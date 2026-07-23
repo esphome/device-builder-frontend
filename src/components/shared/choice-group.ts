@@ -20,13 +20,16 @@ export function rovingTabbable(
 /**
  * Disabled-aware roving tab stop for a ``role="radiogroup"``: the selected
  * card when it is enabled, else the first enabled card (a disabled selected
- * card would otherwise leave the group unreachable by keyboard). ``-1``
- * when every card is disabled.
+ * card would otherwise leave the group unreachable by keyboard). With every
+ * card disabled, the selected (else first) card keeps the stop — an
+ * ``aria-disabled`` card stays focusable, so the group remains reachable
+ * and its state discoverable.
  */
 export function rovingTabStopIndex(selectedIndex: number, enabled: boolean[]): number {
-  return selectedIndex >= 0 && enabled[selectedIndex]
-    ? selectedIndex
-    : enabled.indexOf(true);
+  if (selectedIndex >= 0 && enabled[selectedIndex]) return selectedIndex;
+  const first = enabled.indexOf(true);
+  if (first !== -1) return first;
+  return selectedIndex >= 0 ? selectedIndex : 0;
 }
 
 /**

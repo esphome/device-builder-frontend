@@ -69,39 +69,34 @@ function gpioFromAlias(rawValue: unknown, pins: BoardPin[]): number | null {
   return match ? match.gpio : null;
 }
 
-/** GPIOs the board reserves for the component currently being edited. A board
- *  marks its onboard-function pins ``available: false`` (ethernet RMII, SPI
- *  flash, …); only the ones locked to *this* section's component
- *  (``featured_components[].locked_pins`` keyed by ``component_id``) should stay
- *  selectable here — flash/PSRAM pins, and ethernet pins under a sensor field,
- *  remain disabled. */
-function lockedGpiosForSection(ctx: RenderCtx): Set<number> {
-  const gpios = new Set<number>();
-  for (const fc of ctx.board?.featured_components ?? []) {
-    if (fc.component_id !== ctx.sectionKey) continue;
-    for (const pin of Object.values(fc.locked_pins ?? {})) {
-      if (typeof pin === "number") gpios.add(pin);
-    }
-  }
-  return gpios;
-}
-
-/** Pins the board designates for this section's field — locked pins plus
- *  featured-component field presets keyed by *entryKey* (the RGB header
- *  pin a board pre-fills without locking) — split into board GPIOs and
- *  expander-channel ``provider:hub:channel`` tokens. A current value
- *  matching either means the wiring is the board's, so the wiring UI
- *  guards its edits behind an unlock. */
-function boardDefinedPinsForSection(
+/** The board's designated pins for this section's field, in one pass over
+ *  ``featured_components`` (entries keyed by ``component_id``):
+ *
+ *  - ``lockedGpios`` — GPIOs locked to *this* component, which must stay
+ *    selectable in the picker even when board-reserved (ethernet RMII
+ *    pins under ``ethernet:``); flash/PSRAM pins and other components'
+ *    locks remain disabled.
+ *  - ``gpios`` — the wider board-defined set (locked plus field presets
+ *    keyed by *entryKey*, like the RGB header pin a board pre-fills
+ *    without locking); a current value here gets the wiring guard.
+ *  - ``tokens`` — expander-channel ``provider:hub:channel`` identities,
+ *    the non-GPIO half of the same guard. */
+function boardPinsForSection(
   ctx: RenderCtx,
   entryKey: string
-): { gpios: Set<number>; tokens: Set<string> } {
-  const gpios = lockedGpiosForSection(ctx);
+): { lockedGpios: Set<number>; gpios: Set<number>; tokens: Set<string> } {
+  const lockedGpios = new Set<number>();
+  const gpios = new Set<number>();
   const tokens = new Set<string>();
   for (const fc of ctx.board?.featured_components ?? []) {
     if (fc.component_id !== ctx.sectionKey) continue;
     for (const pin of Object.values(fc.locked_pins ?? {})) {
-      if (typeof pin === "string") tokens.add(pin);
+      if (typeof pin === "number") {
+        lockedGpios.add(pin);
+        gpios.add(pin);
+      } else if (typeof pin === "string") {
+        tokens.add(pin);
+      }
     }
     const preset = fc.fields?.[entryKey]?.value;
     if (preset == null) continue;
@@ -109,7 +104,7 @@ function boardDefinedPinsForSection(
     if (gpio !== null) gpios.add(gpio);
     else if (typeof preset === "string") tokens.add(preset);
   }
-  return { gpios, tokens };
+  return { lockedGpios, gpios, tokens };
 }
 
 function buildPinOption(
@@ -288,7 +283,7 @@ export function renderPinField(
       ctx,
       identity,
       rawValue,
-      boardDefinedPinsForSection(ctx, entry.key).tokens.has(identity)
+      boardPinsForSection(ctx, entry.key).tokens.has(identity)
     );
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
@@ -369,7 +364,8 @@ export function renderPinField(
     ctx.fromLine,
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
-  const ownLockedGpios = lockedGpiosForSection(ctx);
+  const boardPins = boardPinsForSection(ctx, entry.key);
+  const ownLockedGpios = boardPins.lockedGpios;
   // The current pin sitting on a board-defined GPIO for this section
   // (locked, field preset, or suggestion) means the wiring is the
   // board's, not the user's — the wiring UI guards its edits behind an
@@ -377,8 +373,7 @@ export function renderPinField(
   // designation is the user's own.
   const boardPresetPin =
     valueGpio !== null &&
-    (boardDefinedPinsForSection(ctx, entry.key).gpios.has(valueGpio) ||
-      suggestionGpios.has(valueGpio));
+    (boardPins.gpios.has(valueGpio) || suggestionGpios.has(valueGpio));
   // The field's current value must stay pickable even on a reserved pin the
   // board didn't lock to this section (a hand-edited YAML, or a manifest
   // preset missing its lock) — a disabled selected option blanks the
@@ -423,8 +418,6 @@ export function renderPinField(
         path,
         ctx,
         rawValue,
-        isLongForm,
-        fieldDisabled,
         boardPin,
         boardPreset: boardPresetPin,
       })}
@@ -464,8 +457,6 @@ function renderSubstitutionPin(
         path,
         ctx,
         rawValue,
-        isLongForm: true,
-        fieldDisabled,
         boardPin: null,
         boardPreset: false,
       })}
@@ -502,8 +493,6 @@ function renderExpanderPin(
         path,
         ctx,
         rawValue,
-        isLongForm: isPlainObject(rawValue),
-        fieldDisabled: effectiveDisabled(entry, ctx),
         boardPin: null,
         boardPreset,
       })}

@@ -47,6 +47,8 @@ export function renderCustomEditor(
   inputOnly = false
 ): TemplateResult {
   const flags = modeFlagsOf(modeValue);
+  // The null half is defensive — the presets gate already excludes
+  // unreadable modes; the live case is a flag outside the native set.
   if (flags === null || Object.keys(flags).some((k) => !KNOWN_MODE_FLAGS.has(k))) {
     return html`<div class="pin-wiring-custom">
       ${renderLongFormChild(modeChild, path, ctx)}

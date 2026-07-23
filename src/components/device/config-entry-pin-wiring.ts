@@ -17,10 +17,12 @@ import { isSubstitutionString } from "../../util/substitutions.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
+  PIN_WIRING_KEYS,
   presetsForPinMode,
   presetUnavailableReason,
   wiringStateOf,
   wiringTechSummary,
+  wiringValuesReadable,
   type WiringPreset,
   type WiringState,
 } from "../../util/pin-wiring-presets.js";
@@ -35,6 +37,7 @@ import {
   wiringDiagram,
 } from "./config-entry-pin-mode.js";
 import {
+  effectiveDisabled,
   fieldKeyAttr,
   type LockedReasonCarrier,
   type RenderCtx,
@@ -47,8 +50,6 @@ export interface PinWiringOptions {
   path: string[];
   ctx: RenderCtx;
   rawValue: unknown;
-  isLongForm: boolean;
-  fieldDisabled: boolean;
   boardPin: BoardPin | null;
   /** The pin sits on a GPIO the board locks to this section — the wiring
    *  is the board's, so edits are guarded behind an unlock. */
@@ -76,15 +77,16 @@ export interface PinWiringOptions {
  * bus pins (uart/i2c/adc) and pre-#430 catalogs keep the plain picker.
  */
 export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof nothing {
-  const { entry, path, ctx, rawValue, isLongForm, fieldDisabled, boardPin, boardPreset } =
-    opts;
+  const { entry, path, ctx, rawValue, boardPin, boardPreset } = opts;
+  const isLongForm = isPlainObject(rawValue);
+  const fieldDisabled = effectiveDisabled(entry, ctx);
   // The wiring fields (mode + inverted) are not an advanced nicety:
   // normalize their catalog ``advanced`` marks off (children too, so the
   // empty-group drop can't eat the mode box while Show advanced is off)
   // and let the form's own filter decide everything else — the strapping
   // / validation escape hatches and drive_strength keep normal gating.
   const source = (entry.config_entries ?? []).map((c) =>
-    c.key === "mode" || c.key === "inverted" ? stripAdvancedDeep(c) : c
+    PIN_WIRING_KEYS.has(c.key) ? stripAdvancedDeep(c) : c
   );
   const pinValues = ctx.scopeValues(path);
   const longFormFields = ctx.filterRenderable(source, pinValues);
@@ -112,18 +114,12 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // substitution gate owns it (a preset pick would clobber the
   // reference), and a ``${var}`` number leaves the actual GPIO unknown,
   // so the input-only guardrail could not vouch for the cards.
-  const flags = modeFlagsOf(modeValue);
-  const invertedReadable =
-    invertedValue === undefined ||
-    invertedValue === null ||
-    parseYamlBoolean(invertedValue) !== null;
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
     providerAllowedModes(rawValue, ctx.pinRegistryModes) === null &&
-    flags !== null &&
-    invertedReadable &&
-    !(isPlainObject(rawValue) && isSubstitutionString(rawValue.number))
+    wiringValuesReadable(modeValue, invertedValue) &&
+    !(isLongForm && isSubstitutionString((rawValue as Record<string, unknown>).number))
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;
@@ -156,7 +152,10 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
     // presets gate above guarantees readable values here.
     const currentTech = implicitPreset
       ? wiringTechSummary(implicitPreset.flags, false)
-      : wiringTechSummary(flags ?? {}, parseYamlBoolean(invertedValue) === true);
+      : wiringTechSummary(
+          modeFlagsOf(modeValue)!,
+          parseYamlBoolean(invertedValue) === true
+        );
     labelText = currentTech
       ? ctx.localize("device.pin_wiring_summary_with_tech", {
           value: summaryValue,
@@ -175,6 +174,15 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   }
   const isOpen = ctx.nestedOpenSections.has(advancedKey);
 
+  // Promote ``pin: GPIO5`` → ``pin: { number: GPIO5 }`` so a subsequent
+  // wiring edit can write to ``pin.mode`` without ``setIn`` clobbering
+  // the GPIO. Skipped when already long-form (preserves the user's
+  // existing flags) or when the pin has no value yet.
+  const promoteShortForm = () => {
+    if (!isLongForm && rawValue != null && rawValue !== "") {
+      ctx.emitChange(path, { number: rawValue });
+    }
+  };
   const onToggle = () => {
     // Locked / disabled fields must not mutate via the disclosure —
     // without this guard, opening it on a short-form locked pin would
@@ -184,26 +192,20 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
     // bypass the guard.
     if (fieldDisabled) return;
     ctx.toggleNested(advancedKey);
-    // When opening for the first time on a short-form pin value, promote
-    // ``pin: GPIO5`` → ``pin: { number: GPIO5 }`` so a subsequent wiring
-    // edit can write to ``pin.mode`` without ``setIn`` clobbering the
-    // GPIO. Skip when already long-form (preserves the user's existing
-    // flags), when the pin has no value yet, or while the board-preset
-    // guard is armed — merely viewing a guarded pin must not edit YAML
-    // (the unlock performs the promotion instead).
-    if (!isOpen && !isLongForm && !guarded && rawValue != null && rawValue !== "") {
-      ctx.emitChange(path, { number: rawValue });
-    }
+    // First open promotes — except while the board-preset guard is armed:
+    // merely viewing a guarded pin must not edit YAML (the unlock
+    // performs the promotion instead).
+    if (!isOpen && !guarded) promoteShortForm();
   };
 
   const onGuardToggle = (e: Event) => {
     const on = (e.target as HTMLInputElement & { checked: boolean }).checked;
     ctx.setClusterChoice(guardKey, on ? "unlocked" : "locked");
-    if (on && !isLongForm && rawValue != null && rawValue !== "") {
-      ctx.emitChange(path, { number: rawValue });
-    }
+    if (on) promoteShortForm();
   };
-  const guardRow =
+  // Built lazily with the rest of the panel — the disclosure body only
+  // renders while open.
+  const renderGuardRow = () =>
     boardPreset && !fieldDisabled
       ? html`<div class="pin-wiring-guard">
           <wa-icon library="mdi" name="lock-outline"></wa-icon>
@@ -238,7 +240,6 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
             ctx.renderEntry(lockEntryDeep(child, guarded), childPath),
         }
       : ctx;
-  const editDisabled = fieldDisabled || guarded;
 
   return html`
     <div class="pin-advanced" data-field-key="${advancedKey}">
@@ -265,13 +266,14 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
         iconBefore: true,
         disabled: fieldDisabled,
         body: () =>
-          html`${guardRow}
+          html`${renderGuardRow()}
           ${
             usePresets
               ? renderWiringPanel({
                   longFormFields,
                   modeChild: modeChild!,
                   pinMode: entry.pin_mode ?? null,
+                  modeValue,
                   invertedValue,
                   guardTooltip: guarded
                     ? ctx.localize("device.pin_wiring_guard_tooltip")
@@ -282,7 +284,6 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
                   presets,
                   state,
                   boardPin,
-                  editDisabled,
                 })
               : longFormFields.map((child) => renderLongFormChild(child, path, panelCtx))
           }`,
@@ -295,6 +296,7 @@ interface WiringPanelOptions {
   longFormFields: ConfigEntry[];
   modeChild: ConfigEntry;
   pinMode: PinMode | null;
+  modeValue: unknown;
   /** The stored ``inverted``, for cards whose pick preserves it. */
   invertedValue: unknown;
   /** Non-empty while the board-preset guard is armed; hovers explain it. */
@@ -305,12 +307,13 @@ interface WiringPanelOptions {
   presets: WiringPreset[];
   state: WiringState;
   boardPin: BoardPin | null;
-  editDisabled: boolean;
 }
 
 function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
-  const { longFormFields, path, ctx, presets, state, boardPin, editDisabled } = opts;
-  const modeValue = isPlainObject(opts.rawValue) ? opts.rawValue.mode : undefined;
+  const { longFormFields, modeValue, path, ctx, presets, state, boardPin } = opts;
+  // ``panelCtx`` carries the guard/lock state: it is wrapped with
+  // ``disabled: true`` exactly when edits are blocked.
+  const editDisabled = ctx.disabled;
   const currentInverted = parseYamlBoolean(opts.invertedValue) === true;
   const choiceKey = `${path.join(".")}:pin-wiring`;
   const showCustom =
@@ -350,7 +353,7 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
     : nothing;
 
   const invertedChild = longFormFields.find((c) => c.key === "inverted");
-  const others = longFormFields.filter((c) => c.key !== "mode" && c.key !== "inverted");
+  const others = longFormFields.filter((c) => !PIN_WIRING_KEYS.has(c.key));
 
   // The Custom card sits at index ``presets.length``. A disabled
   // selected card (its preset guardrailed by the board pin) or an
@@ -365,12 +368,7 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
     ...presets.map((_, i) => !editDisabled && reasons[i] === null),
     !editDisabled,
   ];
-  const enabledTabStop = rovingTabStopIndex(selectedIndex, cardEnabled);
-  // With every card unavailable (the board-preset guard armed), keep one
-  // aria-disabled card in the tab order — the group must stay reachable
-  // so its state and tooltip are discoverable by keyboard.
-  const tabStopIndex =
-    enabledTabStop !== -1 ? enabledTabStop : selectedIndex >= 0 ? selectedIndex : 0;
+  const tabStopIndex = rovingTabStopIndex(selectedIndex, cardEnabled);
   return html`
     ${banner}
     <div
@@ -436,15 +434,34 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
   `;
 }
 
+/** *entry* deep-mapped with *patch* applied to itself and every
+ *  descendant, preserving an absent ``config_entries``. */
+function mapEntryDeep(
+  entry: ConfigEntry,
+  patch: (e: ConfigEntry) => Partial<ConfigEntry & LockedReasonCarrier>
+): ConfigEntry {
+  return {
+    ...entry,
+    ...patch(entry),
+    config_entries:
+      entry.config_entries?.map((c) => mapEntryDeep(c, patch)) ?? entry.config_entries,
+  };
+}
+
+// Catalog entries are stable references, so the advanced-stripped copies
+// are built once per entry rather than on every keystroke render.
+const strippedAdvanced = new WeakMap<ConfigEntry, ConfigEntry>();
+
 /** *entry* with the catalog ``advanced`` mark stripped from itself and
  *  every descendant, so the form's filter keeps it regardless of the
  *  global Show-advanced toggle. */
 function stripAdvancedDeep(entry: ConfigEntry): ConfigEntry {
-  return {
-    ...entry,
-    advanced: false,
-    config_entries: entry.config_entries?.map(stripAdvancedDeep) ?? entry.config_entries,
-  };
+  let out = strippedAdvanced.get(entry);
+  if (!out) {
+    out = mapEntryDeep(entry, () => ({ advanced: false }));
+    strippedAdvanced.set(entry, out);
+  }
+  return out;
 }
 
 /** *entry* with itself and every descendant marked locked, so children
@@ -453,14 +470,12 @@ function stripAdvancedDeep(entry: ConfigEntry): ConfigEntry {
  *  explain the guard's unlock instead of claiming the board set the
  *  field. */
 function lockEntryDeep(entry: ConfigEntry, guarded: boolean): ConfigEntry {
-  const locked: ConfigEntry & LockedReasonCarrier = {
-    ...entry,
-    locked: true,
-    config_entries:
-      entry.config_entries?.map((c) => lockEntryDeep(c, guarded)) ?? entry.config_entries,
-  };
-  if (guarded) locked.locked_reason_key = "device.pin_wiring_guard_tooltip";
-  return locked;
+  return mapEntryDeep(
+    entry,
+    guarded
+      ? () => ({ locked: true, locked_reason_key: "device.pin_wiring_guard_tooltip" })
+      : () => ({ locked: true })
+  );
 }
 
 function renderPresetCard(

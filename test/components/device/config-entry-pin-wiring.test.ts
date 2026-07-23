@@ -93,6 +93,10 @@ const cardById = (result: unknown, id: string) =>
   cards(result).find((b) => b["data-preset"] === id);
 const disclosureToggle = (result: unknown) =>
   findElementBindings(result, "button").find((b) => "aria-expanded" in b)!;
+const inputOnlyBoard = () =>
+  makeTestBoard({
+    pins: [makeBoardPin(2), makeBoardPin(34, { features: ["input", "input_only"] })],
+  });
 
 describe("pin wiring preset cards", () => {
   it("renders the input preset set plus Custom for pin_mode input", () => {
@@ -364,11 +368,6 @@ describe("pin wiring seeding (preconfigured boards stay quiet)", () => {
 });
 
 describe("pin wiring input-only guardrail", () => {
-  const inputOnlyBoard = () =>
-    makeTestBoard({
-      pins: [makeBoardPin(2), makeBoardPin(34, { features: ["input", "input_only"] })],
-    });
-
   it("banners and disables the presets the pin can't wire", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
@@ -518,9 +517,7 @@ describe("pin wiring custom editor", () => {
   });
 
   it("lets open drain only be cleared on an input-only pin", () => {
-    const board = makeTestBoard({
-      pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
-    });
+    const board = inputOnlyBoard();
     const openDrainSwitch = (result: unknown) =>
       findElementBindings(result, "wa-switch").find(
         (b) => b["aria-label"] === "device.pin_wiring_open_drain"
@@ -551,9 +548,7 @@ describe("pin wiring custom editor", () => {
   });
 
   it("disables the options an input-only pin can't do, except the set one", () => {
-    const board = makeTestBoard({
-      pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
-    });
+    const board = inputOnlyBoard();
     // Legacy config already carries pullup on GPIO34: the option stays
     // enabled so the user can move off it, but pulldown and the output
     // directions are out.
@@ -587,9 +582,7 @@ describe("pin wiring input-only banner copy", () => {
       makeRenderCtx(
         { pin: { number: "GPIO34" } },
         {
-          board: makeTestBoard({
-            pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
-          }),
+          board: inputOnlyBoard(),
           overrides: {
             sectionKey: "switch.gpio",
             nestedOpenSections: new Set(["pin:pin-advanced"]),

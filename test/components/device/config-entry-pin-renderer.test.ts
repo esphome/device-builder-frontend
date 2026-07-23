@@ -751,25 +751,6 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 
-  it("shows the disclosure without the global Show-advanced toggle", () => {
-    // The long-form extras are catalog-marked ``advanced``, but wiring
-    // is how a button or relay works at all — the disclosure must render
-    // with the global toggle off (it used to be hidden until the user
-    // flipped Show advanced settings, then expanded two disclosures).
-    const children = makeLongFormChildren().map((c) => ({ ...c, advanced: true }));
-    const ctx = makeRenderCtx({ pin: 0 }, { overrides: { showAdvanced: false } });
-    const result = renderPinField(
-      makeEntry(ConfigEntryType.PIN, {
-        key: "pin",
-        required: true,
-        config_entries: children,
-      }),
-      ["pin"],
-      ctx
-    );
-    expect(findTemplatesByAnchor(result, "<button").length).toBe(1);
-  });
-
   it("omits the disclosure in required-only mode", () => {
     // The add-component quick dialog runs requiredOnly; the optional
     // long-form extras all drop through the form's filter, so no

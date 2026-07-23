@@ -19,6 +19,26 @@ export const KNOWN_MODE_FLAGS: ReadonlySet<string> = new Set(
   Object.values(PIN_MODE_SHORTHANDS).flatMap((flags) => Object.keys(flags))
 );
 
+/** The long-form keys the wiring section owns (renders un-gated, guards,
+ *  summarizes). The one source of truth for every layer that special-cases
+ *  them. */
+export const PIN_WIRING_KEYS: ReadonlySet<string> = new Set(["mode", "inverted"]);
+
+/** Whether both wiring values can be read as flags / a boolean. The
+ *  preset cards require this — a ``${var}`` in either must fall through
+ *  to the raw disclosure, where the substitution gate owns editing. */
+export function wiringValuesReadable(
+  modeValue: unknown,
+  invertedValue: unknown
+): boolean {
+  return (
+    modeFlagsOf(modeValue) !== null &&
+    (invertedValue === undefined ||
+      invertedValue === null ||
+      parseYamlBoolean(invertedValue) !== null)
+  );
+}
+
 export interface WiringPreset {
   /** Localization suffix: ``device.pin_wiring_<id>`` / ``…_description``. */
   id: string;
