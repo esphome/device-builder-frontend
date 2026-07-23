@@ -168,25 +168,26 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
-  it("omits the tech clause when a wiring value is unreadable", () => {
-    // ``inverted: ${var}`` classifies as Custom; a tech summary built by
-    // coercing the unreadable value would just be wrong.
-    const localize = vi.fn((key: string) => key);
-    renderPinField(
+  it("falls back to the raw disclosure when a wiring value is unreadable", () => {
+    // A preset pick would clobber the ``${var}``; the raw disclosure's
+    // substitution gate owns editing it instead.
+    const invertedSub = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
-      openCtx(
-        { number: "GPIO2", mode: { input: true, pullup: true }, inverted: "${inv}" },
-        { localize: localize as never }
-      )
+      openCtx({
+        number: "GPIO2",
+        mode: { input: true, pullup: true },
+        inverted: "${inv}",
+      })
     );
-    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary", {
-      value: "device.pin_wiring_custom",
-    });
-    expect(localize).not.toHaveBeenCalledWith(
-      "device.pin_wiring_summary_with_tech",
-      expect.anything()
+    expect(cards(invertedSub)).toHaveLength(0);
+
+    const flagSub = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2", mode: { pullup: "${use_pullup}" } })
     );
+    expect(cards(flagSub)).toHaveLength(0);
   });
 
   it("marks the platform-default card active on an untouched pin", () => {
@@ -247,6 +248,49 @@ describe("pin wiring preset cards", () => {
 
     expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-wiring", "custom");
     expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("pin wiring summary line", () => {
+  const summarize = (pin: unknown, pinMode = PinMode.INPUT) => {
+    const localize = vi.fn((key: string) => key);
+    renderPinField(
+      wiringPinEntry(pinMode),
+      ["pin"],
+      openCtx(pin, { localize: localize as never })
+    );
+    return localize;
+  };
+
+  it("names an explicit preset with its flags", () => {
+    const localize = summarize({
+      number: "GPIO2",
+      mode: { input: true, pullup: true },
+      inverted: true,
+    });
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary_with_tech", {
+      value: "device.pin_wiring_ground_switch",
+      tech: "input + pullup · inverted",
+    });
+  });
+
+  it("reports the platform default with implied flags, not the preset name", () => {
+    const localize = summarize({ number: "GPIO2" }, PinMode.OUTPUT);
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary_with_tech", {
+      value: "device.pin_wiring_default",
+      tech: "output",
+    });
+  });
+
+  it("reports custom flags with their tech clause", () => {
+    const localize = summarize({
+      number: "GPIO2",
+      mode: { input: true, pullup: true, pulldown: true },
+    });
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary_with_tech", {
+      value: "device.pin_wiring_custom",
+      tech: "input + pullup + pulldown",
+    });
   });
 });
 

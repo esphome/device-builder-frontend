@@ -76,20 +76,26 @@ export function renderCustomEditor(
     // the ``mode:`` key entirely rather than writing an empty mapping.
     ctx.emitChange([...path, "mode"], Object.keys(next).length ? next : undefined);
   };
-  const onDirection = (value: string) =>
+  // An unexpected radio value (a component shape change) must no-op, not
+  // strip the flags it would have replaced.
+  const onDirection = (value: string) => {
+    if (value !== "input" && value !== "output" && value !== "both") return;
     writeMode((f) => {
       delete f.input;
       delete f.output;
       if (value === "input" || value === "both") f.input = true;
       if (value === "output" || value === "both") f.output = true;
     });
-  const onPull = (value: string) =>
+  };
+  const onPull = (value: string) => {
+    if (value !== "none" && value !== "pullup" && value !== "pulldown") return;
     writeMode((f) => {
       delete f.pullup;
       delete f.pulldown;
       if (value === "pullup") f.pullup = true;
       if (value === "pulldown") f.pulldown = true;
     });
+  };
 
   const uid = `pin-wiring-${path.join("-")}`;
   // On an input-only pin (no output driver, no internal pulls) the

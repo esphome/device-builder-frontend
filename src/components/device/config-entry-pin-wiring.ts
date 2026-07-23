@@ -25,7 +25,6 @@ import {
 } from "../../util/pin-wiring-presets.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { looksLikeSubstitution } from "../../util/substitutions.js";
 import { onChoiceGroupKeydown, rovingTabStopIndex } from "../shared/choice-group.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
@@ -107,11 +106,20 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // Preset cards only on generic-GPIO platforms: on a bus or data-line
   // pin (uart, an addressable LED strip) the wiring is the protocol's,
   // not the user's circuit, so cards like "active low output" mislead.
+  // And only when every stored wiring value is readable — a ``${var}``
+  // mode or inverted must fall through to the raw disclosure, where the
+  // substitution gate owns it; a preset pick would clobber the reference.
+  const flags = modeFlagsOf(modeValue);
+  const invertedReadable =
+    invertedValue === undefined ||
+    invertedValue === null ||
+    parseYamlBoolean(invertedValue) !== null;
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
     providerAllowedModes(rawValue, ctx.pinRegistryModes) === null &&
-    !(typeof modeValue === "string" && looksLikeSubstitution(modeValue))
+    flags !== null &&
+    invertedReadable
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;
@@ -140,19 +148,11 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
               : "device.pin_wiring_default"
           );
     // The effective flags in technical vocabulary, so advanced users can
-    // read what the pin is set to without opening the section. A value
-    // the classifier can't read (a ``${var}`` flag or inverted) gets no
-    // tech clause at all — better silent than wrong.
-    const flags = modeFlagsOf(modeValue);
-    const invertedUnreadable =
-      invertedValue !== undefined &&
-      invertedValue !== null &&
-      parseYamlBoolean(invertedValue) === null;
+    // read what the pin is set to without opening the section. The
+    // presets gate above guarantees readable values here.
     const currentTech = implicitPreset
       ? wiringTechSummary(implicitPreset.flags, false)
-      : flags === null || invertedUnreadable
-        ? ""
-        : wiringTechSummary(flags, parseYamlBoolean(invertedValue) === true);
+      : wiringTechSummary(flags ?? {}, parseYamlBoolean(invertedValue) === true);
     labelText = currentTech
       ? ctx.localize("device.pin_wiring_summary_with_tech", {
           value: summaryValue,
