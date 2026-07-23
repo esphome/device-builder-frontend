@@ -27,7 +27,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@codemirror/autocomplete": "^6.20.1",
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-yaml": "^6.1.3",
