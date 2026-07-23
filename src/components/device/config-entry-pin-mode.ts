@@ -68,7 +68,9 @@ export function renderCustomEditor(
     for (const key of Object.keys(next)) {
       if (!next[key]) delete next[key];
     }
-    ctx.emitChange([...path, "mode"], next);
+    // A pull-only mode cleared back to None empties the flag set; drop
+    // the ``mode:`` key entirely rather than writing an empty mapping.
+    ctx.emitChange([...path, "mode"], Object.keys(next).length ? next : undefined);
   };
   const onDirection = (value: string) =>
     writeMode((f) => {

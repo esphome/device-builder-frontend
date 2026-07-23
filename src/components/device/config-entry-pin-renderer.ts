@@ -303,26 +303,24 @@ export function renderPinField(
     valueGpio !== null
       ? (ctx.board.pins.find((p) => p.gpio === valueGpio) ?? null)
       : null;
+  const suggestionGpios = new Set(
+    (entry.suggestions ?? []).map(parseBoardGpio).filter((g): g is number => g !== null)
+  );
   // A featured-component preset can narrow the pin set further — e.g.
   // pin the ESK-1 PIR motion sensor to one of the two FPC-connector
   // GPIOs. Skip the narrowing if no parseable GPIOs survive (a manifest
   // typo shouldn't blank the dropdown — the user will see the full
   // pin set instead, with a visible error for the field).
-  if (entry.suggestions && entry.suggestions.length > 0) {
-    const allowed = new Set(
-      entry.suggestions.map(parseBoardGpio).filter((g): g is number => g !== null)
-    );
-    if (allowed.size > 0) {
-      const narrowed = visible.filter((p) => allowed.has(p.gpio));
-      // Only apply the narrowing when at least one pin survives —
-      // otherwise a manifest typo (suggestion lists a GPIO that doesn't
-      // exist on the board, or one that fails the field's
-      // `pin_features`) would render an empty dropdown with no escape
-      // hatch. Prefer the feature-filtered superset so the user can
-      // still configure the field.
-      if (narrowed.length > 0) {
-        visible = narrowed;
-      }
+  if (suggestionGpios.size > 0) {
+    const narrowed = visible.filter((p) => suggestionGpios.has(p.gpio));
+    // Only apply the narrowing when at least one pin survives —
+    // otherwise a manifest typo (suggestion lists a GPIO that doesn't
+    // exist on the board, or one that fails the field's
+    // `pin_features`) would render an empty dropdown with no escape
+    // hatch. Prefer the feature-filtered superset so the user can
+    // still configure the field.
+    if (narrowed.length > 0) {
+      visible = narrowed;
     }
   }
   // The board's preset pin trumps generic feature filtering — a locked
@@ -339,10 +337,13 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
   const ownLockedGpios = lockedGpiosForSection(ctx);
-  // The current pin sitting on a board-locked GPIO for this section means
-  // the wiring is the board's, not the user's — the wiring UI guards its
-  // edits behind an unlock.
-  const boardPresetPin = valueGpio !== null && ownLockedGpios.has(valueGpio);
+  // The current pin sitting on a board-locked or board-suggested GPIO for
+  // this section means the wiring is the board's, not the user's — the
+  // wiring UI guards its edits behind an unlock. Value-dependent on
+  // purpose: a pin moved off the board's suggestion is the user's own.
+  const boardPresetPin =
+    valueGpio !== null &&
+    (ownLockedGpios.has(valueGpio) || suggestionGpios.has(valueGpio));
   // The field's current value must stay pickable even on a reserved pin the
   // board didn't lock to this section (a hand-edited YAML, or a manifest
   // preset missing its lock) — a disabled selected option blanks the

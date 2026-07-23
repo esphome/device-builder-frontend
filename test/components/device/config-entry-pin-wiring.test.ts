@@ -4,12 +4,15 @@
  * looked up by their ``data-preset`` binding; walker and fixtures are
  * shared with the sibling tests.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, PinMode } from "../../../src/api/types/config-entries.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../_lit-template-walker.js";
 import {
   findElementBindings,
   makeBoardPin,
@@ -65,10 +68,24 @@ const openCtx = (pin: unknown, overrides: Partial<RenderCtx> = {}) =>
     }
   );
 
+/** Card bindings, including the Custom card's static ``data-preset``
+ *  attribute (the preset cards carry it as a binding). */
 const cards = (result: unknown) =>
-  findElementBindings(result, "button").filter((b) => "data-preset" in b);
+  findTemplatesByAnchor(result, "<button")
+    .map((t) => {
+      const bindings = extractAttributeBindings(t);
+      if (!("data-preset" in bindings)) {
+        const strings = (t as { strings?: readonly string[] }).strings;
+        const m = /data-preset="([^"]+)"/.exec(strings?.join("") ?? "");
+        if (m) bindings["data-preset"] = m[1];
+      }
+      return bindings;
+    })
+    .filter((b) => "data-preset" in b);
 const cardById = (result: unknown, id: string) =>
   cards(result).find((b) => b["data-preset"] === id);
+const disclosureToggle = (result: unknown) =>
+  findElementBindings(result, "button").find((b) => "aria-expanded" in b)!;
 
 describe("pin wiring preset cards", () => {
   it("renders the input preset set plus Custom for pin_mode input", () => {
@@ -398,6 +415,42 @@ describe("pin wiring custom editor", () => {
     );
     expect(findElementBindings(result, "wa-radio-group")).toHaveLength(0);
   });
+
+  it("drops the mode key instead of writing an empty mapping", () => {
+    const ctx = customCtx({ number: "GPIO2", mode: { pullup: true } });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const pullGroup = findElementBindings(result, "wa-radio-group")[1];
+    (pullGroup["@change"] as (e: unknown) => void)({ target: { value: "none" } });
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "mode"], undefined);
+  });
+});
+
+describe("pin wiring input-only banner copy", () => {
+  it("uses the output variant on an output field", () => {
+    const localize = vi.fn((key: string) => key);
+    renderPinField(
+      wiringPinEntry(PinMode.OUTPUT),
+      ["pin"],
+      makeRenderCtx(
+        { pin: { number: "GPIO34" } },
+        {
+          board: makeTestBoard({
+            pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
+          }),
+          overrides: {
+            sectionKey: "switch.gpio",
+            nestedOpenSections: new Set(["pin:pin-advanced"]),
+            localize: localize as never,
+          },
+        }
+      )
+    );
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_input_only_banner_output", {
+      pin: "GPIO34",
+    });
+  });
 });
 
 describe("pin wiring board-preset guard", () => {
@@ -459,13 +512,73 @@ describe("pin wiring board-preset guard", () => {
     const ctx = guardedCtx("GPIO2", { nestedOpenSections: new Set<string>() });
     const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
 
-    const toggle = findElementBindings(result, "button").find(
-      (b) => !("data-preset" in b)
-    )!;
-    (toggle["@click"] as () => void)();
+    (disclosureToggle(result)["@click"] as () => void)();
 
     expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
     expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("does not guard a pin moved off the board's suggestions", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT, { suggestions: ["GPIO2"] }),
+      ["pin"],
+      openCtx("GPIO33")
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
+    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(false);
+  });
+
+  it("locks children routed through the form dispatch while guarded", () => {
+    // ``ctx.renderEntry`` closes over the form's original ctx, so the
+    // guard must lock the entries themselves; a disabled ctx copy alone
+    // fails open on the raw-disclosure path.
+    const ctx = openCtx(
+      { number: "GPIO2", mode: {} },
+      { sectionKey: "light.esp32_rmt_led_strip" }
+    );
+    renderPinField(
+      wiringPinEntry(PinMode.OUTPUT, { suggestions: ["GPIO2"] }),
+      ["pin"],
+      ctx
+    );
+
+    expect(ctx.renderEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "mode",
+        locked: true,
+        config_entries: expect.arrayContaining([
+          expect.objectContaining({ key: "pullup", locked: true }),
+        ]),
+      }),
+      ["pin", "mode"]
+    );
+  });
+
+  it("keeps non-wiring advanced extras behind the global toggle", () => {
+    // The force-include is scoped to mode + inverted; the validation
+    // escape hatches stay gated.
+    const escapeHatch = makeEntry(ConfigEntryType.BOOLEAN, {
+      key: "ignore_strapping_warning",
+      label: "Ignore strapping warning",
+      advanced: true,
+    });
+    const entry = wiringPinEntry(PinMode.INPUT, {
+      config_entries: [modeChild(), invertedChild(), escapeHatch],
+    });
+    const gated = (entries: ConfigEntry[]) => entries.filter((c) => !c.advanced);
+    const ctx = openCtx({ number: "GPIO2" }, { filterRenderable: gated });
+    renderPinField(entry, ["pin"], ctx);
+    expect(ctx.renderEntry).not.toHaveBeenCalledWith(
+      expect.objectContaining({ key: "ignore_strapping_warning" }),
+      expect.anything()
+    );
+
+    const openCtxAdvanced = openCtx({ number: "GPIO2" });
+    renderPinField(entry, ["pin"], openCtxAdvanced);
+    expect(openCtxAdvanced.renderEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "ignore_strapping_warning" }),
+      ["pin", "ignore_strapping_warning"]
+    );
   });
 
   it("the unlock enables edits and performs the deferred promotion", () => {

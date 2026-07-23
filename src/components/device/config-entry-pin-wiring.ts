@@ -11,7 +11,7 @@ import { mdiTune } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import type { BoardPin } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../api/types/config-entries.js";
+import { ConfigEntryType, PinMode } from "../../api/types/config-entries.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
@@ -76,14 +76,21 @@ export interface PinWiringOptions {
  */
 export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof nothing {
   const { entry, path, ctx, rawValue, isLongForm, fieldDisabled, boardPin } = opts;
-  // Force-include advanced children: how a button or relay is wired is
-  // not an advanced nicety, so the section must not hide behind the
-  // global Show-advanced toggle. Platform / depends_on gating still
-  // applies through the shared filter.
+  // Force-include the wiring fields (mode + inverted) past the global
+  // Show-advanced toggle: how a button or relay is wired is not an
+  // advanced nicety. The other catalog-advanced extras (the strapping /
+  // validation escape hatches, drive_strength) keep the normal gating,
+  // and platform / depends_on gating applies throughout.
   const pinValues = ctx.scopeValues(path);
-  const longFormFields = filterChildEntries(entry.config_entries ?? [], pinValues, ctx, {
+  const advancedFields = filterChildEntries(entry.config_entries ?? [], pinValues, ctx, {
     includeAdvanced: true,
   });
+  const gatedKeys = new Set(
+    ctx.filterRenderable(entry.config_entries ?? [], pinValues).map((c) => c.key)
+  );
+  const longFormFields = advancedFields.filter(
+    (c) => c.key === "mode" || c.key === "inverted" || gatedKeys.has(c.key)
+  );
   if (longFormFields.length === 0) return nothing;
 
   const hasAdvancedValue =
@@ -112,12 +119,11 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
       : [];
   const usePresets = presets.length > 0;
 
-  // A board-preset pin (locked GPIO for this section, or a featured
-  // preset narrowing) carries the board's known-good wiring; edits are
+  // A board-preset pin carries the board's known-good wiring; edits are
   // view-only until the user flips the unlock. Session-transient, so the
   // guard re-arms on reload.
   const guardKey = `${path.join(".")}:pin-guard`;
-  const boardPreset = opts.boardPreset || (entry.suggestions ?? []).length > 0;
+  const boardPreset = opts.boardPreset;
   const guarded =
     boardPreset && !fieldDisabled && ctx.getClusterChoice(guardKey) !== "unlocked";
 
@@ -208,9 +214,20 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
           ></wa-switch>
         </div>`
       : nothing;
-  // While guarded, everything inside the panel renders read-only; the
-  // ctx copy flips the shared ``effectiveDisabled`` for child renderers.
-  const panelCtx = guarded ? { ...ctx, disabled: true } : ctx;
+  // While guarded, everything inside the panel renders read-only. The
+  // ``disabled`` copy alone is not enough: ``ctx.renderEntry`` closes
+  // over the form's original ctx, so children routed through the
+  // dispatch would still see ``disabled: false``. Lock the entries
+  // themselves at every depth — ``effectiveDisabled`` honors
+  // ``entry.locked`` in every renderer.
+  const panelCtx: RenderCtx = guarded
+    ? {
+        ...ctx,
+        disabled: true,
+        renderEntry: (child, childPath) =>
+          ctx.renderEntry(lockEntryDeep(child), childPath),
+      }
+    : ctx;
   const editDisabled = fieldDisabled || guarded;
 
   return html`
@@ -235,6 +252,11 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
                 longFormFields,
                 modeChild: modeChild!,
                 modeValue,
+                currentInverted: parseYamlBoolean(invertedValue) === true,
+                bannerKey:
+                  entry.pin_mode === PinMode.OUTPUT
+                    ? "device.pin_wiring_input_only_banner_output"
+                    : "device.pin_wiring_input_only_banner",
                 path,
                 ctx: panelCtx,
                 rawValue,
@@ -254,6 +276,10 @@ interface WiringPanelOptions {
   longFormFields: ConfigEntry[];
   modeChild: ConfigEntry;
   modeValue: unknown;
+  /** The stored ``inverted``, for cards whose pick preserves it. */
+  currentInverted: boolean;
+  /** Direction-appropriate input-only banner copy. */
+  bannerKey: string;
   path: string[];
   ctx: RenderCtx;
   rawValue: unknown;
@@ -292,9 +318,7 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
     : "";
   const banner = unavailableText
     ? html`<div class="warning-banner pin-wiring-banner">
-        ${ctx.localize("device.pin_wiring_input_only_banner", {
-          pin: boardPin!.label,
-        })}
+        ${ctx.localize(opts.bannerKey, { pin: boardPin!.label })}
       </div>`
     : nothing;
 
@@ -336,6 +360,9 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
           selectedId === preset.id,
           i === tabStopIndex,
           reasons[i] ? unavailableText : "",
+          // A pick preserves the stored inverted when the preset doesn't
+          // care, so the tech line must reflect it for those cards.
+          preset.invertedWrite ?? opts.currentInverted,
           editDisabled,
           () => pickPreset(preset),
           ctx
@@ -344,11 +371,7 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
       <button
         type="button"
         class="pin-wiring-card${showCustom ? " pin-wiring-card--selected" : ""}"
-        data-preset=${
-          // A binding (not a static attribute) so the template-walker
-          // tests can look the card up alongside the preset cards.
-          "custom"
-        }
+        data-preset="custom"
         role="radio"
         aria-checked=${showCustom ? "true" : "false"}
         tabindex=${tabStopIndex === presets.length ? "0" : "-1"}
@@ -382,11 +405,23 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
   `;
 }
 
+/** *entry* with itself and every descendant marked locked, so children
+ *  routed through the form's dispatch render read-only via
+ *  ``effectiveDisabled`` at every depth. */
+function lockEntryDeep(entry: ConfigEntry): ConfigEntry {
+  return {
+    ...entry,
+    locked: true,
+    config_entries: entry.config_entries?.map(lockEntryDeep) ?? entry.config_entries,
+  };
+}
+
 function renderPresetCard(
   preset: WiringPreset,
   selected: boolean,
   tabbable: boolean,
   reasonText: string,
+  techInverted: boolean,
   editDisabled: boolean,
   onPick: () => void,
   ctx: RenderCtx
@@ -425,7 +460,7 @@ function renderPresetCard(
       ${reasonText || ctx.localize(`device.pin_wiring_${preset.id}_description`)}
     </span>
     <code class="pin-wiring-card-tech">
-      ${wiringTechSummary(preset.flags, preset.invertedWrite === true)}
+      ${wiringTechSummary(preset.flags, techInverted)}
     </code>
   </button>`;
 }
