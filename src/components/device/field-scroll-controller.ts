@@ -46,8 +46,9 @@ export function advanceScrollGate(
   return { gate: { scrolledKey, lastFocusKey, tries }, scroll };
 }
 
-/** Open keys for disclosures that gate *path* — a disclosure declares the
- *  path prefix it hides behind; a strict-ancestor prefix means it must open.
+/** Open keys for disclosures that gate *path* — a disclosure declares each
+ *  gated field path it hides; the field itself or any descendant means it
+ *  must open, while an ungated sibling (the pin ``number``) leaves it shut.
  *  An empty prefix gates nothing (a malformed decl mustn't match every path). */
 export function gatingDisclosureKeys(
   decls: ReadonlyArray<{ prefix: string[]; key: string }>,
@@ -57,7 +58,7 @@ export function gatingDisclosureKeys(
     .filter(
       (d) =>
         d.prefix.length > 0 &&
-        d.prefix.length < path.length &&
+        d.prefix.length <= path.length &&
         d.prefix.every((k, i) => k === path[i])
     )
     .map((d) => d.key);

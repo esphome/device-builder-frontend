@@ -544,7 +544,9 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.renderEntry).not.toHaveBeenCalled();
   });
 
-  it("declares the gated path prefix so cursor-nav can reveal collapsed fields", () => {
+  it("declares each gated field so cursor-nav can reveal collapsed fields", () => {
+    // One marker per gated field, so a YAML cursor on ``pin`` / ``number``
+    // (which the always-visible picker owns) leaves the section shut.
     const ctx = makeRenderCtx({ pin: 0 });
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
@@ -555,10 +557,14 @@ describe("renderPinField long-form Advanced disclosure", () => {
       ["pin"],
       ctx
     );
-    const disclosure = findTemplatesByAnchor(result, 'class="pin-advanced"')[0];
-    const bindings = extractAttributeBindings(disclosure);
-    expect(bindings["data-reveal-for"]).toBe('["pin"]');
-    expect(bindings["data-field-key"]).toBe("pin:pin-advanced");
+    const markers = findTemplatesByAnchor(result, "data-reveal-for").map(
+      extractAttributeBindings
+    );
+    expect(markers.map((m) => m["data-reveal-for"])).toEqual([
+      '["pin","mode"]',
+      '["pin","inverted"]',
+    ]);
+    expect(markers[0]["data-field-key"]).toBe("pin:pin-advanced");
   });
 
   it("renders the long-form children when the disclosure is open", () => {

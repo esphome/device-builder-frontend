@@ -229,11 +229,20 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   const editDisabled = fieldDisabled || guarded;
 
   return html`
-    <div
-      class="pin-advanced"
-      data-field-key="${advancedKey}"
-      data-reveal-for="${fieldKeyAttr(path)}"
-    >
+    <div class="pin-advanced" data-field-key="${advancedKey}">
+      ${
+        // One reveal marker per gated field, so the YAML cursor landing on
+        // ``mode`` / ``inverted`` opens the collapsed section while the
+        // ungated ``pin`` / ``number`` lines leave it shut.
+        longFormFields.map(
+          (c) =>
+            html`<span
+              hidden
+              data-reveal-for=${fieldKeyAttr([...path, c.key])}
+              data-field-key="${advancedKey}"
+            ></span>`
+        )
+      }
       ${renderDisclosure({
         open: isOpen,
         onToggle,
