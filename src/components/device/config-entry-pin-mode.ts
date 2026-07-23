@@ -168,14 +168,18 @@ export function renderCustomEditor(
               </div>
               <wa-switch
                 ?checked=${!!flags.open_drain}
-                ?disabled=${fieldDisabled}
+                ?disabled=${fieldDisabled || (inputOnly && !flags.open_drain)}
                 aria-label=${ctx.localize("device.pin_wiring_open_drain")}
-                @change=${(e: Event) =>
+                @change=${(e: Event) => {
+                  const checked = (e.target as HTMLInputElement & { checked: boolean })
+                    .checked;
+                  // An input-only pin has no output driver: a legacy
+                  // open drain can be cleared but never set.
+                  if (checked && inputOnly) return;
                   writeMode((f) => {
-                    f.open_drain = (
-                      e.target as HTMLInputElement & { checked: boolean }
-                    ).checked;
-                  })}
+                    f.open_drain = checked;
+                  });
+                }}
               ></wa-switch>
             </div>`
           : nothing

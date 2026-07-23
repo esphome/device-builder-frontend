@@ -487,6 +487,39 @@ describe("pin wiring custom editor", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "mode"], undefined);
   });
 
+  it("lets open drain only be cleared on an input-only pin", () => {
+    const board = makeTestBoard({
+      pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
+    });
+    const openDrainSwitch = (result: unknown) =>
+      findElementBindings(result, "wa-switch").find(
+        (b) => b["aria-label"] === "device.pin_wiring_open_drain"
+      );
+    // Legacy invalid config (output direction on an input-only pin):
+    // the switch renders but can't turn open drain ON.
+    const unset = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "GPIO34", mode: { output: true } },
+        { getClusterChoice: () => "custom" },
+        board
+      )
+    );
+    expect(openDrainSwitch(unset)?.["?disabled"]).toBe(true);
+    // Already set: stays clearable for repair.
+    const set = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "GPIO34", mode: { output: true, open_drain: true } },
+        { getClusterChoice: () => "custom" },
+        board
+      )
+    );
+    expect(openDrainSwitch(set)?.["?disabled"]).toBe(false);
+  });
+
   it("disables the options an input-only pin can't do, except the set one", () => {
     const board = makeTestBoard({
       pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
