@@ -282,6 +282,47 @@ describe("pin wiring input-only guardrail", () => {
     expect(cardById(result, "driven_signal")?.["?disabled"]).toBe(false);
   });
 
+  it("moves the tab stop off a disabled selected card", () => {
+    // Stored flags match ground_switch, but the input-only pin disables
+    // it; the tab stop must land on a focusable card or the radiogroup
+    // is unreachable by keyboard.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      makeRenderCtx(
+        { pin: { number: "GPIO34", mode: { input: true, pullup: true } } },
+        {
+          board: inputOnlyBoard(),
+          overrides: {
+            sectionKey: "binary_sensor.gpio",
+            nestedOpenSections: new Set(["pin:pin-advanced"]),
+          },
+        }
+      )
+    );
+    expect(cardById(result, "ground_switch")?.tabindex).toBe("-1");
+    expect(cardById(result, "driven_signal")?.tabindex).toBe("0");
+  });
+
+  it("makes Custom the tab stop when every preset is disabled", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.OUTPUT),
+      ["pin"],
+      makeRenderCtx(
+        { pin: { number: "GPIO34" } },
+        {
+          board: inputOnlyBoard(),
+          overrides: {
+            sectionKey: "switch.gpio",
+            nestedOpenSections: new Set(["pin:pin-advanced"]),
+          },
+        }
+      )
+    );
+    expect(cardById(result, "output_standard")?.tabindex).toBe("-1");
+    expect(cardById(result, "custom")?.tabindex).toBe("0");
+  });
+
   it("shows no banner on a pin with pulls available", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
