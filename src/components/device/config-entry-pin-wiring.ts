@@ -13,6 +13,7 @@ import type { BoardPin } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { isPlainObject } from "../../util/nested-values.js";
+import { isSubstitutionString } from "../../util/substitutions.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
@@ -108,7 +109,9 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // not the user's circuit, so cards like "active low output" mislead.
   // And only when every stored wiring value is readable — a ``${var}``
   // mode or inverted must fall through to the raw disclosure, where the
-  // substitution gate owns it; a preset pick would clobber the reference.
+  // substitution gate owns it (a preset pick would clobber the
+  // reference), and a ``${var}`` number leaves the actual GPIO unknown,
+  // so the input-only guardrail could not vouch for the cards.
   const flags = modeFlagsOf(modeValue);
   const invertedReadable =
     invertedValue === undefined ||
@@ -119,7 +122,8 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
     ctx.sectionKey.endsWith(".gpio") &&
     providerAllowedModes(rawValue, ctx.pinRegistryModes) === null &&
     flags !== null &&
-    invertedReadable
+    invertedReadable &&
+    !(isPlainObject(rawValue) && isSubstitutionString(rawValue.number))
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;

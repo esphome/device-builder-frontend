@@ -73,6 +73,8 @@ const openCtx = (
     }
   );
 
+const STATIC_DATA_PRESET = /data-preset="([^"]+)"/;
+
 /** Card bindings, including the Custom card's static ``data-preset``
  *  attribute (the preset cards carry it as a binding). */
 const cards = (result: unknown) =>
@@ -81,7 +83,7 @@ const cards = (result: unknown) =>
       const bindings = extractAttributeBindings(t);
       if (!("data-preset" in bindings)) {
         const strings = (t as { strings?: readonly string[] }).strings;
-        const m = /data-preset="([^"]+)"/.exec(strings?.join("") ?? "");
+        const m = STATIC_DATA_PRESET.exec(strings?.join("") ?? "");
         if (m) bindings["data-preset"] = m[1];
       }
       return bindings;
@@ -188,6 +190,17 @@ describe("pin wiring preset cards", () => {
       openCtx({ number: "GPIO2", mode: { pullup: "${use_pullup}" } })
     );
     expect(cards(flagSub)).toHaveLength(0);
+  });
+
+  it("keeps the raw disclosure when the pin number is a substitution", () => {
+    // The GPIO is unknown, so the input-only guardrail can't vouch for
+    // the cards; the raw disclosure edits the reference safely.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "${my_pin}", mode: {} })
+    );
+    expect(cards(result)).toHaveLength(0);
   });
 
   it("marks the platform-default card active on an untouched pin", () => {
