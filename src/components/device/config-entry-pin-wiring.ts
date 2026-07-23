@@ -140,13 +140,19 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
               : "device.pin_wiring_default"
           );
     // The effective flags in technical vocabulary, so advanced users can
-    // read what the pin is set to without opening the section.
+    // read what the pin is set to without opening the section. A value
+    // the classifier can't read (a ``${var}`` flag or inverted) gets no
+    // tech clause at all — better silent than wrong.
+    const flags = modeFlagsOf(modeValue);
+    const invertedUnreadable =
+      invertedValue !== undefined &&
+      invertedValue !== null &&
+      parseYamlBoolean(invertedValue) === null;
     const currentTech = implicitPreset
       ? wiringTechSummary(implicitPreset.flags, false)
-      : wiringTechSummary(
-          modeFlagsOf(modeValue) ?? {},
-          parseYamlBoolean(invertedValue) === true
-        );
+      : flags === null || invertedUnreadable
+        ? ""
+        : wiringTechSummary(flags, parseYamlBoolean(invertedValue) === true);
     labelText = currentTech
       ? ctx.localize("device.pin_wiring_summary_with_tech", {
           value: summaryValue,

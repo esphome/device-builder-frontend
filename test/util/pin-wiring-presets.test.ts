@@ -198,6 +198,15 @@ describe("wiringTechSummary", () => {
     expect(wiringTechSummary({}, true)).toBe("inverted");
     expect(wiringTechSummary({}, false)).toBe("");
   });
+
+  it("renders a stable order regardless of YAML key order", () => {
+    expect(wiringTechSummary({ pullup: true, input: true }, false)).toBe(
+      "input + pullup"
+    );
+    expect(wiringTechSummary({ open_drain: true, output: true }, false)).toBe(
+      "output + open_drain"
+    );
+  });
 });
 
 describe("presetUnavailableReason", () => {

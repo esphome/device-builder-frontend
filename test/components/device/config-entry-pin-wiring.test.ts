@@ -168,6 +168,27 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
+  it("omits the tech clause when a wiring value is unreadable", () => {
+    // ``inverted: ${var}`` classifies as Custom; a tech summary built by
+    // coercing the unreadable value would just be wrong.
+    const localize = vi.fn((key: string) => key);
+    renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "GPIO2", mode: { input: true, pullup: true }, inverted: "${inv}" },
+        { localize: localize as never }
+      )
+    );
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary", {
+      value: "device.pin_wiring_custom",
+    });
+    expect(localize).not.toHaveBeenCalledWith(
+      "device.pin_wiring_summary_with_tech",
+      expect.anything()
+    );
+  });
+
   it("marks the platform-default card active on an untouched pin", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.OUTPUT),

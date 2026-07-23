@@ -188,13 +188,21 @@ export function applyPresetToPin(
   return base;
 }
 
+/** Display order for the tech summary — stable regardless of the YAML
+ *  key order the flags were stored in. */
+const FLAG_DISPLAY_ORDER = ["input", "output", "pullup", "pulldown", "open_drain"];
+
 /** Compact technical form of a flag set ("input + pullup · inverted") so
  *  advanced users can read what a preset writes at a glance. */
 export function wiringTechSummary(
   flags: Readonly<Record<string, boolean>>,
   inverted: boolean
 ): string {
-  const parts = Object.keys(flags).filter((k) => flags[k]);
+  const set = Object.keys(flags).filter((k) => flags[k]);
+  const parts = [
+    ...FLAG_DISPLAY_ORDER.filter((k) => set.includes(k)),
+    ...set.filter((k) => !FLAG_DISPLAY_ORDER.includes(k)),
+  ];
   const joined = parts.join(" + ");
   if (!inverted) return joined;
   return joined ? `${joined} · inverted` : "inverted";
