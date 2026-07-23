@@ -87,6 +87,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         @request-close=${this._dialog.onRequestClose}
       >
         <esphome-device-name-inputs
+          autofocus
           .friendlyLabelKey=${"dashboard.action_clone_friendly_name_label"}
           .friendlyPlaceholderKey=${"dashboard.action_clone_friendly_name_placeholder"}
           .friendlyHelperKey=${"dashboard.action_clone_friendly_name_helper"}

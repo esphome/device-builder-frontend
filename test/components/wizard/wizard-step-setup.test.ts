@@ -311,13 +311,18 @@ describe("wizard-step-setup", () => {
   });
 
   it("uses a board-derived example as the name placeholder", async () => {
-    // The context-less localize stub is identity-on-key, so the board-aware
-    // placeholder surfaces as its key; the board name reaches it as a param.
+    // The default localize stub drops params; substitute one that surfaces
+    // them so the board name's arrival is actually assertable.
     const el = await mount(wifiBoard());
+    (el as unknown as { _localize: unknown })._localize = (
+      key: string,
+      params?: Record<string, string | number>
+    ) => `${key} ${Object.values(params ?? {}).join(" ")}`;
+    await el.updateComplete;
     const inputs = await deviceNameInputsOf(el);
     const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
     expect(friendly?.getAttribute("placeholder")).toBe(
-      "wizard.device_name_placeholder_board"
+      "wizard.device_name_placeholder_board Board"
     );
   });
 

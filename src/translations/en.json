@@ -1004,7 +1004,7 @@
     "hostname_disclosure": "Hostname: {hostname}",
     "hostname_label": "Hostname",
     "hostname_helper": "Used on the network (mDNS) and as the YAML filename.",
-    "hostname_required": "A hostname is required. Type one here, or edit the name above to derive it.",
+    "hostname_required": "A hostname is required: lowercase letters a-z, digits, and hyphens. Type one here.",
     "hostname_taken": "A device named {hostname} already exists.",
     "hostname_help_label": "About the hostname",
     "hostname_help": "The hostname identifies this device on your network (mDNS) and names its YAML file. It is derived from the name; expand to override it. Tip: set the device's room with an area in Home Assistant rather than putting it in the name."

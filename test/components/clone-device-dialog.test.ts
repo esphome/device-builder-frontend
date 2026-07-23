@@ -89,6 +89,18 @@ describe("clone-device-dialog ENTER", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("marks the name inputs [autofocus] where base-dialog can find them", async () => {
+    // base-dialog resolves its focus target via a light-DOM
+    // querySelector("[autofocus]"), which cannot pierce the component's
+    // shadow root — the host element itself must carry the attribute.
+    const el = await mount(new ESPHomeCloneDeviceDialog());
+    el.open("source");
+    await el.updateComplete;
+    const base = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+    const target = base.querySelector("[autofocus]");
+    expect(target?.tagName.toLowerCase()).toBe("esphome-device-name-inputs");
+  });
+
   it("open() resets the name inputs from a previous use", async () => {
     const el = await mount(new ESPHomeCloneDeviceDialog());
     el.open("source");

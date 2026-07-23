@@ -18,9 +18,24 @@ describe("takenHostnameSet", () => {
     expect(set.has("other")).toBe(false);
   });
 
-  it("memoizes per array reference", () => {
+  it("includes discovered-but-unadopted device names", () => {
+    const set = takenHostnameSet(
+      [{ name: "kitchen-plug", configuration: "kitchen-plug.yaml" }],
+      [{ name: "garage-door" }]
+    );
+    expect(set.has("garage-door")).toBe(true);
+  });
+
+  it("memoizes per array reference and revalidates the importables", () => {
     const devices = [{ name: "a", configuration: "a.yaml" }];
-    expect(takenHostnameSet(devices)).toBe(takenHostnameSet(devices));
-    expect(takenHostnameSet([...devices])).not.toBe(takenHostnameSet(devices));
+    const importables = [{ name: "b" }];
+    expect(takenHostnameSet(devices, importables)).toBe(
+      takenHostnameSet(devices, importables)
+    );
+    expect(takenHostnameSet([...devices], importables)).not.toBe(
+      takenHostnameSet(devices, importables)
+    );
+    expect(takenHostnameSet(devices, [...importables]).has("b")).toBe(true);
+    expect(takenHostnameSet(devices, [{ name: "c" }]).has("c")).toBe(true);
   });
 });

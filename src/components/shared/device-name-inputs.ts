@@ -37,6 +37,11 @@ registerMdiIcons({ "help-circle-outline": mdiHelpCircleOutline });
  */
 @customElement("esphome-device-name-inputs")
 export class ESPHomeDeviceNameInputs extends LitElement {
+  // base-dialog autofocuses via a light-DOM [autofocus] lookup that can't
+  // pierce this shadow root; hosts mark the element itself and focus
+  // delegates inward.
+  static shadowRootOptions = { ...LitElement.shadowRootOptions, delegatesFocus: true };
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -186,12 +191,23 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     this._open = false;
   }
 
+  override focus(): void {
+    const input = this.shadowRoot?.querySelector<HTMLInputElement>(
+      "#device-friendly-name"
+    );
+    input?.focus();
+    // Select-all so typing replaces a prefilled value (base-dialog does this
+    // for bare inputs; the host indirection would otherwise lose it).
+    input?.select();
+  }
+
   protected render() {
     const validity = this.validity;
-    // Any error or warning holds the panel open: both render inside the
-    // panel body, so collapsing would hide the one message explaining a
-    // disabled submit or a problematic hostname.
-    const open = this._open || validity.err !== null || validity.warning !== null;
+    // An error holds the panel open (it is the only place the blocking
+    // reason renders). Warnings auto-open via the input handlers instead,
+    // so the toggle stays functional — submit is enabled, and the user may
+    // legitimately collapse an advisory.
+    const open = this._open || validity.err !== null;
     return html`
       <div class="field">
         <label for="device-friendly-name">${this._localize(this.friendlyLabelKey)}</label>
@@ -263,6 +279,9 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   };
 
   private _notify() {
+    if (this.validity.warning) {
+      this._open = true;
+    }
     this.dispatchEvent(
       new CustomEvent("device-name-changed", { bubbles: true, composed: true })
     );

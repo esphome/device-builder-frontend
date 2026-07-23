@@ -197,7 +197,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @cancel=${() => (host._pendingConfirm = null)}
     ></esphome-confirm-dialog>
     <esphome-clone-device-dialog
-      .takenHostnames=${takenHostnameSet(host._devices)}
+      .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
       @clone-confirm=${host._executeClone}
     ></esphome-clone-device-dialog>
     <esphome-friendly-name-dialog
@@ -232,7 +232,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog
-      .takenHostnames=${takenHostnameSet(host._devices)}
+      .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
     ></esphome-create-config-dialog>
     <esphome-command-dialog
       @request-show-logs-after-install=${host._onPostInstallShowLogs}
