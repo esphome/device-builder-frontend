@@ -154,12 +154,17 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     }
     if (hostname.length > HOSTNAME_MAX_LEN) {
       // The shared 63-char device-name validation is too loose here: the
-      // backend clamps this value to esphome's 31-char hostname cap, so a
-      // longer manual override would be silently rewritten.
+      // backend enforces esphome's 31-char hostname cap.
       return {
         err: { code: "validation.max_length", params: { max: HOSTNAME_MAX_LEN } },
         warning: null,
       };
+    }
+    if (hostname.startsWith("-") || hostname.endsWith("-")) {
+      // A warning elsewhere (rename keeps existing names working), but a hard
+      // error for new names: the backend refuses them, and an RFC 1123 label
+      // can't start or end with a hyphen. Derived slugs never produce one.
+      return { err: { code: "validation.device_name_edge_hyphen" }, warning: null };
     }
     if (
       showsValidation &&

@@ -191,6 +191,17 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(friendlyInput(el).getAttribute("placeholder")).toBe("e.g. Some Board");
   });
 
+  it("rejects an edge-hyphen manual override", async () => {
+    // The backend refuses these (RFC 1123 labels can't start or end with a
+    // hyphen), so the preview must block rather than warn.
+    const el = await mountInputs();
+    await typeHostname(el, "plug-");
+    expect(el.validity.err?.code).toBe("validation.device_name_edge_hyphen");
+    expect(el.canSubmit).toBe(false);
+    await typeHostname(el, "plug");
+    expect(el.canSubmit).toBe(true);
+  });
+
   it("caps a manual hostname override at 31 chars", async () => {
     // The backend clamps to esphome's 31-char hostname cap; a longer
     // override passing client validation would be silently rewritten.
