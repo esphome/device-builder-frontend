@@ -7,6 +7,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 
+import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { ESPHomeOnboardingWizardDialog } from "../../../src/components/onboarding/onboarding-wizard-dialog.js";
 
@@ -119,7 +120,10 @@ describe("onboarding existing-server orientation", () => {
 
     expect(state._screen).toBe("tour");
     expect(state._api.updatePreferences).toHaveBeenCalledWith(
-      expect.objectContaining({ remote_compute_only: true })
+      expect.objectContaining({
+        experience_level: ExperienceLevel.BEGINNER,
+        remote_compute_only: true,
+      })
     );
   });
 

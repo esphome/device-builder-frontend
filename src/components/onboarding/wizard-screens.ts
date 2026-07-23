@@ -9,7 +9,8 @@ export type UsageChoice = "standalone" | "remote_builder";
 /**
  * The ordered onboarding-wizard screens for the current environment.
  *
- * Welcome and experience are always mandatory. On the desktop app a usage
+ * Welcome is always mandatory; experience is too except on the remote-builder
+ * exit below. On the desktop app a usage
  * question comes right after Welcome: picking "standalone" continues the
  * normal flow, while "remote builder" ends the wizard there — the app
  * switches to remote-build mode and its own pairing onboarding takes over,

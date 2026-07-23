@@ -7,6 +7,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 
+import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import {
   DESKTOP_ONBOARDING_PARAM,
@@ -121,6 +122,7 @@ describe("desktop usage question", () => {
     expect(state._screens).not.toContain("existing_server");
     expect(state._api.updatePreferences).toHaveBeenCalledWith(
       expect.objectContaining({
+        experience_level: ExperienceLevel.BEGINNER,
         remote_compute_only: false,
         hide_device_builder: false,
       })
@@ -140,6 +142,10 @@ describe("desktop usage question", () => {
         hide_device_builder: true,
       })
     );
+    // The experience screen was never shown, so the default must not
+    // overwrite a returning user's stored level.
+    const prefs = state._api.updatePreferences.mock.calls[0][0];
+    expect("experience_level" in prefs).toBe(false);
     expect(state._api.markOnboardingAcknowledged).toHaveBeenCalledOnce();
     expect(state._open).toBe(false);
   });
@@ -171,6 +177,21 @@ describe("desktop usage question", () => {
 
     expect(state._screen).toBe("experience");
     expect(wizard.shadowRoot?.querySelector(".existing-notice")).not.toBeNull();
+  });
+
+  it("names the detected install in the banner", async () => {
+    const { wizard, state } = openDesktopWizard();
+    document.body.appendChild(wizard);
+    state._localize = ((key, params) =>
+      params ? `${key} ${Object.values(params).join(" ")}` : key) as LocalizeFunc;
+    state._discoveredHosts = hosts("living-room");
+    await state._onContinue(); // welcome -> usage
+    state._usage = "standalone";
+    await state._onContinue(); // usage -> experience
+    await wizard.updateComplete;
+
+    const notice = wizard.shadowRoot?.querySelector(".existing-notice");
+    expect(notice?.textContent).toContain("living-room");
   });
 
   it("returns to the usage screen with remote preselected via the banner link", async () => {

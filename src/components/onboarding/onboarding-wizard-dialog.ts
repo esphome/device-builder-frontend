@@ -179,9 +179,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   /** Ordered screens for the current environment. */
   private get _screens(): WizardScreen[] {
-    // existing_server sits after experience (index 1). While the user is still
-    // on Welcome or experience the tail can grow as mDNS hosts arrive; freeze it
-    // once they advance past experience so a late host can't shift the flow.
+    // existing_server can appear only in the non-desktop flow, where experience
+    // is index 1 (wizardScreens ignores the flag when the usage screen shows).
+    // While the user is still on Welcome or experience the tail can grow as
+    // mDNS hosts arrive; freeze it once they advance past experience so a late
+    // host can't shift the flow.
     const showExistingServer =
       this._index <= 1 ? this._computeShowExistingServer() : this._existingServerPinned;
     return wizardScreens({
@@ -384,6 +386,24 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     `;
   }
 
+  /** Discovered-host names localized through *key* ({name}) or, past the
+   *  display cap, *overflowKey* ({name}, {count}); null when none are known.
+   *  The cap keeps a busy network from blowing up the copy. */
+  private _localizeDiscoveredHosts(key: string, overflowKey: string): string | null {
+    const names = this._discoveredHosts
+      ? [...new Set([...this._discoveredHosts.values()].map(remoteBuildPeerName))]
+      : [];
+    if (!names.length) return null;
+    const shown = names.slice(0, 3);
+    const extra = names.length - shown.length;
+    const joined = new Intl.ListFormat(activeLocale(), {
+      type: extra > 0 ? "unit" : "conjunction",
+    }).format(shown);
+    return extra > 0
+      ? this._localize(overflowKey, { name: joined, count: extra })
+      : this._localize(key, { name: joined });
+  }
+
   /** Banner atop the experience screen when the user picked a standalone
    *  setup even though another Device Builder was discovered. Reads the
    *  live host map on purpose: a host that appears mid-flow should still
@@ -392,12 +412,16 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
    *  preselected, so Continue there completes the switch. */
   private _renderExistingNotice() {
     if (!this._showUsage || this._usage !== "standalone") return nothing;
-    if (!this._discoveredHosts?.size) return nothing;
+    const notice = this._localizeDiscoveredHosts(
+      "onboarding.wizard.experience.existing_notice",
+      "onboarding.wizard.experience.existing_notice_overflow"
+    );
+    if (!notice) return nothing;
     return html`
       <div class="existing-notice" role="status">
         <wa-icon library="mdi" name="alert-outline" aria-hidden="true"></wa-icon>
         <span>
-          ${this._localize("onboarding.wizard.experience.existing_notice")}
+          ${notice}
           <button type="button" class="notice-link" @click=${this._switchToRemoteBuild}>
             ${this._localize("onboarding.wizard.experience.existing_notice_link")}
           </button>
@@ -412,26 +436,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   };
 
   private _renderExistingServer() {
-    const names = this._discoveredHosts
-      ? [...new Set([...this._discoveredHosts.values()].map(remoteBuildPeerName))]
-      : [];
-    // Cap the named list so a busy network can't push the switch off-screen.
-    const shown = names.slice(0, 3);
-    const extra = names.length - shown.length;
-    const joined = new Intl.ListFormat(activeLocale(), {
-      type: extra > 0 ? "unit" : "conjunction",
-    }).format(shown);
-    const foundLabel =
-      extra > 0
-        ? this._localize("onboarding.wizard.existing_server.found_overflow", {
-            name: joined,
-            count: extra,
-          })
-        : this._localize("onboarding.wizard.existing_server.found", { name: joined });
+    const foundLabel = this._localizeDiscoveredHosts(
+      "onboarding.wizard.existing_server.found",
+      "onboarding.wizard.existing_server.found_overflow"
+    );
     return html`
       <div class="existing-server">
         <wa-icon library="mdi" name="server-network" class="tour-offer-icon"></wa-icon>
-        ${names.length ? html`<p class="tour-ready">${foundLabel}</p>` : nothing}
+        ${foundLabel ? html`<p class="tour-ready">${foundLabel}</p>` : nothing}
         <p class="intro">${this._localize("onboarding.wizard.existing_server.intro")}</p>
         <label class="remote-toggle">
           <span class="remote-toggle-text">
@@ -609,7 +621,10 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     const remoteBuilder = this._usage === "remote_builder";
     try {
       await this._api.updatePreferences({
-        experience_level: this._experience,
+        // The remote-builder path ends before the experience screen, so
+        // persisting the default would silently downgrade a returning
+        // EXPERT/ADVANCED user on an onboarding re-run.
+        ...(remoteBuilder ? {} : { experience_level: this._experience }),
         remote_compute_only: remoteBuilder || this._remoteCompute,
         // Only the desktop usage question decides this: a remote builder
         // hides the Device builder entirely (the dashboard shows just the

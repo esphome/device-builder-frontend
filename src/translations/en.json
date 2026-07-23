@@ -1066,7 +1066,8 @@
       "experience": {
         "title": "Choose your experience",
         "intro": "You can change this any time in Settings.",
-        "existing_notice": "We have detected an existing instance of ESPHome Device Builder on your network.",
+        "existing_notice": "We have detected an existing instance of ESPHome Device Builder on your network: {name}.",
+        "existing_notice_overflow": "We have detected existing instances of ESPHome Device Builder on your network: {name}, and {count} more.",
         "existing_notice_link": "Would you like to change to remote build mode?",
         "beginner_title": "New to ESPHome",
         "beginner_desc": "Start with a simple, guided interface.",
