@@ -18,6 +18,7 @@ import {
   getTourSuggestedName,
   isTourActive,
 } from "../guided-tour/tour-session.js";
+import { slugifyHostname } from "../../util/slugify-hostname.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 import type { ESPHomeDeviceNameInputs } from "../shared/device-name-inputs.js";
@@ -128,10 +129,21 @@ export class ESPHomeWizardStepSetup extends LitElement {
     // only the host's own render reads — re-render or Next stays disabled.
     const suggested = getTourSuggestedName();
     if (suggested && this._nameInputs && !this._nameInputs.friendlyName) {
-      this._nameInputs.reset(suggested);
+      this._nameInputs.reset(this._untakenSeed(suggested));
       this.requestUpdate();
     }
     clearTourSuggestedName();
+  }
+
+  // A re-run tour's seed collides with the device its first run created;
+  // arriving with Next hard-blocked would contradict the tour bubble.
+  private _untakenSeed(name: string): string {
+    if (!this.takenHostnames.has(slugifyHostname(name))) return name;
+    for (let n = 2; n < 100; n++) {
+      const candidate = `${name} ${n}`;
+      if (!this.takenHostnames.has(slugifyHostname(candidate))) return candidate;
+    }
+    return name;
   }
 
   static styles = [

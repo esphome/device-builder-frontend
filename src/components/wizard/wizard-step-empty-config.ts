@@ -3,7 +3,6 @@ import { LitElement, css, html, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -39,14 +38,12 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   static styles = [
     espHomeStyles,
-    inputStyles,
     css`
       :host {
         display: block;
       }
 
       esphome-device-name-inputs {
-        display: block;
         margin-bottom: var(--wa-space-xl);
       }
 

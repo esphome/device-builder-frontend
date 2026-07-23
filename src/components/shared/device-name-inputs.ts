@@ -89,6 +89,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     dialogFieldStyles,
     disclosureStyles,
     css`
+      :host {
+        display: block;
+      }
+
       .hostname-row {
         display: flex;
         align-items: center;

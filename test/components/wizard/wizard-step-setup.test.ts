@@ -14,6 +14,8 @@ import {
   setTourPending,
   setTourSuggestedName,
 } from "../../../src/components/guided-tour/tour-session.js";
+import { STARTER_DEVICE_NAME } from "../../../src/components/guided-tour/tour-steps.js";
+import { slugifyHostname } from "../../../src/util/slugify-hostname.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 import { deviceNameInputsOf, typeFriendlyName } from "../../_dom.js";
@@ -320,11 +322,31 @@ describe("wizard-step-setup", () => {
   });
 
   it("a tour-seeded name fills the inputs and enables Next", async () => {
-    setTourSuggestedName("ESPHome Starter");
+    setTourSuggestedName(STARTER_DEVICE_NAME);
     const el = await mount(noWifiBoard());
     const inputs = await deviceNameInputsOf(el);
-    expect(inputs.friendlyName).toBe("ESPHome Starter");
-    expect(inputs.hostname).toBe("esphome-starter");
+    expect(inputs.friendlyName).toBe(STARTER_DEVICE_NAME);
+    expect(inputs.hostname).toBe(slugifyHostname(STARTER_DEVICE_NAME));
+    const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
+    expect(primary.disabled).toBe(false);
+  });
+
+  it("a re-run tour seed skips past its first run's device", async () => {
+    setTourSuggestedName(STARTER_DEVICE_NAME);
+    const el = new ESPHomeWizardStepSetup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._api = {};
+    el.board = noWifiBoard();
+    el.active = true;
+    el.takenHostnames = new Set([slugifyHostname(STARTER_DEVICE_NAME)]);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await Promise.resolve();
+    await Promise.resolve();
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe(`${STARTER_DEVICE_NAME} 2`);
+    expect(inputs.canSubmit).toBe(true);
     const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
     expect(primary.disabled).toBe(false);
   });
