@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigEntryType, PinMode } from "../../../src/api/types/config-entries.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import {
   findElementBindings,
@@ -52,14 +53,15 @@ const wiringPinEntry = (pinMode: PinMode, overrides: Partial<ConfigEntry> = {}) 
     ...overrides,
   });
 
-const openCtx = (pin: unknown, overrides: Record<string, unknown> = {}) =>
+const openCtx = (pin: unknown, overrides: Partial<RenderCtx> = {}) =>
   makeRenderCtx(
     { pin },
     {
       overrides: {
+        sectionKey: "binary_sensor.gpio",
         nestedOpenSections: new Set(["pin:pin-advanced"]),
         ...overrides,
-      } as never,
+      },
     }
   );
 
@@ -100,6 +102,17 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
+  it("keeps the raw disclosure on a non-gpio platform (data-line pin)", () => {
+    // An addressable LED strip's pin is a protocol data line; wiring
+    // cards like "active low output" would mislead there.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.OUTPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2" }, { sectionKey: "light.esp32_rmt_led_strip" })
+    );
+    expect(cards(result)).toHaveLength(0);
+  });
+
   it("keeps the raw disclosure for an expander-provided pin", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
@@ -112,14 +125,24 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
+  it("marks the platform-default card active on an untouched pin", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.OUTPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2" })
+    );
+    expect(cardById(result, "output_standard")?.["aria-checked"]).toBe("true");
+    expect(cardById(result, "output_active_low")?.["aria-checked"]).toBe("false");
+  });
+
   it("selects the card matching the stored flags", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
       openCtx({ number: "GPIO2", mode: { input: true, pullup: true }, inverted: true })
     );
-    expect(cardById(result, "ground_switch")?.["aria-pressed"]).toBe("true");
-    expect(cardById(result, "vcc_switch")?.["aria-pressed"]).toBe("false");
+    expect(cardById(result, "ground_switch")?.["aria-checked"]).toBe("true");
+    expect(cardById(result, "vcc_switch")?.["aria-checked"]).toBe("false");
   });
 
   it("selects through a scalar mode shorthand", () => {
@@ -128,7 +151,7 @@ describe("pin wiring preset cards", () => {
       ["pin"],
       openCtx({ number: "GPIO2", mode: "INPUT_PULLUP" })
     );
-    expect(cardById(result, "ground_switch")?.["aria-pressed"]).toBe("true");
+    expect(cardById(result, "ground_switch")?.["aria-checked"]).toBe("true");
   });
 
   it("writes the full long-form block when a preset is picked", () => {
@@ -174,21 +197,29 @@ describe("pin wiring preset cards", () => {
 
 describe("pin wiring seeding (preconfigured boards stay quiet)", () => {
   it("does not seed open when the flags match a preset", () => {
-    const ctx = makeRenderCtx({
-      pin: { number: "GPIO2", mode: { input: true, pullup: true }, inverted: true },
-    });
-    (ctx.scopeValues as unknown) = () => ({ mode: { input: true, pullup: true } });
+    const ctx = makeRenderCtx(
+      { pin: { number: "GPIO2", mode: { input: true, pullup: true }, inverted: true } },
+      {
+        overrides: {
+          sectionKey: "binary_sensor.gpio",
+          scopeValues: () => ({ mode: { input: true, pullup: true } }),
+        },
+      }
+    );
     renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
     expect(ctx.seedNestedOpen).not.toHaveBeenCalled();
   });
 
   it("seeds open for a flag combination no preset names", () => {
-    const ctx = makeRenderCtx({
-      pin: { number: "GPIO2", mode: { input: true, pullup: true, pulldown: true } },
-    });
-    (ctx.scopeValues as unknown) = () => ({
-      mode: { input: true, pullup: true, pulldown: true },
-    });
+    const ctx = makeRenderCtx(
+      { pin: { number: "GPIO2", mode: { input: true, pullup: true, pulldown: true } } },
+      {
+        overrides: {
+          sectionKey: "binary_sensor.gpio",
+          scopeValues: () => ({ mode: { input: true, pullup: true, pulldown: true } }),
+        },
+      }
+    );
     renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
     expect(ctx.seedNestedOpen).toHaveBeenCalledWith("pin:pin-advanced");
   });
@@ -217,7 +248,10 @@ describe("pin wiring input-only guardrail", () => {
         { pin: { number: "GPIO34" } },
         {
           board: inputOnlyBoard(),
-          overrides: { nestedOpenSections: new Set(["pin:pin-advanced"]) },
+          overrides: {
+            sectionKey: "binary_sensor.gpio",
+            nestedOpenSections: new Set(["pin:pin-advanced"]),
+          },
         }
       )
     );
@@ -235,7 +269,10 @@ describe("pin wiring input-only guardrail", () => {
         { pin: { number: "GPIO2" } },
         {
           board: inputOnlyBoard(),
-          overrides: { nestedOpenSections: new Set(["pin:pin-advanced"]) },
+          overrides: {
+            sectionKey: "binary_sensor.gpio",
+            nestedOpenSections: new Set(["pin:pin-advanced"]),
+          },
         }
       )
     );
@@ -298,5 +335,94 @@ describe("pin wiring custom editor", () => {
       customCtx({ number: "GPIO2", mode: { analog: true } })
     );
     expect(findElementBindings(result, "wa-radio-group")).toHaveLength(0);
+  });
+});
+
+describe("pin wiring board-preset guard", () => {
+  // GPIO2 is locked to this section by a featured component, so its
+  // wiring is the board's — edits sit behind the unlock.
+  const presetBoard = () =>
+    makeTestBoard({
+      overrides: {
+        featured_components: [
+          { component_id: "binary_sensor.gpio", locked_pins: { pin: 2 } },
+        ],
+      } as never,
+    });
+  const guardedCtx = (pin: unknown, overrides: Partial<RenderCtx> = {}) =>
+    makeRenderCtx(
+      { pin },
+      {
+        board: presetBoard(),
+        overrides: {
+          sectionKey: "binary_sensor.gpio",
+          nestedOpenSections: new Set(["pin:pin-advanced"]),
+          ...overrides,
+        },
+      }
+    );
+
+  it("renders the guard row and view-only cards on a board-locked pin", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      guardedCtx("GPIO2")
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
+    expect(cardById(result, "custom")?.["?disabled"]).toBe(true);
+  });
+
+  it("guards a field carrying board suggestions the same way", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT, { suggestions: ["GPIO2"] }),
+      ["pin"],
+      openCtx("GPIO2")
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
+  });
+
+  it("does not guard an ordinary pin", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx("GPIO2")
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
+    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(false);
+  });
+
+  it("opening a guarded short-form pin does not promote it", () => {
+    const ctx = guardedCtx("GPIO2", { nestedOpenSections: new Set<string>() });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const toggle = findElementBindings(result, "button").find(
+      (b) => !("data-preset" in b)
+    )!;
+    (toggle["@click"] as () => void)();
+
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("the unlock enables edits and performs the deferred promotion", () => {
+    const ctx = guardedCtx("GPIO2");
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const unlock = findElementBindings(result, "wa-switch")[0];
+    (unlock["@change"] as (e: unknown) => void)({ target: { checked: true } });
+
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "unlocked");
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
+
+    const unlocked = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      guardedCtx("GPIO2", {
+        getClusterChoice: (key) => (key === "pin:pin-guard" ? "unlocked" : undefined),
+      })
+    );
+    expect(cardById(unlocked, "ground_switch")?.["?disabled"]).toBe(false);
   });
 });

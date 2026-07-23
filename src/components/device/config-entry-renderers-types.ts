@@ -107,13 +107,14 @@ export interface RenderCtx {
    *  and an un-blurred buffer would paint (and commit) over the wrong row. */
   clearEditingMagnitudesUnder: (path: string[]) => void;
   /**
-   * Either/or constraint cluster (radio chooser) UI state, off-config like
-   * the unit/magnitude stashes above. ``ClusterChoice`` is the selected
+   * Generic per-key off-config UI-choice store. Born for either/or
+   * constraint clusters (radio chooser): ``ClusterChoice`` is the selected
    * alternative id, needed because a freshly-picked-but-empty side has no
-   * present value to infer the selection from. ``ClusterStash`` preserves the
+   * present value to infer the selection from; ``ClusterStash`` preserves the
    * deselected side's values so switching back restores them (only the
    * selected side is ever serialized). Keyed by cluster id (its first member
-   * key) plus, for the stash, the member key.
+   * key) plus, for the stash, the member key. The pin wiring section reuses
+   * the choice half under its own keys (Custom-card pick, guard unlock).
    */
   getClusterChoice: (clusterId: string) => string | undefined;
   setClusterChoice: (clusterId: string, altId: string) => void;

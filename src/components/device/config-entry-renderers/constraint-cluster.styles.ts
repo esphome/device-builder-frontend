@@ -41,12 +41,6 @@ export const constraintClusterStyles = css`
     margin-bottom: var(--wa-space-2xs);
   }
 
-  /* wa-radio's checked dot is "fill: currentColor", and its
-     ":host(:state(checked)) .control { color: ... }" rule ties on specificity
-     with the default "color: transparent" — the attribute selector wins the
-     tie here, so the dot renders invisible. Force the activated color onto the
-     control part of a checked radio (aria-checked is reliably reflected). */
-  .constraint-cluster-radios wa-radio[aria-checked="true"]::part(control) {
-    color: var(--wa-form-control-activated-color) !important;
-  }
+  /* The checked-dot visibility fix lives once in
+     config-entry-form-extra.styles.ts as a generic wa-radio rule. */
 `;

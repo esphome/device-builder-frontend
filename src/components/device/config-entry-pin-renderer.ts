@@ -299,6 +299,10 @@ export function renderPinField(
   // merely-missing capability is grouped, not warned. Hiding it is too
   // harsh for unusual boards and "I know what I'm doing" workflows.
   let visible = ctx.board.pins;
+  const boardPin =
+    valueGpio !== null
+      ? (ctx.board.pins.find((p) => p.gpio === valueGpio) ?? null)
+      : null;
   // A featured-component preset can narrow the pin set further — e.g.
   // pin the ESK-1 PIR motion sensor to one of the two FPC-connector
   // GPIOs. Skip the narrowing if no parseable GPIOs survive (a manifest
@@ -326,13 +330,8 @@ export function renderPinField(
   // the underlying `switch.gpio` schema asks for, but the manifest is
   // authoritative. Make sure the active value's pin is always in the
   // dropdown so the disabled select still shows the right option.
-  if (
-    valueGpio !== null &&
-    !visible.some((p) => p.gpio === valueGpio) &&
-    ctx.board.pins.some((p) => p.gpio === valueGpio)
-  ) {
-    const pin = ctx.board.pins.find((p) => p.gpio === valueGpio)!;
-    visible = [pin, ...visible];
+  if (boardPin && !visible.some((p) => p.gpio === boardPin.gpio)) {
+    visible = [boardPin, ...visible];
   }
   const usedPins = findUsedPins(
     ctx.yaml,
@@ -340,6 +339,10 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
   const ownLockedGpios = lockedGpiosForSection(ctx);
+  // The current pin sitting on a board-locked GPIO for this section means
+  // the wiring is the board's, not the user's — the wiring UI guards its
+  // edits behind an unlock.
+  const boardPresetPin = valueGpio !== null && ownLockedGpios.has(valueGpio);
   // The field's current value must stay pickable even on a reserved pin the
   // board didn't lock to this section (a hand-edited YAML, or a manifest
   // preset missing its lock) — a disabled selected option blanks the
@@ -349,10 +352,6 @@ export function renderPinField(
   }
   const fieldDisabled = effectiveDisabled(entry, ctx);
   const isLongForm = isPlainObject(rawValue);
-  const boardPin =
-    valueGpio !== null
-      ? (ctx.board.pins.find((p) => p.gpio === valueGpio) ?? null)
-      : null;
 
   // Pin-select onChange routes to ``path.number`` when the field is
   // already in long form (the user expanded Advanced and set a flag,
@@ -383,7 +382,16 @@ export function renderPinField(
         ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
       </wa-select>
       ${renderFieldError(path, ctx)}
-      ${renderPinWiring(entry, path, ctx, rawValue, isLongForm, fieldDisabled, boardPin)}
+      ${renderPinWiring({
+        entry,
+        path,
+        ctx,
+        rawValue,
+        isLongForm,
+        fieldDisabled,
+        boardPin,
+        boardPreset: boardPresetPin,
+      })}
     </div>
   `;
 }
@@ -415,7 +423,16 @@ function renderSubstitutionPin(
       />
       ${renderSubstitutionHint(number, ctx.substitutions, ctx.localize)}
       ${renderFieldError(numberPath, ctx)}
-      ${renderPinWiring(entry, path, ctx, rawValue, true, fieldDisabled, null)}
+      ${renderPinWiring({
+        entry,
+        path,
+        ctx,
+        rawValue,
+        isLongForm: true,
+        fieldDisabled,
+        boardPin: null,
+        boardPreset: false,
+      })}
     </div>
   `;
 }
@@ -443,15 +460,16 @@ function renderExpanderPin(
         .value=${ctx.localize("device.pin_on_expander", { provider, hub, channel })}
       />
       ${renderFieldError(path, ctx)}
-      ${renderPinWiring(
+      ${renderPinWiring({
         entry,
         path,
         ctx,
         rawValue,
-        isPlainObject(rawValue),
-        effectiveDisabled(entry, ctx),
-        null
-      )}
+        isLongForm: isPlainObject(rawValue),
+        fieldDisabled: effectiveDisabled(entry, ctx),
+        boardPin: null,
+        boardPreset: false,
+      })}
     </div>
   `;
 }

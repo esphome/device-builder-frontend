@@ -8,19 +8,16 @@
 import type { BoardPin } from "../api/types/boards.js";
 import { PinFeature, PinMode } from "../api/types/config-entries.js";
 import { isPlainObject } from "./nested-values.js";
-import { expandPinModeShorthand } from "./pin-mode.js";
+import { expandPinModeShorthand, PIN_MODE_SHORTHANDS } from "./pin-mode.js";
 import { parseYamlBoolean } from "./yaml-serialize.js";
 
-/** Mode-flag keys the guided wiring editor understands; a value carrying
- *  any other flag (``analog``, an expander-specific flag) falls back to
- *  the raw flag list. */
-export const KNOWN_MODE_FLAGS: ReadonlySet<string> = new Set([
-  "input",
-  "output",
-  "pullup",
-  "pulldown",
-  "open_drain",
-]);
+/** Mode-flag keys the guided wiring editor understands — the five native
+ *  flags, derived from the shorthand table so the two can't drift. A
+ *  value carrying any other flag (``analog``, an expander-specific flag)
+ *  falls back to the raw flag list. */
+export const KNOWN_MODE_FLAGS: ReadonlySet<string> = new Set(
+  Object.values(PIN_MODE_SHORTHANDS).flatMap((flags) => Object.keys(flags))
+);
 
 export interface WiringPreset {
   /** Localization suffix: ``device.pin_wiring_<id>`` / ``…_description``. */
@@ -88,7 +85,15 @@ export function presetsForPinMode(pinMode: PinMode | null | undefined): WiringPr
 }
 
 export type WiringState =
-  { kind: "default" } | { kind: "preset"; preset: WiringPreset } | { kind: "custom" };
+  | { kind: "default" }
+  | {
+      kind: "preset";
+      preset: WiringPreset;
+      /** No flags stored — the preset is the platform's implied default
+       *  direction, not an explicit user choice. */
+      implicit?: boolean;
+    }
+  | { kind: "custom" };
 
 /** The set flags of a ``mode`` value (object form, or a known scalar
  *  shorthand); ``null`` when the value can't be read as flags. */
@@ -106,13 +111,16 @@ export function modeFlagsOf(modeValue: unknown): Record<string, boolean> | null 
 /**
  * Classify the current ``mode``/``inverted`` pair against *presets*.
 
- * No flags and no inverted → default; an exact flag-set match (with the
- * closest ``invertedMatch``) → that preset; anything else → custom.
+ * An exact flag-set match (with the closest ``invertedMatch``) → that
+ * preset; no flags at all → the preset matching *pinMode*'s implied
+ * default direction, marked ``implicit`` (ESPHome runs the untouched pin
+ * that way); anything else → custom.
  */
 export function wiringStateOf(
   presets: WiringPreset[],
   modeValue: unknown,
-  invertedValue: unknown
+  invertedValue: unknown,
+  pinMode?: PinMode | null
 ): WiringState {
   const flags = modeFlagsOf(modeValue);
   if (flags === null) return { kind: "custom" };
@@ -122,7 +130,19 @@ export function wiringStateOf(
   // classified — don't claim a preset over it.
   if (invertedSet && inverted === null) return { kind: "custom" };
   if (Object.keys(flags).length === 0) {
-    return invertedSet ? { kind: "custom" } : { kind: "default" };
+    if (invertedSet) return { kind: "custom" };
+    const implied: Record<string, boolean> | null =
+      pinMode === PinMode.INPUT
+        ? { input: true }
+        : pinMode === PinMode.OUTPUT
+          ? { output: true }
+          : null;
+    const preset =
+      implied &&
+      presets
+        .filter((p) => sameFlagSet(implied, p.flags))
+        .find((p) => p.invertedMatch !== true);
+    return preset ? { kind: "preset", preset, implicit: true } : { kind: "default" };
   }
   const flagMatches = presets.filter((p) => sameFlagSet(flags, p.flags));
   if (flagMatches.length === 0) return { kind: "custom" };

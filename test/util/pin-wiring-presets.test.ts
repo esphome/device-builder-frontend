@@ -56,8 +56,23 @@ describe("modeFlagsOf", () => {
 });
 
 describe("wiringStateOf", () => {
-  it("classifies an untouched pin as default", () => {
+  it("classifies an untouched pin as default without a direction", () => {
     expect(wiringStateOf(inputPresets, undefined, undefined).kind).toBe("default");
+  });
+
+  it("maps an untouched pin to the direction's implied preset", () => {
+    const output = wiringStateOf(outputPresets, undefined, undefined, PinMode.OUTPUT);
+    expect(output).toMatchObject({
+      kind: "preset",
+      implicit: true,
+      preset: { id: "output_standard" },
+    });
+    const input = wiringStateOf(inputPresets, undefined, undefined, PinMode.INPUT);
+    expect(input).toMatchObject({
+      kind: "preset",
+      implicit: true,
+      preset: { id: "driven_signal" },
+    });
   });
 
   it("matches each input preset by exact flag set, inverted-agnostic", () => {

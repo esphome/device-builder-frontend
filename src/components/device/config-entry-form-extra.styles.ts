@@ -180,8 +180,12 @@ export const configEntryFormExtraStyles = css`
   }
 
   .pin-wiring-card--unavailable {
-    opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .pin-wiring-card[disabled] {
+    opacity: 0.6;
+    cursor: default;
   }
 
   .pin-wiring-card-title {
@@ -259,9 +263,37 @@ export const configEntryFormExtraStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
-  /* Same checked-dot specificity fix as the constraint-cluster radios. */
-  .pin-wiring-radios wa-radio[aria-checked="true"]::part(control) {
+  /* wa-radio's checked dot is "fill: currentColor", and its
+     ":host(:state(checked)) .control { color: ... }" rule ties on specificity
+     with the default "color: transparent" — the attribute selector wins the
+     tie, so the dot renders invisible. One generic rule for every form
+     radio group (constraint clusters, pin wiring). */
+  wa-radio[aria-checked="true"]::part(control) {
     color: var(--wa-form-control-activated-color) !important;
+  }
+
+  /* Board-preset wiring guard: view-only until the unlock is flipped. */
+  .pin-wiring-guard {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+  }
+
+  .pin-wiring-guard > wa-icon {
+    flex-shrink: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  .pin-wiring-guard-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pin-wiring-guard-text .field-description {
+    margin: 0;
   }
 
   /* ─── ID reference picker option layout ──────────────────── */

@@ -509,9 +509,29 @@ export function renderSuggestionSelect(
   `;
 }
 
+/** The renderable subset of *entries* for a nested scope.
+ *
+ * ``includeAdvanced`` forces advanced children visible while keeping the
+ * platform / depends_on gating — used where there is no per-member
+ * advanced toggle (a picked exclusive-group member, the pin wiring
+ * section). */
+export function filterChildEntries(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  ctx: RenderCtx,
+  opts: { includeAdvanced?: boolean } = {}
+): ConfigEntry[] {
+  return opts.includeAdvanced
+    ? filterRenderable(
+        entries,
+        values,
+        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
+      )
+    : ctx.filterRenderable(entries, values);
+}
+
 // Shared child rendering for the nested renderer and the exclusive-group
-// dropdown. ``includeAdvanced`` forces advanced children visible — a picked
-// exclusive member's fields must all show, as it has no per-member toggle.
+// dropdown.
 export function renderChildEntries(
   entry: ConfigEntry,
   path: string[],
@@ -519,12 +539,6 @@ export function renderChildEntries(
   opts: { includeAdvanced?: boolean } = {}
 ) {
   const values = ctx.scopeValues(path);
-  const children = opts.includeAdvanced
-    ? filterRenderable(
-        entry.config_entries ?? [],
-        values,
-        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
-      )
-    : ctx.filterRenderable(entry.config_entries ?? [], values);
+  const children = filterChildEntries(entry.config_entries ?? [], values, ctx, opts);
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }
