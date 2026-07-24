@@ -4,7 +4,10 @@
  */
 import { html, nothing } from "lit";
 import { defaultBoardImageUrl, onBoardImageError } from "../../../util/board-image.js";
-import { featuredEntryForInstance } from "../../../util/featured-id.js";
+import {
+  featuredDisplayName,
+  featuredEntryForInstance,
+} from "../../../util/featured-id.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import type { SectionConfigResponse } from "./loading.js";
@@ -30,9 +33,19 @@ export function renderSectionHeader(
     ? host._localize("device.external_component_title")
     : host._isPlatformDomain
       ? host._localize("device.platform_section_title")
-      : (featured?.name ?? config.title);
+      : config.title;
   const description = featured?.description ?? config.description;
   const imageUrl = featured?.image_url || config.image_url;
+  // The title keeps the component's identity ("ESP32 RMT LED Strip");
+  // the featured entry's name ("RGB LEDs (module)") rides the subtitle,
+  // named like the recommended card. A catalog miss keeps its raw
+  // section key there instead.
+  const featuredName = featured ? featuredDisplayName(featured, config.title) : null;
+  const subtitle = catalogMiss
+    ? host.sectionKey
+    : featuredName !== config.title
+      ? featuredName
+      : null;
   return html`
     <div class="section-header">
       <div class="section-header-info">
@@ -52,9 +65,7 @@ export function renderSectionHeader(
               : nothing
           }
         </div>
-        ${
-          catalogMiss ? html`<p class="section-subtitle">${host.sectionKey}</p>` : nothing
-        }
+        ${subtitle ? html`<p class="section-subtitle">${subtitle}</p>` : nothing}
         ${
           description
             ? html`<p class="section-desc">${renderMarkdown(description)}</p>`

@@ -7,7 +7,6 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import { renderSectionHeader } from "../../../src/components/device/device-section-config/render-header.js";
 import type { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import type { SectionConfigResponse } from "../../../src/components/device/device-section-config/loading.js";
@@ -15,27 +14,40 @@ import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
+import { makeTestBoard } from "./_renderer-fixtures.js";
 
-const BOARD = {
-  id: "apollo-esk-1",
-  featured_components: [
-    {
-      id: "rgb_leds",
-      component_id: "light.esp32_rmt_led_strip",
-      name: "RGB LEDs (module)",
-      description: "The 10 RGB LEDs by themselves.",
-      image_url: "https://cdn.example/led_module.png",
-      fields: { id: { value: "rgb_leds", locked: false, suggestions: null } },
-    },
-    {
-      id: "onboard_rgb_led",
-      component_id: "light.esp32_rmt_led_strip",
-      name: "Onboard RGB LED",
-      description: "The onboard RGB LED.",
-      fields: { id: { value: "onboard_rgb_led", locked: false, suggestions: null } },
-    },
-  ],
-} as unknown as BoardCatalogEntry;
+const BOARD = makeTestBoard({
+  overrides: {
+    id: "apollo-esk-1",
+    featured_components: [
+      {
+        id: "rgb_leds",
+        component_id: "light.esp32_rmt_led_strip",
+        name: "RGB LEDs (module)",
+        description: "The 10 RGB LEDs by themselves.",
+        image_url: "https://cdn.example/led_module.png",
+        fields: { id: { value: "rgb_leds" } },
+      },
+      {
+        id: "onboard_rgb_led",
+        component_id: "light.esp32_rmt_led_strip",
+        name: "Onboard RGB LED",
+        description: "The onboard RGB LED.",
+        fields: { id: { value: "onboard_rgb_led" } },
+      },
+      {
+        id: "relay_1",
+        component_id: "light.esp32_rmt_led_strip",
+        name: null,
+        description: null,
+        fields: {
+          id: { value: "relay_1" },
+          name: { value: "Relay 1" },
+        },
+      },
+    ],
+  } as never,
+});
 
 const CONFIG = {
   section_key: "light.esp32_rmt_led_strip",
@@ -63,9 +75,12 @@ const imgSrc = (tpl: unknown): unknown =>
   extractAttributeBindings(findTemplatesByAnchor(tpl, "<img")[0]).src;
 
 describe("section header featured presentation", () => {
-  it("uses the matching featured entry's name, description, and image", () => {
+  it("keeps the component title and subtitles the featured entry's name", () => {
     const tpl = renderSectionHeader(makeHost({ id: "rgb_leds" }), CONFIG, []);
     const out = serialize(tpl);
+    // Component identity stays the title; the module name rides below.
+    expect(out).toContain("ESP32 RMT LED Strip");
+    expect(out).toContain("section-subtitle");
     expect(out).toContain("RGB LEDs (module)");
     expect(out).toContain("The 10 RGB LEDs by themselves.");
     expect(imgSrc(tpl)).toBe("https://cdn.example/led_module.png");
@@ -77,11 +92,20 @@ describe("section header featured presentation", () => {
     expect(imgSrc(tpl)).toBe("https://cdn.example/generic.png");
   });
 
+  it("names an unnamed entry from its name preset, like the add card", () => {
+    // Mirrors the backend's _featured_display_name chain so the header
+    // and the recommended card never disagree on the entry's name.
+    const tpl = renderSectionHeader(makeHost({ id: "relay_1" }), CONFIG, []);
+    expect(serialize(tpl)).toContain("Relay 1");
+  });
+
   it("keeps the catalog presentation for a hand-authored instance", () => {
     const tpl = renderSectionHeader(makeHost({ id: "my_own_strip" }), CONFIG, []);
     const out = serialize(tpl);
     expect(out).toContain("ESP32 RMT LED Strip");
     expect(out).toContain("Generic catalog description.");
     expect(imgSrc(tpl)).toBe("https://cdn.example/generic.png");
+    // No featured override, no subtitle.
+    expect(out).not.toContain("section-subtitle");
   });
 });
