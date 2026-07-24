@@ -24,15 +24,19 @@ export const KNOWN_MODE_FLAGS: ReadonlySet<string> = new Set(
  *  them. */
 export const PIN_WIRING_KEYS: ReadonlySet<string> = new Set(["mode", "inverted"]);
 
-/** Whether both wiring values can be read as flags / a boolean. The
- *  preset cards require this — a ``${var}`` in either must fall through
- *  to the raw disclosure, where the substitution gate owns editing. */
-export function wiringValuesReadable(
+/** Whether the preset cards may own the wiring values: both readable
+ *  (a ``${var}`` in either falls to the raw disclosure, where the
+ *  substitution gate owns editing) and every stored mode flag one the
+ *  guided UI models — a card pick replaces the whole ``mode`` block, so
+ *  it must never delete a flag it can't represent (``analog``). */
+export function wiringValuesPresetSafe(
   modeValue: unknown,
   invertedValue: unknown
 ): boolean {
+  const flags = modeFlagsOf(modeValue);
   return (
-    modeFlagsOf(modeValue) !== null &&
+    flags !== null &&
+    Object.keys(flags).every((k) => KNOWN_MODE_FLAGS.has(k)) &&
     (invertedValue === undefined ||
       invertedValue === null ||
       parseYamlBoolean(invertedValue) !== null)

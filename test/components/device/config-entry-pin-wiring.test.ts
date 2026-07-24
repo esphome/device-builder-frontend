@@ -205,6 +205,17 @@ describe("pin wiring preset cards", () => {
     expect(cards(flagSub)).toHaveLength(0);
   });
 
+  it("keeps the raw disclosure for a readable flag outside the guided set", () => {
+    // A card pick replaces the whole mode block — never offer one that
+    // would delete a flag the cards can't represent.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2", mode: { input: true, analog: true } })
+    );
+    expect(cards(result)).toHaveLength(0);
+  });
+
   it("keeps the raw disclosure when the pin number is a substitution", () => {
     // The GPIO is unknown, so the input-only guardrail can't vouch for
     // the cards; the raw disclosure edits the reference safely.
@@ -647,6 +658,18 @@ describe("pin wiring board-preset guard", () => {
     // The group stays Tab-reachable while everything is guarded: the
     // selected (implied-default) card keeps the tab stop.
     expect(cardById(result, "driven_signal")?.tabindex).toBe("0");
+  });
+
+  it("guards a substitution pin resolving to the board's designated GPIO", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      guardedCtx(
+        { number: "${my_pin}", mode: { input: true } },
+        { yaml: "substitutions:\n  my_pin: GPIO2\n" }
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
   });
 
   it("guards a pin sitting on a featured-component field preset", () => {

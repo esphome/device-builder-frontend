@@ -12,7 +12,7 @@ import { PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
-import { isSubstitutionString } from "../../util/substitutions.js";
+import { isSubstitutionString, resolveSubstitutions } from "../../util/substitutions.js";
 import { renderPinWiring } from "./config-entry-pin-wiring.js";
 import {
   effectiveDisabled,
@@ -443,6 +443,17 @@ function renderSubstitutionPin(
   const numberPath = [...path, "number"];
   const invalid = ctx.errorAt(numberPath) !== null;
   const fieldDisabled = effectiveDisabled(entry, ctx);
+  // The ``${var}`` can still resolve to the board's designated GPIO for
+  // this section — run the picker path's designation test on the
+  // resolved value, so spelling the pin as a substitution doesn't drop
+  // the wiring guard. An unresolvable reference guards nothing (the
+  // wiring is unknowable, and the presets gate already withholds cards).
+  const resolvedGpio = parseBoardGpio(resolveSubstitutions(number, ctx.substitutions));
+  const boardPins = boardPinsForSection(ctx, entry.key);
+  const boardPreset =
+    resolvedGpio !== null &&
+    (boardPins.gpios.has(resolvedGpio) ||
+      (entry.suggestions ?? []).some((s) => parseBoardGpio(s) === resolvedGpio));
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
@@ -463,7 +474,7 @@ function renderSubstitutionPin(
         ctx,
         rawValue,
         boardPin: null,
-        boardPreset: false,
+        boardPreset,
       })}
     </div>
   `;

@@ -8,6 +8,7 @@ import {
   presetUnavailableReason,
   wiringStateOf,
   wiringTechSummary,
+  wiringValuesPresetSafe,
 } from "../../src/util/pin-wiring-presets.js";
 
 const inputPresets = presetsForPinMode(PinMode.INPUT);
@@ -33,6 +34,22 @@ describe("presetsForPinMode", () => {
     expect(presetsForPinMode(PinMode.INPUT_OUTPUT)).toEqual([]);
     expect(presetsForPinMode(null)).toEqual([]);
     expect(presetsForPinMode(undefined)).toEqual([]);
+  });
+});
+
+describe("wiringValuesPresetSafe", () => {
+  it("accepts native flags with a readable inverted, and unset values", () => {
+    expect(wiringValuesPresetSafe({ input: true, pullup: true }, true)).toBe(true);
+    expect(wiringValuesPresetSafe(undefined, undefined)).toBe(true);
+  });
+
+  it("rejects a readable flag outside the guided set", () => {
+    expect(wiringValuesPresetSafe({ input: true, analog: true }, undefined)).toBe(false);
+  });
+
+  it("rejects a substitution in either value", () => {
+    expect(wiringValuesPresetSafe("${my_mode}", undefined)).toBe(false);
+    expect(wiringValuesPresetSafe({ input: true }, "${inv}")).toBe(false);
   });
 });
 

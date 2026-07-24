@@ -38,6 +38,7 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
   let level = entries;
   let advanced = false;
   let prevWasPin = false;
+  let inPinWiring = false;
   for (const key of path) {
     if (isIndexSegment(key)) continue;
     const entry = level.find((e) => e.key === key);
@@ -46,12 +47,11 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
     // can't show it — don't reveal for one.
     if (entry.hidden) return false;
     // A pin's wiring section renders its fields regardless of the global
-    // toggle, so their catalog-advanced marks don't gate anything; only
-    // advanced-ness above the pin counts.
-    if (prevWasPin && PIN_WIRING_KEYS.has(entry.key)) {
-      return advanced;
-    }
-    if (entry.advanced) advanced = true;
+    // toggle, so advanced marks at or below the wiring keys don't gate
+    // anything; keep walking so the hidden check above still covers the
+    // rest of the path.
+    if (prevWasPin && PIN_WIRING_KEYS.has(entry.key)) inPinWiring = true;
+    if (entry.advanced && !inPinWiring) advanced = true;
     prevWasPin = entry.type === ConfigEntryType.PIN;
     level = entry.config_entries ?? [];
   }

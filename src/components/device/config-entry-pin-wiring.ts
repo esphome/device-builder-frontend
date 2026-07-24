@@ -23,7 +23,7 @@ import {
   presetUnavailableReason,
   wiringStateOf,
   wiringTechSummary,
-  wiringValuesReadable,
+  wiringValuesPresetSafe,
   type WiringPreset,
   type WiringState,
 } from "../../util/pin-wiring-presets.js";
@@ -111,16 +111,17 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // not the user's circuit, so cards like "active low output" mislead.
   // Expander channels are excluded structurally (never via the provider
   // mode registry, which may still be fetching).
-  // And only when every stored wiring value is readable — a ``${var}``
-  // mode or inverted must fall through to the raw disclosure, where the
-  // substitution gate owns it (a preset pick would clobber the
-  // reference), and a ``${var}`` number leaves the actual GPIO unknown,
-  // so the input-only guardrail could not vouch for the cards.
+  // And only when a card pick can't lose data — a ``${var}`` mode or
+  // inverted, or a readable flag outside the guided set (``analog``),
+  // must fall through to the raw disclosure (a pick would clobber the
+  // reference / delete the flag), and a ``${var}`` number leaves the
+  // actual GPIO unknown, so the input-only guardrail could not vouch
+  // for the cards.
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
     !isExpanderPinValue(rawValue) &&
-    wiringValuesReadable(modeValue, invertedValue) &&
+    wiringValuesPresetSafe(modeValue, invertedValue) &&
     !(isLongForm && isSubstitutionString((rawValue as Record<string, unknown>).number))
       ? presetsForPinMode(entry.pin_mode)
       : [];

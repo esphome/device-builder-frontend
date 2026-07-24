@@ -80,4 +80,23 @@ describe("pathIsAdvanced", () => {
     const advancedPin = { ...pin, advanced: true } as ConfigEntry;
     expect(pathIsAdvanced([advancedPin], ["pin", "mode", "input"])).toBe(true);
   });
+
+  it("still short-circuits on a hidden flag under a pin's mode group", () => {
+    // The wiring exception suppresses advanced marks, not the hidden
+    // walk — a hidden flag never renders, so don't reveal for it.
+    const pin = {
+      key: "pin",
+      type: ConfigEntryType.PIN,
+      label: "Pin",
+      advanced: true,
+      config_entries: [
+        nested("mode", true, [
+          entry("input", true),
+          { ...entry("secret", true), hidden: true } as ConfigEntry,
+        ]),
+      ],
+    } as ConfigEntry;
+    expect(pathIsAdvanced([pin], ["pin", "mode", "secret"])).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "mode", "input"])).toBe(true);
+  });
 });
