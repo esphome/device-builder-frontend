@@ -434,6 +434,11 @@ export function renderPinField(
     ownLockedGpios.add(valueGpio);
   }
   const fieldDisabled = effectiveDisabled(entry, ctx);
+  // A board-preset pin's GPIO is the board's wiring, not the user's: lock
+  // the select in lockstep with the wiring panel's guard (wiring.ts). The
+  // active option is already forced into ``visible`` above, so the disabled
+  // head still shows the real pin instead of blanking.
+  const guarded = boardPresetPin && !fieldDisabled;
   const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is
@@ -465,7 +470,8 @@ export function renderPinField(
         data-field-key=${fieldKeyAttr(isLongForm ? [...path, "number"] : path)}
         class=${invalid ? "invalid" : ""}
         placeholder=${defaultPlaceholder}
-        ?disabled=${fieldDisabled}
+        ?disabled=${fieldDisabled || guarded}
+        title=${guarded ? ctx.localize("device.pin_wiring_guard_tooltip") : nothing}
         @change=${onPinChange}
       >
         ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
