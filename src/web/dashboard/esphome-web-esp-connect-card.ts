@@ -10,6 +10,7 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
+import { PortDisconnectWatcher } from "../util/port-disconnect-watcher.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 import "./esphome-web-esp-device-card.js";
@@ -32,6 +33,14 @@ export class ESPHomeWebEspConnectCard extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _port?: SerialPort;
+
+  // Rides out the spurious disconnect a native-USB chip fires while
+  // re-enumerating, swapping in the live handle; a real unplug still resets.
+  private _watcher = new PortDisconnectWatcher(
+    this,
+    (port) => (this._port = port),
+    () => (this._port = undefined)
+  );
 
   protected render() {
     if (this._port) {
@@ -83,11 +92,11 @@ export class ESPHomeWebEspConnectCard extends LitElement {
       return;
     }
     this._port = port;
-    port.addEventListener("disconnect", this._handleClose);
+    this._watcher.watch(port);
   }
 
   private _handleClose = (): void => {
-    this._port?.removeEventListener("disconnect", this._handleClose);
+    this._watcher.unwatch();
     this._port = undefined;
   };
 

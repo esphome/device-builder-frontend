@@ -14,6 +14,7 @@ import { isPortPickerCancel } from "../../util/web-serial.js";
 import { IMPROV_OPEN_DELAY_MS, openImprovDialog } from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-install-pico-dialog.js";
 import { picoPortFilters } from "../util/pico-port-filter.js";
+import { PortDisconnectWatcher } from "../util/port-disconnect-watcher.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 import "./esphome-web-pico-device-card.js";
@@ -36,6 +37,14 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
 
   @state() private _port?: SerialPort;
   @state() private _setupOpen = false;
+
+  // Rides out the spurious disconnect a native-USB chip fires while
+  // re-enumerating, swapping in the live handle; a real unplug still resets.
+  private _watcher = new PortDisconnectWatcher(
+    this,
+    (port) => (this._port = port),
+    () => (this._port = undefined)
+  );
 
   protected render() {
     if (this._port) {
@@ -113,11 +122,11 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
 
   private _adoptPort(port: SerialPort): void {
     this._port = port;
-    port.addEventListener("disconnect", this._handleClose);
+    this._watcher.watch(port);
   }
 
   private _handleClose = (): void => {
-    this._port?.removeEventListener("disconnect", this._handleClose);
+    this._watcher.unwatch();
     this._port = undefined;
   };
 

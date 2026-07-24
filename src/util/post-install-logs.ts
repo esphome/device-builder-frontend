@@ -4,12 +4,11 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError } from "./notify.js";
-import { isPortPickerCancel, SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
-
-// Reopen budget for a port closed by the post-install reset: covers the
-// native-USB re-enumeration window (``SERIAL_ACTIVITY_WINDOW_MS``) with margin
-// for a slower first enumeration on a brand-new board.
-const SERIAL_REOPEN_TIMEOUT_MS = SERIAL_ACTIVITY_WINDOW_MS + 2000;
+import {
+  grantedHandlesFor,
+  isPortPickerCancel,
+  SERIAL_REOPEN_TIMEOUT_MS,
+} from "./web-serial.js";
 
 /**
  * Human label for a Web Serial port, for error messages. Web Serial exposes
@@ -160,17 +159,6 @@ export function postInstallShowLogsHandler(
   return (e) => handlePostInstallShowLogs(e, getLogsDialog(), getLocalize());
 }
 
-// Same USB device by vendor/product id. Requires both ids present so two
-// non-USB ports (``undefined === undefined``) aren't treated as a match.
-// VID:PID isn't a unique device id — two identical boards both match and
-// getPorts() order picks one; Web Serial exposes no per-device serial to
-// disambiguate, and the post-install flow is single-device anyway.
-const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
-  a.usbVendorId !== undefined &&
-  a.usbProductId !== undefined &&
-  a.usbVendorId === b.usbVendorId &&
-  a.usbProductId === b.usbProductId;
-
 /**
  * Open the live SerialPort for a device the post-install hard-reset just
  * closed, retrying through the native-USB re-enumeration window. Returns the
@@ -189,25 +177,15 @@ async function openLiveSerialPort(
   baudRate: number,
   timeoutMs: number
 ): Promise<SerialPort | null> {
-  const want = cachedPort.getInfo();
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
   while (true) {
-    let granted: SerialPort[] = [];
-    try {
-      granted = await navigator.serial.getPorts();
-    } catch {
-      /* getPorts can transiently reject mid-re-enumeration; treat as empty
-         and retry (the cached handle is still tried below). */
-    }
     // Prefer a freshly-granted handle for the same device (Chrome's live
     // re-enumerated port), then the cached handle (Firefox / UART bridges
-    // reopen it in place). The cached handle is dropped from the granted list
-    // so it isn't tried twice per round.
-    const candidates = [
-      ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
-      cachedPort,
-    ];
+    // reopen it in place), probed even when getPorts() omits it: the open()
+    // attempt below is the real liveness test here.
+    const { fresh } = await grantedHandlesFor(cachedPort);
+    const candidates = [...fresh, cachedPort];
     for (const p of candidates) {
       if (p.readable) return p; // already open (a reset race left it usable)
       try {

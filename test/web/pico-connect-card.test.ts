@@ -12,12 +12,16 @@ vi.mock("../../src/web/install/esphome-web-install-pico-dialog.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-pico-device-card.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
+const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
+  reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { flush } from "../_dom.js";
+import { makeDisconnectPort } from "../_web-serial.js";
 import { ESPHomeWebPicoConnectCard } from "../../src/web/dashboard/esphome-web-pico-connect-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -64,6 +68,33 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
     );
 
     expect(openImprovDialog).toHaveBeenCalledOnce();
+    expect((el as any)._port).toBeUndefined();
+  });
+});
+
+describe("esphome-web-pico-connect-card disconnect resilience", () => {
+  it("keeps the device card through a re-enum blip, rebinding the live handle", async () => {
+    const adopted = makeDisconnectPort();
+    const fresh = makeDisconnectPort();
+    reacquirePort.mockResolvedValue(fresh);
+    const el = await mount();
+
+    (el as any)._adoptPort(adopted);
+    adopted.fire();
+    await flush();
+
+    expect((el as any)._port).toBe(fresh);
+  });
+
+  it("falls back to the connect screen when the device stays gone", async () => {
+    const adopted = makeDisconnectPort();
+    reacquirePort.mockResolvedValue(null);
+    const el = await mount();
+
+    (el as any)._adoptPort(adopted);
+    adopted.fire();
+    await flush();
+
     expect((el as any)._port).toBeUndefined();
   });
 });
