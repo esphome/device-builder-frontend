@@ -298,4 +298,46 @@ describe("esphome-web-logs-dialog", () => {
     hooks.onLine("paused line");
     expect((el as any)._pendingLines).not.toContain("paused line");
   });
+
+  it("starts streaming when the port arrives after the dialog opened", async () => {
+    // The flash receiver's hand-off shape: dialog open while the rebooted
+    // device re-enumerates, port assigned once acquired.
+    const el = await mount();
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).not.toHaveBeenCalled();
+
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("latches the crash banner on a panic line, upgrading previous-boot to live", async () => {
+    const el = await mount();
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    const hooks = calls[calls.length - 1][1];
+
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+
+    hooks.onLine("*** CRASH DETECTED - report follows ***");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")?.textContent).toContain(
+      "crash_report.banner_previous_boot"
+    );
+
+    hooks.onLine("Guru Meditation Error: Core  1 panic'ed (LoadProhibited)");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")?.textContent?.trim()).toBe(
+      "crash_report.banner"
+    );
+
+    // Clear drops the banner with the lines.
+    (el as any)._clear();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
 });

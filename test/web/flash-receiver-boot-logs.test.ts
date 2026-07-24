@@ -5,20 +5,23 @@ vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
 }));
 vi.mock("../../src/web/install/run-flash.js", () => ({ runFlash: vi.fn() }));
-vi.mock("../../src/util/serial-log-stream.js", () => ({
-  streamSerialLines: vi.fn(() => vi.fn()),
-}));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("../../src/components/ansi-log.js", () => ({}));
+vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+  openPortForLogs: vi.fn(async () => true),
+}));
 
 const openLiveLogPort = vi.fn();
 vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
   openLiveLogPort: (...args: unknown[]) => openLiveLogPort(...args),
 }));
 
-import { streamSerialLines } from "../../src/util/serial-log-stream.js";
+import toast from "sonner-js";
+
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
+import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -44,39 +47,91 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("esphome-web-flash-receiver live-log stop race", () => {
-  it("does not start streaming when Stop lands during the setSignals await", async () => {
+describe("esphome-web-flash-receiver boot logs hand-off", () => {
+  it("opens the logs dialog immediately and hands it the acquired port", async () => {
     const el = await mount();
+    const port = makePort();
+    openLiveLogPort.mockImplementation(async () => {
+      // The dialog must already be open while the device re-enumerates.
+      expect((el as any)._logsOpen).toBe(true);
+      return { port, error: null };
+    });
 
+    await (el as any)._openBootLogs({}, []);
+
+    expect((el as any)._logPort).toBe(port);
+    expect((el as any)._logsOpen).toBe(true);
+    expect(port.setSignals).toHaveBeenCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
+    expect(port.close).not.toHaveBeenCalled();
+  });
+
+  it("aborts the wait silently when the dialog is closed during it", async () => {
+    const el = await mount();
+    openLiveLogPort.mockImplementation(async (...args: unknown[]) => {
+      (el as any)._logsOpen = false; // user closed the dialog
+      expect((args[4] as () => boolean)()).toBe(true); // shouldStop sees it
+      return { port: null };
+    });
+
+    await (el as any)._openBootLogs({}, []);
+
+    expect((el as any)._logPort).toBeUndefined();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("toasts and closes the dialog when the device never re-enumerates", async () => {
+    const el = await mount();
+    openLiveLogPort.mockResolvedValue({ port: null, error: "gone" });
+
+    await (el as any)._openBootLogs({}, []);
+
+    expect((el as any)._logsOpen).toBe(false);
+    expect(toast.error).toHaveBeenCalledOnce();
+  });
+
+  it("closes the port instead of handing it when the dialog closed mid-setSignals", async () => {
+    const el = await mount();
     const port = makePort({
-      // Simulate the user pressing Stop mid-await: _logCancel?.() is a no-op
-      // because no reader is attached yet.
       setSignals: vi.fn(async () => {
-        (el as any)._stopLogs = true;
+        (el as any)._logsOpen = false;
       }),
     });
     openLiveLogPort.mockResolvedValue({ port, error: null });
 
-    await (el as any)._streamLogs({}, []);
-    await el.updateComplete;
+    await (el as any)._openBootLogs({}, []);
 
-    expect(streamSerialLines).not.toHaveBeenCalled();
     expect(port.close).toHaveBeenCalledOnce();
-    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._logPort).toBeUndefined();
   });
 
-  it("streams when Stop is not pressed", async () => {
+  it("reopens the kept port through openPortForLogs on the Logs button", async () => {
     const el = await mount();
-
     const port = makePort();
-    openLiveLogPort.mockResolvedValue({ port, error: null });
+    (el as any)._flashDone = true;
+    (el as any)._logPort = port;
 
-    await (el as any)._streamLogs({}, []);
+    await (el as any)._onViewLogs();
+
+    expect(openPortForLogs).toHaveBeenCalledWith(port, expect.anything());
+    expect((el as any)._logsOpen).toBe(true);
+  });
+});
+
+describe("esphome-web-flash-receiver keep-visible warning", () => {
+  it("shows the warning only while a flash is running", async () => {
+    const el = await mount();
+    (el as any)._state = "installing";
+    (el as any)._statusMessage = "x";
+    (el as any)._busy = true;
     await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("firmware.flashing_keep_visible");
 
-    expect(streamSerialLines).toHaveBeenCalledOnce();
-    expect(port.close).not.toHaveBeenCalled();
-    expect((el as any)._logCancel).toBeTypeOf("function");
+    (el as any)._busy = false;
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).not.toContain("firmware.flashing_keep_visible");
   });
 });
 
@@ -104,16 +159,6 @@ describe("esphome-web-flash-receiver behaviour", () => {
     (el as any)._onFileChange();
 
     expect((el as any)._flashDone).toBe(false);
-  });
-
-  it("prints a Terminal disconnected line when the log stream drops", async () => {
-    const el = await mount();
-    (el as any)._streaming = true;
-
-    (el as any)._onLogDisconnect();
-
-    expect((el as any)._streaming).toBe(false);
-    expect((el as any)._logLines).toContain("web.logs.terminal_disconnected");
   });
 
   it("shows a terminal error state when the hand-off times out", async () => {
