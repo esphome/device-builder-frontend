@@ -51,9 +51,11 @@ export interface PinWiringOptions {
   ctx: RenderCtx;
   rawValue: unknown;
   boardPin: BoardPin | null;
-  /** The pin sits on a GPIO the board locks to this section — the wiring
-   *  is the board's, shown read-only; changes go through the YAML. */
-  boardPreset: boolean;
+  /** The pin sits on a board designation for this section and isn't
+   *  hard-locked — the wiring is the board's, shown read-only; changes
+   *  go through the YAML. Computed by the caller so the picker's select
+   *  locks in lockstep with this panel. */
+  guarded: boolean;
 }
 
 /**
@@ -77,7 +79,7 @@ export interface PinWiringOptions {
  * bus pins (uart/i2c/adc) and pre-#430 catalogs keep the plain picker.
  */
 export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof nothing {
-  const { entry, path, ctx, rawValue, boardPin, boardPreset } = opts;
+  const { entry, path, ctx, rawValue, boardPin, guarded } = opts;
   const isLongForm = isPlainObject(rawValue);
   const fieldDisabled = effectiveDisabled(entry, ctx);
   // The wiring fields (mode + inverted) are not an advanced nicety:
@@ -129,11 +131,6 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;
-
-  // A board-preset pin carries the board's known-good wiring; the panel
-  // is view-only and the guard row points at the YAML editor for the
-  // rare deliberate change.
-  const guarded = boardPreset && !fieldDisabled;
 
   let state: WiringState = { kind: "default" };
   let labelText: string | undefined;

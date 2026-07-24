@@ -1026,7 +1026,7 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 
-  it("disables the GPIO select on a board-preset pin", () => {
+  it("disables the GPIO select on a board-preset pin, keeping the active option", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
@@ -1035,6 +1035,10 @@ describe("pin wiring board-preset guard", () => {
     const select = findElementBindings(result, "wa-select")[0];
     expect(select["?disabled"]).toBe(true);
     expect(select.title).toBe("device.pin_wiring_guard_tooltip");
+    // The active pin's option still renders, so the disabled head isn't blank.
+    expect(
+      findElementBindings(result, "wa-option").some((o) => o.value === "GPIO2")
+    ).toBe(true);
   });
 
   it("leaves the select editable when the pin is the user's own", () => {
@@ -1046,18 +1050,6 @@ describe("pin wiring board-preset guard", () => {
     const select = findElementBindings(result, "wa-select")[0];
     expect(select["?disabled"]).toBe(false);
     expect(select.title).toBe(nothing);
-  });
-
-  it("keeps the active pin option rendered while the select is disabled", () => {
-    const result = renderPinField(
-      wiringPinEntry(PinMode.INPUT),
-      ["pin"],
-      guardedCtx("GPIO2")
-    );
-    expect(findElementBindings(result, "wa-select")[0]["?disabled"]).toBe(true);
-    expect(
-      findElementBindings(result, "wa-option").some((o) => o.value === "GPIO2")
-    ).toBe(true);
   });
 
   it("locks children of a hard-locked pin carrying wiring values", () => {

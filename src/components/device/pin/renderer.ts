@@ -434,8 +434,8 @@ export function renderPinField(
     ownLockedGpios.add(valueGpio);
   }
   const fieldDisabled = effectiveDisabled(entry, ctx);
-  // A board-preset pin's GPIO is the board's wiring, not the user's: lock
-  // the select in lockstep with the wiring panel's guard (wiring.ts). The
+  // A board-preset pin's GPIO is the board's wiring, not the user's: the
+  // same guard that view-onlys the wiring panel locks the select. The
   // active option is already forced into ``visible`` above, so the disabled
   // head still shows the real pin instead of blanking.
   const guarded = boardPresetPin && !fieldDisabled;
@@ -483,7 +483,7 @@ export function renderPinField(
         ctx,
         rawValue,
         boardPin,
-        boardPreset: boardPresetPin,
+        guarded,
       })}
     </div>
   `;
@@ -524,6 +524,7 @@ function renderSubstitutionPin(
         (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolved)
       : designationMatches(boardPins.tokens, resolved) ||
         (entry.suggestions ?? []).some((s) => s === resolved));
+  const guarded = boardPreset && !fieldDisabled;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
@@ -544,7 +545,7 @@ function renderSubstitutionPin(
         ctx,
         rawValue,
         boardPin: null,
-        boardPreset,
+        guarded,
       })}
     </div>
   `;
@@ -565,6 +566,7 @@ function renderExpanderPin(
   boardPreset: boolean
 ): TemplateResult {
   const [provider, hub, channel] = identity.split(":");
+  const guarded = boardPreset && !effectiveDisabled(entry, ctx);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
@@ -580,7 +582,7 @@ function renderExpanderPin(
         ctx,
         rawValue,
         boardPin: null,
-        boardPreset,
+        guarded,
       })}
     </div>
   `;
