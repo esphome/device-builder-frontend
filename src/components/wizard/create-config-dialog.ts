@@ -47,7 +47,7 @@ type WizardStep =
   | "import-partial";
 type CreationMethod = "basic" | "empty" | "import";
 
-const EMPTY_TAKEN: ReadonlySet<string> = new Set();
+const EMPTY_TAKEN: ReadonlySet<string> = new Set<string>();
 type WizardStepDetail =
   | WizardStep
   | {
