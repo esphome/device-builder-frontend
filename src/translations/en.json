@@ -1218,7 +1218,7 @@
     "theme_system": "System",
     "settings": "Settings",
     "search": "Search commands",
-    "search_shortcut": "Ctrl K",
+    "search_shortcut": "Ctrl+K",
     "guided_tour": "Take a tour",
     "archived_devices": "Archived devices",
     "show_ignored_discoveries": "Show ignored discoveries ({count})",
