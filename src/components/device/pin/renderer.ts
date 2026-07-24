@@ -30,6 +30,7 @@ import {
   renderLabel,
   renderStringField,
   renderSubstitutionHint,
+  tooltipAnchorId,
   type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -451,7 +452,7 @@ export function renderPinField(
         locked_reason_key: "device.pin_wiring_guard_tooltip",
       } as ConfigEntry & LockedReasonCarrier)
     : entry;
-  const guardTipId = `pin-guard-tip-${path.join(".")}`;
+  const guardTipId = tooltipAnchorId("pin-guard-tip", path);
   const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is
@@ -472,7 +473,7 @@ export function renderPinField(
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(labelEntry, ctx)}
+      ${renderLabel(labelEntry, ctx, { path })}
       <!-- Keyed as the long form's number so the YAML cursor lands on the
            select itself (the whole-field fallback centers mid-panel once
            the wiring disclosure is open). Short form keeps the bare path:
@@ -547,7 +548,7 @@ function renderSubstitutionPin(
   const guarded = boardPreset && !fieldDisabled;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <!-- Deliberately not guard-locked: no manifest designates a pin via a
            substitution, so a \${var} landing on one is the user's own
            hand-authored setup, and this input edits the reference name, not
@@ -593,7 +594,7 @@ function renderExpanderPin(
   const guarded = boardPreset && !effectiveDisabled(entry, ctx);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <input
         type="text"
         readonly

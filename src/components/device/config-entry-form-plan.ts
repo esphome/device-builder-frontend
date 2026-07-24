@@ -5,8 +5,10 @@ import {
 } from "./config-entry-render-filter.js";
 import {
   buildConstraintClusters,
+  isRadioCluster,
   type ConstraintCluster,
 } from "./config-entry-renderers/constraint-cluster.js";
+import { choicePinned } from "../../util/config-entry-tree.js";
 import { orderExclusiveGroups } from "./config-entry-renderers/exclusive-group.js";
 
 /**
@@ -63,9 +65,20 @@ export function planNeedsUserInput(
 ): boolean {
   const anyActionable = (entries: ConfigEntry[]): boolean =>
     entries.some((e) => !e.locked && isVisible(e));
+  // A pinned selector (group dropdown, exactly_one radios) is disabled, so
+  // an unlocked member behind it is unreachable — don't let it hold the
+  // form open. Box clusters paint their members directly and stay gated on
+  // anyActionable alone.
   return (
     anyActionable([...plan.visible]) ||
-    plan.clusters.some((cluster) => anyActionable(cluster.members)) ||
-    plan.ordered.some((item) => Array.isArray(item) && anyActionable(item))
+    plan.clusters.some(
+      (cluster) =>
+        anyActionable(cluster.members) &&
+        !(isRadioCluster(cluster) && choicePinned(cluster.members, isVisible))
+    ) ||
+    plan.ordered.some(
+      (item) =>
+        Array.isArray(item) && anyActionable(item) && !choicePinned(item, isVisible)
+    )
   );
 }

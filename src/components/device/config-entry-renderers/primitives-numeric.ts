@@ -219,7 +219,7 @@ export function renderTimePeriodField(
         : parsed.unit;
   return html`
     <div class="field time-period" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <div class="time-period-inputs">
         <input
           type="text"
@@ -311,7 +311,7 @@ export function renderFloatWithUnitField(
     ctx.emitChange(path, serializeFloatWithUnit(next));
   return html`
     <div class="field float-with-unit" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <div class="float-with-unit-inputs">
         <input
           type="number"

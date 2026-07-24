@@ -47,7 +47,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   ) {
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
+        ${renderLabel(entry, ctx, { path })}
         <p class="field-description">
           ${ctx.localize("device.value_set_in_yaml", { value: String(raw) })}
         </p>

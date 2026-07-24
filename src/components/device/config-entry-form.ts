@@ -41,6 +41,7 @@ import {
 import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fetchAllComponents } from "../../util/fetch-all-components.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -367,11 +368,20 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
+    // Board-locked featured presets render read-only wherever the form is
+    // mounted — the add dialog's entries arrive pre-locked, but the editor's
+    // plain schema needs the value-dependent overlay.
+    const withLocks = overlayBoardLockedPresets(
+      this.entries,
+      this.board,
+      this.sectionKey,
+      this.values
+    );
     // In the add-component dialog, float required entries above optional
     // ones (stable, so each keeps its catalog order) so the user fills the
     // mandatory fields first. The section editor mirrors the on-disk YAML
     // order, so it's left untouched.
-    const entries = this.requiredOnly ? floatRequiredFirst(this.entries) : this.entries;
+    const entries = this.requiredOnly ? floatRequiredFirst(withLocks) : withLocks;
     return this.advancedSection
       ? this._renderWithAdvancedSection(entries, ctx)
       : this._renderFlat(entries, ctx);

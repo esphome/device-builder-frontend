@@ -1,3 +1,5 @@
+import type { BoardCatalogEntry, FeaturedComponent } from "../api/types/boards.js";
+
 /** The `featured.<board>.<local>` id prefix marking a board-curated preset entry. */
 export const FEATURED_ID_PREFIX = "featured.";
 
@@ -15,6 +17,26 @@ export function buildFeaturedId(boardId: string, localId: string): string {
 /** True when a catalog id carries the `featured.` prefix; only the prefix is checked, not the full shape. */
 export function isFeaturedId(id: string): boolean {
   return id.startsWith(FEATURED_ID_PREFIX);
+}
+
+/**
+ * The featured entry a YAML instance materializes, or null.
+
+ * Matches by section (``component_id``) plus the instance's emitted
+ * ``id`` against the entry's ``id`` preset — the per-instance
+ * counterpart to the pin guard's physical per-GPIO matching.
+ */
+export function featuredEntryForInstance(
+  board: BoardCatalogEntry | null,
+  sectionKey: string,
+  instanceId: unknown
+): FeaturedComponent | null {
+  if (!board || !sectionKey || typeof instanceId !== "string") return null;
+  return (
+    board.featured_components?.find(
+      (fc) => fc.component_id === sectionKey && fc.fields.id?.value === instanceId
+    ) ?? null
+  );
 }
 
 /** Resolve a featured catalog id to the component it actually adds; non-featured or unknown ids pass through. */
