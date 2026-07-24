@@ -72,6 +72,12 @@ describe("modeFlagsOf", () => {
     expect(modeFlagsOf({ input: true, pullup: "${use_pullup}" })).toBeNull();
   });
 
+  it("refuses a flag whose value is a bare null", () => {
+    // ``analog:`` with no value must not be silently dropped — a later
+    // preset pick would erase the key.
+    expect(modeFlagsOf({ analog: null, input: true })).toBeNull();
+  });
+
   it("treats an absent mode as no flags", () => {
     expect(modeFlagsOf(undefined)).toEqual({});
     expect(modeFlagsOf(null)).toEqual({});

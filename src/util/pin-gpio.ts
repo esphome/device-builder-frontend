@@ -145,7 +145,7 @@ export function isExpanderPinValue(value: unknown): boolean {
 /** The I/O-expander provider key of a long-form pin object, or undefined
  *  when every key is a board-pin field (or the value isn't a pin object).
  *  The one provider rule the parser and the classifier share. */
-function providerKeyOf(value: unknown): string | undefined {
+export function providerKeyOf(value: unknown): string | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }

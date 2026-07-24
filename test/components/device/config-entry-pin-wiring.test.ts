@@ -844,6 +844,31 @@ describe("pin wiring board-preset guard", () => {
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
   });
 
+  it("fails closed on an unparseable object preset (hub wildcard)", () => {
+    // A manifest preset naming a provider+hub with no readable channel
+    // still guards every channel on that hub.
+    const board = makeTestBoard({
+      overrides: {
+        featured_components: [
+          {
+            component_id: "binary_sensor.gpio",
+            fields: { pin: { value: { pca9554: "hub" } } },
+          },
+        ],
+      } as never,
+    });
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: 0, mode: "OUTPUT" },
+        { pinRegistryModes: { pca9554: ["input", "output"] } },
+        board
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+  });
+
   it("guards an expander channel whose number is a substitution", () => {
     const board = makeTestBoard({
       overrides: {

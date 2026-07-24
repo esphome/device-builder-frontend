@@ -16,6 +16,7 @@ import {
   isExpanderPinValue,
   parseBoardGpio,
   parsePinGpio,
+  providerKeyOf,
 } from "../../util/pin-gpio.js";
 import { isSubstitutionString, resolveSubstitutions } from "../../util/substitutions.js";
 import { renderPinWiring } from "./config-entry-pin-wiring.js";
@@ -120,8 +121,31 @@ function boardPinsForSection(
     if (typeof id === "number") gpios.add(id);
     else if (typeof id === "string") tokens.add(id);
     else if (typeof preset === "string") tokens.add(preset);
+    else {
+      // Fail closed on an unparseable object preset: a provider+hub
+      // with an unreadable channel guards every channel on that hub
+      // (matched by ``designationMatches``'s hub wildcard).
+      const provider = providerKeyOf(preset);
+      const hub =
+        provider !== undefined
+          ? (preset as Record<string, unknown>)[provider]
+          : undefined;
+      if (provider !== undefined && typeof hub === "string" && hub !== "") {
+        tokens.add(`${provider}:${hub}:*`);
+      }
+    }
   }
   return { lockedGpios, gpios, tokens };
+}
+
+/** Whether an expander-channel *identity* matches a designation token —
+ *  exact, or the hub-wildcard (``provider:hub:*``) recorded for an
+ *  unparseable manifest preset. */
+function designationMatches(tokens: Set<string>, identity: string): boolean {
+  return (
+    tokens.has(identity) ||
+    tokens.has(`${identity.slice(0, identity.lastIndexOf(":") + 1)}*`)
+  );
 }
 
 function buildPinOption(
@@ -305,7 +329,8 @@ export function renderPinField(
       ctx,
       identity,
       rawValue,
-      suggestedTokens || boardPinsForSection(ctx, entry.key).tokens.has(identity)
+      suggestedTokens ||
+        designationMatches(boardPinsForSection(ctx, entry.key).tokens, identity)
     );
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
@@ -483,7 +508,7 @@ function renderSubstitutionPin(
     (typeof resolved === "number"
       ? boardPins.gpios.has(resolved) ||
         (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolved)
-      : boardPins.tokens.has(resolved) ||
+      : designationMatches(boardPins.tokens, resolved) ||
         (entry.suggestions ?? []).some((s) => s === resolved));
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>

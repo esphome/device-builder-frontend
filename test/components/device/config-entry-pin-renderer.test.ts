@@ -426,6 +426,48 @@ describe("renderPinField reserved pins locked to the edited component", () => {
   });
 });
 
+describe("renderPinField suggestion narrowing", () => {
+  const pinEntry = (suggestions: string[]) =>
+    makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [],
+      suggestions,
+    });
+
+  it("narrows the dropdown to alias-spelled suggestions", () => {
+    const board = makeTestBoard({
+      pins: [
+        makeBoardPin(1, { aliases: ["D1"] }),
+        makeBoardPin(2, { aliases: ["D2"] }),
+        makeBoardPin(3),
+      ],
+    });
+    const result = renderPinField(
+      pinEntry(["D1", "D2"]),
+      ["pin"],
+      makeRenderCtx({}, { board })
+    );
+    const values = findElementBindings(result, "wa-option").map((o) => o.value);
+    expect(values).toContain("GPIO1");
+    expect(values).toContain("GPIO2");
+    expect(values).not.toContain("GPIO3");
+  });
+
+  it("keeps the full pin set when no suggestion resolves", () => {
+    // The manifest-typo escape hatch survives alias resolution.
+    const board = makeTestBoard({ pins: [makeBoardPin(1), makeBoardPin(2)] });
+    const result = renderPinField(
+      pinEntry(["BOGUS"]),
+      ["pin"],
+      makeRenderCtx({}, { board })
+    );
+    const values = findElementBindings(result, "wa-option").map((o) => o.value);
+    expect(values).toContain("GPIO1");
+    expect(values).toContain("GPIO2");
+  });
+});
+
 describe("renderPinField wa-select binding", () => {
   // The form's ``_syncSelectValues`` clears ``wa-select.value`` to
   // ``""`` for any non-primitive value (transient autocompletion

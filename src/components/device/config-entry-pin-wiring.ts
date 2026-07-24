@@ -201,7 +201,10 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // itself, and the Custom pick promotes before its pane opens.
   // Checked against the unfiltered ``source``: a filtered-out advanced
   // extra can appear mid-open (Show advanced flipped), after the
-  // open-time promotion decision already passed.
+  // open-time promotion decision already passed. Today's catalog
+  // (``_pin_long_form_extras``) attaches only mode + inverted, so the
+  // non-wiring arm is future-proofing; a catalog that starts emitting
+  // extras trades back to promote-on-open for those pins.
   const openNeedsLongForm =
     !usePresets || source.some((c) => !PIN_WIRING_KEYS.has(c.key));
   const onToggle = () => {

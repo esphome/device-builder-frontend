@@ -132,7 +132,10 @@ export function modeFlagsOf(modeValue: unknown): Record<string, boolean> | null 
   const out: Record<string, boolean> = Object.create(null) as Record<string, boolean>;
   for (const [key, value] of Object.entries(modeValue)) {
     const parsed = parseYamlBoolean(value);
-    if (parsed === null && value !== undefined && value !== null) return null;
+    // A flag with no readable boolean — a ``${var}``, or a bare
+    // ``analog:`` that parses to null — makes the whole set unreadable;
+    // silently dropping it would let a later pick erase the key.
+    if (parsed === null && value !== undefined) return null;
     if (parsed === true) out[key] = true;
   }
   return out;
