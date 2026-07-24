@@ -270,7 +270,7 @@ export const configEntryFormExtraStyles = css`
     color: var(--wa-form-control-activated-color) !important;
   }
 
-  /* Board-preset wiring guard: view-only until the unlock is flipped. */
+  /* Board-preset wiring guard: the panel is view-only; changes go through the YAML. */
   .pin-wiring-guard {
     display: flex;
     align-items: center;
@@ -292,14 +292,6 @@ export const configEntryFormExtraStyles = css`
 
   .pin-wiring-guard-text .field-description {
     margin: 0;
-  }
-
-  /* The switch's slotted label renders at body size by default and
-     overpowers the row; keep it compact and unwrapped. */
-  .pin-wiring-guard-switch {
-    flex-shrink: 0;
-    font-size: var(--wa-font-size-s);
-    white-space: nowrap;
   }
 
   /* ─── ID reference picker option layout ──────────────────── */

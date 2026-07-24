@@ -52,7 +52,7 @@ export interface PinWiringOptions {
   rawValue: unknown;
   boardPin: BoardPin | null;
   /** The pin sits on a GPIO the board locks to this section — the wiring
-   *  is the board's, so edits are guarded behind an unlock. */
+   *  is the board's, shown read-only; changes go through the YAML. */
   boardPreset: boolean;
 }
 
@@ -127,14 +127,10 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
       : [];
   const usePresets = presets.length > 0;
 
-  // A board-preset pin carries the board's known-good wiring; edits are
-  // view-only until the user flips the unlock. Session-transient, so the
-  // guard re-arms on reload.
-  const guardKey = `${path.join(".")}:pin-guard`;
-  // "unlocked-promoted" also records that the unlock itself performed
-  // the short-form promotion, so a no-edit re-lock can revert it.
-  const guardChoice = ctx.getClusterChoice(guardKey);
-  const guarded = boardPreset && !fieldDisabled && !guardChoice?.startsWith("unlocked");
+  // A board-preset pin carries the board's known-good wiring; the panel
+  // is view-only and the guard row points at the YAML editor for the
+  // rare deliberate change.
+  const guarded = boardPreset && !fieldDisabled;
 
   let state: WiringState = { kind: "default" };
   let labelText: string | undefined;
@@ -203,37 +199,15 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
     // bypass the guard.
     if (fieldDisabled) return;
     ctx.toggleNested(advancedKey);
-    // First open promotes — except while the board-preset guard is armed:
-    // merely viewing a guarded pin must not edit YAML (the unlock
-    // performs the promotion instead).
+    // First open promotes — except on a board-preset pin: merely viewing
+    // its wiring must not edit YAML (the panel is view-only anyway).
     if (!isOpen && !guarded) promoteShortForm();
   };
 
-  const onGuardToggle = (e: Event) => {
-    const on = (e.target as HTMLInputElement & { checked: boolean }).checked;
-    if (on) {
-      const promotes = !isLongForm && rawValue != null && rawValue !== "";
-      ctx.setClusterChoice(guardKey, promotes ? "unlocked-promoted" : "unlocked");
-      promoteShortForm();
-      return;
-    }
-    // A re-lock with no wiring edit must leave the YAML untouched:
-    // revert the unlock's promotion while the value is still the bare
-    // promoted shape.
-    if (
-      guardChoice === "unlocked-promoted" &&
-      isLongForm &&
-      Object.keys(rawValue as object).length === 1 &&
-      (rawValue as Record<string, unknown>).number != null
-    ) {
-      ctx.emitChange(path, (rawValue as Record<string, unknown>).number);
-    }
-    ctx.setClusterChoice(guardKey, "locked");
-  };
   // Built lazily with the rest of the panel — the disclosure body only
   // renders while open.
   const renderGuardRow = () =>
-    boardPreset && !fieldDisabled
+    guarded
       ? html`<div class="pin-wiring-guard">
           <wa-icon library="mdi" name="lock-outline"></wa-icon>
           <div class="pin-wiring-guard-text">
@@ -242,13 +216,6 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
               ${ctx.localize("device.pin_wiring_guard_hint")}
             </p>
           </div>
-          <wa-switch
-            class="pin-wiring-guard-switch"
-            ?checked=${!guarded}
-            @change=${onGuardToggle}
-          >
-            ${ctx.localize("device.pin_wiring_guard_unlock")}
-          </wa-switch>
         </div>`
       : nothing;
   // While guarded or hard-locked, everything inside the panel renders
@@ -256,8 +223,9 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // ``ctx.renderEntry`` closes over the form's original ctx, so children
   // routed through the dispatch would still see ``disabled: false``.
   // Lock the entries themselves at every depth — ``effectiveDisabled``
-  // honors ``entry.locked`` in every renderer. The guard's unlock hint
-  // only applies while the guard (not a hard lock) is what's blocking.
+  // honors ``entry.locked`` in every renderer. The guard's edit-in-YAML
+  // hint only applies while the guard (not a hard lock) is what's
+  // blocking.
   const panelCtx: RenderCtx =
     guarded || fieldDisabled
       ? {
@@ -499,7 +467,7 @@ const lockedPlain = new WeakMap<ConfigEntry, ConfigEntry>();
 /** *entry* with itself and every descendant marked locked, so children
  *  routed through the form's dispatch render read-only via
  *  ``effectiveDisabled`` at every depth. While *guarded*, the lock icons
- *  explain the guard's unlock instead of claiming the board set the
+ *  point at the YAML editor instead of claiming the board set the
  *  field. */
 function lockEntryDeep(entry: ConfigEntry, guarded: boolean): ConfigEntry {
   const cache = guarded ? lockedGuarded : lockedPlain;

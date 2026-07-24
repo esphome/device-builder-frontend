@@ -630,7 +630,7 @@ describe("pin wiring input-only banner copy", () => {
 
 describe("pin wiring board-preset guard", () => {
   // GPIO2 is locked to this section by a featured component, so its
-  // wiring is the board's — edits sit behind the unlock.
+  // wiring is the board's — shown view-only, changed only via YAML.
   const presetBoard = () =>
     makeTestBoard({
       overrides: {
@@ -651,7 +651,7 @@ describe("pin wiring board-preset guard", () => {
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
     expect(cardById(result, "custom")?.["aria-disabled"]).toBe("true");
-    // Hovering the greyed cards explains the unlock.
+    // Hovering the greyed cards points at the YAML editor.
     expect(cardById(result, "ground_switch")?.title).toBe(
       "device.pin_wiring_guard_tooltip"
     );
@@ -773,7 +773,7 @@ describe("pin wiring board-preset guard", () => {
   it("locks children of a hard-locked pin carrying wiring values", () => {
     // A hard-locked pin with a flag set no preset names seeds the
     // disclosure open; its children must render read-only too, with the
-    // plain board-lock tooltip (no unlock exists for a hard lock).
+    // plain board-lock tooltip (no edit-in-YAML hint for a hard lock).
     const ctx = openCtx(
       { number: "GPIO2", mode: { input: true, pullup: true, pulldown: true } },
       {
@@ -843,73 +843,24 @@ describe("pin wiring board-preset guard", () => {
     );
   });
 
-  it("the unlock enables edits and performs the deferred promotion", () => {
-    const ctx = guardedCtx("GPIO2");
+  it("renders no unlock control and never mutates the YAML", () => {
+    // The board's wiring is not editable in the visual editor at all;
+    // the guard row points at the YAML for the last-resort override.
+    const ctx = guardedCtx("GPIO2", { nestedOpenSections: new Set<string>() });
     const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
 
-    const unlock = findElementBindings(result, "wa-switch")[0];
-    (unlock["@change"] as (e: unknown) => void)({ target: { checked: true } });
-
-    expect(ctx.setClusterChoice).toHaveBeenCalledWith(
-      "pin:pin-guard",
-      "unlocked-promoted"
-    );
-    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
-
-    const unlocked = renderPinField(
-      wiringPinEntry(PinMode.INPUT),
-      ["pin"],
-      guardedCtx("GPIO2", {
-        getClusterChoice: (key) => (key === "pin:pin-guard" ? "unlocked" : undefined),
-      })
-    );
-    expect(cardById(unlocked, "ground_switch")?.["aria-disabled"]).toBe("false");
-  });
-
-  it("re-locking with no wiring edit reverts the unlock's promotion", () => {
-    const ctx = guardedCtx(
-      { number: "GPIO2" },
-      {
-        getClusterChoice: (key) =>
-          key === "pin:pin-guard" ? "unlocked-promoted" : undefined,
-      }
-    );
-    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
-
-    const unlock = findElementBindings(result, "wa-switch")[0];
-    (unlock["@change"] as (e: unknown) => void)({ target: { checked: false } });
-
-    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO2");
-    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "locked");
-  });
-
-  it("re-locking after a wiring edit keeps the long form", () => {
-    const ctx = guardedCtx(
-      { number: "GPIO2", mode: { input: true } },
-      {
-        getClusterChoice: (key) =>
-          key === "pin:pin-guard" ? "unlocked-promoted" : undefined,
-      }
-    );
-    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
-
-    const unlock = findElementBindings(result, "wa-switch")[0];
-    (unlock["@change"] as (e: unknown) => void)({ target: { checked: false } });
-
+    expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
+    // Opening the disclosure on a guarded short-form pin must not fire
+    // the scalar-to-long-form promotion.
+    (
+      findElementBindings(result, "button").find((b) => "aria-expanded" in b)![
+        "@click"
+      ] as () => void
+    )();
     expect(ctx.emitChange).not.toHaveBeenCalled();
-    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "locked");
-  });
-
-  it("unlocking an already long-form pin records a plain unlock", () => {
-    // No promotion happened, so a later re-lock must not demote the
-    // user's own long form.
-    const ctx = guardedCtx({ number: "GPIO2", mode: { input: true } });
-    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
-
-    const unlock = findElementBindings(result, "wa-switch")[0];
-    (unlock["@change"] as (e: unknown) => void)({ target: { checked: true } });
-
-    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "unlocked");
-    expect(ctx.emitChange).not.toHaveBeenCalled();
+    expect(ctx.setClusterChoice).not.toHaveBeenCalledWith(
+      expect.stringContaining("pin-guard"),
+      expect.anything()
+    );
   });
 });
