@@ -39,6 +39,21 @@ export function featuredEntryForInstance(
   );
 }
 
+/**
+ * Display name for a featured entry, mirroring the backend's
+ * ``_featured_display_name`` so every surface names the entry the same
+ * way: manifest ``name`` override, preset entity name (``fields.name``),
+ * then *fallback* suffixed with the preset id ("SPI Bus (lcd_spi)").
+ */
+export function featuredDisplayName(fc: FeaturedComponent, fallback: string): string {
+  if (fc.name) return fc.name;
+  const namePreset = fc.fields.name?.value;
+  if (typeof namePreset === "string" && namePreset) return namePreset;
+  const idPreset = fc.fields.id?.value;
+  if (typeof idPreset === "string" && idPreset) return `${fallback} (${idPreset})`;
+  return fallback;
+}
+
 /** Resolve a featured catalog id to the component it actually adds; non-featured or unknown ids pass through. */
 export function resolveFeaturedComponentId(
   id: string,

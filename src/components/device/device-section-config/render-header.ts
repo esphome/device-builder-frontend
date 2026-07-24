@@ -4,7 +4,10 @@
  */
 import { html, nothing } from "lit";
 import { defaultBoardImageUrl, onBoardImageError } from "../../../util/board-image.js";
-import { featuredEntryForInstance } from "../../../util/featured-id.js";
+import {
+  featuredDisplayName,
+  featuredEntryForInstance,
+} from "../../../util/featured-id.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import type { SectionConfigResponse } from "./loading.js";
@@ -30,7 +33,9 @@ export function renderSectionHeader(
     ? host._localize("device.external_component_title")
     : host._isPlatformDomain
       ? host._localize("device.platform_section_title")
-      : (featured?.name ?? config.title);
+      : featured
+        ? featuredDisplayName(featured, config.title)
+        : config.title;
   const description = featured?.description ?? config.description;
   const imageUrl = featured?.image_url || config.image_url;
   return html`
