@@ -69,6 +69,12 @@ function gpioFromAlias(rawValue: unknown, pins: BoardPin[]): number | null {
   return match ? match.gpio : null;
 }
 
+/** Board GPIO of *value* in any accepted spelling: the parseable forms
+ *  first, then the board's alias table ("SDA", "RX", "D1"). */
+function boardGpioOf(value: unknown, pins: BoardPin[]): number | null {
+  return parseBoardGpio(value) ?? gpioFromAlias(value, pins);
+}
+
 /** The board's designated pins for this section's field, in one pass over
  *  ``featured_components`` (entries keyed by ``component_id``):
  *
@@ -102,8 +108,10 @@ function boardPinsForSection(
     if (preset == null) continue;
     // ``parsePinGpio`` so an object-form expander preset
     // (``{pcf8574: hub, number: 0}``) yields its channel token instead
-    // of being dropped; a raw manifest token string passes through.
-    const id = parsePinGpio(preset);
+    // of being dropped; an alias-spelled preset ("SDA") resolves through
+    // the board's alias table; any other manifest string passes through
+    // as a token.
+    const id = parsePinGpio(preset) ?? gpioFromAlias(preset, ctx.board?.pins ?? []);
     if (typeof id === "number") gpios.add(id);
     else if (typeof id === "string") tokens.add(id);
     else if (typeof preset === "string") tokens.add(preset);
@@ -320,10 +328,7 @@ export function renderPinField(
   // the select renderer). A default named by alias (i2c ``sda: SDA``) resolves
   // to its GPIO so the box shows the real pin label rather than the raw name.
   const defaultGpio =
-    entry.default_value != null
-      ? (parseBoardGpio(entry.default_value) ??
-        gpioFromAlias(entry.default_value, ctx.board.pins))
-      : null;
+    entry.default_value != null ? boardGpioOf(entry.default_value, ctx.board.pins) : null;
   const defaultPlaceholder =
     defaultGpio !== null
       ? (ctx.board.pins.find((p) => p.gpio === defaultGpio)?.label ??
@@ -341,7 +346,9 @@ export function renderPinField(
       ? (ctx.board.pins.find((p) => p.gpio === valueGpio) ?? null)
       : null;
   const suggestionGpios = new Set(
-    (entry.suggestions ?? []).map(parseBoardGpio).filter((g): g is number => g !== null)
+    (entry.suggestions ?? [])
+      .map((s) => boardGpioOf(s, ctx.board!.pins))
+      .filter((g): g is number => g !== null)
   );
   // A featured-component preset can narrow the pin set further — e.g.
   // pin the ESK-1 PIR motion sensor to one of the two FPC-connector
@@ -456,12 +463,13 @@ function renderSubstitutionPin(
   // resolved value, so spelling the pin as a substitution doesn't drop
   // the wiring guard. An unresolvable reference guards nothing (the
   // wiring is unknowable, and the presets gate already withholds cards).
-  const resolvedGpio = parseBoardGpio(resolveSubstitutions(number, ctx.substitutions));
+  const pins = ctx.board?.pins ?? [];
+  const resolvedGpio = boardGpioOf(resolveSubstitutions(number, ctx.substitutions), pins);
   const boardPins = boardPinsForSection(ctx, entry.key);
   const boardPreset =
     resolvedGpio !== null &&
     (boardPins.gpios.has(resolvedGpio) ||
-      (entry.suggestions ?? []).some((s) => parseBoardGpio(s) === resolvedGpio));
+      (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolvedGpio));
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}

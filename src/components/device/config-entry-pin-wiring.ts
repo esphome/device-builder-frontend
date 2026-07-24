@@ -329,8 +329,16 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
   const editDisabled = ctx.disabled;
   const currentInverted = parseYamlBoolean(opts.invertedValue) === true;
   const choiceKey = `${path.join(".")}:pin-wiring`;
+  // A sticky Custom choice is ignored once the value has reverted to a
+  // scalar GPIO (hand-edited YAML after a pick): the pane's nested
+  // writes would clobber it via ``setIn``, and the inverted toggle
+  // routes through the form dispatch where a promote-on-write wrapper
+  // can't reach. An empty pin stays eligible — no GPIO to lose.
+  const isScalarGpio =
+    !isPlainObject(opts.rawValue) && opts.rawValue != null && opts.rawValue !== "";
   const showCustom =
-    ctx.getClusterChoice(choiceKey) === "custom" || state.kind === "custom";
+    state.kind === "custom" ||
+    (ctx.getClusterChoice(choiceKey) === "custom" && !isScalarGpio);
 
   const pickPreset = (preset: WiringPreset, selected: boolean) => {
     // Same belt-and-braces as every other mutating handler: the missing

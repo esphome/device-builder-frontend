@@ -605,6 +605,28 @@ describe("pin wiring custom editor", () => {
     });
   });
 
+  it("ignores a sticky Custom choice after the YAML reverts to a scalar", () => {
+    // The pane's nested writes would clobber the scalar GPIO, and the
+    // inverted toggle routes through the form dispatch where a
+    // promote-on-write wrapper can't reach.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      customCtx("GPIO2")
+    );
+    expect(findElementBindings(result, "wa-radio-group")).toHaveLength(0);
+    expect(cardById(result, "custom")?.["aria-checked"]).toBe("false");
+  });
+
+  it("keeps the Custom pane for an empty pin with a sticky choice", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      customCtx(undefined)
+    );
+    expect(findElementBindings(result, "wa-radio-group")).toHaveLength(2);
+  });
+
   it("falls back to the raw flag list for flags outside the native set", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
@@ -769,6 +791,33 @@ describe("pin wiring board-preset guard", () => {
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
+  });
+
+  it("guards a field preset spelled by board alias", () => {
+    const board = makeTestBoard({
+      pins: [makeBoardPin(2, { aliases: ["D9"] })],
+      overrides: {
+        featured_components: [
+          { component_id: "binary_sensor.gpio", fields: { pin: { value: "D9" } } },
+        ],
+      } as never,
+    });
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2" }, {}, board)
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+  });
+
+  it("guards a suggestion spelled by board alias", () => {
+    const board = makeTestBoard({ pins: [makeBoardPin(2, { aliases: ["D9"] })] });
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT, { suggestions: ["D9"] }),
+      ["pin"],
+      openCtx("GPIO2", {}, board)
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
   });
 
   it("guards an expander channel preset written as a long-form object", () => {
