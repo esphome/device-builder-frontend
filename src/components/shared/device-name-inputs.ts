@@ -272,6 +272,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
                 // once the edit clears the error that force-opened it, or
                 // the field unmounts mid-keystroke.
                 this._open = true;
+                // Select-all + delete restores a value identical to the last
+                // committed one, so no @state changes; force a render so the
+                // live() binding can resync the visually emptied DOM input.
+                this.requestUpdate();
                 this._notify();
               },
               id: "device-hostname",
