@@ -211,6 +211,9 @@ const lockedReasonKey = (entry: ConfigEntry): string =>
 
 export interface RenderLabelOptions {
   includeHelpLink?: boolean;
+  /** Field path; keys the lock icon's wa-tooltip anchor. Without it the
+   *  icon falls back to a native title, which many UAs won't surface. */
+  path?: string[];
 }
 
 export function renderLabel(
@@ -218,25 +221,38 @@ export function renderLabel(
   ctx: RenderCtx,
   options: RenderLabelOptions = {}
 ) {
-  const { includeHelpLink = true } = options;
+  const { includeHelpLink = true, path } = options;
   return html`
     <label class="field-label">
       ${labelFor(entry, ctx)}
       ${entry.required ? html`<span class="required">*</span>` : nothing}
-      ${
-        entry.locked
-          ? html`<wa-icon
-              class="lock-icon"
-              library="mdi"
-              name="lock-outline"
-              title=${ctx.localize(lockedReasonKey(entry))}
-            ></wa-icon>`
-          : nothing
-      }
+      ${entry.locked ? renderLockIcon(entry, ctx, path) : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
     ${_fieldDescription(entry, ctx)}
   `;
+}
+
+/** The label's lock icon; *path* keys a wa-tooltip anchor id (native
+ *  title tooltips are unreliable, so pass it whenever available). */
+function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path?: string[]) {
+  const reason = ctx.localize(lockedReasonKey(entry));
+  if (!path) {
+    return html`<wa-icon
+      class="lock-icon"
+      library="mdi"
+      name="lock-outline"
+      title=${reason}
+    ></wa-icon>`;
+  }
+  const tipId = `lock-tip-${path.join(".")}`;
+  return html`<wa-icon
+      id=${tipId}
+      class="lock-icon"
+      library="mdi"
+      name="lock-outline"
+    ></wa-icon>
+    <wa-tooltip for=${tipId}>${reason}</wa-tooltip>`;
 }
 
 /** The field's description, with the backend's baked constraint-prose paragraph
@@ -285,7 +301,8 @@ export function renderFieldShell(
 ) {
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)} ${input} ${trailing} ${renderFieldError(path, ctx)}
+      ${renderLabel(entry, ctx, { path })} ${input} ${trailing}
+      ${renderFieldError(path, ctx)}
     </div>
   `;
 }
@@ -327,7 +344,7 @@ export function renderUnparseableScalarField(
 export function renderYamlOnlyField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
       ${renderFieldError(path, ctx)}
     </div>
@@ -443,7 +460,7 @@ export function renderStringField(
     ></esphome-password-input>`;
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)} ${withPicker(passwordInput)} ${secretHint}
+        ${renderLabel(entry, ctx, { path })} ${withPicker(passwordInput)} ${secretHint}
         ${renderFieldError(path, ctx)}
       </div>
     `;
@@ -473,8 +490,8 @@ export function renderStringField(
   />`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)} ${withPicker(textInput)} ${secretHint} ${subHint}
-      ${renderFieldError(path, ctx)}
+      ${renderLabel(entry, ctx, { path })} ${withPicker(textInput)} ${secretHint}
+      ${subHint} ${renderFieldError(path, ctx)}
     </div>
   `;
 }
@@ -497,7 +514,7 @@ export function renderSuggestionSelect(
   const placeholder = String(entry.default_value ?? "");
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${disabled}

@@ -1040,10 +1040,12 @@ describe("pin wiring board-preset guard", () => {
     ).toBe(true);
     // A disabled control surfaces no native title tooltip, so the hint is
     // a wa-tooltip anchored on the select plus the label's lock icon.
-    expect(findElementBindings(result, "wa-tooltip")[0]?.for).toBe(select.id);
+    const tooltips = findElementBindings(result, "wa-tooltip");
+    expect(tooltips.some((t) => t.for === select.id)).toBe(true);
+    // The label's lock icon carries its own tooltip anchor.
     expect(
       findElementBindings(result, "wa-icon").some(
-        (i) => i.title === "device.pin_wiring_guard_tooltip"
+        (i) => typeof i.id === "string" && tooltips.some((t) => t.for === i.id)
       )
     ).toBe(true);
   });
@@ -1058,11 +1060,6 @@ describe("pin wiring board-preset guard", () => {
     expect(select["?disabled"]).toBe(false);
     expect(select.id).toBe(nothing);
     expect(findElementBindings(result, "wa-tooltip")).toHaveLength(0);
-    expect(
-      findElementBindings(result, "wa-icon").some(
-        (i) => i.title === "device.pin_wiring_guard_tooltip"
-      )
-    ).toBe(false);
   });
 
   it("locks children of a hard-locked pin carrying wiring values", () => {

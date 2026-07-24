@@ -201,7 +201,7 @@ export class ESPHomeRegistryList extends LitElement {
       // stand-in catalog.
       return html`
         <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
-          ${renderLabel(this.entry, this.ctx)}
+          ${renderLabel(this.entry, this.ctx, { path: this.path })}
           <p class="registry-list-fallback">
             ${this.ctx.localize("device.registry_list_unsupported")}
           </p>
@@ -218,7 +218,7 @@ export class ESPHomeRegistryList extends LitElement {
     if (raw instanceof YamlRawValue || (raw !== undefined && !Array.isArray(raw))) {
       return html`
         <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
-          ${renderLabel(this.entry, this.ctx)}
+          ${renderLabel(this.entry, this.ctx, { path: this.path })}
           <p class="field-description">
             ${this.ctx.localize("device.multi_value_yaml_only")}
           </p>
@@ -286,8 +286,8 @@ export class ESPHomeRegistryList extends LitElement {
     const addDisabled = disabled || catalog.length === 0;
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
-        ${renderLabel(this.entry, this.ctx)} ${renderListEmptyHint(items, this.ctx)}
-        ${statusHint}
+        ${renderLabel(this.entry, this.ctx, { path: this.path })}
+        ${renderListEmptyHint(items, this.ctx)} ${statusHint}
         ${items.map((item, i) =>
           this._renderRow(item, i, catalog, items, disabled, ops.dedupByTypeId)
         )}
