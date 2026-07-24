@@ -77,6 +77,18 @@ describe("overlayBoardLockedPresets", () => {
     expect(out.find((e) => e.key === "pin")!.locked).toBeFalsy();
   });
 
+  it("passes an already-locked entry through with its own reason", () => {
+    // The add dialog's server-hydrated entries arrive locked; the overlay
+    // must not re-stamp them with the guard reason.
+    const serverLocked = makeConfigEntry({
+      key: "chipset",
+      type: ConfigEntryType.STRING,
+      locked: true,
+    });
+    const out = overlayBoardLockedPresets([serverLocked], BOARD, SECTION, VALUES);
+    expect(out[0]).toBe(serverLocked);
+  });
+
   it("returns the input array untouched outside the section", () => {
     expect(overlayBoardLockedPresets(ENTRIES, BOARD, "switch.gpio", VALUES)).toBe(
       ENTRIES

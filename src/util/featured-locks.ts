@@ -31,8 +31,14 @@ export function overlayBoardLockedPresets(
   return entries.map((entry) => {
     // Pins keep their own value-dependent guard (the picker's
     // board-preset lock); stamping ``locked`` would demote it to the
-    // hard-lock chrome and hide the wiring guard row.
-    if (!lockedKeys.has(entry.key) || entry.type === ConfigEntryType.PIN) {
+    // hard-lock chrome and hide the wiring guard row. An already-locked
+    // entry (the add dialog's server-hydrated featured schema) keeps its
+    // own lock and reason verbatim.
+    if (
+      !lockedKeys.has(entry.key) ||
+      entry.locked ||
+      entry.type === ConfigEntryType.PIN
+    ) {
       return entry;
     }
     let copy = lockedCopies.get(entry);
