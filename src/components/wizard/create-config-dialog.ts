@@ -46,6 +46,8 @@ type WizardStep =
   | "confirm-overwrite"
   | "import-partial";
 type CreationMethod = "basic" | "empty" | "import";
+
+const EMPTY_TAKEN: ReadonlySet<string> = new Set();
 type WizardStepDetail =
   | WizardStep
   | {
@@ -105,6 +107,12 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
 
   @state()
   private _submitting = false;
+
+  // One-way latch set on a successful create. Distinct from ``_submitting``,
+  // which must drop in ``finally`` — it drives the base dialog's busy gate,
+  // and a busy dialog vetoes its own close (wa-hide preventDefault).
+  @state()
+  private _created = false;
 
   @state()
   private _importError = "";
@@ -198,9 +206,20 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
+    this._created = false;
     this._pickedBoardId = null;
     this._resetCreateErrors();
     this._dialog.open = true;
+  }
+
+  /**
+   * Collision set handed to the name-input steps. Frozen to empty from
+   * submit through the close: the devices push lands with the just-created
+   * slug while the dialog is still on screen, and the live set would flag
+   * the name as a self-collision (#1416, #1438).
+   */
+  private get _stepTakenHostnames(): ReadonlySet<string> {
+    return this._submitting || this._created ? EMPTY_TAKEN : this.takenHostnames;
   }
 
   /** Clear both error slots so a stale message from a prior
@@ -327,13 +346,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       case "setup":
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
-          .takenHostnames=${this.takenHostnames}
+          .takenHostnames=${this._stepTakenHostnames}
           ?active=${this._dialog.open}
           ?submitting=${this._submitting}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config
-          .takenHostnames=${this.takenHostnames}
+          .takenHostnames=${this._stepTakenHostnames}
           ?active=${this._dialog.open}
         ></esphome-wizard-step-empty-config>`;
       case "resolve-conflicts":
@@ -566,6 +585,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       if (options.fullSetup && options.board) {
         await this._applyFullSetup(configuration, options.board);
       }
+      this._created = true; // keep the collision check frozen through the close
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
