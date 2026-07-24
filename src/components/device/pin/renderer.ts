@@ -30,6 +30,7 @@ import {
   renderLabel,
   renderStringField,
   renderSubstitutionHint,
+  tooltipAnchorId,
   type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -451,7 +452,7 @@ export function renderPinField(
         locked_reason_key: "device.pin_wiring_guard_tooltip",
       } as ConfigEntry & LockedReasonCarrier)
     : entry;
-  const guardTipId = `pin-guard-tip-${path.join(".")}`;
+  const guardTipId = tooltipAnchorId("pin-guard-tip", path);
   const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is

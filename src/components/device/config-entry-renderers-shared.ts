@@ -103,6 +103,12 @@ export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
  *  the round-trip back to a path in ``parseFieldKey``. */
 export const fieldKeyAttr = (path: string[]): string => JSON.stringify(path);
 
+/** Collision-free tooltip anchor id for *path* under *prefix* — JSON keeps
+ *  dotted map keys distinct from nested paths; URI-encoding keeps the id
+ *  whitespace-free. */
+export const tooltipAnchorId = (prefix: string, path: string[]): string =>
+  `${prefix}-${encodeURIComponent(fieldKeyAttr(path))}`;
+
 /** Recover a field path from a ``data-field-key`` attribute. Non-JSON
  *  values (the pin-advanced toggle key) fall back to dot-splitting. */
 export const parseFieldKey = (attr: string): string[] => {
@@ -236,7 +242,7 @@ export function renderLabel(
  *  (native title tooltips don't surface reliably). */
 function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
   const reason = ctx.localize(lockedReasonKey(entry));
-  const tipId = `lock-tip-${path.join(".")}`;
+  const tipId = tooltipAnchorId("lock-tip", path);
   return html`<wa-icon
       id=${tipId}
       class="lock-icon"
