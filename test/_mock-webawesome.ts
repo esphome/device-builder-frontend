@@ -9,3 +9,4 @@ import { vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));

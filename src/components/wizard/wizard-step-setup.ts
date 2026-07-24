@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -18,11 +18,14 @@ import {
   getTourSuggestedName,
   isTourActive,
 } from "../guided-tour/tour-session.js";
+import { slugifyHostname } from "../../util/slugify-hostname.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
+import type { ESPHomeDeviceNameInputs } from "../shared/device-name-inputs.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../shared/device-name-inputs.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -39,6 +42,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // Set by the parent dialog; the step stays mounted while the dialog is
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
+
+  /** Hostnames of every configured device; a collision blocks submit. */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
 
   // Set by the parent dialog while createDevice is in flight; a big board
   // (128-relay full setup) takes seconds, so the button must show progress.
@@ -60,8 +67,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
     );
   }
 
-  @state()
-  private _deviceName = "";
+  @query("esphome-device-name-inputs")
+  private _nameInputs?: ESPHomeDeviceNameInputs;
 
   // Pre-checked: a complete onboard device is almost always wanted whole, not
   // assembled component by component. Only shown for full-config boards.
@@ -97,7 +104,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   });
 
   private _canAdvance(): boolean {
-    if (this._stage === "name") return !!this._deviceName.trim();
+    // The name inputs stay mounted across stages, so a collision push
+    // arriving on the Wi-Fi stage must still block Finish.
+    if (!(this._nameInputs?.canSubmit ?? false)) return false;
+    if (this._stage === "name") return true;
     if (this._wifiConfigured) return true;
     // The Wi-Fi stage only appears when Wi-Fi is required, so an SSID is
     // mandatory; a too-short WPA passphrase is also rejected.
@@ -111,14 +121,39 @@ export class ESPHomeWizardStepSetup extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
 
-    if (!this._deviceName) {
-      const suggested = getTourSuggestedName();
-      if (suggested) this._deviceName = suggested;
-    }
-    clearTourSuggestedName();
     // Already configured ⇒ skip the Wi-Fi stage and reuse !secret. Read via the
     // shared, secrets-saved-refreshed key cache (caches [] on failure).
     this._wifiConfigured = hasSharedWifiSecret(await fetchSecretKeys(this._api));
+  }
+
+  protected firstUpdated(): void {
+    // The name inputs exist only after the first render, so the tour seed
+    // can't land in connectedCallback. The seed changes _canAdvance, which
+    // only the host's own render reads — re-render or Next stays disabled.
+    // A translated seed with no ASCII alphanumerics would slug to an empty
+    // hostname and open the tour with Next hard-blocked — skip seeding then.
+    const suggested = getTourSuggestedName();
+    if (
+      suggested &&
+      slugifyHostname(suggested) &&
+      this._nameInputs &&
+      !this._nameInputs.friendlyName
+    ) {
+      this._nameInputs.reset(this._untakenSeed(suggested));
+      this.requestUpdate();
+    }
+    clearTourSuggestedName();
+  }
+
+  // A re-run tour's seed collides with the device its first run created;
+  // arriving with Next hard-blocked would contradict the tour bubble.
+  private _untakenSeed(name: string): string {
+    if (!this.takenHostnames.has(slugifyHostname(name))) return name;
+    for (let n = 2; n < 100; n++) {
+      const candidate = `${name} ${n}`;
+      if (!this.takenHostnames.has(slugifyHostname(candidate))) return candidate;
+    }
+    return name;
   }
 
   static styles = [
@@ -191,6 +226,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-m);
+      }
+
+      /* display: flex above outweighs the UA [hidden] rule. */
+      .section[hidden] {
+        display: none;
       }
 
       .section-title {
@@ -343,7 +383,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
       <hr class="divider" />
 
-      ${this._stage === "name" ? this._renderNameSection() : this._renderWifiSection()}
+      ${
+        // The name section stays mounted (hidden) on the Wi-Fi stage: the
+        // name inputs component owns the typed values, so unmounting it
+        // would blank the finish payload and lose the name on Back.
+        this._renderNameSection()
+      }
+      ${this._stage === "wifi" ? this._renderWifiSection() : nothing}
 
       <div class="actions">
         <button
@@ -396,7 +442,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _renderNameSection() {
     return html`
-      <section class="section">
+      <section class="section" ?hidden=${this._stage !== "name"}>
         <div>
           <h3 class="section-title">${this._localize("wizard.section_name_device")}</h3>
           <p class="section-subtitle">
@@ -404,18 +450,20 @@ export class ESPHomeWizardStepSetup extends LitElement {
           </p>
         </div>
 
-        <div class="field" ${tourAnchor("name-field")}>
-          <label for="device-name">${this._localize("wizard.device_name")}</label>
-          <input
-            id="device-name"
-            type="text"
-            autocomplete="off"
-            .value=${this._deviceName}
-            placeholder=${this._localize("wizard.device_name_placeholder")}
-            @input=${(e: InputEvent) => {
-              this._deviceName = (e.target as HTMLInputElement).value;
-            }}
-          />
+        <div ${tourAnchor("name-field")}>
+          <esphome-device-name-inputs
+            .friendlyLabelKey=${"wizard.device_name"}
+            .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
+            .friendlyPlaceholder=${
+              this.board?.name && !this.board.is_generic
+                ? this._localize("wizard.device_name_placeholder_board", {
+                    board: this.board.name,
+                  })
+                : ""
+            }
+            .takenHostnames=${this.takenHostnames}
+            @device-name-changed=${() => this.requestUpdate()}
+          ></esphome-device-name-inputs>
         </div>
 
         ${
@@ -531,7 +579,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
   private _finish(wifiSsid: string, wifiPassword: string) {
     fireEvent(this, "finish-setup", {
       board: this.board,
-      name: this._deviceName,
+      name: this._nameInputs?.hostname ?? "",
+      friendlyName: this._nameInputs?.friendlyName ?? "",
       wifiSsid,
       wifiPassword,
       fullSetup: this._offersFullSetup && this._fullSetup,

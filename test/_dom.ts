@@ -12,6 +12,8 @@
 import { render } from "lit";
 import { vi } from "vitest";
 
+import type { ESPHomeDeviceNameInputs } from "../src/components/shared/device-name-inputs.js";
+
 /**
  * Append ``el`` to ``document.body`` and wait for its first render.
  *
@@ -88,6 +90,31 @@ export async function baseDialogSettled(el: HTMLElement): Promise<void> {
   await (el as { updateComplete?: Promise<unknown> }).updateComplete;
   const base = el.shadowRoot?.querySelector("esphome-base-dialog");
   await (base as { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+}
+
+/**
+ * The nested ``<esphome-device-name-inputs>`` inside ``host``'s shadow
+ * root, settled. Suites reach its friendly/hostname inputs through the
+ * returned element's own shadow root.
+ */
+export async function deviceNameInputsOf(
+  host: HTMLElement
+): Promise<ESPHomeDeviceNameInputs> {
+  const comp = host.shadowRoot!.querySelector("esphome-device-name-inputs")!;
+  await comp.updateComplete;
+  return comp;
+}
+
+/** Type ``value`` into the nested friendly-name input and settle both hosts. */
+export async function typeFriendlyName(host: HTMLElement, value: string): Promise<void> {
+  const comp = await deviceNameInputsOf(host);
+  const input = comp.shadowRoot!.querySelector<HTMLInputElement>(
+    "#device-friendly-name"
+  )!;
+  input.value = value;
+  input.dispatchEvent(new Event("input"));
+  await comp.updateComplete;
+  await (host as { updateComplete?: Promise<unknown> }).updateComplete;
 }
 
 /** Resolve after a zero-delay timeout so queued real-timer callbacks run. */

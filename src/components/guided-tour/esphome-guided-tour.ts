@@ -38,12 +38,7 @@ import {
 } from "./tour-session.js";
 import { TourSkipAffordance } from "./tour-skip-affordance.js";
 import { tourSpotlightStyles } from "./tour-spotlight.js";
-import {
-  DIALOG_ANCHORS,
-  STARTER_DEVICE_NAME,
-  TOUR_STEPS,
-  type TourStep,
-} from "./tour-steps.js";
+import { DIALOG_ANCHORS, TOUR_STEPS, type TourStep } from "./tour-steps.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -150,7 +145,7 @@ export class ESPHomeGuidedTour extends LitElement {
       stepIndex = 0;
     }
     setTourPending(stepIndex);
-    setTourSuggestedName(STARTER_DEVICE_NAME);
+    setTourSuggestedName(this._localize("tour.suggested_name"));
     this._active = true;
     setTourActive(true);
     this._stepIndex = stepIndex;

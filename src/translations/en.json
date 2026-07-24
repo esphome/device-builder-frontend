@@ -141,10 +141,9 @@
     "action_rename_offline_desc": "\"{name}\" can't be reached right now, so it can't be reflashed. Rename the config anyway? The device keeps its current name until you reinstall, and since it won't answer to the new name yet, you may need to reinstall using Advanced options and enter its IP address.",
     "action_rename_offline_confirm": "Rename config",
     "action_clone_title": "Duplicate {name}",
-    "action_clone_name_label": "New hostname",
-    "action_clone_friendly_name_label": "Friendly name (optional)",
-    "action_clone_friendly_name_placeholder": "Leave blank to derive from hostname",
-    "action_clone_friendly_name_helper": "Shown in Home Assistant. Leaving this blank derives a label from the new hostname so the dashboard list doesn't show two entries with the same label.",
+    "action_clone_friendly_name_label": "New friendly name",
+    "action_clone_friendly_name_placeholder": "e.g. Smart Plug",
+    "action_clone_friendly_name_helper": "Shown in Home Assistant. The hostname below is derived from it as you type.",
     "action_clone_confirm": "Duplicate",
     "action_clone_same_name": "New hostname must differ from the source",
     "action_clone_success": "Duplicated to \"{name}\"",
@@ -552,13 +551,14 @@
     "drop_yaml": "You can also drag and drop a .yaml file or a bundle here",
     "title_empty_config": "Create empty configuration",
     "device_name": "Device name",
-    "device_name_placeholder": "e.g. my-esp-device",
+    "device_name_placeholder": "e.g. Smart Plug",
+    "device_name_placeholder_board": "e.g. {board}",
     "cancel": "Cancel",
     "next": "Next",
     "back": "Back",
     "finish_setup": "Finish setup",
     "section_name_device": "Name your device",
-    "section_name_device_desc": "Naming your project will show up in the ESPHome dashboard. Choose a recognisable, descriptive and memorable name. You can use component names or relevant words. You can edit this after you finish this project.",
+    "section_name_device_desc": "Shown in the dashboard and in Home Assistant. Choose a recognisable, descriptive and memorable name; the network hostname is derived from it below. You can edit both after you finish this project.",
     "full_setup": "Set up with all recommended components",
     "full_setup_desc": "Adds this device's onboard components (relays, sensors, and more) so it's ready to use. You can change them afterwards in the editor.",
     "package_config_desc": "This device uses a ready-made configuration and automatically stays up to date with it. You can add more components afterwards in the editor.",
@@ -1000,6 +1000,16 @@
     "discard_changes": "Discard",
     "save_and_leave": "Save"
   },
+  "naming": {
+    "hostname_disclosure": "Hostname: {hostname}",
+    "hostname_label": "Hostname",
+    "hostname_helper": "Used on the network (mDNS) and as the YAML filename.",
+    "hostname_required": "A hostname is required: lowercase letters a-z, digits, and hyphens. Type one here.",
+    "hostname_edge_hyphen": "A hostname can't start or end with a hyphen.",
+    "hostname_taken": "A device named {hostname} already exists.",
+    "hostname_help_label": "About the hostname",
+    "hostname_help": "The hostname identifies this device on your network (mDNS) and names its YAML file. It is derived from the name; expand to override it. Tip: set the device's room with an area in Home Assistant rather than putting it in the name."
+  },
   "validation": {
     "required": "This field is required",
     "min": "Must be at least {min}",
@@ -1147,7 +1157,8 @@
         "title": "Your device is ready",
         "body": "Your device has been added to the dashboard. From here you can monitor its status, edit its configuration, install updates, and return to it whenever you need."
       }
-    }
+    },
+    "suggested_name": "ESPHome Starter"
   },
   "layout": {
     "release_notes": "View release notes",

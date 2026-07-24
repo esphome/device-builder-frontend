@@ -1,12 +1,14 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
+import type { ESPHomeDeviceNameInputs } from "../shared/device-name-inputs.js";
+
+import "../shared/device-name-inputs.js";
 
 @customElement("esphome-wizard-step-empty-config")
 export class ESPHomeWizardStepEmptyConfig extends LitElement {
@@ -18,12 +20,16 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
 
-  @state()
-  private _name = "";
+  /** Hostnames of every configured device; a collision blocks submit. */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
 
-  // Enter finishes setup once a name is entered.
+  @query("esphome-device-name-inputs")
+  private _nameInputs?: ESPHomeDeviceNameInputs;
+
+  // Enter finishes setup once a valid name is entered.
   private _enter = new EnterController(this, () => {
-    if (this._name.trim()) this._next();
+    if (this._nameInputs?.canSubmit) this._next();
   });
 
   protected willUpdate(changed: PropertyValues): void {
@@ -32,23 +38,13 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   static styles = [
     espHomeStyles,
-    inputStyles,
     css`
       :host {
         display: block;
       }
 
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-xs);
+      esphome-device-name-inputs {
         margin-bottom: var(--wa-space-xl);
-      }
-
-      label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
       }
 
       .actions {
@@ -104,24 +100,22 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   protected render() {
     return html`
-      <div class="field">
-        <label for="device-name">${this._localize("wizard.device_name")}</label>
-        <input
-          id="device-name"
-          type="text"
-          .value=${this._name}
-          placeholder=${this._localize("wizard.device_name_placeholder")}
-          @input=${(e: InputEvent) => {
-            this._name = (e.target as HTMLInputElement).value;
-          }}
-        />
-      </div>
+      <esphome-device-name-inputs
+        .friendlyLabelKey=${"wizard.device_name"}
+        .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
+        .takenHostnames=${this.takenHostnames}
+        @device-name-changed=${() => this.requestUpdate()}
+      ></esphome-device-name-inputs>
 
       <div class="actions">
         <button class="btn btn-cancel" @click=${this._cancel}>
           ${this._localize("wizard.cancel")}
         </button>
-        <button class="btn btn-next" ?disabled=${!this._name.trim()} @click=${this._next}>
+        <button
+          class="btn btn-next"
+          ?disabled=${!(this._nameInputs?.canSubmit ?? false)}
+          @click=${this._next}
+        >
           ${this._localize("wizard.finish_setup")}
         </button>
       </div>
@@ -133,7 +127,10 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   }
 
   private _next() {
-    fireEvent(this, "create-empty-config", { name: this._name });
+    fireEvent(this, "create-empty-config", {
+      name: this._nameInputs?.hostname ?? "",
+      friendlyName: this._nameInputs?.friendlyName ?? "",
+    });
   }
 }
 

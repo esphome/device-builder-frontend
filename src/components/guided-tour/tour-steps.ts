@@ -1,5 +1,3 @@
-export const STARTER_DEVICE_NAME = "esphome-starter";
-
 export type TourStepKind = "action" | "info";
 export type TourSide = "top" | "bottom" | "left" | "right";
 export type TourRoute = "dashboard" | "device";

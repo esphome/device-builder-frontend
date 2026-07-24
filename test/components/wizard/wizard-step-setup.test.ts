@@ -12,9 +12,12 @@ import {
   clearTourPending,
   setTourActive,
   setTourPending,
+  setTourSuggestedName,
 } from "../../../src/components/guided-tour/tour-session.js";
+import { slugifyHostname } from "../../../src/util/slugify-hostname.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
+import { deviceNameInputsOf, typeFriendlyName } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
 
 // The real wa-checkbox is a form-associated element that crashes under happy-dom
@@ -22,6 +25,8 @@ import { pressEnter } from "../../_press-enter.js";
 // render it as a plain unknown element.
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
@@ -72,10 +77,7 @@ async function mount(
 }
 
 function setName(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
-  const input = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name")!;
-  input.value = value;
-  input.dispatchEvent(new Event("input"));
-  return el.updateComplete;
+  return typeFriendlyName(el, value);
 }
 
 function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
@@ -87,6 +89,10 @@ function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stage = (el: ESPHomeWizardStepSetup) => (el as any)._stage;
+
+// The production seed comes from the tour.suggested_name translation; tests
+// seed their own value, so any display-shaped string works.
+const TOUR_SEED = "ESPHome Starter";
 
 describe("wizard-step-setup", () => {
   it("advances to the Wi-Fi stage for a Wi-Fi-only board with no secret", async () => {
@@ -258,6 +264,57 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
   });
 
+  it("finishing from the Wi-Fi stage carries the typed name and friendly name", async () => {
+    // The name section stays mounted (hidden) on the Wi-Fi stage; if it
+    // unmounted, the finish payload would blank both values.
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    await setSsid(el, "home");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.name).toBe("kitchen-plug");
+    expect(detail.friendlyName).toBe("Kitchen Plug");
+  });
+
+  it("going Back from the Wi-Fi stage keeps the typed name", async () => {
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    (el.shadowRoot!.querySelector(".btn-secondary") as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(stage(el)).toBe("name");
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("Kitchen Plug");
+    expect(inputs.hostname).toBe("kitchen-plug");
+  });
+
+  it("a collision push on the Wi-Fi stage blocks Finish", async () => {
+    // The name was valid when the user advanced; a devices push landing
+    // afterwards must still gate the finish button.
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    await setSsid(el, "home");
+    el.takenHostnames = new Set(["kitchen-plug"]);
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    await inputs.updateComplete;
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(
+      el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!.disabled
+    ).toBe(true);
+  });
+
   it("a fresh Enter on the Wi-Fi stage finishes once an SSID is set", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");
@@ -273,8 +330,73 @@ describe("wizard-step-setup", () => {
 
   it("disables browser autofill on the name input", async () => {
     const el = await mount(wifiBoard());
-    const deviceName = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name");
-    expect(deviceName?.getAttribute("autocomplete")).toBe("off");
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("autocomplete")).toBe("off");
+  });
+
+  it("uses a board-derived example as the name placeholder", async () => {
+    // The default localize stub drops params; substitute one that surfaces
+    // them so the board name's arrival is actually assertable.
+    const el = await mount(wifiBoard());
+    (el as unknown as { _localize: unknown })._localize = (
+      key: string,
+      params?: Record<string, string | number>
+    ) => `${key} ${Object.values(params ?? {}).join(" ")}`;
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("placeholder")).toBe(
+      "wizard.device_name_placeholder_board Board"
+    );
+  });
+
+  it("a tour-seeded name fills the inputs and enables Next", async () => {
+    setTourSuggestedName(TOUR_SEED);
+    const el = await mount(noWifiBoard());
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe(TOUR_SEED);
+    expect(inputs.hostname).toBe(slugifyHostname(TOUR_SEED));
+    const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
+    expect(primary.disabled).toBe(false);
+  });
+
+  it("a re-run tour seed skips past its first run's device", async () => {
+    setTourSuggestedName(TOUR_SEED);
+    const el = new ESPHomeWizardStepSetup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._api = {};
+    el.board = noWifiBoard();
+    el.active = true;
+    el.takenHostnames = new Set([slugifyHostname(TOUR_SEED)]);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await Promise.resolve();
+    await Promise.resolve();
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe(`${TOUR_SEED} 2`);
+    expect(inputs.canSubmit).toBe(true);
+    const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
+    expect(primary.disabled).toBe(false);
+  });
+
+  it("skips a tour seed that derives no hostname", async () => {
+    // A translated seed with no ASCII alphanumerics would open the tour
+    // hard-blocked on the empty-hostname error.
+    setTourSuggestedName("我的设备");
+    const el = await mount(noWifiBoard());
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("");
+    expect(inputs.hostname).toBe("");
+  });
+
+  it("falls back to the generic example for a generic board", async () => {
+    // "e.g. Generic ESP32 Board" is not a name anyone should copy.
+    const el = await mount(board({ requires_wifi: true, is_generic: true }));
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("placeholder")).toBe("wizard.device_name_placeholder");
   });
 
   // A complete onboard config with recommended components → offer "set up with
