@@ -601,6 +601,20 @@ export class ESPHomePageDashboard extends LitElement {
         this._drawerOpen = false;
       }
     }
+    // Same re-bind for the install/logs method picker: its OTA row gates on
+    // the device being online, and a device rebooting after an OTA must
+    // un-gray the row while the picker sits open (#1431).
+    if (changed.has("_devices") && this._installMethodDevice) {
+      const live = this._devices.find(
+        (d) => d.configuration === this._installMethodDevice!.configuration
+      );
+      if (live && live !== this._installMethodDevice) {
+        this._installMethodDevice = live;
+      } else if (!live) {
+        this._installMethodDevice = null;
+        this._installMethodOpen = false;
+      }
+    }
   }
 
   protected updated(changed: PropertyValues): void {
