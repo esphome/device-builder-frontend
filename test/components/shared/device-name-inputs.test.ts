@@ -145,6 +145,17 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(el.canSubmit).toBe(true);
   });
 
+  it("a host-prop push does not re-expand a collapsed warning panel", async () => {
+    const el = await mountInputs();
+    await typeHostname(el, "under_score"); // warning; panel open
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("#device-hostname")).toBeNull();
+    el.takenHostnames = new Set(["unrelated"]);
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("#device-hostname")).toBeNull();
+  });
+
   it("a soft warning auto-opens the panel but stays collapsible", async () => {
     // Warnings render inside the panel body, so they open it on input —
     // but unlike a hard error, the toggle must still work: submit is

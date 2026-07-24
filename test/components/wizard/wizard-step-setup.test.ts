@@ -293,6 +293,28 @@ describe("wizard-step-setup", () => {
     expect(inputs.hostname).toBe("kitchen-plug");
   });
 
+  it("a collision push on the Wi-Fi stage blocks Finish", async () => {
+    // The name was valid when the user advanced; a devices push landing
+    // afterwards must still gate the finish button.
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    await setSsid(el, "home");
+    el.takenHostnames = new Set(["kitchen-plug"]);
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    await inputs.updateComplete;
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(
+      el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!.disabled
+    ).toBe(true);
+  });
+
   it("a fresh Enter on the Wi-Fi stage finishes once an SSID is set", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");

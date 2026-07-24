@@ -104,7 +104,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   });
 
   private _canAdvance(): boolean {
-    if (this._stage === "name") return this._nameInputs?.canSubmit ?? false;
+    // The name inputs stay mounted across stages, so a collision push
+    // arriving on the Wi-Fi stage must still block Finish.
+    if (!(this._nameInputs?.canSubmit ?? false)) return false;
+    if (this._stage === "name") return true;
     if (this._wifiConfigured) return true;
     // The Wi-Fi stage only appears when Wi-Fi is required, so an SSID is
     // mandatory; a too-short WPA passphrase is also rejected.

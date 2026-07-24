@@ -297,13 +297,19 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     if (!this._hostnameEdited) {
       this._hostname = slugifyHostname(this._friendly);
     }
+    this._autoOpenOnWarning();
     this._notify();
   };
 
-  private _notify() {
+  // Keystroke-driven only: a host-prop push must not re-expand a panel the
+  // user deliberately collapsed over a standing warning.
+  private _autoOpenOnWarning() {
     if (this.validity.warning) {
       this._open = true;
     }
+  }
+
+  private _notify() {
     this.dispatchEvent(
       new CustomEvent("device-name-changed", { bubbles: true, composed: true })
     );
