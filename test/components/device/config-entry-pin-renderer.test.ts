@@ -517,17 +517,26 @@ describe("renderPinField wa-select binding", () => {
     ).toBe(false);
   });
 
-  it("keys the select as the long form's number for cursor targeting", () => {
-    // The exact match keeps the YAML cursor on ``number:`` landing on
-    // the select; the whole-field fallback centers mid-panel once the
-    // wiring disclosure is open.
-    const result = renderPinField(
-      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+  it("keys the select by value form for cursor targeting", () => {
+    // Long form: the exact ``number`` match keeps the YAML cursor on
+    // ``number:`` landing on the select (the whole-field fallback
+    // centers mid-panel once the wiring disclosure is open), and the
+    // form-to-YAML pulse finds the ``number:`` line. Short form: the
+    // bare path, since there is no ``number:`` line to pulse.
+    const entry = () =>
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] });
+    const longForm = renderPinField(
+      entry(),
       ["pin"],
-      makeRenderCtx({ pin: 0 })
+      makeRenderCtx({ pin: { number: 0 } })
     );
-    const select = findElementBindings(result, "wa-select")[0];
-    expect(select["data-field-key"]).toBe(fieldKeyAttr(["pin", "number"]));
+    expect(findElementBindings(longForm, "wa-select")[0]["data-field-key"]).toBe(
+      fieldKeyAttr(["pin", "number"])
+    );
+    const shortForm = renderPinField(entry(), ["pin"], makeRenderCtx({ pin: 0 }));
+    expect(findElementBindings(shortForm, "wa-select")[0]["data-field-key"]).toBe(
+      fieldKeyAttr(["pin"])
+    );
   });
 });
 

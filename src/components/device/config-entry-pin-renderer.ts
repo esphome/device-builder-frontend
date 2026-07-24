@@ -450,11 +450,13 @@ export function renderPinField(
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <!-- Keyed as the long form's number so the YAML cursor lands on the
-           select itself; the fallback match on the whole pin field
-           centers mid-panel once the wiring disclosure is open. -->
+           select itself (the whole-field fallback centers mid-panel once
+           the wiring disclosure is open). Short form keeps the bare path:
+           a number key would break the form-to-YAML pulse, which looks up
+           a number line the YAML doesn't have. -->
       <wa-select
         data-no-value-sync
-        data-field-key=${fieldKeyAttr([...path, "number"])}
+        data-field-key=${fieldKeyAttr(isLongForm ? [...path, "number"] : path)}
         class=${invalid ? "invalid" : ""}
         placeholder=${defaultPlaceholder}
         ?disabled=${fieldDisabled}

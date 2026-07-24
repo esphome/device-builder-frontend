@@ -45,6 +45,8 @@ describe("wiringValuesPresetSafe", () => {
 
   it("rejects a readable flag outside the guided set", () => {
     expect(wiringValuesPresetSafe({ input: true, analog: true }, undefined)).toBe(false);
+    // Explicitly-false spelling too: a pick would delete the line.
+    expect(wiringValuesPresetSafe({ input: true, analog: false }, undefined)).toBe(false);
   });
 
   it("rejects a substitution in either value", () => {

@@ -26,9 +26,10 @@ export const PIN_WIRING_KEYS: ReadonlySet<string> = new Set(["mode", "inverted"]
 
 /** Whether the preset cards may own the wiring values: both readable
  *  (a ``${var}`` in either falls to the raw disclosure, where the
- *  substitution gate owns editing) and every stored mode flag one the
- *  guided UI models — a card pick replaces the whole ``mode`` block, so
- *  it must never delete a flag it can't represent (``analog``). */
+ *  substitution gate owns editing) and every stored mode key — set or
+ *  explicitly false — one the guided UI models. A card pick replaces the
+ *  whole ``mode`` block, so it must never delete a line it can't
+ *  represent (``analog: true``, but also ``analog: false``). */
 export function wiringValuesPresetSafe(
   modeValue: unknown,
   invertedValue: unknown
@@ -37,6 +38,8 @@ export function wiringValuesPresetSafe(
   return (
     flags !== null &&
     Object.keys(flags).every((k) => KNOWN_MODE_FLAGS.has(k)) &&
+    (!isPlainObject(modeValue) ||
+      Object.keys(modeValue).every((k) => KNOWN_MODE_FLAGS.has(k))) &&
     (invertedValue === undefined ||
       invertedValue === null ||
       parseYamlBoolean(invertedValue) !== null)
