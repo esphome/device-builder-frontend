@@ -548,6 +548,10 @@ function renderSubstitutionPin(
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
+      <!-- Deliberately not guard-locked: no manifest designates a pin via a
+           substitution, so a \${var} landing on one is the user's own
+           hand-authored setup, and this input edits the reference name, not
+           the wiring the panel below guards. -->
       <input
         type="text"
         autocomplete="off"
