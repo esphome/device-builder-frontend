@@ -325,6 +325,17 @@ describe("pin wiring summary line", () => {
     expect(ground.values).not.toContain("input + pullup · inverted");
   });
 
+  it("carries the implied direction when only inverted is stored", () => {
+    // ``{number, inverted: true}`` on an output field matches the
+    // active-low preset; the tech clause must include the direction
+    // ESPHome applies, consistent with the checked card's line.
+    const localize = summarize({ number: "GPIO2", inverted: true }, PinMode.OUTPUT);
+    expect(localize).toHaveBeenCalledWith("device.pin_wiring_summary_with_tech", {
+      value: "device.pin_wiring_output_active_low",
+      tech: "output · inverted",
+    });
+  });
+
   it("reports custom flags with their tech clause", () => {
     const localize = summarize({
       number: "GPIO2",

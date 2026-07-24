@@ -150,14 +150,20 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
               : "device.pin_wiring_default"
           );
     // The effective flags in technical vocabulary, so advanced users can
-    // read what the pin is set to without opening the section. The
-    // presets gate above guarantees readable values here.
-    const currentTech = implicitPreset
-      ? wiringTechSummary(implicitPreset.flags, false)
-      : wiringTechSummary(
-          modeFlagsOf(modeValue)!,
-          parseYamlBoolean(invertedValue) === true
-        );
+    // read what the pin is set to without opening the section (the
+    // presets gate above guarantees readable values here). A preset
+    // matched with no stored flags carries the implied direction ESPHome
+    // applies, so describe the preset's flags, not the empty stored set.
+    const matchedPreset = state.kind === "preset" ? state.preset : null;
+    const storedFlags = modeFlagsOf(modeValue)!;
+    const techFlags =
+      matchedPreset && Object.keys(storedFlags).length === 0
+        ? matchedPreset.flags
+        : storedFlags;
+    const currentTech = wiringTechSummary(
+      techFlags,
+      implicitPreset ? false : parseYamlBoolean(invertedValue) === true
+    );
     labelText = currentTech
       ? ctx.localize("device.pin_wiring_summary_with_tech", {
           value: summaryValue,
