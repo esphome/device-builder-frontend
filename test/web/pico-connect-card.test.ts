@@ -12,8 +12,10 @@ vi.mock("../../src/web/install/esphome-web-install-pico-dialog.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-pico-device-card.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
+const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
+  reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -64,6 +66,44 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
     );
 
     expect(openImprovDialog).toHaveBeenCalledOnce();
+    expect((el as any)._port).toBeUndefined();
+  });
+});
+
+describe("esphome-web-pico-connect-card disconnect resilience", () => {
+  function livePort(): SerialPort & { dispatch: () => void } {
+    const listeners = new Set<EventListener>();
+    return {
+      addEventListener: (_t: string, l: EventListener) => listeners.add(l),
+      removeEventListener: (_t: string, l: EventListener) => listeners.delete(l),
+      dispatch: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
+    } as unknown as SerialPort & { dispatch: () => void };
+  }
+
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("keeps the device card through a re-enum blip, rebinding the live handle", async () => {
+    const adopted = livePort();
+    const fresh = livePort();
+    reacquirePort.mockResolvedValue(fresh);
+    const el = await mount();
+
+    (el as any)._adoptPort(adopted);
+    adopted.dispatch();
+    await flush();
+
+    expect((el as any)._port).toBe(fresh);
+  });
+
+  it("falls back to the connect screen when the device stays gone", async () => {
+    const adopted = livePort();
+    reacquirePort.mockResolvedValue(null);
+    const el = await mount();
+
+    (el as any)._adoptPort(adopted);
+    adopted.dispatch();
+    await flush();
+
     expect((el as any)._port).toBeUndefined();
   });
 });

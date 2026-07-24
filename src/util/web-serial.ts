@@ -174,6 +174,61 @@ export function isRecentSerialActivity(
   return Date.now() - _lastSerialActivityMs < windowMs;
 }
 
+// Budget for finding a usable handle after a disconnect / post-reset close:
+// covers the native-USB re-enumeration window (SERIAL_ACTIVITY_WINDOW_MS) with
+// margin for a slower first enumeration on a brand-new board.
+export const SERIAL_REOPEN_TIMEOUT_MS = SERIAL_ACTIVITY_WINDOW_MS + 2000;
+
+// Same USB device by vendor/product id. Requires both ids present so two
+// non-USB ports (undefined === undefined) aren't treated as a match.
+// VID:PID isn't a unique device id: two identical boards both match and
+// getPorts() order picks one; Web Serial exposes no per-device serial to
+// disambiguate, and every caller's flow is single-device anyway.
+export const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
+  a.usbVendorId !== undefined &&
+  a.usbProductId !== undefined &&
+  a.usbVendorId === b.usbVendorId &&
+  a.usbProductId === b.usbProductId;
+
+/**
+ * Reacquire a live handle for a just-disconnected authorized port, waiting out
+ * the native-USB re-enumeration window. ESP32-C3 / S3 / C6 (USB-Serial/JTAG)
+ * drop off the bus and come back seconds later, firing a spurious disconnect
+ * on the way; without this the UI holding the port treats the blip as a real
+ * unplug (#1410).
+ *
+ * Prefers a freshly-granted getPorts() handle for the same device (Chrome
+ * hands out a new handle after a re-enum), falling back to the cached handle
+ * when it is granted and connected again (Firefox and UART bridges keep the
+ * same handle usable). Returns the handle without opening it, or null when
+ * the device stays gone past timeoutMs (a genuine unplug).
+ */
+export async function reacquirePort(
+  cachedPort: SerialPort,
+  timeoutMs: number = SERIAL_REOPEN_TIMEOUT_MS
+): Promise<SerialPort | null> {
+  const want = cachedPort.getInfo();
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    let granted: SerialPort[] = [];
+    try {
+      granted = await navigator.serial.getPorts();
+    } catch {
+      /* getPorts can transiently reject mid-re-enumeration; retry below. */
+    }
+    // Presence in getPorts() means the device is granted and physically
+    // present; the connected check filters implementations that also return
+    // granted-but-unplugged ports (undefined tolerates ones without it).
+    const live = [
+      ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
+      ...(granted.includes(cachedPort) ? [cachedPort] : []),
+    ].find((p) => p.connected !== false);
+    if (live) return live;
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
 /**
  * Open an already-authorized serial port and detect the connected chip.
  *

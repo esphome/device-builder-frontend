@@ -6,8 +6,10 @@ vi.mock("../../src/web/dashboard/esphome-web-no-port-picked-dialog.js", () => ({
   openNoPortPickedDialog: (...a: unknown[]) => openNoPortPickedDialog(...a),
 }));
 const isPortPickerCancel = vi.fn((..._a: unknown[]) => true);
+const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: (...a: unknown[]) => isPortPickerCancel(...a),
+  reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-esp-device-card.js", () => ({}));
@@ -59,5 +61,65 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
 
     expect(openNoPortPickedDialog).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledOnce();
+  });
+});
+
+function fakePort(): SerialPort {
+  const listeners = new Set<EventListener>();
+  return {
+    addEventListener: (_t: string, l: EventListener) => listeners.add(l),
+    removeEventListener: (_t: string, l: EventListener) => listeners.delete(l),
+    dispatch: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
+  } as unknown as SerialPort;
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("esphome-web-esp-connect-card disconnect resilience", () => {
+  async function connected(port: SerialPort): Promise<ESPHomeWebEspConnectCard> {
+    const el = new ESPHomeWebEspConnectCard();
+    (el as any)._localize = (k: string) => k;
+    (navigator as any).serial = { requestPort: vi.fn(async () => port) };
+    await (el as any)._connect();
+    expect((el as any)._port).toBe(port);
+    return el;
+  }
+
+  it("keeps the device card through a re-enum blip, rebinding the live handle (#1410)", async () => {
+    const port = fakePort();
+    const fresh = fakePort();
+    reacquirePort.mockResolvedValue(fresh);
+    const el = await connected(port);
+
+    (port as any).dispatch();
+    await flush();
+
+    expect((el as any)._port).toBe(fresh);
+  });
+
+  it("falls back to the connect screen when the device stays gone", async () => {
+    const port = fakePort();
+    reacquirePort.mockResolvedValue(null);
+    const el = await connected(port);
+
+    (port as any).dispatch();
+    await flush();
+
+    expect((el as any)._port).toBeUndefined();
+  });
+
+  it("explicit disconnect resets immediately, ignoring a pending reacquire", async () => {
+    const port = fakePort();
+    let resolve!: (v: SerialPort | null) => void;
+    reacquirePort.mockReturnValue(new Promise((r) => (resolve = r)));
+    const el = await connected(port);
+
+    (port as any).dispatch();
+    (el as any)._handleClose();
+    expect((el as any)._port).toBeUndefined();
+
+    resolve(fakePort());
+    await flush();
+    expect((el as any)._port).toBeUndefined();
   });
 });
