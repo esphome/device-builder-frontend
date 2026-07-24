@@ -287,9 +287,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   // Recovery failed ⇒ the handle is released and the spinner is down.
+  // Release, not just clear: a sync throw in _streamFrom lands here with
+  // the freshly-opened handle already recorded as _activePort, and the
+  // already-closed old port on the !live path rejects harmlessly.
   private _failReconnect(): void {
     this._streaming = false;
-    this._activePort = undefined;
+    this._releaseActivePort();
     this._enqueueLine(this._localize("web.logs.reconnect_failed"));
     this._flushPending();
   }
