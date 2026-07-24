@@ -20,10 +20,9 @@ import "./shared/device-name-inputs.js";
  * derives from it behind the disclosure, with the source name forbidden
  * as the new hostname.
  *
- * Emits ``clone-confirm`` on submit with
- * ``{newName, newFriendlyName}`` (the friendly name is ``""`` when
- * the user left the field blank — the page handler decides whether
- * to forward as ``undefined`` so the backend defaults kick in).
+ * Emits ``clone-confirm`` on submit with ``{newName, newFriendlyName}``;
+ * a blank friendly name falls back to the hostname, matching the create
+ * flows, so the same user action yields the same display name.
  */
 @customElement("esphome-clone-device-dialog")
 export class ESPHomeCloneDeviceDialog extends LitElement {
@@ -123,7 +122,10 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     this.close();
     this.dispatchEvent(
       new CustomEvent<{ newName: string; newFriendlyName: string }>("clone-confirm", {
-        detail: { newName: inputs.hostname, newFriendlyName: inputs.friendlyName },
+        detail: {
+          newName: inputs.hostname,
+          newFriendlyName: inputs.friendlyName || inputs.hostname,
+        },
         bubbles: true,
         composed: true,
       })

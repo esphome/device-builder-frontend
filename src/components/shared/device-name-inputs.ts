@@ -164,7 +164,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
       // A warning elsewhere (rename keeps existing names working), but a hard
       // error for new names: the backend refuses them, and an RFC 1123 label
       // can't start or end with a hyphen. Derived slugs never produce one.
-      return { err: { code: "validation.device_name_edge_hyphen" }, warning: null };
+      return { err: { code: "naming.hostname_edge_hyphen" }, warning: null };
     }
     if (
       showsValidation &&
@@ -264,6 +264,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
               onInput: (value) => {
                 this._hostname = value;
                 this._hostnameEdited = value.trim().length > 0;
+                // Typing here is an explicit override; keep the panel open
+                // once the edit clears the error that force-opened it, or
+                // the field unmounts mid-keystroke.
+                this._open = true;
                 this._notify();
               },
               id: "device-hostname",

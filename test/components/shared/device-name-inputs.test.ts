@@ -199,10 +199,21 @@ describe("device-name-inputs disclosure + validity", () => {
     // hyphen), so the preview must block rather than warn.
     const el = await mountInputs();
     await typeHostname(el, "plug-");
-    expect(el.validity.err?.code).toBe("validation.device_name_edge_hyphen");
+    expect(el.validity.err?.code).toBe("naming.hostname_edge_hyphen");
     expect(el.canSubmit).toBe(false);
     await typeHostname(el, "plug");
     expect(el.canSubmit).toBe(true);
+  });
+
+  it("the panel stays open through the keystroke that clears the error", async () => {
+    // The error force-opened the panel; the fix the copy prescribes is
+    // typed into it, so it must not unmount mid-edit.
+    const el = await mountInputs();
+    await typeFriendly(el, "!!!");
+    expect(el.validity.err?.code).toBe("naming.hostname_required");
+    await typeHostname(el, "m");
+    expect(el.validity.err).toBeNull();
+    expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
   });
 
   it("caps a manual hostname override at 31 chars", async () => {

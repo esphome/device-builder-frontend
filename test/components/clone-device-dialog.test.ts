@@ -65,6 +65,29 @@ describe("clone-device-dialog ENTER", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("a hostname-only clone uses the hostname as the friendly name", async () => {
+    // Matches the create flows: the same blank-friendly action yields the
+    // same display name in both.
+    const el = await mount(new ESPHomeCloneDeviceDialog());
+    el.open("source");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("clone-confirm", onConfirm as EventListener);
+    const inputs = await deviceNameInputsOf(el);
+    // Expand the disclosure and type only a hostname.
+    inputs.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!.click();
+    await inputs.updateComplete;
+    const field = inputs.shadowRoot!.querySelector<HTMLInputElement>("#device-hostname")!;
+    field.value = "my_plug";
+    field.dispatchEvent(new Event("input"));
+    await inputs.updateComplete;
+    await el.updateComplete;
+    pressEnter();
+    const detail = (onConfirm.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.newName).toBe("my_plug");
+    expect(detail.newFriendlyName).toBe("my_plug");
+  });
+
   it("ignores Enter with an empty name", async () => {
     const el = await mount(new ESPHomeCloneDeviceDialog());
     el.open("source");
