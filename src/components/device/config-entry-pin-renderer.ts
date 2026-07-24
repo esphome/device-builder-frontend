@@ -100,8 +100,12 @@ function boardPinsForSection(
     }
     const preset = fc.fields?.[entryKey]?.value;
     if (preset == null) continue;
-    const gpio = parseBoardGpio(preset);
-    if (gpio !== null) gpios.add(gpio);
+    // ``parsePinGpio`` so an object-form expander preset
+    // (``{pcf8574: hub, number: 0}``) yields its channel token instead
+    // of being dropped; a raw manifest token string passes through.
+    const id = parsePinGpio(preset);
+    if (typeof id === "number") gpios.add(id);
+    else if (typeof id === "string") tokens.add(id);
     else if (typeof preset === "string") tokens.add(preset);
   }
   return { lockedGpios, gpios, tokens };

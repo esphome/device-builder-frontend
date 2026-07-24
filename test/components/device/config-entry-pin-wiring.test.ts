@@ -694,6 +694,30 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
   });
 
+  it("guards an expander channel preset written as a long-form object", () => {
+    // ``fields`` presets can carry the object form; its channel token
+    // must land in the guard set, not be dropped as an unparseable GPIO.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: 0, mode: "OUTPUT" },
+        { pinRegistryModes: { pca9554: ["input", "output"] } },
+        makeTestBoard({
+          overrides: {
+            featured_components: [
+              {
+                component_id: "binary_sensor.gpio",
+                fields: { pin: { value: { pca9554: "hub", number: 0 } } },
+              },
+            ],
+          } as never,
+        })
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+  });
+
   it("guards an expander channel designated via suggestions (fail closed)", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT, { suggestions: ["pca9554:hub:0"] }),
