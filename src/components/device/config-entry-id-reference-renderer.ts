@@ -144,7 +144,7 @@ export function renderIdReferenceField(
   if (empty) {
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
+        ${renderLabel(entry, ctx, { path })}
         <wa-select
           class=${fieldError ? "invalid" : ""}
           ?disabled=${effectiveDisabled(entry, ctx)}
@@ -174,7 +174,7 @@ export function renderIdReferenceField(
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${effectiveDisabled(entry, ctx)}

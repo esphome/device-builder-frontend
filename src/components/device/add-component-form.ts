@@ -298,6 +298,7 @@ export class ESPHomeAddComponentForm extends LitElement {
           .errors=${this._errors}
           .board=${this.board}
           .yaml=${this.yaml}
+          .sectionKey=${this._sectionKey}
           .presentComponents=${presentComponents}
           ?disabled=${disabled}
           ?required-only=${true}
@@ -475,11 +476,15 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 
+  /** Section key the block resolves to — featured ids are synthetic
+   *  (``featured.<board>.<local>``); the underlying component id keys the
+   *  committed YAML and scopes the board's featured designations. */
+  private get _sectionKey(): string {
+    return resolveFeaturedComponentId(this.component.id, this.board);
+  }
+
   private _generateYamlPreview(): string {
-    // Featured ids are synthetic (`featured.<board>.<local>`); preview the
-    // underlying component the block resolves to, matching the committed YAML.
-    const key = resolveFeaturedComponentId(this.component.id, this.board);
-    const lines: string[] = [`${key}:`];
+    const lines: string[] = [`${this._sectionKey}:`];
     lines.push(...serializeYamlValues(this._values, "  "));
     return lines.join("\n");
   }

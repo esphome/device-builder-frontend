@@ -30,14 +30,14 @@ describe("constraint-prose strip scoping", () => {
       {},
       { overrides: { reactiveConstraintKeys: new Set(["client_certificate"]) } }
     );
-    const out = serialize(renderLabel(entry, ctx));
+    const out = serialize(renderLabel(entry, ctx, { path: ["client_certificate"] }));
     expect(out).toContain("The real description.");
     expect(out).not.toContain("Set together");
   });
 
   it("keeps the prose for a member the form doesn't reactively render", () => {
     const ctx = makeRenderCtx({}, { overrides: { reactiveConstraintKeys: new Set() } });
-    const out = serialize(renderLabel(entry, ctx));
+    const out = serialize(renderLabel(entry, ctx, { path: ["client_certificate"] }));
     expect(out).toContain("Set together");
   });
 });

@@ -69,7 +69,9 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
   const checked = (raw == null ? parseYamlBoolean(entry.default_value) : parsed) === true;
   return html`
     <div class="switch-field" data-field-key=${fieldKeyAttr(path)}>
-      <div class="field-info">${renderLabel(entry, ctx, { includeHelpLink: false })}</div>
+      <div class="field-info">
+        ${renderLabel(entry, ctx, { includeHelpLink: false, path })}
+      </div>
       ${renderHelpLink(entry, ctx)}
       <wa-switch
         ?checked=${checked}
@@ -171,7 +173,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
     // chrome of its own, so this isn't a duplicate visible label.
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
+        ${renderLabel(entry, ctx, { path })}
         <esphome-options-combobox
           .options=${filterOptionsByVariant(entry.options, variant, value)}
           .value=${value}
@@ -212,7 +214,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const shownOptions = filterOptionsByVariant(visibleOptions, variant, value);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${disabled}
@@ -272,7 +274,7 @@ export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: Ren
   const invalid = ctx.errorAt(path) !== null;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <textarea
         class="textarea-field ${invalid ? "invalid" : ""}"
         rows="4"
@@ -297,7 +299,7 @@ export function renderIconField(entry: ConfigEntry, path: string[], ctx: RenderC
   const invalid = ctx.errorAt(path) !== null;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <esphome-mdi-icon-picker
         .value=${value}
         .invalid=${invalid}

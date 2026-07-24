@@ -19,7 +19,14 @@ import {
   renderConstraintRadioField,
   selectClusterAlternative,
 } from "../../../src/components/device/config-entry-renderers/constraint-cluster.js";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../_lit-template-walker.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
+
+const radioGroupBindings = (tpl: unknown) =>
+  extractAttributeBindings(findTemplatesByAnchor(tpl, "<wa-radio-group")[0]);
 
 const ENTRIES: ConfigEntry[] = [
   makeConfigEntry({ key: "rgb_order", type: ConfigEntryType.STRING, label: "RGB Order" }),
@@ -312,6 +319,25 @@ describe("renderConstraintRadioField", () => {
     const out = serialize(renderConstraintRadioField(cluster, ctxFor({})));
     expect(out).not.toContain("wa-radio-group");
     expect(out).toContain("nested-group");
+  });
+
+  it("pins the radios when an alternative member is board-locked", () => {
+    // The board's preset picked the chipset side; switching to manual timings
+    // would clear the locked value.
+    const lockedChipset = ENTRIES.map((e) =>
+      e.key === "chipset" ? { ...e, locked: true } : e
+    );
+    const [locked] = buildConstraintClusters(lockedChipset, REQUIRED_GROUPS).clusters;
+    const tpl = renderConstraintRadioField(
+      locked,
+      statefulCtx({ chipset: "WS2812" }).ctx
+    );
+    expect(radioGroupBindings(tpl)["?disabled"]).toBe(true);
+  });
+
+  it("keeps the radios live when no member is locked", () => {
+    const tpl = renderConstraintRadioField(cluster, statefulCtx({}).ctx);
+    expect(radioGroupBindings(tpl)["?disabled"]).toBe(false);
   });
 });
 

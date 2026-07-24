@@ -142,7 +142,7 @@ export function renderMultiValueField(
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
+      ${renderLabel(entry, ctx, { path })} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
         // Row widgets match the single-value renderers (#1349): INTEGER
         // rows are text — a number input can't show the 0x literals,
@@ -310,7 +310,7 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       ${
         keys.length === 0
           ? html`<p class="field-description">${ctx.localize("device.map_empty")}</p>`
@@ -349,7 +349,7 @@ export function renderNestedListField(
   if (raw instanceof YamlRawValue) {
     return html`
       <div class="nested-list" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
+        ${renderLabel(entry, ctx, { path })}
         <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
         ${renderFieldError(path, ctx)}
       </div>
@@ -364,7 +364,7 @@ export function renderNestedListField(
 
   return html`
     <div class="nested-list" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
+      ${renderLabel(entry, ctx, { path })} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
         const itemPath = [...path, String(i)];
         const renderableChildren = ctx.filterRenderable(childrenSchema, item);

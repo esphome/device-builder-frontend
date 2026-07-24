@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { isEntryVisible } from "../../../util/config-validation.js";
+import { choicePinned } from "../../../util/config-entry-tree.js";
 import {
   fieldKeyAttr,
   labelFor,
@@ -64,11 +65,11 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       )
   );
 
-  // Every *rendered* option board-locked → the choice is fixed; render the
-  // dropdown read-only so it matches `planNeedsUserInput` treating it as
-  // non-actionable. Use options, not all members: a hidden unlocked member
+  // Any *rendered* option board-locked → the choice is fixed: the board's
+  // preset picked this member, and switching away would clear the locked
+  // value. Use options, not all members: a hidden unlocked member
   // (e.g. platform-incompatible) isn't selectable and shouldn't keep it live.
-  const disabled = ctx.disabled || options.every((m) => m.locked);
+  const disabled = ctx.disabled || choicePinned(options);
 
   // Clear only the members actually present (avoids ~N redundant events and
   // stray key: undefined state); scaffold {} only for an absent choice, so

@@ -88,11 +88,13 @@ describe("renderExclusiveGroupField", () => {
     expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
   });
 
-  it("keeps the dropdown enabled when a member is still unlocked", () => {
+  it("disables the dropdown when any member is board-locked", () => {
+    // The board's preset picked the locked member; switching away would
+    // clear its locked value.
     const ctx = makeRenderCtx({ raw: { code: "x" } });
     const [a, b] = members();
     const tpl = renderExclusiveGroupField([{ ...a, locked: true }, b], ctx);
-    expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(false);
+    expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
   });
 
   it("disables when every visible option is locked, ignoring a hidden unlocked member", () => {

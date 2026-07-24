@@ -30,6 +30,8 @@ import {
   renderLabel,
   renderStringField,
   renderSubstitutionHint,
+  tooltipAnchorId,
+  type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -434,6 +436,23 @@ export function renderPinField(
     ownLockedGpios.add(valueGpio);
   }
   const fieldDisabled = effectiveDisabled(entry, ctx);
+  // A board-preset pin's GPIO is the board's wiring, not the user's: the
+  // same guard that view-onlys the wiring panel locks the select. The
+  // active option is already forced into ``visible`` above, so the disabled
+  // head still shows the real pin instead of blanking.
+  const guarded = boardPresetPin && !fieldDisabled;
+  // Hovering a disabled control shows not-allowed but no native title
+  // tooltip, so the guard's hint rides the label's lock icon (the same
+  // chrome a hard lock gets, retargeted at the YAML editor) plus a
+  // wa-tooltip hung off the select.
+  const labelEntry: ConfigEntry = guarded
+    ? ({
+        ...entry,
+        locked: true,
+        locked_reason_key: "device.pin_wiring_guard_tooltip",
+      } as ConfigEntry & LockedReasonCarrier)
+    : entry;
+  const guardTipId = tooltipAnchorId("pin-guard-tip", path);
   const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is
@@ -454,7 +473,7 @@ export function renderPinField(
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(labelEntry, ctx, { path })}
       <!-- Keyed as the long form's number so the YAML cursor lands on the
            select itself (the whole-field fallback centers mid-panel once
            the wiring disclosure is open). Short form keeps the bare path:
@@ -463,13 +482,21 @@ export function renderPinField(
       <wa-select
         data-no-value-sync
         data-field-key=${fieldKeyAttr(isLongForm ? [...path, "number"] : path)}
+        id=${guarded ? guardTipId : nothing}
         class=${invalid ? "invalid" : ""}
         placeholder=${defaultPlaceholder}
-        ?disabled=${fieldDisabled}
+        ?disabled=${fieldDisabled || guarded}
         @change=${onPinChange}
       >
         ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
       </wa-select>
+      ${
+        guarded
+          ? html`<wa-tooltip for=${guardTipId}>
+              ${ctx.localize("device.pin_wiring_guard_tooltip")}
+            </wa-tooltip>`
+          : nothing
+      }
       ${renderFieldError(path, ctx)}
       ${renderPinWiring({
         entry,
@@ -477,7 +504,7 @@ export function renderPinField(
         ctx,
         rawValue,
         boardPin,
-        boardPreset: boardPresetPin,
+        guarded,
       })}
     </div>
   `;
@@ -518,9 +545,14 @@ function renderSubstitutionPin(
         (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolved)
       : designationMatches(boardPins.tokens, resolved) ||
         (entry.suggestions ?? []).some((s) => s === resolved));
+  const guarded = boardPreset && !fieldDisabled;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
+      <!-- Deliberately not guard-locked: no manifest designates a pin via a
+           substitution, so a \${var} landing on one is the user's own
+           hand-authored setup, and this input edits the reference name, not
+           the wiring the panel below guards. -->
       <input
         type="text"
         autocomplete="off"
@@ -538,7 +570,7 @@ function renderSubstitutionPin(
         ctx,
         rawValue,
         boardPin: null,
-        boardPreset,
+        guarded,
       })}
     </div>
   `;
@@ -559,9 +591,10 @@ function renderExpanderPin(
   boardPreset: boolean
 ): TemplateResult {
   const [provider, hub, channel] = identity.split(":");
+  const guarded = boardPreset && !effectiveDisabled(entry, ctx);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(entry, ctx, { path })}
       <input
         type="text"
         readonly
@@ -574,7 +607,7 @@ function renderExpanderPin(
         ctx,
         rawValue,
         boardPin: null,
-        boardPreset,
+        guarded,
       })}
     </div>
   `;
