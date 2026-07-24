@@ -229,21 +229,53 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect((el as any)._createError).toBeTruthy();
   });
 
-  it("keeps submitting set through a successful create until the next open", async () => {
-    // Dropping the flag on success restores the live takenHostnames set —
-    // which now contains the just-created slug — while the close animation
-    // still plays, flashing the collision error (#1438).
+  it("keeps the setup step's collision set frozen through a successful create", async () => {
+    // The devices push lands with the just-created slug while the close
+    // animation still plays; the live set reaching the step would flash the
+    // collision error (#1438).
     const createDevice = vi.fn().mockResolvedValueOnce({ configuration: "kitchen.yaml" });
     const el = await mount({ createDevice });
+    el.takenHostnames = new Set(["kitchen"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step = "setup";
+    await el.updateComplete;
 
     emitFinish(el, "kitchen");
     await flush();
+    await el.updateComplete;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._submitting).toBe(true);
-    el.open();
+    // Busy must release on success or the busy gate vetoes the dialog's close.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._submitting).toBe(false);
+    const step = el.shadowRoot!.querySelector("esphome-wizard-step-setup")!;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((step as any).takenHostnames.size).toBe(0);
+
+    // The next open unfreezes back to the live set.
+    el.open();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step = "setup";
+    await el.updateComplete;
+    const reopened = el.shadowRoot!.querySelector("esphome-wizard-step-setup")!;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((reopened as any).takenHostnames.size).toBe(1);
+  });
+
+  it("freezes the empty-config step's collision set too", async () => {
+    const createDevice = vi.fn().mockResolvedValueOnce({ configuration: "kitchen.yaml" });
+    const el = await mount({ createDevice });
+    el.takenHostnames = new Set(["kitchen"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step = "empty-config";
+    await el.updateComplete;
+
+    emitCreate(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    const step = el.shadowRoot!.querySelector("esphome-wizard-step-empty-config")!;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((step as any).takenHostnames.size).toBe(0);
   });
 
   it("forwards the hostname and friendly name from the empty-config flow", async () => {
