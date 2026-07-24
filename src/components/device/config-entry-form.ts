@@ -75,6 +75,7 @@ import "@home-assistant/webawesome/dist/components/radio-group/radio-group.js";
 import "@home-assistant/webawesome/dist/components/radio/radio.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
 import { buildFormRenderPlan } from "./config-entry-form-plan.js";

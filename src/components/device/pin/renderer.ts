@@ -30,6 +30,7 @@ import {
   renderLabel,
   renderStringField,
   renderSubstitutionHint,
+  type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -439,6 +440,18 @@ export function renderPinField(
   // active option is already forced into ``visible`` above, so the disabled
   // head still shows the real pin instead of blanking.
   const guarded = boardPresetPin && !fieldDisabled;
+  // Hovering a disabled control shows not-allowed but no native title
+  // tooltip, so the guard's hint rides the label's lock icon (the same
+  // chrome a hard lock gets, retargeted at the YAML editor) plus a
+  // wa-tooltip hung off the select.
+  const labelEntry: ConfigEntry = guarded
+    ? ({
+        ...entry,
+        locked: true,
+        locked_reason_key: "device.pin_wiring_guard_tooltip",
+      } as ConfigEntry & LockedReasonCarrier)
+    : entry;
+  const guardTipId = `pin-guard-tip-${path.join(".")}`;
   const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is
@@ -459,7 +472,7 @@ export function renderPinField(
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
+      ${renderLabel(labelEntry, ctx)}
       <!-- Keyed as the long form's number so the YAML cursor lands on the
            select itself (the whole-field fallback centers mid-panel once
            the wiring disclosure is open). Short form keeps the bare path:
@@ -468,14 +481,21 @@ export function renderPinField(
       <wa-select
         data-no-value-sync
         data-field-key=${fieldKeyAttr(isLongForm ? [...path, "number"] : path)}
+        id=${guarded ? guardTipId : nothing}
         class=${invalid ? "invalid" : ""}
         placeholder=${defaultPlaceholder}
         ?disabled=${fieldDisabled || guarded}
-        title=${guarded ? ctx.localize("device.pin_wiring_guard_tooltip") : nothing}
         @change=${onPinChange}
       >
         ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
       </wa-select>
+      ${
+        guarded
+          ? html`<wa-tooltip for=${guardTipId}>
+              ${ctx.localize("device.pin_wiring_guard_tooltip")}
+            </wa-tooltip>`
+          : nothing
+      }
       ${renderFieldError(path, ctx)}
       ${renderPinWiring({
         entry,
