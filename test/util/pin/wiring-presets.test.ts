@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { BoardPin } from "../../src/api/types/boards.js";
-import { PinMode } from "../../src/api/types/config-entries.js";
+import type { BoardPin } from "../../../src/api/types/boards.js";
+import { PinMode } from "../../../src/api/types/config-entries.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
@@ -9,7 +9,7 @@ import {
   wiringStateOf,
   wiringTechSummary,
   wiringValuesPresetSafe,
-} from "../../src/util/pin-wiring-presets.js";
+} from "../../../src/util/pin/wiring-presets.js";
 
 const inputPresets = presetsForPinMode(PinMode.INPUT);
 const outputPresets = presetsForPinMode(PinMode.OUTPUT);

@@ -18,7 +18,7 @@
  */
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { isValidEspHomeId } from "./esphome-id.js";
-import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin-gpio.js";
+import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { hasSubstitutionReference } from "./substitutions.js";
 import { indentOf } from "./yaml-line-walker.js";
 import {

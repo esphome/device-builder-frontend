@@ -1,5 +1,5 @@
-import type { ESPHomeAPI } from "../api/esphome-api.js";
-import { createSessionBlobCache } from "./session-blob-cache.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import { createSessionBlobCache } from "../session-blob-cache.js";
 
 /**
  * Session cache of the ``{provider_key: [allowed_mode_flags]}`` map

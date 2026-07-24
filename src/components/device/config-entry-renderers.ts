@@ -16,7 +16,7 @@ export {
   renderIdReferenceField,
 } from "./config-entry-id-reference-renderer.js";
 
-export { renderPinField } from "./config-entry-pin-renderer.js";
+export { renderPinField } from "./pin/renderer.js";
 
 export {
   renderBooleanField,

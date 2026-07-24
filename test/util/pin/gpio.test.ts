@@ -1,6 +1,6 @@
 /**
  * Tests for the pin string <-> GPIO primitives in
- * ``src/util/pin-gpio.ts`` — the single source of truth shared by the
+ * ``src/util/pin/gpio.ts`` — the single source of truth shared by the
  * pin-selector renderer (current value + suggestions) and the YAML
  * used-pin scanner (cross-section conflict detection).
  *
@@ -38,7 +38,7 @@ import {
   parseBoardGpio,
   parsePinGpio,
   scanPinGpios,
-} from "../../src/util/pin-gpio.js";
+} from "../../../src/util/pin/gpio.js";
 
 describe("parsePinGpio", () => {
   it("returns finite numbers verbatim", () => {

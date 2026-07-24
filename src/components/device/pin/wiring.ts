@@ -3,18 +3,22 @@
  * flag group + ``inverted``) behind a summary disclosure, fronted by
  * guided wiring presets ("button or switch to ground", "active low
  * output", …) on fields that declare a direction via ``pin_mode``.
- * Split from ``config-entry-pin-renderer.ts`` so the GPIO picker and
+ * Split from ``renderer.ts`` so the GPIO picker and
  * the wiring UI stay separately readable.
  */
 
 import { mdiTune } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
-import type { BoardPin } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
-import { isPlainObject } from "../../util/nested-values.js";
-import { isExpanderPinValue } from "../../util/pin-gpio.js";
-import { isSubstitutionString } from "../../util/substitutions.js";
+import type { BoardPin } from "../../../api/types/boards.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import {
+  ConfigEntryType,
+  PinFeature,
+  PinMode,
+} from "../../../api/types/config-entries.js";
+import { isPlainObject } from "../../../util/nested-values.js";
+import { isExpanderPinValue } from "../../../util/pin/gpio.js";
+import { isSubstitutionString } from "../../../util/substitutions.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
@@ -26,22 +30,18 @@ import {
   wiringValuesPresetSafe,
   type WiringPreset,
   type WiringState,
-} from "../../util/pin-wiring-presets.js";
-import { parseYamlBoolean } from "../../util/yaml-serialize.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
-import { onChoiceGroupKeydown, rovingTabStopIndex } from "../shared/choice-group.js";
-import { renderDisclosure } from "../shared/disclosure.js";
-import {
-  renderCustomEditor,
-  renderLongFormChild,
-  wiringDiagram,
-} from "./config-entry-pin-mode.js";
+} from "../../../util/pin/wiring-presets.js";
+import { parseYamlBoolean } from "../../../util/yaml-serialize.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
+import { onChoiceGroupKeydown, rovingTabStopIndex } from "../../shared/choice-group.js";
+import { renderDisclosure } from "../../shared/disclosure.js";
+import { renderCustomEditor, renderLongFormChild, wiringDiagram } from "./mode-editor.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
   type LockedReasonCarrier,
   type RenderCtx,
-} from "./config-entry-renderers-shared.js";
+} from "../config-entry-renderers-shared.js";
 
 registerMdiIcons({ tune: mdiTune });
 

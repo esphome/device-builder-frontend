@@ -2,21 +2,21 @@
  * The pin ``mode`` machinery behind the wiring section: the guided
  * Custom pane, the raw long-form child rendering (provider scoping,
  * scalar-shorthand expansion), and the shared micro-schematic helper.
- * Split from ``config-entry-pin-wiring.ts`` to keep both under the
+ * Split from ``wiring.ts`` to keep both under the
  * repo's file-size limit.
  */
 
 import { html, nothing, type TemplateResult } from "lit";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType, PinMode } from "../../api/types/config-entries.js";
-import { withBase } from "../../util/base-path.js";
-import { isPlainObject } from "../../util/nested-values.js";
-import { expandPinModeShorthand } from "../../util/pin-mode.js";
-import { KNOWN_MODE_FLAGS, modeFlagsOf } from "../../util/pin-wiring-presets.js";
-import { looksLikeSubstitution } from "../../util/substitutions.js";
-import { type RenderCtx } from "./config-entry-renderers-shared.js";
-import { renderNestedField } from "./config-entry-renderers/nested.js";
-import { renderBooleanField } from "./config-entry-renderers/primitives.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType, PinMode } from "../../../api/types/config-entries.js";
+import { withBase } from "../../../util/base-path.js";
+import { isPlainObject } from "../../../util/nested-values.js";
+import { expandPinModeShorthand } from "../../../util/pin/mode.js";
+import { KNOWN_MODE_FLAGS, modeFlagsOf } from "../../../util/pin/wiring-presets.js";
+import { looksLikeSubstitution } from "../../../util/substitutions.js";
+import { type RenderCtx } from "../config-entry-renderers-shared.js";
+import { renderNestedField } from "../config-entry-renderers/nested.js";
+import { renderBooleanField } from "../config-entry-renderers/primitives.js";
 
 /** Decorative micro-schematic for a preset card or custom-editor row,
  *  from the bundled ``assets/pin-wiring/<name>.svg`` files. Applied as a
