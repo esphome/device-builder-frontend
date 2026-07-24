@@ -281,7 +281,16 @@ export async function openLiveSerialPort(
     const { fresh } = await grantedHandlesFor(cachedPort);
     const candidates = [...fresh, cachedPort];
     for (const p of candidates) {
-      if (p.readable) return p; // already open (a reset race left it usable)
+      if (p.readable) {
+        // Open but locked by an existing reader → unusable: the caller's
+        // getReader() would throw "already locked". Skip it and try the
+        // next candidate (mirrors live-log-port's candidate walk).
+        if (p.readable.locked) {
+          lastErr = new Error("port stream already locked");
+          continue;
+        }
+        return p; // already open (a reset race left it usable)
+      }
       try {
         await p.open(bufferSize ? { baudRate, bufferSize } : { baudRate });
         return p;
@@ -289,8 +298,15 @@ export async function openLiveSerialPort(
         lastErr = err;
         const name = err instanceof DOMException ? err.name : "";
         const message = err instanceof Error ? err.message : "";
-        // Already open (a reset race / another candidate) — usable as-is.
-        if (name === "InvalidStateError" && /already open/i.test(message)) {
+        // Already open (a reset race / another candidate) — usable as-is,
+        // unless its stream is held by another reader. Re-read readable:
+        // the failed open() invalidates the null the loop head narrowed to.
+        const readableNow = p.readable as ReadableStream<Uint8Array> | null;
+        if (
+          name === "InvalidStateError" &&
+          /already open/i.test(message) &&
+          !readableNow?.locked
+        ) {
           return p;
         }
         // Unusable this round — still re-enumerating (NetworkError), claimed

@@ -8,7 +8,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { reacquirePort } from "../../src/util/web-serial.js";
+import { openLiveSerialPort, reacquirePort } from "../../src/util/web-serial.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -94,5 +94,43 @@ describe("reacquirePort", () => {
       await reacquirePort(cached, { timeoutMs: 1000, cancelled: () => true })
     ).toBeNull();
     expect(getPorts).not.toHaveBeenCalled();
+  });
+});
+
+describe("openLiveSerialPort", () => {
+  it("skips an open candidate whose stream is locked and opens the next", async () => {
+    const cached = fakePort({
+      readable: null,
+      open: vi.fn(async () => {}),
+    });
+    const locked = fakePort({ readable: { locked: true } });
+    stubGetPorts(async () => [locked, cached]);
+
+    const got = await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 500 });
+    expect(got).toBe(cached);
+    expect((cached as any).open).toHaveBeenCalledWith({ baudRate: 115200 });
+  });
+
+  it("returns an open unlocked candidate without reopening it", async () => {
+    const cached = fakePort({ readable: null, open: vi.fn(async () => {}) });
+    const openUnlocked = fakePort({ readable: { locked: false } });
+    stubGetPorts(async () => [openUnlocked]);
+
+    const got = await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 500 });
+    expect(got).toBe(openUnlocked);
+  });
+
+  it("gives up past the deadline when every candidate stays unopenable", async () => {
+    const cached = fakePort({
+      readable: null,
+      open: vi.fn(async () => {
+        throw new DOMException("not ready", "NetworkError");
+      }),
+    });
+    stubGetPorts(async () => []);
+
+    expect(await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1 })).toBe(
+      null
+    );
   });
 });
