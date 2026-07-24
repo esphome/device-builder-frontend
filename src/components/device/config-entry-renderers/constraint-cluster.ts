@@ -212,6 +212,9 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   const headerId = `constraint-cluster-${clusterId}`;
 
   const visibleMembers = (selected?.members ?? []).filter(isRenderable);
+  // A board-locked member means the board made the cluster choice; switching
+  // sides would clear the locked value, so the radios pin to it.
+  const pinned = alternatives.some((a) => a.members.some((m) => m.locked));
   return html`
     <div
       class="nested-group constraint-cluster"
@@ -224,7 +227,7 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
         class="constraint-cluster-radios"
         aria-labelledby=${headerId}
         .value=${selectedId ?? ""}
-        ?disabled=${ctx.disabled}
+        ?disabled=${ctx.disabled || pinned}
         @change=${(e: Event) =>
           selectClusterAlternative(
             cluster,
