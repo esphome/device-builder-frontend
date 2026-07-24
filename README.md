@@ -99,6 +99,8 @@ pnpm run build:web  # static site → esphome_web/ (gitignored)
 
 Unlike the wheel build (`pnpm run build` → `esphome_device_builder_frontend/`), ESPHome Web has no WebSocket, no auth, and no server: everything runs in the browser. Its output (`esphome_web/`) is **never** part of the wheel; `.github/workflows/deploy-web.yml` publishes it to GitHub Pages at web.esphome.io. New copy goes in `en.json` under the `web.*` namespace like the rest of the app.
 
+Development guide (dev server, hardware testing, layout): [src/web/README.md](src/web/README.md).
+
 ## Translations
 
 ### Contributing translations
