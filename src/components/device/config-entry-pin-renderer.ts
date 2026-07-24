@@ -11,7 +11,12 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
+import {
+  formatPinValue,
+  isExpanderPinValue,
+  parseBoardGpio,
+  parsePinGpio,
+} from "../../util/pin-gpio.js";
 import { isSubstitutionString, resolveSubstitutions } from "../../util/substitutions.js";
 import { renderPinWiring } from "./config-entry-pin-wiring.js";
 import {
@@ -458,18 +463,28 @@ function renderSubstitutionPin(
   const numberPath = [...path, "number"];
   const invalid = ctx.errorAt(numberPath) !== null;
   const fieldDisabled = effectiveDisabled(entry, ctx);
-  // The ``${var}`` can still resolve to the board's designated GPIO for
-  // this section — run the picker path's designation test on the
-  // resolved value, so spelling the pin as a substitution doesn't drop
-  // the wiring guard. An unresolvable reference guards nothing (the
-  // wiring is unknowable, and the presets gate already withholds cards).
+  // The ``${var}`` can still resolve to the board's designation for this
+  // section — run the picker path's test on the resolved value, so
+  // spelling the pin as a substitution doesn't drop the wiring guard.
+  // Re-parsing the whole value keeps the provider rule: an expander pin
+  // yields its channel token (compared against the board's token
+  // designations), never a board GPIO its channel number could alias. A
+  // plain pin's alias spelling ("SDA") resolves through the board table.
+  // An unresolvable reference guards nothing (the wiring is unknowable,
+  // and the presets gate already withholds cards).
   const pins = ctx.board?.pins ?? [];
-  const resolvedGpio = boardGpioOf(resolveSubstitutions(number, ctx.substitutions), pins);
+  const resolvedNumber = resolveSubstitutions(number, ctx.substitutions);
+  const resolved =
+    parsePinGpio({ ...rawValue, number: resolvedNumber }) ??
+    (isExpanderPinValue(rawValue) ? null : gpioFromAlias(resolvedNumber, pins));
   const boardPins = boardPinsForSection(ctx, entry.key);
   const boardPreset =
-    resolvedGpio !== null &&
-    (boardPins.gpios.has(resolvedGpio) ||
-      (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolvedGpio));
+    resolved !== null &&
+    (typeof resolved === "number"
+      ? boardPins.gpios.has(resolved) ||
+        (entry.suggestions ?? []).some((s) => boardGpioOf(s, pins) === resolved)
+      : boardPins.tokens.has(resolved) ||
+        (entry.suggestions ?? []).some((s) => s === resolved));
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}

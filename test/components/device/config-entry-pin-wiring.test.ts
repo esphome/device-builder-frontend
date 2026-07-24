@@ -820,6 +820,44 @@ describe("pin wiring board-preset guard", () => {
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
   });
 
+  it("guards an expander channel whose number is a substitution", () => {
+    const board = makeTestBoard({
+      overrides: {
+        featured_components: [
+          {
+            component_id: "binary_sensor.gpio",
+            locked_pins: { pin: "pca9554:hub:3" },
+          },
+        ],
+      } as never,
+    });
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: "${ch}", mode: { input: true } },
+        { yaml: 'substitutions:\n  ch: "3"\n' },
+        board
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+  });
+
+  it("never matches an expander channel against a board GPIO designation", () => {
+    // Channel 2 on the expander is not board GPIO 2; arming the guard
+    // here would claim board wiring the pin doesn't have.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: "${ch}", mode: { input: true } },
+        { yaml: 'substitutions:\n  ch: "2"\n' },
+        presetBoard()
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
+  });
+
   it("guards an expander channel preset written as a long-form object", () => {
     // ``fields`` presets can carry the object form; its channel token
     // must land in the guard set, not be dropped as an unparseable GPIO.
