@@ -636,6 +636,30 @@ describe("pin wiring custom editor", () => {
     expect(findElementBindings(result, "wa-radio-group")).toHaveLength(0);
   });
 
+  it("seeds the implied direction for an untouched pin", () => {
+    // Direction must never render blank under "Default (input)".
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      customCtx({ number: "GPIO2" })
+    );
+    const groups = findElementBindings(result, "wa-radio-group");
+    expect(groups[0][".value"]).toBe("input");
+  });
+
+  it("keeps the implied direction on a pull-only write", () => {
+    const ctx = customCtx({ number: "GPIO2" });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const pullGroup = findElementBindings(result, "wa-radio-group")[1];
+    (pullGroup["@change"] as (e: unknown) => void)({ target: { value: "pullup" } });
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "mode"], {
+      input: true,
+      pullup: true,
+    });
+  });
+
   it("drops the mode key instead of writing an empty mapping", () => {
     const ctx = customCtx({ number: "GPIO2", mode: { pullup: true } });
     const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);

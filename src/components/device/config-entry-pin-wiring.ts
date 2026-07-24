@@ -455,7 +455,8 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
             ctx,
             modeValue,
             editDisabled,
-            boardPin?.features.includes(PinFeature.INPUT_ONLY) ?? false
+            boardPin?.features.includes(PinFeature.INPUT_ONLY) ?? false,
+            opts.pinMode
           )
         : nothing
     }

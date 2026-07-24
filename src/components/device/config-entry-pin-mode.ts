@@ -8,7 +8,7 @@
 
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../api/types/config-entries.js";
+import { ConfigEntryType, PinMode } from "../../api/types/config-entries.js";
 import { withBase } from "../../util/base-path.js";
 import { isPlainObject } from "../../util/nested-values.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
@@ -44,16 +44,28 @@ export function renderCustomEditor(
   ctx: RenderCtx,
   modeValue: unknown,
   fieldDisabled: boolean,
-  inputOnly = false
+  inputOnly = false,
+  pinMode: PinMode | null = null
 ): TemplateResult {
-  const flags = modeFlagsOf(modeValue);
+  const stored = modeFlagsOf(modeValue);
   // The null half is defensive — the presets gate already excludes
   // unreadable modes; the live case is a flag outside the native set.
-  if (flags === null || Object.keys(flags).some((k) => !KNOWN_MODE_FLAGS.has(k))) {
+  if (stored === null || Object.keys(stored).some((k) => !KNOWN_MODE_FLAGS.has(k))) {
     return html`<div class="pin-wiring-custom">
       ${renderLongFormChild(modeChild, path, ctx)}
       ${invertedChild ? renderLongFormChild(invertedChild, path, ctx) : nothing}
     </div>`;
+  }
+
+  // Direction-less flags carry the field's implied direction (an
+  // untouched pin IS an input/output by schema default): seed it into
+  // the display and the write base, so Direction never renders blank
+  // and a pull-only change doesn't write a mode with no direction.
+  const impliedDirection =
+    pinMode === PinMode.INPUT ? "input" : pinMode === PinMode.OUTPUT ? "output" : null;
+  const flags = { ...stored };
+  if (impliedDirection && !flags.input && !flags.output) {
+    flags[impliedDirection] = true;
   }
 
   const direction =
@@ -79,9 +91,14 @@ export function renderCustomEditor(
     for (const key of Object.keys(next)) {
       if (!next[key]) delete next[key];
     }
-    // A pull-only mode cleared back to None empties the flag set; drop
-    // the ``mode:`` key entirely rather than writing an empty mapping.
-    ctx.emitChange([...path, "mode"], Object.keys(next).length ? next : undefined);
+    // An empty flag set, or one carrying only the implied direction, is
+    // the schema default; drop the ``mode:`` key entirely rather than
+    // writing a redundant mapping.
+    const keys = Object.keys(next);
+    const isDefault =
+      keys.length === 0 ||
+      (keys.length === 1 && impliedDirection !== null && next[impliedDirection]);
+    ctx.emitChange([...path, "mode"], isDefault ? undefined : next);
   };
   // An unexpected radio value (a component shape change) must no-op, not
   // strip the flags it would have replaced — and a rendered-disabled
