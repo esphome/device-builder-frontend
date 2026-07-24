@@ -1804,7 +1804,11 @@
       "open_failed": "Could not open the serial port: {error}",
       "reset_failed": "Could not reset the device.",
       "port_busy": "The device is busy with another operation. Close it and try again.",
-      "terminal_disconnected": "Terminal disconnected"
+      "terminal_disconnected": "Terminal disconnected",
+      "reconnecting": "Waiting for the device to come back…",
+      "reconnected": "Reconnected",
+      "reconnect_failed": "The device did not come back. Close the logs and reconnect it.",
+      "reconnect_gave_up": "Stopped reconnecting — no output after several attempts. Close the logs and reconnect."
     },
     "dashboard_hint": {
       "logs": "Connect your device below, then click Logs to view its output.",

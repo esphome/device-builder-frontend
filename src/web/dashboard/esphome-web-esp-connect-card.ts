@@ -47,6 +47,7 @@ export class ESPHomeWebEspConnectCard extends LitElement {
       return html`<esphome-web-esp-device-card
         .port=${this._port}
         @close=${this._handleClose}
+        @port-replaced=${(e: CustomEvent<SerialPort>) => this._watcher.adopt(e.detail)}
       ></esphome-web-esp-device-card>`;
     }
 

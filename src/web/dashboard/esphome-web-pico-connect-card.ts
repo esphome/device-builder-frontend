@@ -51,6 +51,7 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
       return html`<esphome-web-pico-device-card
         .port=${this._port}
         @close=${this._handleClose}
+        @port-replaced=${(e: CustomEvent<SerialPort>) => this._watcher.adopt(e.detail)}
       ></esphome-web-pico-device-card>`;
     }
 

@@ -162,3 +162,39 @@ describe("PortDisconnectWatcher", () => {
     expect(port.listenerCount()).toBe(1);
   });
 });
+
+describe("PortDisconnectWatcher.adopt", () => {
+  it("reports the adopted handle and moves the watch to it", () => {
+    const old = makeDisconnectPort();
+    const adopted = makeDisconnectPort();
+    const { watcher, onReplace } = makeWatcher();
+
+    watcher.watch(old);
+    watcher.adopt(adopted);
+
+    expect(onReplace).toHaveBeenCalledWith(adopted);
+    expect(old.listenerCount()).toBe(0);
+    expect(adopted.listenerCount()).toBe(1);
+  });
+
+  it("supersedes a reacquire in flight for the same disconnect", async () => {
+    const old = makeDisconnectPort();
+    const adopted = makeDisconnectPort();
+    let resolve: (v: unknown) => void;
+    reacquirePort.mockReturnValue(new Promise((r) => (resolve = r)));
+    const { watcher, onReplace, onGone } = makeWatcher();
+
+    watcher.watch(old);
+    old.fire();
+    watcher.adopt(adopted);
+    const stale = makeDisconnectPort();
+    resolve!(stale);
+    await flush();
+
+    // The adopted handle stands; the stale reacquire result is dropped.
+    expect(onReplace).toHaveBeenCalledTimes(1);
+    expect(onReplace).toHaveBeenCalledWith(adopted);
+    expect(onGone).not.toHaveBeenCalled();
+    expect(stale.listenerCount()).toBe(0);
+  });
+});

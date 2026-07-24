@@ -250,6 +250,86 @@ export async function reacquirePort(
 }
 
 /**
+ * Open a live handle for a possibly re-enumerating device, retrying through
+ * the re-enumeration window. Returns the OPEN port, or ``null`` past
+ * ``timeoutMs`` / on cancel.
+ *
+ * Presence in ``getPorts()`` isn't enough — a device can be enumerated but
+ * not yet openable (Chrome throws ``NetworkError`` in that window) — so the
+ * ``open()`` attempt is the real liveness test. Each round prefers a
+ * freshly-granted handle (Chrome's re-enumerated port), then the cached
+ * handle (Firefox / UART bridges reopen it in place).
+ */
+export async function openLiveSerialPort(
+  cachedPort: SerialPort,
+  options: {
+    baudRate: number;
+    bufferSize?: number;
+    timeoutMs?: number;
+    cancelled?: () => boolean;
+  }
+): Promise<SerialPort | null> {
+  const {
+    baudRate,
+    bufferSize,
+    timeoutMs = SERIAL_REOPEN_TIMEOUT_MS,
+    cancelled = () => false,
+  } = options;
+  const deadline = Date.now() + timeoutMs;
+  let lastErr: unknown = null;
+  while (!cancelled()) {
+    const { fresh } = await grantedHandlesFor(cachedPort);
+    const candidates = [...fresh, cachedPort];
+    for (const p of candidates) {
+      if (p.readable) {
+        // Open but locked by an existing reader → unusable: the caller's
+        // getReader() would throw "already locked". Skip it and try the
+        // next candidate (mirrors live-log-port's candidate walk).
+        if (p.readable.locked) {
+          lastErr = new Error("port stream already locked");
+          continue;
+        }
+        return p; // already open (a reset race left it usable)
+      }
+      try {
+        await p.open(bufferSize ? { baudRate, bufferSize } : { baudRate });
+        return p;
+      } catch (err) {
+        lastErr = err;
+        const name = err instanceof DOMException ? err.name : "";
+        const message = err instanceof Error ? err.message : "";
+        // Already open (a reset race / another candidate) — usable only
+        // with an actual unlocked stream: a fatal read error leaves a port
+        // open with readable null, and returning that would just throw at
+        // getReader(). Re-read readable: the failed open() invalidates the
+        // null the loop head narrowed to.
+        const readableNow = p.readable as ReadableStream<Uint8Array> | null;
+        if (
+          name === "InvalidStateError" &&
+          /already open/i.test(message) &&
+          readableNow &&
+          !readableNow.locked
+        ) {
+          return p;
+        }
+        // Unusable this round — still re-enumerating (NetworkError), claimed
+        // by another app, or a transient driver / security error. Fall
+        // through to the next candidate and only give up at the deadline.
+      }
+    }
+    if (Date.now() >= deadline) {
+      console.error("[Web Serial] Failed to reopen port:", lastErr);
+      return null;
+    }
+    // Re-check before the inter-round sleep so a teardown that landed
+    // mid-round short-circuits instead of napping on it.
+    if (cancelled()) return null;
+    await sleep(200);
+  }
+  return null;
+}
+
+/**
  * Open an already-authorized serial port and detect the connected chip.
  *
  * Used for both first-time detect (via ``detectChip`` after the

@@ -76,6 +76,28 @@ describe("esphome-web-esp-connect-card disconnect resilience", () => {
     return el;
   }
 
+  it("folds a dialog-recovered handle in via port-replaced (composed hop)", async () => {
+    const port = makeDisconnectPort();
+    const live = makeDisconnectPort();
+    const el = await connected(port);
+    document.body.appendChild(el);
+    await (el as any).updateComplete;
+
+    // The logs dialog dispatches from inside the device card's shadow
+    // root; give the stubbed card one so the event genuinely crosses a
+    // shadow boundary — composed: true is what carries it out.
+    const device = el.shadowRoot!.querySelector("esphome-web-esp-device-card")!;
+    const inner = document.createElement("div");
+    device.attachShadow({ mode: "open" }).appendChild(inner);
+    inner.dispatchEvent(
+      new CustomEvent("port-replaced", { detail: live, bubbles: true, composed: true })
+    );
+
+    expect((el as any)._port).toBe(live);
+    expect(live.listenerCount()).toBe(1);
+    el.remove();
+  });
+
   it("keeps the device card through a re-enum blip, rebinding the live handle (#1410)", async () => {
     const port = makeDisconnectPort();
     const fresh = makeDisconnectPort();

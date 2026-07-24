@@ -17,6 +17,7 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
+import { openLiveSerialPort } from "../../util/web-serial.js";
 
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -38,6 +39,14 @@ const MAX_LOG_LINES = 10000;
 // default is all that applies.
 const LOG_BAUD_RATE = 115200;
 
+// 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
+// throttled/backgrounded tab doesn't overrun — matches the legacy site.
+const LOG_BUFFER_SIZE = 8192;
+
+// Consecutive reconnect cycles that produced no log lines before giving up:
+// a flapping bridge or a device stuck resetting must not churn forever.
+const MAX_SILENT_RECONNECTS = 3;
+
 /**
  * Open a port for the logs view before showing the dialog. Returns ``true`` if
  * the port is ready to stream. Opening here (in the caller's click gesture)
@@ -50,9 +59,7 @@ export async function openPortForLogs(
   localize: LocalizeFunc
 ): Promise<boolean> {
   try {
-    // 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
-    // throttled/backgrounded tab doesn't overrun — matches the legacy site.
-    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: 8192 });
+    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader — streamSerialLines() calls getReader(), so
@@ -81,6 +88,8 @@ export async function openPortForLogs(
  * plain Web Serial reader instead of the backend logs WS — no ``apiContext``,
  * no OTA source. The parent opens the port (via ``openPortForLogs``) before
  * showing the dialog; the dialog streams it and closes it on ``after-hide``.
+ * After a mid-stream disconnect the dialog owns recovery: it closes the
+ * dead handle and reopens a live one itself (``openLiveSerialPort``).
  */
 @customElement("esphome-web-logs-dialog")
 export class ESPHomeWebLogsDialog extends LitElement {
@@ -112,6 +121,16 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @state() private _paused = false;
 
   private _cancel?: () => void;
+  // Handle currently streamed. Starts as ``port`` and is replaced when a
+  // native-USB re-enumeration hands back a fresh handle; the parent's own
+  // ``PortDisconnectWatcher`` swap can't be relied on here — Firefox keeps
+  // the same handle, so no property change ever reaches this dialog.
+  private _activePort?: SerialPort;
+  // Supersedes stale reacquire attempts (close, a newer disconnect).
+  private _reacquireGeneration = 0;
+  // Consecutive reconnects that have produced no log lines yet; reset by
+  // the first line after a resume, checked against MAX_SILENT_RECONNECTS.
+  private _silentReconnects = 0;
   // Batched line buffer flushed on the next animation frame, matching the
   // dashboard logs dialog (logs-dialog.ts): a flooding device would otherwise
   // trigger a Lit render per line. Flushed early on teardown / clear / download.
@@ -128,20 +147,36 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
   }
 
+  // A genuine unplug collapses the whole device card (the connect card's
+  // watcher), unmounting this dialog mid-reacquire — cancel it.
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._stop();
+  }
+
   // The parent opens the port (openPortForLogs) before showing the dialog, so
-  // here we just stream it. Defensive guard: a closed port has no readable.
+  // the initial stream reads it as-is; reconnect reopens are this dialog's
+  // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
     if (!this.port?.readable || this._cancel) return;
     this._resetLines();
     this._paused = false;
     this._streaming = true;
-    // Shared reader: same ESPHome log formatting / timestamps / garbage
-    // filtering as the dashboard's post-install serial logs. The cancel it
-    // returns also closes the port.
-    this._cancel = streamSerialLines(this.port, {
+    this._silentReconnects = 0;
+    this._streamFrom(this.port);
+  }
+
+  // Shared reader: same ESPHome log formatting / timestamps / garbage
+  // filtering as the dashboard's post-install serial logs. The cancel it
+  // returns also closes the port. Single place the live handle is recorded,
+  // so "streaming ⇒ _activePort set" holds by construction.
+  private _streamFrom(port: SerialPort): void {
+    this._activePort = port;
+    this._cancel = streamSerialLines(port, {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
       onLine: (line) => {
+        this._silentReconnects = 0;
         if (!this._paused) this._enqueueLine(line);
       },
       onDisconnect: (error) => this._onDisconnect(error),
@@ -162,26 +197,135 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   // The device dropped the stream on its own (unplugged / reset). Print a
-  // "Terminal disconnected" line and drop the spinner, matching legacy — the
-  // terminal would otherwise look stuck streaming forever.
+  // "Terminal disconnected" line, then ride out a native-USB re-enumeration
+  // the way the connect cards do: reacquire the handle, reopen, and resume
+  // streaming. Only a device that stays gone ends the terminal for good.
   private _onDisconnect(error?: unknown): void {
     this._enqueueLine("");
     this._enqueueLine("");
     const base = this._localize("web.logs.terminal_disconnected");
     this._enqueueLine(error ? `${base}: ${String(error)}` : base);
-    this._flushPending();
-    // Reader ended: no Stop/Start button (neither streaming nor paused).
+    // Reader ended: no Stop/Start button until the resume decides.
+    this._cancel = undefined;
     this._streaming = false;
+    const wasPaused = this._paused;
     this._paused = false;
+    const port = this._activePort;
+    if (!this.open || !port || ++this._silentReconnects > MAX_SILENT_RECONNECTS) {
+      if (this.open && port) {
+        // The cap case: every reopen succeeded but nothing readable ever
+        // arrived — a different diagnosis than "did not come back".
+        this._enqueueLine(this._localize("web.logs.reconnect_gave_up"));
+      }
+      // The reader is gone and _cancel is cleared, so nothing else will
+      // release the handle — an open Web Serial port locks the device
+      // away from every other tool for the tab's lifetime.
+      this._releaseActivePort();
+      this._flushPending();
+      return;
+    }
+    this._enqueueLine(this._localize("web.logs.reconnecting"));
+    this._flushPending();
+    const generation = ++this._reacquireGeneration;
+    void this._resumeAfterDisconnect(port, generation, wasPaused).catch((err) => {
+      // A throw in the resume tail (a locked readable slipping through)
+      // must not strand the spinner on a dead stream.
+      console.error("[Web Serial] Logs reconnect failed:", err);
+      if (generation !== this._reacquireGeneration) return;
+      this._failReconnect();
+    });
+  }
+
+  private async _resumeAfterDisconnect(
+    port: SerialPort,
+    generation: number,
+    wasPaused: boolean
+  ): Promise<void> {
+    // Close the dead stream's port first: the reacquired handle is often
+    // this very one (a UART bridge, or Firefox after a re-enum), and
+    // reopening a still-open port would re-read the dead stream and loop.
+    // The dead reader already released its lock, so close() can proceed;
+    // a UA that closed it on device loss rejects harmlessly. A real
+    // failure is logged — it means the cached handle may come back dead.
+    await port.close().catch((err) => {
+      console.error("[Web Serial] Failed to close the dead logs port:", err);
+    });
+    const live = await openLiveSerialPort(port, {
+      baudRate: LOG_BAUD_RATE,
+      bufferSize: LOG_BUFFER_SIZE,
+      cancelled: () => generation !== this._reacquireGeneration,
+    });
+    if (generation !== this._reacquireGeneration) {
+      // Superseded after the open — reclaim the handle we just opened.
+      // Logged loudly: a failure here is a genuinely leaked open port.
+      if (live) {
+        void live.close().catch((err) => {
+          console.error("[Web Serial] Failed to release superseded port:", err);
+        });
+      }
+      return;
+    }
+    if (!live) {
+      this._failReconnect();
+      return;
+    }
+    this._enqueueLine(this._localize("web.logs.reconnected"));
+    this._enqueueLine("");
+    // Honour a Stop pressed before the reset: the reader drains either
+    // way, so the display stays paused instead of force-resuming.
+    this._streaming = !wasPaused;
+    this._paused = wasPaused;
+    this._streamFrom(live);
+    // Hand the recovered handle to the parent card: a read-error-only
+    // disconnect fires no DOM disconnect event, so the card's watcher
+    // may still hold the dead one for the other actions.
+    this.dispatchEvent(
+      new CustomEvent("port-replaced", {
+        detail: live,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  // Recovery failed ⇒ the handle is released and the spinner is down.
+  // Release, not just clear: a sync throw in _streamFrom lands here with
+  // the freshly-opened handle already recorded as _activePort, and the
+  // already-closed old port on the !live path rejects harmlessly.
+  private _failReconnect(): void {
+    this._streaming = false;
+    // The .catch path lands here after _paused was restored for the resume;
+    // a Start button over a released port would strand the spinner.
+    this._paused = false;
+    this._releaseActivePort();
+    this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+    this._flushPending();
+  }
+
+  // Null-and-close the abandoned active handle in one step: the paired
+  // invariant on every reader-already-dead path.
+  private _releaseActivePort(): void {
+    const active = this._activePort;
+    this._activePort = undefined;
+    void active?.close().catch(() => {});
   }
 
   private _stop(): void {
+    this._reacquireGeneration++;
     this._streaming = false;
     this._paused = false;
     this._resetPending();
     const cancel = this._cancel;
     this._cancel = undefined;
-    cancel?.();
+    if (cancel) {
+      this._activePort = undefined;
+      cancel();
+    } else {
+      // A dead-stream path already dropped the cancel closure; release
+      // whatever handle the reconnect flow last held (a no-op when the
+      // UA closed it with the device).
+      this._releaseActivePort();
+    }
   }
 
   // Buffer a streamed line; flush on the next animation frame so a log flood
@@ -224,10 +368,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // 1s settle for the device to come back up. Best-effort — some USB bridges
   // don't wire the reset lines.
   private async _resetDevice(): Promise<void> {
-    if (!this.port) return;
+    // The reacquired handle after a re-enumeration, never the stale one.
+    const port = this._activePort ?? this.port;
+    if (!port) return;
     try {
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
       await sleep(1000);
     } catch {
       toast.error(this._localize("web.logs.reset_failed"));
