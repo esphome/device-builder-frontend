@@ -1807,7 +1807,8 @@
       "terminal_disconnected": "Terminal disconnected",
       "reconnecting": "Waiting for the device to come back…",
       "reconnected": "Reconnected",
-      "reconnect_failed": "The device did not come back. Close the logs and reconnect it."
+      "reconnect_failed": "The device did not come back. Close the logs and reconnect it.",
+      "reconnect_gave_up": "Stopped reconnecting — no output after several attempts. Close the logs and reconnect."
     },
     "dashboard_hint": {
       "logs": "Connect your device below, then click Logs to view its output.",

@@ -213,7 +213,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
     const port = this._activePort;
     if (!this.open || !port || ++this._silentReconnects > MAX_SILENT_RECONNECTS) {
       if (this.open && port) {
-        this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+        // The cap case: every reopen succeeded but nothing readable ever
+        // arrived — a different diagnosis than "did not come back".
+        this._enqueueLine(this._localize("web.logs.reconnect_gave_up"));
       }
       // The reader is gone and _cancel is cleared, so nothing else will
       // release the handle — an open Web Serial port locks the device
@@ -292,6 +294,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // already-closed old port on the !live path rejects harmlessly.
   private _failReconnect(): void {
     this._streaming = false;
+    // The .catch path lands here after _paused was restored for the resume;
+    // a Start button over a released port would strand the spinner.
+    this._paused = false;
     this._releaseActivePort();
     this._enqueueLine(this._localize("web.logs.reconnect_failed"));
     this._flushPending();

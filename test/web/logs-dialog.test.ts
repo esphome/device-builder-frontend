@@ -181,7 +181,7 @@ describe("esphome-web-logs-dialog", () => {
     expect(last.close).toHaveBeenCalled();
     expect((el as any)._activePort).toBeUndefined();
     (el as any)._flushPending();
-    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+    expect((el as any)._lines).toContain("web.logs.reconnect_gave_up");
   });
 
   it("a throw in the resume tail ends as reconnect_failed, not a stuck spinner", async () => {

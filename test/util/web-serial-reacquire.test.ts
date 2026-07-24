@@ -133,4 +133,41 @@ describe("openLiveSerialPort", () => {
       null
     );
   });
+
+  it("forwards bufferSize to open (the 8k logs buffer must survive the reopen)", async () => {
+    const cached = fakePort({ readable: null, open: vi.fn(async () => {}) });
+    stubGetPorts(async () => []);
+
+    await openLiveSerialPort(cached, {
+      baudRate: 115200,
+      bufferSize: 8192,
+      timeoutMs: 500,
+    });
+    expect((cached as any).open).toHaveBeenCalledWith({
+      baudRate: 115200,
+      bufferSize: 8192,
+    });
+  });
+
+  it("stops polling when cancelled", async () => {
+    let rounds = 0;
+    const cached = fakePort({
+      readable: null,
+      open: vi.fn(async () => {
+        throw new DOMException("not ready", "NetworkError");
+      }),
+    });
+    stubGetPorts(async () => {
+      rounds++;
+      return [];
+    });
+
+    const got = await openLiveSerialPort(cached, {
+      baudRate: 115200,
+      timeoutMs: 60000,
+      cancelled: () => rounds >= 2,
+    });
+    expect(got).toBe(null);
+    expect(rounds).toBeLessThanOrEqual(3);
+  });
 });
