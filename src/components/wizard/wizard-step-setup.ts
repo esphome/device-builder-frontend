@@ -27,6 +27,11 @@ import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../shared/device-name-inputs.js";
 
+// While createDevice is in flight the devices push announcing the new device
+// arrives before the dialog closes; checking against it would flash a
+// collides-with-itself error on the name being created.
+const _EMPTY_TAKEN: ReadonlySet<string> = new Set();
+
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -461,7 +466,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
                   })
                 : ""
             }
-            .takenHostnames=${this.takenHostnames}
+            .takenHostnames=${this.submitting ? _EMPTY_TAKEN : this.takenHostnames}
             @device-name-changed=${() => this.requestUpdate()}
           ></esphome-device-name-inputs>
         </div>
