@@ -190,6 +190,14 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
       ctx.emitChange(path, { number: rawValue });
     }
   };
+  // Eager promotion on open is load-bearing only where children write
+  // through the form dispatch (``setIn`` coerces a scalar parent to
+  // ``{}``, dropping the GPIO): the raw disclosure, and any non-wiring
+  // long-form field (drive_strength, the escape hatches). On the pure
+  // presets path a curious click just reads — a preset pick promotes
+  // itself, and the Custom pick promotes before its pane opens.
+  const openNeedsLongForm =
+    !usePresets || longFormFields.some((c) => !PIN_WIRING_KEYS.has(c.key));
   const onToggle = () => {
     // Locked / disabled fields must not mutate via the disclosure —
     // without this guard, opening it on a short-form locked pin would
@@ -201,7 +209,7 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
     ctx.toggleNested(advancedKey);
     // First open promotes — except on a board-preset pin: merely viewing
     // its wiring must not edit YAML (the panel is view-only anyway).
-    if (!isOpen && !guarded) promoteShortForm();
+    if (!isOpen && !guarded && openNeedsLongForm) promoteShortForm();
   };
 
   // Built lazily with the rest of the panel — the disclosure body only
@@ -279,6 +287,7 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
                   presets,
                   state,
                   boardPin,
+                  promoteShortForm,
                 })
               : longFormFields.map((child) => renderLongFormChild(child, path, panelCtx))
           }`,
@@ -302,6 +311,9 @@ interface WiringPanelOptions {
   presets: WiringPreset[];
   state: WiringState;
   boardPin: BoardPin | null;
+  /** Promote a scalar pin to ``{ number }`` — the Custom pane's nested
+   *  writes need the long-form parent the open no longer creates. */
+  promoteShortForm: () => void;
 }
 
 function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
@@ -314,10 +326,15 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
   const showCustom =
     ctx.getClusterChoice(choiceKey) === "custom" || state.kind === "custom";
 
-  const pickPreset = (preset: WiringPreset) => {
+  const pickPreset = (preset: WiringPreset, selected: boolean) => {
     // Same belt-and-braces as every other mutating handler: the missing
-    // click binding alone must not be the guardrail.
-    if (editDisabled || presetUnavailableReason(preset, boardPin) !== null) return;
+    // click binding alone must not be the guardrail. A re-click of the
+    // checked card is a no-op — an inverted-agnostic preset writes a
+    // concrete ``inverted``, which the checked card's tech line
+    // deliberately doesn't show, so re-applying could silently flip it.
+    if (selected || editDisabled || presetUnavailableReason(preset, boardPin) !== null) {
+      return;
+    }
     // Clear a prior Custom pick; the preset itself round-trips from the
     // written flags, so no id needs storing.
     ctx.setClusterChoice(choiceKey, "");
@@ -325,6 +342,9 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
   };
   const pickCustom = () => {
     if (editDisabled) return;
+    // The pane's nested writes need the long-form parent; opening the
+    // disclosure no longer creates it on the presets path.
+    opts.promoteShortForm();
     ctx.setClusterChoice(choiceKey, "custom");
   };
 
@@ -386,7 +406,7 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
             : (preset.invertedWrite ?? currentInverted),
           opts.guardTooltip,
           editDisabled,
-          () => pickPreset(preset),
+          () => pickPreset(preset, i === selectedIndex),
           ctx
         )
       )}

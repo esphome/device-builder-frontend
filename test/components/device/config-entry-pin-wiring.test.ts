@@ -286,6 +286,61 @@ describe("pin wiring preset cards", () => {
     expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-wiring", "custom");
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
+
+  it("picking Custom on a short-form pin promotes it first", () => {
+    // The pane's nested writes need the long-form parent; opening the
+    // disclosure no longer creates it on the presets path.
+    const ctx = openCtx("GPIO2");
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    (cardById(result, "custom")!["@click"] as () => void)();
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-wiring", "custom");
+  });
+
+  it("re-clicking the checked card does not rewrite the pin", () => {
+    // ground_switch matches inverted-agnostically but writes a concrete
+    // inverted; re-applying would flip state the checked card's tech
+    // line deliberately doesn't show.
+    const ctx = openCtx({ number: "GPIO2", mode: { input: true, pullup: true } });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    (cardById(result, "ground_switch")!["@click"] as () => void)();
+
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("opening the wiring summary does not rewrite a short-form pin", () => {
+    const ctx = openCtx("GPIO2", { nestedOpenSections: new Set<string>() });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    (disclosureToggle(result)["@click"] as () => void)();
+
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("still promotes on open when a non-wiring long-form field renders", () => {
+    // drive_strength writes through the form dispatch, where ``setIn``
+    // on a scalar parent would drop the GPIO.
+    const entry = wiringPinEntry(PinMode.INPUT, {
+      config_entries: [
+        modeChild(),
+        invertedChild(),
+        makeEntry(ConfigEntryType.STRING, {
+          key: "drive_strength",
+          label: "Drive strength",
+        }),
+      ],
+    });
+    const ctx = openCtx("GPIO2", { nestedOpenSections: new Set<string>() });
+    const result = renderPinField(entry, ["pin"], ctx);
+
+    (disclosureToggle(result)["@click"] as () => void)();
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
+  });
 });
 
 describe("pin wiring summary line", () => {
