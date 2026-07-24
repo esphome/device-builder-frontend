@@ -4,6 +4,7 @@
  * looked up by their ``data-preset`` binding; walker and fixtures are
  * shared with the sibling tests.
  */
+import { nothing } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, PinMode } from "../../../../src/api/types/config-entries.js";
 import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
@@ -1023,6 +1024,45 @@ describe("pin wiring board-preset guard", () => {
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
+  });
+
+  it("disables the GPIO select on a board-preset pin, keeping the active option", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      guardedCtx("GPIO2")
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(select["?disabled"]).toBe(true);
+    // The active pin's option still renders, so the disabled head isn't blank.
+    expect(
+      findElementBindings(result, "wa-option").some((o) => o.value === "GPIO2")
+    ).toBe(true);
+    // A disabled control surfaces no native title tooltip, so the hint is
+    // a wa-tooltip anchored on the select plus the label's lock icon.
+    expect(findElementBindings(result, "wa-tooltip")[0]?.for).toBe(select.id);
+    expect(
+      findElementBindings(result, "wa-icon").some(
+        (i) => i.title === "device.pin_wiring_guard_tooltip"
+      )
+    ).toBe(true);
+  });
+
+  it("leaves the select editable when the pin is the user's own", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      guardedCtx("GPIO33")
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(select["?disabled"]).toBe(false);
+    expect(select.id).toBe(nothing);
+    expect(findElementBindings(result, "wa-tooltip")).toHaveLength(0);
+    expect(
+      findElementBindings(result, "wa-icon").some(
+        (i) => i.title === "device.pin_wiring_guard_tooltip"
+      )
+    ).toBe(false);
   });
 
   it("locks children of a hard-locked pin carrying wiring values", () => {
