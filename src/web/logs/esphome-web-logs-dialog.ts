@@ -192,6 +192,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
     const base = this._localize("web.logs.terminal_disconnected");
     this._enqueueLine(error ? `${base}: ${String(error)}` : base);
     // Reader ended: no Stop/Start button (neither streaming nor paused).
+    // Dropping the cancel closure without calling it is deliberate — the
+    // dead reader already released its lock (the stream helper's finally),
+    // the UA auto-closes the port on real device loss, and a port that
+    // survived its stream stays tolerated by openPortForLogs' already-open
+    // path when the resume reopens it.
     this._cancel = undefined;
     this._streaming = false;
     this._paused = false;
