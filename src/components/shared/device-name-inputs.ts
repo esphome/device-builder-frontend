@@ -28,8 +28,8 @@ registerMdiIcons({ "help-circle-outline": mdiHelpCircleOutline });
  * hostname behind a chevron disclosure for overrides.
  *
  * Typing in the friendly field keeps the hostname in sync until the user
- * edits the hostname directly; clearing the hostname re-enables derivation
- * from the next friendly-name edit.
+ * edits the hostname directly; clearing the hostname restores the derived
+ * value and re-enables derivation.
  * A hard validation error force-opens the disclosure so the reason for a
  * disabled submit is never hidden. Hosts read ``friendlyName`` /
  * ``hostname`` / ``canSubmit`` off the element and re-render their submit
@@ -83,7 +83,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   // Latched once the user types in the hostname field directly; stops the
   // friendly-name input from clobbering their edit. Clearing the hostname
-  // unlatches; derivation resumes on the next friendly-name edit.
+  // unlatches and restores the derived value.
   @state()
   private _hostnameEdited = false;
 
@@ -262,8 +262,12 @@ export class ESPHomeDeviceNameInputs extends LitElement {
               value: this._hostname,
               validity,
               onInput: (value) => {
-                this._hostname = value;
                 this._hostnameEdited = value.trim().length > 0;
+                // Clearing is an undo: restore the derived value instead of
+                // stranding an empty field behind a required-hostname error.
+                this._hostname = this._hostnameEdited
+                  ? value
+                  : slugifyHostname(this._friendly);
                 // Typing here is an explicit override; keep the panel open
                 // once the edit clears the error that force-opened it, or
                 // the field unmounts mid-keystroke.

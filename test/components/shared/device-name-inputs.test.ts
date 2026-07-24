@@ -84,12 +84,16 @@ describe("device-name-inputs derivation", () => {
     expect(el.friendlyName).toBe("Dining Room AC 2");
   });
 
-  it("resumes deriving after the hostname is cleared", async () => {
+  it("clearing the hostname restores the derived value immediately", async () => {
     const el = await mountInputs();
-    await typeHostname(el, "manual-name");
+    await typeFriendly(el, "Office Fan");
+    await typeHostname(el, "mangled");
     await typeHostname(el, "");
-    await typeFriendly(el, "Dining Room AC 2");
-    expect(el.hostname).toBe("dining-room-ac-2");
+    expect(el.hostname).toBe("office-fan");
+    expect(el.validity.err).toBeNull();
+    expect(el.canSubmit).toBe(true);
+    await typeFriendly(el, "Office Fan 2");
+    expect(el.hostname).toBe("office-fan-2");
   });
 
   it("reset() clears both fields and the latch, optionally seeding the friendly name", async () => {
