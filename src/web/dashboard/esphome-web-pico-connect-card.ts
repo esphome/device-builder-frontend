@@ -46,11 +46,20 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
     () => (this._port = undefined)
   );
 
+  // The logs dialog recovered a live handle from a read-error disconnect
+  // the watcher never saw (no DOM disconnect event fires for those); fold
+  // it in so the card's other actions use the live handle too.
+  private _onPortReplaced = (e: CustomEvent<SerialPort>): void => {
+    this._port = e.detail;
+    this._watcher.watch(e.detail);
+  };
+
   protected render() {
     if (this._port) {
       return html`<esphome-web-pico-device-card
         .port=${this._port}
         @close=${this._handleClose}
+        @port-replaced=${this._onPortReplaced}
       ></esphome-web-pico-device-card>`;
     }
 

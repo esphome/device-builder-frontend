@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
@@ -44,6 +44,12 @@ afterEach(() => {
   // resetAllMocks (not clearAllMocks): per-test mockResolvedValue
   // implementations must not leak into later tests.
   vi.resetAllMocks();
+});
+
+// resetAllMocks strips module-level spy implementations too; restore the
+// sleep stub so callers awaiting it keep getting a promise.
+beforeEach(() => {
+  sleep.mockImplementation((_ms?: number) => Promise.resolve());
 });
 
 const drainMacrotasks = () => new Promise((r) => setTimeout(r, 0));
@@ -96,7 +102,7 @@ describe("esphome-web-logs-dialog", () => {
     const el = await mount();
     const order: string[] = [];
     const stale = { close: vi.fn(async () => order.push("close")) };
-    const live = { readable: {} };
+    const live = { readable: {}, close: vi.fn(async () => {}) };
     (openLiveSerialPort as any).mockImplementation(async () => {
       order.push("reopen");
       return live;
@@ -118,7 +124,10 @@ describe("esphome-web-logs-dialog", () => {
 
   it("keeps the display paused across an auto-reconnect", async () => {
     const el = await mount();
-    (openLiveSerialPort as any).mockResolvedValue({ readable: {} });
+    (openLiveSerialPort as any).mockResolvedValue({
+      readable: {},
+      close: vi.fn(async () => {}),
+    });
     el.open = true;
     (el as any)._activePort = { close: vi.fn(async () => {}) };
     (el as any)._paused = true;
@@ -145,7 +154,10 @@ describe("esphome-web-logs-dialog", () => {
 
   it("gives up after consecutive reconnects that never produce a line", async () => {
     const el = await mount();
-    (openLiveSerialPort as any).mockResolvedValue({ readable: {} });
+    (openLiveSerialPort as any).mockResolvedValue({
+      readable: {},
+      close: vi.fn(async () => {}),
+    });
     el.open = true;
 
     for (let i = 0; i < 3; i++) {
@@ -154,13 +166,60 @@ describe("esphome-web-logs-dialog", () => {
       await vi.waitFor(() => expect((el as any)._streaming).toBe(true));
     }
     (openLiveSerialPort as any).mockClear();
-    (el as any)._activePort = { close: vi.fn(async () => {}) };
+    const last = { close: vi.fn(async () => {}) };
+    (el as any)._activePort = last;
     (el as any)._onDisconnect();
     await drainMacrotasks();
 
     expect(openLiveSerialPort).not.toHaveBeenCalled();
+    // The stranded handle is released — nothing else holds a cancel for it.
+    expect(last.close).toHaveBeenCalled();
+    expect((el as any)._activePort).toBeUndefined();
     (el as any)._flushPending();
     expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+  });
+
+  it("hands the recovered handle to the parent via port-replaced", async () => {
+    const el = await mount();
+    const live = { readable: {}, close: vi.fn(async () => {}) };
+    (openLiveSerialPort as any).mockResolvedValue(live);
+    el.open = true;
+    (el as any)._activePort = { close: vi.fn(async () => {}) };
+    const replaced = vi.fn();
+    el.addEventListener("port-replaced", (e) => replaced((e as CustomEvent).detail));
+
+    (el as any)._onDisconnect();
+    await vi.waitFor(() => expect(replaced).toHaveBeenCalledWith(live));
+  });
+
+  it("a throw in the resume tail ends as reconnect_failed, not a stuck spinner", async () => {
+    const el = await mount();
+    (openLiveSerialPort as any).mockResolvedValue({
+      readable: {},
+      close: vi.fn(async () => {}),
+    });
+    (streamSerialLines as any).mockImplementation(() => {
+      throw new TypeError("stream already locked");
+    });
+    el.open = true;
+    (el as any)._activePort = { close: vi.fn(async () => {}) };
+
+    (el as any)._onDisconnect();
+    await vi.waitFor(() =>
+      expect((el as any)._lines).toContain("web.logs.reconnect_failed")
+    );
+    expect((el as any)._streaming).toBe(false);
+  });
+
+  it("closing the dialog releases a handle orphaned by a dead stream", async () => {
+    const el = await mount();
+    const orphan = { close: vi.fn(async () => {}) };
+    (el as any)._activePort = orphan;
+    (el as any)._cancel = undefined;
+
+    (el as any)._stop();
+
+    expect(orphan.close).toHaveBeenCalled();
   });
 
   it("a line arriving after a resume resets the give-up counter", async () => {
@@ -170,7 +229,10 @@ describe("esphome-web-logs-dialog", () => {
       hooks = h;
       return vi.fn();
     });
-    (openLiveSerialPort as any).mockResolvedValue({ readable: {} });
+    (openLiveSerialPort as any).mockResolvedValue({
+      readable: {},
+      close: vi.fn(async () => {}),
+    });
     el.open = true;
     (el as any)._activePort = { close: vi.fn(async () => {}) };
 
@@ -204,7 +266,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("renders a Clear label and toggles Stop ⇄ Start", async () => {
     const el = await mount();
-    el.port = { readable: {} } as unknown as SerialPort;
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
     el.open = true;
     // _start() flips _streaming inside updated(), which schedules a second
     // render — await both cycles before asserting on the toolbar.
@@ -231,7 +293,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("drops incoming lines while paused, keeps them while streaming", async () => {
     const el = await mount();
-    el.port = { readable: {} } as unknown as SerialPort;
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
     el.open = true;
     await el.updateComplete;
 
