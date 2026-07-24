@@ -64,7 +64,6 @@ export class ESPHomeWebHeader extends LitElement {
                 <button
                   class="switch-btn"
                   @click=${this._onToggle}
-                  title=${targetLabel}
                   aria-label=${targetLabel}
                 >
                   <img class="target-logo" src="/static/logo/${targetLogo}.png" alt="" />
