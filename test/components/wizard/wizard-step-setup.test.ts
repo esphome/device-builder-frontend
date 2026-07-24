@@ -293,6 +293,20 @@ describe("wizard-step-setup", () => {
     expect(inputs.hostname).toBe("kitchen-plug");
   });
 
+  it("ignores the just-created device's push while submitting", async () => {
+    // createDevice's success push announces the new device before the
+    // dialog closes; flagging it would flash a self-collision error.
+    const el = await mount(noWifiBoard());
+    await setName(el, "Kitchen Plug");
+    el.submitting = true;
+    el.takenHostnames = new Set(["kitchen-plug"]);
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    await inputs.updateComplete;
+    expect(inputs.validity.err).toBeNull();
+    expect(inputs.canSubmit).toBe(true);
+  });
+
   it("a collision push on the Wi-Fi stage blocks Finish", async () => {
     // The name was valid when the user advanced; a devices push landing
     // afterwards must still gate the finish button.
