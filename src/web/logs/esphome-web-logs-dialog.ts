@@ -8,10 +8,15 @@ import {
   mdiStop,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import {
+  crashCalloutStyles,
+  renderCrashCallout,
+} from "../../components/process-terminal/crash-callout.js";
+import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import {
   fillTerminalOnMobile,
   termButtonStyles,
@@ -20,7 +25,11 @@ import {
 import { renderTermButton } from "../../components/process-terminal/toolbar-button.js";
 import { localizeContext } from "../../context/index.js";
 import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
-import { type CrashKind, classifyLine } from "../../util/crash-detector.js";
+import {
+  type CrashKind,
+  classifyLine,
+  latchCrashKind,
+} from "../../util/crash-detector.js";
 import { downloadAnsiText } from "../../util/download-text.js";
 import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -135,6 +144,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // nothing downgrades it (mirrors the builder's logs dialog).
   @state() private _crashKind: CrashKind | null = null;
 
+  @query("esphome-process-terminal")
+  private _terminal?: ESPHomeProcessTerminal;
+
   private _cancel?: () => void;
   // Handle currently streamed. Starts as ``port`` and is replaced when a
   // native-USB re-enumeration hands back a fresh handle; the parent's own
@@ -152,18 +164,17 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _pendingLines: string[] = [];
   private _flushScheduled = 0;
 
+  // One (open, port) → streaming reconcile: the device cards open with the
+  // port already set, the flash receiver opens first and assigns the port
+  // once the rebooted device re-enumerates. _start's guards make the extra
+  // calls no-ops, including a port swapped mid-stream or mid-reconnect —
+  // the dialog owns its active handle and announces swaps via port-replaced.
   protected updated(changed: Map<string, unknown>): void {
-    if (changed.has("open")) {
-      if (this.open) {
-        this._start();
-      } else {
-        this._stop();
-      }
-    } else if (changed.has("port") && this.open) {
-      // The flash receiver opens the dialog before the rebooted device has
-      // re-enumerated, then assigns the open port once acquired — start
-      // streaming when it lands (_start no-ops if a reader is already up).
+    if (!changed.has("open") && !changed.has("port")) return;
+    if (this.open) {
       this._start();
+    } else if (changed.has("open")) {
+      this._stop();
     }
   }
 
@@ -178,7 +189,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // the initial stream reads it as-is; reconnect reopens are this dialog's
   // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
-    if (!this.port?.readable || this._cancel) return;
+    // _activePort blocks a restart while a disconnect recovery is in flight
+    // (_cancel is already cleared there): a parent swapping .port in that
+    // window must not wipe the rendered lines or race a second reader
+    // against _resumeAfterDisconnect.
+    if (!this.port?.readable || this._cancel || this._activePort) return;
     this._resetLines();
     this._crashKind = null;
     this._paused = false;
@@ -196,10 +211,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._cancel = streamSerialLines(port, {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
+      // The paused gate also covers crash detection: the banner must never
+      // claim a crash the terminal (and a download) contains no trace of.
       onLine: (line) => {
         this._silentReconnects = 0;
+        if (this._paused) return;
         this._observeCrash(line);
-        if (!this._paused) this._enqueueLine(line);
+        this._enqueueLine(line);
       },
       onDisconnect: (error) => this._onDisconnect(error),
     });
@@ -208,9 +226,18 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // Detection only — web.esphome.io has no backend to decode or report a
   // crash, so the callout stays a banner (the builder's dialog adds those).
   private _observeCrash(line: string): void {
-    if (this._crashKind === "live") return;
-    const kind = classifyLine(normalizeLogLine(line));
-    if (kind && kind !== this._crashKind) this._crashKind = kind;
+    if (this._crashKind === "live") return; // latched; skip the regex scan
+    const next = latchCrashKind(this._crashKind, classifyLine(normalizeLogLine(line)));
+    if (next === this._crashKind) return;
+    const firstDetection = this._crashKind === null;
+    this._crashKind = next;
+    // The callout shrinks the log container; re-pin so the crash tail
+    // stays visible (mirrors the builder's dialog).
+    if (firstDetection) {
+      void this.updateComplete
+        .then(() => this._terminal?.scrollToBottom())
+        .catch((err) => console.warn("crash callout re-pin scroll failed", err));
+    }
   }
 
   // Stop → pause the display (reader stays alive). Start → resume. Start only
@@ -443,20 +470,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
           .streaming=${this._streaming}
           placeholder=${this._localize("web.logs.waiting")}
         >
-          ${
-            this._crashKind !== null
-              ? html`<div class="crash-callout" slot="suggestion">
-                  <wa-icon library="mdi" name="alert-circle"></wa-icon>
-                  <span class="crash-callout-text" role="status"
-                    >${this._localize(
-                      this._crashKind === "previous-boot"
-                        ? "crash_report.banner_previous_boot"
-                        : "crash_report.banner"
-                    )}</span
-                  >
-                </div>`
-              : nothing
-          }
+          ${renderCrashCallout(this._localize, this._crashKind)}
           <div class="toolbar-slot" slot="toolbar-right">
             ${
               this.isPico
@@ -535,25 +549,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
         gap: var(--wa-space-2xs);
         align-items: center;
       }
-      /* Mirrors the builder logs dialog's callout, minus the report button. */
-      .crash-callout {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-s);
-        padding: 8px 20px;
-        border-top: 1px solid var(--term-border);
-        background: color-mix(in srgb, var(--esphome-error, #d32f2f) 14%, var(--term-bg));
-        color: var(--term-fg);
-        font-size: var(--wa-font-size-s);
-      }
-      .crash-callout wa-icon {
-        flex-shrink: 0;
-        color: var(--esphome-error, #d32f2f);
-      }
-      .crash-callout-text {
-        flex: 1;
-      }
     `,
+    crashCalloutStyles,
   ];
 }
 

@@ -70,6 +70,8 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
 
   it("aborts the wait silently when the dialog is closed during it", async () => {
     const el = await mount();
+    // A stale handle from a previous install must not survive into this one.
+    (el as any)._logPort = makePort();
     openLiveLogPort.mockImplementation(async (...args: unknown[]) => {
       (el as any)._logsOpen = false; // user closed the dialog
       expect((args[4] as () => boolean)()).toBe(true); // shouldStop sees it
@@ -92,7 +94,9 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect(toast.error).toHaveBeenCalledOnce();
   });
 
-  it("closes the port instead of handing it when the dialog closed mid-setSignals", async () => {
+  it("closes the port but keeps the handle when the dialog closed mid-setSignals", async () => {
+    // An accidental Escape mid-hand-off stays a one-click recovery: the
+    // Logs button reopens the kept (closed) handle.
     const el = await mount();
     const port = makePort({
       setSignals: vi.fn(async () => {
@@ -104,7 +108,35 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     await (el as any)._openBootLogs({}, []);
 
     expect(port.close).toHaveBeenCalledOnce();
+    expect((el as any)._logPort).toBe(port);
+  });
+
+  it("a newer install supersedes a pending acquisition and reclaims its port", async () => {
+    const el = await mount();
+    const port = makePort({
+      setSignals: vi.fn(async () => {
+        (el as any)._bootLogsGen++; // a second flash started
+      }),
+    });
+    openLiveLogPort.mockResolvedValue({ port, error: null });
+
+    await (el as any)._openBootLogs({}, []);
+
+    expect(port.close).toHaveBeenCalledOnce();
     expect((el as any)._logPort).toBeUndefined();
+  });
+
+  it("unmounting the receiver aborts the acquisition without a toast", async () => {
+    const el = await mount();
+    openLiveLogPort.mockImplementation(async (...args: unknown[]) => {
+      el.remove(); // disconnectedCallback bumps the generation
+      expect((args[4] as () => boolean)()).toBe(true);
+      return { port: null };
+    });
+
+    await (el as any)._openBootLogs({}, []);
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("reopens the kept port through openPortForLogs on the Logs button", async () => {

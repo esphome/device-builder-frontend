@@ -313,6 +313,37 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._streaming).toBe(true);
   });
 
+  it("ignores a port swap while a disconnect recovery is in flight", async () => {
+    const el = await mount();
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+
+    // The reconnect window: reader gone (_cancel cleared) but the active
+    // handle retained; a parent watcher swapping .port here must not wipe
+    // the rendered lines or race a second reader against the resume.
+    (el as any)._cancel = undefined;
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+  });
+
+  it("does not latch the crash banner for lines dropped while paused", async () => {
+    const el = await mount();
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    const hooks = calls[calls.length - 1][1];
+
+    (el as any)._onStop();
+    hooks.onLine("Guru Meditation Error: Core  1 panic'ed (LoadProhibited)");
+    await el.updateComplete;
+    // The banner must never claim a crash the terminal has no trace of.
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
+
   it("latches the crash banner on a panic line, upgrading previous-boot to live", async () => {
     const el = await mount();
     el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;

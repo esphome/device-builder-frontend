@@ -7,6 +7,7 @@ import toast from "sonner-js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
+import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
@@ -62,6 +63,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
 
   private _handshake?: FlashHandshake;
   private _hasOpener = false;
+  // Supersedes a pending boot-log acquisition (a second manual flash during
+  // the re-enumeration wait, or an unmount mid-await).
+  private _bootLogsGen = 0;
   // Batched log buffer flushed on the next animation frame (mirrors the logs
   // dialog): an esptool output flood would otherwise trigger a render per line.
   private _pendingLog: string[] = [];
@@ -89,6 +93,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._handshake?.stop();
+    this._bootLogsGen++;
     if (this._flushScheduled) cancelAnimationFrame(this._flushScheduled);
   }
 
@@ -195,6 +200,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._busy = true;
     this._flashDone = false;
     this._progress = null;
+    this._bootLogsGen++; // abandon any prior flash's pending acquisition
     this._resetLog();
 
     let port: SerialPort;
@@ -267,26 +273,22 @@ export class ESPHomeWebFlashReceiver extends LitElement {
    * ``openLiveLogPort`` acquires and opens the live handle — its 8k buffer
    * holds the earliest boot bytes until the dialog's reader attaches, so
    * nothing is lost and the port is never reopened. Closing the dialog
-   * mid-wait aborts the acquisition.
+   * mid-wait aborts the acquisition; a newer install or an unmount
+   * supersedes it via the generation counter.
    */
   private async _openBootLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
+    const gen = ++this._bootLogsGen;
+    this._logPort = undefined;
     this._logsOpen = true;
     const { port, error } = await openLiveLogPort(
       oldPort,
       before,
       LOG_BAUD_RATE,
       LOG_REOPEN_TIMEOUT_MS,
-      () => !this._logsOpen
+      () => gen !== this._bootLogsGen || !this._logsOpen
     );
-    if (!port?.readable) {
-      if (port) {
-        try {
-          await port.close();
-        } catch {
-          // already closed
-        }
-      }
-      if (this._logsOpen) {
+    if (!port) {
+      if (gen === this._bootLogsGen && this._logsOpen) {
         this._logsOpen = false;
         toast.error(
           this._localize("web.flash.logs_unavailable", {
@@ -302,14 +304,25 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     } catch {
       // tolerate; the chip may already be fine
     }
-    // The dialog may have been closed during the awaits above; don't strand
-    // the port open with no reader to ever release it.
+    // Superseded by a newer install or an unmount during the awaits above —
+    // reclaim the handle; nothing will ever stream it.
+    if (gen !== this._bootLogsGen) {
+      try {
+        await port.close();
+      } catch {
+        // already closed
+      }
+      return;
+    }
+    // The user closed the dialog mid-hand-off: release the handle but keep
+    // it for the Logs button, so an accidental Escape is a one-click recovery.
     if (!this._logsOpen) {
       try {
         await port.close();
       } catch {
         // already closed
       }
+      this._logPort = port;
       return;
     }
     this._logPort = port; // the open dialog picks it up and streams
@@ -372,7 +385,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           }
           ${
             this._busy
-              ? html`<p class="keep-visible">
+              ? html`<p class="warning-banner">
                   ${this._localize("firmware.flashing_keep_visible")}
                 </p>`
               : nothing
@@ -435,6 +448,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     espHomeStyles,
     actionBtnStyles,
     cardActionsRowStyles,
+    warningBannerStyles,
     css`
       .wrap {
         width: 90%;
@@ -445,10 +459,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         margin: 0 0 var(--wa-space-s);
         color: var(--wa-color-text-quiet);
       }
-      .keep-visible {
+      .warning-banner {
         margin: 0 0 var(--wa-space-s);
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-warning-fill-loud, var(--esphome-warning, #b26a00));
       }
       .status {
         display: flex;
