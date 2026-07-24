@@ -366,7 +366,7 @@ export class ESPHomeCommandPalette extends LitElement {
           )}</span
         >
         <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
-        <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
+        <span><kbd>Esc</kbd> ${this._localize("command_palette.close_hint")}</span>
         ${
           this._expertMode
             ? html`<span class="yaml-hint">
