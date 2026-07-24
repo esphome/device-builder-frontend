@@ -567,10 +567,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         await this._applyFullSetup(configuration, options.board);
       }
       this.navigateToCreated(configuration);
+      // _submitting stays true: dropping it here restores the live
+      // takenHostnames set — which now contains the just-created slug — while
+      // the close animation is still playing, flashing the collision error
+      // (#1438). The next open resets it via _resetTransientState.
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
-    } finally {
       this._submitting = false;
     }
   }

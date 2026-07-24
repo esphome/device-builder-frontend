@@ -229,6 +229,23 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect((el as any)._createError).toBeTruthy();
   });
 
+  it("keeps submitting set through a successful create until the next open", async () => {
+    // Dropping the flag on success restores the live takenHostnames set —
+    // which now contains the just-created slug — while the close animation
+    // still plays, flashing the collision error (#1438).
+    const createDevice = vi.fn().mockResolvedValueOnce({ configuration: "kitchen.yaml" });
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._submitting).toBe(true);
+    el.open();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._submitting).toBe(false);
+  });
+
   it("forwards the hostname and friendly name from the empty-config flow", async () => {
     const createDevice = vi
       .fn()
