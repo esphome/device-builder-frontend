@@ -123,7 +123,9 @@ export function modeFlagsOf(modeValue: unknown): Record<string, boolean> | null 
   if (modeValue === undefined || modeValue === null) return {};
   if (typeof modeValue === "string") return expandPinModeShorthand(modeValue);
   if (!isPlainObject(modeValue)) return null;
-  const out: Record<string, boolean> = {};
+  // Null prototype so a hostile YAML key (``__proto__``) lands as a plain
+  // own property instead of hitting an object setter.
+  const out: Record<string, boolean> = Object.create(null) as Record<string, boolean>;
   for (const [key, value] of Object.entries(modeValue)) {
     const parsed = parseYamlBoolean(value);
     if (parsed === null && value !== undefined && value !== null) return null;

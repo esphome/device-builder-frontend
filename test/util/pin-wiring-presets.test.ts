@@ -59,6 +59,15 @@ describe("modeFlagsOf", () => {
     expect(modeFlagsOf(undefined)).toEqual({});
     expect(modeFlagsOf(null)).toEqual({});
   });
+
+  it("keeps a hostile key as a plain own property", () => {
+    // ``__proto__`` from YAML must neither pollute nor silently vanish;
+    // as a preserved unknown flag it routes the pin to Custom.
+    const flags = modeFlagsOf(JSON.parse('{"__proto__": true, "input": true}'));
+    expect(flags).not.toBeNull();
+    expect(Object.keys(flags!).sort()).toEqual(["__proto__", "input"]);
+    expect(({} as { input?: unknown }).input).toBeUndefined();
+  });
 });
 
 describe("wiringStateOf", () => {

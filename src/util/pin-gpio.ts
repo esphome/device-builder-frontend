@@ -134,11 +134,6 @@ export function pinIdentityToken(provider: string, hub: string, channel: number)
   return `${provider}:${hub}:${channel}`;
 }
 
-/**
- * Like {@link parsePinGpio} but for callers that only deal in board GPIOs (the
- * pin picker, alias resolution): an I/O-expander token resolves to `null` since
- * an expander channel is not a board pin.
- */
 /** True when *value* is a long-form pin block naming an I/O-expander
  *  provider — its ``number`` is an expander channel, never a board GPIO.
  *  Deliberately registry-independent: pin classification must not change
@@ -152,6 +147,11 @@ export function isExpanderPinValue(value: unknown): boolean {
   );
 }
 
+/**
+ * Like {@link parsePinGpio} but for callers that only deal in board GPIOs (the
+ * pin picker, alias resolution): an I/O-expander token resolves to `null` since
+ * an expander channel is not a board pin.
+ */
 export function parseBoardGpio(s: unknown): number | null {
   const parsed = parsePinGpio(s);
   return typeof parsed === "number" ? parsed : null;
