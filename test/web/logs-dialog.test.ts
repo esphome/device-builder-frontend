@@ -7,11 +7,13 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn() }));
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+vi.mock("../../src/util/web-serial.js", () => ({ reacquirePort: vi.fn() }));
 
 const sleep = vi.fn((_ms?: number) => Promise.resolve());
 vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }));
 
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
+import { reacquirePort } from "../../src/util/web-serial.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -84,6 +86,60 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._paused).toBe(false);
     await el.updateComplete;
     expect(toolbarLabels(el)).not.toContain("dashboard.logs_start");
+  });
+
+  it("reacquires and resumes streaming after a native-USB re-enumeration", async () => {
+    const el = await mount();
+    const live = { open: vi.fn(async () => {}), readable: {} };
+    (reacquirePort as any).mockResolvedValue(live);
+    el.open = true;
+    (el as any)._activePort = { fake: "stale" };
+
+    (el as any)._onDisconnect();
+    expect((el as any)._lines).toContain("web.logs.reconnecting");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(live.open).toHaveBeenCalled();
+    expect((el as any)._activePort).toBe(live);
+    expect((el as any)._streaming).toBe(true);
+    expect(streamSerialLines).toHaveBeenLastCalledWith(live, expect.anything());
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.reconnected");
+  });
+
+  it("ends the terminal when the device stays gone", async () => {
+    const el = await mount();
+    (reacquirePort as any).mockResolvedValue(null);
+    el.open = true;
+    (el as any)._activePort = { fake: "stale" };
+
+    (el as any)._onDisconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+  });
+
+  it("a close during the reacquire window cancels the resume", async () => {
+    const el = await mount();
+    let resolve: (v: unknown) => void;
+    (reacquirePort as any).mockReturnValue(new Promise((r) => (resolve = r)));
+    el.open = true;
+    (el as any)._activePort = { fake: "stale" };
+
+    (el as any)._onDisconnect();
+    (el as any)._stop();
+    resolve!({ open: vi.fn(async () => {}), readable: {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect((el as any)._streaming).toBe(false);
+    (el as any)._flushPending();
+    expect((el as any)._lines).not.toContain("web.logs.reconnected");
   });
 
   it("renders a Clear label and toggles Stop ⇄ Start", async () => {

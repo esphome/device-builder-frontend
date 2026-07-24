@@ -17,6 +17,7 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
+import { reacquirePort } from "../../util/web-serial.js";
 
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -112,6 +113,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @state() private _paused = false;
 
   private _cancel?: () => void;
+  // Handle currently streamed. Starts as ``port`` and is replaced when a
+  // native-USB re-enumeration hands back a fresh handle; the parent's own
+  // ``PortDisconnectWatcher`` swap can't be relied on here — Firefox keeps
+  // the same handle, so no property change ever reaches this dialog.
+  private _activePort?: SerialPort;
+  // Supersedes stale reacquire attempts (close, a newer disconnect).
+  private _reacquireGeneration = 0;
   // Batched line buffer flushed on the next animation frame, matching the
   // dashboard logs dialog (logs-dialog.ts): a flooding device would otherwise
   // trigger a Lit render per line. Flushed early on teardown / clear / download.
@@ -128,6 +136,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
   }
 
+  // A genuine unplug collapses the whole device card (the connect card's
+  // watcher), unmounting this dialog mid-reacquire — cancel it.
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._stop();
+  }
+
   // The parent opens the port (openPortForLogs) before showing the dialog, so
   // here we just stream it. Defensive guard: a closed port has no readable.
   private _start(): void {
@@ -135,10 +150,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._resetLines();
     this._paused = false;
     this._streaming = true;
-    // Shared reader: same ESPHome log formatting / timestamps / garbage
-    // filtering as the dashboard's post-install serial logs. The cancel it
-    // returns also closes the port.
-    this._cancel = streamSerialLines(this.port, {
+    this._activePort = this.port;
+    this._streamFrom(this.port);
+  }
+
+  // Shared reader: same ESPHome log formatting / timestamps / garbage
+  // filtering as the dashboard's post-install serial logs. The cancel it
+  // returns also closes the port.
+  private _streamFrom(port: SerialPort): void {
+    this._cancel = streamSerialLines(port, {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
       onLine: (line) => {
@@ -162,22 +182,49 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   // The device dropped the stream on its own (unplugged / reset). Print a
-  // "Terminal disconnected" line and drop the spinner, matching legacy — the
-  // terminal would otherwise look stuck streaming forever.
+  // "Terminal disconnected" line, then ride out a native-USB re-enumeration
+  // the way the connect cards do: reacquire the handle, reopen, and resume
+  // streaming. Only a device that stays gone ends the terminal for good.
   private _onDisconnect(error?: unknown): void {
     this._enqueueLine("");
     this._enqueueLine("");
     const base = this._localize("web.logs.terminal_disconnected");
     this._enqueueLine(error ? `${base}: ${String(error)}` : base);
-    this._flushPending();
     // Reader ended: no Stop/Start button (neither streaming nor paused).
+    this._cancel = undefined;
     this._streaming = false;
     this._paused = false;
+    const port = this._activePort;
+    if (!this.open || !port) {
+      this._flushPending();
+      return;
+    }
+    this._enqueueLine(this._localize("web.logs.reconnecting"));
+    this._flushPending();
+    const generation = ++this._reacquireGeneration;
+    void reacquirePort(port, {
+      cancelled: () => generation !== this._reacquireGeneration,
+    }).then(async (live) => {
+      if (generation !== this._reacquireGeneration) return;
+      if (live && (await openPortForLogs(live, this._localize))) {
+        if (generation !== this._reacquireGeneration) return;
+        this._activePort = live;
+        this._enqueueLine(this._localize("web.logs.reconnected"));
+        this._enqueueLine("");
+        this._streaming = true;
+        this._streamFrom(live);
+      } else {
+        this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+        this._flushPending();
+      }
+    });
   }
 
   private _stop(): void {
+    this._reacquireGeneration++;
     this._streaming = false;
     this._paused = false;
+    this._activePort = undefined;
     this._resetPending();
     const cancel = this._cancel;
     this._cancel = undefined;
@@ -224,10 +271,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // 1s settle for the device to come back up. Best-effort — some USB bridges
   // don't wire the reset lines.
   private async _resetDevice(): Promise<void> {
-    if (!this.port) return;
+    // The reacquired handle after a re-enumeration, never the stale one.
+    const port = this._activePort ?? this.port;
+    if (!port) return;
     try {
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
       await sleep(1000);
     } catch {
       toast.error(this._localize("web.logs.reset_failed"));
