@@ -38,6 +38,15 @@ export function renderSectionHeader(
         : config.title;
   const description = featured?.description ?? config.description;
   const imageUrl = featured?.image_url || config.image_url;
+  // A featured name replaces the component's identity, so surface what
+  // the section actually is ("ESP32 RMT LED Strip") as the subtitle —
+  // skipped when the title already carries it (the "Title (id)" form).
+  // A catalog miss keeps its raw section key there instead.
+  const subtitle = catalogMiss
+    ? host.sectionKey
+    : headerTitle.includes(config.title)
+      ? null
+      : config.title;
   return html`
     <div class="section-header">
       <div class="section-header-info">
@@ -57,9 +66,7 @@ export function renderSectionHeader(
               : nothing
           }
         </div>
-        ${
-          catalogMiss ? html`<p class="section-subtitle">${host.sectionKey}</p>` : nothing
-        }
+        ${subtitle ? html`<p class="section-subtitle">${subtitle}</p>` : nothing}
         ${
           description
             ? html`<p class="section-desc">${renderMarkdown(description)}</p>`

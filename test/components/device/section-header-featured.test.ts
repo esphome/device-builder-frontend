@@ -81,6 +81,10 @@ describe("section header featured presentation", () => {
     expect(out).toContain("RGB LEDs (module)");
     expect(out).toContain("The 10 RGB LEDs by themselves.");
     expect(imgSrc(tpl)).toBe("https://cdn.example/led_module.png");
+    // The featured name hides what the section is; the catalog title
+    // stays visible as the subtitle.
+    expect(out).toContain("section-subtitle");
+    expect(out).toContain("ESP32 RMT LED Strip");
   });
 
   it("falls back to the catalog image when the featured entry has none", () => {
@@ -102,5 +106,7 @@ describe("section header featured presentation", () => {
     expect(out).toContain("ESP32 RMT LED Strip");
     expect(out).toContain("Generic catalog description.");
     expect(imgSrc(tpl)).toBe("https://cdn.example/generic.png");
+    // No featured override, no subtitle.
+    expect(out).not.toContain("section-subtitle");
   });
 });
