@@ -3,7 +3,7 @@ import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
+import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
 import {
   findReferenceCandidates,
   resolveSoleCandidate,

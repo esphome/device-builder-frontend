@@ -6,20 +6,23 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
-import type { BoardPin } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { PinFeature, PinMode } from "../../api/types/config-entries.js";
-import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
-import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import type { BoardPin } from "../../../api/types/boards.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { PinFeature, PinMode } from "../../../api/types/config-entries.js";
+import { findUsedPins, sectionEndLine } from "../../../util/config-entry-yaml-scan.js";
+import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import {
   formatPinValue,
   isExpanderPinValue,
   parseBoardGpio,
   parsePinGpio,
   providerKeyOf,
-} from "../../util/pin-gpio.js";
-import { isSubstitutionString, resolveSubstitutions } from "../../util/substitutions.js";
-import { renderPinWiring } from "./config-entry-pin-wiring.js";
+} from "../../../util/pin/gpio.js";
+import {
+  isSubstitutionString,
+  resolveSubstitutions,
+} from "../../../util/substitutions.js";
+import { renderPinWiring } from "./wiring.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -28,9 +31,9 @@ import {
   renderStringField,
   renderSubstitutionHint,
   type RenderCtx,
-} from "./config-entry-renderers-shared.js";
+} from "../config-entry-renderers-shared.js";
 
-// `parsePinGpio` / `formatPinValue` moved to `util/pin-gpio.ts` so the YAML
+// `parsePinGpio` / `formatPinValue` moved to `util/pin/gpio.ts` so the YAML
 // used-pin scanner shares the same platform pin-format rules. Re-exported
 // here to keep this module's long-standing public surface (and its tests)
 // pointing at the renderer.

@@ -5,21 +5,21 @@
  * shared with the sibling tests.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, PinMode } from "../../../src/api/types/config-entries.js";
-import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
-import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
-import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { ConfigEntryType, PinMode } from "../../../../src/api/types/config-entries.js";
+import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
+import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
+import type { RenderCtx } from "../../../../src/components/device/config-entry-renderers-shared.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
-} from "../../_lit-template-walker.js";
+} from "../../../_lit-template-walker.js";
 import {
   findElementBindings,
   makeBoardPin,
   makeEntry,
   makeRenderCtx,
   makeTestBoard,
-} from "./_renderer-fixtures.js";
+} from "../_renderer-fixtures.js";
 
 const flag = (key: string, label: string) =>
   makeEntry(ConfigEntryType.BOOLEAN, { key, label, advanced: true });

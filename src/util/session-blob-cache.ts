@@ -10,7 +10,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
  * This is distinct from :class:`BatchedCache` (`batched-cache.ts`),
  * which is per-key / microtask-batched / consumer-driven — the wrong
  * shape for "read one whole list/map at once". Both
- * ``pin-registry-modes-cache`` and ``automation-catalog-cache`` are
+ * ``pin/registry-modes-cache`` and ``automation-catalog-cache`` are
  * built on this.
  *
  * Failure policy is the ``fallback`` option:

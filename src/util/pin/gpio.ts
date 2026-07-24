@@ -214,7 +214,7 @@ export function scanPinGpios(line: string): number[] {
   return out;
 }
 
-// ESPHome's `_pin`/`_gpio` suffix convention (mirrors `board-pin-defaults.ts`'s
+// ESPHome's `_pin`/`_gpio` suffix convention (mirrors `board-defaults.ts`'s
 // role strip) plus the long-form `pin:` / `number:` sub-keys.
 const PIN_FIELD_KEY_RE = /(?:^|_)(?:pin|gpio)$|^number$/i;
 

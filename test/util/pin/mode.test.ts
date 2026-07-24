@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { expandPinModeShorthand, PIN_MODE_SHORTHANDS } from "../../src/util/pin-mode.js";
+import {
+  expandPinModeShorthand,
+  PIN_MODE_SHORTHANDS,
+} from "../../../src/util/pin/mode.js";
 
 describe("expandPinModeShorthand", () => {
   it("expands every shorthand to its documented flag dict", () => {

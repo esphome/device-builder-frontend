@@ -8,15 +8,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ConfigEntryType, PinFeature } from "../../../src/api/types/config-entries.js";
-import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
-import { renderInto } from "../../_dom.js";
+import { ConfigEntryType, PinFeature } from "../../../../src/api/types/config-entries.js";
+import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
+import { renderInto } from "../../../_dom.js";
 import {
   makeBoardPin,
   makeEntry,
   makeRenderCtx,
   makeTestBoard,
-} from "./_renderer-fixtures.js";
+} from "../_renderer-fixtures.js";
 
 // GPIO32 has ADC (Supports), GPIO25 doesn't (Other), GPIO6 is
 // board-unavailable (Reserved) — forces all three groups + dividers.

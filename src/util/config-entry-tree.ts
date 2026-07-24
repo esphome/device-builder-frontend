@@ -8,7 +8,7 @@ import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
 import { isIndexSegment } from "./nested-values.js";
-import { PIN_WIRING_KEYS } from "./pin-wiring-presets.js";
+import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
 /** True when `entries` contains any advanced entry, recursively. Drives whether
  *  the advanced-settings control shows at all: a nested advanced field reveals

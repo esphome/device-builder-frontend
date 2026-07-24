@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
 import {
   _resetPinRegistryModesCache,
   fetchPinRegistryModes,
   getCachedPinRegistryModes,
   subscribePinRegistryModes,
-} from "../../src/util/pin-registry-modes-cache.js";
+} from "../../../src/util/pin/registry-modes-cache.js";
 
 const makeApi = (impl: () => Promise<Record<string, string[]>>): ESPHomeAPI =>
   ({ getPinRegistryModes: vi.fn(impl) }) as unknown as ESPHomeAPI;

@@ -48,7 +48,7 @@ import {
   fetchPinRegistryModes,
   getCachedPinRegistryModes,
   subscribePinRegistryModes,
-} from "../../util/pin-registry-modes-cache.js";
+} from "../../util/pin/registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
