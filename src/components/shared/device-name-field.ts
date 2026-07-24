@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { live } from "lit/directives/live.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   getDeviceNameWarning,
@@ -56,7 +57,7 @@ export function renderDeviceNameField(o: DeviceNameFieldOptions): TemplateResult
         type="text"
         ?autofocus=${o.autofocus ?? true}
         class=${err ? "invalid" : ""}
-        .value=${o.value}
+        .value=${live(o.value)}
         placeholder=${o.placeholder ?? nothing}
         @input=${(e: Event) => o.onInput((e.target as HTMLInputElement).value)}
       />

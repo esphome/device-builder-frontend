@@ -84,6 +84,21 @@ describe("device-name-inputs derivation", () => {
     expect(el.friendlyName).toBe("Dining Room AC 2");
   });
 
+  it("a one-step select-all clear resyncs the DOM input with the restored value", async () => {
+    // Clearing an un-edited override restores a value identical to the last
+    // committed one: no state changes, and a plain .value binding would be
+    // dirty-checked away, leaving the field visually empty while the
+    // component reports the derived hostname.
+    const el = await mountInputs();
+    await typeFriendly(el, "Office Fan");
+    const input = await hostnameInput(el);
+    input.value = "";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    expect(el.hostname).toBe("office-fan");
+    expect(input.value).toBe("office-fan");
+  });
+
   it("clearing the hostname restores the derived value immediately", async () => {
     const el = await mountInputs();
     await typeFriendly(el, "Office Fan");
