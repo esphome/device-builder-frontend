@@ -9,6 +9,7 @@ import {
   parsePinGpio,
   renderPinField,
 } from "../../../src/components/device/config-entry-pin-renderer.js";
+import { fieldKeyAttr } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -472,6 +473,19 @@ describe("renderPinField wa-select binding", () => {
       ".value" in bindings,
       "wa-select must not have a property binding to .value alongside data-no-value-sync"
     ).toBe(false);
+  });
+
+  it("keys the select as the long form's number for cursor targeting", () => {
+    // The exact match keeps the YAML cursor on ``number:`` landing on
+    // the select; the whole-field fallback centers mid-panel once the
+    // wiring disclosure is open.
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      makeRenderCtx({ pin: 0 })
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(select["data-field-key"]).toBe(fieldKeyAttr(["pin", "number"]));
   });
 });
 

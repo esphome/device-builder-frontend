@@ -412,8 +412,12 @@ export function renderPinField(
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
+      <!-- Keyed as the long form's number so the YAML cursor lands on the
+           select itself; the fallback match on the whole pin field
+           centers mid-panel once the wiring disclosure is open. -->
       <wa-select
         data-no-value-sync
+        data-field-key=${fieldKeyAttr([...path, "number"])}
         class=${invalid ? "invalid" : ""}
         placeholder=${defaultPlaceholder}
         ?disabled=${fieldDisabled}
