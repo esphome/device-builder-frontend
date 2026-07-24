@@ -277,13 +277,18 @@ export function renderPinField(
     // writes a board GPIO into `pin.number` and clobbers the channel. The
     // Advanced mode-flag disclosure still renders below (the channel's mode is
     // editable, scoped to the provider), just not the board-GPIO selector.
+    // Board designations via ``suggestions`` count too (fail closed): a
+    // suggestion that isn't a board GPIO is an expander token candidate.
+    const suggestedTokens = (entry.suggestions ?? []).some(
+      (sug) => typeof sug === "string" && parseBoardGpio(sug) === null && sug === identity
+    );
     return renderExpanderPin(
       entry,
       path,
       ctx,
       identity,
       rawValue,
-      boardPinsForSection(ctx, entry.key).tokens.has(identity)
+      suggestedTokens || boardPinsForSection(ctx, entry.key).tokens.has(identity)
     );
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a

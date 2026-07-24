@@ -466,18 +466,29 @@ function stripAdvancedDeep(entry: ConfigEntry): ConfigEntry {
   return out;
 }
 
+// Same stable-reference rationale as ``strippedAdvanced``, keyed per
+// tooltip variant.
+const lockedGuarded = new WeakMap<ConfigEntry, ConfigEntry>();
+const lockedPlain = new WeakMap<ConfigEntry, ConfigEntry>();
+
 /** *entry* with itself and every descendant marked locked, so children
  *  routed through the form's dispatch render read-only via
  *  ``effectiveDisabled`` at every depth. While *guarded*, the lock icons
  *  explain the guard's unlock instead of claiming the board set the
  *  field. */
 function lockEntryDeep(entry: ConfigEntry, guarded: boolean): ConfigEntry {
-  return mapEntryDeep(
-    entry,
-    guarded
-      ? () => ({ locked: true, locked_reason_key: "device.pin_wiring_guard_tooltip" })
-      : () => ({ locked: true })
-  );
+  const cache = guarded ? lockedGuarded : lockedPlain;
+  let out = cache.get(entry);
+  if (!out) {
+    out = mapEntryDeep(
+      entry,
+      guarded
+        ? () => ({ locked: true, locked_reason_key: "device.pin_wiring_guard_tooltip" })
+        : () => ({ locked: true })
+    );
+    cache.set(entry, out);
+  }
+  return out;
 }
 
 function renderPresetCard(

@@ -155,29 +155,31 @@ export function wiringStateOf(
   // An inverted that isn't a readable boolean (a ``${var}``) can't be
   // classified — don't claim a preset over it.
   if (invertedSet && inverted === null) return { kind: "custom" };
+  let effective = flags;
+  let implicit = false;
   if (Object.keys(flags).length === 0) {
-    // An explicit ``inverted: false`` is what the toggle writes when
-    // switched back off — semantically unset, not a custom choice.
-    if (inverted === true) return { kind: "custom" };
+    // No stored flags: match the platform's implied direction (what
+    // ESPHome runs), so ``inverted: true`` alone on an output pin lands
+    // on the active-low preset. An explicit ``inverted: false`` is what
+    // the toggle writes when switched back off — semantically unset.
     const implied: Record<string, boolean> | null =
       pinMode === PinMode.INPUT
         ? { input: true }
         : pinMode === PinMode.OUTPUT
           ? { output: true }
           : null;
-    const preset =
-      implied &&
-      presets
-        .filter((p) => sameFlagSet(implied, p.flags))
-        .find((p) => p.invertedMatch !== true);
-    return preset ? { kind: "preset", preset, implicit: true } : { kind: "default" };
+    if (!implied) return inverted === true ? { kind: "custom" } : { kind: "default" };
+    effective = implied;
+    implicit = inverted !== true;
   }
-  const flagMatches = presets.filter((p) => sameFlagSet(flags, p.flags));
-  if (flagMatches.length === 0) return { kind: "custom" };
+  const flagMatches = presets.filter((p) => sameFlagSet(effective, p.flags));
   const match =
     flagMatches.find((p) => p.invertedMatch === (inverted ?? false)) ??
     flagMatches.find((p) => p.invertedMatch === null);
-  return match ? { kind: "preset", preset: match } : { kind: "custom" };
+  if (!match) return implicit ? { kind: "default" } : { kind: "custom" };
+  return implicit
+    ? { kind: "preset", preset: match, implicit: true }
+    : { kind: "preset", preset: match };
 }
 
 /** Why *preset* can't be used on *pin*; ``null`` when it can. An
@@ -235,5 +237,10 @@ function sameFlagSet(
   target: Readonly<Record<string, boolean>>
 ): boolean {
   const keys = Object.keys(flags);
-  return keys.length === Object.keys(target).length && keys.every((k) => target[k]);
+  // Own-property check so a flag named after an inherited member
+  // (``toString``, ``__proto__``) can't false-match a preset.
+  return (
+    keys.length === Object.keys(target).length &&
+    keys.every((k) => Object.prototype.hasOwnProperty.call(target, k) && target[k])
+  );
 }

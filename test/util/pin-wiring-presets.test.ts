@@ -85,6 +85,26 @@ describe("wiringStateOf", () => {
     expect(wiringStateOf(outputPresets, undefined, false).kind).toBe("default");
   });
 
+  it("maps a bare inverted true onto the direction's inverted preset", () => {
+    // ``{number, inverted: true}`` on an output pin IS an active-low
+    // output; the implied direction completes the match (explicitly, not
+    // as an implicit default).
+    const output = wiringStateOf(outputPresets, undefined, true, PinMode.OUTPUT);
+    expect(output).toMatchObject({ kind: "preset", preset: { id: "output_active_low" } });
+    expect(output).not.toMatchObject({ implicit: true });
+    expect(presetIdOf(wiringStateOf(inputPresets, undefined, true, PinMode.INPUT))).toBe(
+      "driven_signal"
+    );
+  });
+
+  it("refuses a preset for a flag named after an inherited member", () => {
+    // ``target[k]`` on ``toString`` is truthy via the prototype; the
+    // own-property check must keep this from matching ground_switch.
+    expect(
+      wiringStateOf(inputPresets, { toString: true, pullup: true }, undefined).kind
+    ).toBe("custom");
+  });
+
   it("maps an untouched pin to the direction's implied preset", () => {
     const output = wiringStateOf(outputPresets, undefined, undefined, PinMode.OUTPUT);
     expect(output).toMatchObject({

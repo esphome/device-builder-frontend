@@ -660,6 +660,18 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
   });
 
+  it("guards an expander channel designated via suggestions (fail closed)", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT, { suggestions: ["pca9554:hub:0"] }),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: 0, mode: "OUTPUT" },
+        { pinRegistryModes: { pca9554: ["input", "output"] } }
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+  });
+
   it("guards a board-locked expander channel (fail closed)", () => {
     // locked_pins carries expander tokens too; the guard must not fail
     // open just because the token isn't a board GPIO.
