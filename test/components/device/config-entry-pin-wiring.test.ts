@@ -997,6 +997,24 @@ describe("pin wiring board-preset guard", () => {
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 
+  it("does not guard a field sitting on a sibling field's locked GPIO", () => {
+    // ethernet locks clk and miso separately; a hand-set pin colliding
+    // with a sibling's lock is a misconfiguration, not board wiring.
+    const board = makeTestBoard({
+      overrides: {
+        featured_components: [
+          { component_id: "binary_sensor.gpio", locked_pins: { other_pin: 2 } },
+        ],
+      } as never,
+    });
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx("GPIO2", {}, board)
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
+  });
+
   it("does not guard a pin moved off the board's suggestions", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT, { suggestions: ["GPIO2"] }),

@@ -53,6 +53,10 @@ describe("wiringValuesPresetSafe", () => {
     expect(wiringValuesPresetSafe("${my_mode}", undefined)).toBe(false);
     expect(wiringValuesPresetSafe({ input: true }, "${inv}")).toBe(false);
   });
+
+  it("rejects a bare null inverted (mid-edit line)", () => {
+    expect(wiringValuesPresetSafe({ input: true }, null)).toBe(false);
+  });
 });
 
 describe("modeFlagsOf", () => {

@@ -40,9 +40,9 @@ export function wiringValuesPresetSafe(
     Object.keys(flags).every((k) => KNOWN_MODE_FLAGS.has(k)) &&
     (!isPlainObject(modeValue) ||
       Object.keys(modeValue).every((k) => KNOWN_MODE_FLAGS.has(k))) &&
-    (invertedValue === undefined ||
-      invertedValue === null ||
-      parseYamlBoolean(invertedValue) !== null)
+    // A bare ``inverted:`` line parses to null (mid-edit): unreadable,
+    // like a null-valued flag — a pick could delete the incomplete line.
+    (invertedValue === undefined || parseYamlBoolean(invertedValue) !== null)
   );
 }
 

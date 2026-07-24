@@ -102,11 +102,14 @@ function boardPinsForSection(
   const tokens = new Set<string>();
   for (const fc of ctx.board?.featured_components ?? []) {
     if (fc.component_id !== ctx.sectionKey) continue;
-    for (const pin of Object.values(fc.locked_pins ?? {})) {
+    for (const [key, pin] of Object.entries(fc.locked_pins ?? {})) {
+      // ``lockedGpios`` (picker selectability) stays component-wide; the
+      // guard sets are per-field, so a sibling field's locked GPIO
+      // (ethernet's clk vs miso) doesn't read-only this field's wiring.
       if (typeof pin === "number") {
         lockedGpios.add(pin);
-        gpios.add(pin);
-      } else if (typeof pin === "string") {
+        if (key === entryKey) gpios.add(pin);
+      } else if (typeof pin === "string" && key === entryKey) {
         tokens.add(pin);
       }
     }
