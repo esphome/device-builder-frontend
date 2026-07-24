@@ -321,7 +321,7 @@ describe("pin wiring preset cards", () => {
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 
-  it("still promotes on open when a non-wiring long-form field renders", () => {
+  it("still promotes on open when a non-wiring long-form field exists", () => {
     // drive_strength writes through the form dispatch, where ``setIn``
     // on a scalar parent would drop the GPIO.
     const entry = wiringPinEntry(PinMode.INPUT, {
@@ -331,6 +331,7 @@ describe("pin wiring preset cards", () => {
         makeEntry(ConfigEntryType.STRING, {
           key: "drive_strength",
           label: "Drive strength",
+          advanced: true,
         }),
       ],
     });
@@ -340,6 +341,19 @@ describe("pin wiring preset cards", () => {
     (disclosureToggle(result)["@click"] as () => void)();
 
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
+
+    // Even while the extra is filtered out (Show advanced off): it can
+    // appear mid-open, after the open-time promotion decision passed.
+    const gated = (entries: ConfigEntry[]) => entries.filter((c) => !c.advanced);
+    const filteredCtx = openCtx("GPIO2", {
+      nestedOpenSections: new Set<string>(),
+      filterRenderable: gated,
+    });
+    const filtered = renderPinField(entry, ["pin"], filteredCtx);
+
+    (disclosureToggle(filtered)["@click"] as () => void)();
+
+    expect(filteredCtx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
   });
 });
 

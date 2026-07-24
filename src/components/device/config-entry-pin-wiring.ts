@@ -196,8 +196,11 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // long-form field (drive_strength, the escape hatches). On the pure
   // presets path a curious click just reads — a preset pick promotes
   // itself, and the Custom pick promotes before its pane opens.
+  // Checked against the unfiltered ``source``: a filtered-out advanced
+  // extra can appear mid-open (Show advanced flipped), after the
+  // open-time promotion decision already passed.
   const openNeedsLongForm =
-    !usePresets || longFormFields.some((c) => !PIN_WIRING_KEYS.has(c.key));
+    !usePresets || source.some((c) => !PIN_WIRING_KEYS.has(c.key));
   const onToggle = () => {
     // Locked / disabled fields must not mutate via the disclosure —
     // without this guard, opening it on a short-form locked pin would
