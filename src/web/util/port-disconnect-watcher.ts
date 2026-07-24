@@ -32,6 +32,15 @@ export class PortDisconnectWatcher implements ReactiveController {
     port.addEventListener("disconnect", this._handleDisconnect);
   }
 
+  /** Fold in a live handle another recovery path produced (the logs
+   *  dialog's read-error resume): report it and move the watch — which
+   *  also supersedes any reacquire in flight for the same physical
+   *  disconnect. */
+  adopt(port: SerialPort): void {
+    this.watch(port);
+    this._onReplace(port);
+  }
+
   /** Stop watching (explicit disconnect); no callbacks fire after. */
   unwatch(): void {
     this._generation++;

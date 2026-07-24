@@ -218,87 +218,105 @@ export class ESPHomeWebLogsDialog extends LitElement {
       // The reader is gone and _cancel is cleared, so nothing else will
       // release the handle — an open Web Serial port locks the device
       // away from every other tool for the tab's lifetime.
-      this._activePort = undefined;
-      void port?.close().catch(() => {});
+      this._releaseActivePort();
       this._flushPending();
       return;
     }
     this._enqueueLine(this._localize("web.logs.reconnecting"));
     this._flushPending();
     const generation = ++this._reacquireGeneration;
-    void (async () => {
-      // Close the dead stream's port first: the reacquired handle is often
-      // this very one (a UART bridge, or Firefox after a re-enum), and
-      // reopening a still-open port would re-read the dead stream and loop.
-      // The dead reader already released its lock, so close() can proceed;
-      // a UA that closed it on device loss rejects harmlessly. A real
-      // failure is logged — it means the cached handle may come back dead.
-      await port.close().catch((err) => {
-        console.error("[Web Serial] Failed to close the dead logs port:", err);
-      });
-      const live = await openLiveSerialPort(port, {
-        baudRate: LOG_BAUD_RATE,
-        bufferSize: LOG_BUFFER_SIZE,
-        cancelled: () => generation !== this._reacquireGeneration,
-      });
-      if (generation !== this._reacquireGeneration) {
-        // Superseded after the open — reclaim the handle we just opened.
-        if (live) {
-          void live.close().catch((err) => {
-            console.error("[Web Serial] Failed to release superseded port:", err);
-          });
-        }
-        return;
-      }
-      if (!live) {
-        this._enqueueLine(this._localize("web.logs.reconnect_failed"));
-        this._flushPending();
-        return;
-      }
-      this._enqueueLine(this._localize("web.logs.reconnected"));
-      this._enqueueLine("");
-      // Honour a Stop pressed before the reset: the reader drains either
-      // way, so the display stays paused instead of force-resuming.
-      this._streaming = !wasPaused;
-      this._paused = wasPaused;
-      this._streamFrom(live);
-      // Hand the recovered handle to the parent card: a read-error-only
-      // disconnect fires no DOM disconnect event, so the card's watcher
-      // may still hold the dead one for the other actions.
-      this.dispatchEvent(
-        new CustomEvent("port-replaced", {
-          detail: live,
-          bubbles: true,
-          composed: true,
-        })
-      );
-    })().catch((err) => {
-      // A synchronous throw in the resume tail (a locked readable slipping
-      // through) must not strand the spinner on a dead stream.
+    void this._resumeAfterDisconnect(port, generation, wasPaused).catch((err) => {
+      // A throw in the resume tail (a locked readable slipping through)
+      // must not strand the spinner on a dead stream.
       console.error("[Web Serial] Logs reconnect failed:", err);
       if (generation !== this._reacquireGeneration) return;
-      this._streaming = false;
-      this._enqueueLine(this._localize("web.logs.reconnect_failed"));
-      this._flushPending();
+      this._failReconnect();
     });
+  }
+
+  private async _resumeAfterDisconnect(
+    port: SerialPort,
+    generation: number,
+    wasPaused: boolean
+  ): Promise<void> {
+    // Close the dead stream's port first: the reacquired handle is often
+    // this very one (a UART bridge, or Firefox after a re-enum), and
+    // reopening a still-open port would re-read the dead stream and loop.
+    // The dead reader already released its lock, so close() can proceed;
+    // a UA that closed it on device loss rejects harmlessly. A real
+    // failure is logged — it means the cached handle may come back dead.
+    await port.close().catch((err) => {
+      console.error("[Web Serial] Failed to close the dead logs port:", err);
+    });
+    const live = await openLiveSerialPort(port, {
+      baudRate: LOG_BAUD_RATE,
+      bufferSize: LOG_BUFFER_SIZE,
+      cancelled: () => generation !== this._reacquireGeneration,
+    });
+    if (generation !== this._reacquireGeneration) {
+      // Superseded after the open — reclaim the handle we just opened.
+      // Logged loudly: a failure here is a genuinely leaked open port.
+      if (live) {
+        void live.close().catch((err) => {
+          console.error("[Web Serial] Failed to release superseded port:", err);
+        });
+      }
+      return;
+    }
+    if (!live) {
+      this._failReconnect();
+      return;
+    }
+    this._enqueueLine(this._localize("web.logs.reconnected"));
+    this._enqueueLine("");
+    // Honour a Stop pressed before the reset: the reader drains either
+    // way, so the display stays paused instead of force-resuming.
+    this._streaming = !wasPaused;
+    this._paused = wasPaused;
+    this._streamFrom(live);
+    // Hand the recovered handle to the parent card: a read-error-only
+    // disconnect fires no DOM disconnect event, so the card's watcher
+    // may still hold the dead one for the other actions.
+    this.dispatchEvent(
+      new CustomEvent("port-replaced", {
+        detail: live,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  // Recovery failed ⇒ the handle is released and the spinner is down.
+  private _failReconnect(): void {
+    this._streaming = false;
+    this._activePort = undefined;
+    this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+    this._flushPending();
+  }
+
+  // Null-and-close the abandoned active handle in one step: the paired
+  // invariant on every reader-already-dead path.
+  private _releaseActivePort(): void {
+    const active = this._activePort;
+    this._activePort = undefined;
+    void active?.close().catch(() => {});
   }
 
   private _stop(): void {
     this._reacquireGeneration++;
     this._streaming = false;
     this._paused = false;
-    const active = this._activePort;
-    this._activePort = undefined;
     this._resetPending();
     const cancel = this._cancel;
     this._cancel = undefined;
     if (cancel) {
+      this._activePort = undefined;
       cancel();
     } else {
       // A dead-stream path already dropped the cancel closure; release
       // whatever handle the reconnect flow last held (a no-op when the
       // UA closed it with the device).
-      void active?.close().catch(() => {});
+      this._releaseActivePort();
     }
   }
 

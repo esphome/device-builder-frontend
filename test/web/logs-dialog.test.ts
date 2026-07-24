@@ -110,6 +110,9 @@ describe("esphome-web-logs-dialog", () => {
     el.open = true;
     (el as any)._activePort = stale;
 
+    const replaced = vi.fn();
+    el.addEventListener("port-replaced", (e) => replaced((e as CustomEvent).detail));
+
     (el as any)._onDisconnect();
     expect((el as any)._lines).toContain("web.logs.reconnecting");
     await vi.waitFor(() => expect((el as any)._activePort).toBe(live));
@@ -118,6 +121,8 @@ describe("esphome-web-logs-dialog", () => {
     expect(order).toEqual(["close", "reopen"]);
     expect((el as any)._streaming).toBe(true);
     expect(streamSerialLines).toHaveBeenLastCalledWith(live, expect.anything());
+    // The recovered handle is announced to the parent card.
+    await vi.waitFor(() => expect(replaced).toHaveBeenCalledWith(live));
     (el as any)._flushPending();
     expect((el as any)._lines).toContain("web.logs.reconnected");
   });
@@ -177,19 +182,6 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._activePort).toBeUndefined();
     (el as any)._flushPending();
     expect((el as any)._lines).toContain("web.logs.reconnect_failed");
-  });
-
-  it("hands the recovered handle to the parent via port-replaced", async () => {
-    const el = await mount();
-    const live = { readable: {}, close: vi.fn(async () => {}) };
-    (openLiveSerialPort as any).mockResolvedValue(live);
-    el.open = true;
-    (el as any)._activePort = { close: vi.fn(async () => {}) };
-    const replaced = vi.fn();
-    el.addEventListener("port-replaced", (e) => replaced((e as CustomEvent).detail));
-
-    (el as any)._onDisconnect();
-    await vi.waitFor(() => expect(replaced).toHaveBeenCalledWith(live));
   });
 
   it("a throw in the resume tail ends as reconnect_failed, not a stuck spinner", async () => {
