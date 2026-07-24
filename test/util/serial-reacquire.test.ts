@@ -8,7 +8,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openLiveSerialPort, reacquirePort } from "../../src/util/web-serial.js";
+import {
+  openLiveSerialPort as openLiveViaBarrel,
+  reacquirePort as reacquireViaBarrel,
+} from "../../src/util/web-serial.js";
+import { openLiveSerialPort, reacquirePort } from "../../src/util/serial-reacquire.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -185,5 +189,14 @@ describe("openLiveSerialPort", () => {
     });
     expect(got).toBe(null);
     expect(rounds).toBeLessThanOrEqual(3);
+  });
+});
+
+// The web-serial barrel re-exports must stay pointed at these exact
+// functions — long-standing import paths depend on the bridge (#1432).
+describe("web-serial re-export bridge", () => {
+  it("resolves to the same functions as serial-reacquire", () => {
+    expect(reacquireViaBarrel).toBe(reacquirePort);
+    expect(openLiveViaBarrel).toBe(openLiveSerialPort);
   });
 });
