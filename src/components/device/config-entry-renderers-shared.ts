@@ -248,6 +248,9 @@ function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
       class="lock-icon"
       library="mdi"
       name="lock-outline"
+      tabindex="0"
+      role="img"
+      aria-label=${reason}
     ></wa-icon>
     <wa-tooltip for=${tipId}>${reason}</wa-tooltip>`;
 }
