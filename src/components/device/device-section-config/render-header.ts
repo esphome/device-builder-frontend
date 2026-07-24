@@ -33,20 +33,19 @@ export function renderSectionHeader(
     ? host._localize("device.external_component_title")
     : host._isPlatformDomain
       ? host._localize("device.platform_section_title")
-      : featured
-        ? featuredDisplayName(featured, config.title)
-        : config.title;
+      : config.title;
   const description = featured?.description ?? config.description;
   const imageUrl = featured?.image_url || config.image_url;
-  // A featured name replaces the component's identity, so surface what
-  // the section actually is ("ESP32 RMT LED Strip") as the subtitle —
-  // skipped when the title already carries it (the "Title (id)" form).
-  // A catalog miss keeps its raw section key there instead.
+  // The title keeps the component's identity ("ESP32 RMT LED Strip");
+  // the featured entry's name ("RGB LEDs (module)") rides the subtitle,
+  // named like the recommended card. A catalog miss keeps its raw
+  // section key there instead.
+  const featuredName = featured ? featuredDisplayName(featured, config.title) : null;
   const subtitle = catalogMiss
     ? host.sectionKey
-    : headerTitle.includes(config.title)
-      ? null
-      : config.title;
+    : featuredName !== config.title
+      ? featuredName
+      : null;
   return html`
     <div class="section-header">
       <div class="section-header-info">

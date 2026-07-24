@@ -75,16 +75,15 @@ const imgSrc = (tpl: unknown): unknown =>
   extractAttributeBindings(findTemplatesByAnchor(tpl, "<img")[0]).src;
 
 describe("section header featured presentation", () => {
-  it("uses the matching featured entry's name, description, and image", () => {
+  it("keeps the component title and subtitles the featured entry's name", () => {
     const tpl = renderSectionHeader(makeHost({ id: "rgb_leds" }), CONFIG, []);
     const out = serialize(tpl);
+    // Component identity stays the title; the module name rides below.
+    expect(out).toContain("ESP32 RMT LED Strip");
+    expect(out).toContain("section-subtitle");
     expect(out).toContain("RGB LEDs (module)");
     expect(out).toContain("The 10 RGB LEDs by themselves.");
     expect(imgSrc(tpl)).toBe("https://cdn.example/led_module.png");
-    // The featured name hides what the section is; the catalog title
-    // stays visible as the subtitle.
-    expect(out).toContain("section-subtitle");
-    expect(out).toContain("ESP32 RMT LED Strip");
   });
 
   it("falls back to the catalog image when the featured entry has none", () => {
