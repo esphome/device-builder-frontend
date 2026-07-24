@@ -30,7 +30,7 @@ import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
-import { renderOtaFallbackBanner } from "./logs-dialog/ota-fallback-banner.js";
+import { renderActionSuggestion } from "./process-terminal/reset-suggestion.js";
 import {
   abortSerialReconnect,
   onStart,
@@ -39,6 +39,7 @@ import {
   openPassive,
   setSerialOpenFailed,
   setSerialStream,
+  switchToOtaLogs,
   teardownSession,
   toggleShowStates,
 } from "./logs-dialog/session.js";
@@ -262,6 +263,9 @@ export class ESPHomeLogsDialog extends LitElement {
     const s = this._session;
     const streaming = isStreaming(s);
     const passive = isPassive(s);
+    // The dead state (serial reopen failed) gets the escape hatch
+    // unconditionally — its only other recovery is Start-to-reconnect.
+    const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
     const title = this._localize("dashboard.logs_title", { name: this.name });
     // Web Serial's source label keys off the passive states; OTA / server-serial
     // show the target port.
@@ -329,10 +333,14 @@ export class ESPHomeLogsDialog extends LitElement {
               : ""
           }
           ${
-            // The dead state (serial reopen failed) gets the escape hatch
-            // unconditionally — its only other recovery is Start-to-reconnect.
-            this._quietSerial.quiet || s.kind === "dead"
-              ? renderOtaFallbackBanner(this)
+            offerOtaFallback
+              ? renderActionSuggestion(
+                  this._localize,
+                  "dashboard.logs_no_serial_output",
+                  "{network_action}",
+                  "dashboard.logs_switch_to_network",
+                  () => switchToOtaLogs(this)
+                )
               : ""
           }
           <div class="toolbar-slot" slot="toolbar-right">

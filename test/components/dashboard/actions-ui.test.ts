@@ -33,7 +33,10 @@ vi.mock("sonner-js", () => ({
 const { requestAndOpenSerialPort } = vi.hoisted(() => ({
   requestAndOpenSerialPort: vi.fn(),
 }));
-vi.mock("../../../src/util/post-install-logs.js", () => ({
+vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
+  // Keep the real openNetworkLogsFallback so the baud-0 reroute test can
+  // assert its toast + dialog-open behavior through the real helper.
+  ...(await importOriginal<object>()),
   requestAndOpenSerialPort,
   attachSerialLogStream: vi.fn(),
   reconnectWebSerialLogs: vi.fn(),
@@ -97,7 +100,7 @@ describe("openLogsWithMethod web-serial", () => {
       expect.anything()
     );
     expect(toastError).not.toHaveBeenCalled();
-    expect(logsDialog.open).toHaveBeenCalledWith();
+    expect(logsDialog.open).toHaveBeenCalledWith("OTA", {});
     expect(logsDialog.configuration).toBe("x.yaml");
     expect(requestAndOpenSerialPort).not.toHaveBeenCalled();
   });

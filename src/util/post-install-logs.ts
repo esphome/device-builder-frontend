@@ -11,6 +11,19 @@ import {
 } from "./web-serial.js";
 
 /**
+ * Route a device whose serial console is provably silent (logger baud_rate 0)
+ * to the network log stream, with a notice saying why (#1430).
+ */
+export function openNetworkLogsFallback(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  options: { onBackToInstall?: () => void } = {}
+): void {
+  notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
+  logsDialog.open(OTA_PORT, options);
+}
+
+/**
  * Human label for a Web Serial port, for error messages. Web Serial exposes
  * no device path/name, only the USB vendor/product ids; fall back to a generic
  * label when those are absent (non-USB ports).
@@ -211,11 +224,7 @@ export async function handlePostInstallShowLogs(
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging disabled; the port would be
-      // silent. Land on network logs instead of a dead end (#1430); the
-      // backend's esphome logs keeps retrying until the device is online.
-      notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
-      logsDialog.open(OTA_PORT, { onBackToInstall: reopenInstall });
+      openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
       return;
     }
     logsDialog.openPassive({

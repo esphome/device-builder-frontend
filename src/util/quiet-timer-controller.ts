@@ -8,11 +8,15 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
  * activity; the window restarts on every report, so a healthy stream never
  * goes quiet. When the window elapses ``quiet`` flips true with a host
  * update. Disarmed, activity is ignored and ``quiet`` is false.
+ *
+ * activity() is hot-path safe: it only stamps a timestamp. The single
+ * pending timeout re-checks the stamp when it fires and re-arms for the
+ * remainder, so a line flood costs no timer churn.
  */
 export class QuietTimerController implements ReactiveController {
   private _handle: ReturnType<typeof setTimeout> | null = null;
+  private _lastActivity = 0;
   private _quiet = false;
-  private _armed = false;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
@@ -29,32 +33,42 @@ export class QuietTimerController implements ReactiveController {
     return this._quiet;
   }
 
+  // Armed means a window is pending or has already gone quiet; disarmed is
+  // the only state with neither.
+  private get _armed(): boolean {
+    return this._handle !== null || this._quiet;
+  }
+
   /** Arm if not already armed; an armed window keeps its current deadline. */
   ensureArmed(): void {
     if (this._armed) return;
-    this._armed = true;
-    this._start();
+    this._lastActivity = Date.now();
+    this._schedule(this._timeoutMs);
   }
 
   /** Restart the window and clear ``quiet``. No-op while disarmed. */
   activity(): void {
     if (!this._armed) return;
-    this._start();
+    this._lastActivity = Date.now();
+    if (this._handle === null) this._schedule(this._timeoutMs);
     this._setQuiet(false);
   }
 
   disarm(): void {
-    this._armed = false;
     this._clear();
     this._setQuiet(false);
   }
 
-  private _start(): void {
-    this._clear();
+  private _schedule(delayMs: number): void {
     this._handle = setTimeout(() => {
+      const remaining = this._lastActivity + this._timeoutMs - Date.now();
+      if (remaining > 0) {
+        this._schedule(remaining);
+        return;
+      }
       this._handle = null;
       this._setQuiet(true);
-    }, this._timeoutMs);
+    }, delayMs);
   }
 
   private _clear(): void {
