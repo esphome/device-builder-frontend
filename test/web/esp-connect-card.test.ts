@@ -18,6 +18,8 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import toast from "sonner-js";
+import { flush } from "../_dom.js";
+import { makeDisconnectPort } from "../_web-serial.js";
 import { ESPHomeWebEspConnectCard } from "../../src/web/dashboard/esphome-web-esp-connect-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -64,17 +66,6 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
   });
 });
 
-function fakePort(): SerialPort {
-  const listeners = new Set<EventListener>();
-  return {
-    addEventListener: (_t: string, l: EventListener) => listeners.add(l),
-    removeEventListener: (_t: string, l: EventListener) => listeners.delete(l),
-    dispatch: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
-  } as unknown as SerialPort;
-}
-
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
 describe("esphome-web-esp-connect-card disconnect resilience", () => {
   async function connected(port: SerialPort): Promise<ESPHomeWebEspConnectCard> {
     const el = new ESPHomeWebEspConnectCard();
@@ -86,39 +77,39 @@ describe("esphome-web-esp-connect-card disconnect resilience", () => {
   }
 
   it("keeps the device card through a re-enum blip, rebinding the live handle (#1410)", async () => {
-    const port = fakePort();
-    const fresh = fakePort();
+    const port = makeDisconnectPort();
+    const fresh = makeDisconnectPort();
     reacquirePort.mockResolvedValue(fresh);
     const el = await connected(port);
 
-    (port as any).dispatch();
+    port.fire();
     await flush();
 
     expect((el as any)._port).toBe(fresh);
   });
 
   it("falls back to the connect screen when the device stays gone", async () => {
-    const port = fakePort();
+    const port = makeDisconnectPort();
     reacquirePort.mockResolvedValue(null);
     const el = await connected(port);
 
-    (port as any).dispatch();
+    port.fire();
     await flush();
 
     expect((el as any)._port).toBeUndefined();
   });
 
   it("explicit disconnect resets immediately, ignoring a pending reacquire", async () => {
-    const port = fakePort();
+    const port = makeDisconnectPort();
     let resolve!: (v: SerialPort | null) => void;
     reacquirePort.mockReturnValue(new Promise((r) => (resolve = r)));
     const el = await connected(port);
 
-    (port as any).dispatch();
+    port.fire();
     (el as any)._handleClose();
     expect((el as any)._port).toBeUndefined();
 
-    resolve(fakePort());
+    resolve(makeDisconnectPort());
     await flush();
     expect((el as any)._port).toBeUndefined();
   });

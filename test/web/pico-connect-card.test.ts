@@ -20,6 +20,8 @@ vi.mock("../../src/util/web-serial.js", () => ({
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { flush } from "../_dom.js";
+import { makeDisconnectPort } from "../_web-serial.js";
 import { ESPHomeWebPicoConnectCard } from "../../src/web/dashboard/esphome-web-pico-connect-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -71,37 +73,26 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
 });
 
 describe("esphome-web-pico-connect-card disconnect resilience", () => {
-  function livePort(): SerialPort & { dispatch: () => void } {
-    const listeners = new Set<EventListener>();
-    return {
-      addEventListener: (_t: string, l: EventListener) => listeners.add(l),
-      removeEventListener: (_t: string, l: EventListener) => listeners.delete(l),
-      dispatch: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
-    } as unknown as SerialPort & { dispatch: () => void };
-  }
-
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
   it("keeps the device card through a re-enum blip, rebinding the live handle", async () => {
-    const adopted = livePort();
-    const fresh = livePort();
+    const adopted = makeDisconnectPort();
+    const fresh = makeDisconnectPort();
     reacquirePort.mockResolvedValue(fresh);
     const el = await mount();
 
     (el as any)._adoptPort(adopted);
-    adopted.dispatch();
+    adopted.fire();
     await flush();
 
     expect((el as any)._port).toBe(fresh);
   });
 
   it("falls back to the connect screen when the device stays gone", async () => {
-    const adopted = livePort();
+    const adopted = makeDisconnectPort();
     reacquirePort.mockResolvedValue(null);
     const el = await mount();
 
     (el as any)._adoptPort(adopted);
-    adopted.dispatch();
+    adopted.fire();
     await flush();
 
     expect((el as any)._port).toBeUndefined();

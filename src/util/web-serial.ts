@@ -7,6 +7,8 @@
  */
 import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 
+import { sleep } from "./sleep.js";
+
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 const ESPRESSIF_USB_VID = 0x303a;
 
@@ -191,42 +193,60 @@ export const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
   a.usbProductId === b.usbProductId;
 
 /**
+ * One enumeration round for a possibly re-enumerating device: the
+ * freshly-granted handles matching cachedPort's USB ids (a re-enum on Chrome
+ * hands out a new handle), plus whether cachedPort itself is still granted.
+ * getPorts() can transiently reject mid-re-enumeration; that round counts as
+ * nothing granted and the caller's next round retries.
+ */
+export async function grantedHandlesFor(
+  cachedPort: SerialPort
+): Promise<{ fresh: SerialPort[]; cachedGranted: boolean }> {
+  const want = cachedPort.getInfo();
+  let granted: SerialPort[] = [];
+  try {
+    granted = await navigator.serial.getPorts();
+  } catch {
+    /* Transient mid-re-enumeration rejection; see the contract above. */
+  }
+  return {
+    fresh: granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
+    cachedGranted: granted.includes(cachedPort),
+  };
+}
+
+/**
  * Reacquire a live handle for a just-disconnected authorized port, waiting out
  * the native-USB re-enumeration window. ESP32-C3 / S3 / C6 (USB-Serial/JTAG)
  * drop off the bus and come back seconds later, firing a spurious disconnect
  * on the way; without this the UI holding the port treats the blip as a real
  * unplug (#1410).
  *
- * Prefers a freshly-granted getPorts() handle for the same device (Chrome
- * hands out a new handle after a re-enum), falling back to the cached handle
- * when it is granted and connected again (Firefox and UART bridges keep the
- * same handle usable). Returns the handle without opening it, or null when
- * the device stays gone past timeoutMs (a genuine unplug).
+ * Prefers a freshly-granted getPorts() handle for the same device, falling
+ * back to the cached handle when it is granted and connected again (Firefox
+ * and UART bridges keep the same handle usable). Returns the handle without
+ * opening it, or null when the device stays gone past timeoutMs (a genuine
+ * unplug) or the caller cancels.
  */
 export async function reacquirePort(
   cachedPort: SerialPort,
-  timeoutMs: number = SERIAL_REOPEN_TIMEOUT_MS
+  options: { timeoutMs?: number; cancelled?: () => boolean } = {}
 ): Promise<SerialPort | null> {
-  const want = cachedPort.getInfo();
+  const { timeoutMs = SERIAL_REOPEN_TIMEOUT_MS, cancelled = () => false } = options;
   const deadline = Date.now() + timeoutMs;
-  while (true) {
-    let granted: SerialPort[] = [];
-    try {
-      granted = await navigator.serial.getPorts();
-    } catch {
-      /* getPorts can transiently reject mid-re-enumeration; retry below. */
-    }
+  while (!cancelled()) {
+    const { fresh, cachedGranted } = await grantedHandlesFor(cachedPort);
     // Presence in getPorts() means the device is granted and physically
     // present; the connected check filters implementations that also return
     // granted-but-unplugged ports (undefined tolerates ones without it).
-    const live = [
-      ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
-      ...(granted.includes(cachedPort) ? [cachedPort] : []),
-    ].find((p) => p.connected !== false);
+    const live = [...fresh, ...(cachedGranted ? [cachedPort] : [])].find(
+      (p) => p.connected !== false
+    );
     if (live) return live;
     if (Date.now() >= deadline) return null;
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await sleep(200);
   }
+  return null;
 }
 
 /**

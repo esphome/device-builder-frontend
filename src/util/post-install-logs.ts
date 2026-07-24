@@ -5,8 +5,8 @@ import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError } from "./notify.js";
 import {
+  grantedHandlesFor,
   isPortPickerCancel,
-  matchesDevice,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
 
@@ -177,25 +177,15 @@ async function openLiveSerialPort(
   baudRate: number,
   timeoutMs: number
 ): Promise<SerialPort | null> {
-  const want = cachedPort.getInfo();
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
   while (true) {
-    let granted: SerialPort[] = [];
-    try {
-      granted = await navigator.serial.getPorts();
-    } catch {
-      /* getPorts can transiently reject mid-re-enumeration; treat as empty
-         and retry (the cached handle is still tried below). */
-    }
     // Prefer a freshly-granted handle for the same device (Chrome's live
     // re-enumerated port), then the cached handle (Firefox / UART bridges
-    // reopen it in place). The cached handle is dropped from the granted list
-    // so it isn't tried twice per round.
-    const candidates = [
-      ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
-      cachedPort,
-    ];
+    // reopen it in place), probed even when getPorts() omits it: the open()
+    // attempt below is the real liveness test here.
+    const { fresh } = await grantedHandlesFor(cachedPort);
+    const candidates = [...fresh, cachedPort];
     for (const p of candidates) {
       if (p.readable) return p; // already open (a reset race left it usable)
       try {

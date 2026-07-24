@@ -37,6 +37,7 @@ export class ESPHomeWebEspConnectCard extends LitElement {
   // Rides out the spurious disconnect a native-USB chip fires while
   // re-enumerating, swapping in the live handle; a real unplug still resets.
   private _watcher = new PortDisconnectWatcher(
+    this,
     (port) => (this._port = port),
     () => (this._port = undefined)
   );
@@ -98,11 +99,6 @@ export class ESPHomeWebEspConnectCard extends LitElement {
     this._watcher.unwatch();
     this._port = undefined;
   };
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._watcher.unwatch();
-  }
 
   static styles = [espHomeStyles, actionBtnStyles, cardActionsRowStyles];
 }

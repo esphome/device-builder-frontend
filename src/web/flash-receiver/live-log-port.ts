@@ -8,16 +8,7 @@
  */
 
 import { sleep } from "../../util/sleep.js";
-
-/** Same USB device by vendor/product id; both ids must be present. */
-function matchesDevice(a: SerialPortInfo, b: SerialPortInfo): boolean {
-  return (
-    a.usbVendorId !== undefined &&
-    a.usbProductId !== undefined &&
-    a.usbVendorId === b.usbVendorId &&
-    a.usbProductId === b.usbProductId
-  );
-}
+import { matchesDevice } from "../../util/web-serial.js";
 
 export interface LiveLogPortResult {
   port: SerialPort | null;

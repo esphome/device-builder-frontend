@@ -1,3 +1,5 @@
+import type { ReactiveController, ReactiveControllerHost } from "lit";
+
 import { reacquirePort } from "../../util/web-serial.js";
 
 /**
@@ -8,16 +10,20 @@ import { reacquirePort } from "../../util/web-serial.js";
  * On a disconnect event it reacquires a live handle for the same device and
  * reports it via onReplace, moving the watch to the new handle; only when the
  * device stays gone past the re-enumeration window does it report onGone (a
- * genuine unplug).
+ * genuine unplug). Host disconnect cancels a pending reacquire and detaches
+ * the listener; reconnect re-attaches it to the held port.
  */
-export class PortDisconnectWatcher {
+export class PortDisconnectWatcher implements ReactiveController {
   private _port?: SerialPort;
   private _generation = 0;
 
   constructor(
+    host: ReactiveControllerHost,
     private readonly _onReplace: (port: SerialPort) => void,
     private readonly _onGone: () => void
-  ) {}
+  ) {
+    host.addController(this);
+  }
 
   /** Watch a newly-authorized port, replacing any previous watch. */
   watch(port: SerialPort): void {
@@ -26,31 +32,43 @@ export class PortDisconnectWatcher {
     port.addEventListener("disconnect", this._handleDisconnect);
   }
 
-  /** Stop watching (explicit disconnect / unmount); no callbacks fire after. */
+  /** Stop watching (explicit disconnect); no callbacks fire after. */
   unwatch(): void {
     this._generation++;
     this._port?.removeEventListener("disconnect", this._handleDisconnect);
     this._port = undefined;
   }
 
+  hostConnected(): void {
+    this._port?.addEventListener("disconnect", this._handleDisconnect);
+  }
+
+  hostDisconnected(): void {
+    this._generation++;
+    this._port?.removeEventListener("disconnect", this._handleDisconnect);
+  }
+
   private _handleDisconnect = (): void => {
     const port = this._port;
     if (!port) return;
-    // A later disconnect (or unwatch) supersedes this reacquire attempt.
+    // A later disconnect, watch, or unwatch supersedes this reacquire attempt
+    // (and cancels its polling).
     const generation = ++this._generation;
-    void reacquirePort(port).then((live) => {
-      if (generation !== this._generation) return;
-      if (!live) {
-        this.unwatch();
-        this._onGone();
-        return;
+    void reacquirePort(port, { cancelled: () => generation !== this._generation }).then(
+      (live) => {
+        if (generation !== this._generation) return;
+        if (!live) {
+          this.unwatch();
+          this._onGone();
+          return;
+        }
+        if (live !== port) {
+          port.removeEventListener("disconnect", this._handleDisconnect);
+          this._port = live;
+          live.addEventListener("disconnect", this._handleDisconnect);
+        }
+        this._onReplace(live);
       }
-      if (live !== port) {
-        port.removeEventListener("disconnect", this._handleDisconnect);
-        this._port = live;
-        live.addEventListener("disconnect", this._handleDisconnect);
-      }
-      this._onReplace(live);
-    });
+    );
   };
 }

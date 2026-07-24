@@ -3,7 +3,8 @@
  *
  * reacquirePort: after a native-USB re-enumeration blip, prefer a fresh
  * getPorts() handle for the same device, fall back to the surviving cached
- * handle, and give up (null) only when the device stays gone past the window.
+ * handle, and give up (null) only when the device stays gone past the window
+ * or the caller cancels.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,26 +19,13 @@ function fakePort(
   return { getInfo: () => info, connected: true, ...overrides } as unknown as SerialPort;
 }
 
-function restoreSerial(had: boolean, prev: unknown): () => void {
-  return () => {
-    if (had) {
-      Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
-    } else {
-      delete (navigator as any).serial;
-    }
-  };
-}
-
-function withGetPorts(impl: () => Promise<SerialPort[]>): () => void {
-  const restore = restoreSerial("serial" in navigator, (navigator as any).serial);
-  Object.defineProperty(navigator, "serial", {
-    configurable: true,
-    value: { getPorts: vi.fn(impl) },
-  });
-  return restore;
+function stubGetPorts(impl: () => Promise<SerialPort[]>): void {
+  (navigator as any).serial = { getPorts: vi.fn(impl) };
 }
 
 afterEach(() => {
+  delete (navigator as any).serial;
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -45,65 +33,42 @@ describe("reacquirePort", () => {
   it("returns the fresh granted handle for the same device (Chrome re-enum)", async () => {
     const cached = fakePort();
     const fresh = fakePort();
-    const restore = withGetPorts(async () => [fresh]);
-    try {
-      expect(await reacquirePort(cached, 1000)).toBe(fresh);
-    } finally {
-      restore();
-    }
+    stubGetPorts(async () => [fresh]);
+    expect(await reacquirePort(cached, { timeoutMs: 1000 })).toBe(fresh);
   });
 
   it("returns the cached handle when it is granted and connected again", async () => {
     const cached = fakePort();
-    const restore = withGetPorts(async () => [cached]);
-    try {
-      expect(await reacquirePort(cached, 1000)).toBe(cached);
-    } finally {
-      restore();
-    }
+    stubGetPorts(async () => [cached]);
+    expect(await reacquirePort(cached, { timeoutMs: 1000 })).toBe(cached);
   });
 
   it("ignores granted ports for a different device", async () => {
     vi.useFakeTimers();
     const cached = fakePort();
     const other = fakePort({}, { usbVendorId: 0x1a86, usbProductId: 0x7523 });
-    const restore = withGetPorts(async () => [other]);
-    try {
-      const pending = reacquirePort(cached, 1000);
-      await vi.advanceTimersByTimeAsync(1100);
-      expect(await pending).toBeNull();
-    } finally {
-      restore();
-      vi.useRealTimers();
-    }
+    stubGetPorts(async () => [other]);
+    const pending = reacquirePort(cached, { timeoutMs: 1000 });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(await pending).toBeNull();
   });
 
   it("skips a handle whose connected flag is false", async () => {
     vi.useFakeTimers();
     const cached = fakePort({ connected: false });
-    const restore = withGetPorts(async () => [cached]);
-    try {
-      const pending = reacquirePort(cached, 1000);
-      await vi.advanceTimersByTimeAsync(1100);
-      expect(await pending).toBeNull();
-    } finally {
-      restore();
-      vi.useRealTimers();
-    }
+    stubGetPorts(async () => [cached]);
+    const pending = reacquirePort(cached, { timeoutMs: 1000 });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(await pending).toBeNull();
   });
 
   it("returns null when the device never reappears within the window", async () => {
     vi.useFakeTimers();
     const cached = fakePort();
-    const restore = withGetPorts(async () => []);
-    try {
-      const pending = reacquirePort(cached, 1000);
-      await vi.advanceTimersByTimeAsync(1100);
-      expect(await pending).toBeNull();
-    } finally {
-      restore();
-      vi.useRealTimers();
-    }
+    stubGetPorts(async () => []);
+    const pending = reacquirePort(cached, { timeoutMs: 1000 });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(await pending).toBeNull();
   });
 
   it("rides out a transient getPorts rejection and succeeds on a later round", async () => {
@@ -111,18 +76,23 @@ describe("reacquirePort", () => {
     const cached = fakePort();
     const fresh = fakePort();
     let calls = 0;
-    const restore = withGetPorts(async () => {
+    stubGetPorts(async () => {
       calls++;
       if (calls === 1) throw new DOMException("mid-re-enum", "InvalidStateError");
       return [fresh];
     });
-    try {
-      const pending = reacquirePort(cached, 1000);
-      await vi.advanceTimersByTimeAsync(300);
-      expect(await pending).toBe(fresh);
-    } finally {
-      restore();
-      vi.useRealTimers();
-    }
+    const pending = reacquirePort(cached, { timeoutMs: 1000 });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await pending).toBe(fresh);
+  });
+
+  it("stops polling as soon as the caller cancels", async () => {
+    const cached = fakePort();
+    const getPorts = vi.fn(async () => []);
+    (navigator as any).serial = { getPorts };
+    expect(
+      await reacquirePort(cached, { timeoutMs: 1000, cancelled: () => true })
+    ).toBeNull();
+    expect(getPorts).not.toHaveBeenCalled();
   });
 });
