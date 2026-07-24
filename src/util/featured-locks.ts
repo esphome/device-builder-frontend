@@ -13,6 +13,8 @@
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
+import type { LockedReasonCarrier } from "../components/device/config-entry-renderers-shared.js";
+import { featuredEntryForInstance } from "./featured-id.js";
 
 // Stable locked copies so re-renders hand the form identical entry
 // references (same rationale as the pin wiring's lock cache).
@@ -39,7 +41,7 @@ export function overlayBoardLockedPresets(
         ...entry,
         locked: true,
         locked_reason_key: "device.pin_wiring_guard_tooltip",
-      } as ConfigEntry & { locked_reason_key?: string };
+      } as ConfigEntry & LockedReasonCarrier;
       lockedCopies.set(entry, copy);
     }
     return copy;
@@ -54,14 +56,11 @@ function boardLockedPresetKeys(
   values: Record<string, unknown>
 ): Set<string> {
   const out = new Set<string>();
-  if (!sectionKey || values.id === undefined) return out;
-  for (const fc of board?.featured_components ?? []) {
-    if (fc.component_id !== sectionKey) continue;
-    if (fc.fields.id?.value !== values.id) continue;
-    for (const [key, preset] of Object.entries(fc.fields)) {
-      if (preset.locked && presetValueMatches(values[key], preset.value)) {
-        out.add(key);
-      }
+  const fc = featuredEntryForInstance(board, sectionKey, values.id);
+  if (!fc) return out;
+  for (const [key, preset] of Object.entries(fc.fields)) {
+    if (preset.locked && presetValueMatches(values[key], preset.value)) {
+      out.add(key);
     }
   }
   return out;

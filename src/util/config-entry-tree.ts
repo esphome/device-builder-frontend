@@ -10,6 +10,17 @@ import type { ValidationError } from "./config-validation.js";
 import { isIndexSegment } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
+/** A pick-one group/cluster with any visible board-locked member is the
+ *  board's choice: switching away would clear the locked value. Single
+ *  source for the selector paint (dropdown/radios disable) and the
+ *  add-form gate (the whole choice is non-actionable). */
+export function choicePinned(
+  members: ConfigEntry[],
+  isVisible: (entry: ConfigEntry) => boolean = () => true
+): boolean {
+  return members.some((m) => m.locked && isVisible(m));
+}
+
 /** True when `entries` contains any advanced entry, recursively. Drives whether
  *  the advanced-settings control shows at all: a nested advanced field reveals
  *  in place (it can't move to the bottom section), so the control must surface

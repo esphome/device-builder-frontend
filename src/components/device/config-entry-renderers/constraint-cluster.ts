@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
+import { choicePinned } from "../../../util/config-entry-tree.js";
 import { evaluateGroup } from "../../../util/constraint-groups.js";
 import {
   fieldKeyAttr,
@@ -214,7 +215,7 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   const visibleMembers = (selected?.members ?? []).filter(isRenderable);
   // A board-locked member means the board made the cluster choice; switching
   // sides would clear the locked value, so the radios pin to it.
-  const pinned = alternatives.some((a) => a.members.some((m) => m.locked));
+  const pinned = choicePinned(alternatives.flatMap((a) => a.members));
   return html`
     <div
       class="nested-group constraint-cluster"

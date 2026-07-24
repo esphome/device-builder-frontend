@@ -47,12 +47,14 @@ describe("addFormNeedsUserInput", () => {
     expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(false);
   });
 
-  it("shows the form when an exclusive group still has an unlocked choice", () => {
+  it("skips an exclusive group pinned by one locked member", () => {
+    // The dropdown disables when any rendered option is locked (the board
+    // made the choice), so the unlocked sibling is unreachable.
     const entries = [
       makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),
       makeConfigEntry({ key: "spi", exclusive_group: "bus", locked: false }),
     ];
-    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
+    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(false);
   });
 
   it("skips a fully board-locked constraint cluster (every member read-only)", () => {

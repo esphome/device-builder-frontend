@@ -211,15 +211,14 @@ const lockedReasonKey = (entry: ConfigEntry): string =>
 
 export interface RenderLabelOptions {
   includeHelpLink?: boolean;
-  /** Field path; keys the lock icon's wa-tooltip anchor. Without it the
-   *  icon falls back to a native title, which many UAs won't surface. */
-  path?: string[];
+  /** Field path; keys the lock icon's wa-tooltip anchor. */
+  path: string[];
 }
 
 export function renderLabel(
   entry: ConfigEntry,
   ctx: RenderCtx,
-  options: RenderLabelOptions = {}
+  options: RenderLabelOptions
 ) {
   const { includeHelpLink = true, path } = options;
   return html`
@@ -233,18 +232,10 @@ export function renderLabel(
   `;
 }
 
-/** The label's lock icon; *path* keys a wa-tooltip anchor id (native
- *  title tooltips are unreliable, so pass it whenever available). */
-function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path?: string[]) {
+/** The label's lock icon, its reason on a wa-tooltip anchored per *path*
+ *  (native title tooltips don't surface reliably). */
+function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
   const reason = ctx.localize(lockedReasonKey(entry));
-  if (!path) {
-    return html`<wa-icon
-      class="lock-icon"
-      library="mdi"
-      name="lock-outline"
-      title=${reason}
-    ></wa-icon>`;
-  }
   const tipId = `lock-tip-${path.join(".")}`;
   return html`<wa-icon
       id=${tipId}
