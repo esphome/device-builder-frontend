@@ -97,11 +97,7 @@ describe("esphome-web-logs-dialog", () => {
 
     (el as any)._onDisconnect();
     expect((el as any)._lines).toContain("web.logs.reconnecting");
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(live.open).toHaveBeenCalled();
+    await vi.waitFor(() => expect(live.open).toHaveBeenCalled());
     expect((el as any)._activePort).toBe(live);
     expect((el as any)._streaming).toBe(true);
     expect(streamSerialLines).toHaveBeenLastCalledWith(live, expect.anything());
@@ -116,11 +112,10 @@ describe("esphome-web-logs-dialog", () => {
     (el as any)._activePort = { fake: "stale" };
 
     (el as any)._onDisconnect();
-    await Promise.resolve();
-    await Promise.resolve();
-
+    await vi.waitFor(() =>
+      expect((el as any)._lines).toContain("web.logs.reconnect_failed")
+    );
     expect((el as any)._streaming).toBe(false);
-    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
   });
 
   it("a close during the reacquire window cancels the resume", async () => {
@@ -132,11 +127,13 @@ describe("esphome-web-logs-dialog", () => {
 
     (el as any)._onDisconnect();
     (el as any)._stop();
-    resolve!({ open: vi.fn(async () => {}), readable: {} });
+    const live = { open: vi.fn(async () => {}), readable: {} };
+    resolve!(live);
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 
+    expect(live.open).not.toHaveBeenCalled();
     expect((el as any)._streaming).toBe(false);
     (el as any)._flushPending();
     expect((el as any)._lines).not.toContain("web.logs.reconnected");

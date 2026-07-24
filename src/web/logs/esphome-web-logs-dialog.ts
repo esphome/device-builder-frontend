@@ -150,14 +150,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._resetLines();
     this._paused = false;
     this._streaming = true;
-    this._activePort = this.port;
     this._streamFrom(this.port);
   }
 
   // Shared reader: same ESPHome log formatting / timestamps / garbage
   // filtering as the dashboard's post-install serial logs. The cancel it
-  // returns also closes the port.
+  // returns also closes the port. Single place the live handle is recorded,
+  // so "streaming ⇒ _activePort set" holds by construction.
   private _streamFrom(port: SerialPort): void {
+    this._activePort = port;
     this._cancel = streamSerialLines(port, {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
@@ -208,7 +209,6 @@ export class ESPHomeWebLogsDialog extends LitElement {
       if (generation !== this._reacquireGeneration) return;
       if (live && (await openPortForLogs(live, this._localize))) {
         if (generation !== this._reacquireGeneration) return;
-        this._activePort = live;
         this._enqueueLine(this._localize("web.logs.reconnected"));
         this._enqueueLine("");
         this._streaming = true;
