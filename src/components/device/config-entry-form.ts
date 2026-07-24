@@ -243,9 +243,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  against the parent component's domain — without it a
    *  binary_sensor's filter picker offers sensor-only filters
    *  and a non-addressable light's effects picker offers
-   *  addressable-only effects. Empty when the form is mounted
-   *  outside a section context (the add-component dialog's
-   *  preview, etc.). */
+   *  addressable-only effects. The add-component dialog passes the
+   *  resolved component id so board featured-component designations
+   *  (pin guard) apply there too; empty only outside any section
+   *  context. */
   @property({ attribute: "section-key" })
   sectionKey = "";
 
