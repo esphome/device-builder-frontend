@@ -225,6 +225,14 @@ describe("pin wiring preset cards", () => {
       openCtx({ number: "${my_pin}", mode: {} })
     );
     expect(cards(result)).toHaveLength(0);
+
+    // Same rule for the scalar form.
+    const scalar = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx("${my_pin}")
+    );
+    expect(cards(scalar)).toHaveLength(0);
   });
 
   it("marks the platform-default card active on an untouched pin", () => {

@@ -114,15 +114,18 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // And only when a card pick can't lose data — a ``${var}`` mode or
   // inverted, or a readable flag outside the guided set (``analog``),
   // must fall through to the raw disclosure (a pick would clobber the
-  // reference / delete the flag), and a ``${var}`` number leaves the
-  // actual GPIO unknown, so the input-only guardrail could not vouch
-  // for the cards.
+  // reference / delete the flag), and a ``${var}`` number (either form)
+  // leaves the actual GPIO unknown, so the input-only guardrail could
+  // not vouch for the cards.
+  const numberValue = isLongForm
+    ? (rawValue as Record<string, unknown>).number
+    : rawValue;
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
     !isExpanderPinValue(rawValue) &&
     wiringValuesPresetSafe(modeValue, invertedValue) &&
-    !(isLongForm && isSubstitutionString((rawValue as Record<string, unknown>).number))
+    !isSubstitutionString(numberValue)
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;
