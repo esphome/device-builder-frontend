@@ -45,6 +45,7 @@ import {
   openLogs,
   showJobProgress,
 } from "../components/dashboard/install.js";
+import { relinkLive } from "../components/dashboard/live-rebind.js";
 import { loadPreferences, saveTablePreference } from "../components/dashboard/prefs.js";
 import {
   renderCardGrid,
@@ -591,12 +592,10 @@ export class ESPHomePageDashboard extends LitElement {
     // Re-bind drawer to live device so renames / state flaps / DHCP renews
     // don't leave the drawer showing stale fields.
     if (changed.has("_devices") && this._drawerDevice) {
-      const live = this._devices.find(
-        (d) => d.configuration === this._drawerDevice!.configuration
-      );
-      if (live && live !== this._drawerDevice) {
+      const live = relinkLive(this._devices, this._drawerDevice);
+      if (live) {
         this._drawerDevice = live;
-      } else if (!live) {
+      } else {
         this._drawerDevice = null;
         this._drawerOpen = false;
       }
@@ -605,12 +604,10 @@ export class ESPHomePageDashboard extends LitElement {
     // the device being online, and a device rebooting after an OTA must
     // un-gray the row while the picker sits open (#1431).
     if (changed.has("_devices") && this._installMethodDevice) {
-      const live = this._devices.find(
-        (d) => d.configuration === this._installMethodDevice!.configuration
-      );
-      if (live && live !== this._installMethodDevice) {
+      const live = relinkLive(this._devices, this._installMethodDevice);
+      if (live) {
         this._installMethodDevice = live;
-      } else if (!live) {
+      } else {
         this._installMethodDevice = null;
         this._installMethodOpen = false;
       }

@@ -22,6 +22,10 @@ async function mountWithPickerOpen(): Promise<ESPHomePageDashboard> {
   const page = new ESPHomePageDashboard();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._devices = [OFFLINE];
+  // Loaded, so render() produces the real dialog tree (not the skeleton) and
+  // the .deviceState binding under test actually evaluates.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._devicesLoaded = true;
   page._installMethodDevice = OFFLINE;
   page._installMethodMode = "logs";
   page._installMethodOpen = true;
@@ -29,6 +33,12 @@ async function mountWithPickerOpen(): Promise<ESPHomePageDashboard> {
   await page.updateComplete;
   await flushMicrotasks(8);
   return page;
+}
+
+function pickerDeviceState(page: ESPHomePageDashboard): DeviceState | undefined {
+  const dialog = page.shadowRoot!.querySelector("esphome-install-method-dialog");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (dialog as any)?.deviceState;
 }
 
 describe("dashboard install-method picker device re-bind", () => {
@@ -43,6 +53,8 @@ describe("dashboard install-method picker device re-bind", () => {
 
   it("swaps the snapshot for the live object when the device comes back online", async () => {
     const page = await mountWithPickerOpen();
+    expect(pickerDeviceState(page)).toBe(DeviceState.OFFLINE);
+
     const online = makeConfiguredDevice({
       runtime_state: { state: DeviceState.ONLINE },
     });
@@ -51,6 +63,8 @@ describe("dashboard install-method picker device re-bind", () => {
     await page.updateComplete;
     expect(page._installMethodDevice).toBe(online);
     expect(page._installMethodOpen).toBe(true);
+    // The user-visible link: the dialog prop that gates the OTA row.
+    expect(pickerDeviceState(page)).toBe(DeviceState.ONLINE);
   });
 
   it("closes the picker when the device leaves the list", async () => {
