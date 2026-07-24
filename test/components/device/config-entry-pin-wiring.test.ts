@@ -850,7 +850,10 @@ describe("pin wiring board-preset guard", () => {
     const unlock = findElementBindings(result, "wa-switch")[0];
     (unlock["@change"] as (e: unknown) => void)({ target: { checked: true } });
 
-    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "unlocked");
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith(
+      "pin:pin-guard",
+      "unlocked-promoted"
+    );
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO2" });
 
     const unlocked = renderPinField(
@@ -861,5 +864,52 @@ describe("pin wiring board-preset guard", () => {
       })
     );
     expect(cardById(unlocked, "ground_switch")?.["aria-disabled"]).toBe("false");
+  });
+
+  it("re-locking with no wiring edit reverts the unlock's promotion", () => {
+    const ctx = guardedCtx(
+      { number: "GPIO2" },
+      {
+        getClusterChoice: (key) =>
+          key === "pin:pin-guard" ? "unlocked-promoted" : undefined,
+      }
+    );
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const unlock = findElementBindings(result, "wa-switch")[0];
+    (unlock["@change"] as (e: unknown) => void)({ target: { checked: false } });
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO2");
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "locked");
+  });
+
+  it("re-locking after a wiring edit keeps the long form", () => {
+    const ctx = guardedCtx(
+      { number: "GPIO2", mode: { input: true } },
+      {
+        getClusterChoice: (key) =>
+          key === "pin:pin-guard" ? "unlocked-promoted" : undefined,
+      }
+    );
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const unlock = findElementBindings(result, "wa-switch")[0];
+    (unlock["@change"] as (e: unknown) => void)({ target: { checked: false } });
+
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "locked");
+  });
+
+  it("unlocking an already long-form pin records a plain unlock", () => {
+    // No promotion happened, so a later re-lock must not demote the
+    // user's own long form.
+    const ctx = guardedCtx({ number: "GPIO2", mode: { input: true } });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    const unlock = findElementBindings(result, "wa-switch")[0];
+    (unlock["@change"] as (e: unknown) => void)({ target: { checked: true } });
+
+    expect(ctx.setClusterChoice).toHaveBeenCalledWith("pin:pin-guard", "unlocked");
+    expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 });

@@ -131,8 +131,10 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // view-only until the user flips the unlock. Session-transient, so the
   // guard re-arms on reload.
   const guardKey = `${path.join(".")}:pin-guard`;
-  const guarded =
-    boardPreset && !fieldDisabled && ctx.getClusterChoice(guardKey) !== "unlocked";
+  // "unlocked-promoted" also records that the unlock itself performed
+  // the short-form promotion, so a no-edit re-lock can revert it.
+  const guardChoice = ctx.getClusterChoice(guardKey);
+  const guarded = boardPreset && !fieldDisabled && !guardChoice?.startsWith("unlocked");
 
   let state: WiringState = { kind: "default" };
   let labelText: string | undefined;
@@ -209,8 +211,24 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
 
   const onGuardToggle = (e: Event) => {
     const on = (e.target as HTMLInputElement & { checked: boolean }).checked;
-    ctx.setClusterChoice(guardKey, on ? "unlocked" : "locked");
-    if (on) promoteShortForm();
+    if (on) {
+      const promotes = !isLongForm && rawValue != null && rawValue !== "";
+      ctx.setClusterChoice(guardKey, promotes ? "unlocked-promoted" : "unlocked");
+      promoteShortForm();
+      return;
+    }
+    // A re-lock with no wiring edit must leave the YAML untouched:
+    // revert the unlock's promotion while the value is still the bare
+    // promoted shape.
+    if (
+      guardChoice === "unlocked-promoted" &&
+      isLongForm &&
+      Object.keys(rawValue as object).length === 1 &&
+      (rawValue as Record<string, unknown>).number != null
+    ) {
+      ctx.emitChange(path, (rawValue as Record<string, unknown>).number);
+    }
+    ctx.setClusterChoice(guardKey, "locked");
   };
   // Built lazily with the rest of the panel — the disclosure body only
   // renders while open.
