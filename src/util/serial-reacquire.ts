@@ -18,11 +18,14 @@ import { sleep } from "./sleep.js";
  * port — without this guard the toast in ``app-shell`` would loop
  * every time the wizard runs a serial op.
  *
- * Every entry point in this module stamps ``_lastSerialActivityMs``
- * at the start (and the toast click handler in ``app-shell`` does
- * the same to cover the gap between the user's click and the first
- * internal op). ``isRecentSerialActivity`` answers whether we're
- * inside the window defined by ``SERIAL_ACTIVITY_WINDOW_MS``.
+ * The serial entry points in ``web-serial.ts`` (connectToPort,
+ * detectChip, flashFirmware, disconnect, resetAndDisconnect, ...) stamp
+ * ``_lastSerialActivityMs`` at the start via ``markSerialActivity``, and
+ * the toast click handler in ``app-shell`` does the same to cover the
+ * gap between the user's click and the first internal op. The
+ * reacquire/reopen loops below do NOT stamp. ``isRecentSerialActivity``
+ * answers whether we're inside the window defined by
+ * ``SERIAL_ACTIVITY_WINDOW_MS``.
  */
 let _lastSerialActivityMs = 0;
 
