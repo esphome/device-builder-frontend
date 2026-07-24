@@ -298,14 +298,17 @@ export async function openLiveSerialPort(
         lastErr = err;
         const name = err instanceof DOMException ? err.name : "";
         const message = err instanceof Error ? err.message : "";
-        // Already open (a reset race / another candidate) — usable as-is,
-        // unless its stream is held by another reader. Re-read readable:
-        // the failed open() invalidates the null the loop head narrowed to.
+        // Already open (a reset race / another candidate) — usable only
+        // with an actual unlocked stream: a fatal read error leaves a port
+        // open with readable null, and returning that would just throw at
+        // getReader(). Re-read readable: the failed open() invalidates the
+        // null the loop head narrowed to.
         const readableNow = p.readable as ReadableStream<Uint8Array> | null;
         if (
           name === "InvalidStateError" &&
           /already open/i.test(message) &&
-          !readableNow?.locked
+          readableNow &&
+          !readableNow.locked
         ) {
           return p;
         }
@@ -318,6 +321,9 @@ export async function openLiveSerialPort(
       console.error("[Web Serial] Failed to reopen port:", lastErr);
       return null;
     }
+    // Re-check before the inter-round sleep so a teardown that landed
+    // mid-round short-circuits instead of napping on it.
+    if (cancelled()) return null;
     await sleep(200);
   }
   return null;

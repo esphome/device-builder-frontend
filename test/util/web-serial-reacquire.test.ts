@@ -149,6 +149,22 @@ describe("openLiveSerialPort", () => {
     });
   });
 
+  it("never returns an already-open port whose readable is null", async () => {
+    // A fatal read error leaves a port open with readable null; handing it
+    // back would just throw at getReader(). The loop must keep retrying.
+    const cached = fakePort({
+      readable: null,
+      open: vi.fn(async () => {
+        throw Object.assign(new DOMException("Port already open", "InvalidStateError"));
+      }),
+    });
+    stubGetPorts(async () => []);
+
+    expect(await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1 })).toBe(
+      null
+    );
+  });
+
   it("stops polling when cancelled", async () => {
     let rounds = 0;
     const cached = fakePort({
