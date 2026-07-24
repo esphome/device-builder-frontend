@@ -107,7 +107,7 @@ export function parsePinGpio(s: unknown): number | string | null {
   }
   if (s !== null && typeof s === "object" && !Array.isArray(s)) {
     const obj = s as Record<string, unknown>;
-    const provider = Object.keys(obj).find((k) => !LONG_FORM_PIN_KEYS.has(k));
+    const provider = providerKeyOf(obj);
     // The ``number`` is parsed the same way whichever branch we take, so an
     // expander channel written ``GPIO0`` resolves like a bare ``0``.
     const channel = parsePinGpio(obj.number);
@@ -132,6 +132,24 @@ export function parsePinGpio(s: unknown): number | string | null {
  */
 export function pinIdentityToken(provider: string, hub: string, channel: number): string {
   return `${provider}:${hub}:${channel}`;
+}
+
+/** True when *value* is a long-form pin block naming an I/O-expander
+ *  provider — its ``number`` is an expander channel, never a board GPIO.
+ *  Deliberately registry-independent: pin classification must not change
+ *  while the provider mode map is still being fetched. */
+export function isExpanderPinValue(value: unknown): boolean {
+  return providerKeyOf(value) !== undefined;
+}
+
+/** The I/O-expander provider key of a long-form pin object, or undefined
+ *  when every key is a board-pin field (or the value isn't a pin object).
+ *  The one provider rule the parser and the classifier share. */
+export function providerKeyOf(value: unknown): string | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return Object.keys(value).find((k) => !LONG_FORM_PIN_KEYS.has(k));
 }
 
 /**

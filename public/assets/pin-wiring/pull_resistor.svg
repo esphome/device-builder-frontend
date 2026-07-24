@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="34" viewBox="0 0 140 34" fill="none" stroke="#000" stroke-width="1.5">
+  <text x="2" y="10" font-size="11" font-family="system-ui, sans-serif" stroke="none" fill="#000">3.3V</text>
+  <line x1="30" y1="12" x2="30" y2="15"/>
+  <rect x="26" y="15" width="8" height="9"/>
+  <line x1="30" y1="24" x2="30" y2="28"/>
+  <line x1="30" y1="28" x2="52" y2="28"/>
+  <line x1="82" y1="8" x2="104" y2="8"/>
+  <line x1="104" y1="8" x2="104" y2="12"/>
+  <rect x="100" y="12" width="8" height="9"/>
+  <line x1="104" y1="21" x2="104" y2="25"/>
+  <line x1="96" y1="25" x2="112" y2="25"/>
+  <line x1="99" y1="29" x2="109" y2="29"/>
+  <line x1="102" y1="33" x2="106" y2="33"/>
+</svg>

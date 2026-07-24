@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="34" viewBox="0 0 140 34" fill="none" stroke="#000" stroke-width="1.5">
+  <text x="0" y="21" font-size="11" font-family="system-ui, sans-serif" stroke="none" fill="#000">GPIO</text>
+  <line x1="32" y1="17" x2="56" y2="17"/>
+  <circle cx="59" cy="17" r="2.5"/>
+  <line x1="61" y1="15" x2="80" y2="6"/>
+  <circle cx="83" cy="17" r="2.5"/>
+  <line x1="86" y1="17" x2="104" y2="17"/>
+  <line x1="104" y1="17" x2="104" y2="23"/>
+  <line x1="96" y1="23" x2="112" y2="23"/>
+  <line x1="99" y1="27" x2="109" y2="27"/>
+  <line x1="102" y1="31" x2="106" y2="31"/>
+</svg>

@@ -32,6 +32,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPinValue,
+  isExpanderPinValue,
   isPinFieldKey,
   LONG_FORM_PIN_KEYS,
   parseBoardGpio,
@@ -156,6 +157,32 @@ describe("parseBoardGpio", () => {
     expect(parseBoardGpio({ number: 5, mode: { input: true } })).toBe(5);
     // An expander channel is not a board pin.
     expect(parseBoardGpio({ pcf8574: "hub", number: 0 })).toBeNull();
+  });
+});
+
+describe("isExpanderPinValue", () => {
+  it("agrees with parsePinGpio on what names a provider", () => {
+    // The classifier and the parser share one provider rule; a value
+    // classified as an expander pin must parse as a channel token (or
+    // null mid-edit), never as a board GPIO — and vice versa.
+    const expander = { pcf8574: "hub", number: 0 };
+    expect(isExpanderPinValue(expander)).toBe(true);
+    expect(typeof parsePinGpio(expander)).toBe("string");
+
+    const midEdit = { pcf8574: "", number: 0 };
+    expect(isExpanderPinValue(midEdit)).toBe(true);
+    expect(parsePinGpio(midEdit)).toBeNull();
+
+    const longForm = { id: "my_pin", number: 5, mode: { input: true }, inverted: true };
+    expect(isExpanderPinValue(longForm)).toBe(false);
+    expect(parsePinGpio(longForm)).toBe(5);
+  });
+
+  it("rejects non-object values", () => {
+    expect(isExpanderPinValue("pcf8574:hub:0")).toBe(false);
+    expect(isExpanderPinValue(5)).toBe(false);
+    expect(isExpanderPinValue(null)).toBe(false);
+    expect(isExpanderPinValue([{ pcf8574: "hub" }])).toBe(false);
   });
 });
 

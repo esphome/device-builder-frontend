@@ -145,6 +145,155 @@ export const configEntryFormExtraStyles = css`
     gap: var(--wa-space-s);
   }
 
+  /* ─── Pin wiring presets ─────────────────────────────────── */
+  .pin-wiring-banner {
+    margin: 0;
+  }
+
+  .pin-wiring-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--wa-space-xs);
+  }
+
+  .pin-wiring-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: var(--wa-color-text-normal);
+  }
+
+  .pin-wiring-card:hover:not([aria-disabled="true"]) {
+    border-color: var(--wa-color-brand-border-loud);
+  }
+
+  .pin-wiring-card--selected {
+    border-color: var(--wa-color-brand-border-loud);
+    box-shadow: inset 0 0 0 1px var(--wa-color-brand-border-loud);
+  }
+
+  /* aria-disabled, not native disabled: the card stays hoverable (the
+     guard tooltip must show) and reachable by keyboard/AT. */
+  .pin-wiring-card[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .pin-wiring-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+  }
+
+  .pin-wiring-badge {
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-normal);
+    padding: 0 var(--wa-space-2xs);
+    border-radius: var(--wa-border-radius-s);
+    background: var(--wa-color-brand-fill-quiet);
+    color: var(--wa-color-brand-text-quiet);
+  }
+
+  .pin-wiring-card-desc {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+  }
+
+  .pin-wiring-card-desc--reason {
+    color: var(--esphome-warning, #d97706);
+  }
+
+  /* What the preset writes, in mode-flag vocabulary — the quick read
+     for users who already know what a pull-up is. */
+  .pin-wiring-card-tech {
+    font-family: var(--wa-font-family-code);
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+  }
+
+  .pin-wiring-diagram {
+    height: 30px;
+    align-self: flex-start;
+    color: var(--wa-color-text-quiet);
+  }
+
+  /* The schematic SVGs ship as asset files and are applied as a mask so
+     the drawing takes the theme's text color in light and dark mode. */
+  .pin-wiring-diagram--mask {
+    width: 140px;
+    background-color: var(--wa-color-text-quiet);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: left center;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: left center;
+    mask-size: contain;
+  }
+
+  .pin-wiring-diagram--icon {
+    display: flex;
+    align-items: center;
+    font-size: 22px;
+  }
+
+  .pin-wiring-custom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  .pin-wiring-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+  }
+
+  .pin-wiring-radios wa-radio {
+    font-size: var(--wa-font-size-s);
+  }
+
+  /* wa-radio's checked dot is "fill: currentColor", and its
+     ":host(:state(checked)) .control { color: ... }" rule ties on specificity
+     with the default "color: transparent" — the attribute selector wins the
+     tie, so the dot renders invisible. One generic rule for every form
+     radio group (constraint clusters, pin wiring). */
+  wa-radio[aria-checked="true"]::part(control) {
+    color: var(--wa-form-control-activated-color) !important;
+  }
+
+  /* Board-preset wiring guard: the panel is view-only; changes go through the YAML. */
+  .pin-wiring-guard {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+  }
+
+  .pin-wiring-guard > wa-icon {
+    flex-shrink: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  .pin-wiring-guard-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pin-wiring-guard-text .field-description {
+    margin: 0;
+  }
+
   /* ─── ID reference picker option layout ──────────────────── */
   .id-option-stack {
     display: inline-flex;

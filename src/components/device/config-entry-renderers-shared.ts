@@ -198,6 +198,17 @@ export function renderHelpLink(entry: ConfigEntry, ctx: RenderCtx) {
   </a>`;
 }
 
+/** UI-only marker a wrapper may stamp on a locked entry copy to retarget
+ *  the lock icon's tooltip (e.g. the pin wiring guard's "Allow changes"
+ *  hint instead of "Set by the board"). */
+export interface LockedReasonCarrier {
+  locked_reason_key?: string;
+}
+
+const lockedReasonKey = (entry: ConfigEntry): string =>
+  (entry as ConfigEntry & LockedReasonCarrier).locked_reason_key ??
+  "device.field_locked_by_board";
+
 export interface RenderLabelOptions {
   includeHelpLink?: boolean;
 }
@@ -218,7 +229,7 @@ export function renderLabel(
               class="lock-icon"
               library="mdi"
               name="lock-outline"
-              title=${ctx.localize("device.field_locked_by_board")}
+              title=${ctx.localize(lockedReasonKey(entry))}
             ></wa-icon>`
           : nothing
       }

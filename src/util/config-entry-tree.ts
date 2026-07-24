@@ -8,6 +8,7 @@ import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
 import { isIndexSegment } from "./nested-values.js";
+import { PIN_WIRING_KEYS } from "./pin-wiring-presets.js";
 
 /** True when `entries` contains any advanced entry, recursively. Drives whether
  *  the advanced-settings control shows at all: a nested advanced field reveals
@@ -36,6 +37,8 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
 export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean {
   let level = entries;
   let advanced = false;
+  let prevWasPin = false;
+  let inPinWiring = false;
   for (const key of path) {
     if (isIndexSegment(key)) continue;
     const entry = level.find((e) => e.key === key);
@@ -43,7 +46,13 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
     // A hidden entry never renders, so opening the advanced section
     // can't show it — don't reveal for one.
     if (entry.hidden) return false;
-    if (entry.advanced) advanced = true;
+    // A pin's wiring section renders its fields regardless of the global
+    // toggle, so advanced marks at or below the wiring keys don't gate
+    // anything; keep walking so the hidden check above still covers the
+    // rest of the path.
+    if (prevWasPin && PIN_WIRING_KEYS.has(entry.key)) inPinWiring = true;
+    if (entry.advanced && !inPinWiring) advanced = true;
+    prevWasPin = entry.type === ConfigEntryType.PIN;
     level = entry.config_entries ?? [];
   }
   return advanced;

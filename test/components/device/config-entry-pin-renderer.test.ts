@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   type ConfigEntry,
   ConfigEntryType,
@@ -9,6 +9,7 @@ import {
   parsePinGpio,
   renderPinField,
 } from "../../../src/components/device/config-entry-pin-renderer.js";
+import { fieldKeyAttr } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -425,6 +426,48 @@ describe("renderPinField reserved pins locked to the edited component", () => {
   });
 });
 
+describe("renderPinField suggestion narrowing", () => {
+  const pinEntry = (suggestions: string[]) =>
+    makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [],
+      suggestions,
+    });
+
+  it("narrows the dropdown to alias-spelled suggestions", () => {
+    const board = makeTestBoard({
+      pins: [
+        makeBoardPin(1, { aliases: ["D1"] }),
+        makeBoardPin(2, { aliases: ["D2"] }),
+        makeBoardPin(3),
+      ],
+    });
+    const result = renderPinField(
+      pinEntry(["D1", "D2"]),
+      ["pin"],
+      makeRenderCtx({}, { board })
+    );
+    const values = findElementBindings(result, "wa-option").map((o) => o.value);
+    expect(values).toContain("GPIO1");
+    expect(values).toContain("GPIO2");
+    expect(values).not.toContain("GPIO3");
+  });
+
+  it("keeps the full pin set when no suggestion resolves", () => {
+    // The manifest-typo escape hatch survives alias resolution.
+    const board = makeTestBoard({ pins: [makeBoardPin(1), makeBoardPin(2)] });
+    const result = renderPinField(
+      pinEntry(["BOGUS"]),
+      ["pin"],
+      makeRenderCtx({}, { board })
+    );
+    const values = findElementBindings(result, "wa-option").map((o) => o.value);
+    expect(values).toContain("GPIO1");
+    expect(values).toContain("GPIO2");
+  });
+});
+
 describe("renderPinField wa-select binding", () => {
   // The form's ``_syncSelectValues`` clears ``wa-select.value`` to
   // ``""`` for any non-primitive value (transient autocompletion
@@ -472,6 +515,28 @@ describe("renderPinField wa-select binding", () => {
       ".value" in bindings,
       "wa-select must not have a property binding to .value alongside data-no-value-sync"
     ).toBe(false);
+  });
+
+  it("keys the select by value form for cursor targeting", () => {
+    // Long form: the exact ``number`` match keeps the YAML cursor on
+    // ``number:`` landing on the select (the whole-field fallback
+    // centers mid-panel once the wiring disclosure is open), and the
+    // form-to-YAML pulse finds the ``number:`` line. Short form: the
+    // bare path, since there is no ``number:`` line to pulse.
+    const entry = () =>
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] });
+    const longForm = renderPinField(
+      entry(),
+      ["pin"],
+      makeRenderCtx({ pin: { number: 0 } })
+    );
+    expect(findElementBindings(longForm, "wa-select")[0]["data-field-key"]).toBe(
+      fieldKeyAttr(["pin", "number"])
+    );
+    const shortForm = renderPinField(entry(), ["pin"], makeRenderCtx({ pin: 0 }));
+    expect(findElementBindings(shortForm, "wa-select")[0]["data-field-key"]).toBe(
+      fieldKeyAttr(["pin"])
+    );
   });
 });
 
@@ -544,7 +609,9 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.renderEntry).not.toHaveBeenCalled();
   });
 
-  it("declares the gated path prefix so cursor-nav can reveal collapsed fields", () => {
+  it("declares each gated field so cursor-nav can reveal collapsed fields", () => {
+    // One marker per gated field, so a YAML cursor on ``pin`` / ``number``
+    // (which the always-visible picker owns) leaves the section shut.
     const ctx = makeRenderCtx({ pin: 0 });
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
@@ -555,10 +622,14 @@ describe("renderPinField long-form Advanced disclosure", () => {
       ["pin"],
       ctx
     );
-    const disclosure = findTemplatesByAnchor(result, 'class="pin-advanced"')[0];
-    const bindings = extractAttributeBindings(disclosure);
-    expect(bindings["data-reveal-for"]).toBe('["pin"]');
-    expect(bindings["data-field-key"]).toBe("pin:pin-advanced");
+    const markers = findTemplatesByAnchor(result, "data-reveal-for").map(
+      extractAttributeBindings
+    );
+    expect(markers.map((m) => m["data-reveal-for"])).toEqual([
+      '["pin","mode"]',
+      '["pin","inverted"]',
+    ]);
+    expect(markers[0]["data-field-key"]).toBe("pin:pin-advanced");
   });
 
   it("renders the long-form children when the disclosure is open", () => {
@@ -582,9 +653,18 @@ describe("renderPinField long-form Advanced disclosure", () => {
     // ``mode`` and ``inverted`` both rendered, each at its nested
     // path under the pin field. Order-sensitive — ``mode`` first
     // matches the catalog's emission order, which the form's
-    // tab-order convention follows.
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(1, children[0], ["pin", "mode"]);
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(2, children[1], ["pin", "inverted"]);
+    // tab-order convention follows. Matched by key, not identity: the
+    // wiring section renders advanced-stripped copies.
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ key: "mode" }),
+      ["pin", "mode"]
+    );
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ key: "inverted" }),
+      ["pin", "inverted"]
+    );
   });
 
   it("promotes the pin value to long form when the user opens Advanced", () => {
@@ -736,52 +816,20 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 
-  it("filters long-form children through ctx.filterRenderable", () => {
-    // Every other nested renderer applies ``filterRenderable`` so
-    // requiredOnly / showAdvanced / platform-visibility rules hide
-    // sub-fields the rest of the form has hidden. Skipping the
-    // filter here would let the long-form disclosure leak fields
-    // the catalog has marked advanced or gated by platform.
-    const openSet = new Set<string>(["pin:pin-advanced"]);
-    const filterMock = vi.fn((entries: ConfigEntry[]) => entries.slice(0, 1));
-    const ctx = makeRenderCtx(
-      { pin: { number: "GPIO5" } },
-      {
-        overrides: {
-          nestedOpenSections: openSet,
-          filterRenderable: filterMock as never,
-        },
-      }
-    );
-    const children = makeLongFormChildren();
-    renderPinField(
-      makeEntry(ConfigEntryType.PIN, {
-        key: "pin",
-        required: true,
-        config_entries: children,
-      }),
-      ["pin"],
-      ctx
-    );
-    // Filter received the full children list; only the survivor
-    // (the first child) gets handed to renderEntry. A regression
-    // that bypassed ``filterRenderable`` would render both
-    // children and the assertion below would catch the second
-    // one.
-    expect(filterMock).toHaveBeenCalledWith(children, expect.anything());
-    expect(ctx.renderEntry).toHaveBeenCalledTimes(1);
-    expect(ctx.renderEntry).toHaveBeenCalledWith(children[0], ["pin", "mode"]);
-  });
-
-  it("omits the Advanced disclosure when filterRenderable hides every child", () => {
-    // requiredOnly mode (the add-component dialog) hides everything
-    // marked advanced. The pin extras are all advanced, so the
-    // whole disclosure should disappear — rendering an empty
-    // toggle would invite the user to expand into nothing.
-    const filterMock = vi.fn(() => [] as ConfigEntry[]);
+  it("omits the disclosure in required-only mode", () => {
+    // The add-component quick dialog runs requiredOnly; the optional
+    // long-form extras all drop through the form's filter, so no
+    // empty toggle renders inviting the user to expand into nothing.
+    // The fixture's filterRenderable is an identity stub, so model the
+    // required-only drop explicitly.
     const ctx = makeRenderCtx(
       { pin: 0 },
-      { overrides: { filterRenderable: filterMock as never } }
+      {
+        overrides: {
+          requiredOnly: true,
+          filterRenderable: (entries) => entries.filter((c) => c.required),
+        },
+      }
     );
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {

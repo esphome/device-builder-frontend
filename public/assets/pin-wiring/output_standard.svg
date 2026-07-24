@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="34" viewBox="0 0 140 34" fill="none" stroke="#000" stroke-width="1.5">
+  <text x="0" y="21" font-size="11" font-family="system-ui, sans-serif" stroke="none" fill="#000">GPIO</text>
+  <path d="M40 26 H76 V8 H128"/>
+  <text x="80" y="22" font-size="11" font-family="system-ui, sans-serif" stroke="none" fill="#000">ON</text>
+</svg>

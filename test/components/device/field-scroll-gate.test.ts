@@ -51,22 +51,27 @@ describe("advanceScrollGate", () => {
 });
 
 describe("gatingDisclosureKeys", () => {
-  const DECLS = [{ prefix: ["pin"], key: "pin:pin-advanced" }];
+  // One decl per gated field, the shape the pin wiring markers render.
+  const DECLS = [
+    { prefix: ["pin", "mode"], key: "pin:pin-advanced" },
+    { prefix: ["pin", "inverted"], key: "pin:pin-advanced" },
+  ];
 
-  it("opens a disclosure gating a strict-descendant field", () => {
+  it("opens a disclosure when the cursor is on a gated field itself", () => {
     expect(gatingDisclosureKeys(DECLS, ["pin", "inverted"])).toEqual([
       "pin:pin-advanced",
     ]);
   });
 
-  it("opens it for a deeply nested descendant", () => {
+  it("opens it for a descendant of a gated field", () => {
     expect(gatingDisclosureKeys(DECLS, ["pin", "mode", "pullup"])).toEqual([
       "pin:pin-advanced",
     ]);
   });
 
-  it("leaves the prefix path itself untouched", () => {
+  it("leaves an ungated sibling untouched (the pin number)", () => {
     expect(gatingDisclosureKeys(DECLS, ["pin"])).toEqual([]);
+    expect(gatingDisclosureKeys(DECLS, ["pin", "number"])).toEqual([]);
   });
 
   it("ignores a path that doesn't sit under the prefix", () => {
