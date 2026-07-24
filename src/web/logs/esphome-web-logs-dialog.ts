@@ -17,7 +17,7 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
-import { reacquirePort } from "../../util/web-serial.js";
+import { openLiveSerialPort } from "../../util/web-serial.js";
 
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -39,6 +39,14 @@ const MAX_LOG_LINES = 10000;
 // default is all that applies.
 const LOG_BAUD_RATE = 115200;
 
+// 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
+// throttled/backgrounded tab doesn't overrun — matches the legacy site.
+const LOG_BUFFER_SIZE = 8192;
+
+// Consecutive reconnect cycles that produced no log lines before giving up:
+// a flapping bridge or a device stuck resetting must not churn forever.
+const MAX_SILENT_RECONNECTS = 3;
+
 /**
  * Open a port for the logs view before showing the dialog. Returns ``true`` if
  * the port is ready to stream. Opening here (in the caller's click gesture)
@@ -51,9 +59,7 @@ export async function openPortForLogs(
   localize: LocalizeFunc
 ): Promise<boolean> {
   try {
-    // 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
-    // throttled/backgrounded tab doesn't overrun — matches the legacy site.
-    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: 8192 });
+    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader — streamSerialLines() calls getReader(), so
@@ -82,6 +88,8 @@ export async function openPortForLogs(
  * plain Web Serial reader instead of the backend logs WS — no ``apiContext``,
  * no OTA source. The parent opens the port (via ``openPortForLogs``) before
  * showing the dialog; the dialog streams it and closes it on ``after-hide``.
+ * After a mid-stream disconnect the dialog owns recovery: it closes the
+ * dead handle and reopens a live one itself (``openLiveSerialPort``).
  */
 @customElement("esphome-web-logs-dialog")
 export class ESPHomeWebLogsDialog extends LitElement {
@@ -120,6 +128,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _activePort?: SerialPort;
   // Supersedes stale reacquire attempts (close, a newer disconnect).
   private _reacquireGeneration = 0;
+  // Consecutive reconnects that have produced no log lines yet; reset by
+  // the first line after a resume, checked against MAX_SILENT_RECONNECTS.
+  private _silentReconnects = 0;
   // Batched line buffer flushed on the next animation frame, matching the
   // dashboard logs dialog (logs-dialog.ts): a flooding device would otherwise
   // trigger a Lit render per line. Flushed early on teardown / clear / download.
@@ -144,12 +155,14 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   // The parent opens the port (openPortForLogs) before showing the dialog, so
-  // here we just stream it. Defensive guard: a closed port has no readable.
+  // the initial stream reads it as-is; reconnect reopens are this dialog's
+  // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
     if (!this.port?.readable || this._cancel) return;
     this._resetLines();
     this._paused = false;
     this._streaming = true;
+    this._silentReconnects = 0;
     this._streamFrom(this.port);
   }
 
@@ -163,6 +176,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
       onLine: (line) => {
+        this._silentReconnects = 0;
         if (!this._paused) this._enqueueLine(line);
       },
       onDisconnect: (error) => this._onDisconnect(error),
@@ -191,38 +205,52 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._enqueueLine("");
     const base = this._localize("web.logs.terminal_disconnected");
     this._enqueueLine(error ? `${base}: ${String(error)}` : base);
-    // Reader ended: no Stop/Start button (neither streaming nor paused).
-    // Dropping the cancel closure without calling it is deliberate — the
-    // dead reader already released its lock (the stream helper's finally),
-    // the UA auto-closes the port on real device loss, and a port that
-    // survived its stream stays tolerated by openPortForLogs' already-open
-    // path when the resume reopens it.
+    // Reader ended: no Stop/Start button until the resume decides.
     this._cancel = undefined;
     this._streaming = false;
+    const wasPaused = this._paused;
     this._paused = false;
     const port = this._activePort;
-    if (!this.open || !port) {
+    if (!this.open || !port || ++this._silentReconnects > MAX_SILENT_RECONNECTS) {
+      if (this.open && port) {
+        this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+      }
       this._flushPending();
       return;
     }
     this._enqueueLine(this._localize("web.logs.reconnecting"));
     this._flushPending();
     const generation = ++this._reacquireGeneration;
-    void reacquirePort(port, {
-      cancelled: () => generation !== this._reacquireGeneration,
-    }).then(async (live) => {
-      if (generation !== this._reacquireGeneration) return;
-      if (live && (await openPortForLogs(live, this._localize))) {
-        if (generation !== this._reacquireGeneration) return;
-        this._enqueueLine(this._localize("web.logs.reconnected"));
-        this._enqueueLine("");
-        this._streaming = true;
-        this._streamFrom(live);
-      } else {
+    void (async () => {
+      // Close the dead stream's port first: the reacquired handle is often
+      // this very one (a UART bridge, or Firefox after a re-enum), and
+      // reopening a still-open port would re-read the dead stream and loop.
+      // The dead reader already released its lock, so close() can proceed;
+      // a UA that closed it on device loss rejects harmlessly.
+      await port.close().catch(() => {});
+      const live = await openLiveSerialPort(port, {
+        baudRate: LOG_BAUD_RATE,
+        bufferSize: LOG_BUFFER_SIZE,
+        cancelled: () => generation !== this._reacquireGeneration,
+      });
+      if (generation !== this._reacquireGeneration) {
+        // Superseded after the open — reclaim the handle we just opened.
+        if (live) void live.close().catch(() => {});
+        return;
+      }
+      if (!live) {
         this._enqueueLine(this._localize("web.logs.reconnect_failed"));
         this._flushPending();
+        return;
       }
-    });
+      this._enqueueLine(this._localize("web.logs.reconnected"));
+      this._enqueueLine("");
+      // Honour a Stop pressed before the reset: the reader drains either
+      // way, so the display stays paused instead of force-resuming.
+      this._streaming = !wasPaused;
+      this._paused = wasPaused;
+      this._streamFrom(live);
+    })();
   }
 
   private _stop(): void {
