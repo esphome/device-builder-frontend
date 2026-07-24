@@ -27,8 +27,10 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { notifyError } from "../util/notify.js";
+import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
+import { renderOtaFallbackBanner } from "./logs-dialog/ota-fallback-banner.js";
 import {
   abortSerialReconnect,
   onStart,
@@ -82,6 +84,12 @@ registerMdiIcons({
 // DOM grow until the tab locks up. Trimmed to the newest on every flush.
 const MAX_LOG_LINES = 5000;
 
+// How long a Web Serial session may show nothing before the dialog offers
+// network logs instead. Long enough for a normal boot's first line; short
+// enough that a dead-end console (uart: on the console pins, #1430) doesn't
+// strand the user staring at the placeholder.
+const QUIET_SERIAL_TIMEOUT_MS = 5000;
+
 @customElement("esphome-logs-dialog")
 export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -129,6 +137,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
+
+  // Watchdog for a Web Serial session that shows nothing (uart: repurposed
+  // the console pins, wrong baud). Armed/disarmed off the session state in
+  // willUpdate; fed displayed lines via _noteSerialActivity. When it goes
+  // quiet the toolbar area offers switching to network logs (#1430).
+  _quietSerial = new QuietTimerController(this, QUIET_SERIAL_TIMEOUT_MS);
 
   // The visible log, its cap, and the stream-position map inline decoding
   // needs. Owns every line the dialog shows; the dialog holds no counters.
@@ -186,6 +200,17 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
+    }
+    if (changedProperties.has("_session") || changedProperties.has("_open")) {
+      // Every session transition flows through logs-dialog/session.ts and
+      // replaces _session, so keying here covers open/attach/pause/teardown
+      // without touching each transition. A deliberate Stop (pause, #526)
+      // disarms rather than counting as silence.
+      const s = this._session;
+      const watching =
+        this._open && (s.kind === "serial" || s.kind === "reconnecting") && !s.paused;
+      if (watching) this._quietSerial.ensureArmed();
+      else this._quietSerial.disarm();
     }
   }
 
@@ -303,6 +328,13 @@ export class ESPHomeLogsDialog extends LitElement {
                 </div>`
               : ""
           }
+          ${
+            // The dead state (serial reopen failed) gets the escape hatch
+            // unconditionally — its only other recovery is Start-to-reconnect.
+            this._quietSerial.quiet || s.kind === "dead"
+              ? renderOtaFallbackBanner(this)
+              : ""
+          }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
               passive
@@ -418,6 +450,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // reader (streamSerialToDialog) and the OTA stream both feed through here.
   _enqueueLine(line: string): void {
     this._log.enqueue(line);
+  }
+
+  // Called by `streamSerialToDialog` for every displayed serial line; feeds
+  // the quiet-serial watchdog so a healthy stream never trips the banner.
+  _noteSerialActivity(): void {
+    this._quietSerial.activity();
   }
 
   // Every line the buffer takes on, batched or direct, passes through here.

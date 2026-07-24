@@ -93,6 +93,36 @@ export const logsDialogStyles = css`
     background: var(--esphome-primary-hover);
   }
 
+  /* Quiet-serial escape hatch — the muted reset-suggestion idiom (same
+     classes as the command dialogs' failure hints). */
+  .reset-suggestion {
+    padding: 10px 20px;
+    border-top: 1px solid var(--term-border);
+    background: var(--term-bg-alt);
+    font-family: var(--term-mono-font);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--term-fg-muted);
+  }
+
+  .reset-suggestion-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--term-accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .reset-suggestion-link:hover,
+  .reset-suggestion-link:focus-visible {
+    color: var(--term-accent);
+    text-decoration-thickness: 2px;
+    outline: none;
+  }
+
   /* Expanded → "just give me logs": full viewport, the terminal fills the
      space between the slim title bar and the toolbar. The component fills the
      dialog body (height: 100%) and its content stretches via the height vars. */

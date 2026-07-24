@@ -3,7 +3,7 @@ import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
-import { notifyError } from "./notify.js";
+import { notifyError, notifyInfo } from "./notify.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
@@ -211,8 +211,11 @@ export async function handlePostInstallShowLogs(
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging disabled; the port would be silent.
-      notifyError(localize("dashboard.logs_serial_disabled"));
+      // logger: baud_rate: 0 — UART logging disabled; the port would be
+      // silent. Land on network logs instead of a dead end (#1430); the
+      // backend's esphome logs keeps retrying until the device is online.
+      notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
+      logsDialog.open(OTA_PORT, { onBackToInstall: reopenInstall });
       return;
     }
     logsDialog.openPassive({

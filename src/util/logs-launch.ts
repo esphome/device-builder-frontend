@@ -3,7 +3,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
-import { notifyError } from "./notify.js";
+import { notifyError, notifyInfo } from "./notify.js";
 import {
   attachSerialLogStream,
   reconnectWebSerialLogs,
@@ -79,8 +79,12 @@ export async function launchLogsWithMethod(
     }
     const baudRate = resolveLogBaudRate(device.logger_baud_rate);
     if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging is disabled; serial would be silent.
-      notifyError(host.localize("dashboard.logs_serial_disabled"));
+      // logger: baud_rate: 0 — UART logging is disabled; serial would be
+      // silent. Skip the port picker and land on network logs (#1430).
+      notifyInfo(host.localize("dashboard.logs_serial_disabled_fallback"));
+      host.logsDialog.configuration = device.configuration;
+      host.logsDialog.name = device.friendly_name || device.name;
+      host.logsDialog.open();
       return;
     }
     let serialPort: SerialPort | null;
