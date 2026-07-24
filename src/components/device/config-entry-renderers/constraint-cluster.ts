@@ -214,8 +214,12 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
 
   const visibleMembers = (selected?.members ?? []).filter(isRenderable);
   // A board-locked member means the board made the cluster choice; switching
-  // sides would clear the locked value, so the radios pin to it.
-  const pinned = choicePinned(alternatives.flatMap((a) => a.members));
+  // sides would clear the locked value, so the radios pin to it. Gated on
+  // renderable members, matching the dropdown's options and the plan gate.
+  const pinned = choicePinned(
+    alternatives.flatMap((a) => a.members),
+    isRenderable
+  );
   return html`
     <div
       class="nested-group constraint-cluster"
