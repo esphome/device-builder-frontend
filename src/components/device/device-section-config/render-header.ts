@@ -4,6 +4,7 @@
  */
 import { html, nothing } from "lit";
 import { defaultBoardImageUrl, onBoardImageError } from "../../../util/board-image.js";
+import { featuredEntryForInstance } from "../../../util/featured-id.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import type { SectionConfigResponse } from "./loading.js";
@@ -18,11 +19,20 @@ export function renderSectionHeader(
   // A catalog miss (external component or bare platform domain) swaps the
   // title and drops the subtitle-less image header.
   const catalogMiss = host._isUnknown || host._isPlatformDomain;
+  // An instance a featured entry materialized keeps that entry's
+  // presentation (module photo, name, description) instead of the
+  // generic catalog one; per-field fallback for anything the manifest
+  // doesn't carry.
+  const featured = catalogMiss
+    ? null
+    : featuredEntryForInstance(host.board, host.sectionKey, host._values.id);
   const headerTitle = host._isUnknown
     ? host._localize("device.external_component_title")
     : host._isPlatformDomain
       ? host._localize("device.platform_section_title")
-      : config.title;
+      : (featured?.name ?? config.title);
+  const description = featured?.description ?? config.description;
+  const imageUrl = featured?.image_url || config.image_url;
   return html`
     <div class="section-header">
       <div class="section-header-info">
@@ -46,8 +56,8 @@ export function renderSectionHeader(
           catalogMiss ? html`<p class="section-subtitle">${host.sectionKey}</p>` : nothing
         }
         ${
-          config.description
-            ? html`<p class="section-desc">${renderMarkdown(config.description)}</p>`
+          description
+            ? html`<p class="section-desc">${renderMarkdown(description)}</p>`
             : nothing
         }
       </div>
@@ -56,8 +66,8 @@ export function renderSectionHeader(
           ? nothing
           : html`<div class="section-image">
               <img
-                src=${config.image_url || defaultBoardImageUrl()}
-                alt=${config.title}
+                src=${imageUrl || defaultBoardImageUrl()}
+                alt=${headerTitle}
                 referrerpolicy="no-referrer"
                 @error=${onBoardImageError}
               />

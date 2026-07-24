@@ -70,6 +70,8 @@ export interface FeaturedComponent {
   component_id: string;
   name: string | null;
   description: string | null;
+  /** Photo of the physical module; absent when the entry has none (omit_default). */
+  image_url?: string;
   fields: Record<string, FieldPreset>;
   /** Underlying component's multi_conf; absent means multi-conf (omit_default). */
   multi_conf?: boolean;
