@@ -6,7 +6,7 @@
  * render and lifecycle (hydrate, catalog lists, headers).
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
+import { type CSSResultGroup, html, LitElement, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
@@ -124,7 +124,7 @@ export abstract class BaseAutomationEditor<
     return this._engine.flushPending();
   }
 
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
 
   /** Inline error line + the confirm-gated delete footer. The
    *  message factory receives the non-null ``location`` so callers

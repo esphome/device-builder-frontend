@@ -73,7 +73,7 @@ export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocati
     return location.kind === "api_action" && !!location.action_name;
   }
 
-  static styles = [...BaseAutomationEditor.styles, fieldHighlightStyles];
+  static styles = [BaseAutomationEditor.styles, fieldHighlightStyles];
 
   connectedCallback(): void {
     super.connectedCallback();
