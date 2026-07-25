@@ -2,12 +2,12 @@ import { css } from "lit";
 
 /** Add affordances, empty/error states, and the bottom save/delete action bar. */
 export const automationEditorActionStyles = css`
-  /* Add button — used at the bottom of every list. The default is
-     a modest dashed affordance for nested lists (then/else inside
-     an "if"). The top-level list (wrapped in .ae-section) gets
-     the prominent overlay below — that's the primary "Add action"
-     / "Add condition" the user reaches for from a fresh
-     automation, so it should pop. */
+  /* Add button — one dashed quiet affordance at the bottom of every
+     list, top-level and nested alike (#1450); brand color on hover
+     for affordance. Nested lists (via :host-context() reaching the
+     parent action-node's .ae-nested wrapper, the only way a sibling
+     custom-element with its own shadow can scope the rule) only
+     tighten the density. */
   .ae-add {
     display: flex;
     justify-content: center;
@@ -15,13 +15,13 @@ export const automationEditorActionStyles = css`
     gap: var(--wa-space-2xs);
     width: 100%;
     appearance: none;
-    border: 1px solid var(--wa-color-brand-fill-loud, var(--esphome-primary));
-    background: var(--esphome-primary-light);
-    color: var(--wa-color-brand-fill-loud, var(--esphome-primary));
-    padding: var(--wa-space-s) var(--wa-space-m);
+    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    padding: var(--wa-space-xs) var(--wa-space-m);
     border-radius: var(--wa-border-radius-m);
     cursor: pointer;
-    font-size: var(--wa-font-size-s);
+    font-size: var(--wa-font-size-xs);
     font-weight: var(--wa-font-weight-semibold);
     margin-top: var(--wa-space-s);
     transition:
@@ -31,11 +31,9 @@ export const automationEditorActionStyles = css`
   }
 
   .ae-add:hover:not(:disabled) {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-brand-fill-loud, var(--esphome-primary)) 18%,
-      transparent
-    );
+    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    background: transparent;
   }
 
   .ae-add:disabled {
@@ -43,25 +41,10 @@ export const automationEditorActionStyles = css`
     cursor: not-allowed;
   }
 
-  /* Nested add buttons (inside then / else / while / repeat) —
-     dashed, quiet so the eye reads the prominent outer button as
-     the primary CTA. :host-context() reaches across the
-     action-list's shadow boundary into the parent action-node's
-     .ae-nested wrapper, which is the only way a sibling
-     custom-element with its own shadow can scope the rule. They
-     still pick up the brand color on hover for affordance. */
   :host-context(.ae-nested) .ae-add {
-    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
-    color: var(--wa-color-text-quiet);
     padding: var(--wa-space-2xs) var(--wa-space-s);
     font-size: var(--wa-font-size-2xs);
     margin-top: var(--wa-space-2xs);
-  }
-
-  :host-context(.ae-nested) .ae-add:hover:not(:disabled) {
-    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
-    background: transparent;
   }
 
   .ae-error {
