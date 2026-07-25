@@ -19,6 +19,7 @@ vi.mock("../../src/util/web-serial.js", () => ({
 }));
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { flush } from "../_dom.js";
 import { makeDisconnectPort } from "../_web-serial.js";

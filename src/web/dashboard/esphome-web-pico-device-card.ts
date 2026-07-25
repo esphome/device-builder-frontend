@@ -14,6 +14,7 @@ import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   "text-box-outline": mdiTextBoxOutline,
@@ -64,21 +65,25 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
             ${this._localize("web.actions.configure_wifi")}
           </button>
           <button
+            id="btn-logs"
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("dashboard.logs")}
             aria-label=${this._localize("dashboard.logs")}
             @click=${this._showLogs}
           >
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
+          <wa-tooltip for="btn-logs">${this._localize("dashboard.logs")}</wa-tooltip>
           <button
+            id="btn-disconnect"
             class="action-btn action-btn--ghost action-btn--icon-only"
-            title=${this._localize("web.actions.disconnect")}
             aria-label=${this._localize("web.actions.disconnect")}
             @click=${this._disconnect}
           >
             <wa-icon library="mdi" name="link-off"></wa-icon>
           </button>
+          <wa-tooltip for="btn-disconnect"
+            >${this._localize("web.actions.disconnect")}</wa-tooltip
+          >
         </div>
       </esphome-web-card>
       <esphome-web-logs-dialog

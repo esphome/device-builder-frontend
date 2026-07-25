@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebHeader } from "../../src/web/header/esphome-web-header.js";
+import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -67,5 +69,10 @@ describe("esphome-web-header switch target", () => {
     const el = await mount("esp", true);
 
     expect(el.shadowRoot!.querySelector("esphome-web-header-actions")).not.toBeNull();
+  });
+
+  it("anchors the switch tooltip to the button id", async () => {
+    const el = await mount("esp");
+    expectTooltipsAnchored(el, 1);
   });
 });

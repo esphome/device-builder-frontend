@@ -12,6 +12,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   "bug-outline": mdiBugOutline,
@@ -38,14 +39,15 @@ export class ESPHomeWebHeaderActions extends OverflowMenuElement {
     const kebabLabel = this._localize("web.header.more_options");
     return html`
       <button
+        id="btn-kebab"
         type="button"
         class="menu-btn menu-kebab"
         @click=${this._toggle}
-        title=${kebabLabel}
         aria-label=${kebabLabel}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
       </button>
+      <wa-tooltip for="btn-kebab">${kebabLabel}</wa-tooltip>
       ${
         this._open
           ? html`

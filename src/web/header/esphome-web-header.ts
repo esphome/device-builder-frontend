@@ -11,6 +11,7 @@ import { isWebSerialSupported } from "../../util/web-serial.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "./esphome-web-header-actions.js";
 
 registerMdiIcons({ "swap-horizontal": mdiSwapHorizontal });
@@ -62,15 +63,19 @@ export class ESPHomeWebHeader extends LitElement {
           !this.minimal && isWebSerialSupported()
             ? html`
                 <button
+                  id="btn-switch"
                   class="switch-btn"
                   @click=${this._onToggle}
-                  title=${targetLabel}
                   aria-label=${targetLabel}
                 >
                   <img class="target-logo" src="/static/logo/${targetLogo}.png" alt="" />
                   <span class="target-label">${targetLabel}</span>
                   <wa-icon library="mdi" name="swap-horizontal"></wa-icon>
                 </button>
+                <!-- Redundant beside the visible label on wide windows, but the
+                     870px query hides the label by width, not pointer — a
+                     narrow desktop window still hovers. -->
+                <wa-tooltip for="btn-switch">${targetLabel}</wa-tooltip>
               `
             : nothing
         }
