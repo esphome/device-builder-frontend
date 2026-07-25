@@ -1776,6 +1776,8 @@ export class ESPHomePageDevice extends LitElement {
     // Only a returned promise defers the switch; the component
     // editor's sync flush (and no active section) keeps the switch
     // synchronous, so cursor-driven selection stays re-entrant safe.
+    // The automation editors' flushPending is async, so switching out
+    // of one always defers — idle or not.
     const pending = this._activeSection?.flushPending();
     if (pending) {
       // A failed flush already surfaced its own error; still switch —
@@ -1785,6 +1787,9 @@ export class ESPHomePageDevice extends LitElement {
       } catch {
         // Handled by the editor.
       }
+      // The page can unmount across the flush; a late action would
+      // replaceState on whatever URL the user has since landed on.
+      if (!this.isConnected) return;
     }
     action();
   }

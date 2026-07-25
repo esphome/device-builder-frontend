@@ -32,9 +32,15 @@ import type { SectionEditor } from "../../src/components/device/section-editor.j
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internals = (page: ESPHomePageDevice) => page as any;
 
+/** Stub Node.isConnected — attaching the real page element would run
+ *  its full connectedCallback against a mockless backend. */
+const setConnected = (page: ESPHomePageDevice, value: boolean) =>
+  Object.defineProperty(page, "isConnected", { value, configurable: true });
+
 describe("section-switch flush barrier", () => {
   it("defers the switch until an async flushPending resolves", async () => {
     const page = new ESPHomePageDevice();
+    setConnected(page, true);
     let resolveFlush!: () => void;
     const editor: SectionEditor = {
       dirty: true,
@@ -60,16 +66,20 @@ describe("section-switch flush barrier", () => {
     expect(order).toEqual(["returned", "action"]);
   });
 
-  it("runs the action with no active section", async () => {
+  it("runs the action synchronously with no active section", async () => {
     const page = new ESPHomePageDevice();
     internals(page)._activeSection = null;
     const action = vi.fn();
-    await internals(page)._guardSectionSwitch(action);
+    const switching = internals(page)._guardSectionSwitch(action) as Promise<void>;
+    // No microtask hop: an async function runs synchronously up to
+    // its first await, and the no-flush path has none.
     expect(action).toHaveBeenCalledOnce();
+    await switching;
   });
 
   it("still switches when the flush rejects", async () => {
     const page = new ESPHomePageDevice();
+    setConnected(page, true);
     internals(page)._activeSection = {
       dirty: true,
       flushPending: () => Promise.reject(new Error("upsert failed")),
@@ -80,7 +90,7 @@ describe("section-switch flush barrier", () => {
     expect(action).toHaveBeenCalledOnce();
   });
 
-  it("runs the action after a sync flush (component editor shape)", async () => {
+  it("runs the action synchronously after a sync flush (component editor shape)", async () => {
     const page = new ESPHomePageDevice();
     const flushPending = vi.fn();
     internals(page)._activeSection = {
@@ -89,8 +99,35 @@ describe("section-switch flush barrier", () => {
       reload: () => {},
     } satisfies SectionEditor;
     const action = vi.fn();
-    await internals(page)._guardSectionSwitch(action);
+    const switching = internals(page)._guardSectionSwitch(action) as Promise<void>;
     expect(flushPending).toHaveBeenCalledOnce();
+    // No microtask hop: a void-returning flush must not defer the
+    // switch, or the cursor-driven paths become re-entrant.
     expect(action).toHaveBeenCalledOnce();
+    await switching;
+  });
+
+  it("skips the action when the page unmounts during the flush", async () => {
+    const page = new ESPHomePageDevice();
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    setConnected(page, true);
+    const action = vi.fn();
+    const switching = internals(page)._guardSectionSwitch(action) as Promise<void>;
+
+    // The user leaves the device page while the flush is in flight; a
+    // late action would replaceState on whatever URL they landed on.
+    setConnected(page, false);
+
+    resolveFlush();
+    await switching;
+    expect(action).not.toHaveBeenCalled();
   });
 });
