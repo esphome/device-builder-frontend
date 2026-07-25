@@ -108,7 +108,7 @@ export class AutoApplyController implements ReactiveController {
   private _debounce: ReturnType<typeof setTimeout> | null = null;
   private _apply: ApplyPhase = { kind: "idle" };
   /** Non-null while a delete owns the section. */
-  private _delete: DeleteMode | null = null;
+  private _deleteMode: DeleteMode | null = null;
   private _lastSelfWrittenYaml: string | null = null;
   private _dirty = false;
   // Whether the host element is on screen; a failure-path re-arm must not
@@ -146,13 +146,13 @@ export class AutoApplyController implements ReactiveController {
 
   /** Disables the host's form chrome while a delete is running. */
   get deleting(): boolean {
-    return this._delete !== null;
+    return this._deleteMode !== null;
   }
 
   /** In-flight write guard — parents that re-fetch on reconnect
    *  consult this to skip clobbering an optimistic update. */
   get inFlightWrite(): boolean {
-    return this._delete !== null || this._apply.kind === "applying";
+    return this._deleteMode !== null || this._apply.kind === "applying";
   }
 
   /**
@@ -191,9 +191,9 @@ export class AutoApplyController implements ReactiveController {
   scheduleAutoApply(): void {
     if (this._host.addMode) return;
     if (this._options.isReadOnly()) return;
-    if (this._delete) {
-      this._delete.suppressed = true;
-      this._delete.suppressedFor = this._host.location;
+    if (this._deleteMode) {
+      this._deleteMode.suppressed = true;
+      this._deleteMode.suppressedFor = this._host.location;
       return;
     }
     this._setDirty(true);
@@ -242,11 +242,11 @@ export class AutoApplyController implements ReactiveController {
     if (this._options.canApply && !this._options.canApply(location)) return;
     // A delete owns the section from here on; a racing apply (the
     // in-flight queued re-run, a stray flushPending) must not run.
-    if (this._delete) {
-      this._delete.suppressed = true;
+    if (this._deleteMode) {
+      this._deleteMode.suppressed = true;
       // The snapshot from the top of the call, so the suppression is
       // tied to the apply attempt being blocked.
-      this._delete.suppressedFor = location;
+      this._deleteMode.suppressedFor = location;
       return;
     }
     if (this._apply.kind === "applying") {
@@ -282,7 +282,7 @@ export class AutoApplyController implements ReactiveController {
     } catch (err) {
       this._surfaceSaveError(err);
     } finally {
-      const queued = this._apply.kind === "applying" && this._apply.queued;
+      const queued = this._apply.queued;
       this._apply = { kind: "idle" };
       if (queued) {
         // A value-change landed while we were running. Re-run with
@@ -309,7 +309,7 @@ export class AutoApplyController implements ReactiveController {
    */
   async delete(): Promise<void> {
     const api = this._options.getApi();
-    if (!api || !this._host.location || this._delete) return;
+    if (!api || !this._host.location || this._deleteMode) return;
     // Snapshot the identity before any await: location is a reactive prop
     // the parent reassigns on navigation, and the element is reused across
     // sibling automations — a mid-flush section switch must not retarget
@@ -320,7 +320,7 @@ export class AutoApplyController implements ReactiveController {
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
     const mode: DeleteMode = { suppressed: false, suppressedFor: null };
-    this._setDelete(mode);
+    this._setDeleteMode(mode);
     this._options.setError("");
     let failed = false;
     try {
@@ -370,7 +370,7 @@ export class AutoApplyController implements ReactiveController {
       failed = true;
       this._surfaceSaveError(err);
     } finally {
-      this._setDelete(null);
+      this._setDeleteMode(null);
       this._settleDelete(mode, { failed, hadPending, location });
     }
   }
@@ -436,8 +436,8 @@ export class AutoApplyController implements ReactiveController {
     fireSectionEvent(this._host, "dirty-change", { dirty: value });
   }
 
-  private _setDelete(mode: DeleteMode | null): void {
-    this._delete = mode;
+  private _setDeleteMode(mode: DeleteMode | null): void {
+    this._deleteMode = mode;
     this._host.requestUpdate();
   }
 }
