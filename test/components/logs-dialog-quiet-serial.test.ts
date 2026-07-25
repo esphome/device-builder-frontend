@@ -92,6 +92,24 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).not.toBeNull();
   });
 
+  it("does not count the reopen wait (reconnecting) as silence", async () => {
+    // The settle delay + re-enumeration reopen retries can run for seconds on
+    // a healthy native-USB board; the window must start at reader attach.
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    await el.updateComplete;
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    el.setSerialStream(port, cancel as unknown as () => void);
+    await el.updateComplete;
+    vi.advanceTimersByTime(4999);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
   it("shows the banner immediately for a dead session (reopen failed)", async () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
     el.setSerialOpenFailed("reopen failed");

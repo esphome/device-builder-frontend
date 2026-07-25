@@ -1,7 +1,7 @@
-import { html, type TemplateResult } from "lit";
+import type { TemplateResult } from "lit";
 import { JobSource } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { splitTemplate } from "../../util/template-split.js";
+import { renderActionSuggestion } from "./reset-suggestion.js";
 
 /**
  * Discovery hint shown in a running compile's ``suggestion`` slot once the
@@ -48,16 +48,11 @@ export function shouldShowOffloadHint(state: OffloadHintState): boolean {
 }
 
 export function renderOffloadHint(host: OffloadHintHost): TemplateResult {
-  const text = host._localize("command.offload_hint");
-  const [before, after] = splitTemplate(text, "{action}");
-  return html`
-    <div class="reset-suggestion" role="status" slot="suggestion">
-      ${before}<button
-        class="reset-suggestion-link"
-        @click=${host._tryOpenBuildOffloadSettings}
-      >
-        ${host._localize("command.offload_hint_action")}</button
-      >${after}
-    </div>
-  `;
+  return renderActionSuggestion(
+    host._localize,
+    "command.offload_hint",
+    "{action}",
+    "command.offload_hint_action",
+    host._tryOpenBuildOffloadSettings
+  );
 }

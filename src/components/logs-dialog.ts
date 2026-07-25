@@ -57,6 +57,7 @@ import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal
 import {
   fillTerminalOnMobile,
   termButtonStyles,
+  termSuggestionStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
 import { renderTermButton, renderTermToggle } from "./process-terminal/toolbar-button.js";
@@ -188,6 +189,7 @@ export class ESPHomeLogsDialog extends LitElement {
     primaryDialogHeaderStyles,
     termTokens,
     termButtonStyles,
+    termSuggestionStyles,
     textStyles,
     logsDialogStyles,
     // Full-screen on mobile, terminal fills it.
@@ -205,11 +207,14 @@ export class ESPHomeLogsDialog extends LitElement {
     if (changedProperties.has("_session") || changedProperties.has("_open")) {
       // Every session transition flows through logs-dialog/session.ts and
       // replaces _session, so keying here covers open/attach/pause/teardown
-      // without touching each transition. A deliberate Stop (pause, #526)
-      // disarms rather than counting as silence.
+      // without touching each transition. Only a live reader arms: the
+      // reconnecting phase is the settle delay + reopen retries (several
+      // seconds on a re-enumerating native-USB chip), which isn't silence —
+      // and a failed reopen lands in dead, which offers the banner anyway.
+      // A deliberate Stop (pause, #526) disarms rather than counting as
+      // silence.
       const s = this._session;
-      const watching =
-        this._open && (s.kind === "serial" || s.kind === "reconnecting") && !s.paused;
+      const watching = this._open && s.kind === "serial" && !s.paused;
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
