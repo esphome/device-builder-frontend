@@ -519,21 +519,6 @@ describe("AutoApplyController delete", () => {
     expect(selections).toHaveLength(0);
   });
 
-  it("the unmount announcement rides the mount-time parent past detachment", () => {
-    const outer = document.createElement("div");
-    const shadow = outer.attachShadow({ mode: "open" });
-    const { host, controller } = setup({}, shadow);
-    const unmounts: unknown[] = [];
-    outer.addEventListener("section-unmount", (e) =>
-      unmounts.push((e as CustomEvent<{ node: unknown }>).detail.node)
-    );
-    // Tear down like Lit does — after the host has left the tree.
-    host.parentNode = null;
-    controller.hostDisconnected();
-
-    expect(unmounts).toEqual([host]);
-  });
-
   it("a mid-flush retarget without an edit stays on the sibling with nothing re-armed", async () => {
     const { host, controller, upsertAutomation, deleteAutomation } = setup();
     const selections = captureEvents(host, "section-select");
@@ -685,6 +670,8 @@ describe("AutoApplyController host lifecycle", () => {
     expect(addController).toHaveBeenCalledWith(controller);
   });
 
+  // No parent → exercises the ``anchor ?? host`` fallback dispatch;
+  // the anchored path production uses is pinned by the test below.
   it("announces section-mount / section-unmount with the host node", () => {
     const { host, controller } = setup();
     const mounts = captureEvents(host, "section-mount");
@@ -693,6 +680,21 @@ describe("AutoApplyController host lifecycle", () => {
     controller.hostDisconnected();
     expect(mounts.map((e) => e.detail.node)).toEqual([host]);
     expect(unmounts.map((e) => e.detail.node)).toEqual([host]);
+  });
+
+  it("the unmount announcement rides the mount-time parent past detachment", () => {
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
+    const { host, controller } = setup({}, shadow);
+    const unmounts: unknown[] = [];
+    outer.addEventListener("section-unmount", (e) =>
+      unmounts.push((e as CustomEvent<{ node: unknown }>).detail.node)
+    );
+    // Tear down like Lit does — after the host has left the tree.
+    host.parentNode = null;
+    controller.hostDisconnected();
+
+    expect(unmounts).toEqual([host]);
   });
 
   it("cancels the pending debounced upsert on host disconnect", async () => {
