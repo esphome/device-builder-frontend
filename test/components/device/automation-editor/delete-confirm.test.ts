@@ -149,6 +149,6 @@ describe.each(CASES)("$name delete confirm gate", ({ make, location, expectedNam
     await mountEditor(editor, api, location);
 
     const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog")!;
-    expect(dialog.getAttribute("message")).toMatch(new RegExp(`:${expectedName}$`));
+    expect(dialog.getAttribute("message")!.endsWith(`:${expectedName}`)).toBe(true);
   });
 });
