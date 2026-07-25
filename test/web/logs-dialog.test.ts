@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
