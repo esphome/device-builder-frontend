@@ -7,10 +7,10 @@ import type {
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { fireEvent } from "../../../util/fire-event.js";
-import type { SectionEditor } from "../section-editor.js";
-import { fireSectionEvent } from "../section-editor.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
+import type { SectionEditor } from "../section-editor.js";
+import { fireSectionEvent } from "../section-editor.js";
 import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 /** Debounce window between a value change and the auto-apply upsert.

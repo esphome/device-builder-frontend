@@ -28,7 +28,7 @@ export interface SectionEditor {
   reload(): void;
 }
 
-export interface SectionMountDetail {
+export interface SectionLifecycleDetail {
   node: SectionEditor;
 }
 
@@ -38,8 +38,8 @@ export interface SectionDirtyChangeDetail {
 
 /** The events every section editor dispatches for the device page. */
 export interface SectionEditorEventMap {
-  "section-mount": SectionMountDetail;
-  "section-unmount": SectionMountDetail;
+  "section-mount": SectionLifecycleDetail;
+  "section-unmount": SectionLifecycleDetail;
   "dirty-change": SectionDirtyChangeDetail;
 }
 
@@ -55,8 +55,8 @@ export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
 
 declare global {
   interface HTMLElementEventMap {
-    "section-mount": CustomEvent<SectionMountDetail>;
-    "section-unmount": CustomEvent<SectionMountDetail>;
-    "dirty-change": CustomEvent<SectionDirtyChangeDetail>;
+    "section-mount": CustomEvent<SectionEditorEventMap["section-mount"]>;
+    "section-unmount": CustomEvent<SectionEditorEventMap["section-unmount"]>;
+    "dirty-change": CustomEvent<SectionEditorEventMap["dirty-change"]>;
   }
 }
