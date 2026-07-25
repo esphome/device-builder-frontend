@@ -1,12 +1,5 @@
 import { consume } from "@lit/context";
-import {
-  mdiAlertCircle,
-  mdiDeleteSweep,
-  mdiDownload,
-  mdiPlay,
-  mdiRestart,
-  mdiStop,
-} from "@mdi/js";
+import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -42,7 +35,6 @@ import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
 
 registerMdiIcons({
-  "alert-circle": mdiAlertCircle,
   restart: mdiRestart,
   download: mdiDownload,
   "delete-sweep": mdiDeleteSweep,

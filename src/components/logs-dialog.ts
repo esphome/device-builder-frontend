@@ -1,6 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircle,
   mdiArrowCollapse,
   mdiArrowExpand,
   mdiArrowLeft,
@@ -68,7 +67,6 @@ import "./crash-report-dialog.js";
 import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
-  "alert-circle": mdiAlertCircle,
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
   "arrow-left": mdiArrowLeft,
