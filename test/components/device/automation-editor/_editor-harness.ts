@@ -67,10 +67,8 @@ export const slimAvailable = (): AvailableAutomations =>
     devices: [],
   }) as unknown as AvailableAutomations;
 
-/** API mock covering every verb the editors call at mount or on
- *  write; override per suite for behaviour under test. */
-export const makeEditorApi = (overrides: Record<string, unknown> = {}) => ({
-  getAvailableAutomations: vi.fn().mockResolvedValue(slimAvailable()),
+const editorApiDefaults = (available: AvailableAutomations) => ({
+  getAvailableAutomations: vi.fn().mockResolvedValue(available),
   getAutomationBodies: vi.fn().mockResolvedValue({}),
   parseDeviceAutomations: vi.fn().mockResolvedValue([]),
   upsertAutomation: vi.fn().mockResolvedValue({
@@ -80,10 +78,21 @@ export const makeEditorApi = (overrides: Record<string, unknown> = {}) => ({
     yaml_diff: { fromLine: 0, toLine: 0, replacement: "" },
   }),
   updateConfig: vi.fn().mockResolvedValue(undefined),
-  ...overrides,
 });
 
-export type EditorApiMock = ReturnType<typeof makeEditorApi>;
+export type EditorApiMock = ReturnType<typeof editorApiDefaults>;
+
+/** API mock covering every verb the editors call at mount or on
+ *  write. ``overrides`` is keyed to the real verbs so a typo is a
+ *  compile error instead of a vacuous pass; ``available`` is the
+ *  catalog the default load resolves. */
+export const makeEditorApi = (
+  overrides: Partial<EditorApiMock> = {},
+  available: AvailableAutomations = slimAvailable()
+): EditorApiMock => ({
+  ...editorApiDefaults(available),
+  ...overrides,
+});
 
 /** Slim catalog carrying one hydratable action — shared by the
  *  script / api-action hydration suites (#1286). */

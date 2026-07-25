@@ -13,7 +13,6 @@ import { slimAvailable } from "./_editor-harness.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
-  AvailableAutomations,
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";

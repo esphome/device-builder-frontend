@@ -76,9 +76,7 @@ describe.each(CASES)(
   "$name delete confirm gate",
   ({ make, location, available, expectedName }) => {
     it("clicking Delete opens the confirm dialog without deleting", async () => {
-      const api = makeEditorApi(
-        available ? { getAvailableAutomations: vi.fn().mockResolvedValue(available) } : {}
-      );
+      const api = makeEditorApi({}, available);
       const editor = make();
       await mountAndSettle(editor, api, location);
 
@@ -106,9 +104,7 @@ describe.each(CASES)(
     });
 
     it("names the delete target in the confirm message", async () => {
-      const api = makeEditorApi(
-        available ? { getAvailableAutomations: vi.fn().mockResolvedValue(available) } : {}
-      );
+      const api = makeEditorApi({}, available);
       const editor = make();
       (editor as any)._localize = (key: string, params?: Record<string, string>) =>
         params?.name ? `${key}:${params.name}` : key;
