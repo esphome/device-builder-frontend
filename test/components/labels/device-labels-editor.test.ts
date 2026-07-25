@@ -7,9 +7,18 @@
  * close (Escape / X / outside-click) actually dismisses. Saves fire on every
  * label toggle while the dialog stays open, so it deliberately does NOT bind
  * ?busy (that would dim/lock the dialog on each toggle).
+ *
+ * Also pins the optimistic-override lifecycle: the override is dropped
+ * when the save settles (failure, or success once the prop agrees) or
+ * by a same-device push while no save is pending, a newer click's
+ * override survives an older save's failure, and a device swap
+ * mid-save must not reset the pending counter.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // Stub esphome-label-form with the one method the editor calls on its @query
@@ -24,6 +33,8 @@ vi.mock("../../../src/components/labels/label-form.js", () => {
   return {};
 });
 
+import toast from "sonner-js";
+
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeDeviceLabelsEditor } from "../../../src/components/labels/device-labels-editor.js";
 
@@ -34,6 +45,19 @@ async function mount(): Promise<ESPHomeDeviceLabelsEditor> {
   await el.updateComplete;
   return el;
 }
+
+/** Effective label ids (optimistic override or prop). */
+const chipIds = (el: ESPHomeDeviceLabelsEditor): string[] =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (el as any)._currentLabelIds as string[];
+
+const withApi = (
+  el: ESPHomeDeviceLabelsEditor,
+  setDeviceLabels: (config: string, ids: string[]) => Promise<void>
+) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (el as any)._api = { setDeviceLabels };
+};
 
 const dialog = (el: ESPHomeDeviceLabelsEditor): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
@@ -92,5 +116,162 @@ describe("device-labels-editor open/close contract", () => {
     } as unknown as ConfiguredDevice;
     await el.updateComplete;
     expect(isOpen(el)).toBe(true);
+  });
+});
+
+describe("device-labels-editor optimistic override lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reverts the optimistic assignment when set_labels fails", async () => {
+    const el = await mount();
+    withApi(el, () => Promise.reject(new Error("nope")));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (el as any)._toggleAssignment("a", true);
+
+    expect(chipIds(el)).toEqual([]);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a newer click's optimistic state when an older save fails", async () => {
+    const el = await mount();
+    let rejectFirst!: (e: Error) => void;
+    let resolveSecond!: () => void;
+    let calls = 0;
+    withApi(el, () =>
+      ++calls === 1
+        ? new Promise<void>((_, reject) => {
+            rejectFirst = reject;
+          })
+        : new Promise<void>((resolve) => {
+            resolveSecond = resolve;
+          })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const first = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const second = (el as any)._toggleAssignment("b", true) as Promise<void>;
+    // Let the chained task start so the first save is actually in flight.
+    await new Promise((r) => setTimeout(r));
+
+    rejectFirst(new Error("nope"));
+    await first;
+    // The failed save must not clobber the newer click's override.
+    expect(chipIds(el)).toEqual(["a", "b"]);
+    // Let the queued second save reach the API before releasing it.
+    await new Promise((r) => setTimeout(r));
+    resolveSecond();
+    await second;
+  });
+
+  it("drops the override in the save's finally when the push landed first", async () => {
+    const el = await mount();
+    let resolveSave!: () => void;
+    withApi(
+      el,
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saving = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    // DEVICE_UPDATED for our own write, riding ahead of the command
+    // reply; _pendingSaves > 0 blocks willUpdate from clearing here.
+    el.device = {
+      configuration: "kitchen",
+      labels: ["a"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).not.toBeNull();
+
+    resolveSave();
+    await saving;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).toBeNull();
+    expect(chipIds(el)).toEqual(["a"]);
+  });
+
+  it("a same-device push after the save settles drops the override", async () => {
+    const el = await mount();
+    withApi(el, () => Promise.resolve());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (el as any)._toggleAssignment("a", true);
+    el.device = {
+      configuration: "kitchen",
+      labels: ["a"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+
+    expect(chipIds(el)).toEqual(["a"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).toBeNull();
+  });
+
+  it("a device swap mid-save leaves the pending counter consistent", async () => {
+    const el = await mount();
+    let resolveSave!: () => void;
+    withApi(
+      el,
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saving = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    el.device = {
+      configuration: "bedroom",
+      labels: [],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    resolveSave();
+    await saving;
+
+    // Counter drained back to 0, so the same-device exit still works;
+    // resetting _pendingSaves in the swap branch drives it negative
+    // and permanently disables this clear.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._optimisticLabels = ["x"];
+    el.device = {
+      configuration: "bedroom",
+      labels: ["y"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).toBeNull();
+  });
+
+  it("an unrelated same-device push mid-save does not revert the chips", async () => {
+    const el = await mount();
+    let resolveSave!: () => void;
+    withApi(
+      el,
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saving = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    // A DEVICE_UPDATED push for something else (state flip) lands while
+    // the save is still in flight, carrying the pre-save labels.
+    el.device = { configuration: "kitchen", labels: [] } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    expect(chipIds(el)).toEqual(["a"]);
+
+    resolveSave();
+    await saving;
+    // Save succeeded but the prop hasn't caught up — the override
+    // must survive until the push lands.
+    expect(chipIds(el)).toEqual(["a"]);
   });
 });
