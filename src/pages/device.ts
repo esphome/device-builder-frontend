@@ -68,6 +68,7 @@ import {
 import {
   findFieldLine,
   parseYamlTopLevelSections,
+  resolveCurrentSectionLine,
   sectionForCursor,
   sectionKeyOf,
   type YamlSection,
@@ -1341,7 +1342,15 @@ export class ESPHomePageDevice extends LitElement {
         if (prev) {
           this._sectionHistory = this._sectionHistory.slice(0, -1);
           this._selectedSection = prev.key;
-          this._selectedFromLine = prev.fromLine;
+          // History entries were recorded against an older buffer;
+          // re-resolve like the click paths (#1470). A vanished key
+          // leaves the line unset rather than pointing at whatever
+          // now sits on the stale line.
+          this._selectedFromLine = resolveCurrentSectionLine(
+            this._yaml,
+            prev.key,
+            prev.fromLine
+          );
         } else {
           this._selectedSection = null;
           this._selectedFromLine = undefined;
@@ -1597,8 +1606,21 @@ export class ESPHomePageDevice extends LitElement {
     // unmounted during it), so it can't point the old section's form
     // at a path meant for the new one.
     void this._guardSectionSwitch(() => {
+      // The awaited flush can rewrite the buffer (an upsert's diff
+      // shifts every section below it), making the snapshot's
+      // fromLine a pre-flush coordinate that _focusedSection and the
+      // URL would then mis-resolve (#1470). Re-resolve the intended
+      // section against the settled buffer — same key (automation or
+      // top-level), instance nearest the snapshot. A key with no
+      // instance left leaves the line unset: downstream resolution
+      // then falls back to the key instead of latching onto whatever
+      // unrelated section now starts at the stale line.
       this._selectedSection = sectionKey;
-      this._selectedFromLine = match.fromLine;
+      this._selectedFromLine = resolveCurrentSectionLine(
+        this._yaml,
+        sectionKey,
+        match.fromLine
+      );
       this._focusFieldPath = rel;
       this._focusYamlPath = e.detail.indexedPath;
       // The navigator selection follows the caret; a block highlight
@@ -1767,7 +1789,16 @@ export class ESPHomePageDevice extends LitElement {
         ];
       }
       this._selectedSection = sectionKey;
-      this._selectedFromLine = fromLine;
+      // The navigator captured fromLine against the click-time buffer;
+      // the awaited flush can shift every section below its upsert
+      // (#1470). Re-resolve against the settled buffer, same rule and
+      // same vanished-key handling as the cursor path. Emitters that
+      // send no fromLine keep an unset line (key-based resolution),
+      // as before.
+      this._selectedFromLine =
+        sectionKey !== null && fromLine !== undefined
+          ? resolveCurrentSectionLine(this._yaml, sectionKey, fromLine)
+          : undefined;
       // A navigator click carries no field intent — a stale cursor path
       // would scroll/flash a target in the newly mounted editor that the
       // user never pointed at.

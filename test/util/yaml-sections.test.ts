@@ -7,6 +7,7 @@ import {
   parseYamlAutomations,
   parseYamlTopLevelSections,
   resolveCurrentFromLine,
+  resolveCurrentSectionLine,
   sectionAtLine,
   sectionForCursor,
   sectionKeyOf,
@@ -1415,5 +1416,39 @@ describe("resolveCurrentFromLine", () => {
     expect(resolved).toBeUndefined();
     const values = parseYamlSectionValues(yaml, "ota.esphome", resolved);
     expect(values).toEqual({});
+  });
+});
+
+describe("resolveCurrentSectionLine", () => {
+  const yaml = [
+    "i2c:",
+    "  sda: 1",
+    "binary_sensor:",
+    "  - platform: gpio",
+    "    id: btn",
+    "    on_press:",
+    "      - logger.log: hi",
+    "sensor:",
+    "  - platform: aht10",
+    "  - platform: aht10",
+  ].join("\n");
+
+  it("resolves an automation key via the automations layer", () => {
+    expect(
+      resolveCurrentSectionLine(yaml, "automation:component_on:btn:on_press", 4)
+    ).toBe(6);
+  });
+
+  it("delegates non-automation keys to the top-level resolver", () => {
+    expect(resolveCurrentSectionLine(yaml, "i2c", 1)).toBe(1);
+  });
+
+  it("picks the same-key instance nearest the stale line", () => {
+    expect(resolveCurrentSectionLine(yaml, "sensor.aht10", 11)).toBe(10);
+  });
+
+  it("returns undefined when the key has no instance", () => {
+    expect(resolveCurrentSectionLine(yaml, "automation:script:gone", 3)).toBeUndefined();
+    expect(resolveCurrentSectionLine(yaml, "wifi", 3)).toBeUndefined();
   });
 });
