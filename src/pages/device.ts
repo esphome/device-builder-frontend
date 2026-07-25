@@ -330,6 +330,11 @@ export class ESPHomePageDevice extends LitElement {
    *  page and the section editor. */
   private _activeSection: SectionEditor | null = null;
 
+  /** Supersede token for the section-switch guard: a queued absolute
+   *  switch yields to any later one; composing actions (Back) always
+   *  land but still bump the token. */
+  private _switchSeq = 0;
+
   @state()
   private _sectionDirty = false;
 
@@ -1326,21 +1331,26 @@ export class ESPHomePageDevice extends LitElement {
    *  not this one. */
   private _onBack = () => {
     this._heldUnknownInstance = null;
-    this._guardSectionSwitch(() => {
-      const prev = this._sectionHistory.length
-        ? this._sectionHistory[this._sectionHistory.length - 1]
-        : null;
-      if (prev) {
-        this._sectionHistory = this._sectionHistory.slice(0, -1);
-        this._selectedSection = prev.key;
-        this._selectedFromLine = prev.fromLine;
-      } else {
-        this._selectedSection = null;
-        this._selectedFromLine = undefined;
-      }
-      this._setHighlight(null, false);
-      this._updateUrl();
-    });
+    // compose: each press pops one entry, so two presses inside one
+    // flush window must both land rather than the newest winning.
+    void this._guardSectionSwitch(
+      () => {
+        const prev = this._sectionHistory.length
+          ? this._sectionHistory[this._sectionHistory.length - 1]
+          : null;
+        if (prev) {
+          this._sectionHistory = this._sectionHistory.slice(0, -1);
+          this._selectedSection = prev.key;
+          this._selectedFromLine = prev.fromLine;
+        } else {
+          this._selectedSection = null;
+          this._selectedFromLine = undefined;
+        }
+        this._setHighlight(null, false);
+        this._updateUrl();
+      },
+      { compose: true }
+    );
   };
 
   /** Left-edge expand affordance. On mobile it opens the drawer; on
@@ -1555,6 +1565,12 @@ export class ESPHomePageDevice extends LitElement {
     ) {
       // Same section: update the field target directly for intra-section
       // moves (the switch below would early-return and freeze it).
+      // Also supersede any switch still queued behind the flush
+      // barrier — a caret that left and came home must not be yanked
+      // back out when the queued action fires. Safe against spurious
+      // cancellation: yaml-cursor-line only fires on selectionSet,
+      // which the flush's own draft sync never carries.
+      this._switchSeq++;
       this._focusFieldPath = rel;
       this._focusYamlPath = e.detail.indexedPath;
       return;
@@ -1577,9 +1593,10 @@ export class ESPHomePageDevice extends LitElement {
     }
     this._heldUnknownInstance = null;
     // Cross-section: set the field path only when the switch actually
-    // applies, so a guard veto (unsaved edits) can't point the old
-    // section's form at a path meant for the new one.
-    this._guardSectionSwitch(() => {
+    // applies (after the flush barrier, and not at all if the page
+    // unmounted during it), so it can't point the old section's form
+    // at a path meant for the new one.
+    void this._guardSectionSwitch(() => {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
       this._focusFieldPath = rel;
@@ -1721,10 +1738,18 @@ export class ESPHomePageDevice extends LitElement {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
     if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
+      // Also supersede any switch still queued behind the flush
+      // barrier — the displayed section is the pre-switch one for the
+      // whole window, so a click on it is the user's newest intent.
+      this._switchSeq++;
       this._drawerOpen = false;
       return;
     }
-    this._guardSectionSwitch(() => {
+    // Close the drawer before the guard's flush barrier: on mobile it
+    // is the only visual acknowledgement of the tap, and it is pure
+    // chrome — nothing about it depends on the flushed buffer.
+    this._drawerOpen = false;
+    void this._guardSectionSwitch(() => {
       // Back-stack bookkeeping: A → B pushes A so back returns to it.
       // Going back to no-section clears the trail — a later trip into
       // a section is a fresh navigation, not a continuation of the
@@ -1748,7 +1773,6 @@ export class ESPHomePageDevice extends LitElement {
       // user never pointed at.
       this._focusFieldPath = undefined;
       this._focusYamlPath = undefined;
-      this._drawerOpen = false;
       this._updateUrl();
     });
   }
@@ -1762,9 +1786,48 @@ export class ESPHomePageDevice extends LitElement {
    *  re-render in the form when they come back to this section.
    *  The leave-page guard (``_confirmLeave``) is the only thing
    *  that prompts about unsaved YAML, since *that's* the only
-   *  state that's actually at risk. */
-  private _guardSectionSwitch(action: () => void): void {
-    this._activeSection?.flushPending();
+   *  state that's actually at risk.
+   *
+   *  The flush is awaited before the switch: the automation
+   *  editors' flush is a backend upsert round trip, and swapping
+   *  the selection first can unmount the editor mid-flight — its
+   *  ``yaml-draft`` then fires from a detached element and never
+   *  reaches the page, silently dropping the last edit. The wait is
+   *  bounded by the WS command timeout (~10s worst case) and shows
+   *  no desktop busy affordance — a deliberate trade; repeat clicks
+   *  are harmless under the supersede token (#1478 tracks an
+   *  affordance). */
+  private async _guardSectionSwitch(
+    action: () => void,
+    opts: { compose?: boolean } = {}
+  ): Promise<void> {
+    // Only a returned promise defers the switch; the component
+    // editor's sync flush (and no active section) keeps the switch
+    // synchronous, so cursor-driven selection stays re-entrant safe.
+    // The automation editors' flushPending is async, so switching out
+    // of one always defers — idle or not.
+    const seq = ++this._switchSeq;
+    const pending = this._activeSection?.flushPending();
+    if (pending) {
+      // A failed flush already surfaced its own error; still switch —
+      // blocking navigation on it is strictly worse than a stale draft.
+      try {
+        await pending;
+      } catch {
+        // Handled by the editor.
+      }
+      // The page can unmount across the flush (a late action would
+      // replaceState on whatever URL the user has since landed on),
+      // and a later switch supersedes this one — the callers' dedupe
+      // reads pre-switch state for the whole window, so without the
+      // token a duplicate click double-pushes the back stack and a
+      // caret returning home still gets yanked away. Composing
+      // actions (Back's relative history pop) are never dropped —
+      // two Back presses must pop twice — but still take the token,
+      // so a pending absolute switch yields to them.
+      if (!this.isConnected) return;
+      if (!opts.compose && seq !== this._switchSeq) return;
+    }
     action();
   }
 
