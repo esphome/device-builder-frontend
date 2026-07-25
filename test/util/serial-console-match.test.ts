@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment happy-dom
+ */
 import { describe, expect, it } from "vitest";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import {
