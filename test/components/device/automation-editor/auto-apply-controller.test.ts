@@ -46,6 +46,10 @@ class Host extends EventTarget implements AutoApplyHost {
   addMode = false;
   value: AutomationTree | null = tree();
   location: AutomationLocation | null = SCRIPT;
+  // SectionEditor surface the real hosts delegate to the engine.
+  dirty = false;
+  flushPending(): void {}
+  reload(): void {}
   updates = 0;
   addController(_c: ReactiveController): void {}
   removeController(): void {}
