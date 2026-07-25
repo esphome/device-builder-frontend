@@ -29,16 +29,16 @@ export function renderActionsSection(opts: {
   disabled: boolean;
   localize: LocalizeFunc;
   focusTarget?: AutomationFocus | null;
-  descriptionKey?: string;
+  /** Required so each editor names its own copy — a fallback would
+   *  silently render the automation flavour under a script. */
+  descriptionKey: string;
   onActionsChange: (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => void;
 }) {
   return html`
     <div class="field">
       <label class="field-label"> ${opts.localize("device.automation_action")} </label>
       <p class="field-description">
-        ${renderMarkdown(
-          opts.localize(opts.descriptionKey ?? "device.automation_actions_description")
-        )}
+        ${renderMarkdown(opts.localize(opts.descriptionKey))}
       </p>
       <esphome-automation-action-list
         no-header

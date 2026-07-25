@@ -32,7 +32,6 @@ import memoizeOne from "memoize-one";
 
 import type {
   AutomationLocation,
-  AutomationTree,
   AutomationTrigger,
   AvailableComponentInstance,
   AvailableScript,
@@ -330,6 +329,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
+        descriptionKey: "device.automation_actions_description",
         onActionsChange: this._onActionsChange,
       })}
       ${this.renderFooter({

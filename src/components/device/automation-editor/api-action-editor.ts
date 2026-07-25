@@ -25,10 +25,7 @@ import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
 
-import type {
-  AutomationLocation,
-  AutomationTree,
-} from "../../../api/types/automations.js";
+import type { AutomationLocation } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
