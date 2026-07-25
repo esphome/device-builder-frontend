@@ -140,7 +140,7 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _layout: DeviceLayoutMode = "both";
 
-  private _tourLayout = new TourLayoutController(
+  _tourLayout = new TourLayoutController(
     this,
     () => this._layout,
     (layout: DeviceLayoutMode) => {

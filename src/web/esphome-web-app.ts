@@ -28,7 +28,7 @@ export class ESPHomeWebApp extends LitElement {
 
   @provide({ context: darkModeContext })
   @state()
-  private _darkMode = false;
+  _darkMode = false;
 
   @state() private _mode: WebMode = readMode();
 

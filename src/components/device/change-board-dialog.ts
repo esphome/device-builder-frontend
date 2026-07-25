@@ -78,7 +78,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   // The board list is always its own scroll box, so observe against it
   // directly — an explicit root also makes the prefetch margin apply to
   // the box the user actually scrolls, unlike the viewport-root form.
-  private readonly _intersection = new IntersectionController(
+  readonly _intersection = new IntersectionController(
     this,
     () => this._requestLoadMore(),
     { rootSelector: ".board-list" }

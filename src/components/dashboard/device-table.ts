@@ -105,7 +105,7 @@ const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
 
 @customElement("esphome-device-table")
 export class ESPHomeDeviceTable extends LitElement {
-  private _tourActivity = new TourActivityController(this);
+  _tourActivity = new TourActivityController(this);
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

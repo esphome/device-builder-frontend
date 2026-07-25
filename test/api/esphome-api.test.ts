@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
-import { JobType } from "../../src/api/types/firmware-jobs.js";
 import {
   MockWebSocket,
   installMockWebSocket,

@@ -101,7 +101,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     boardId: this.board?.id,
   }));
 
-  private readonly _reveal = new NavigatorRevealController(this, () => ({
+  readonly _reveal = new NavigatorRevealController(this, () => ({
     selectedLine: this._selectedLine,
     buckets: this._deriveBuckets(this.yaml),
     openSections: this.openSections,

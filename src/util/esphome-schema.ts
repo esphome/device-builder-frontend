@@ -165,8 +165,8 @@ async function findCvInCv(
  *  then each ``extends`` reference (recursively). */
 async function findCvInSchema(
   api: ESPHomeAPI,
-  bundleName: string,
-  componentKey: string,
+  _bundleName: string,
+  _componentKey: string,
   schema: SchemaSchema,
   key: string,
   visited: Set<string>
