@@ -411,7 +411,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           }
           <div class="card-actions-row" slot="actions">
             ${
-              this._flashDone && this._logPort
+              // Recovery affordance only: hidden while the dialog itself
+              // holds (and streams) the port.
+              this._flashDone && this._logPort && !this._logsOpen
                 ? html`<button
                     class="action-btn action-btn--ghost"
                     @click=${this._onViewLogs}
