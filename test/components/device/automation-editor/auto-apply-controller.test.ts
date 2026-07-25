@@ -376,6 +376,9 @@ describe("AutoApplyController delete", () => {
     const deleting = controller.delete();
     await vi.advanceTimersByTimeAsync(1);
     controller.scheduleAutoApply();
+    // The schedule guard refuses outright: no armed timer and no
+    // spurious dirty flip while the delete owns the section.
+    expect(controller.dirty).toBe(false);
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
 
     resolveDelete({ yaml_diff: DIFF });
