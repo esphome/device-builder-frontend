@@ -123,6 +123,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   @queryAll(".component-description--clamp[data-component-id]")
   private _clampedDescriptions!: NodeListOf<HTMLElement>;
 
+  /** Side-effect controller; the field only keeps the registration alive. */
   protected readonly _resize = new ResizeController(this, () =>
     this._measureDescriptionOverflow()
   );

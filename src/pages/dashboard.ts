@@ -185,6 +185,7 @@ registerMdiIcons({
 
 @customElement("esphome-page-dashboard")
 export class ESPHomePageDashboard extends LitElement {
+  /** Side-effect controller; the field only keeps the registration alive. */
   protected readonly _tourActivity = new TourActivityController(this);
 
   @consume({ context: localizeContext, subscribe: true })
