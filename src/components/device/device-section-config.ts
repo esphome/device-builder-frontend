@@ -22,7 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { fireEvent, fireFromAnchor } from "../../util/fire-event.js";
+import { fireEvent, prepareYamlWritten } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -447,9 +447,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
-    // Mount-time parent carries the dispatch if a section switch
-    // unmounts this element mid round trip (#1465).
-    const dispatchAnchor = this.parentNode;
+    const announceWritten = prepareYamlWritten(this);
     try {
       // Read the buffer and target exactly once: the backend computes
       // the diff's line coordinates against the string we send, and a
@@ -465,11 +463,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       );
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await this._api.updateConfig(configuration, newYaml);
-      fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
-        yaml: newYaml,
-        // Basis for the page's supersede check (#1476).
-        basedOn: yaml,
-      });
+      announceWritten(this.isConnected, newYaml, yaml);
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {

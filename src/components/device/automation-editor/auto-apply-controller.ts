@@ -6,7 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
+import { fireEvent, prepareYamlWritten } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
@@ -332,12 +332,7 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
-    // The parent stays mounted across section switches, so it can
-    // carry the ``yaml-updated`` when a different-kind switch swaps
-    // the element out mid round trip — a detached dispatch bubbles
-    // nowhere and the page's saved buffer would go stale against the
-    // disk write, resurrecting the section on the next global save.
-    const dispatchAnchor = this._host.parentNode;
+    const announceWritten = prepareYamlWritten(this._host);
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
@@ -369,11 +364,7 @@ export class AutoApplyController implements ReactiveController {
       // unmount case a draft the newly mounted section made in the
       // interim is overwritten by this dispatch. Narrow window, and
       // still net-positive versus resurrecting the deleted section.
-      fireFromAnchor(this._host, this._connected, dispatchAnchor, "yaml-updated", {
-        yaml: newYaml,
-        // Basis for the page's supersede check (#1476).
-        basedOn: yaml,
-      });
+      announceWritten(this._connected, newYaml, yaml);
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is
       // already on a sibling (yanking them to null would also unmount

@@ -1,5 +1,5 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
+import { fireEvent, prepareYamlWritten } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
@@ -116,14 +116,10 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
-  // The parent stays mounted across section switches, so it can carry
-  // the ``yaml-updated`` when a switch unmounts the editor mid round
-  // trip — a detached dispatch bubbles nowhere and the page's saved
-  // buffer would go stale against the disk write (#1465). The section
-  // key is snapshotted too: Lit reuses this element across same-kind
-  // switches, so a mid-round-trip retarget keeps it connected while
-  // the deleted section is no longer the one on screen.
-  const dispatchAnchor = host.parentNode;
+  const announceWritten = prepareYamlWritten(host);
+  // The section key is snapshotted: Lit reuses this element across
+  // same-kind switches, so a mid-round-trip retarget keeps it
+  // connected while the deleted section is no longer on screen.
   const deletedKey = host.sectionKey;
   try {
     const baseYaml = host.yaml;
@@ -134,11 +130,7 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    fireFromAnchor(host, host.isConnected, dispatchAnchor, "yaml-updated", {
-      yaml: newYaml,
-      // Basis for the page's supersede check (#1476).
-      basedOn: baseYaml,
-    });
+    announceWritten(host.isConnected, newYaml, baseYaml);
     // Navigate away only while the user is still here, on the
     // section that was deleted.
     if (host.isConnected && host.sectionKey === deletedKey) {
