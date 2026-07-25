@@ -157,7 +157,37 @@ describe("device-labels-editor optimistic override lifecycle", () => {
     await second;
   });
 
-  it("drops the override once the save resolves", async () => {
+  it("drops the override in the save's finally when the push landed first", async () => {
+    const el = await mount();
+    let resolveSave!: () => void;
+    withApi(
+      el,
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saving = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    // DEVICE_UPDATED for our own write, riding ahead of the command
+    // reply; _pendingSaves > 0 blocks willUpdate from clearing here.
+    el.device = {
+      configuration: "kitchen",
+      labels: ["a"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).not.toBeNull();
+
+    resolveSave();
+    await saving;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).toBeNull();
+    expect(chipIds(el)).toEqual(["a"]);
+  });
+
+  it("a same-device push after the save settles drops the override", async () => {
     const el = await mount();
     withApi(el, () => Promise.resolve());
 

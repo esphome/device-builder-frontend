@@ -18,10 +18,10 @@
  * round trips and ``labelsContext`` for the live catalog (so a
  * ``label_*`` event from another client updates the dialog without
  * a re-fetch). Per-device assignments are owned by the caller —
- * we receive ``device`` as a property and rely on the subsequent
- * ``DEVICE_UPDATED`` push (fired from the backend after
- * ``set_labels`` reloads the device) to reset our optimistic
- * override.
+ * we receive ``device`` as a property; the optimistic override is
+ * dropped by whichever comes first, the save settling with the
+ * prop in agreement (or having failed), or the next same-device
+ * ``DEVICE_UPDATED`` push while no save is pending.
  */
 import { consume } from "@lit/context";
 import { mdiCheck, mdiClose, mdiPencil, mdiTagMultiple } from "@mdi/js";
@@ -94,10 +94,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   /** Optimistic label assignment that overrides ``device.labels``
    *  while a save is in flight or queued. Lets the user toggle
    *  multiple chips quickly without each click computing ``next``
-   *  off a stale prop — the editor reads from this state until
-   *  the next ``DEVICE_UPDATED`` push hands the prop a list that
-   *  matches what we already wrote. ``null`` means "no pending
-   *  override; trust the prop". */
+   *  off a stale prop. Dropped by whichever comes first: the save
+   *  settling with the prop in agreement (or having failed), or
+   *  the next same-device push while no save is pending. ``null``
+   *  means "no pending override; trust the prop". */
   @state()
   private _optimisticLabels: string[] | null = null;
 
