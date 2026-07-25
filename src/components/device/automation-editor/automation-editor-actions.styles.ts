@@ -16,7 +16,7 @@ export const automationEditorActionStyles = css`
     width: 100%;
     appearance: none;
     border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
-    background: transparent;
+    background: var(--esphome-primary-light);
     color: var(--wa-color-text-quiet);
     padding: var(--wa-space-xs) var(--wa-space-m);
     border-radius: var(--wa-border-radius-m);
