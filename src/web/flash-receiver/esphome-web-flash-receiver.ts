@@ -363,7 +363,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
     if (gen !== this._bootLogsGen || this._logPort !== port) {
-      void port.close().catch(() => {});
+      // A failure here is a genuine leak — the freshly-opened handle has no
+      // other owner left to release it.
+      void port.close().catch((err) => {
+        console.error("[Web Serial] Failed to release the superseded reopen:", err);
+      });
       return;
     }
     this._logsOpen = true;

@@ -16,6 +16,7 @@ vi.mock("sonner-js", () => ({
 }));
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { startOtaStream } from "../../src/components/logs-dialog/session.js";
 import {
   hasSerialPort,
@@ -384,6 +385,11 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     el.open("OTA");
     el.abortSerialReconnect();
     expect(session(el).kind).toBe("ota");
+  });
+});
+describe("logs-dialog crash callout composition", () => {
+  it("composes the shared crash-callout styles", () => {
+    expect(ESPHomeLogsDialog.styles).toContain(crashCalloutStyles);
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

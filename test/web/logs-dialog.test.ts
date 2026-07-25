@@ -15,6 +15,7 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
+import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
@@ -415,5 +416,9 @@ describe("esphome-web-logs-dialog", () => {
     (el as any)._onAfterHide();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
+
+  it("composes the shared crash-callout styles", () => {
+    expect(ESPHomeWebLogsDialog.styles).toContain(crashCalloutStyles);
   });
 });

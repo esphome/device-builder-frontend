@@ -50,8 +50,4 @@ describe("renderCrashCallout", () => {
     ).not.toBeNull();
     expect(mount("live").querySelector(".crash-callout-button")).toBeNull();
   });
-
-  it("exports the container styles both dialogs compose", () => {
-    expect(crashCalloutStyles.cssText).toContain("display: flex");
-  });
 });
