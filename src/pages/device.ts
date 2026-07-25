@@ -1577,8 +1577,9 @@ export class ESPHomePageDevice extends LitElement {
     }
     this._heldUnknownInstance = null;
     // Cross-section: set the field path only when the switch actually
-    // applies, so a guard veto (unsaved edits) can't point the old
-    // section's form at a path meant for the new one.
+    // applies (after the flush barrier, and not at all if the page
+    // unmounted during it), so it can't point the old section's form
+    // at a path meant for the new one.
     void this._guardSectionSwitch(() => {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
