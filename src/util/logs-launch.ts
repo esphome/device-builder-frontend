@@ -8,8 +8,9 @@ import {
   attachSerialLogStream,
   openNetworkLogsFallback,
   reconnectWebSerialLogs,
-  requestAndOpenSerialPort,
+  requestSerialPort,
 } from "./post-install-logs.js";
+import { serialConsoleMismatchNotice } from "./serial-console-match.js";
 
 /** The host bits both logs entry points need, decoupled from any page class. */
 export interface LogsLaunchHost {
@@ -88,16 +89,35 @@ export async function launchLogsWithMethod(
     }
     let serialPort: SerialPort | null;
     try {
-      serialPort = await requestAndOpenSerialPort(baudRate);
+      serialPort = await requestSerialPort();
     } catch {
-      // The user picked a port but it couldn't open (claimed by another tab,
-      // driver error); unlike a picker dismissal this needs feedback.
+      // A real requestPort failure; unlike a picker dismissal this needs
+      // feedback.
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
       return;
     }
     if (!serialPort) return; // User dismissed the port picker.
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
+    // Decide on the unopened port (getInfo needs no open): a provably-silent
+    // port is never opened, so no DTR/RTS pulse reaches a bridge that wires
+    // them to reset lines.
+    const mismatch = serialConsoleMismatchNotice(
+      device.logger_interface,
+      serialPort,
+      host.localize
+    );
+    if (mismatch) {
+      openNetworkLogsFallback(host.logsDialog, host.localize, { message: mismatch });
+      return;
+    }
+    try {
+      await serialPort.open({ baudRate });
+    } catch {
+      // The port couldn't open (claimed by another tab, driver error).
+      notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
+      return;
+    }
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
     host.logsDialog.openPassive({

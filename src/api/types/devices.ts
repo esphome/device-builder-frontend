@@ -98,6 +98,10 @@ export interface ConfiguredDevice {
    *  unset (open at the 115200 default); `0` means UART logging is disabled;
    *  a positive value is the baud to open at. */
   logger_baud_rate: number | null;
+  /** Resolved `logger:` output interface (UART0 / USB_CDC / USB_SERIAL_JTAG
+   *  / ...). Compared against a Web Serial port's USB vendor to spot a
+   *  console the port can't carry; `null` means unknowable. */
+  logger_interface: string | null;
   current_version: string;
   loaded_integrations: string[];
   /**

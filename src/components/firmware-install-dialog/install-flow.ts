@@ -241,6 +241,7 @@ export function flipToLogs(
     webSerialPort,
     // Raw baud; the logs handler resolves it (0 ⇒ disabled, skip with a notice).
     loggerBaudRate: device.logger_baud_rate,
+    loggerInterface: device.logger_interface,
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;

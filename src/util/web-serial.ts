@@ -10,7 +10,7 @@ import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 import { markSerialActivity } from "./serial-reacquire.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
-const ESPRESSIF_USB_VID = 0x303a;
+export const ESPRESSIF_USB_VID = 0x303a;
 
 export interface DetectedChip {
   chipName: string;

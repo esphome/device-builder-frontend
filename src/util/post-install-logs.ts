@@ -4,6 +4,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import { serialConsoleMismatchNotice } from "./serial-console-match.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
@@ -11,16 +12,18 @@ import {
 } from "./web-serial.js";
 
 /**
- * Route a device whose serial console is provably silent (logger baud_rate 0)
- * to the network log stream, with a notice saying why (#1430).
+ * Route a device whose serial console is provably silent (logger baud_rate 0,
+ * or a port that can't carry the console) to the network log stream, with a
+ * notice saying why (#1430). The default message is the baud-0 one.
  */
 export function openNetworkLogsFallback(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  options: { onBackToInstall?: () => void } = {}
+  options: { onBackToInstall?: () => void; message?: string } = {}
 ): void {
-  notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
-  logsDialog.open(OTA_PORT, options);
+  const { message, ...openOptions } = options;
+  notifyInfo(message ?? localize("dashboard.logs_serial_disabled_fallback"));
+  logsDialog.open(OTA_PORT, openOptions);
 }
 
 /**
@@ -38,6 +41,23 @@ export function formatSerialPortLabel(port: SerialPort): string {
 }
 
 /**
+ * Prompt for a Web Serial port without opening it. Returns ``null`` if the
+ * user dismissed the picker; throws on a real requestPort failure. Callers
+ * that only need the USB identity can decide before ever opening (no DTR/RTS
+ * pulse on a port that won't be used).
+ */
+export async function requestSerialPort(): Promise<SerialPort | null> {
+  try {
+    return await navigator.serial.requestPort();
+  } catch (err) {
+    if (isPortPickerCancel(err)) {
+      return null; // User dismissed the port picker.
+    }
+    throw err; // A real requestPort failure — let the caller surface it.
+  }
+}
+
+/**
  * Prompt for a Web Serial port and open it at log baud. Returns the open port,
  * or ``null`` if the user dismissed the picker. Throws if a picked port can't
  * be opened (claimed by another tab, driver error) — the caller surfaces that.
@@ -45,15 +65,8 @@ export function formatSerialPortLabel(port: SerialPort): string {
 export async function requestAndOpenSerialPort(
   baudRate: number
 ): Promise<SerialPort | null> {
-  let port: SerialPort;
-  try {
-    port = await navigator.serial.requestPort();
-  } catch (err) {
-    if (isPortPickerCancel(err)) {
-      return null; // User dismissed the port picker.
-    }
-    throw err; // A real requestPort failure — let the caller surface it.
-  }
+  const port = await requestSerialPort();
+  if (!port) return null;
   await port.open({ baudRate });
   return port;
 }
@@ -111,6 +124,10 @@ export interface PostInstallShowLogsDetail {
   // The handler resolves it: null / absent ⇒ 115200 default, 0 ⇒ serial
   // logging disabled (skip with a notice).
   loggerBaudRate?: number | null;
+  // Resolved logger output interface (Device.logger_interface), only
+  // meaningful on the webSerialPort path: a port that can't carry it
+  // reroutes to network logs.
+  loggerInterface?: string | null;
   reopenInstall: () => void;
 }
 
@@ -217,14 +234,33 @@ export async function handlePostInstallShowLogs(
   localize: LocalizeFunc
 ) {
   e.preventDefault();
-  const { configuration, name, port, webSerialPort, loggerBaudRate, reopenInstall } =
-    e.detail;
+  const {
+    configuration,
+    name,
+    port,
+    webSerialPort,
+    loggerBaudRate,
+    loggerInterface,
+    reopenInstall,
+  } = e.detail;
   logsDialog.configuration = configuration;
   logsDialog.name = name;
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
       openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
+      return;
+    }
+    const mismatch = serialConsoleMismatchNotice(
+      loggerInterface,
+      webSerialPort,
+      localize
+    );
+    if (mismatch) {
+      openNetworkLogsFallback(logsDialog, localize, {
+        onBackToInstall: reopenInstall,
+        message: mismatch,
+      });
       return;
     }
     logsDialog.openPassive({

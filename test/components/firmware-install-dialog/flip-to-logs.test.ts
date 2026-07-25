@@ -8,7 +8,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { dispatchShowLogsAfterInstall } = vi.hoisted(() => ({
   dispatchShowLogsAfterInstall: vi.fn(
-    (_source: HTMLElement, _detail: { loggerBaudRate?: number | null }) => true
+    (
+      _source: HTMLElement,
+      _detail: { loggerBaudRate?: number | null; loggerInterface?: string | null }
+    ) => true
   ),
 }));
 vi.mock("../../../src/util/post-install-logs.js", () => ({
@@ -19,13 +22,17 @@ import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmw
 import { flipToLogs } from "../../../src/components/firmware-install-dialog/install-flow.js";
 import { identityLocalize } from "../../_dom.js";
 
-function makeHost(loggerBaudRate: number | null): ESPHomeFirmwareInstallDialog {
+function makeHost(
+  loggerBaudRate: number | null,
+  loggerInterface: string | null = null
+): ESPHomeFirmwareInstallDialog {
   return {
     _device: {
       configuration: "x.yaml",
       name: "x",
       friendly_name: "X",
       logger_baud_rate: loggerBaudRate,
+      logger_interface: loggerInterface,
     },
     _localize: identityLocalize,
     _open: true,
@@ -42,5 +49,11 @@ describe("flipToLogs", () => {
     flipToLogs(makeHost(baud), port);
     expect(dispatchShowLogsAfterInstall).toHaveBeenCalledTimes(1);
     expect(dispatchShowLogsAfterInstall.mock.calls[0][1].loggerBaudRate).toBe(baud);
+  });
+
+  it.each(["USB_SERIAL_JTAG", null])("forwards the logger interface %s", (iface) => {
+    flipToLogs(makeHost(115200, iface), port);
+    expect(dispatchShowLogsAfterInstall).toHaveBeenCalledTimes(1);
+    expect(dispatchShowLogsAfterInstall.mock.calls[0][1].loggerInterface).toBe(iface);
   });
 });

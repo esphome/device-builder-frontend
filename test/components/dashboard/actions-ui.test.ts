@@ -30,14 +30,14 @@ vi.mock("sonner-js", () => ({
   },
 }));
 
-const { requestAndOpenSerialPort } = vi.hoisted(() => ({
-  requestAndOpenSerialPort: vi.fn(),
+const { requestSerialPort } = vi.hoisted(() => ({
+  requestSerialPort: vi.fn(),
 }));
 vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
   // Keep the real openNetworkLogsFallback so the baud-0 reroute test can
   // assert its toast + dialog-open behavior through the real helper.
   ...(await importOriginal<object>()),
-  requestAndOpenSerialPort,
+  requestSerialPort,
   attachSerialLogStream: vi.fn(),
   reconnectWebSerialLogs: vi.fn(),
 }));
@@ -75,7 +75,8 @@ function renameEvent(newName: string): CustomEvent<string> {
 describe("openLogsWithMethod web-serial", () => {
   beforeEach(() => {
     toastError.mockClear();
-    requestAndOpenSerialPort.mockClear();
+    toastInfo.mockClear();
+    requestSerialPort.mockReset();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -102,7 +103,71 @@ describe("openLogsWithMethod web-serial", () => {
     expect(toastError).not.toHaveBeenCalled();
     expect(logsDialog.open).toHaveBeenCalledWith("OTA", {});
     expect(logsDialog.configuration).toBe("x.yaml");
-    expect(requestAndOpenSerialPort).not.toHaveBeenCalled();
+    expect(requestSerialPort).not.toHaveBeenCalled();
+  });
+
+  it("reroutes a mismatched port to network logs without ever opening it", async () => {
+    vi.stubGlobal("navigator", { serial: {} });
+    const open = vi.fn(async () => {});
+    requestSerialPort.mockResolvedValue({
+      getInfo: () => ({ usbVendorId: 0x1a86 }),
+      open,
+    });
+    const logsDialog = {
+      configuration: "",
+      name: "",
+      open: vi.fn(),
+      openPassive: vi.fn(),
+    };
+    const host = makeDashboardHost({ _logsDialog: logsDialog });
+    const device = {
+      configuration: "x.yaml",
+      name: "x",
+      friendly_name: "X",
+      logger_baud_rate: null,
+      logger_interface: "USB_SERIAL_JTAG",
+    } as ConfiguredDevice;
+
+    await openLogsWithMethod(host, device, "web-serial");
+
+    // Never opened: no DTR/RTS pulse reaches a provably-silent port.
+    expect(open).not.toHaveBeenCalled();
+    expect(toastInfo).toHaveBeenCalledWith(
+      expect.stringContaining("dashboard.logs_serial_wrong_port_fallback"),
+      expect.anything()
+    );
+    expect(logsDialog.open).toHaveBeenCalledWith("OTA", {});
+    expect(logsDialog.openPassive).not.toHaveBeenCalled();
+  });
+
+  it("opens a matching port and starts the serial session", async () => {
+    vi.stubGlobal("navigator", { serial: {} });
+    const open = vi.fn(async () => {});
+    requestSerialPort.mockResolvedValue({
+      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
+      open,
+    });
+    const logsDialog = {
+      configuration: "",
+      name: "",
+      open: vi.fn(),
+      openPassive: vi.fn(),
+    };
+    const host = makeDashboardHost({ _logsDialog: logsDialog });
+    const device = {
+      configuration: "x.yaml",
+      name: "x",
+      friendly_name: "X",
+      logger_baud_rate: null,
+      logger_interface: "USB_SERIAL_JTAG",
+    } as ConfiguredDevice;
+
+    await openLogsWithMethod(host, device, "web-serial");
+
+    expect(open).toHaveBeenCalledWith({ baudRate: 115200 });
+    expect(logsDialog.openPassive).toHaveBeenCalledTimes(1);
+    expect(logsDialog.open).not.toHaveBeenCalled();
+    expect(toastInfo).not.toHaveBeenCalled();
   });
 });
 
