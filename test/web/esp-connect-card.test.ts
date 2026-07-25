@@ -16,6 +16,7 @@ vi.mock("../../src/web/dashboard/esphome-web-esp-device-card.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import toast from "sonner-js";
 import { flush } from "../_dom.js";

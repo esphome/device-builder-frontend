@@ -11,6 +11,7 @@ vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebPicoDeviceCard } from "../../src/web/dashboard/esphome-web-pico-device-card.js";
 

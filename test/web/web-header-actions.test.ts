@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebHeaderActions } from "../../src/web/header/esphome-web-header-actions.js";
 import { identityLocalize } from "../_dom.js";
