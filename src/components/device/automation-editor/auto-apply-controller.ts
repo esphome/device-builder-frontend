@@ -53,6 +53,28 @@ export interface AutoApplyOptions {
   setError(message: string): void;
 }
 
+/** Apply pipeline phase. A queued re-run is only representable
+ *  while a call is in flight, so the flag pair that used to drift
+ *  apart (in-flight false with a stale queue bit, and vice versa)
+ *  is now one value. The debounce timer stays a separate handle:
+ *  typing during an in-flight round trip legitimately arms it
+ *  while applying, and teardown cancels it without touching the
+ *  in-flight call. */
+type ApplyPhase = { kind: "idle" } | { kind: "applying"; queued: boolean };
+
+/** A delete owning the section. Carrying the suppression record
+ *  inside the mode means it cannot exist without a delete and
+ *  cannot outlive the one that captured it. */
+interface DeleteMode {
+  /** An apply attempt was blocked while this delete owned the
+   *  section; a failed delete re-arms it so the edit isn't
+   *  silently dropped. */
+  suppressed: boolean;
+  /** Whose edit the suppression belongs to, so a mid-flush
+   *  retarget's sibling edit survives a successful delete. */
+  suppressedFor: AutomationLocation | null;
+}
+
 /**
  * Shared auto-apply / delete / dirty-tracking engine for the three
  * automation-section editors (automation, script, api-action).
@@ -83,21 +105,15 @@ export interface AutoApplyOptions {
  * the user instead of silently dropping.
  */
 export class AutoApplyController implements ReactiveController {
-  private _applyTimer: ReturnType<typeof setTimeout> | null = null;
-  private _applyInFlight = false;
-  private _applyDirty = false;
+  private _debounce: ReturnType<typeof setTimeout> | null = null;
+  private _apply: ApplyPhase = { kind: "idle" };
+  /** Non-null while a delete owns the section. */
+  private _delete: DeleteMode | null = null;
   private _lastSelfWrittenYaml: string | null = null;
   private _dirty = false;
-  private _deleting = false;
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
-  /** An apply was suppressed while a delete owned the section; a
-   *  failed delete re-arms it so the edit isn't silently dropped. */
-  private _applySuppressed = false;
-  /** Whose edit the suppression belongs to, so a mid-flush
-   *  retarget's sibling edit survives a successful delete. */
-  private _suppressedFor: AutomationLocation | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -118,7 +134,7 @@ export class AutoApplyController implements ReactiveController {
     this._connected = false;
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
-    this._clearTimer();
+    this._cancelDebounce();
     fireSectionEvent(this._host, "section-unmount", { node: this._host });
   }
 
@@ -130,13 +146,13 @@ export class AutoApplyController implements ReactiveController {
 
   /** Disables the host's form chrome while a delete is running. */
   get deleting(): boolean {
-    return this._deleting;
+    return this._delete !== null;
   }
 
   /** In-flight write guard — parents that re-fetch on reconnect
    *  consult this to skip clobbering an optimistic update. */
   get inFlightWrite(): boolean {
-    return this._deleting || this._applyInFlight;
+    return this._delete !== null || this._apply.kind === "applying";
   }
 
   /**
@@ -146,7 +162,9 @@ export class AutoApplyController implements ReactiveController {
    * back (avoid clobbering the user's just-applied edit).
    */
   shouldSkipReload(): boolean {
-    return this._applyInFlight || this._host.yaml === this._lastSelfWrittenYaml;
+    return (
+      this._apply.kind === "applying" || this._host.yaml === this._lastSelfWrittenYaml
+    );
   }
 
   /** Patch the host's ``value``, announce ``automation-change`` so
@@ -173,15 +191,15 @@ export class AutoApplyController implements ReactiveController {
   scheduleAutoApply(): void {
     if (this._host.addMode) return;
     if (this._options.isReadOnly()) return;
-    if (this._deleting) {
-      this._applySuppressed = true;
-      this._suppressedFor = this._host.location;
+    if (this._delete) {
+      this._delete.suppressed = true;
+      this._delete.suppressedFor = this._host.location;
       return;
     }
     this._setDirty(true);
-    if (this._applyTimer) clearTimeout(this._applyTimer);
-    this._applyTimer = setTimeout(() => {
-      this._applyTimer = null;
+    this._cancelDebounce();
+    this._debounce = setTimeout(() => {
+      this._debounce = null;
       void this.autoApply();
     }, AUTO_APPLY_DEBOUNCE_MS);
   }
@@ -192,12 +210,12 @@ export class AutoApplyController implements ReactiveController {
    * before its global save so the YAML buffer is fully caught up.
    */
   async flushPending(): Promise<void> {
-    if (this._applyTimer) {
-      this._clearTimer();
+    if (this._debounce) {
+      this._cancelDebounce();
       await this.autoApply();
-    } else if (this._applyInFlight) {
+    } else {
       // Wait for the in-flight call to settle.
-      while (this._applyInFlight) {
+      while (this._apply.kind === "applying") {
         await new Promise((r) => setTimeout(r, 20));
       }
     }
@@ -207,8 +225,8 @@ export class AutoApplyController implements ReactiveController {
    * Push the current ``value`` through ``automations/upsert``, apply
    * the returned diff to the page's YAML buffer, and dispatch
    * ``yaml-draft`` so the page picks it up. Only one upsert runs at
-   * a time; if a value-change lands while we're in flight, the dirty
-   * flag re-runs us on resolve so the latest value wins.
+   * a time; a value-change landing while we're in flight queues one
+   * re-run on resolve so the latest value wins.
    */
   async autoApply(): Promise<void> {
     const api = this._options.getApi();
@@ -223,20 +241,19 @@ export class AutoApplyController implements ReactiveController {
     }
     if (this._options.canApply && !this._options.canApply(location)) return;
     // A delete owns the section from here on; a racing apply (the
-    // in-flight dirty requeue, a stray flushPending) must not run.
-    if (this._deleting) {
-      this._applySuppressed = true;
+    // in-flight queued re-run, a stray flushPending) must not run.
+    if (this._delete) {
+      this._delete.suppressed = true;
       // The snapshot from the top of the call, so the suppression is
       // tied to the apply attempt being blocked.
-      this._suppressedFor = location;
+      this._delete.suppressedFor = location;
       return;
     }
-    if (this._applyInFlight) {
-      this._applyDirty = true;
+    if (this._apply.kind === "applying") {
+      this._apply.queued = true;
       return;
     }
-    this._applyInFlight = true;
-    this._applyDirty = false;
+    this._apply = { kind: "applying", queued: false };
     try {
       // Pass the host's YAML so the backend computes the diff against
       // the current draft buffer rather than the on-disk YAML —
@@ -265,11 +282,11 @@ export class AutoApplyController implements ReactiveController {
     } catch (err) {
       this._surfaceSaveError(err);
     } finally {
-      this._applyInFlight = false;
-      if (this._applyDirty) {
+      const queued = this._apply.kind === "applying" && this._apply.queued;
+      this._apply = { kind: "idle" };
+      if (queued) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
-        this._applyDirty = false;
         void this.autoApply();
       } else {
         // No further pending change — the page's YAML is now in sync
@@ -292,7 +309,7 @@ export class AutoApplyController implements ReactiveController {
    */
   async delete(): Promise<void> {
     const api = this._options.getApi();
-    if (!api || !this._host.location || this._deleting) return;
+    if (!api || !this._host.location || this._delete) return;
     // Snapshot the identity before any await: location is a reactive prop
     // the parent reassigns on navigation, and the element is reused across
     // sibling automations — a mid-flush section switch must not retarget
@@ -300,17 +317,18 @@ export class AutoApplyController implements ReactiveController {
     const location = this._host.location;
     const configuration = this._host.configuration;
     // Cancel any pending auto-apply — we're about to delete.
-    const hadPending = this._applyTimer !== null;
-    this._clearTimer();
-    this._setDeleting(true);
+    const hadPending = this._debounce !== null;
+    this._cancelDebounce();
+    const mode: DeleteMode = { suppressed: false, suppressedFor: null };
+    this._setDelete(mode);
     this._options.setError("");
     let failed = false;
     try {
       // Settle the in-flight upsert (the timer is already cancelled)
       // before computing the delete diff: its late ``yaml-draft``
       // would otherwise land after our ``yaml-updated`` and resurrect
-      // the deleted section (#1451). ``_deleting`` blocks the dirty
-      // requeue, so this terminates.
+      // the deleted section (#1451). The delete mode blocks the
+      // queued re-run, so this terminates.
       // ``flushPending`` must resolve on a MACROTASK: three nested
       // Lit update cycles carry the settling upsert's ``yaml-draft``
       // back down into ``.yaml``, and only the poll's setTimeout
@@ -352,37 +370,43 @@ export class AutoApplyController implements ReactiveController {
       failed = true;
       this._surfaceSaveError(err);
     } finally {
-      this._setDeleting(false);
-      const suppressed = this._applySuppressed;
-      const suppressedFor = this._suppressedFor;
-      this._applySuppressed = false;
-      this._suppressedFor = null;
-      if (failed) {
-        // The section survived — land the edit the delete window
-        // suppressed or cancelled instead of silently dropping it.
-        // Only while still on screen: re-arming a torn-down section
-        // would schedule a write for an editor that no longer exists.
-        if (this._connected && (suppressed || hadPending)) this.scheduleAutoApply();
-      } else if (
-        suppressed &&
-        suppressedFor &&
-        this._connected &&
-        this._host.location &&
-        sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location) &&
-        sectionKeyFromLocation(this._host.location) ===
-          sectionKeyFromLocation(suppressedFor)
-      ) {
-        // The suppressed edit belongs to a sibling the reused
-        // element was re-pointed at mid-flush, and the element still
-        // shows that sibling — so the re-armed timer writes exactly
-        // the suppressed edit (autoApply reads host state at fire
-        // time, not the snapshot). The editor stayed mounted (no
-        // section-select above), so the timer lands.
-        this.scheduleAutoApply();
-      } else {
-        // The deleted section's own edits die with it.
-        this._setDirty(false);
-      }
+      this._setDelete(null);
+      this._settleDelete(mode, { failed, hadPending, location });
+    }
+  }
+
+  /** Post-delete outcome routing: which edit, if any, survives. */
+  private _settleDelete(
+    mode: DeleteMode,
+    outcome: { failed: boolean; hadPending: boolean; location: AutomationLocation }
+  ): void {
+    const { suppressed, suppressedFor } = mode;
+    const { failed, hadPending, location } = outcome;
+    if (failed) {
+      // The section survived — land the edit the delete window
+      // suppressed or cancelled instead of silently dropping it.
+      // Only while still on screen: re-arming a torn-down section
+      // would schedule a write for an editor that no longer exists.
+      if (this._connected && (suppressed || hadPending)) this.scheduleAutoApply();
+    } else if (
+      suppressed &&
+      suppressedFor &&
+      this._connected &&
+      this._host.location &&
+      sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location) &&
+      sectionKeyFromLocation(this._host.location) ===
+        sectionKeyFromLocation(suppressedFor)
+    ) {
+      // The suppressed edit belongs to a sibling the reused
+      // element was re-pointed at mid-flush, and the element still
+      // shows that sibling — so the re-armed timer writes exactly
+      // the suppressed edit (autoApply reads host state at fire
+      // time, not the snapshot). The editor stayed mounted (no
+      // section-select above), so the timer lands.
+      this.scheduleAutoApply();
+    } else {
+      // The deleted section's own edits die with it.
+      this._setDirty(false);
     }
   }
 
@@ -398,10 +422,10 @@ export class AutoApplyController implements ReactiveController {
     });
   }
 
-  private _clearTimer(): void {
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
+  private _cancelDebounce(): void {
+    if (this._debounce) {
+      clearTimeout(this._debounce);
+      this._debounce = null;
     }
   }
 
@@ -412,8 +436,8 @@ export class AutoApplyController implements ReactiveController {
     fireSectionEvent(this._host, "dirty-change", { dirty: value });
   }
 
-  private _setDeleting(value: boolean): void {
-    this._deleting = value;
+  private _setDelete(mode: DeleteMode | null): void {
+    this._delete = mode;
     this._host.requestUpdate();
   }
 }
