@@ -40,6 +40,7 @@ import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 import { OverflowMenuElement } from "./overflow-menu-element.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
@@ -174,10 +175,10 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
       : this._localize("layout.search_shortcut");
     return html`
       <button
+        id="btn-kebab"
         type="button"
         class="menu-btn menu-kebab"
         @click=${this._toggle}
-        title=${kebabLabel}
         aria-label=${kebabLabel}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
@@ -187,6 +188,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
             : nothing
         }
       </button>
+      <wa-tooltip for="btn-kebab">${kebabLabel}</wa-tooltip>
       ${
         this._open
           ? html`
