@@ -204,6 +204,41 @@ describe("device-labels-editor optimistic override lifecycle", () => {
     expect((el as any)._optimisticLabels).toBeNull();
   });
 
+  it("a device swap mid-save leaves the pending counter consistent", async () => {
+    const el = await mount();
+    let resolveSave!: () => void;
+    withApi(
+      el,
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saving = (el as any)._toggleAssignment("a", true) as Promise<void>;
+    el.device = {
+      configuration: "bedroom",
+      labels: [],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    resolveSave();
+    await saving;
+
+    // Counter drained back to 0, so the same-device exit still works;
+    // resetting _pendingSaves in the swap branch drives it negative
+    // and permanently disables this clear.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._optimisticLabels = ["x"];
+    el.device = {
+      configuration: "bedroom",
+      labels: ["y"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._optimisticLabels).toBeNull();
+  });
+
   it("an unrelated same-device push mid-save does not revert the chips", async () => {
     const el = await mount();
     let resolveSave!: () => void;

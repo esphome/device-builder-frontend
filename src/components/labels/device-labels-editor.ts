@@ -46,6 +46,7 @@ import {
 import { labelChipStyleString } from "../../util/label-style.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { setsEqual } from "../../util/set-equal.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
 import { labelsListStyles } from "./labels-list-styles.js";
@@ -59,10 +60,6 @@ registerMdiIcons({
   pencil: mdiPencil,
   "tag-multiple": mdiTagMultiple,
 });
-
-/** Order-insensitive label-id set equality. */
-const sameIds = (a: string[], b: string[]): boolean =>
-  a.length === b.length && b.every((id) => a.includes(id));
 
 @customElement("esphome-device-labels-editor")
 export class ESPHomeDeviceLabelsEditor extends LitElement {
@@ -390,10 +387,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   };
 
   /** Re-emit a ``label_ids`` change as a serialized
-   *  ``set_labels`` round trip. We rely on the backend's
-   *  ``DEVICE_UPDATED`` push to refresh the chip row; the
-   *  optimistic-state fallback keeps the UI consistent in the
-   *  meantime. */
+   *  ``set_labels`` round trip. The ``DEVICE_UPDATED`` push
+   *  refreshes the chip row when it arrives; the save's finally
+   *  releases the optimistic override on failure, or on success
+   *  once the prop already agrees. */
   private async _persist(nextIds: string[]) {
     if (!this._api) return;
     const api = this._api;
@@ -416,7 +413,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         // the override when the DEVICE_UPDATED push lands, since
         // ``_pendingSaves`` is 0 by then. Never clobber a newer
         // click's override (identity check).
-        const propAgrees = sameIds(this.device.labels ?? [], nextIds);
+        const propAgrees = setsEqual(new Set(this.device.labels ?? []), new Set(nextIds));
         if (this._optimisticLabels === nextIds && (failed || propAgrees)) {
           this._optimisticLabels = null;
         }
