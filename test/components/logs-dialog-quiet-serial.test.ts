@@ -53,7 +53,9 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
     vi.advanceTimersByTime(5000);
     await el.updateComplete;
-    expect(banner(el)).not.toBeNull();
+    // Identity _localize in tests returns the key verbatim; the quiet branch
+    // gets the tentative no-output-yet copy.
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
   });
 
   it("stays hidden while serial lines keep arriving", async () => {
@@ -114,7 +116,9 @@ describe("logs-dialog quiet-serial banner", () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
     el.setSerialOpenFailed("reopen failed");
     await el.updateComplete;
-    expect(banner(el)).not.toBeNull();
+    // The dead branch is a failed/dismissed port, not a silent console — it
+    // gets the neutral serial-unavailable copy.
+    expect(banner(el)!.textContent).toContain("dashboard.logs_serial_unavailable");
   });
 
   it("never arms for an OTA session", async () => {

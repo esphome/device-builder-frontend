@@ -341,7 +341,11 @@ export class ESPHomeLogsDialog extends LitElement {
             offerOtaFallback
               ? renderActionSuggestion(
                   this._localize,
-                  "dashboard.logs_no_serial_output",
+                  // dead is a reopen failure / dismissed picker, not a silent
+                  // console — don't diagnose "no output" there.
+                  s.kind === "dead"
+                    ? "dashboard.logs_serial_unavailable"
+                    : "dashboard.logs_no_serial_output",
                   "{network_action}",
                   "dashboard.logs_switch_to_network",
                   () => switchToOtaLogs(this)
