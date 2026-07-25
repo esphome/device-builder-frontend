@@ -60,6 +60,10 @@ registerMdiIcons({
   "tag-multiple": mdiTagMultiple,
 });
 
+/** Order-insensitive label-id set equality. */
+const sameIds = (a: string[], b: string[]): boolean =>
+  a.length === b.length && b.every((id) => a.includes(id));
+
 @customElement("esphome-device-labels-editor")
 export class ESPHomeDeviceLabelsEditor extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -250,6 +254,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       // Drop any in-flight create snapshot so a late ``label-created``
       // arriving after the swap is ignored rather than misapplied.
       this._pendingCreateConfig = null;
+      // _pendingSaves is deliberately NOT reset: the orphaned task
+      // still runs its finally. Zeroing it here would drive the
+      // counter negative and permanently disable the same-device
+      // clear below.
     } else if (this._pendingSaves === 0) {
       // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
       // after our own ``set_labels`` — now carries the saved labels, so drop
@@ -392,18 +400,26 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     const config = this.device.configuration;
     this._pendingSaves++;
     const task = this._saveChain.then(async () => {
+      let failed = false;
       try {
         await api.setDeviceLabels(config, nextIds);
       } catch (err) {
+        failed = true;
         console.warn("set_labels failed", err);
         notifyError(this._localize("dashboard.labels_save_failed"));
       } finally {
         this._pendingSaves--;
-        // Success: the DEVICE_UPDATED push rode the socket ahead of
-        // this reply, so the prop is authoritative. Failure: the prop
-        // is the truth the write never changed. Either way drop the
-        // override, unless a newer click already owns it.
-        if (this._optimisticLabels === nextIds) this._optimisticLabels = null;
+        // Failure: the prop is the truth the write never changed —
+        // revert. Success: hand authority back only once the prop
+        // actually carries the saved labels (covers a no-op save the
+        // backend doesn't push for); otherwise ``willUpdate`` drops
+        // the override when the DEVICE_UPDATED push lands, since
+        // ``_pendingSaves`` is 0 by then. Never clobber a newer
+        // click's override (identity check).
+        const propAgrees = sameIds(this.device.labels ?? [], nextIds);
+        if (this._optimisticLabels === nextIds && (failed || propAgrees)) {
+          this._optimisticLabels = null;
+        }
       }
     });
     this._saveChain = task;

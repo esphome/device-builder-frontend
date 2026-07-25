@@ -10,6 +10,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // Stub esphome-label-form with the one method the editor calls on its @query
@@ -24,6 +27,8 @@ vi.mock("../../../src/components/labels/label-form.js", () => {
   return {};
 });
 
+import toast from "sonner-js";
+
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeDeviceLabelsEditor } from "../../../src/components/labels/device-labels-editor.js";
 
@@ -35,7 +40,7 @@ async function mount(): Promise<ESPHomeDeviceLabelsEditor> {
   return el;
 }
 
-/** Chip labels currently rendered, i.e. the effective assignment. */
+/** Effective label ids (optimistic override or prop). */
 const chipIds = (el: ESPHomeDeviceLabelsEditor): string[] =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._currentLabelIds as string[];
@@ -117,6 +122,7 @@ describe("device-labels-editor optimistic override lifecycle", () => {
     await (el as any)._toggleAssignment("a", true);
 
     expect(chipIds(el)).toEqual([]);
+    expect(toast.error).toHaveBeenCalled();
   });
 
   it("keeps a newer click's optimistic state when an older save fails", async () => {
