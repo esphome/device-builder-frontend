@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import "./_editor-harness.js";
-import { slimAvailable } from "./_editor-harness.js";
+import { mountEditor, slimAvailable } from "./_editor-harness.js";
 
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
@@ -56,14 +56,11 @@ describe("automation-editor uneditable (errored parse)", () => {
       upsertAutomation,
     } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    editor.configuration = "device.yaml";
-    editor.location = ON_BOOT;
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    await flushMicrotasks(8);
+    const editor = await mountEditor(new ESPHomeAutomationEditor(), api, {
+      configuration: "device.yaml",
+      location: ON_BOOT,
+      settle: 8,
+    });
 
     // The errored automation is flagged read-only; its empty tree was
     // not adopted, and the error surfaces in the rendered panel.
@@ -83,6 +80,8 @@ describe("automation-editor uneditable (errored parse)", () => {
       upsertAutomation,
     } as unknown as ESPHomeAPI;
 
+    // Inline mount: unlike the harness helper this seeds a non-null
+    // value and stops at updateComplete with no microtask flush.
     const editor = new ESPHomeAutomationEditor();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor as any)._api = api;
