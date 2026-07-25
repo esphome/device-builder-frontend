@@ -1,6 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircle,
   mdiArrowCollapse,
   mdiArrowExpand,
   mdiArrowLeft,
@@ -21,7 +20,7 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
-import { type CrashKind, classifyLine } from "../util/crash-detector.js";
+import { type CrashKind, classifyLine, latchCrashKind } from "../util/crash-detector.js";
 import { normalizeLogLine } from "../util/log-line.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
@@ -31,6 +30,11 @@ import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import { renderActionSuggestion } from "./process-terminal/reset-suggestion.js";
+import {
+  crashCalloutStyles,
+  renderCrashCallout,
+  repinTerminalForCallout,
+} from "./process-terminal/crash-callout.js";
 import {
   abortSerialReconnect,
   onStart,
@@ -68,7 +72,6 @@ import "./crash-report-dialog.js";
 import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
-  "alert-circle": mdiAlertCircle,
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
   "arrow-left": mdiArrowLeft,
@@ -191,6 +194,7 @@ export class ESPHomeLogsDialog extends LitElement {
     termButtonStyles,
     termSuggestionStyles,
     textStyles,
+    crashCalloutStyles,
     logsDialogStyles,
     // Full-screen on mobile, terminal fills it.
     fullscreenMobileDialog("esphome-base-dialog"),
@@ -314,29 +318,17 @@ export class ESPHomeLogsDialog extends LitElement {
                 </div>`
               : ""
           }
-          ${
-            this._crashKind !== null
-              ? html`<div class="crash-callout" slot="suggestion">
-                  <wa-icon library="mdi" name="alert-circle"></wa-icon>
-                  <!-- Live region on the text only: announcing the whole row
-                       would read the button as part of a status message. -->
-                  <span class="crash-callout-text" role="status"
-                    >${this._localize(
-                      this._crashKind === "previous-boot"
-                        ? "crash_report.banner_previous_boot"
-                        : "crash_report.banner"
-                    )}</span
-                  >
-                  <button
-                    type="button"
-                    class="term-btn crash-callout-button"
-                    @click=${this._openCrashReport}
-                  >
-                    ${this._localize("crash_report.report_button")}
-                  </button>
-                </div>`
-              : ""
-          }
+          ${renderCrashCallout(
+            this._localize,
+            this._crashKind,
+            html`<button
+              type="button"
+              class="term-btn crash-callout-button"
+              @click=${this._openCrashReport}
+            >
+              ${this._localize("crash_report.report_button")}
+            </button>`
+          )}
           ${
             offerOtaFallback
               ? renderActionSuggestion(
@@ -488,15 +480,12 @@ export class ESPHomeLogsDialog extends LitElement {
       const lineKind = classifyLine(normalized);
       if (lineKind === "live" || (lineKind && !kind)) kind = lineKind;
     }
-    if (this._crashKind !== "live" && kind && kind !== this._crashKind) {
+    const next = latchCrashKind(this._crashKind, kind);
+    if (next !== this._crashKind) {
       const firstDetection = this._crashKind === null;
-      this._crashKind = kind;
-      // The callout shrinks the log container; re-pin so the crash
-      // tail stays visible.
+      this._crashKind = next;
       if (firstDetection) {
-        void this.updateComplete
-          .then(() => this._terminal?.scrollToBottom())
-          .catch((err) => console.warn("crash callout re-pin scroll failed", err));
+        repinTerminalForCallout(this.updateComplete, () => this._terminal);
       }
     }
   }

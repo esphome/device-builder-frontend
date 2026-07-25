@@ -57,30 +57,9 @@ export const logsDialogStyles = css`
     display: none;
   }
 
-  /* Crash callout — slotted into the terminal's suggestion slot. Louder
-     than the muted reset-suggestion idiom on purpose: this is the primary
-     "report it" affordance, shown the moment a crash lands in the log. */
-  .crash-callout {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-s);
-    padding: 8px 20px;
-    border-top: 1px solid var(--term-border);
-    background: color-mix(in srgb, var(--esphome-error, #d32f2f) 14%, var(--term-bg));
-    color: var(--term-fg);
-    font-size: var(--wa-font-size-s);
-  }
-
-  .crash-callout wa-icon {
-    flex-shrink: 0;
-    color: var(--esphome-error, #d32f2f);
-  }
-
-  .crash-callout-text {
-    flex: 1;
-  }
-
-  /* Composes .term-btn (shape/typography from termButtonStyles); only the
+  /* Crash-callout container shape comes from the shared crashCalloutStyles
+     (process-terminal/crash-callout.ts); only the report button is local.
+     Composes .term-btn (shape/typography from termButtonStyles); only the
      primary-CTA colours are local. */
   .crash-callout-button {
     flex-shrink: 0;

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
@@ -14,7 +15,9 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
+import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -258,7 +261,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("renders a Clear label and toggles Stop ⇄ Start", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     // _start() flips _streaming inside updated(), which schedules a second
     // render — await both cycles before asserting on the toolbar.
@@ -285,7 +288,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("drops incoming lines while paused, keeps them while streaming", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
 
@@ -297,5 +300,125 @@ describe("esphome-web-logs-dialog", () => {
     (el as any)._onStop();
     hooks.onLine("paused line");
     expect((el as any)._pendingLines).not.toContain("paused line");
+  });
+
+  it("starts streaming when the port arrives after the dialog opened", async () => {
+    // The flash receiver's hand-off shape: dialog open while the rebooted
+    // device re-enumerates, port assigned once acquired.
+    const el = await mount();
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).not.toHaveBeenCalled();
+
+    el.port = makeWebSerialPort();
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("releases the streaming reader when open and port clear in one batch", async () => {
+    // The flash receiver's _runInstall teardown shape: both cleared in a
+    // single update. _stop must release via the cancel closure/_activePort,
+    // not this.port (already undefined by then).
+    const el = await mount();
+    const cancel = vi.fn();
+    vi.mocked(streamSerialLines).mockReturnValue(cancel);
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+
+    el.open = false;
+    el.port = undefined;
+    await el.updateComplete;
+    expect(cancel).toHaveBeenCalledOnce();
+    expect((el as any)._activePort).toBeUndefined();
+  });
+
+  it("ignores a port swap while a disconnect recovery is in flight", async () => {
+    const el = await mount();
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+
+    // The reconnect window: reader gone (_cancel cleared) but the active
+    // handle retained; a parent watcher swapping .port here must not wipe
+    // the rendered lines or race a second reader against the resume. The
+    // declined open foreign handle is released — nothing else ever would.
+    (el as any)._cancel = undefined;
+    const swapped = makeWebSerialPort();
+    el.port = swapped;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+    expect(swapped.close).toHaveBeenCalledOnce();
+
+    // The port-replaced round trip echoes the dialog's own handle — kept.
+    const own = (el as any)._activePort as SerialPort;
+    el.port = own;
+    await el.updateComplete;
+    expect(own.close).not.toHaveBeenCalled();
+  });
+
+  it("does not latch the crash banner for lines dropped while paused", async () => {
+    const el = await mount();
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    const hooks = calls[calls.length - 1][1];
+
+    (el as any)._onStop();
+    hooks.onLine("Guru Meditation Error: Core  1 panic'ed (LoadProhibited)");
+    await el.updateComplete;
+    // The banner must never claim a crash the terminal has no trace of.
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
+
+  it("latches the crash banner on a panic line, upgrading previous-boot to live", async () => {
+    const el = await mount();
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    const hooks = calls[calls.length - 1][1];
+
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+
+    hooks.onLine("*** CRASH DETECTED - report follows ***");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")?.textContent).toContain(
+      "crash_report.banner_previous_boot"
+    );
+
+    hooks.onLine("Guru Meditation Error: Core  1 panic'ed (LoadProhibited)");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")?.textContent?.trim()).toBe(
+      "crash_report.banner"
+    );
+
+    // Clear drops the banner with the lines.
+    (el as any)._clear();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
+
+  it("drops the crash banner on hide so a portless reopen starts clean", async () => {
+    const el = await mount();
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    calls[calls.length - 1][1].onLine("Guru Meditation Error: Core  1 panic'ed");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).not.toBeNull();
+
+    (el as any)._onAfterHide();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
+
+  it("composes the shared crash-callout styles", () => {
+    expect(ESPHomeWebLogsDialog.styles).toContain(crashCalloutStyles);
   });
 });

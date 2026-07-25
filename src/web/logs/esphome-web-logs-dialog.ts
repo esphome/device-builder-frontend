@@ -1,10 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import {
+  crashCalloutStyles,
+  renderCrashCallout,
+  repinTerminalForCallout,
+} from "../../components/process-terminal/crash-callout.js";
+import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import {
   fillTerminalOnMobile,
   termButtonStyles,
@@ -13,7 +19,13 @@ import {
 import { renderTermButton } from "../../components/process-terminal/toolbar-button.js";
 import { localizeContext } from "../../context/index.js";
 import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
+import {
+  type CrashKind,
+  classifyLine,
+  latchCrashKind,
+} from "../../util/crash-detector.js";
 import { downloadAnsiText } from "../../util/download-text.js";
+import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
@@ -119,6 +131,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // port (so Start resumes without a reopen/reset) but appends are dropped.
   @state() private _streaming = false;
   @state() private _paused = false;
+  // Latched once a crash marker flows through the stream; drives the callout
+  // for the rest of the session. A live panic upgrades a previous-boot report;
+  // nothing downgrades it (mirrors the builder's logs dialog).
+  @state() private _crashKind: CrashKind | null = null;
+
+  @query("esphome-process-terminal")
+  private _terminal?: ESPHomeProcessTerminal;
 
   private _cancel?: () => void;
   // Handle currently streamed. Starts as ``port`` and is replaced when a
@@ -137,13 +156,17 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _pendingLines: string[] = [];
   private _flushScheduled = 0;
 
+  // One (open, port) → streaming reconcile: the device cards open with the
+  // port already set, the flash receiver opens first and assigns the port
+  // once the rebooted device re-enumerates. _start's guards make the extra
+  // calls no-ops, including a port swapped mid-stream or mid-reconnect —
+  // the dialog owns its active handle and announces swaps via port-replaced.
   protected updated(changed: Map<string, unknown>): void {
-    if (changed.has("open")) {
-      if (this.open) {
-        this._start();
-      } else {
-        this._stop();
-      }
+    if (!changed.has("open") && !changed.has("port")) return;
+    if (this.open) {
+      this._start();
+    } else if (changed.has("open")) {
+      this._stop();
     }
   }
 
@@ -158,8 +181,27 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // the initial stream reads it as-is; reconnect reopens are this dialog's
   // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
-    if (!this.port?.readable || this._cancel) return;
+    if (!this.port?.readable) return; // no (open) port yet — legitimately quiet
+    // Streaming or mid-recovery — _activePort covers both by the _streamFrom
+    // invariant (streaming ⇒ _activePort set). A parent swapping .port in
+    // that window must not wipe the rendered lines or race a second reader
+    // against _resumeAfterDisconnect. Loud, not silent — a refused open
+    // handle would otherwise sit on "Waiting…" with nothing to show why.
+    if (this._activePort) {
+      // The port-replaced round trip echoes our own handle back — quiet. A
+      // genuinely foreign open handle (no known producer) is closed too:
+      // the dialog declines custody, so nothing else would ever release it.
+      if (this.port !== this._activePort) {
+        console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
+        // A failure here is a genuinely leaked open port — log it loudly.
+        void this.port.close().catch((err) => {
+          console.error("[Web Serial] Failed to release the declined port:", err);
+        });
+      }
+      return;
+    }
     this._resetLines();
+    this._crashKind = null;
     this._paused = false;
     this._streaming = true;
     this._silentReconnects = 0;
@@ -175,12 +217,29 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._cancel = streamSerialLines(port, {
       // Stop pauses only the display — the reader keeps draining the port so a
       // Start resumes without a reopen (which would DTR/RTS-reset the device).
+      // The paused gate also covers crash detection: the banner must never
+      // claim a crash the terminal (and a download) contains no trace of.
       onLine: (line) => {
         this._silentReconnects = 0;
-        if (!this._paused) this._enqueueLine(line);
+        if (this._paused) return;
+        this._observeCrash(line);
+        this._enqueueLine(line);
       },
       onDisconnect: (error) => this._onDisconnect(error),
     });
+  }
+
+  // Detection only — web.esphome.io has no backend to decode or report a
+  // crash, so the callout stays a banner (the builder's dialog adds those).
+  private _observeCrash(line: string): void {
+    if (this._crashKind === "live") return; // latched; skip the regex scan
+    const next = latchCrashKind(this._crashKind, classifyLine(normalizeLogLine(line)));
+    if (next === this._crashKind) return;
+    const firstDetection = this._crashKind === null;
+    this._crashKind = next;
+    if (firstDetection) {
+      repinTerminalForCallout(this.updateComplete, () => this._terminal);
+    }
   }
 
   // Stop → pause the display (reader stays alive). Start → resume. Start only
@@ -388,11 +447,16 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   private _clear(): void {
     this._resetLines();
+    this._crashKind = null;
   }
 
   private _onAfterHide(): void {
     this._stop();
     this._lines = [];
+    // A reopen that starts portless (the flash receiver's open-first shape)
+    // renders before _start clears state — don't let last session's crash
+    // banner sit over the fresh "Waiting…" terminal.
+    this._crashKind = null;
     this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true }));
   }
 
@@ -412,6 +476,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
           .streaming=${this._streaming}
           placeholder=${this._localize("web.logs.waiting")}
         >
+          ${renderCrashCallout(this._localize, this._crashKind)}
           <div class="toolbar-slot" slot="toolbar-right">
             ${
               this.isPico
@@ -491,6 +556,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
         align-items: center;
       }
     `,
+    crashCalloutStyles,
   ];
 }
 

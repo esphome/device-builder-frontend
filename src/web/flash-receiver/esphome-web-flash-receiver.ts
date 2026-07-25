@@ -2,15 +2,18 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 
+import toast from "sonner-js";
+
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
+import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import "../dashboard/esphome-web-card.js";
 import { runFlash } from "../install/run-flash.js";
+import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
 import type { FlashPart } from "../util/esphome-web-firmware.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
 import { validateEspImage } from "./image-magic.js";
@@ -19,6 +22,7 @@ import type { FirmwareMessage, FlashState } from "./protocol.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
+import "../logs/esphome-web-logs-dialog.js";
 
 const MAX_LOG_LINES = 10000;
 const LOG_BAUD_RATE = 115200;
@@ -49,17 +53,21 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   @state() private _deviceName?: string;
   @state() private _busy = false;
   @state() private _flashDone = false;
-  @state() private _streaming = false;
+  @state() private _logsOpen = false;
+  // Live handle for the rebooted device's boot logs. Streamed (and closed)
+  // by the logs dialog; kept here so the Logs button can reopen it later.
+  @state() private _logPort?: SerialPort;
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
   @state() private _hasFile = false;
 
   private _handshake?: FlashHandshake;
   private _hasOpener = false;
-  private _stopLogs = false;
-  private _logCancel?: () => void;
+  // Supersedes a pending boot-log acquisition (a second manual flash during
+  // the re-enumeration wait, or an unmount mid-await).
+  private _bootLogsGen = 0;
   // Batched log buffer flushed on the next animation frame (mirrors the logs
-  // dialog): a boot-log flood would otherwise trigger a Lit render per line.
+  // dialog): an esptool output flood would otherwise trigger a render per line.
   private _pendingLog: string[] = [];
   private _flushScheduled = 0;
 
@@ -85,7 +93,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._handshake?.stop();
-    this._logCancel?.();
+    this._bootLogsGen++;
+    // A parked (or handed-over-but-not-yet-streamed) handle has no dialog
+    // left to release it; a closed or dialog-owned one rejects harmlessly.
+    void this._logPort?.close().catch(() => {});
     if (this._flushScheduled) cancelAnimationFrame(this._flushScheduled);
   }
 
@@ -162,15 +173,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   private async _onPrimary(): Promise<void> {
-    if (this._streaming) {
-      // Stop the live logs; the read loop's cancel closes the port.
-      this._stopLogs = true;
-      this._logCancel?.();
-      this._logCancel = undefined;
-      this._streaming = false;
-      this._flushLog(); // surface any buffered tail before we stop
-      return;
-    }
     if (this._flashDone) {
       window.close();
       return;
@@ -200,8 +202,14 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     this._busy = true;
     this._flashDone = false;
-    this._stopLogs = false;
     this._progress = null;
+    // End any prior flash's log session outright: the generation bump only
+    // supersedes a still-pending acquisition; closing the dialog releases a
+    // streaming one (after-hide → _stop), and the stale handle must not
+    // back the Logs button across installs.
+    this._bootLogsGen++;
+    this._logsOpen = false;
+    this._logPort = undefined;
     this._resetLog();
 
     let port: SerialPort;
@@ -263,35 +271,43 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         ? this._localize("web.flash.done_opener")
         : this._localize("web.flash.done")
     );
-    // runFlash already reset + disconnected the device; stream its boot logs.
-    await this._streamLogs(port, before);
+    // runFlash already reset + disconnected the device; show its boot logs in
+    // the shared logs dialog (reset / download / stop-start / reconnect).
+    await this._openBootLogs(port, before);
   }
 
-  private async _streamLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
-    this._streaming = true;
+  /**
+   * Open the logs dialog on the rebooted device. The dialog opens immediately
+   * (its "Waiting…" placeholder covers the re-enumeration window) while
+   * ``openLiveLogPort`` acquires and opens the live handle — its 8k buffer
+   * holds the earliest boot bytes until the dialog's reader attaches, so
+   * nothing is lost and the port is never reopened. Closing the dialog
+   * mid-wait does NOT abort the acquisition — the handle still lands in
+   * ``_logPort`` for the Logs button, so an early Escape and a late one
+   * end the same way. Only a newer install or an unmount supersedes it,
+   * via the generation counter.
+   */
+  private async _openBootLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
+    const gen = ++this._bootLogsGen;
+    this._logsOpen = true;
     const { port, error } = await openLiveLogPort(
       oldPort,
       before,
       LOG_BAUD_RATE,
       LOG_REOPEN_TIMEOUT_MS,
-      () => this._stopLogs
+      () => gen !== this._bootLogsGen
     );
-    if (this._stopLogs || !port?.readable) {
-      if (port) {
-        try {
-          await port.close();
-        } catch {
-          // already closed
-        }
-      }
-      if (!this._stopLogs) {
-        this._enqueueLog(
+    if (!port) {
+      if (gen === this._bootLogsGen) {
+        // Announced even after the user closed the dialog: the alternative
+        // is a silent dead end with no Logs button and no explanation.
+        this._logsOpen = false;
+        toast.error(
           this._localize("web.flash.logs_unavailable", {
             error: error ?? this._localize("web.flash.no_reenumerate"),
           })
         );
       }
-      this._streaming = false;
       return;
     }
     // Clear DTR/RTS so holding the port open doesn't reset the chip.
@@ -300,35 +316,61 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     } catch {
       // tolerate; the chip may already be fine
     }
-    // Stop may have been pressed during the await above; its _logCancel?.() was
-    // a no-op because we hadn't attached the reader yet. Re-check before locking
-    // the port, or the stream would run on after the UI already said stopped.
-    if (this._stopLogs) {
+    // The stream can die during the await above (device yanked mid-hand-off);
+    // a dead handle behind the dialog's "Waiting…" would never resolve.
+    // Same contract as the !port branch: announced and parked regardless of
+    // the dialog being open — openPortForLogs can often reopen a UA-closed
+    // handle, so the Logs button stays a one-click recovery.
+    if (!port.readable) {
       try {
         await port.close();
       } catch {
         // already closed
       }
-      this._streaming = false;
+      if (gen === this._bootLogsGen) {
+        this._logsOpen = false;
+        toast.error(
+          this._localize("web.flash.logs_unavailable", {
+            error: this._localize("web.logs.terminal_disconnected"),
+          })
+        );
+        this._logPort = port;
+      }
       return;
     }
-    this._logCancel = streamSerialLines(port, {
-      onLine: (line) => this._enqueueLog(line),
-      onDisconnect: (error) => this._onLogDisconnect(error),
-    });
+    // Close the handle unless the open dialog is about to stream it (a
+    // dialog closed mid-hand-off gets it back closed, so an accidental
+    // Escape is a one-click recovery via the Logs button); park it unless
+    // a newer install or an unmount superseded this acquisition.
+    if (gen !== this._bootLogsGen || !this._logsOpen) {
+      try {
+        await port.close();
+      } catch {
+        // already closed
+      }
+    }
+    if (gen === this._bootLogsGen) this._logPort = port;
   }
 
-  // The device dropped the log stream on its own (unplugged / reset). Surface a
-  // "Terminal disconnected" line and drop the streaming state so the UI doesn't
-  // look stuck on "Stop logs" forever.
-  private _onLogDisconnect(error?: unknown): void {
-    this._enqueueLog("");
-    this._enqueueLog("");
-    const base = this._localize("web.logs.terminal_disconnected");
-    this._enqueueLog(error ? `${base}: ${String(error)}` : base);
-    this._flushLog();
-    this._logCancel = undefined;
-    this._streaming = false;
+  // Reopen the boot-log dialog after the user closed it (the dialog closed
+  // the port on hide; reopen it in the click gesture like the device cards).
+  private async _onViewLogs(): Promise<void> {
+    const port = this._logPort;
+    if (!port) return;
+    const gen = this._bootLogsGen;
+    if (!(await openPortForLogs(port, this._localize))) return;
+    // A flash started (or the receiver unmounted) during the reopen: the
+    // dialog must not cover the new install, and the handle just opened
+    // would otherwise be orphaned open for the tab's lifetime.
+    if (gen !== this._bootLogsGen || this._logPort !== port) {
+      // A failure here is a genuine leak — the freshly-opened handle has no
+      // other owner left to release it.
+      void port.close().catch((err) => {
+        console.error("[Web Serial] Failed to release the superseded reopen:", err);
+      });
+      return;
+    }
+    this._logsOpen = true;
   }
 
   // Clear a stale bar/state so a fresh attempt starts clean (cancel path).
@@ -341,7 +383,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   private get _primaryLabel(): string {
-    if (this._streaming) return this._localize("web.flash.stop_logs");
     if (this._flashDone) {
       return this._hasOpener
         ? this._localize("web.flash.close_tab")
@@ -351,7 +392,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   private get _primaryDisabled(): boolean {
-    if (this._streaming) return false;
     if (this._flashDone) return !this._hasOpener;
     if (this._busy) return true;
     return !this._firmware && !this._hasFile;
@@ -364,7 +404,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   protected render() {
-    const running = this._busy || this._streaming;
     return html`
       <div class="wrap">
         <esphome-web-card status=${this._localize("web.flash.status")} variant="neutral">
@@ -375,9 +414,16 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           ${
             this._state !== "idle"
               ? html`<div class="status status--${this._state}">
-                  ${running ? html`<wa-spinner></wa-spinner>` : nothing}
+                  ${this._busy ? html`<wa-spinner></wa-spinner>` : nothing}
                   <span>${this._statusMessage}</span>
                 </div>`
+              : nothing
+          }
+          ${
+            this._busy
+              ? html`<p class="warning-banner">
+                  ${this._localize("firmware.flashing_keep_visible")}
+                </p>`
               : nothing
           }
           ${
@@ -400,6 +446,19 @@ export class ESPHomeWebFlashReceiver extends LitElement {
                 </label>`
           }
           <div class="card-actions-row" slot="actions">
+            ${
+              // Recovery affordance only: hidden while the dialog itself
+              // holds (and streams) the port. _logPort implies a completed
+              // flash — _runInstall clears it on every fresh attempt.
+              this._logPort && !this._logsOpen
+                ? html`<button
+                    class="action-btn action-btn--ghost"
+                    @click=${this._onViewLogs}
+                  >
+                    ${this._localize("dashboard.logs")}
+                  </button>`
+                : nothing
+            }
             <button
               class="action-btn action-btn--primary"
               ?disabled=${this._primaryDisabled}
@@ -410,6 +469,17 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           </div>
         </esphome-web-card>
       </div>
+      <esphome-web-logs-dialog
+        .port=${this._logPort}
+        ?open=${this._logsOpen}
+        .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
+        @port-replaced=${(e: CustomEvent<SerialPort>) => {
+          this._logPort = e.detail;
+        }}
+        @after-hide=${() => {
+          this._logsOpen = false;
+        }}
+      ></esphome-web-logs-dialog>
     `;
   }
 
@@ -417,6 +487,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     espHomeStyles,
     actionBtnStyles,
     cardActionsRowStyles,
+    warningBannerStyles,
     css`
       .wrap {
         width: 90%;
@@ -426,6 +497,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       .hint {
         margin: 0 0 var(--wa-space-s);
         color: var(--wa-color-text-quiet);
+      }
+      .warning-banner {
+        margin: 0 0 var(--wa-space-s);
       }
       .status {
         display: flex;

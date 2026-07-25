@@ -1745,8 +1745,8 @@
       "firmware_ready": "Firmware received. Press Connect & install.",
       "firmware_ready_named": "Firmware received: {name}. Press Connect & install.",
       "erasing": "Erasing device…",
-      "done": "Installed and rebooting. Live logs below; press Stop logs when finished.",
-      "done_opener": "Installed and rebooting. Live logs below; close this tab when finished.",
+      "done": "Installed and rebooting.",
+      "done_opener": "Installed and rebooting. Close this tab when finished.",
       "malformed": "Received a malformed firmware payload.",
       "handoff_timeout": "The dashboard didn't send the firmware in time. Return to your ESPHome Device Builder and try again, or pick a factory .bin below.",
       "tab_title": "Flashing {name} — ESPHome Web",
@@ -1754,11 +1754,10 @@
       "no_port": "No serial port selected.",
       "choose_file": "Choose a factory .bin file first.",
       "connect_install": "Connect & install",
-      "stop_logs": "Stop logs",
       "close_tab": "Close this tab",
       "log_placeholder": "Waiting…",
       "manual": "No firmware received? Flash a factory .bin manually:",
-      "logs_unavailable": "[serial logs unavailable: {error}]",
+      "logs_unavailable": "Serial logs unavailable: {error}",
       "no_reenumerate": "the device did not re-enumerate in time"
     },
     "no_port": {

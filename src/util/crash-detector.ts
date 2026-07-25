@@ -75,3 +75,11 @@ export function classifyLine(normalized: string): CrashKind | null {
   }
   return kind;
 }
+
+/** Session latch: "live" is terminal, previous-boot upgrades to live, nothing downgrades. */
+export function latchCrashKind(
+  current: CrashKind | null,
+  next: CrashKind | null
+): CrashKind | null {
+  return current === "live" || next === null ? current : next;
+}
