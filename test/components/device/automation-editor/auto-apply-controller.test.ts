@@ -46,6 +46,8 @@ class Host extends EventTarget implements AutoApplyHost {
   addMode = false;
   value: AutomationTree | null = tree();
   location: AutomationLocation | null = SCRIPT;
+  isConnected = true;
+  parentNode: ParentNode | null = null;
   // SectionEditor surface the real hosts delegate to the engine.
   dirty = false;
   flushPending(): void {}
@@ -472,6 +474,37 @@ describe("AutoApplyController delete", () => {
     );
     // The user is on the sibling; the delete must not navigate away
     // (that unmount would cancel the re-armed edit).
+    expect(selections).toHaveLength(0);
+  });
+
+  it("a mid-delete unmount still lands yaml-updated through the mount-time parent", async () => {
+    const { host, controller, deleteAutomation } = setup();
+    const parent = document.createElement("div");
+    const updates: string[] = [];
+    parent.addEventListener("yaml-updated", (e) =>
+      updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
+    );
+    host.parentNode = parent;
+    const selections = captureEvents(host, "section-select");
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // A different-kind section switch swaps the element out of the
+    // tree while the delete round trip is outstanding.
+    host.isConnected = false;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+
+    // The disk write still reaches the page's buffer via the parent…
+    expect(updates).toEqual(["replaced\nline2"]);
+    // …and no navigation fires at a user who already left.
     expect(selections).toHaveLength(0);
   });
 

@@ -116,6 +116,11 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
+  // The parent stays mounted across section switches, so it can carry
+  // the ``yaml-updated`` when a switch unmounts the editor mid round
+  // trip — a detached dispatch bubbles nowhere and the page's saved
+  // buffer would go stale against the disk write (#1465).
+  const dispatchAnchor = host.parentNode;
   try {
     const newYaml = removeSectionFromYaml(host.yaml, host.sectionKey, fromLine);
     if (newYaml === host.yaml) {
@@ -124,8 +129,11 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    fireEvent(host, "yaml-updated", { yaml: newYaml });
-    fireEvent(host, "section-select", { sectionKey: null });
+    fireEvent(host.isConnected ? host : (dispatchAnchor ?? host), "yaml-updated", {
+      yaml: newYaml,
+    });
+    // Navigating away only applies while the user is still here.
+    if (host.isConnected) fireEvent(host, "section-select", { sectionKey: null });
     notifySuccess(host._localize("device.section_deleted", { name: title }));
   } catch (e) {
     host._error = formatApiError(e, host._localize, "device.section_delete_error");
