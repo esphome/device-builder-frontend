@@ -1,8 +1,13 @@
 /**
  * Shared scaffolding for the automation-editor suites. Import this
- * module BEFORE any editor import — the ``vi.mock`` registrations
- * are import-order dependent (same pattern as
- * ``test/pages/_mock-dashboard-children.ts``). Carries the union of
+ * module with a bare side-effect import BEFORE any editor import —
+ * the ``vi.mock`` registrations are import-order dependent (same
+ * pattern as ``test/pages/_mock-dashboard-children.ts``), and the
+ * pinned organize-imports plugin alphabetizes *named* imports below
+ * the ``../../../../src`` editor specifiers while leaving
+ * side-effect imports in place. The suites' separate named import
+ * for the helpers is therefore deliberate, not redundant.
+ * Carries the union of
  * the heavy-children no-op mocks every mount suite needs, the slim
  * catalog factory, a parameterizable API mock, and the mount
  * helper. Suite-specific fixtures stay in their suites.
@@ -58,14 +63,13 @@ export const seedTree = (): AutomationTree => ({
   actions: [],
 });
 
-export const slimAvailable = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
+export const slimAvailable = (): AvailableAutomations => ({
+  triggers: [],
+  actions: [],
+  conditions: [],
+  scripts: [],
+  devices: [],
+});
 
 const editorApiDefaults = (available: AvailableAutomations) => ({
   getAvailableAutomations: vi.fn().mockResolvedValue(available),
