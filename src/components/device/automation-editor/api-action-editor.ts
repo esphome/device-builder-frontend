@@ -257,7 +257,9 @@ export class ESPHomeApiActionEditor extends LitElement {
         this.location && this.value && !this.addMode
           ? renderDeleteRow({
               label: this._localize("device.delete_api_action"),
-              message: this._localize("device.confirm_delete_api_action"),
+              message: this._localize("device.confirm_delete_api_action", {
+                name: this.location.action_name,
+              }),
               disabled,
               onConfirm: this._onDelete,
             })

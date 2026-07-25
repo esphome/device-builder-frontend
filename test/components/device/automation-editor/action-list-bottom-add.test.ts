@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  *
  * The action list's Add button renders below the rows — the append
- * loop never scrolls back up (#1436) — and the editor no longer
- * mounts a header-positioned add button.
+ * loop never scrolls back up (#1436) — and is enabled whenever the
+ * catalog has entries.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,20 +17,27 @@ vi.mock(
 );
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import type { ActionNode } from "../../../../src/api/types/automations.js";
+import type {
+  ActionNode,
+  AutomationAction,
+} from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationActionList } from "../../../../src/components/device/automation-editor/automation-action-list.js";
 
 const action = (action_id: string): ActionNode => ({ action_id, params: {} });
 
 describe("automation-action-list add placement", () => {
-  it("renders the Add button after the action rows", async () => {
+  it("renders the Add button enabled after the action rows", async () => {
     const list = new ESPHomeAutomationActionList();
     list.actions = [action("logger.log"), action("delay")];
+    list.catalog = [
+      { id: "logger.log", config_entries: [] },
+    ] as unknown as AutomationAction[];
     document.body.appendChild(list);
     await list.updateComplete;
 
     const add = list.shadowRoot!.querySelector<HTMLButtonElement>("button.ae-add");
     expect(add).not.toBeNull();
+    expect(add!.disabled).toBe(false);
     const rows = [...list.shadowRoot!.querySelectorAll("esphome-automation-action-node")];
     expect(rows).toHaveLength(2);
     const lastRow = rows[rows.length - 1];

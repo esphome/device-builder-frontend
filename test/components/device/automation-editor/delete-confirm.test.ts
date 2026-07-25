@@ -6,7 +6,7 @@
  * children are no-op mocked; the confirm dialog is stubbed with an
  * observable ``open()``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -83,10 +83,6 @@ async function mountEditor(
   await flushMicrotasks(5);
   await editor.updateComplete;
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 const CASES: Array<{
   name: string;

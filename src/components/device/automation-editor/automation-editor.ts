@@ -43,6 +43,7 @@ import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
+import { automationHeaderTitle } from "../../../util/automation-header-title.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
@@ -447,7 +448,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.location && this.value && !this.addMode
           ? renderDeleteRow({
               label: this._localize("device.delete_automation"),
-              message: this._localize("device.confirm_delete_automation"),
+              message: this._localize("device.confirm_delete_automation", {
+                name: automationHeaderTitle(this.location, activeTrigger, this._localize),
+              }),
               disabled,
               onConfirm: this._onDelete,
             })

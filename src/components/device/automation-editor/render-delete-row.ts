@@ -22,6 +22,9 @@ export function renderDeleteRow(opts: {
   disabled: boolean;
   onConfirm: () => void;
 }) {
+  // A fresh per-render ref is safe: Lit re-commits the element part
+  // every update, so the ref and the click closure from the same
+  // render always pair on the same dialog element.
   const dialog = createRef<ESPHomeConfirmDialog>();
   return html`<div class="ae-actions">
       <button

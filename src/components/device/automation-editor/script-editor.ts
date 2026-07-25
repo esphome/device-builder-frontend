@@ -343,7 +343,9 @@ export class ESPHomeScriptEditor extends LitElement {
         this.location && this.value && !this.addMode
           ? renderDeleteRow({
               label: this._localize("device.delete_script"),
-              message: this._localize("device.confirm_delete_script"),
+              message: this._localize("device.confirm_delete_script", {
+                name: this.location.id,
+              }),
               disabled,
               onConfirm: this._onDelete,
             })
