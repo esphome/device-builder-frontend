@@ -77,6 +77,9 @@ describe("serialPortCannotCarryConsole", () => {
     expect(serialPortCannotCarryConsole(null, port(CH340))).toBe(false);
     expect(serialPortCannotCarryConsole(undefined, port(ESP_JTAG))).toBe(false);
     expect(serialPortCannotCarryConsole("", port(CH340))).toBe(false);
+    // An interface name outside both known families fails open too, even on
+    // the port that would mismatch a UART console.
+    expect(serialPortCannotCarryConsole("SOMETHING_NEW", port(ESP_JTAG))).toBe(false);
   });
 });
 

@@ -23,6 +23,10 @@ const ESPRESSIF_USB_JTAG_PID = 0x1001;
 // keep in lockstep.
 const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
 
+// UART0 / UART1 / UART2 / UART0_SWAP. Anything matching neither family is
+// an interface this code doesn't know - fail open.
+const UART_CONSOLE_RE = /^UART\d/;
+
 /**
  * Whether a granted Web Serial port provably cannot carry the device's log
  * console. Deliberately fails open: a mismatch is claimed only when the
@@ -43,6 +47,7 @@ export function serialPortCannotCarryConsole(
     // 0x2e8a, nRF52) - assume it works.
     return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
   }
+  if (!UART_CONSOLE_RE.test(loggerInterface)) return false;
   // UART-family console: only the on-chip USB-Serial-JTAG device provably
   // can't carry it; any other port might be wired to the UART pins.
   return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
