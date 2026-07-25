@@ -79,6 +79,8 @@ function setup(over: Partial<AutoApplyOptions> = {}) {
     setError,
     ...over,
   });
+  // Mirror Lit's lifecycle: the host is on screen when tests drive it.
+  controller.hostConnected();
   return { host, controller, upsertAutomation, deleteAutomation, updateConfig, setError };
 }
 
@@ -329,6 +331,43 @@ describe("AutoApplyController delete", () => {
       "replaced\nline2"
     );
     expect(order).toEqual(["draft", "updated"]);
+  });
+
+  it("a mid-flush section switch cannot retarget the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+
+    const applying = controller.autoApply();
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(60);
+    // The user clicks a sibling automation while the delete is parked on
+    // the in-flight upsert; the reused element gets a new location.
+    host.location = { kind: "script", id: "s2" };
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, deleting]);
+
+    expect(deleteAutomation).toHaveBeenCalledOnce();
+    // The snapshot taken before the barrier wins, not the swapped prop.
+    expect(deleteAutomation.mock.calls[0][1]).toBe(SCRIPT);
+  });
+
+  it("a failed delete does not re-arm a torn-down section", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    controller.scheduleAutoApply();
+    const deleting = controller.delete();
+    controller.hostDisconnected();
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+    expect(upsertAutomation).not.toHaveBeenCalled();
   });
 
   it("a failed delete re-arms the edit suppressed during the delete window", async () => {

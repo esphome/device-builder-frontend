@@ -84,6 +84,9 @@ export class AutoApplyController implements ReactiveController {
   private _lastSelfWrittenYaml: string | null = null;
   private _dirty = false;
   private _deleting = false;
+  // Whether the host element is on screen; a failure-path re-arm must not
+  // schedule a write for a torn-down section.
+  private _connected = false;
   /** An apply was suppressed while a delete owned the section; a
    *  failed delete re-arms it so the edit isn't silently dropped. */
   private _applySuppressed = false;
@@ -99,10 +102,12 @@ export class AutoApplyController implements ReactiveController {
    *  ``flushPending()`` before its global save. Mirrors
    *  device-section-config's section-mount event. */
   hostConnected(): void {
+    this._connected = true;
     fireSectionEvent(this._host, "section-mount", { node: this._host });
   }
 
   hostDisconnected(): void {
+    this._connected = false;
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._clearTimer();
@@ -275,6 +280,12 @@ export class AutoApplyController implements ReactiveController {
   async delete(): Promise<void> {
     const api = this._options.getApi();
     if (!api || !this._host.location || this._deleting) return;
+    // Snapshot the identity before any await: location is a reactive prop
+    // the parent reassigns on navigation, and the element is reused across
+    // sibling automations — a mid-flush section switch must not retarget
+    // the delete.
+    const location = this._host.location;
+    const configuration = this._host.configuration;
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._applyTimer !== null;
     this._clearTimer();
@@ -289,12 +300,12 @@ export class AutoApplyController implements ReactiveController {
       // requeue, so this terminates.
       await this.flushPending();
       const { yaml_diff } = await api.deleteAutomation(
-        this._host.configuration,
-        this._host.location,
+        configuration,
+        location,
         this._host.yaml
       );
       const newYaml = applyYamlDiff(this._host.yaml, yaml_diff);
-      await api.updateConfig(this._host.configuration, newYaml);
+      await api.updateConfig(configuration, newYaml);
       this._host.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-updated", {
           detail: { yaml: newYaml },
@@ -319,7 +330,9 @@ export class AutoApplyController implements ReactiveController {
       if (failed) {
         // The section survived — land the edit the delete window
         // suppressed or cancelled instead of silently dropping it.
-        if (suppressed || hadPending) this.scheduleAutoApply();
+        // Only while still on screen: re-arming a torn-down section
+        // would schedule a write for an editor that no longer exists.
+        if (this._connected && (suppressed || hadPending)) this.scheduleAutoApply();
       } else {
         // The section is gone; nothing from this editor is left to
         // save.
