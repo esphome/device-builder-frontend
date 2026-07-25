@@ -41,7 +41,7 @@ function makeHost() {
 }
 
 describe("onDeleteConfirmed mid-round-trip navigation", () => {
-  it("unmounted: lands yaml-updated through the ShadowRoot anchor, no section-select", async () => {
+  it("unmounted mid-flight: lands yaml-updated through the ShadowRoot anchor, no section-select", async () => {
     const { c, release } = makeHost();
     // Production's anchor is board-info's ShadowRoot; the listener on
     // the shadow host pins that the fallback dispatch crosses the
@@ -49,6 +49,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const outer = document.createElement("div");
     const shadow = outer.attachShadow({ mode: "open" });
     shadow.appendChild(c);
+    document.body.appendChild(outer);
     const updates: string[] = [];
     outer.addEventListener("yaml-updated", (e) =>
       updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
@@ -56,23 +57,32 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const selections: unknown[] = [];
     outer.addEventListener("section-select", (e) => selections.push(e));
 
-    const deleting = onDeleteConfirmed(c);
-    release();
-    await deleting;
+    try {
+      // The element is connected when the delete starts — the anchor
+      // snapshot must be taken here, before the unmount.
+      const deleting = onDeleteConfirmed(c);
+      c.remove();
+      release();
+      await deleting;
 
-    expect(updates).toEqual(["logger:\n"]);
-    expect(selections).toHaveLength(0);
+      expect(updates).toEqual(["logger:\n"]);
+      expect(selections).toHaveLength(0);
+    } finally {
+      outer.remove();
+    }
   });
 
   it("same-kind reuse: a retargeted but still-connected element does not navigate away", async () => {
     const { c, inner, release } = makeHost();
-    document.body.appendChild(c);
+    const container = document.createElement("div");
+    container.appendChild(c);
+    document.body.appendChild(container);
     const updates: string[] = [];
-    document.body.addEventListener("yaml-updated", (e) =>
+    container.addEventListener("yaml-updated", (e) =>
       updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
     );
     const selections: unknown[] = [];
-    document.body.addEventListener("section-select", (e) => selections.push(e));
+    container.addEventListener("section-select", (e) => selections.push(e));
 
     try {
       const deleting = onDeleteConfirmed(c);
@@ -87,7 +97,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       // stops the navigation.
       expect(selections).toHaveLength(0);
     } finally {
-      c.remove();
+      container.remove();
     }
   });
 });
