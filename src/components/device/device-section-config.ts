@@ -44,6 +44,7 @@ import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import type { SectionEditor } from "./section-editor.js";
+import { fireSectionEvent } from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
@@ -291,7 +292,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // Announce so the page-level navigation guard (device.ts) can hold a
     // direct ref. The tree is page → device-editor → device-board-info → us;
     // a property passthrough chain would cost three edits per API change.
-    fireEvent(this, "section-mount", { node: this });
+    fireSectionEvent(this, "section-mount", { node: this });
   }
 
   disconnectedCallback() {
@@ -300,7 +301,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       clearTimeout(this._draftTimer);
       this._draftTimer = null;
     }
-    fireEvent(this, "section-unmount", { node: this });
+    fireSectionEvent(this, "section-unmount", { node: this });
   }
 
   // Flush pending draft sync now. The page calls this before save / section
@@ -334,7 +335,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   _setDirty(value: boolean): void {
     if (this._dirty === value) return;
     this._dirty = value;
-    fireEvent(this, "dirty-change", { dirty: value });
+    fireSectionEvent(this, "dirty-change", { dirty: value });
   }
 
   _scheduleDraftFlush() {

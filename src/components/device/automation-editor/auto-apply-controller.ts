@@ -9,6 +9,8 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
+import type { SectionEditor } from "../section-editor.js";
+import { fireSectionEvent } from "../section-editor.js";
 import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 /** Debounce window between a value change and the auto-apply upsert.
@@ -19,7 +21,8 @@ export const AUTO_APPLY_DEBOUNCE_MS = 200;
 /** The slice of an automation-section editor the engine reads (and,
  *  for ``value``, writes). All three hosts (automation / script /
  *  api-action editor) expose exactly these reactive properties. */
-export interface AutoApplyHost extends ReactiveControllerHost, EventTarget {
+export interface AutoApplyHost
+  extends ReactiveControllerHost, EventTarget, SectionEditor {
   configuration: string;
   yaml: string;
   addMode: boolean;
@@ -93,14 +96,14 @@ export class AutoApplyController implements ReactiveController {
    *  ``flushPending()`` before its global save. Mirrors
    *  device-section-config's section-mount event. */
   hostConnected(): void {
-    fireEvent(this._host, "section-mount", { node: this._host });
+    fireSectionEvent(this._host, "section-mount", { node: this._host });
   }
 
   hostDisconnected(): void {
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._clearTimer();
-    fireEvent(this._host, "section-unmount", { node: this._host });
+    fireSectionEvent(this._host, "section-unmount", { node: this._host });
   }
 
   /** Brief-window dirty flag covering the debounce gap so the global
@@ -315,7 +318,7 @@ export class AutoApplyController implements ReactiveController {
     if (this._dirty === value) return;
     this._dirty = value;
     this._host.requestUpdate();
-    fireEvent(this._host, "dirty-change", { dirty: value });
+    fireSectionEvent(this._host, "dirty-change", { dirty: value });
   }
 
   private _setDeleting(value: boolean): void {

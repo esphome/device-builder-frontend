@@ -1781,23 +1781,20 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  private _onSectionMount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: SectionEditor }>;
-    this._activeSection = ev.detail.node;
-    this._sectionDirty = ev.detail.node.dirty;
+  private _onSectionMount = (e: HTMLElementEventMap["section-mount"]) => {
+    this._activeSection = e.detail.node;
+    this._sectionDirty = e.detail.node.dirty;
   };
 
-  private _onSectionUnmount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: SectionEditor }>;
-    if (this._activeSection === ev.detail.node) {
+  private _onSectionUnmount = (e: HTMLElementEventMap["section-unmount"]) => {
+    if (this._activeSection === e.detail.node) {
       this._activeSection = null;
       this._sectionDirty = false;
     }
   };
 
-  private _onSectionDirtyChange = (e: Event) => {
-    const ev = e as CustomEvent<{ dirty: boolean }>;
-    this._sectionDirty = ev.detail.dirty;
+  private _onSectionDirtyChange = (e: HTMLElementEventMap["dirty-change"]) => {
+    this._sectionDirty = e.detail.dirty;
   };
 
   // ─── URL State Persistence ─────────────────────────────────
