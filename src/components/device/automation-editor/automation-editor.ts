@@ -35,6 +35,7 @@ import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
+  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
@@ -449,7 +450,7 @@ export class ESPHomeAutomationEditor extends LitElement {
           ? renderDeleteRow({
               label: this._localize("device.delete_automation"),
               message: this._localize("device.confirm_delete_automation", {
-                name: automationHeaderTitle(this.location, activeTrigger, this._localize),
+                name: this._deleteTargetName(activeTrigger),
               }),
               disabled,
               onConfirm: this._onDelete,
@@ -531,6 +532,20 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   // ─── Delete ──────────────────────────────────────────────────
+
+  /** Identity for the delete prompt; before the trigger catalog
+   *  resolves, the raw ``on_*`` key still names the automation
+   *  where the header title would degrade to "Automation". */
+  private _deleteTargetName(activeTrigger: AutomationTrigger | null): string {
+    const location = this.location;
+    if (
+      !activeTrigger &&
+      (location?.kind === "device_on" || location?.kind === "component_on")
+    ) {
+      return location.trigger;
+    }
+    return automationHeaderTitle(location, activeTrigger, this._localize);
+  }
 
   private _onDelete = () => {
     void this._engine.delete();
