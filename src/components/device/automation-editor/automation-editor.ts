@@ -47,8 +47,8 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
+import type { ESPHomeConfirmDialog } from "../../confirm-dialog.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
-import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
@@ -63,10 +63,10 @@ import { renderAutomationHeader } from "./render-automation-header.js";
 import {
   renderActionsSection,
   renderAddModePickers,
-  renderDeleteRow,
   renderIdentityFields,
   renderTriggerParamsForm,
 } from "./render-automation-sections.js";
+import { renderDeleteRow } from "./render-delete-row.js";
 import {
   applyParamChange,
   emptyAutomationTree,
@@ -120,11 +120,8 @@ export class ESPHomeAutomationEditor extends LitElement {
   @property({ attribute: false })
   focusYamlPath?: YamlPathSegment[];
 
-  /** Action-list reference — used by the header-positioned Add
-   *  button to open the catalog picker dialog that lives inside
-   *  the action-list component. */
-  @query("esphome-automation-action-list")
-  private _actionList?: ESPHomeAutomationActionList;
+  @query("esphome-confirm-dialog")
+  private _deleteConfirm?: ESPHomeConfirmDialog;
 
   /** Scoped catalog response. Trigger / action / condition lists
    *  come from here (the backend filters to what's actually in the
@@ -447,13 +444,18 @@ export class ESPHomeAutomationEditor extends LitElement {
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
-        onOpenPicker: () => this._actionList?.openPicker(),
         onActionsChange: this._onActionsChange,
       })}
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${
         this.location && this.value && !this.addMode
-          ? renderDeleteRow(this._localize, disabled, this._onDelete)
+          ? renderDeleteRow({
+              label: this._localize("device.delete_automation"),
+              message: this._localize("device.confirm_delete_automation"),
+              disabled,
+              onOpenConfirm: this._onDeleteClick,
+              onConfirm: this._onDelete,
+            })
           : nothing
       }
     `;
@@ -531,6 +533,10 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   // ─── Delete ──────────────────────────────────────────────────
+
+  private _onDeleteClick = () => {
+    this._deleteConfirm?.open();
+  };
 
   private _onDelete = () => {
     void this._engine.delete();

@@ -84,9 +84,6 @@ export class ESPHomeAutomationActionList extends LitElement {
   @property({ type: Boolean, attribute: "no-header" })
   noHeader = false;
 
-  @property({ type: Boolean, attribute: "hide-add" })
-  hideAdd = false;
-
   /** Cursor focus target whose ``node`` head indexes this list; the
    *  matching row gets the sliced remainder. */
   @property({ attribute: false, hasChanged: focusTargetHasChanged })
@@ -116,19 +113,15 @@ export class ESPHomeAutomationActionList extends LitElement {
                 this._renderRow(node, idx, idx === this.actions.length - 1)
               )
         }
-        ${
-          this.hideAdd
-            ? nothing
-            : html`<button
-                type="button"
-                class="ae-add"
-                ?disabled=${this.disabled || this.catalog.length === 0}
-                @click=${this.openPicker}
-              >
-                <wa-icon library="mdi" name="plus"></wa-icon>
-                ${this._localize("device.add_action")}
-              </button>`
-        }
+        <button
+          type="button"
+          class="ae-add"
+          ?disabled=${this.disabled || this.catalog.length === 0}
+          @click=${this.openPicker}
+        >
+          <wa-icon library="mdi" name="plus"></wa-icon>
+          ${this._localize("device.add_action")}
+        </button>
         <esphome-catalog-picker-dialog
           kind="action"
           .items=${this.catalog}
