@@ -157,6 +157,7 @@ export class AutoApplyController implements ReactiveController {
   scheduleAutoApply(): void {
     if (this._host.addMode) return;
     if (this._options.isReadOnly()) return;
+    if (this._deleting) return;
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -201,6 +202,12 @@ export class AutoApplyController implements ReactiveController {
       return;
     }
     if (this._options.canApply && !this._options.canApply(location)) return;
+    // A delete owns the section from here on; a racing apply (the
+    // in-flight dirty requeue, a stray flushPending) must not run.
+    if (this._deleting) {
+      this._setDirty(false);
+      return;
+    }
     if (this._applyInFlight) {
       this._applyDirty = true;
       return;
@@ -267,6 +274,11 @@ export class AutoApplyController implements ReactiveController {
     this._setDeleting(true);
     this._options.setError("");
     try {
+      // Settle a racing upsert before computing the delete diff: its
+      // late ``yaml-draft`` would otherwise land after our
+      // ``yaml-updated`` and resurrect the deleted section (#1451).
+      // ``_deleting`` blocks the dirty requeue, so this terminates.
+      await this.flushPending();
       const { yaml_diff } = await api.deleteAutomation(
         this._host.configuration,
         this._host.location,

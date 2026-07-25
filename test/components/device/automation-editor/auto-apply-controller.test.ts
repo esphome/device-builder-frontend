@@ -284,6 +284,73 @@ describe("AutoApplyController delete", () => {
     });
     expect(controller.deleting).toBe(false);
   });
+
+  it("waits out an in-flight upsert so its draft lands before the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    const order: string[] = [];
+    host.addEventListener("yaml-draft", () => order.push("draft"));
+    host.addEventListener("yaml-updated", () => order.push("updated"));
+
+    const applying = controller.autoApply();
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(60);
+    expect(deleteAutomation).not.toHaveBeenCalled();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, deleting]);
+
+    expect(deleteAutomation).toHaveBeenCalledOnce();
+    expect(order).toEqual(["draft", "updated"]);
+  });
+
+  it("a queued re-apply is dropped once the delete owns the section", async () => {
+    const { controller, upsertAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    const first = controller.autoApply();
+    void controller.autoApply();
+    const deleting = controller.delete();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([first, deleting]);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+  });
+
+  it("nothing schedules a new upsert while a delete is running", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    resolveDelete({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(20);
+    await deleting;
+
+    expect(upsertAutomation).not.toHaveBeenCalled();
+  });
 });
 
 describe("AutoApplyController host lifecycle", () => {
