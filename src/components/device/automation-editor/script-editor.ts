@@ -38,7 +38,6 @@ import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
-import "./automation-action-list.js";
 import {
   actionsFocus,
   type AutomationFocus,
@@ -47,6 +46,7 @@ import {
   paramFocus,
 } from "./automation-focus.js";
 import { CallableAutomationEditor } from "./callable-editor.js";
+import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 
@@ -58,7 +58,6 @@ type ScriptLocation = Extract<AutomationLocation, { kind: "script" }>;
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
   "open-in-new": mdiOpenInNew,
@@ -133,15 +132,8 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   }
 
   protected render() {
-    if (this._loading) {
-      return html`<div class="ae-empty">
-        <wa-spinner></wa-spinner>
-        ${this._localize("device.loading_automation_catalog")}
-      </div>`;
-    }
-    if (this._parseError.active) {
-      return this._parseError.renderPanel(this._localize);
-    }
+    const gate = this.renderStateGate();
+    if (gate) return gate;
     const automation = this.value ?? emptyAutomationTree();
     const devices = this._available?.devices ?? [];
     const scripts = this._available?.scripts ?? [];
@@ -156,25 +148,20 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
           ? this._renderParametersField(automation, disabled, focus)
           : nothing
       }
-      <div class="field">
-        <label class="field-label"> ${this._localize("device.automation_action")} </label>
-        <p class="field-description">
-          ${renderMarkdown(this._localize("device.script_actions_description"))}
-        </p>
-        <esphome-automation-action-list
-          no-header
-          .focusTarget=${actionsFocus(focus)}
-          .actions=${automation.actions}
-          .catalog=${actions}
-          .conditionCatalog=${conditions}
-          .scripts=${scripts}
-          .devices=${devices}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          ?disabled=${disabled}
-          @actions-change=${this._onActionsChange}
-        ></esphome-automation-action-list>
-      </div>
+      ${renderActionsSection({
+        automation,
+        catalog: actions,
+        conditionCatalog: conditions,
+        scripts,
+        devices,
+        board: this.board,
+        yaml: this.yaml,
+        disabled,
+        localize: this._localize,
+        focusTarget: actionsFocus(focus),
+        descriptionKey: "device.script_actions_description",
+        onActionsChange: this._onActionsChange,
+      })}
       ${this.renderFooter({
         label: this._localize("device.delete_script"),
         message: (location) =>
@@ -344,11 +331,6 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
         parameters: e.detail.value,
       },
     });
-  };
-
-  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
-    e.stopPropagation();
-    this._engine.withValue({ actions: e.detail.actions });
   };
 }
 

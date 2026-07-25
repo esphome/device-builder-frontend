@@ -27,6 +27,8 @@ import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import { renderDeleteRow } from "./render-delete-row.js";
 
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+
 export abstract class BaseAutomationEditor<
   L extends AutomationLocation,
 > extends LitElement {
@@ -126,6 +128,21 @@ export abstract class BaseAutomationEditor<
 
   static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
 
+  /** Loading spinner / parse-error panel that preempts the body
+   *  render, or ``null`` once the editor is ready to paint. */
+  protected renderStateGate() {
+    if (this._loading) {
+      return html`<div class="ae-empty">
+        <wa-spinner></wa-spinner>
+        ${this._localize("device.loading_automation_catalog")}
+      </div>`;
+    }
+    if (this._parseError.active) {
+      return this._parseError.renderPanel(this._localize);
+    }
+    return null;
+  }
+
   /** Inline error line + the confirm-gated delete footer. The
    *  message factory receives the non-null ``location`` so callers
    *  build it inside the narrowing. */
@@ -149,5 +166,12 @@ export abstract class BaseAutomationEditor<
 
   protected _onDelete = () => {
     void this._engine.delete();
+  };
+
+  protected _onActionsChange = (
+    e: CustomEvent<{ actions: AutomationTree["actions"] }>
+  ) => {
+    e.stopPropagation();
+    this._engine.withValue({ actions: e.detail.actions });
   };
 }

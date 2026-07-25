@@ -45,8 +45,8 @@ import { actionsFocus, entryFieldFocus } from "./automation-focus.js";
 import { BaseAutomationEditor } from "./base-editor.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
 import { renderAutomationHeader } from "./render-automation-header.js";
+import { renderActionsSection } from "./render-actions-section.js";
 import {
-  renderActionsSection,
   renderAddModePickers,
   renderIdentityFields,
   renderTriggerParamsForm,
@@ -57,8 +57,6 @@ import {
   sectionKeyFromLocation,
 } from "./serialise.js";
 import { bareTriggerKey, effectiveTriggerIdFor } from "./trigger-identity.js";
-
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 @customElement("esphome-automation-editor")
 export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLocation> {
@@ -259,15 +257,8 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
   }
 
   protected render() {
-    if (this._loading) {
-      return html`<div class="ae-empty">
-        <wa-spinner></wa-spinner>
-        ${this._localize("device.loading_automation_catalog")}
-      </div>`;
-    }
-    if (this._parseError.active) {
-      return this._parseError.renderPanel(this._localize);
-    }
+    const gate = this.renderStateGate();
+    if (gate) return gate;
     const automation = this.value ?? emptyAutomationTree();
     const target = this.location;
     const devices = this._available?.devices ?? [];
@@ -405,11 +396,6 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
   ) => {
     e.stopPropagation();
     this._engine.withValue({ trigger_params: e.detail.params });
-  };
-
-  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
-    e.stopPropagation();
-    this._engine.withValue({ actions: e.detail.actions });
   };
 
   // ─── Delete ──────────────────────────────────────────────────
