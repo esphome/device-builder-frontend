@@ -289,7 +289,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /** Emits ``field-focus`` as the user moves between fields (the other side
    *  of the sync); owns its own listener lifecycle. */
-  _fieldFocus = new FieldFocusController(this);
+  protected readonly _fieldFocus = new FieldFocusController(this);
 
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user

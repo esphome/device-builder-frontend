@@ -77,9 +77,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @property({ attribute: false })
   device!: ConfiguredDevice;
 
-  /** True while a ``set_labels`` round trip is in flight. Used to
-   *  gate optimistic-state cleanup; toggle clicks are still
-
   /** Snapshot of ``device.configuration`` taken when the user
    *  initiated a ``labels/create`` round trip. ``null`` means "no
    *  create in flight". A device swap mid-flight clears it (in
@@ -244,7 +241,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     // Only a real swap to a *different* device tears down the transient edit
     // state and closes the dialog; otherwise a half-typed "create" form would
     // persist into the next device's editor and a still-pending save chained
-    // against the previous device would gate this one's ``_saving`` indicator.
+    // against the previous device would gate this one's cleanup.
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
       this._dialog.open = false;
       this._createForm?.collapse();

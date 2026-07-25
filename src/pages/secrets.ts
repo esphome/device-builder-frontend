@@ -92,7 +92,7 @@ export class ESPHomePageSecrets extends LitElement {
 
   // Cmd/Ctrl+S → save when there's something to save. Covers both the
   // structured and YAML views, which share the single _yaml buffer.
-  _saveShortcut = new SaveShortcutController(this, () => {
+  protected readonly _saveShortcut = new SaveShortcutController(this, () => {
     if (this._isDirty && !this._saving && this._yaml.trim() !== "") {
       void this._save();
     }

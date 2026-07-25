@@ -69,7 +69,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   // only short page is the last one, which lands hasMore=false and removes
   // the sentinel. A short non-final page (which would keep the sentinel in
   // view and not re-fire) never occurs.
-  _intersection = new IntersectionController(this, () =>
+  protected readonly _intersection = new IntersectionController(this, () =>
     this.dispatchEvent(new CustomEvent("load-more"))
   );
 

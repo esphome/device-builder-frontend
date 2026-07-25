@@ -120,7 +120,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   };
 
   // Cmd/Ctrl+S → save the YAML if there are unsaved changes.
-  _saveShortcut = new SaveShortcutController(this, () => {
+  protected readonly _saveShortcut = new SaveShortcutController(this, () => {
     if (this.hasUnsavedEdits) {
       this._onSave();
     }
