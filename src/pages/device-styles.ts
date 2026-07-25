@@ -30,6 +30,24 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(0, 5fr);
   }
 
+  /* Busy affordance while a section switch is parked behind the
+     active editor's flush (up to the WS command timeout). The dim
+     engages only after a delay so the common fast flush never
+     flickers; the base state carries no delay, so clearing un-dims
+     immediately. */
+  .layout-grid .desktop-nav {
+    transition: opacity 120ms ease;
+  }
+
+  .layout-grid.switch-pending {
+    cursor: progress;
+  }
+
+  .layout-grid.switch-pending .desktop-nav {
+    opacity: 0.6;
+    transition-delay: 200ms;
+  }
+
   .layout-grid.nav-collapsed .desktop-nav {
     display: none;
   }

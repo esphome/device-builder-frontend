@@ -468,6 +468,69 @@ describe("section-switch flush barrier", () => {
     expect(internals(page)._selectedFromLine).toBeUndefined();
   });
 
+  it("flags the busy affordance while parked behind the flush, never on the sync path", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolveFlush = gateFlush(page);
+
+    const switching = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolveFlush();
+    await switching;
+    expect(internals(page)._switchPending).toBe(false);
+
+    // Sync path (component editor shape): no flicker, flag never set.
+    internals(page)._activeSection = {
+      dirty: false,
+      flushPending: vi.fn(),
+      reload: () => {},
+    } satisfies SectionEditor;
+    const sync = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(false);
+    await sync;
+  });
+
+  it("the affordance clears only when the last parked switch settles", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolvers: (() => void)[] = [];
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    const s1 = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    const s2 = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolvers[0]();
+    await s1;
+    // The second switch is still parked.
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolvers[1]();
+    await s2;
+    expect(internals(page)._switchPending).toBe(false);
+  });
+
+  it("a rejecting flush still clears the affordance", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () => Promise.reject(new Error("upsert failed")),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    await internals(page)._guardSectionSwitch(vi.fn());
+    expect(internals(page)._switchPending).toBe(false);
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     const resolveFlush = gateFlush(page);
