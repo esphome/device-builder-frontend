@@ -34,9 +34,7 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -48,7 +46,7 @@ import {
   focusKey,
   paramFocus,
 } from "./automation-focus.js";
-import { BaseAutomationEditor } from "./base-editor.js";
+import { CallableAutomationEditor } from "./callable-editor.js";
 import "./callable-params-editor.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 
@@ -68,7 +66,7 @@ registerMdiIcons({
 });
 
 @customElement("esphome-script-editor")
-export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
+export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation> {
   /** ``focusKey`` already advanced-revealed — one-shot per target so a
    *  later deliberate collapse sticks. */
   private _paramsRevealKey?: string;
@@ -101,63 +99,16 @@ export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
     return location.kind === "script" && !!location.id;
   }
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    void this._load();
+  protected readonly _sectionKind = "script" as const;
+
+  protected _identityOf(location: ScriptLocation): string {
+    return location.id;
   }
 
-  protected updated(changed: Map<string, unknown>) {
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
-    // Navigator-driven location swap (user clicked a different
-    // script in the navigator) — invalidate the stale value so
-    // the hydrate path below re-fetches.
-    if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as ScriptLocation | null | undefined;
-      if (prev && this.location && prev.id !== this.location.id) {
-        this.value = null;
-      }
-    }
-    if (
-      !this.addMode &&
-      (changed.has("location") ||
-        changed.has("configuration") ||
-        changed.has("_loading")) &&
-      this.location &&
-      this.value === null &&
-      !this._loading
-    ) {
-      void this._hydrateFromBackend();
-    }
-  }
-
-  private async _load() {
-    if (!this._api) return;
-    this._loading = true;
-    this._error = "";
-    try {
-      if (this.configuration) await this._loadAvailable();
-      void this._loadScriptComponent();
-    } catch (err) {
-      this._error = getErrorMessage(err);
-    } finally {
-      this._loading = false;
-    }
-  }
-
-  private async _loadAvailable() {
-    // Hydrates config_entries (the slim catalog omits them); without
-    // it every action renders fieldless since the node bails on an
-    // empty config_entries list.
-    this._error = "";
-    const { available, error } = await this._catalogLoad.load(
-      this._api,
-      this.configuration,
-      this._localize
-    );
-    if (error !== undefined) this._error = error;
-    if (available) this._available = available;
+  /** The script-component fetch rides along with the shared load. */
+  protected override async _load() {
+    await super._load();
+    void this._loadScriptComponent();
   }
 
   /** Lazy fetch of the ``script`` component catalog entry. Reuses
@@ -179,41 +130,6 @@ export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
       /* swallow — the editor falls back to the static label if
          the catalog entry isn't available. */
     }
-  }
-
-  private async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
-    try {
-      // ``this.yaml`` override mirrors the automation-editor's
-      // hydrate path: post-add the user's draft buffer holds the
-      // new script, but the on-disk YAML doesn't yet. Without the
-      // override the parse returns the stale on-disk state and the
-      // form lands empty.
-      const parsed = await this._api.parseDeviceAutomations(
-        this.configuration,
-        this.yaml
-      );
-      const m = this._parseError.resolve(parsed, this.location, "script");
-      if (m) {
-        this.location = m.location;
-        this.value = m.tree;
-      }
-    } catch (err) {
-      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-    }
-  }
-
-  /**
-   * Re-hydrate from the live YAML. Called by the parent
-   * (``device-board-info``) when the YAML pane changes the document
-   * out from under us — mirrors device-section-config.reload() and
-   * automation-editor.reload() so editing YAML in the pane updates
-   * the visual editor.
-   */
-  public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
-    void this._hydrateFromBackend();
   }
 
   protected render() {

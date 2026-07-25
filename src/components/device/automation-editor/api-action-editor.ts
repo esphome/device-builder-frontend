@@ -30,9 +30,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { scrollFlashRow } from "../field-highlight.js";
@@ -44,7 +42,7 @@ import {
   focusKey,
   paramFocus,
 } from "./automation-focus.js";
-import { BaseAutomationEditor } from "./base-editor.js";
+import { CallableAutomationEditor } from "./callable-editor.js";
 import "./callable-params-editor.js";
 import { emptyAutomationTree } from "./serialise.js";
 
@@ -67,47 +65,26 @@ const API_DOCS_URL = `${ESPHOME_DOCS_BASE}/components/api.html`;
 type ApiActionLocation = Extract<AutomationLocation, { kind: "api_action" }>;
 
 @customElement("esphome-api-action-editor")
-export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocation> {
+export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLocation> {
   // Can't upsert an api action with no name.
   protected override _canApply(location: AutomationLocation): boolean {
     return location.kind === "api_action" && !!location.action_name;
   }
 
-  static styles = [BaseAutomationEditor.styles, fieldHighlightStyles];
+  protected readonly _sectionKind = "api_action" as const;
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    void this._load();
+  protected _identityOf(location: ApiActionLocation): string {
+    return location.action_name;
   }
+
+  static styles = [CallableAutomationEditor.styles, fieldHighlightStyles];
 
   /** ``focusKey`` already name-flashed — one-shot per target. */
   private _nameFlashKey?: string;
 
-  protected updated(changed: Map<string, unknown>) {
+  protected override updated(changed: Map<string, unknown>) {
     this._maybeFlashName();
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
-    // Navigator-driven location swap (user clicked a different
-    // api_action in the navigator) — invalidate the stale value so
-    // the hydrate path below re-fetches.
-    if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as ApiActionLocation | null | undefined;
-      if (prev && this.location && prev.action_name !== this.location.action_name) {
-        this.value = null;
-      }
-    }
-    if (
-      !this.addMode &&
-      (changed.has("location") ||
-        changed.has("configuration") ||
-        changed.has("_loading")) &&
-      this.location &&
-      this.value === null &&
-      !this._loading
-    ) {
-      void this._hydrateFromBackend();
-    }
+    super.updated(changed);
   }
 
   protected render() {
@@ -232,66 +209,6 @@ export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocati
     if (!field) return;
     this._nameFlashKey = key;
     scrollFlashRow(field);
-  }
-
-  private async _load() {
-    if (!this._api) return;
-    this._loading = true;
-    this._error = "";
-    try {
-      if (this.configuration) await this._loadAvailable();
-    } catch (err) {
-      this._error = getErrorMessage(err);
-    } finally {
-      this._loading = false;
-    }
-  }
-
-  private async _loadAvailable() {
-    // Hydrates config_entries (the slim catalog omits them); without
-    // it every action renders fieldless since the node bails on an
-    // empty config_entries list.
-    this._error = "";
-    const { available, error } = await this._catalogLoad.load(
-      this._api,
-      this.configuration,
-      this._localize
-    );
-    if (error !== undefined) this._error = error;
-    if (available) this._available = available;
-  }
-
-  private async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
-    try {
-      // Pass ``this.yaml`` so the parser sees the current draft
-      // buffer — without it the post-add hydrate would read on-disk
-      // and miss the just-inserted entry.
-      const parsed = await this._api.parseDeviceAutomations(
-        this.configuration,
-        this.yaml
-      );
-      const m = this._parseError.resolve(parsed, this.location, "api_action");
-      if (m) {
-        this.location = m.location;
-        this.value = m.tree;
-      }
-    } catch (err) {
-      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-    }
-  }
-
-  /**
-   * Re-hydrate from the live YAML. Called by the parent
-   * (``device-board-info``) when the YAML pane changes the document
-   * out from under us — mirrors device-section-config.reload() and
-   * automation/script reload() so editing YAML in the pane updates
-   * the visual editor.
-   */
-  public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
-    void this._hydrateFromBackend();
   }
 
   private _onActionNameChange(name: string) {
