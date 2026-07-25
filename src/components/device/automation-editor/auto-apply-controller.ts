@@ -11,7 +11,11 @@ import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
 import { fireSectionEvent } from "../section-editor.js";
-import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
+import {
+  applyYamlDiff,
+  emptyAutomationTree,
+  sectionKeyFromLocation,
+} from "./serialise.js";
 
 /** Debounce window between a value change and the auto-apply upsert.
  *  Coalesces bursts (typing into a templatable string param, dragging
@@ -90,6 +94,9 @@ export class AutoApplyController implements ReactiveController {
   /** An apply was suppressed while a delete owned the section; a
    *  failed delete re-arms it so the edit isn't silently dropped. */
   private _applySuppressed = false;
+  /** Whose edit the suppression belongs to, so a mid-flush
+   *  retarget's sibling edit survives a successful delete. */
+  private _suppressedFor: AutomationLocation | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -167,6 +174,7 @@ export class AutoApplyController implements ReactiveController {
     if (this._options.isReadOnly()) return;
     if (this._deleting) {
       this._applySuppressed = true;
+      this._suppressedFor = this._host.location;
       return;
     }
     this._setDirty(true);
@@ -217,6 +225,7 @@ export class AutoApplyController implements ReactiveController {
     // in-flight dirty requeue, a stray flushPending) must not run.
     if (this._deleting) {
       this._applySuppressed = true;
+      this._suppressedFor = this._host.location;
       return;
     }
     if (this._applyInFlight) {
@@ -298,6 +307,11 @@ export class AutoApplyController implements ReactiveController {
       // would otherwise land after our ``yaml-updated`` and resurrect
       // the deleted section (#1451). ``_deleting`` blocks the dirty
       // requeue, so this terminates.
+      // ``flushPending`` must resolve on a MACROTASK: three nested
+      // Lit update cycles carry the settling upsert's ``yaml-draft``
+      // back down into ``.yaml``, and only the poll's setTimeout
+      // drains them all. A promise-await refactor of the poll would
+      // resolve on a microtask and reintroduce #1451.
       await this.flushPending();
       // Read the settled buffer exactly once: the backend computes
       // the diff's line coordinates against the string we send, so
@@ -327,16 +341,27 @@ export class AutoApplyController implements ReactiveController {
     } finally {
       this._setDeleting(false);
       const suppressed = this._applySuppressed;
+      const suppressedFor = this._suppressedFor;
       this._applySuppressed = false;
+      this._suppressedFor = null;
       if (failed) {
         // The section survived — land the edit the delete window
         // suppressed or cancelled instead of silently dropping it.
         // Only while still on screen: re-arming a torn-down section
         // would schedule a write for an editor that no longer exists.
         if (this._connected && (suppressed || hadPending)) this.scheduleAutoApply();
+      } else if (
+        suppressed &&
+        suppressedFor &&
+        this._connected &&
+        sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location)
+      ) {
+        // The suppressed edit belongs to a sibling the reused
+        // element was re-pointed at mid-flush; that section
+        // survived the delete, so its edit must land.
+        this.scheduleAutoApply();
       } else {
-        // The section is gone; nothing from this editor is left to
-        // save.
+        // The deleted section's own edits die with it.
         this._setDirty(false);
       }
     }

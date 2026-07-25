@@ -309,9 +309,17 @@ describe("AutoApplyController delete", () => {
     const order: string[] = [];
     host.addEventListener("yaml-draft", (e) => {
       order.push("draft");
-      // Mirror the page: the draft advances the buffer the editor
-      // sees, so the delete diff is computed against it.
-      host.yaml = (e as CustomEvent<{ yaml: string }>).detail.yaml;
+      // Mirror the page faithfully: three nested Lit update cycles
+      // carry the draft back down, each on its own microtask — only
+      // the flush poll's macrotask boundary drains them all before
+      // the delete reads the buffer.
+      const yaml = (e as CustomEvent<{ yaml: string }>).detail.yaml;
+      void Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => Promise.resolve())
+        .then(() => {
+          host.yaml = yaml;
+        });
     });
     host.addEventListener("yaml-updated", () => order.push("updated"));
 
@@ -377,6 +385,35 @@ describe("AutoApplyController delete", () => {
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
 
     expect(upsertAutomation).toHaveBeenCalledTimes(1);
+  });
+
+  it("a sibling's edit suppressed during the delete window survives the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // The navigator re-points the reused element at a sibling and
+    // the user edits it while the delete is still in flight.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+    controller.scheduleAutoApply();
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(upsertAutomation).toHaveBeenCalledWith(
+      "device.yaml",
+      host.value,
+      host.location,
+      expect.any(String)
+    );
   });
 
   it("a failed delete does not re-arm a torn-down section", async () => {
