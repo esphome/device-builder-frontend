@@ -243,6 +243,35 @@ describe("section-switch flush barrier", () => {
     expect(internals(page)._selectedFromLine).toBe(1);
   });
 
+  it("closes the drawer before the flush barrier (mobile tap feedback)", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+    internals(page)._drawerOpen = true;
+
+    internals(page)._onSectionSelect(
+      new CustomEvent("section-select", {
+        detail: { sectionKey: "sensor.aht10", fromLine: 3 },
+      })
+    );
+    // Chrome, not selection state: the close must not wait on the
+    // barrier, or the mobile tap gets no acknowledgement.
+    expect(internals(page)._drawerOpen).toBe(false);
+
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;
