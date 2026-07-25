@@ -12,6 +12,11 @@ import { markSerialActivity } from "./serial-reacquire.js";
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 export const ESPRESSIF_USB_VID = 0x303a;
 
+/** The on-chip USB-Serial-JTAG device's product id. The vendor id alone is
+ *  not native-USB proof: Espressif also ships real UART bridges under it
+ *  (ESP-USB-Bridge, 0x1002). */
+export const ESPRESSIF_USB_JTAG_PID = 0x1001;
+
 export interface DetectedChip {
   chipName: string;
   port: SerialPort;
@@ -454,7 +459,9 @@ async function classicHardReset(transport: Transport): Promise<void> {
  *   CP210x, etc.) and the chip's own USB-Serial-JTAG alike, and
  *   doesn't depend on the board's auto-reset circuit having the
  *   "cancellation" behaviour the DTR/RTS sequence implicitly assumes.
- * - Native USB-Serial/JTAG (VID 0x303A) for chips not in the WDT
+ * - Native USB-Serial/JTAG (0x303a:0x1001, matching esptool; other
+ *   0x303a products like the ESP-USB-Bridge are real UART bridges) for
+ *   chips not in the WDT
  *   list (mostly fall-through; safety net): esptool-js's
  *   ``UsbJtagSerialReset``.
  * - Everything else (classic ESP32 / ESP8266 via CP210x / CH340 /
@@ -470,8 +477,8 @@ async function hardResetChip(
   port: SerialPort
 ): Promise<void> {
   if (await watchdogReset(loader, transport)) return;
-  const vendorId = port.getInfo().usbVendorId;
-  if (vendorId === ESPRESSIF_USB_VID) {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  if (usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID) {
     await new UsbJtagSerialReset(transport).reset();
   } else {
     await classicHardReset(transport);

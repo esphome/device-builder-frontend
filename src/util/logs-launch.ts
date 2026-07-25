@@ -10,7 +10,7 @@ import {
   reconnectWebSerialLogs,
   requestSerialPort,
 } from "./post-install-logs.js";
-import { serialConsoleMismatchNotice } from "./serial-console-match.js";
+import { serialConsoleMismatch } from "./serial-console-match.js";
 
 /** The host bits both logs entry points need, decoupled from any page class. */
 export interface LogsLaunchHost {
@@ -102,13 +102,15 @@ export async function launchLogsWithMethod(
     // Decide on the unopened port (getInfo needs no open): a provably-silent
     // port is never opened, so no DTR/RTS pulse reaches a bridge that wires
     // them to reset lines.
-    const mismatch = serialConsoleMismatchNotice(
+    const mismatch = serialConsoleMismatch(
       device.logger_interface,
       serialPort,
       host.localize
     );
     if (mismatch) {
-      openNetworkLogsFallback(host.logsDialog, host.localize, { message: mismatch });
+      openNetworkLogsFallback(host.logsDialog, host.localize, {
+        message: mismatch.message,
+      });
       return;
     }
     try {
@@ -121,7 +123,13 @@ export async function launchLogsWithMethod(
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
     host.logsDialog.openPassive({
-      onReconnect: () => reconnectWebSerialLogs(host.logsDialog, host.localize, baudRate),
+      onReconnect: () =>
+        reconnectWebSerialLogs(
+          host.logsDialog,
+          host.localize,
+          baudRate,
+          device.logger_interface
+        ),
     });
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.

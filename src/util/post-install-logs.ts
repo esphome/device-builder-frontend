@@ -4,7 +4,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
-import { serialConsoleMismatchNotice } from "./serial-console-match.js";
+import { serialConsoleMismatch } from "./serial-console-match.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
@@ -85,11 +85,12 @@ export async function requestAndOpenSerialPort(
 export async function reconnectWebSerialLogs(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  baudRate: number
+  baudRate: number,
+  loggerInterface?: string | null
 ): Promise<void> {
   let port: SerialPort | null;
   try {
-    port = await requestAndOpenSerialPort(baudRate);
+    port = await requestSerialPort();
   } catch {
     const message = localize("dashboard.logs_web_serial_open_failed");
     logsDialog.setSerialOpenFailed(message);
@@ -98,6 +99,21 @@ export async function reconnectWebSerialLogs(
   }
   if (!port) {
     logsDialog.abortSerialReconnect(); // Picker dismissed — back to "Start", quietly.
+    return;
+  }
+  // Same pre-open gate as the entry points: a re-picked port that provably
+  // can't carry the console reroutes instead of reopening a dead end.
+  const mismatch = serialConsoleMismatch(loggerInterface, port, localize);
+  if (mismatch) {
+    openNetworkLogsFallback(logsDialog, localize, { message: mismatch.message });
+    return;
+  }
+  try {
+    await port.open({ baudRate });
+  } catch {
+    const message = localize("dashboard.logs_web_serial_open_failed");
+    logsDialog.setSerialOpenFailed(message);
+    notifyError(message);
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate);
@@ -251,15 +267,11 @@ export async function handlePostInstallShowLogs(
       openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
       return;
     }
-    const mismatch = serialConsoleMismatchNotice(
-      loggerInterface,
-      webSerialPort,
-      localize
-    );
+    const mismatch = serialConsoleMismatch(loggerInterface, webSerialPort, localize);
     if (mismatch) {
       openNetworkLogsFallback(logsDialog, localize, {
         onBackToInstall: reopenInstall,
-        message: mismatch,
+        message: mismatch.message,
       });
       return;
     }
@@ -268,7 +280,8 @@ export async function handlePostInstallShowLogs(
       // "click Start to reconnect" after a reopen failure (#636). Re-acquire a
       // fresh port via the picker rather than reopening the cached esptool
       // handle, which a native-USB chip's post-flash re-enumeration leaves dead.
-      onReconnect: () => reconnectWebSerialLogs(logsDialog, localize, baudRate),
+      onReconnect: () =>
+        reconnectWebSerialLogs(logsDialog, localize, baudRate, loggerInterface),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

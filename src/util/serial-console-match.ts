@@ -1,5 +1,5 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { ESPRESSIF_USB_VID } from "./web-serial.js";
+import { ESPRESSIF_USB_JTAG_PID, ESPRESSIF_USB_VID } from "./web-serial.js";
 
 // Vendors that make dedicated USB-UART bridge chips and nothing that
 // enumerates as a device's native USB console. A port from one of these can
@@ -12,11 +12,6 @@ const UART_BRIDGE_VENDOR_IDS = new Set([
   0x0403, // FTDI
   0x067b, // Prolific (PL2303)
 ]);
-
-// The on-chip USB-Serial-JTAG device every native-USB ESP32 variant
-// enumerates as. The product id matters: Espressif's vendor id also covers
-// the ESP-USB-Bridge (0x1002), which IS a UART bridge.
-const ESPRESSIF_USB_JTAG_PID = 0x1001;
 
 // Spellings come from the backend's logger_interface_values vocabulary
 // (platform_capabilities.index.json, snapshotted from esphome's logger) -
@@ -54,16 +49,19 @@ export function serialPortCannotCarryConsole(
 }
 
 /**
- * Localized wrong-port notice when the port provably can't carry the
- * console, else null. The single home for the mismatch decision + message.
+ * Mismatch verdict + localized notice when the port provably can't carry
+ * the console, else null. The single home for the decision and its message;
+ * an object so callers gate on the verdict, never on the copy's truthiness.
  */
-export function serialConsoleMismatchNotice(
+export function serialConsoleMismatch(
   loggerInterface: string | null | undefined,
   port: SerialPort,
   localize: LocalizeFunc
-): string | null {
+): { message: string } | null {
   if (!serialPortCannotCarryConsole(loggerInterface, port)) return null;
-  return localize("dashboard.logs_serial_wrong_port_fallback", {
-    interface: loggerInterface ?? "",
-  });
+  return {
+    message: localize("dashboard.logs_serial_wrong_port_fallback", {
+      interface: loggerInterface ?? "",
+    }),
+  };
 }

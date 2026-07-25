@@ -57,6 +57,7 @@ function deadPort(
 
 function stubDialog() {
   return {
+    open: vi.fn(),
     setSerialStream: vi.fn(),
     setSerialOpenFailed: vi.fn(),
     abortSerialReconnect: vi.fn(),
@@ -147,6 +148,32 @@ describe("reconnectWebSerialLogs", () => {
       expect(dialog.abortSerialReconnect).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("reroutes a reconnect onto a mismatched port without opening it", async () => {
+    // Re-picked a bridge port for a native-USB console: same pre-open gate
+    // as the entry points, so no DTR/RTS pulse and no dead serial session.
+    const bridge = {
+      readable: null,
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      open: vi.fn(),
+    } as unknown as SerialPort;
+    const restore = withRequestPort(async () => bridge);
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(
+        dialog as never,
+        defaultLocalize,
+        115200,
+        "USB_SERIAL_JTAG"
+      );
+      expect(bridge.open).not.toHaveBeenCalled();
+      expect(dialog.open).toHaveBeenCalledWith("OTA", {});
+      expect(toastInfo).toHaveBeenCalledTimes(1);
+      expect(dialog.setSerialStream).not.toHaveBeenCalled();
     } finally {
       restore();
     }
