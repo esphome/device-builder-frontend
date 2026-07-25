@@ -41,6 +41,23 @@ export function formatSerialPortLabel(port: SerialPort): string {
 }
 
 /**
+ * Prompt for a Web Serial port without opening it. Returns ``null`` if the
+ * user dismissed the picker; throws on a real requestPort failure. Callers
+ * that only need the USB identity can decide before ever opening (no DTR/RTS
+ * pulse on a port that won't be used).
+ */
+export async function requestSerialPort(): Promise<SerialPort | null> {
+  try {
+    return await navigator.serial.requestPort();
+  } catch (err) {
+    if (isPortPickerCancel(err)) {
+      return null; // User dismissed the port picker.
+    }
+    throw err; // A real requestPort failure — let the caller surface it.
+  }
+}
+
+/**
  * Prompt for a Web Serial port and open it at log baud. Returns the open port,
  * or ``null`` if the user dismissed the picker. Throws if a picked port can't
  * be opened (claimed by another tab, driver error) — the caller surfaces that.
@@ -48,15 +65,8 @@ export function formatSerialPortLabel(port: SerialPort): string {
 export async function requestAndOpenSerialPort(
   baudRate: number
 ): Promise<SerialPort | null> {
-  let port: SerialPort;
-  try {
-    port = await navigator.serial.requestPort();
-  } catch (err) {
-    if (isPortPickerCancel(err)) {
-      return null; // User dismissed the port picker.
-    }
-    throw err; // A real requestPort failure — let the caller surface it.
-  }
+  const port = await requestSerialPort();
+  if (!port) return null;
   await port.open({ baudRate });
   return port;
 }
