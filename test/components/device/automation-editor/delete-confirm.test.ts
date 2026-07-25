@@ -8,38 +8,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-action-list.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-target-picker.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-trigger-picker.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/callable-params-editor.js",
-  () => ({})
-);
-vi.mock("../../../../src/components/confirm-dialog.js", () => {
-  class StubConfirmDialog extends HTMLElement {
-    open = vi.fn();
-  }
-  customElements.define("esphome-confirm-dialog", StubConfirmDialog);
-  return {};
-});
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
-vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+import "./_editor-harness.js";
 
-import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
   AvailableAutomations,
@@ -51,36 +21,18 @@ import { flushMicrotasks } from "../../../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const slimAvailable = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
+import { makeEditorApi, mountEditor, slimAvailable } from "./_editor-harness.js";
 
-const makeApi = (available: AvailableAutomations = slimAvailable()) => ({
-  getAvailableAutomations: vi.fn().mockResolvedValue(available),
-  getAutomationBodies: vi.fn().mockResolvedValue({}),
-  deleteAutomation: vi.fn().mockResolvedValue({
-    yaml_diff: { fromLine: 0, toLine: 0, replacement: "" },
-  }),
-  updateConfig: vi.fn().mockResolvedValue(undefined),
-});
-
-async function mountEditor(
+async function mountAndSettle(
   editor: ESPHomeAutomationEditor | ESPHomeScriptEditor | ESPHomeApiActionEditor,
-  api: ReturnType<typeof makeApi>,
+  api: ReturnType<typeof makeEditorApi>,
   location: AutomationLocation
 ) {
-  (editor as any)._api = api as unknown as ESPHomeAPI;
-  editor.configuration = "device.yaml";
-  (editor as any).location = location;
-  (editor as any).value = { trigger_id: null, trigger_params: {}, actions: [] };
-  document.body.appendChild(editor);
-  await editor.updateComplete;
-  await flushMicrotasks(5);
+  await mountEditor(editor, api, {
+    configuration: "device.yaml",
+    location,
+    value: { trigger_id: null, trigger_params: {}, actions: [] } as never,
+  });
   await editor.updateComplete;
 }
 
@@ -119,9 +71,11 @@ describe.each(CASES)(
   "$name delete confirm gate",
   ({ make, location, available, expectedName }) => {
     it("clicking Delete opens the confirm dialog without deleting", async () => {
-      const api = makeApi(available);
+      const api = makeEditorApi(
+        available ? { getAvailableAutomations: vi.fn().mockResolvedValue(available) } : {}
+      );
       const editor = make();
-      await mountEditor(editor, api, location);
+      await mountAndSettle(editor, api, location);
 
       const button = editor.shadowRoot!.querySelector<HTMLButtonElement>(".ae-danger")!;
       expect(button).not.toBeNull();
@@ -134,9 +88,9 @@ describe.each(CASES)(
     });
 
     it("the dialog's confirm event runs the delete", async () => {
-      const api = makeApi();
+      const api = makeEditorApi();
       const editor = make();
-      await mountEditor(editor, api, location);
+      await mountAndSettle(editor, api, location);
 
       const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog")!;
       dialog.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
@@ -147,11 +101,13 @@ describe.each(CASES)(
     });
 
     it("names the delete target in the confirm message", async () => {
-      const api = makeApi(available);
+      const api = makeEditorApi(
+        available ? { getAvailableAutomations: vi.fn().mockResolvedValue(available) } : {}
+      );
       const editor = make();
       (editor as any)._localize = (key: string, params?: Record<string, string>) =>
         params?.name ? `${key}:${params.name}` : key;
-      await mountEditor(editor, api, location);
+      await mountAndSettle(editor, api, location);
 
       const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog")!;
       expect(dialog.getAttribute("message")!.endsWith(`:${expectedName}`)).toBe(true);
@@ -161,11 +117,11 @@ describe.each(CASES)(
 
 describe("automation editor delete confirm before the catalog resolves", () => {
   it("falls back to the raw trigger key, not the generic title", async () => {
-    const api = makeApi();
+    const api = makeEditorApi();
     const editor = new ESPHomeAutomationEditor();
     (editor as any)._localize = (key: string, params?: Record<string, string>) =>
       params?.name ? `${key}:${params.name}` : key;
-    await mountEditor(editor, api, { kind: "device_on", trigger: "on_boot" });
+    await mountAndSettle(editor, api, { kind: "device_on", trigger: "on_boot" });
 
     const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog")!;
     expect(dialog.getAttribute("message")!.endsWith(":on_boot")).toBe(true);

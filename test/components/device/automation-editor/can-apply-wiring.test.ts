@@ -7,64 +7,27 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-action-list.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/callable-params-editor.js",
-  () => ({})
-);
-vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
-vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+import "./_editor-harness.js";
 
-import type { ESPHomeAPI } from "../../../../src/api/index.js";
-import type {
-  AutomationLocation,
-  AvailableAutomations,
-} from "../../../../src/api/types/automations.js";
+import type { AutomationLocation } from "../../../../src/api/types/automations.js";
 import { ESPHomeApiActionEditor } from "../../../../src/components/device/automation-editor/api-action-editor.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 import { flushMicrotasks } from "../../../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const slimAvailable = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
-
-const makeApi = () => ({
-  getAvailableAutomations: vi.fn().mockResolvedValue(slimAvailable()),
-  getAutomationBodies: vi.fn().mockResolvedValue({}),
-  parseDeviceAutomations: vi.fn().mockResolvedValue([]),
-  upsertAutomation: vi.fn().mockResolvedValue({
-    yaml_diff: { fromLine: 0, toLine: 0, replacement: "" },
-  }),
-  updateConfig: vi.fn().mockResolvedValue(undefined),
-});
+import { type EditorApiMock, makeEditorApi, mountEditor } from "./_editor-harness.js";
 
 async function mountAndFlush(
   editor: ESPHomeScriptEditor | ESPHomeApiActionEditor,
-  api: ReturnType<typeof makeApi>,
+  api: EditorApiMock,
   location: AutomationLocation
 ) {
-  (editor as any)._api = api as unknown as ESPHomeAPI;
-  editor.configuration = "device.yaml";
-  (editor as any).location = location;
-  (editor as any).value = { trigger_id: null, trigger_params: {}, actions: [] };
-  document.body.appendChild(editor);
-  await editor.updateComplete;
-  await flushMicrotasks(5);
+  await mountEditor(editor, api, {
+    configuration: "device.yaml",
+    location,
+    value: { trigger_id: null, trigger_params: {}, actions: [] } as never,
+  });
   (editor as any)._engine.withValue({ actions: [] });
   await editor.flushPending();
   await flushMicrotasks(5);
@@ -95,21 +58,21 @@ const CASES: Array<{
 
 describe.each(CASES)("$name _canApply wiring", ({ make, blocked, allowed, sibling }) => {
   it("blocks the upsert while the identity is empty", async () => {
-    const api = makeApi();
+    const api = makeEditorApi();
     await mountAndFlush(make(), api, blocked);
 
     expect(api.upsertAutomation).not.toHaveBeenCalled();
   });
 
   it("upserts once the identity is set", async () => {
-    const api = makeApi();
+    const api = makeEditorApi();
     await mountAndFlush(make(), api, allowed);
 
     expect(api.upsertAutomation).toHaveBeenCalled();
   });
 
   it("a navigator swap to a sibling invalidates the stale value and re-hydrates", async () => {
-    const api = makeApi();
+    const api = makeEditorApi();
     const editor = make();
     await mountAndFlush(editor, api, allowed);
     expect(api.parseDeviceAutomations).not.toHaveBeenCalled();

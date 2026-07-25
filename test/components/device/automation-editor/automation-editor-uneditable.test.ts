@@ -7,24 +7,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-action-list.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-target-picker.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-trigger-picker.js",
-  () => ({})
-);
-vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
-vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+import "./_editor-harness.js";
+import { slimAvailable } from "./_editor-harness.js";
 
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
@@ -62,15 +46,6 @@ const validParse = (): ParsedAutomation[] => [
     raw_yaml: "on_boot:\n  then: []\n",
   } as unknown as ParsedAutomation,
 ];
-
-const slimAvailable = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
 
 describe("automation-editor uneditable (errored parse)", () => {
   it("renders read-only and never upserts when the parsed automation has an error", async () => {
