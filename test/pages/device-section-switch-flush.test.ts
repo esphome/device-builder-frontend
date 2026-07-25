@@ -107,6 +107,34 @@ describe("section-switch flush barrier", () => {
     await switching;
   });
 
+  it("a later switch supersedes one queued behind the flush", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolvers: (() => void)[] = [];
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    const first = vi.fn();
+    const second = vi.fn();
+    // Both callers pass their dedupe against the same pre-switch
+    // selection (it only advances inside the action), so both reach
+    // the guard; only the newest may run.
+    const switching1 = internals(page)._guardSectionSwitch(first) as Promise<void>;
+    const switching2 = internals(page)._guardSectionSwitch(second) as Promise<void>;
+
+    resolvers.forEach((r) => r());
+    await Promise.all([switching1, switching2]);
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledOnce();
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;

@@ -330,6 +330,10 @@ export class ESPHomePageDevice extends LitElement {
    *  page and the section editor. */
   private _activeSection: SectionEditor | null = null;
 
+  /** Supersede token for the section-switch guard: a switch queued
+   *  behind the flush barrier yields to any later one. */
+  private _switchSeq = 0;
+
   @state()
   private _sectionDirty = false;
 
@@ -1779,6 +1783,7 @@ export class ESPHomePageDevice extends LitElement {
     // synchronous, so cursor-driven selection stays re-entrant safe.
     // The automation editors' flushPending is async, so switching out
     // of one always defers — idle or not.
+    const seq = ++this._switchSeq;
     const pending = this._activeSection?.flushPending();
     if (pending) {
       // A failed flush already surfaced its own error; still switch —
@@ -1788,9 +1793,13 @@ export class ESPHomePageDevice extends LitElement {
       } catch {
         // Handled by the editor.
       }
-      // The page can unmount across the flush; a late action would
-      // replaceState on whatever URL the user has since landed on.
-      if (!this.isConnected) return;
+      // The page can unmount across the flush (a late action would
+      // replaceState on whatever URL the user has since landed on),
+      // and a later switch supersedes this one — the callers' dedupe
+      // reads pre-switch state for the whole window, so without the
+      // token a duplicate click double-pushes the back stack and a
+      // caret returning home still gets yanked away.
+      if (!this.isConnected || seq !== this._switchSeq) return;
     }
     action();
   }
