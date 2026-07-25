@@ -18,6 +18,9 @@ const UART_BRIDGE_VENDOR_IDS = new Set([
 // the ESP-USB-Bridge (0x1002), which IS a UART bridge.
 const ESPRESSIF_USB_JTAG_PID = 0x1001;
 
+// Spellings come from the backend's logger_interface_values vocabulary
+// (platform_capabilities.index.json, snapshotted from esphome's logger) -
+// keep in lockstep.
 const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
 
 /**
