@@ -60,6 +60,13 @@ export class ESPHomeConfirmDialog extends LitElement {
     espHomeStyles,
     modalDialogStyles,
     css`
+      :host {
+        /* Match base-dialog: contribute no box to the embedder's
+           layout (a flex/grid host would otherwise gap around an
+           empty item). */
+        display: contents;
+      }
+
       esphome-base-dialog {
         /* Hosts can widen a specific dialog (e.g. one showing long secret
            keys) by setting --esphome-confirm-dialog-width on the element. */
