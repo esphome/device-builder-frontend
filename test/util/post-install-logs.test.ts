@@ -308,4 +308,36 @@ describe("handlePostInstallShowLogs serial baud", () => {
     expect(dialog.openPassive).not.toHaveBeenCalled();
     expect(dialog.setSerialStream).not.toHaveBeenCalled();
   });
+
+  it("reroutes to network logs when the port can't carry the console", async () => {
+    // A CH340-class bridge on a device whose logger outputs on native USB —
+    // the #1430 heat-pump shape.
+    const dialog = logsDialog();
+    const event = new CustomEvent("request-show-logs-after-install", {
+      cancelable: true,
+      detail: {
+        ...detail(115200),
+        webSerialPort: openPort({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+        loggerInterface: "USB_SERIAL_JTAG",
+      },
+    });
+    await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
+    expect(dialog.open).toHaveBeenCalledWith("OTA", {
+      onBackToInstall: event.detail.reopenInstall,
+    });
+    expect(toastInfo).toHaveBeenCalledTimes(1);
+    expect(dialog.openPassive).not.toHaveBeenCalled();
+  });
+
+  it("keeps the serial session when the port matches the console", async () => {
+    // Native Espressif port + native-USB console: the common healthy path.
+    const dialog = logsDialog();
+    const event = new CustomEvent("request-show-logs-after-install", {
+      cancelable: true,
+      detail: { ...detail(115200), loggerInterface: "USB_SERIAL_JTAG" },
+    });
+    await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
+    expect(dialog.open).not.toHaveBeenCalled();
+    expect(dialog.openPassive).toHaveBeenCalledTimes(1);
+  });
 });

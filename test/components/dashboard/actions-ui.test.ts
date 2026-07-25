@@ -104,6 +104,39 @@ describe("openLogsWithMethod web-serial", () => {
     expect(logsDialog.configuration).toBe("x.yaml");
     expect(requestAndOpenSerialPort).not.toHaveBeenCalled();
   });
+
+  it("closes a mismatched port and reroutes to network logs", async () => {
+    vi.stubGlobal("navigator", { serial: {} });
+    const close = vi.fn(async () => {});
+    requestAndOpenSerialPort.mockResolvedValue({
+      getInfo: () => ({ usbVendorId: 0x1a86 }),
+      close,
+    });
+    const logsDialog = {
+      configuration: "",
+      name: "",
+      open: vi.fn(),
+      openPassive: vi.fn(),
+    };
+    const host = makeDashboardHost({ _logsDialog: logsDialog });
+    const device = {
+      configuration: "x.yaml",
+      name: "x",
+      friendly_name: "X",
+      logger_baud_rate: null,
+      logger_interface: "USB_SERIAL_JTAG",
+    } as ConfiguredDevice;
+
+    await openLogsWithMethod(host, device, "web-serial");
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(toastInfo).toHaveBeenCalledWith(
+      expect.stringContaining("dashboard.logs_serial_wrong_port_fallback"),
+      expect.anything()
+    );
+    expect(logsDialog.open).toHaveBeenCalledWith("OTA", {});
+    expect(logsDialog.openPassive).not.toHaveBeenCalled();
+  });
 });
 
 describe("executeRename", () => {

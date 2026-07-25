@@ -4,6 +4,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import { serialPortCannotCarryConsole } from "./serial-console-match.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
@@ -11,16 +12,19 @@ import {
 } from "./web-serial.js";
 
 /**
- * Route a device whose serial console is provably silent (logger baud_rate 0)
- * to the network log stream, with a notice saying why (#1430).
+ * Route a device whose serial console is provably silent (logger baud_rate 0,
+ * or a port that can't carry the console) to the network log stream, with a
+ * notice saying why (#1430). The default message is the baud-0 one.
  */
 export function openNetworkLogsFallback(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  options: { onBackToInstall?: () => void } = {}
+  options: { onBackToInstall?: () => void; message?: string } = {}
 ): void {
-  notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
-  logsDialog.open(OTA_PORT, options);
+  notifyInfo(options.message ?? localize("dashboard.logs_serial_disabled_fallback"));
+  const openOptions: { onBackToInstall?: () => void } = {};
+  if (options.onBackToInstall) openOptions.onBackToInstall = options.onBackToInstall;
+  logsDialog.open(OTA_PORT, openOptions);
 }
 
 /**
@@ -111,6 +115,10 @@ export interface PostInstallShowLogsDetail {
   // The handler resolves it: null / absent ⇒ 115200 default, 0 ⇒ serial
   // logging disabled (skip with a notice).
   loggerBaudRate?: number | null;
+  // Resolved logger output interface (Device.logger_interface), only
+  // meaningful on the webSerialPort path: a port that can't carry it
+  // reroutes to network logs.
+  loggerInterface?: string | null;
   reopenInstall: () => void;
 }
 
@@ -217,14 +225,30 @@ export async function handlePostInstallShowLogs(
   localize: LocalizeFunc
 ) {
   e.preventDefault();
-  const { configuration, name, port, webSerialPort, loggerBaudRate, reopenInstall } =
-    e.detail;
+  const {
+    configuration,
+    name,
+    port,
+    webSerialPort,
+    loggerBaudRate,
+    loggerInterface,
+    reopenInstall,
+  } = e.detail;
   logsDialog.configuration = configuration;
   logsDialog.name = name;
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
       openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
+      return;
+    }
+    if (serialPortCannotCarryConsole(loggerInterface, webSerialPort)) {
+      openNetworkLogsFallback(logsDialog, localize, {
+        onBackToInstall: reopenInstall,
+        message: localize("dashboard.logs_serial_wrong_port_fallback", {
+          interface: loggerInterface ?? "",
+        }),
+      });
       return;
     }
     logsDialog.openPassive({
