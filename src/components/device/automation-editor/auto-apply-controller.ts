@@ -11,7 +11,11 @@ import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
 import { fireSectionEvent } from "../section-editor.js";
-import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
+import {
+  applyYamlDiff,
+  emptyAutomationTree,
+  sectionKeyFromLocation,
+} from "./serialise.js";
 
 /** Debounce window between a value change and the auto-apply upsert.
  *  Coalesces bursts (typing into a templatable string param, dragging
@@ -69,9 +73,10 @@ export interface AutoApplyOptions {
  * - ``yaml-draft`` after a successful upsert (the global save button
  *   is the only writer to disk; auto-apply only advances the page's
  *   YAML buffer).
- * - ``yaml-updated`` + ``section-select`` after a successful delete
- *   (delete writes through immediately via ``updateConfig``,
- *   matching the component editor's delete UX).
+ * - ``yaml-updated`` after a successful delete (delete writes through
+ *   immediately via ``updateConfig``, matching the component editor's
+ *   delete UX), plus ``section-select`` unless the element was
+ *   re-pointed at a sibling mid-delete.
  *
  * Failures on either path surface a ``toast.error`` plus the host's
  * inline error message — per CLAUDE.md, a failed write must reach
@@ -84,6 +89,15 @@ export class AutoApplyController implements ReactiveController {
   private _lastSelfWrittenYaml: string | null = null;
   private _dirty = false;
   private _deleting = false;
+  // Whether the host element is on screen; a failure-path re-arm must not
+  // schedule a write for a torn-down section.
+  private _connected = false;
+  /** An apply was suppressed while a delete owned the section; a
+   *  failed delete re-arms it so the edit isn't silently dropped. */
+  private _applySuppressed = false;
+  /** Whose edit the suppression belongs to, so a mid-flush
+   *  retarget's sibling edit survives a successful delete. */
+  private _suppressedFor: AutomationLocation | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -96,10 +110,12 @@ export class AutoApplyController implements ReactiveController {
    *  ``flushPending()`` before its global save. Mirrors
    *  device-section-config's section-mount event. */
   hostConnected(): void {
+    this._connected = true;
     fireSectionEvent(this._host, "section-mount", { node: this._host });
   }
 
   hostDisconnected(): void {
+    this._connected = false;
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._clearTimer();
@@ -157,6 +173,11 @@ export class AutoApplyController implements ReactiveController {
   scheduleAutoApply(): void {
     if (this._host.addMode) return;
     if (this._options.isReadOnly()) return;
+    if (this._deleting) {
+      this._applySuppressed = true;
+      this._suppressedFor = this._host.location;
+      return;
+    }
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -201,6 +222,15 @@ export class AutoApplyController implements ReactiveController {
       return;
     }
     if (this._options.canApply && !this._options.canApply(location)) return;
+    // A delete owns the section from here on; a racing apply (the
+    // in-flight dirty requeue, a stray flushPending) must not run.
+    if (this._deleting) {
+      this._applySuppressed = true;
+      // The snapshot from the top of the call, so the suppression is
+      // tied to the apply attempt being blocked.
+      this._suppressedFor = location;
+      return;
+    }
     if (this._applyInFlight) {
       this._applyDirty = true;
       return;
@@ -257,23 +287,44 @@ export class AutoApplyController implements ReactiveController {
    * compute the new YAML via the backend's delete diff, write it via
    * ``api.updateConfig``, then dispatch ``yaml-updated`` (which
    * advances both ``_yaml`` AND ``_savedYaml`` on the page — a clean
-   * state). Navigates away from the deleted section after.
+   * state). Navigates away from the deleted section after, unless the
+   * reused element has already been re-pointed at a sibling.
    */
   async delete(): Promise<void> {
     const api = this._options.getApi();
     if (!api || !this._host.location || this._deleting) return;
+    // Snapshot the identity before any await: location is a reactive prop
+    // the parent reassigns on navigation, and the element is reused across
+    // sibling automations — a mid-flush section switch must not retarget
+    // the delete.
+    const location = this._host.location;
+    const configuration = this._host.configuration;
     // Cancel any pending auto-apply — we're about to delete.
+    const hadPending = this._applyTimer !== null;
     this._clearTimer();
     this._setDeleting(true);
     this._options.setError("");
+    let failed = false;
     try {
-      const { yaml_diff } = await api.deleteAutomation(
-        this._host.configuration,
-        this._host.location,
-        this._host.yaml
-      );
-      const newYaml = applyYamlDiff(this._host.yaml, yaml_diff);
-      await api.updateConfig(this._host.configuration, newYaml);
+      // Settle the in-flight upsert (the timer is already cancelled)
+      // before computing the delete diff: its late ``yaml-draft``
+      // would otherwise land after our ``yaml-updated`` and resurrect
+      // the deleted section (#1451). ``_deleting`` blocks the dirty
+      // requeue, so this terminates.
+      // ``flushPending`` must resolve on a MACROTASK: three nested
+      // Lit update cycles carry the settling upsert's ``yaml-draft``
+      // back down into ``.yaml``, and only the poll's setTimeout
+      // drains them all. A promise-await refactor of the poll would
+      // resolve on a microtask and reintroduce #1451.
+      await this.flushPending();
+      // Read the settled buffer exactly once: the backend computes
+      // the diff's line coordinates against the string we send, so
+      // splicing into a later re-read (a YAML-pane keystroke during
+      // the round-trip) would silently mangle the write-through.
+      const yaml = this._host.yaml;
+      const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
+      const newYaml = applyYamlDiff(yaml, yaml_diff);
+      await api.updateConfig(configuration, newYaml);
       this._host.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-updated", {
           detail: { yaml: newYaml },
@@ -281,17 +332,57 @@ export class AutoApplyController implements ReactiveController {
           composed: true,
         })
       );
-      this._host.dispatchEvent(
-        new CustomEvent<{ sectionKey: string | null }>("section-select", {
-          detail: { sectionKey: null },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      // Navigate away only while the editor still shows the deleted
+      // section. After a mid-flush retarget the user is already on a
+      // sibling; yanking them to null would also unmount the editor
+      // and cancel the sibling's re-armed edit below.
+      if (
+        !this._host.location ||
+        sectionKeyFromLocation(this._host.location) === sectionKeyFromLocation(location)
+      ) {
+        this._host.dispatchEvent(
+          new CustomEvent<{ sectionKey: string | null }>("section-select", {
+            detail: { sectionKey: null },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
     } catch (err) {
+      failed = true;
       this._surfaceSaveError(err);
     } finally {
       this._setDeleting(false);
+      const suppressed = this._applySuppressed;
+      const suppressedFor = this._suppressedFor;
+      this._applySuppressed = false;
+      this._suppressedFor = null;
+      if (failed) {
+        // The section survived — land the edit the delete window
+        // suppressed or cancelled instead of silently dropping it.
+        // Only while still on screen: re-arming a torn-down section
+        // would schedule a write for an editor that no longer exists.
+        if (this._connected && (suppressed || hadPending)) this.scheduleAutoApply();
+      } else if (
+        suppressed &&
+        suppressedFor &&
+        this._connected &&
+        this._host.location &&
+        sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location) &&
+        sectionKeyFromLocation(this._host.location) ===
+          sectionKeyFromLocation(suppressedFor)
+      ) {
+        // The suppressed edit belongs to a sibling the reused
+        // element was re-pointed at mid-flush, and the element still
+        // shows that sibling — so the re-armed timer writes exactly
+        // the suppressed edit (autoApply reads host state at fire
+        // time, not the snapshot). The editor stayed mounted (no
+        // section-select above), so the timer lands.
+        this.scheduleAutoApply();
+      } else {
+        // The deleted section's own edits die with it.
+        this._setDirty(false);
+      }
     }
   }
 

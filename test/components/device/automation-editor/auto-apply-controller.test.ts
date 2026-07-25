@@ -79,6 +79,8 @@ function setup(over: Partial<AutoApplyOptions> = {}) {
     setError,
     ...over,
   });
+  // Mirror Lit's lifecycle: the host is on screen when tests drive it.
+  controller.hostConnected();
   return { host, controller, upsertAutomation, deleteAutomation, updateConfig, setError };
 }
 
@@ -261,12 +263,22 @@ describe("AutoApplyController delete", () => {
     expect(controller.deleting).toBe(false);
   });
 
-  it("cancels a pending auto-apply before deleting", async () => {
+  it("cancels a pending auto-apply before deleting and clears its dirty flag", async () => {
     const { controller, upsertAutomation } = setup();
     controller.scheduleAutoApply();
     await controller.delete();
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
     expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a failed delete re-arms the cancelled pending auto-apply", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    controller.scheduleAutoApply();
+    await controller.delete();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a delete failure via toast.error and clears the deleting flag", async () => {
@@ -283,6 +295,259 @@ describe("AutoApplyController delete", () => {
       richColors: true,
     });
     expect(controller.deleting).toBe(false);
+  });
+
+  it("waits out an in-flight upsert so its draft lands before the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    const order: string[] = [];
+    host.addEventListener("yaml-draft", (e) => {
+      order.push("draft");
+      // Mirror the page faithfully: three nested Lit update cycles
+      // carry the draft back down, each on its own microtask — only
+      // the flush poll's macrotask boundary drains them all before
+      // the delete reads the buffer.
+      const yaml = (e as CustomEvent<{ yaml: string }>).detail.yaml;
+      void Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => Promise.resolve())
+        .then(() => {
+          host.yaml = yaml;
+        });
+    });
+    host.addEventListener("yaml-updated", () => order.push("updated"));
+
+    const applying = controller.autoApply();
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(60);
+    expect(deleteAutomation).not.toHaveBeenCalled();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, deleting]);
+
+    expect(deleteAutomation).toHaveBeenCalledOnce();
+    expect(deleteAutomation).toHaveBeenCalledWith(
+      "device.yaml",
+      SCRIPT,
+      "replaced\nline2"
+    );
+    expect(order).toEqual(["draft", "updated"]);
+  });
+
+  it("a mid-flush section switch cannot retarget the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+
+    const applying = controller.autoApply();
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(60);
+    // The user clicks a sibling automation while the delete is parked on
+    // the in-flight upsert; the reused element gets a new location.
+    host.location = { kind: "script", id: "s2" };
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, deleting]);
+
+    expect(deleteAutomation).toHaveBeenCalledOnce();
+    // The snapshot taken before the barrier wins, not the swapped prop.
+    expect(deleteAutomation.mock.calls[0][1]).toBe(SCRIPT);
+  });
+
+  it("a failed delete re-arms an edit scheduled during the delete window", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let rejectDelete!: (e: Error) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectDelete = reject;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    controller.scheduleAutoApply();
+
+    rejectDelete(new Error("nope"));
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+  });
+
+  it("a sibling's edit suppressed during the delete window survives the delete", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    const selections = captureEvents(host, "section-select");
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // The navigator re-points the reused element at a sibling and
+    // the user edits it while the delete is still in flight.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+    controller.scheduleAutoApply();
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(upsertAutomation).toHaveBeenCalledWith(
+      "device.yaml",
+      host.value,
+      host.location,
+      expect.any(String)
+    );
+    // The user is on the sibling; the delete must not navigate away
+    // (that unmount would cancel the re-armed edit).
+    expect(selections).toHaveLength(0);
+  });
+
+  it("a mid-flush retarget without an edit stays on the sibling with nothing re-armed", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    const selections = captureEvents(host, "section-select");
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // The navigator re-points the reused element at a sibling but the
+    // user types nothing before the delete resolves.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(selections).toHaveLength(0);
+    expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a suppressed sibling edit is not re-armed after navigating back to the deleted section", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // Retarget to a sibling, edit it, then navigate back to the
+    // section being deleted before the round-trip finishes.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+    controller.scheduleAutoApply();
+    host.location = SCRIPT;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    // Re-arming here would upsert the deleted location and resurrect
+    // it; the guard requires the host to still show the sibling.
+    expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a failed delete does not re-arm a torn-down section", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    controller.scheduleAutoApply();
+    const deleting = controller.delete();
+    controller.hostDisconnected();
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+    expect(upsertAutomation).not.toHaveBeenCalled();
+  });
+
+  it("a failed delete re-arms the edit suppressed during the delete window", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    const first = controller.autoApply();
+    void controller.autoApply();
+    const deleting = controller.delete();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([first, deleting]);
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a queued re-apply is dropped once the delete owns the section", async () => {
+    const { controller, upsertAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    const first = controller.autoApply();
+    void controller.autoApply();
+    const deleting = controller.delete();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([first, deleting]);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+  });
+
+  it("nothing schedules a new upsert while a delete is running", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    controller.scheduleAutoApply();
+    // The schedule guard refuses outright: no armed timer and no
+    // spurious dirty flip while the delete owns the section.
+    expect(controller.dirty).toBe(false);
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    resolveDelete({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(20);
+    await deleting;
+
+    expect(upsertAutomation).not.toHaveBeenCalled();
   });
 });
 
