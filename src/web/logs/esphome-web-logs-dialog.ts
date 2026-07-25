@@ -181,11 +181,19 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // the initial stream reads it as-is; reconnect reopens are this dialog's
   // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
+    if (!this.port?.readable) return; // no (open) port yet — legitimately quiet
     // _activePort blocks a restart while a disconnect recovery is in flight
     // (_cancel is already cleared there): a parent swapping .port in that
     // window must not wipe the rendered lines or race a second reader
-    // against _resumeAfterDisconnect.
-    if (!this.port?.readable || this._cancel || this._activePort) return;
+    // against _resumeAfterDisconnect. Loud, not silent — a refused open
+    // handle would otherwise sit on "Waiting…" with nothing to show why.
+    if (this._cancel || this._activePort) {
+      // The port-replaced round trip echoes our own handle back — quiet.
+      if (this.port !== this._activePort) {
+        console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
+      }
+      return;
+    }
     this._resetLines();
     this._crashKind = null;
     this._paused = false;

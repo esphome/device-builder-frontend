@@ -200,7 +200,13 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._busy = true;
     this._flashDone = false;
     this._progress = null;
-    this._bootLogsGen++; // abandon any prior flash's pending acquisition
+    // End any prior flash's log session outright: the generation bump only
+    // supersedes a still-pending acquisition; closing the dialog releases a
+    // streaming one (after-hide → _stop), and the stale handle must not
+    // back the Logs button across installs.
+    this._bootLogsGen++;
+    this._logsOpen = false;
+    this._logPort = undefined;
     this._resetLog();
 
     let port: SerialPort;
@@ -273,8 +279,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
    * ``openLiveLogPort`` acquires and opens the live handle — its 8k buffer
    * holds the earliest boot bytes until the dialog's reader attaches, so
    * nothing is lost and the port is never reopened. Closing the dialog
-   * mid-wait aborts the acquisition; a newer install or an unmount
-   * supersedes it via the generation counter.
+   * mid-wait does NOT abort the acquisition — the handle still lands in
+   * ``_logPort`` for the Logs button, so an early Escape and a late one
+   * end the same way. Only a newer install or an unmount supersedes it,
+   * via the generation counter.
    */
   private async _openBootLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
     const gen = ++this._bootLogsGen;
@@ -285,10 +293,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       before,
       LOG_BAUD_RATE,
       LOG_REOPEN_TIMEOUT_MS,
-      () => gen !== this._bootLogsGen || !this._logsOpen
+      () => gen !== this._bootLogsGen
     );
     if (!port) {
-      if (gen === this._bootLogsGen && this._logsOpen) {
+      if (gen === this._bootLogsGen) {
+        // Announced even after the user closed the dialog: the alternative
+        // is a silent dead end with no Logs button and no explanation.
         this._logsOpen = false;
         toast.error(
           this._localize("web.flash.logs_unavailable", {

@@ -22,7 +22,7 @@ export function renderCrashCallout(
 ): TemplateResult | typeof nothing {
   if (kind === null) return nothing;
   return html`<div class="crash-callout" slot="suggestion">
-    <wa-icon library="mdi" name="alert-circle"></wa-icon>
+    <wa-icon library="mdi" name="alert-circle" aria-hidden="true"></wa-icon>
     <!-- Live region on the text only: announcing the whole row would
          read any action button as part of a status message. -->
     <span class="crash-callout-text" role="status"

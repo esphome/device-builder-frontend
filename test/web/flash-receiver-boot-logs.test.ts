@@ -68,19 +68,24 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect(port.close).not.toHaveBeenCalled();
   });
 
-  it("aborts the wait silently when the dialog is closed during it", async () => {
+  it("keeps acquiring after the dialog closes and parks the handle", async () => {
+    // An Escape during the re-enumeration wait must end the same way as one
+    // a second later: closed handle in _logPort, Logs button available.
     const el = await mount();
     // A stale handle from a previous install must not survive into this one.
     (el as any)._logPort = makePort();
+    const port = makePort();
     openLiveLogPort.mockImplementation(async (...args: unknown[]) => {
-      (el as any)._logsOpen = false; // user closed the dialog
-      expect((args[4] as () => boolean)()).toBe(true); // shouldStop sees it
-      return { port: null };
+      expect((el as any)._logPort).toBeUndefined(); // stale handle cleared
+      (el as any)._logsOpen = false; // user closed the dialog mid-wait
+      expect((args[4] as () => boolean)()).toBe(false); // acquisition continues
+      return { port, error: null };
     });
 
     await (el as any)._openBootLogs({}, []);
 
-    expect((el as any)._logPort).toBeUndefined();
+    expect(port.close).toHaveBeenCalledOnce();
+    expect((el as any)._logPort).toBe(port);
     expect(toast.error).not.toHaveBeenCalled();
   });
 
