@@ -23,9 +23,7 @@ import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
-import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { deviceBoardInfoStyles } from "./device-board-info.styles.js";
@@ -134,12 +132,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   @query("esphome-add-component-dialog")
   private _addComponentDialog!: ESPHomeAddComponentDialog;
-
-  @query("esphome-add-automation-dialog")
-  private _addAutomationDialog!: ESPHomeAddAutomationDialog;
-
-  @query("esphome-add-config-dialog")
-  private _addConfigDialog!: ESPHomeAddConfigDialog;
 
   @query("esphome-change-board-dialog")
   private _changeBoardDialog!: ESPHomeChangeBoardDialog;

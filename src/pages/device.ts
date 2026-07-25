@@ -140,7 +140,8 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _layout: DeviceLayoutMode = "both";
 
-  private _tourLayout = new TourLayoutController(
+  /** Side-effect controller; the field only keeps the registration alive. */
+  protected readonly _tourLayout = new TourLayoutController(
     this,
     () => this._layout,
     (layout: DeviceLayoutMode) => {

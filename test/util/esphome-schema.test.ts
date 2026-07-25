@@ -159,7 +159,7 @@ describe("fetchBundle", () => {
 
 describe("getTriggerKeys", () => {
   it("returns trigger keys from a top-level component (esphome)", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
@@ -175,7 +175,7 @@ describe("getTriggerKeys", () => {
   });
 
   it("returns trigger keys from a platform-style component (binary_sensor.gpio)", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
@@ -197,7 +197,7 @@ describe("getTriggerKeys", () => {
   });
 
   it("returns [] when the component key isn't in the bundle", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
@@ -207,7 +207,7 @@ describe("getTriggerKeys", () => {
   });
 
   it("returns [] when the component has no trigger config-vars", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(
@@ -263,7 +263,7 @@ describe("getTriggerKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("gpio.json"))
@@ -310,7 +310,7 @@ describe("getTriggerKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -360,7 +360,7 @@ const CORE_BUNDLE = {
 
 describe("getActions", () => {
   it("aggregates actions across the requested bundles", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("logger.json"))
@@ -413,7 +413,7 @@ describe("getActions", () => {
   it("dedupes actions when the same component appears under two bundles", async () => {
     // Both bundles carry the same ``logger.log`` action — the
     // aggregator should not list it twice.
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
@@ -432,7 +432,7 @@ describe("getActions", () => {
     // should not appear. Mirrors the doc-scoped filtering the
     // legacy editor used (only suggest actions from components
     // actually present in the YAML).
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(
@@ -502,7 +502,7 @@ describe("getConfigVarKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
@@ -548,7 +548,7 @@ describe("getConfigVarKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(CHILD_BUNDLE), { status: 200 });
@@ -573,7 +573,7 @@ describe("getConfigVarKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -637,7 +637,7 @@ describe("getConfigVarValueOptions", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
@@ -673,7 +673,7 @@ describe("getConfigVarValueOptions", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -747,7 +747,7 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
@@ -800,7 +800,7 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -821,7 +821,7 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -831,7 +831,7 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
   });
 
   it("returns [] when the registry ref points at a missing slot", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify({ thing: { schemas: {} } }), { status: 200 });
@@ -908,7 +908,7 @@ describe("getRegistryEntryKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(GLOBALS_BUNDLE), { status: 200 });
@@ -948,7 +948,7 @@ describe("getRegistryEntryKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -968,7 +968,7 @@ describe("getRegistryEntryKeys", () => {
 
   it("returns [] for a missing registry entry", async () => {
     const BUNDLE = { thing: { action: {} } };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
@@ -996,7 +996,7 @@ describe("getRegistryEntryKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchSpy.mockImplementation(async (url: string, _init?: RequestInit) => {
       if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });

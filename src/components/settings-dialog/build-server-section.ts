@@ -74,7 +74,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     subscribe: true,
   })
   @state()
-  private _rotationCounter = 0;
+  protected _rotationCounter = 0;
 
   private readonly _identityCtrl = new RemoteBuildIdentityController(
     this,
