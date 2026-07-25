@@ -104,6 +104,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
    *  state non-deterministic on overlapping requests. */
   private _saveChain: Promise<unknown> = Promise.resolve();
 
+  /** Saves queued or in flight; while non-zero a same-device prop
+   *  update must not drop the optimistic override (an unrelated
+   *  ``DEVICE_UPDATED`` push would revert the chips mid-save). */
+  private _pendingSaves = 0;
+
   private readonly _dialog = new DialogOpenController(this);
 
   @query("esphome-label-form")
@@ -232,24 +237,27 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   protected willUpdate(changed: Map<string, unknown>) {
     if (!changed.has("device")) return;
     const prev = changed.get("device") as ConfiguredDevice | undefined;
-    // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
-    // after our own ``set_labels`` — now carries the saved labels, so drop
-    // the optimistic override and trust the prop. Crucially, DON'T close the
-    // dialog: the user is mid-edit and toggling more labels, and each toggle
-    // round-trips through this same push.
-    this._optimisticLabels = null;
     // Only a real swap to a *different* device tears down the transient edit
     // state and closes the dialog; otherwise a half-typed "create" form would
     // persist into the next device's editor and a still-pending save chained
     // against the previous device would keep gating this one through
     // the stale _saveChain.
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
+      this._optimisticLabels = null;
       this._dialog.open = false;
       this._createForm?.collapse();
       this._saveChain = Promise.resolve();
       // Drop any in-flight create snapshot so a late ``label-created``
       // arriving after the swap is ignored rather than misapplied.
       this._pendingCreateConfig = null;
+    } else if (this._pendingSaves === 0) {
+      // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
+      // after our own ``set_labels`` — now carries the saved labels, so drop
+      // the optimistic override and trust the prop. Only with no save
+      // pending: an unrelated push mid-save must not revert the chips.
+      // Crucially, DON'T close the dialog: the user is mid-edit and toggling
+      // more labels, and each toggle round-trips through this same push.
+      this._optimisticLabels = null;
     }
   }
 
@@ -382,12 +390,20 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     if (!this._api) return;
     const api = this._api;
     const config = this.device.configuration;
+    this._pendingSaves++;
     const task = this._saveChain.then(async () => {
       try {
         await api.setDeviceLabels(config, nextIds);
       } catch (err) {
         console.warn("set_labels failed", err);
         notifyError(this._localize("dashboard.labels_save_failed"));
+      } finally {
+        this._pendingSaves--;
+        // Success: the DEVICE_UPDATED push rode the socket ahead of
+        // this reply, so the prop is authoritative. Failure: the prop
+        // is the truth the write never changed. Either way drop the
+        // override, unless a newer click already owns it.
+        if (this._optimisticLabels === nextIds) this._optimisticLabels = null;
       }
     });
     this._saveChain = task;
