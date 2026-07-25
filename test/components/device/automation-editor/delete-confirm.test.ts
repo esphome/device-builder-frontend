@@ -88,25 +88,31 @@ const CASES: Array<{
   name: string;
   make: () => ESPHomeAutomationEditor | ESPHomeScriptEditor | ESPHomeApiActionEditor;
   location: AutomationLocation;
+  expectedName: string;
 }> = [
   {
     name: "automation editor",
     make: () => new ESPHomeAutomationEditor(),
     location: { kind: "device_on", trigger: "on_boot" },
+    // No trigger catalog loaded in the test, so the header-title
+    // fallback is the interpolated name.
+    expectedName: "device.automation_header_title_static",
   },
   {
     name: "script editor",
     make: () => new ESPHomeScriptEditor(),
     location: { kind: "script", id: "my_script" },
+    expectedName: "my_script",
   },
   {
     name: "api-action editor",
     make: () => new ESPHomeApiActionEditor(),
     location: { kind: "api_action", action_name: "my_action" },
+    expectedName: "my_action",
   },
 ];
 
-describe.each(CASES)("$name delete confirm gate", ({ make, location }) => {
+describe.each(CASES)("$name delete confirm gate", ({ make, location, expectedName }) => {
   it("clicking Delete opens the confirm dialog without deleting", async () => {
     const api = makeApi();
     const editor = make();
@@ -133,5 +139,16 @@ describe.each(CASES)("$name delete confirm gate", ({ make, location }) => {
 
     expect(api.deleteAutomation).toHaveBeenCalledOnce();
     expect(api.deleteAutomation).toHaveBeenCalledWith("device.yaml", location, "");
+  });
+
+  it("names the delete target in the confirm message", async () => {
+    const api = makeApi();
+    const editor = make();
+    (editor as any)._localize = (key: string, params?: Record<string, string>) =>
+      params?.name ? `${key}:${params.name}` : key;
+    await mountEditor(editor, api, location);
+
+    const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog")!;
+    expect(dialog.getAttribute("message")).toMatch(new RegExp(`:${expectedName}$`));
   });
 });

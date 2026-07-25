@@ -76,6 +76,13 @@ export const automationEditorActionStyles = css`
     font-style: italic;
   }
 
+  /* The delete confirm dialog is an empty box in the editors'
+     flex-gap column; keep it out of layout so it adds no trailing
+     gap. */
+  esphome-confirm-dialog {
+    display: contents;
+  }
+
   /* Bottom-of-editor save / delete buttons. */
   .ae-actions {
     display: flex;
