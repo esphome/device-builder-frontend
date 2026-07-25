@@ -10,7 +10,7 @@ import {
   reconnectWebSerialLogs,
   requestAndOpenSerialPort,
 } from "./post-install-logs.js";
-import { serialPortCannotCarryConsole } from "./serial-console-match.js";
+import { serialConsoleMismatchNotice } from "./serial-console-match.js";
 
 /** The host bits both logs entry points need, decoupled from any page class. */
 export interface LogsLaunchHost {
@@ -99,17 +99,18 @@ export async function launchLogsWithMethod(
     if (!serialPort) return; // User dismissed the port picker.
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
-    if (serialPortCannotCarryConsole(device.logger_interface, serialPort)) {
+    const mismatch = serialConsoleMismatchNotice(
+      device.logger_interface,
+      serialPort,
+      host.localize
+    );
+    if (mismatch) {
       try {
         await serialPort.close();
       } catch {
         // Releasing the provably-silent port is best-effort.
       }
-      openNetworkLogsFallback(host.logsDialog, host.localize, {
-        message: host.localize("dashboard.logs_serial_wrong_port_fallback", {
-          interface: device.logger_interface ?? "",
-        }),
-      });
+      openNetworkLogsFallback(host.logsDialog, host.localize, { message: mismatch });
       return;
     }
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh

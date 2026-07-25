@@ -4,7 +4,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
-import { serialPortCannotCarryConsole } from "./serial-console-match.js";
+import { serialConsoleMismatchNotice } from "./serial-console-match.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
@@ -21,9 +21,8 @@ export function openNetworkLogsFallback(
   localize: LocalizeFunc,
   options: { onBackToInstall?: () => void; message?: string } = {}
 ): void {
-  notifyInfo(options.message ?? localize("dashboard.logs_serial_disabled_fallback"));
-  const openOptions: { onBackToInstall?: () => void } = {};
-  if (options.onBackToInstall) openOptions.onBackToInstall = options.onBackToInstall;
+  const { message, ...openOptions } = options;
+  notifyInfo(message ?? localize("dashboard.logs_serial_disabled_fallback"));
   logsDialog.open(OTA_PORT, openOptions);
 }
 
@@ -242,12 +241,15 @@ export async function handlePostInstallShowLogs(
       openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
       return;
     }
-    if (serialPortCannotCarryConsole(loggerInterface, webSerialPort)) {
+    const mismatch = serialConsoleMismatchNotice(
+      loggerInterface,
+      webSerialPort,
+      localize
+    );
+    if (mismatch) {
       openNetworkLogsFallback(logsDialog, localize, {
         onBackToInstall: reopenInstall,
-        message: localize("dashboard.logs_serial_wrong_port_fallback", {
-          interface: loggerInterface ?? "",
-        }),
+        message: mismatch,
       });
       return;
     }

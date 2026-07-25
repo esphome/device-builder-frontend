@@ -1,6 +1,11 @@
+import type { LocalizeFunc } from "../common/localize.js";
+import { ESPRESSIF_USB_VID } from "./web-serial.js";
+
 // Vendors that make dedicated USB-UART bridge chips and nothing that
 // enumerates as a device's native USB console. A port from one of these can
-// only be wired to external UART pins.
+// only be wired to external UART pins. Mirrors the backend's picker-hint
+// taxonomy in controllers/config/serial_ports.py (_BRIDGE_VIDS) - keep the
+// two sets in lockstep.
 const UART_BRIDGE_VENDOR_IDS = new Set([
   0x1a86, // WCH (CH340 / CH9102)
   0x10c4, // Silicon Labs (CP210x)
@@ -9,9 +14,8 @@ const UART_BRIDGE_VENDOR_IDS = new Set([
 ]);
 
 // The on-chip USB-Serial-JTAG device every native-USB ESP32 variant
-// enumerates as. The product id matters: Espressif's 0x303a also covers the
-// ESP-USB-Bridge (0x1002), which IS a UART bridge.
-const ESPRESSIF_USB_JTAG_VID = 0x303a;
+// enumerates as. The product id matters: Espressif's vendor id also covers
+// the ESP-USB-Bridge (0x1002), which IS a UART bridge.
 const ESPRESSIF_USB_JTAG_PID = 0x1001;
 
 const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
@@ -33,12 +37,25 @@ export function serialPortCannotCarryConsole(
   if (USB_CONSOLE_INTERFACES.has(loggerInterface)) {
     // A dedicated bridge chip can't be the chip's own USB device. An
     // unknown or absent vendor could be a native CDC console (RP2040's
-    // 0x2e8a, nRF52) — assume it works.
+    // 0x2e8a, nRF52) - assume it works.
     return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
   }
   // UART-family console: only the on-chip USB-Serial-JTAG device provably
   // can't carry it; any other port might be wired to the UART pins.
-  return (
-    usbVendorId === ESPRESSIF_USB_JTAG_VID && usbProductId === ESPRESSIF_USB_JTAG_PID
-  );
+  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
+}
+
+/**
+ * Localized wrong-port notice when the port provably can't carry the
+ * console, else null. The single home for the mismatch decision + message.
+ */
+export function serialConsoleMismatchNotice(
+  loggerInterface: string | null | undefined,
+  port: SerialPort,
+  localize: LocalizeFunc
+): string | null {
+  if (!serialPortCannotCarryConsole(loggerInterface, port)) return null;
+  return localize("dashboard.logs_serial_wrong_port_fallback", {
+    interface: loggerInterface ?? "",
+  });
 }

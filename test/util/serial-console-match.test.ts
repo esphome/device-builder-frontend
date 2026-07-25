@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { serialPortCannotCarryConsole } from "../../src/util/serial-console-match.js";
+import type { LocalizeFunc } from "../../src/common/localize.js";
+import {
+  serialConsoleMismatchNotice,
+  serialPortCannotCarryConsole,
+} from "../../src/util/serial-console-match.js";
 
 const ESP_JTAG = { usbVendorId: 0x303a, usbProductId: 0x1001 };
 const ESP_USB_BRIDGE = { usbVendorId: 0x303a, usbProductId: 0x1002 };
@@ -65,5 +69,22 @@ describe("serialPortCannotCarryConsole", () => {
     expect(serialPortCannotCarryConsole(null, port(CH340))).toBe(false);
     expect(serialPortCannotCarryConsole(undefined, port(ESP_JTAG))).toBe(false);
     expect(serialPortCannotCarryConsole("", port(CH340))).toBe(false);
+  });
+});
+
+describe("serialConsoleMismatchNotice", () => {
+  const localize = ((key: string, params?: Record<string, string>) =>
+    params ? `${key}:${params.interface}` : key) as unknown as LocalizeFunc;
+
+  it("names the interface in the wrong-port notice", () => {
+    expect(serialConsoleMismatchNotice("USB_SERIAL_JTAG", port(CH340), localize)).toBe(
+      "dashboard.logs_serial_wrong_port_fallback:USB_SERIAL_JTAG"
+    );
+  });
+
+  it("is null when the port can carry the console (or is uncertain)", () => {
+    expect(serialConsoleMismatchNotice("UART0", port(CH340), localize)).toBeNull();
+    expect(serialConsoleMismatchNotice(null, port(CH340), localize)).toBeNull();
+    expect(serialConsoleMismatchNotice("USB_CDC", port(PICO), localize)).toBeNull();
   });
 });
