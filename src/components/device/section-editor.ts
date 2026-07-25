@@ -53,6 +53,21 @@ export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
   fireEvent(target, name, detail);
 }
 
+/**
+ * Announce ``section-mount`` from *host* and return the matching
+ * unmount announcer. The unmount rides the parent captured here:
+ * disconnect callbacks run after the node has left the tree, and a
+ * detached dispatch bubbles nowhere (#1483). A never-mounted host
+ * falls back to itself — a harmless no-op dispatch.
+ */
+export function announceSectionMount(
+  host: SectionEditor & EventTarget & { readonly parentNode: ParentNode | null }
+): () => void {
+  const anchor = host.parentNode;
+  fireSectionEvent(host, "section-mount", { node: host });
+  return () => fireSectionEvent(anchor ?? host, "section-unmount", { node: host });
+}
+
 declare global {
   interface HTMLElementEventMap {
     "section-mount": CustomEvent<SectionEditorEventMap["section-mount"]>;

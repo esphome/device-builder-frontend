@@ -44,7 +44,7 @@ import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import type { SectionEditor } from "./section-editor.js";
-import { fireSectionEvent } from "./section-editor.js";
+import { announceSectionMount, fireSectionEvent } from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
@@ -189,6 +189,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   _loadId = 0;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
+  private _announceUnmount: (() => void) | null = null;
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
   _apiListFlashKey?: string;
   // Parent loops yaml-draft events back through our yaml prop, which would
@@ -292,7 +293,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // Announce so the page-level navigation guard (device.ts) can hold a
     // direct ref. The tree is page → device-editor → device-board-info → us;
     // a property passthrough chain would cost three edits per API change.
-    fireSectionEvent(this, "section-mount", { node: this });
+    this._announceUnmount = announceSectionMount(this);
   }
 
   disconnectedCallback() {
@@ -301,7 +302,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       clearTimeout(this._draftTimer);
       this._draftTimer = null;
     }
-    fireSectionEvent(this, "section-unmount", { node: this });
+    // One-shot: the closure pairs with exactly one mount.
+    this._announceUnmount?.();
+    this._announceUnmount = null;
   }
 
   // Flush pending draft sync now. The page calls this before save / section

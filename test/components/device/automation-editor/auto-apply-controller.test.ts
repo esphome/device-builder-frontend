@@ -62,8 +62,12 @@ class Host extends EventTarget implements AutoApplyHost {
 
 const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
-function setup(over: Partial<AutoApplyOptions> = {}) {
+function setup(
+  over: Partial<AutoApplyOptions> = {},
+  parentNode: ParentNode | null = null
+) {
   const host = new Host();
+  host.parentNode = parentNode;
   const upsertAutomation = vi.fn().mockResolvedValue({ yaml_diff: DIFF });
   const deleteAutomation = vi.fn().mockResolvedValue({ yaml_diff: DIFF });
   const updateConfig = vi.fn().mockResolvedValue(undefined);
@@ -666,6 +670,8 @@ describe("AutoApplyController host lifecycle", () => {
     expect(addController).toHaveBeenCalledWith(controller);
   });
 
+  // No parent → exercises the ``anchor ?? host`` fallback dispatch;
+  // the anchored path production uses is pinned by the test below.
   it("announces section-mount / section-unmount with the host node", () => {
     const { host, controller } = setup();
     const mounts = captureEvents(host, "section-mount");
@@ -674,6 +680,21 @@ describe("AutoApplyController host lifecycle", () => {
     controller.hostDisconnected();
     expect(mounts.map((e) => e.detail.node)).toEqual([host]);
     expect(unmounts.map((e) => e.detail.node)).toEqual([host]);
+  });
+
+  it("the unmount announcement rides the mount-time parent past detachment", () => {
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
+    const { host, controller } = setup({}, shadow);
+    const unmounts: unknown[] = [];
+    outer.addEventListener("section-unmount", (e) =>
+      unmounts.push((e as CustomEvent<{ node: unknown }>).detail.node)
+    );
+    // Tear down like Lit does — after the host has left the tree.
+    host.parentNode = null;
+    controller.hostDisconnected();
+
+    expect(unmounts).toEqual([host]);
   });
 
   it("cancels the pending debounced upsert on host disconnect", async () => {

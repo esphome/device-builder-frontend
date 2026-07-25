@@ -10,7 +10,7 @@ import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
-import { fireSectionEvent } from "../section-editor.js";
+import { announceSectionMount, fireSectionEvent } from "../section-editor.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
@@ -117,6 +117,7 @@ export class AutoApplyController implements ReactiveController {
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
+  private _announceUnmount: (() => void) | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -130,7 +131,7 @@ export class AutoApplyController implements ReactiveController {
    *  device-section-config's section-mount event. */
   hostConnected(): void {
     this._connected = true;
-    fireSectionEvent(this._host, "section-mount", { node: this._host });
+    this._announceUnmount = announceSectionMount(this._host);
   }
 
   hostDisconnected(): void {
@@ -138,7 +139,9 @@ export class AutoApplyController implements ReactiveController {
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._cancelDebounce();
-    fireSectionEvent(this._host, "section-unmount", { node: this._host });
+    // One-shot: the closure pairs with exactly one mount.
+    this._announceUnmount?.();
+    this._announceUnmount = null;
   }
 
   /** Brief-window dirty flag covering the debounce gap so the global
