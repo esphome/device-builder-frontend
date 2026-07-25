@@ -336,6 +336,15 @@ export class ESPHomePageDevice extends LitElement {
    *  land but still bump the token. */
   private _switchSeq = 0;
 
+  /** True while at least one section switch is parked behind the
+   *  flush barrier — drives the desktop busy affordance (#1478). */
+  @state()
+  private _switchPending = false;
+
+  /** Guard calls currently awaiting their flush; the affordance
+   *  clears only when the last one settles. */
+  private _switchWaiters = 0;
+
   @state()
   private _sectionDirty = false;
 
@@ -1191,7 +1200,10 @@ export class ESPHomePageDevice extends LitElement {
 
       <div class="page">
         <div
-          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
+          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""} ${
+            this._switchPending ? "switch-pending" : ""
+          }"
+          aria-busy=${this._switchPending}
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
@@ -1824,10 +1836,10 @@ export class ESPHomePageDevice extends LitElement {
    *  the selection first can unmount the editor mid-flight — its
    *  ``yaml-draft`` then fires from a detached element and never
    *  reaches the page, silently dropping the last edit. The wait is
-   *  bounded by the WS command timeout (~10s worst case) and shows
-   *  no desktop busy affordance — a deliberate trade; repeat clicks
-   *  are harmless under the supersede token (#1478 tracks an
-   *  affordance). */
+   *  bounded by the WS command timeout (~10s worst case);
+   *  ``_switchPending`` surfaces it as the desktop busy affordance
+   *  (progress cursor + delayed navigator dim), and repeat clicks
+   *  are harmless under the supersede token. */
   private async _guardSectionSwitch(
     action: () => void,
     opts: { compose?: boolean } = {}
@@ -1840,12 +1852,16 @@ export class ESPHomePageDevice extends LitElement {
     const seq = ++this._switchSeq;
     const pending = this._activeSection?.flushPending();
     if (pending) {
+      this._switchWaiters++;
+      this._switchPending = true;
       // A failed flush already surfaced its own error; still switch —
       // blocking navigation on it is strictly worse than a stale draft.
       try {
         await pending;
       } catch {
         // Handled by the editor.
+      } finally {
+        if (--this._switchWaiters === 0) this._switchPending = false;
       }
       // The page can unmount across the flush (a late action would
       // replaceState on whatever URL the user has since landed on),

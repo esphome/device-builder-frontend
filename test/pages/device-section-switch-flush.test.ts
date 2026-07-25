@@ -9,6 +9,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import "./_mock-device-children.js";
+// The render-level case attaches the real page; the reselect dialog
+// is not in the shared preamble and its WebAwesome button crashes
+// happy-dom (same local mock as the platform-ready suite).
+vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import type { SectionEditor } from "../../src/components/device/section-editor.js";
@@ -466,6 +470,92 @@ describe("section-switch flush barrier", () => {
     // Unset, not the stale 3 — downstream resolution must fall back
     // to the key rather than the logger section sitting on line 3.
     expect(internals(page)._selectedFromLine).toBeUndefined();
+  });
+
+  it("flags the busy affordance while parked behind the flush, never on the sync path", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolveFlush = gateFlush(page);
+
+    const switching = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolveFlush();
+    await switching;
+    expect(internals(page)._switchPending).toBe(false);
+
+    // Sync path (component editor shape): no flicker, flag never set.
+    internals(page)._activeSection = {
+      dirty: false,
+      flushPending: vi.fn(),
+      reload: () => {},
+    } satisfies SectionEditor;
+    const sync = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(false);
+    await sync;
+  });
+
+  it("the affordance clears only when the last parked switch settles", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolvers: (() => void)[] = [];
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    const s1 = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    const s2 = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolvers[0]();
+    await s1;
+    // The second switch is still parked.
+    expect(internals(page)._switchPending).toBe(true);
+
+    resolvers[1]();
+    await s2;
+    expect(internals(page)._switchPending).toBe(false);
+  });
+
+  it("the pending flag reaches the DOM: switch-pending class and aria-busy", async () => {
+    const page = new ESPHomePageDevice();
+    page.id = "kitchen.yaml";
+    document.body.appendChild(page);
+    try {
+      await page.updateComplete;
+      const resolveFlush = gateFlush(page);
+      const switching = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+      await page.updateComplete;
+      const grid = page.shadowRoot!.querySelector(".layout-grid")!;
+      expect(grid.classList.contains("switch-pending")).toBe(true);
+      expect(grid.getAttribute("aria-busy")).toBe("true");
+
+      resolveFlush();
+      await switching;
+      await page.updateComplete;
+      expect(grid.classList.contains("switch-pending")).toBe(false);
+      expect(grid.getAttribute("aria-busy")).toBe("false");
+    } finally {
+      page.remove();
+    }
+  });
+
+  it("a rejecting flush still clears the affordance", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () => Promise.reject(new Error("upsert failed")),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    await internals(page)._guardSectionSwitch(vi.fn());
+    expect(internals(page)._switchPending).toBe(false);
   });
 
   it("skips the action when the page unmounts during the flush", async () => {
