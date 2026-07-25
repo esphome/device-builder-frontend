@@ -14,7 +14,7 @@ import "./_editor-harness.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 import { flushMicrotasks } from "../../../_dom.js";
-import { makeEditorApi, mountEditor } from "./_editor-harness.js";
+import { makeEditorApi, mountEditor, seedTree } from "./_editor-harness.js";
 
 describe("automation-editor mount-time load (behavioral)", () => {
   it("editor mounted with configuration preset issues exactly one getAvailableAutomations call", async () => {
@@ -103,7 +103,7 @@ describe("automation-editor mount-time load (behavioral)", () => {
         component_id: "my_gate",
         field: "open_action",
       },
-      value: { trigger_id: null, trigger_params: {}, actions: [] } as never,
+      value: seedTree(),
     });
 
     // Header derives from the field (no trigger to name); edit-mode means

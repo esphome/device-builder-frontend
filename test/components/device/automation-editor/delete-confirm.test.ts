@@ -21,7 +21,12 @@ import { flushMicrotasks } from "../../../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { makeEditorApi, mountEditor, slimAvailable } from "./_editor-harness.js";
+import {
+  makeEditorApi,
+  mountEditor,
+  seedTree,
+  slimAvailable,
+} from "./_editor-harness.js";
 
 async function mountAndSettle(
   editor: ESPHomeAutomationEditor | ESPHomeScriptEditor | ESPHomeApiActionEditor,
@@ -31,7 +36,7 @@ async function mountAndSettle(
   await mountEditor(editor, api, {
     configuration: "device.yaml",
     location,
-    value: { trigger_id: null, trigger_params: {}, actions: [] } as never,
+    value: seedTree(),
   });
   await editor.updateComplete;
 }

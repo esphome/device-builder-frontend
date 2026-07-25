@@ -51,6 +51,13 @@ import type {
 import type { BaseAutomationEditor } from "../../../../src/components/device/automation-editor/base-editor.js";
 import { flushMicrotasks } from "../../../_dom.js";
 
+/** Minimal editable tree for seeding an editor in edit mode. */
+export const seedTree = (): AutomationTree => ({
+  trigger_id: null,
+  trigger_params: {},
+  actions: [],
+});
+
 export const slimAvailable = (): AvailableAutomations =>
   ({
     triggers: [],

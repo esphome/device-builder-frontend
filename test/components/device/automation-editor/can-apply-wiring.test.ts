@@ -16,7 +16,12 @@ import { flushMicrotasks } from "../../../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { type EditorApiMock, makeEditorApi, mountEditor } from "./_editor-harness.js";
+import {
+  type EditorApiMock,
+  makeEditorApi,
+  mountEditor,
+  seedTree,
+} from "./_editor-harness.js";
 
 async function mountAndFlush(
   editor: ESPHomeScriptEditor | ESPHomeApiActionEditor,
@@ -26,7 +31,7 @@ async function mountAndFlush(
   await mountEditor(editor, api, {
     configuration: "device.yaml",
     location,
-    value: { trigger_id: null, trigger_params: {}, actions: [] } as never,
+    value: seedTree(),
   });
   (editor as any)._engine.withValue({ actions: [] });
   await editor.flushPending();
