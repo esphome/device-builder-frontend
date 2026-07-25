@@ -318,19 +318,23 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     // The stream can die during the await above (device yanked mid-hand-off);
     // a dead handle behind the dialog's "Waiting…" would never resolve.
+    // Same contract as the !port branch: announced and parked regardless of
+    // the dialog being open — openPortForLogs can often reopen a UA-closed
+    // handle, so the Logs button stays a one-click recovery.
     if (!port.readable) {
       try {
         await port.close();
       } catch {
         // already closed
       }
-      if (gen === this._bootLogsGen && this._logsOpen) {
+      if (gen === this._bootLogsGen) {
         this._logsOpen = false;
         toast.error(
           this._localize("web.flash.logs_unavailable", {
             error: this._localize("web.logs.terminal_disconnected"),
           })
         );
+        this._logPort = port;
       }
       return;
     }

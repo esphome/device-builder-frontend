@@ -343,11 +343,20 @@ describe("esphome-web-logs-dialog", () => {
 
     // The reconnect window: reader gone (_cancel cleared) but the active
     // handle retained; a parent watcher swapping .port here must not wipe
-    // the rendered lines or race a second reader against the resume.
+    // the rendered lines or race a second reader against the resume. The
+    // declined open foreign handle is released — nothing else ever would.
     (el as any)._cancel = undefined;
-    el.port = makeWebSerialPort();
+    const swapped = makeWebSerialPort();
+    el.port = swapped;
     await el.updateComplete;
     expect(streamSerialLines).toHaveBeenCalledOnce();
+    expect(swapped.close).toHaveBeenCalledOnce();
+
+    // The port-replaced round trip echoes the dialog's own handle — kept.
+    const own = (el as any)._activePort as SerialPort;
+    el.port = own;
+    await el.updateComplete;
+    expect(own.close).not.toHaveBeenCalled();
   });
 
   it("does not latch the crash banner for lines dropped while paused", async () => {

@@ -120,7 +120,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect((el as any)._logPort).toBeUndefined();
   });
 
-  it("toasts and closes a handle whose stream died during the hand-off", async () => {
+  it("toasts, closes and parks a handle whose stream died during the hand-off", async () => {
     const el = await mount();
     const port = makePort();
     (port as any).setSignals = vi.fn(async () => {
@@ -131,7 +131,9 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     await (el as any)._openBootLogs({}, []);
 
     expect(port.close).toHaveBeenCalledOnce();
-    expect((el as any)._logPort).toBeUndefined();
+    // Parked: openPortForLogs can often reopen a UA-closed handle, so the
+    // Logs button stays a recovery path instead of forcing a re-flash.
+    expect((el as any)._logPort).toBe(port);
     expect((el as any)._logsOpen).toBe(false);
     expect(toast.error).toHaveBeenCalledOnce();
   });
