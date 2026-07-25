@@ -391,8 +391,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     });
     this._saveChain = task;
     await task;
-    if (this._saveChain === task) {
-    }
   }
 
   private async _toggleAssignment(labelId: string, assign: boolean) {
