@@ -1,16 +1,14 @@
 /**
  * The automation editor's body sections, as pure render functions
  * (matching ``render-target-field.ts``): the legacy add-mode
- * pickers, the edit-mode trigger-params form, and the actions
- * list section. State stays in ``<esphome-automation-editor>``;
+ * pickers, the edit-mode trigger-params form, and the read-only
+ * identity field. State stays in ``<esphome-automation-editor>``;
  * each section receives values plus the host's stable handler
  * references.
  */
 import { html, nothing } from "lit";
 
 import type {
-  AutomationAction,
-  AutomationCondition,
   AutomationLocation,
   AutomationTree,
   AutomationTrigger,
@@ -20,11 +18,8 @@ import type {
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { renderMarkdown } from "../../../util/markdown.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import "../config-entry-form.js";
-import "./automation-action-list.js";
-import type { AutomationFocus } from "./automation-focus.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import { renderTargetField } from "./render-target-field.js";
@@ -129,44 +124,6 @@ export function renderTriggerParamsForm(opts: {
       @value-change=${opts.onValueChange}
       @advanced-toggle=${opts.onAdvancedToggle}
     ></esphome-config-entry-form>
-  `;
-}
-
-/** The Actions section: label, description, and the recursive
- *  action list (whose bottom Add button opens the picker). */
-export function renderActionsSection(opts: {
-  automation: AutomationTree;
-  catalog: AutomationAction[];
-  conditionCatalog: AutomationCondition[];
-  scripts: AvailableScript[];
-  devices: AvailableComponentInstance[];
-  board: BoardCatalogEntry | null;
-  yaml: string;
-  disabled: boolean;
-  localize: LocalizeFunc;
-  focusTarget?: AutomationFocus | null;
-  onActionsChange: (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => void;
-}) {
-  return html`
-    <div class="field">
-      <label class="field-label"> ${opts.localize("device.automation_action")} </label>
-      <p class="field-description">
-        ${renderMarkdown(opts.localize("device.automation_actions_description"))}
-      </p>
-      <esphome-automation-action-list
-        no-header
-        .focusTarget=${opts.focusTarget ?? null}
-        .actions=${opts.automation.actions}
-        .catalog=${opts.catalog}
-        .conditionCatalog=${opts.conditionCatalog}
-        .scripts=${opts.scripts}
-        .devices=${opts.devices}
-        .board=${opts.board}
-        .yaml=${opts.yaml}
-        ?disabled=${opts.disabled}
-        @actions-change=${opts.onActionsChange}
-      ></esphome-automation-action-list>
-    </div>
   `;
 }
 

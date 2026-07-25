@@ -20,50 +20,34 @@
  *   parent's reconnect handler to skip clobbering an in-flight
  *   write.
  */
-import { consume } from "@lit/context";
 import { mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
 
-import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AvailableAutomations,
 } from "../../../api/types/automations.js";
-import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
-import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
-import { AutoApplyController } from "./auto-apply-controller.js";
-import "./automation-action-list.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
   type AutomationFocus,
-  createFocusResolver,
   entryFieldFocus,
   focusKey,
   paramFocus,
-  type YamlPathSegment,
 } from "./automation-focus.js";
+import { CallableAutomationEditor } from "./callable-editor.js";
+import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
-import { CatalogLoadController } from "./catalog-load-controller.js";
-import { ParseErrorController } from "./parse-error-controller.js";
-import { renderDeleteRow } from "./render-delete-row.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 
 /** ``AutomationLocation`` variant for top-level ``script:`` blocks
@@ -74,7 +58,6 @@ type ScriptLocation = Extract<AutomationLocation, { kind: "script" }>;
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
   "open-in-new": mdiOpenInNew,
@@ -82,41 +65,7 @@ registerMdiIcons({
 });
 
 @customElement("esphome-script-editor")
-export class ESPHomeScriptEditor extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
-
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @property() configuration = "";
-
-  @property({ attribute: false })
-  board: BoardCatalogEntry | null = null;
-
-  @property() platform = "";
-
-  @property({ attribute: false })
-  value: AutomationTree | null = null;
-
-  @property({ attribute: false })
-  location: ScriptLocation | null = null;
-
-  /** True when mounted from the "+ Add script" wizard. Add-mode
-   *  lets the user type the id; edit-mode locks it. */
-  @property({ type: Boolean, attribute: "add-mode" })
-  addMode = false;
-
-  @property() yaml = "";
-
-  /** Indexed key path at the YAML cursor; resolved against the
-   *  hydrated tree to scroll/highlight the matching node or field. */
-  @property({ attribute: false })
-  focusYamlPath?: YamlPathSegment[];
-
-  private _resolveFocus = createFocusResolver();
-
+export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation> {
   /** ``focusKey`` already advanced-revealed — one-shot per target so a
    *  later deliberate collapse sticks. */
   private _paramsRevealKey?: string;
@@ -131,13 +80,6 @@ export class ESPHomeScriptEditor extends LitElement {
     if (paramFocus(focus, "parameters") !== null) this._showAdvanced = true;
   }
 
-  @state() private _available: AvailableAutomations | null = null;
-  @state() private _loading = true;
-  @state() private _error = "";
-  /** Renders read-only + blocks auto-apply for a parse-errored
-   *  script so its empty tree can't overwrite the real YAML. */
-  private readonly _parseError = new ParseErrorController(this);
-
   /** Component catalog entry for the ``script`` component, lazily
    *  fetched on mount. Drives the header (name / description /
    *  docs / image) and the inline config-entry form (``id``,
@@ -151,92 +93,15 @@ export class ESPHomeScriptEditor extends LitElement {
    *  isn't drowned out by the rarely-used options. */
   @state() private _showAdvanced = false;
 
-  /** Shared auto-apply / delete / dirty-tracking engine — same
-   *  instance shape as the automation and api-action editors so the
-   *  page-level save guard can treat all three uniformly. */
-  private readonly _engine = new AutoApplyController(this, {
-    getApi: () => this._api,
-    getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active,
-    // Can't upsert a script with no id.
-    canApply: (location) => location.kind === "script" && !!location.id,
-    setError: (message) => {
-      this._error = message;
-    },
-  });
-
-  /** Catalog loader; owns the concurrency guard so overlapping loads
-   *  (connectedCallback + updated both reaching ``_loadAvailable``)
-   *  can't clobber ``_available`` or double-fire the toast. */
-  private readonly _catalogLoad = new CatalogLoadController(this);
-
-  public get dirty(): boolean {
-    return this._engine.dirty;
+  // Can't upsert a script with no id.
+  protected override _canApply(location: AutomationLocation): boolean {
+    return location.kind === "script" && !!location.id;
   }
 
-  public get inFlightWrite(): boolean {
-    return this._engine.inFlightWrite;
-  }
-
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    void this._load();
-  }
-
-  protected updated(changed: Map<string, unknown>) {
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
-    // Navigator-driven location swap (user clicked a different
-    // script in the navigator) — invalidate the stale value so
-    // the hydrate path below re-fetches.
-    if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as ScriptLocation | null | undefined;
-      if (prev && this.location && prev.id !== this.location.id) {
-        this.value = null;
-      }
-    }
-    if (
-      !this.addMode &&
-      (changed.has("location") ||
-        changed.has("configuration") ||
-        changed.has("_loading")) &&
-      this.location &&
-      this.value === null &&
-      !this._loading
-    ) {
-      void this._hydrateFromBackend();
-    }
-  }
-
-  private async _load() {
-    if (!this._api) return;
-    this._loading = true;
-    this._error = "";
-    try {
-      if (this.configuration) await this._loadAvailable();
-      void this._loadScriptComponent();
-    } catch (err) {
-      this._error = getErrorMessage(err);
-    } finally {
-      this._loading = false;
-    }
-  }
-
-  private async _loadAvailable() {
-    // Hydrates config_entries (the slim catalog omits them); without
-    // it every action renders fieldless since the node bails on an
-    // empty config_entries list.
-    this._error = "";
-    const { available, error } = await this._catalogLoad.load(
-      this._api,
-      this.configuration,
-      this._localize
-    );
-    if (error !== undefined) this._error = error;
-    if (available) this._available = available;
+  /** The script-component fetch rides along with the shared load. */
+  protected override async _load() {
+    await super._load();
+    void this._loadScriptComponent();
   }
 
   /** Lazy fetch of the ``script`` component catalog entry. Reuses
@@ -260,51 +125,9 @@ export class ESPHomeScriptEditor extends LitElement {
     }
   }
 
-  private async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
-    try {
-      // ``this.yaml`` override mirrors the automation-editor's
-      // hydrate path: post-add the user's draft buffer holds the
-      // new script, but the on-disk YAML doesn't yet. Without the
-      // override the parse returns the stale on-disk state and the
-      // form lands empty.
-      const parsed = await this._api.parseDeviceAutomations(
-        this.configuration,
-        this.yaml
-      );
-      const m = this._parseError.resolve(parsed, this.location, "script");
-      if (m) {
-        this.location = m.location;
-        this.value = m.tree;
-      }
-    } catch (err) {
-      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-    }
-  }
-
-  /**
-   * Re-hydrate from the live YAML. Called by the parent
-   * (``device-board-info``) when the YAML pane changes the document
-   * out from under us — mirrors device-section-config.reload() and
-   * automation-editor.reload() so editing YAML in the pane updates
-   * the visual editor.
-   */
-  public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
-    void this._hydrateFromBackend();
-  }
-
   protected render() {
-    if (this._loading) {
-      return html`<div class="ae-empty">
-        <wa-spinner></wa-spinner>
-        ${this._localize("device.loading_automation_catalog")}
-      </div>`;
-    }
-    if (this._parseError.active) {
-      return this._parseError.renderPanel(this._localize);
-    }
+    const gate = this.renderStateGate();
+    if (gate) return gate;
     const automation = this.value ?? emptyAutomationTree();
     const devices = this._available?.devices ?? [];
     const scripts = this._available?.scripts ?? [];
@@ -319,38 +142,25 @@ export class ESPHomeScriptEditor extends LitElement {
           ? this._renderParametersField(automation, disabled, focus)
           : nothing
       }
-      <div class="field">
-        <label class="field-label"> ${this._localize("device.automation_action")} </label>
-        <p class="field-description">
-          ${renderMarkdown(this._localize("device.script_actions_description"))}
-        </p>
-        <esphome-automation-action-list
-          no-header
-          .focusTarget=${actionsFocus(focus)}
-          .actions=${automation.actions}
-          .catalog=${actions}
-          .conditionCatalog=${conditions}
-          .scripts=${scripts}
-          .devices=${devices}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          ?disabled=${disabled}
-          @actions-change=${this._onActionsChange}
-        ></esphome-automation-action-list>
-      </div>
-      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${
-        this.location && this.value && !this.addMode
-          ? renderDeleteRow({
-              label: this._localize("device.delete_script"),
-              message: this._localize("device.confirm_delete_script", {
-                name: this.location.id,
-              }),
-              disabled,
-              onConfirm: this._onDelete,
-            })
-          : nothing
-      }
+      ${renderActionsSection({
+        automation,
+        catalog: actions,
+        conditionCatalog: conditions,
+        scripts,
+        devices,
+        board: this.board,
+        yaml: this.yaml,
+        disabled,
+        localize: this._localize,
+        focusTarget: actionsFocus(focus),
+        descriptionKey: "device.script_actions_description",
+        onActionsChange: this._onActionsChange,
+      })}
+      ${this.renderFooter({
+        label: this._localize("device.delete_script"),
+        message: (location) =>
+          this._localize("device.confirm_delete_script", { name: location.id }),
+      })}
     `;
   }
 
@@ -515,19 +325,6 @@ export class ESPHomeScriptEditor extends LitElement {
         parameters: e.detail.value,
       },
     });
-  };
-
-  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
-    e.stopPropagation();
-    this._engine.withValue({ actions: e.detail.actions });
-  };
-
-  public flushPending(): Promise<void> {
-    return this._engine.flushPending();
-  }
-
-  private _onDelete = () => {
-    void this._engine.delete();
   };
 }
 
