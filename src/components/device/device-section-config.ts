@@ -467,6 +467,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       await this._api.updateConfig(configuration, newYaml);
       fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
         yaml: newYaml,
+        // Basis for the page's supersede check (#1476).
+        basedOn: yaml,
       });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");

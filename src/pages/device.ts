@@ -1741,7 +1741,7 @@ export class ESPHomePageDevice extends LitElement {
     this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
-  private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
+  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn?: string }>) {
     /* ``yaml-updated`` fires from completed-API-call paths only —
      * the add-component dialog and the section-delete branch.
      * Both ``await`` the API call before dispatching, so by the
@@ -1752,8 +1752,17 @@ export class ESPHomePageDevice extends LitElement {
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
-    this._setYaml(e.detail.yaml);
-    this._savedYaml = e.detail.yaml;
+    const { yaml, basedOn } = e.detail;
+    if (basedOn !== undefined && basedOn !== this._yaml) {
+      // The write was computed against a buffer this pane has moved
+      // past (a delete landing after a newer draft, #1476). Advance
+      // only the saved side: the pane keeps what the user sees, the
+      // page shows honestly dirty, and Save writes exactly that.
+      this._savedYaml = yaml;
+      return;
+    }
+    this._setYaml(yaml);
+    this._savedYaml = yaml;
   }
 
   private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {

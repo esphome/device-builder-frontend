@@ -371,6 +371,8 @@ export class AutoApplyController implements ReactiveController {
       // still net-positive versus resurrecting the deleted section.
       fireFromAnchor(this._host, this._connected, dispatchAnchor, "yaml-updated", {
         yaml: newYaml,
+        // Basis for the page's supersede check (#1476).
+        basedOn: yaml,
       });
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is

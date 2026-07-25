@@ -126,8 +126,9 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   const dispatchAnchor = host.parentNode;
   const deletedKey = host.sectionKey;
   try {
-    const newYaml = removeSectionFromYaml(host.yaml, host.sectionKey, fromLine);
-    if (newYaml === host.yaml) {
+    const baseYaml = host.yaml;
+    const newYaml = removeSectionFromYaml(baseYaml, host.sectionKey, fromLine);
+    if (newYaml === baseYaml) {
       host._error = host._localize("device.section_delete_error");
       return;
     }
@@ -135,6 +136,8 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     host._setDirty(false);
     fireFromAnchor(host, host.isConnected, dispatchAnchor, "yaml-updated", {
       yaml: newYaml,
+      // Basis for the page's supersede check (#1476).
+      basedOn: baseYaml,
     });
     // Navigate away only while the user is still here, on the
     // section that was deleted.
