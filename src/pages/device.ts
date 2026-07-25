@@ -1783,7 +1783,14 @@ export class ESPHomePageDevice extends LitElement {
         ];
       }
       this._selectedSection = sectionKey;
-      this._selectedFromLine = fromLine;
+      // The navigator captured fromLine against the click-time buffer;
+      // the awaited flush can shift every section below its upsert
+      // (#1470). Re-resolve against the settled buffer, same rule as
+      // the cursor path.
+      this._selectedFromLine =
+        sectionKey !== null && fromLine !== undefined
+          ? (this._nearestSectionLine(sectionKey, fromLine) ?? fromLine)
+          : fromLine;
       // A navigator click carries no field intent — a stale cursor path
       // would scroll/flash a target in the newly mounted editor that the
       // user never pointed at.

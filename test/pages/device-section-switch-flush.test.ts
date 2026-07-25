@@ -316,6 +316,46 @@ describe("section-switch flush barrier", () => {
     expect(internals(page)._selectedFromLine).toBe(6);
   });
 
+  it("re-resolves a navigator click's line against the buffer the flush settled", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
+      "\n"
+    );
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+
+    // Navigator click captured fromLine 4 against the click-time buffer.
+    internals(page)._onSectionSelect(
+      new CustomEvent("section-select", {
+        detail: { sectionKey: "sensor.aht10", fromLine: 4 },
+      })
+    );
+    // The flush's upsert grows the i2c block before the action runs.
+    internals(page)._yaml = [
+      "i2c:",
+      "  sda: 1",
+      "  scl: 0",
+      "  frequency: 100khz",
+      "sensor:",
+      "  - platform: aht10",
+    ].join("\n");
+
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+    expect(internals(page)._selectedSection).toBe("sensor.aht10");
+    expect(internals(page)._selectedFromLine).toBe(6);
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;
