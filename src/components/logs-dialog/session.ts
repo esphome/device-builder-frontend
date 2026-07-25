@@ -6,7 +6,7 @@
  */
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { isPassive, isStreaming } from "../logs-session.js";
+import { OTA_PORT, isPassive, isStreaming } from "../logs-session.js";
 
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(
@@ -127,6 +127,24 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
     return stopBackendStream(host, s.streamId);
   }
   return Promise.resolve();
+}
+
+/**
+ * Swap a Web Serial session (any phase, including ``dead``) for the backend
+ * OTA stream in place — the silent-serial escape hatch (#1430).
+ *
+ * Keeps the log buffer and the back-to-install affordance; only the source
+ * changes. The teardown cancels a live reader / closes its port; a late
+ * attach from an in-flight reconnect is absorbed by ``setSerialStream``'s
+ * passive-session guard.
+ */
+export function switchToOtaLogs(host: ESPHomeLogsDialog): void {
+  if (!isPassive(host._session)) return;
+  void teardownSession(host);
+  host._reconnect = null;
+  host._session = { kind: "ota", port: OTA_PORT, streamId: null };
+  host._log.append([host._localize("dashboard.logs_switched_to_network")]);
+  startOtaStream(host);
 }
 
 function stopBackendStream(host: ESPHomeLogsDialog, streamId: string): Promise<void> {

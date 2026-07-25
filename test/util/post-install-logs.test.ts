@@ -13,8 +13,11 @@ vi.mock("../../src/components/dashboard/actions.js", () => ({
   streamSerialToDialog: () => () => {},
 }));
 
-const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
-vi.mock("sonner-js", () => ({ default: { error: toastError } }));
+const { toastError, toastInfo } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
+}));
+vi.mock("sonner-js", () => ({ default: { error: toastError, info: toastInfo } }));
 
 import { defaultLocalize } from "../../src/common/localize.js";
 import {
@@ -282,6 +285,7 @@ describe("handlePostInstallShowLogs serial baud", () => {
     return {
       configuration: "",
       name: "",
+      open: vi.fn(),
       openPassive: vi.fn(),
       setSerialStream: vi.fn(),
       setSerialOpenFailed: vi.fn(),
@@ -289,14 +293,18 @@ describe("handlePostInstallShowLogs serial baud", () => {
     };
   }
 
-  it("notifies and never opens a serial session when logging is disabled (baud 0)", async () => {
+  it("reroutes to network logs when logging is disabled (baud 0)", async () => {
     const dialog = logsDialog();
     const event = new CustomEvent("request-show-logs-after-install", {
       cancelable: true,
       detail: detail(0),
     });
     await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
-    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(dialog.open).toHaveBeenCalledWith("OTA", {
+      onBackToInstall: event.detail.reopenInstall,
+    });
+    expect(toastInfo).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
     expect(dialog.openPassive).not.toHaveBeenCalled();
     expect(dialog.setSerialStream).not.toHaveBeenCalled();
   });

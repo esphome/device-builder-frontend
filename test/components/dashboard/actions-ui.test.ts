@@ -17,21 +17,26 @@ import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
 
-const { toastError, toastSuccess } = vi.hoisted(() => ({
+const { toastError, toastSuccess, toastInfo } = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  toastInfo: vi.fn(),
 }));
 vi.mock("sonner-js", () => ({
   default: {
     success: (...args: unknown[]) => toastSuccess(...args),
     error: (...args: unknown[]) => toastError(...args),
+    info: (...args: unknown[]) => toastInfo(...args),
   },
 }));
 
 const { requestAndOpenSerialPort } = vi.hoisted(() => ({
   requestAndOpenSerialPort: vi.fn(),
 }));
-vi.mock("../../../src/util/post-install-logs.js", () => ({
+vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
+  // Keep the real openNetworkLogsFallback so the baud-0 reroute test can
+  // assert its toast + dialog-open behavior through the real helper.
+  ...(await importOriginal<object>()),
   requestAndOpenSerialPort,
   attachSerialLogStream: vi.fn(),
   reconnectWebSerialLogs: vi.fn(),
@@ -77,9 +82,10 @@ describe("openLogsWithMethod web-serial", () => {
     vi.unstubAllGlobals();
   });
 
-  it("blocks serial logs and notifies when logging is disabled (baud_rate 0)", async () => {
+  it("reroutes to network logs without a port picker when logging is disabled (baud_rate 0)", async () => {
     vi.stubGlobal("navigator", { serial: {} });
-    const host = makeDashboardHost();
+    const logsDialog = { configuration: "", name: "", open: vi.fn() };
+    const host = makeDashboardHost({ _logsDialog: logsDialog });
     const device = {
       configuration: "x.yaml",
       name: "x",
@@ -89,10 +95,13 @@ describe("openLogsWithMethod web-serial", () => {
 
     await openLogsWithMethod(host, device, "web-serial");
 
-    expect(toastError).toHaveBeenCalledWith(
-      "dashboard.logs_serial_disabled",
+    expect(toastInfo).toHaveBeenCalledWith(
+      "dashboard.logs_serial_disabled_fallback",
       expect.anything()
     );
+    expect(toastError).not.toHaveBeenCalled();
+    expect(logsDialog.open).toHaveBeenCalledWith("OTA", {});
+    expect(logsDialog.configuration).toBe("x.yaml");
     expect(requestAndOpenSerialPort).not.toHaveBeenCalled();
   });
 });

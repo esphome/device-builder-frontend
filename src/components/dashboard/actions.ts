@@ -404,6 +404,7 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
     onLine: (line) => {
       // Keep draining while paused (Stop) but don't display (#526).
       if (!dialog._serialPaused) {
+        dialog._noteSerialActivity();
         dialog._enqueueLine(line);
       }
     },

@@ -131,6 +131,40 @@ export const termButtonStyles = css`
 `;
 
 /**
+ * Terminal-flavoured styling for the ``.reset-suggestion`` markup the
+ * suggestion-slot renderers emit — a muted hint bar with an inline link
+ * action. Shared by the terminal dialogs (command, logs); the
+ * firmware-install dialog keeps its own card-flavoured variant.
+ */
+export const termSuggestionStyles = css`
+  .reset-suggestion {
+    padding: 10px 20px;
+    border-top: 1px solid var(--term-border);
+    background: var(--term-bg-alt);
+    font-family: var(--term-mono-font);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--term-fg-muted);
+  }
+  .reset-suggestion-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--term-accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .reset-suggestion-link:hover,
+  .reset-suggestion-link:focus-visible {
+    color: var(--term-accent);
+    text-decoration-thickness: 2px;
+    outline: none;
+  }
+`;
+
+/**
  * Layout + chrome the ``<esphome-process-terminal>`` element renders itself:
  * the log surface, the status banner (stream) / status card (card variant),
  * the progress bar, the streaming dot, and the toolbar container. Slotted
