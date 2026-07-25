@@ -1,5 +1,5 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { ESPRESSIF_USB_VID } from "./web-serial.js";
+import { isEspressifUsbJtagPort } from "./web-serial.js";
 
 // Vendors that make dedicated USB-UART bridge chips and nothing that
 // enumerates as a device's native USB console. A port from one of these can
@@ -12,11 +12,6 @@ const UART_BRIDGE_VENDOR_IDS = new Set([
   0x0403, // FTDI
   0x067b, // Prolific (PL2303)
 ]);
-
-// The on-chip USB-Serial-JTAG device every native-USB ESP32 variant
-// enumerates as. The product id matters: Espressif's vendor id also covers
-// the ESP-USB-Bridge (0x1002), which IS a UART bridge.
-const ESPRESSIF_USB_JTAG_PID = 0x1001;
 
 // Spellings come from the backend's logger_interface_values vocabulary
 // (platform_capabilities.index.json, snapshotted from esphome's logger) -
@@ -40,30 +35,33 @@ export function serialPortCannotCarryConsole(
   port: SerialPort
 ): boolean {
   if (!loggerInterface) return false;
-  const { usbVendorId, usbProductId } = port.getInfo();
   if (USB_CONSOLE_INTERFACES.has(loggerInterface)) {
     // A dedicated bridge chip can't be the chip's own USB device. An
     // unknown or absent vendor could be a native CDC console (RP2040's
     // 0x2e8a, nRF52) - assume it works.
+    const { usbVendorId } = port.getInfo();
     return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
   }
   if (!UART_CONSOLE_RE.test(loggerInterface)) return false;
   // UART-family console: only the on-chip USB-Serial-JTAG device provably
   // can't carry it; any other port might be wired to the UART pins.
-  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
+  return isEspressifUsbJtagPort(port);
 }
 
 /**
- * Localized wrong-port notice when the port provably can't carry the
- * console, else null. The single home for the mismatch decision + message.
+ * Mismatch verdict + localized notice when the port provably can't carry
+ * the console, else null. The single home for the decision and its message;
+ * an object so callers gate on the verdict, never on the copy's truthiness.
  */
-export function serialConsoleMismatchNotice(
+export function serialConsoleMismatch(
   loggerInterface: string | null | undefined,
   port: SerialPort,
   localize: LocalizeFunc
-): string | null {
+): { message: string } | null {
   if (!serialPortCannotCarryConsole(loggerInterface, port)) return null;
-  return localize("dashboard.logs_serial_wrong_port_fallback", {
-    interface: loggerInterface ?? "",
-  });
+  return {
+    message: localize("dashboard.logs_serial_wrong_port_fallback", {
+      interface: loggerInterface ?? "",
+    }),
+  };
 }

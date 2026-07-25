@@ -10,7 +10,6 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("../../../src/util/post-install-logs.js", () => ({
-  requestAndOpenSerialPort: vi.fn(),
   attachSerialLogStream: vi.fn(),
   reconnectWebSerialLogs: vi.fn(),
 }));

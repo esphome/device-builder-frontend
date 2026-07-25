@@ -8,6 +8,15 @@
  */
 import type { ESPLoader, Transport } from "esptool-js";
 import { describe, expect, it, vi } from "vitest";
+
+const { jtagResetSpy } = vi.hoisted(() => ({ jtagResetSpy: vi.fn() }));
+vi.mock("esptool-js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  UsbJtagSerialReset: class {
+    reset = jtagResetSpy;
+  },
+}));
+
 import { resetAndDisconnect } from "../../src/util/web-serial.js";
 
 function fakeTransport() {
@@ -38,5 +47,33 @@ describe("resetAndDisconnect — classic ESP32 / ESP8266 over a UART bridge", ()
     expect(transport.setDTR).toHaveBeenCalledWith(false);
     expect(transport.setDTR.mock.calls.every((c) => c[0] === false)).toBe(true);
     expect(transport.disconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("resetAndDisconnect — Espressif USB identity discriminator", () => {
+  it("uses the JTAG reset only for the on-chip USB-Serial-JTAG device", async () => {
+    jtagResetSpy.mockClear();
+    const transport = fakeTransport();
+    const jtagPort = {
+      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
+    } as unknown as SerialPort;
+    await resetAndDisconnect(esp8266Loader, transport as unknown as Transport, jtagPort);
+    expect(jtagResetSpy).toHaveBeenCalledTimes(1);
+    expect(transport.setRTS).not.toHaveBeenCalled();
+  });
+
+  it("treats the ESP-USB-Bridge as a bridge despite the Espressif vendor id", async () => {
+    jtagResetSpy.mockClear();
+    const transport = fakeTransport();
+    const bridgePort = {
+      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1002 }),
+    } as unknown as SerialPort;
+    await resetAndDisconnect(
+      esp8266Loader,
+      transport as unknown as Transport,
+      bridgePort
+    );
+    expect(jtagResetSpy).not.toHaveBeenCalled();
+    expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true, false]);
   });
 });

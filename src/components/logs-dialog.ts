@@ -252,6 +252,13 @@ export class ESPHomeLogsDialog extends LitElement {
     abortSerialReconnect(this);
   }
 
+  /** Swap the current Web Serial session for the network stream in place,
+   *  keeping the log buffer and the back-to-install affordance. A *reason*
+   *  is appended to the pane ahead of the switch line. */
+  public switchToNetworkLogs(reason?: string) {
+    switchToOtaLogs(this, reason);
+  }
+
   public close() {
     void teardownSession(this);
     this._open = false;

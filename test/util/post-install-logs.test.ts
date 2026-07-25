@@ -57,6 +57,8 @@ function deadPort(
 
 function stubDialog() {
   return {
+    open: vi.fn(),
+    switchToNetworkLogs: vi.fn(),
     setSerialStream: vi.fn(),
     setSerialOpenFailed: vi.fn(),
     abortSerialReconnect: vi.fn(),
@@ -114,7 +116,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => openPort());
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((navigator as any).serial.requestPort).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -129,7 +131,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => port);
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 19200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 19200, null);
       expect(port.open).toHaveBeenCalledWith({ baudRate: 19200 });
     } finally {
       restore();
@@ -143,10 +145,41 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.abortSerialReconnect).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("reroutes a reconnect onto a mismatched port without opening it", async () => {
+    // Re-picked a bridge port for a native-USB console: same pre-open gate
+    // as the entry points, so no DTR/RTS pulse and no dead serial session.
+    const bridge = {
+      readable: null,
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      open: vi.fn(),
+    } as unknown as SerialPort;
+    const restore = withRequestPort(async () => bridge);
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(
+        dialog as never,
+        defaultLocalize,
+        115200,
+        "USB_SERIAL_JTAG"
+      );
+      expect(bridge.open).not.toHaveBeenCalled();
+      // Mid-session swap, not a fresh open: buffer + back-to-install survive;
+      // the reason rides into the pane so it outlives the toast.
+      expect(dialog.switchToNetworkLogs).toHaveBeenCalledWith(
+        expect.stringContaining("logger outputs on USB_SERIAL_JTAG")
+      );
+      expect(dialog.open).not.toHaveBeenCalled();
+      expect(toastInfo).toHaveBeenCalledTimes(1);
+      expect(dialog.setSerialStream).not.toHaveBeenCalled();
     } finally {
       restore();
     }
@@ -158,7 +191,7 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
@@ -173,7 +206,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => port);
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
