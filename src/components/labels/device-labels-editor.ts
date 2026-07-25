@@ -241,7 +241,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     // Only a real swap to a *different* device tears down the transient edit
     // state and closes the dialog; otherwise a half-typed "create" form would
     // persist into the next device's editor and a still-pending save chained
-    // against the previous device would keep gating this one through the stale _saveChain.
+    // against the previous device would keep gating this one through
+    // the stale _saveChain.
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
       this._dialog.open = false;
       this._createForm?.collapse();
