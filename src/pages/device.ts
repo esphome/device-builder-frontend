@@ -320,13 +320,13 @@ export class ESPHomePageDevice extends LitElement {
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog!: ESPHomeUnsavedChangesDialog;
 
-  /** Live ref to the mounted section-config component, when one
-   *  is rendered. Captured via ``section-mount`` /
-   *  ``section-unmount`` events that the component fires on its
-   *  own lifecycle hooks; ``@query`` doesn't reach across the
-   *  three shadow roots between this page and the section
-   *  editor, so the registration pattern keeps the call site
-   *  for ``activeSection.save()`` cheap and direct. */
+  /** Live ref to the mounted section editor (component editor or
+   *  one of the automation family), typed as the ``SectionEditor``
+   *  contract the page consumes (``dirty`` / ``flushPending``).
+   *  Captured via ``section-mount`` / ``section-unmount`` events
+   *  the editors fire on their own lifecycle hooks; ``@query``
+   *  doesn't reach across the three shadow roots between this
+   *  page and the section editor. */
   private _activeSection: SectionEditor | null = null;
 
   @state()
