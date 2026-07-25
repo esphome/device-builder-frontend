@@ -295,7 +295,12 @@ describe("AutoApplyController delete", () => {
         })
     );
     const order: string[] = [];
-    host.addEventListener("yaml-draft", () => order.push("draft"));
+    host.addEventListener("yaml-draft", (e) => {
+      order.push("draft");
+      // Mirror the page: the draft advances the buffer the editor
+      // sees, so the delete diff is computed against it.
+      host.yaml = (e as CustomEvent<{ yaml: string }>).detail.yaml;
+    });
     host.addEventListener("yaml-updated", () => order.push("updated"));
 
     const applying = controller.autoApply();
@@ -308,7 +313,35 @@ describe("AutoApplyController delete", () => {
     await Promise.all([applying, deleting]);
 
     expect(deleteAutomation).toHaveBeenCalledOnce();
+    expect(deleteAutomation).toHaveBeenCalledWith(
+      "device.yaml",
+      SCRIPT,
+      "replaced\nline2"
+    );
     expect(order).toEqual(["draft", "updated"]);
+  });
+
+  it("a failed delete re-arms the edit suppressed during the delete window", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveUpsert!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveUpsert = r;
+        })
+    );
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    const first = controller.autoApply();
+    void controller.autoApply();
+    const deleting = controller.delete();
+
+    resolveUpsert({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([first, deleting]);
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
+    expect(controller.dirty).toBe(false);
   });
 
   it("a queued re-apply is dropped once the delete owns the section", async () => {

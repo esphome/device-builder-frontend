@@ -84,6 +84,9 @@ export class AutoApplyController implements ReactiveController {
   private _lastSelfWrittenYaml: string | null = null;
   private _dirty = false;
   private _deleting = false;
+  /** An apply was suppressed while a delete owned the section; a
+   *  failed delete re-arms it so the edit isn't silently dropped. */
+  private _applySuppressed = false;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -157,7 +160,10 @@ export class AutoApplyController implements ReactiveController {
   scheduleAutoApply(): void {
     if (this._host.addMode) return;
     if (this._options.isReadOnly()) return;
-    if (this._deleting) return;
+    if (this._deleting) {
+      this._applySuppressed = true;
+      return;
+    }
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -205,7 +211,7 @@ export class AutoApplyController implements ReactiveController {
     // A delete owns the section from here on; a racing apply (the
     // in-flight dirty requeue, a stray flushPending) must not run.
     if (this._deleting) {
-      this._setDirty(false);
+      this._applySuppressed = true;
       return;
     }
     if (this._applyInFlight) {
@@ -273,11 +279,13 @@ export class AutoApplyController implements ReactiveController {
     this._clearTimer();
     this._setDeleting(true);
     this._options.setError("");
+    let failed = false;
     try {
-      // Settle a racing upsert before computing the delete diff: its
-      // late ``yaml-draft`` would otherwise land after our
-      // ``yaml-updated`` and resurrect the deleted section (#1451).
-      // ``_deleting`` blocks the dirty requeue, so this terminates.
+      // Settle the in-flight upsert (the timer is already cancelled)
+      // before computing the delete diff: its late ``yaml-draft``
+      // would otherwise land after our ``yaml-updated`` and resurrect
+      // the deleted section (#1451). ``_deleting`` blocks the dirty
+      // requeue, so this terminates.
       await this.flushPending();
       const { yaml_diff } = await api.deleteAutomation(
         this._host.configuration,
@@ -301,9 +309,20 @@ export class AutoApplyController implements ReactiveController {
         })
       );
     } catch (err) {
+      failed = true;
       this._surfaceSaveError(err);
     } finally {
       this._setDeleting(false);
+      if (this._applySuppressed) {
+        this._applySuppressed = false;
+        if (failed) {
+          // The section survived — land the edit the delete window
+          // suppressed instead of silently dropping it.
+          this.scheduleAutoApply();
+        } else {
+          this._setDirty(false);
+        }
+      }
     }
   }
 
