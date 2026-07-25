@@ -120,6 +120,32 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect((el as any)._logPort).toBeUndefined();
   });
 
+  it("toasts and closes a handle whose stream died during the hand-off", async () => {
+    const el = await mount();
+    const port = makePort();
+    (port as any).setSignals = vi.fn(async () => {
+      (port as any).readable = null; // device yanked mid-hand-off
+    });
+    openLiveLogPort.mockResolvedValue({ port, error: null });
+
+    await (el as any)._openBootLogs({}, []);
+
+    expect(port.close).toHaveBeenCalledOnce();
+    expect((el as any)._logPort).toBeUndefined();
+    expect((el as any)._logsOpen).toBe(false);
+    expect(toast.error).toHaveBeenCalledOnce();
+  });
+
+  it("releases a parked handle on unmount", async () => {
+    const el = await mount();
+    const port = makePort();
+    (el as any)._logPort = port;
+
+    el.remove();
+
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
   it("unmounting the receiver aborts the acquisition without a toast", async () => {
     const el = await mount();
     openLiveLogPort.mockImplementation(async (...args: unknown[]) => {

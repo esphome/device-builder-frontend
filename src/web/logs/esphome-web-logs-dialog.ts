@@ -31,7 +31,6 @@ import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
 import { openLiveSerialPort } from "../../util/web-serial.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
 
@@ -189,9 +188,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
     // against _resumeAfterDisconnect. Loud, not silent — a refused open
     // handle would otherwise sit on "Waiting…" with nothing to show why.
     if (this._activePort) {
-      // The port-replaced round trip echoes our own handle back — quiet.
+      // The port-replaced round trip echoes our own handle back — quiet. A
+      // genuinely foreign open handle (no known producer) is closed too:
+      // the dialog declines custody, so nothing else would ever release it.
       if (this.port !== this._activePort) {
         console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
+        void this.port.close().catch(() => {});
       }
       return;
     }

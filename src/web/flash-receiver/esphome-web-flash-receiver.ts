@@ -94,6 +94,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     super.disconnectedCallback();
     this._handshake?.stop();
     this._bootLogsGen++;
+    // A parked (or handed-over-but-not-yet-streamed) handle has no dialog
+    // left to release it; a closed or dialog-owned one rejects harmlessly.
+    void this._logPort?.close().catch(() => {});
     if (this._flushScheduled) cancelAnimationFrame(this._flushScheduled);
   }
 
@@ -312,6 +315,24 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {
       // tolerate; the chip may already be fine
+    }
+    // The stream can die during the await above (device yanked mid-hand-off);
+    // a dead handle behind the dialog's "Waiting…" would never resolve.
+    if (!port.readable) {
+      try {
+        await port.close();
+      } catch {
+        // already closed
+      }
+      if (gen === this._bootLogsGen && this._logsOpen) {
+        this._logsOpen = false;
+        toast.error(
+          this._localize("web.flash.logs_unavailable", {
+            error: this._localize("web.logs.terminal_disconnected"),
+          })
+        );
+      }
+      return;
     }
     // Close the handle unless the open dialog is about to stream it (a
     // dialog closed mid-hand-off gets it back closed, so an accidental

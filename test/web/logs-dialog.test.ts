@@ -314,6 +314,25 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._streaming).toBe(true);
   });
 
+  it("releases the streaming reader when open and port clear in one batch", async () => {
+    // The flash receiver's _runInstall teardown shape: both cleared in a
+    // single update. _stop must release via the cancel closure/_activePort,
+    // not this.port (already undefined by then).
+    const el = await mount();
+    const cancel = vi.fn();
+    vi.mocked(streamSerialLines).mockReturnValue(cancel);
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenCalledOnce();
+
+    el.open = false;
+    el.port = undefined;
+    await el.updateComplete;
+    expect(cancel).toHaveBeenCalledOnce();
+    expect((el as any)._activePort).toBeUndefined();
+  });
+
   it("ignores a port swap while a disconnect recovery is in flight", async () => {
     const el = await mount();
     el.port = makeWebSerialPort();
