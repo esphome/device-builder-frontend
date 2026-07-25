@@ -7,8 +7,14 @@
  * close (Escape / X / outside-click) actually dismisses. Saves fire on every
  * label toggle while the dialog stays open, so it deliberately does NOT bind
  * ?busy (that would dim/lock the dialog on each toggle).
+ *
+ * Also pins the optimistic-override lifecycle: the override is dropped
+ * when the save settles (failure, or success once the prop agrees) or
+ * by a same-device push while no save is pending, a newer click's
+ * override survives an older save's failure, and a device swap
+ * mid-save must not reset the pending counter.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -114,6 +120,10 @@ describe("device-labels-editor open/close contract", () => {
 });
 
 describe("device-labels-editor optimistic override lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("reverts the optimistic assignment when set_labels fails", async () => {
     const el = await mount();
     withApi(el, () => Promise.reject(new Error("nope")));
@@ -122,7 +132,7 @@ describe("device-labels-editor optimistic override lifecycle", () => {
     await (el as any)._toggleAssignment("a", true);
 
     expect(chipIds(el)).toEqual([]);
-    expect(toast.error).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a newer click's optimistic state when an older save fails", async () => {
