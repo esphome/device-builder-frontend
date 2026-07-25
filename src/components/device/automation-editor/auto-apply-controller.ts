@@ -328,13 +328,22 @@ export class AutoApplyController implements ReactiveController {
           composed: true,
         })
       );
-      this._host.dispatchEvent(
-        new CustomEvent<{ sectionKey: string | null }>("section-select", {
-          detail: { sectionKey: null },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      // Navigate away only while the editor still shows the deleted
+      // section. After a mid-flush retarget the user is already on a
+      // sibling; yanking them to null would also unmount the editor
+      // and cancel the sibling's re-armed edit below.
+      if (
+        !this._host.location ||
+        sectionKeyFromLocation(this._host.location) === sectionKeyFromLocation(location)
+      ) {
+        this._host.dispatchEvent(
+          new CustomEvent<{ sectionKey: string | null }>("section-select", {
+            detail: { sectionKey: null },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
     } catch (err) {
       failed = true;
       this._surfaceSaveError(err);
@@ -357,8 +366,9 @@ export class AutoApplyController implements ReactiveController {
         sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location)
       ) {
         // The suppressed edit belongs to a sibling the reused
-        // element was re-pointed at mid-flush; that section
-        // survived the delete, so its edit must land.
+        // element was re-pointed at mid-flush; the editor stayed
+        // mounted (no section-select above), so the re-armed timer
+        // lands the edit.
         this.scheduleAutoApply();
       } else {
         // The deleted section's own edits die with it.

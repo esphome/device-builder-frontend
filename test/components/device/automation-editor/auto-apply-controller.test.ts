@@ -389,6 +389,7 @@ describe("AutoApplyController delete", () => {
 
   it("a sibling's edit suppressed during the delete window survives the delete", async () => {
     const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    const selections = captureEvents(host, "section-select");
     let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
     deleteAutomation.mockImplementationOnce(
       () =>
@@ -414,6 +415,9 @@ describe("AutoApplyController delete", () => {
       host.location,
       expect.any(String)
     );
+    // The user is on the sibling; the delete must not navigate away
+    // (that unmount would cancel the re-armed edit).
+    expect(selections).toHaveLength(0);
   });
 
   it("a failed delete does not re-arm a torn-down section", async () => {
