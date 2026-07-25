@@ -14,21 +14,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("../../src/components/command-dialog.js", () => ({}));
+import "./_mock-device-children.js";
 vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
-vi.mock("../../src/components/device/device-editor.js", () => ({}));
-vi.mock("../../src/components/device/device-navigator.js", () => ({}));
-vi.mock("../../src/components/firmware-install-dialog.js", () => ({}));
-vi.mock("../../src/components/install-method-dialog.js", () => ({}));
-vi.mock("../../src/components/logs-dialog.js", () => ({}));
-vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
-vi.mock("../../src/components/yaml-validation-dialog.js", () => ({}));
-vi.mock("../../src/components/device/device-install-controller.js", () => ({
-  DeviceInstallController: class {
-    constructor() {}
-  },
-}));
 
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
