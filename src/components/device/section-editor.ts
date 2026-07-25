@@ -4,7 +4,9 @@
  * automation-family editors. Both sides implement it explicitly so
  * drift is a compile error instead of a save-guard edge case; the
  * page's ``section-mount`` / ``section-unmount`` handlers and the
- * YAML-driven reload path type against it.
+ * YAML-driven reload path type against it. The event trio the same
+ * editors dispatch (``section-mount`` / ``section-unmount`` /
+ * ``dirty-change``) is deliberately not covered here.
  */
 export interface SectionEditor {
   /** Brief-window dirty flag so the global save button arms as

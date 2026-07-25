@@ -437,10 +437,12 @@ export class ESPHomePageDevice extends LitElement {
    *  even though the user explicitly typed it.
    *
    *  The leave-page / save / popstate paths call
-   *  ``_activeSection?.flushPending()`` synchronously before they
-   *  read this getter, so by the time ``_isDirty`` is consulted
-   *  any pending form edits have been promoted into ``_yaml`` and
-   *  the YAML branch is authoritative. */
+   *  ``_activeSection?.flushPending()`` before they read this
+   *  getter. The component editor's flush promotes pending form
+   *  edits into ``_yaml`` synchronously; the automation editors'
+   *  flush is a backend round-trip that only the save path awaits,
+   *  so the other paths lean on ``_sectionDirty`` staying set until
+   *  the upsert lands (they fail conservative). */
   private get _isDirty(): boolean {
     return this._isYamlDirty || this._sectionDirty;
   }

@@ -26,13 +26,10 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
-import type { ESPHomeApiActionEditor } from "./automation-editor/api-action-editor.js";
-import type { ESPHomeAutomationEditor } from "./automation-editor/automation-editor.js";
-import type { ESPHomeScriptEditor } from "./automation-editor/script-editor.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { deviceBoardInfoStyles } from "./device-board-info.styles.js";
-import type { ESPHomeDeviceSectionConfig } from "./device-section-config.js";
+import type { SectionEditor } from "./section-editor.js";
 import { SECTION_ICON } from "./section-icons.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -119,7 +116,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   backendErrors: InstanceBackendErrors = NO_INSTANCE_ERRORS;
 
   @query("esphome-device-section-config")
-  private _sectionConfig!: ESPHomeDeviceSectionConfig;
+  private _sectionConfig!: SectionEditor;
 
   /** Refs to the three automation-family editors — one of these is
    *  mounted in the right pane when the navigator's selection lives
@@ -127,13 +124,13 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    *  component-on / interval). YAML-driven reloads target whichever
    *  one is live. */
   @query("esphome-automation-editor")
-  private _automationEditor!: ESPHomeAutomationEditor;
+  private _automationEditor!: SectionEditor;
 
   @query("esphome-script-editor")
-  private _scriptEditor!: ESPHomeScriptEditor;
+  private _scriptEditor!: SectionEditor;
 
   @query("esphome-api-action-editor")
-  private _apiActionEditor!: ESPHomeApiActionEditor;
+  private _apiActionEditor!: SectionEditor;
 
   @query("esphome-add-component-dialog")
   private _addComponentDialog!: ESPHomeAddComponentDialog;
