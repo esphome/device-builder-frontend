@@ -8,23 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("sonner-js", () => ({
-  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
-}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("../../src/components/command-dialog.js", () => ({}));
-vi.mock("../../src/components/device/device-editor.js", () => ({}));
-vi.mock("../../src/components/device/device-navigator.js", () => ({}));
-vi.mock("../../src/components/firmware-install-dialog.js", () => ({}));
-vi.mock("../../src/components/install-method-dialog.js", () => ({}));
-vi.mock("../../src/components/logs-dialog.js", () => ({}));
-vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
-vi.mock("../../src/components/yaml-validation-dialog.js", () => ({}));
-vi.mock("../../src/components/device/device-install-controller.js", () => ({
-  DeviceInstallController: class {
-    constructor() {}
-  },
-}));
+import "./_mock-device-children.js";
 
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import type { SectionEditor } from "../../src/components/device/section-editor.js";
@@ -133,6 +117,100 @@ describe("section-switch flush barrier", () => {
 
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledOnce();
+  });
+
+  it("composing actions queued behind one flush all land (Back pops twice)", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolvers: (() => void)[] = [];
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    const pops: number[] = [];
+    const press = (n: number) =>
+      internals(page)._guardSectionSwitch(() => pops.push(n), {
+        compose: true,
+      }) as Promise<void>;
+    const p1 = press(1);
+    const p2 = press(2);
+
+    resolvers.forEach((r) => r());
+    await Promise.all([p1, p2]);
+    expect(pops).toEqual([1, 2]);
+  });
+
+  it("a composing action still supersedes a pending absolute switch", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    const resolvers: (() => void)[] = [];
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+
+    const absolute = vi.fn();
+    const back = vi.fn();
+    const s1 = internals(page)._guardSectionSwitch(absolute) as Promise<void>;
+    const s2 = internals(page)._guardSectionSwitch(back, {
+      compose: true,
+    }) as Promise<void>;
+
+    resolvers.forEach((r) => r());
+    await Promise.all([s1, s2]);
+    expect(absolute).not.toHaveBeenCalled();
+    expect(back).toHaveBeenCalledOnce();
+  });
+
+  it("a caret returning home cancels the switch queued behind the flush", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    // Two top-level sections; the selection sits on i2c (line 1).
+    internals(page)._yaml = [
+      "i2c:",
+      "  sda: 1",
+      "sensor:",
+      "  - platform: aht10",
+      "",
+    ].join("\n");
+    internals(page)._savedYaml = internals(page)._yaml;
+    internals(page)._knownTopLevelKeys = new Set(["i2c", "sensor"]);
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+
+    const cursor = (line: number) =>
+      internals(page)._onYamlCursorLine(
+        new CustomEvent("yaml-cursor-line", {
+          detail: { line, path: [], viaEdit: false },
+        })
+      );
+    // Caret moves into sensor — cross-section, queued behind the flush.
+    cursor(4);
+    // …and returns home to the exact block it left before it resolves.
+    cursor(2);
+
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+    expect(internals(page)._selectedSection).toBe("i2c");
+    expect(internals(page)._selectedFromLine).toBe(1);
   });
 
   it("skips the action when the page unmounts during the flush", async () => {

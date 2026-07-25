@@ -1330,21 +1330,26 @@ export class ESPHomePageDevice extends LitElement {
    *  not this one. */
   private _onBack = () => {
     this._heldUnknownInstance = null;
-    void this._guardSectionSwitch(() => {
-      const prev = this._sectionHistory.length
-        ? this._sectionHistory[this._sectionHistory.length - 1]
-        : null;
-      if (prev) {
-        this._sectionHistory = this._sectionHistory.slice(0, -1);
-        this._selectedSection = prev.key;
-        this._selectedFromLine = prev.fromLine;
-      } else {
-        this._selectedSection = null;
-        this._selectedFromLine = undefined;
-      }
-      this._setHighlight(null, false);
-      this._updateUrl();
-    });
+    // compose: each press pops one entry, so two presses inside one
+    // flush window must both land rather than the newest winning.
+    void this._guardSectionSwitch(
+      () => {
+        const prev = this._sectionHistory.length
+          ? this._sectionHistory[this._sectionHistory.length - 1]
+          : null;
+        if (prev) {
+          this._sectionHistory = this._sectionHistory.slice(0, -1);
+          this._selectedSection = prev.key;
+          this._selectedFromLine = prev.fromLine;
+        } else {
+          this._selectedSection = null;
+          this._selectedFromLine = undefined;
+        }
+        this._setHighlight(null, false);
+        this._updateUrl();
+      },
+      { compose: true }
+    );
   };
 
   /** Left-edge expand affordance. On mobile it opens the drawer; on
@@ -1559,6 +1564,12 @@ export class ESPHomePageDevice extends LitElement {
     ) {
       // Same section: update the field target directly for intra-section
       // moves (the switch below would early-return and freeze it).
+      // Also supersede any switch still queued behind the flush
+      // barrier — a caret that left and came home must not be yanked
+      // back out when the queued action fires. Safe against spurious
+      // cancellation: yaml-cursor-line only fires on selectionSet,
+      // which the flush's own draft sync never carries.
+      this._switchSeq++;
       this._focusFieldPath = rel;
       this._focusYamlPath = e.detail.indexedPath;
       return;
@@ -1777,7 +1788,10 @@ export class ESPHomePageDevice extends LitElement {
    *  the selection first can unmount the editor mid-flight — its
    *  ``yaml-draft`` then fires from a detached element and never
    *  reaches the page, silently dropping the last edit. */
-  private async _guardSectionSwitch(action: () => void): Promise<void> {
+  private async _guardSectionSwitch(
+    action: () => void,
+    opts: { compose?: boolean } = {}
+  ): Promise<void> {
     // Only a returned promise defers the switch; the component
     // editor's sync flush (and no active section) keeps the switch
     // synchronous, so cursor-driven selection stays re-entrant safe.
@@ -1798,8 +1812,12 @@ export class ESPHomePageDevice extends LitElement {
       // and a later switch supersedes this one — the callers' dedupe
       // reads pre-switch state for the whole window, so without the
       // token a duplicate click double-pushes the back stack and a
-      // caret returning home still gets yanked away.
-      if (!this.isConnected || seq !== this._switchSeq) return;
+      // caret returning home still gets yanked away. Composing
+      // actions (Back's relative history pop) are never dropped —
+      // two Back presses must pop twice — but still take the token,
+      // so a pending absolute switch yields to them.
+      if (!this.isConnected) return;
+      if (!opts.compose && seq !== this._switchSeq) return;
     }
     action();
   }
