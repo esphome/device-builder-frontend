@@ -68,6 +68,18 @@ describe("section-switch flush barrier", () => {
     expect(action).toHaveBeenCalledOnce();
   });
 
+  it("still switches when the flush rejects", async () => {
+    const page = new ESPHomePageDevice();
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () => Promise.reject(new Error("upsert failed")),
+      reload: () => {},
+    } satisfies SectionEditor;
+    const action = vi.fn();
+    await internals(page)._guardSectionSwitch(action);
+    expect(action).toHaveBeenCalledOnce();
+  });
+
   it("runs the action after a sync flush (component editor shape)", async () => {
     const page = new ESPHomePageDevice();
     const flushPending = vi.fn();

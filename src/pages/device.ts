@@ -1724,6 +1724,10 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = false;
       return;
     }
+    // Close the drawer before the guard's flush barrier: on mobile it
+    // is the only visual acknowledgement of the tap, and it is pure
+    // chrome — nothing about it depends on the flushed buffer.
+    this._drawerOpen = false;
     void this._guardSectionSwitch(() => {
       // Back-stack bookkeeping: A → B pushes A so back returns to it.
       // Going back to no-section clears the trail — a later trip into
@@ -1748,7 +1752,6 @@ export class ESPHomePageDevice extends LitElement {
       // user never pointed at.
       this._focusFieldPath = undefined;
       this._focusYamlPath = undefined;
-      this._drawerOpen = false;
       this._updateUrl();
     });
   }
@@ -1774,7 +1777,15 @@ export class ESPHomePageDevice extends LitElement {
     // editor's sync flush (and no active section) keeps the switch
     // synchronous, so cursor-driven selection stays re-entrant safe.
     const pending = this._activeSection?.flushPending();
-    if (pending) await pending;
+    if (pending) {
+      // A failed flush already surfaced its own error; still switch —
+      // blocking navigation on it is strictly worse than a stale draft.
+      try {
+        await pending;
+      } catch {
+        // Handled by the editor.
+      }
+    }
     action();
   }
 
