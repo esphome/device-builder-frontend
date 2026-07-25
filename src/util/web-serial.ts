@@ -10,7 +10,7 @@ import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 import { markSerialActivity } from "./serial-reacquire.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
-export const ESPRESSIF_USB_VID = 0x303a;
+const ESPRESSIF_USB_VID = 0x303a;
 
 /** The on-chip USB-Serial-JTAG device's product id — esptool-js's own
  *  discriminator (it gates on this PID alone). The vendor id alone is not

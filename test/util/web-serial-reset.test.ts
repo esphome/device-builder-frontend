@@ -59,7 +59,7 @@ describe("resetAndDisconnect — Espressif USB identity discriminator", () => {
     } as unknown as SerialPort;
     await resetAndDisconnect(esp8266Loader, transport as unknown as Transport, jtagPort);
     expect(jtagResetSpy).toHaveBeenCalledTimes(1);
-    expect(transport.setRTS.mock.calls.map((c) => c[0])).not.toEqual([true, false]);
+    expect(transport.setRTS).not.toHaveBeenCalled();
   });
 
   it("treats the ESP-USB-Bridge as a bridge despite the Espressif vendor id", async () => {

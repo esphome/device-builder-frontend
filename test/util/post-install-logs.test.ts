@@ -116,7 +116,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => openPort());
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((navigator as any).serial.requestPort).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -131,7 +131,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => port);
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 19200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 19200, null);
       expect(port.open).toHaveBeenCalledWith({ baudRate: 19200 });
     } finally {
       restore();
@@ -145,7 +145,7 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.abortSerialReconnect).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
@@ -191,7 +191,7 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
@@ -206,7 +206,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => port);
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200, null);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();

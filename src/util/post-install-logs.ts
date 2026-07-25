@@ -72,7 +72,7 @@ export async function reconnectWebSerialLogs(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  loggerInterface?: string | null
+  loggerInterface: string | null
 ): Promise<void> {
   let port: SerialPort | null;
   try {
@@ -269,7 +269,7 @@ export async function handlePostInstallShowLogs(
       // fresh port via the picker rather than reopening the cached esptool
       // handle, which a native-USB chip's post-flash re-enumeration leaves dead.
       onReconnect: () =>
-        reconnectWebSerialLogs(logsDialog, localize, baudRate, loggerInterface),
+        reconnectWebSerialLogs(logsDialog, localize, baudRate, loggerInterface ?? null),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly
