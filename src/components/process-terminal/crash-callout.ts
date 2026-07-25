@@ -1,6 +1,13 @@
+import { mdiAlertCircle } from "@mdi/js";
 import { css, html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { CrashKind } from "../../util/crash-detector.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
+
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+
+// Self-contained: a consumer that registers nothing still gets the icon.
+registerMdiIcons({ "alert-circle": mdiAlertCircle });
 
 /**
  * Crash-detected callout for the ``suggestion`` slot of a process

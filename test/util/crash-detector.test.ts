@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCrashMarker } from "../../src/util/crash-detector.js";
+import { isCrashMarker, latchCrashKind } from "../../src/util/crash-detector.js";
 import { CRASH_BANNER_LINE } from "../_crash-lines.js";
 
 // Realistic crash lines, one per supported shape.
@@ -45,5 +45,26 @@ describe("isCrashMarker", () => {
 
   it.each(NON_CRASH_LINES)("does not match %s", (_name, line) => {
     expect(isCrashMarker(line)).toBe(false);
+  });
+});
+
+describe("latchCrashKind", () => {
+  it("latches the first detected kind", () => {
+    expect(latchCrashKind(null, "previous-boot")).toBe("previous-boot");
+    expect(latchCrashKind(null, "live")).toBe("live");
+  });
+
+  it("upgrades previous-boot to live", () => {
+    expect(latchCrashKind("previous-boot", "live")).toBe("live");
+  });
+
+  it("never downgrades live to a later previous-boot marker", () => {
+    expect(latchCrashKind("live", "previous-boot")).toBe("live");
+  });
+
+  it("keeps the current kind across non-crash lines", () => {
+    expect(latchCrashKind("live", null)).toBe("live");
+    expect(latchCrashKind("previous-boot", null)).toBe("previous-boot");
+    expect(latchCrashKind(null, null)).toBeNull();
   });
 });
