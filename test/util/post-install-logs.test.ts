@@ -58,6 +58,7 @@ function deadPort(
 function stubDialog() {
   return {
     open: vi.fn(),
+    switchToNetworkLogs: vi.fn(),
     setSerialStream: vi.fn(),
     setSerialOpenFailed: vi.fn(),
     abortSerialReconnect: vi.fn(),
@@ -171,7 +172,9 @@ describe("reconnectWebSerialLogs", () => {
         "USB_SERIAL_JTAG"
       );
       expect(bridge.open).not.toHaveBeenCalled();
-      expect(dialog.open).toHaveBeenCalledWith("OTA", {});
+      // Mid-session swap, not a fresh open: buffer + back-to-install survive.
+      expect(dialog.switchToNetworkLogs).toHaveBeenCalledTimes(1);
+      expect(dialog.open).not.toHaveBeenCalled();
       expect(toastInfo).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream).not.toHaveBeenCalled();
     } finally {

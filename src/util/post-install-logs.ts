@@ -58,20 +58,6 @@ export async function requestSerialPort(): Promise<SerialPort | null> {
 }
 
 /**
- * Prompt for a Web Serial port and open it at log baud. Returns the open port,
- * or ``null`` if the user dismissed the picker. Throws if a picked port can't
- * be opened (claimed by another tab, driver error) — the caller surfaces that.
- */
-export async function requestAndOpenSerialPort(
-  baudRate: number
-): Promise<SerialPort | null> {
-  const port = await requestSerialPort();
-  if (!port) return null;
-  await port.open({ baudRate });
-  return port;
-}
-
-/**
  * Reconnect a dead Web Serial logs session by acquiring a FRESH port via the
  * picker, not reopening the cached handle.
  *
@@ -101,11 +87,13 @@ export async function reconnectWebSerialLogs(
     logsDialog.abortSerialReconnect(); // Picker dismissed — back to "Start", quietly.
     return;
   }
-  // Same pre-open gate as the entry points: a re-picked port that provably
-  // can't carry the console reroutes instead of reopening a dead end.
+  // Same pre-open gate as the entry points, but this fires mid-session:
+  // swap the source in place so the buffer and the back-to-install
+  // affordance survive, rather than re-opening a fresh session.
   const mismatch = serialConsoleMismatch(loggerInterface, port, localize);
   if (mismatch) {
-    openNetworkLogsFallback(logsDialog, localize, { message: mismatch.message });
+    notifyInfo(mismatch.message);
+    logsDialog.switchToNetworkLogs();
     return;
   }
   try {
