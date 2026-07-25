@@ -420,6 +420,58 @@ describe("AutoApplyController delete", () => {
     expect(selections).toHaveLength(0);
   });
 
+  it("a mid-flush retarget without an edit stays on the sibling with nothing re-armed", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    const selections = captureEvents(host, "section-select");
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // The navigator re-points the reused element at a sibling but the
+    // user types nothing before the delete resolves.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(selections).toHaveLength(0);
+    expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a suppressed sibling edit is not re-armed after navigating back to the deleted section", async () => {
+    const { host, controller, upsertAutomation, deleteAutomation } = setup();
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // Retarget to a sibling, edit it, then navigate back to the
+    // section being deleted before the round-trip finishes.
+    host.location = { kind: "script", id: "sibling" } as unknown as AutomationLocation;
+    controller.scheduleAutoApply();
+    host.location = SCRIPT;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    // Re-arming here would upsert the deleted location and resurrect
+    // it; the guard requires the host to still show the sibling.
+    expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
   it("a failed delete does not re-arm a torn-down section", async () => {
     const { controller, upsertAutomation, deleteAutomation } = setup();
     deleteAutomation.mockRejectedValueOnce(new Error("nope"));

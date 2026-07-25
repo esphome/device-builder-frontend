@@ -73,9 +73,10 @@ export interface AutoApplyOptions {
  * - ``yaml-draft`` after a successful upsert (the global save button
  *   is the only writer to disk; auto-apply only advances the page's
  *   YAML buffer).
- * - ``yaml-updated`` + ``section-select`` after a successful delete
- *   (delete writes through immediately via ``updateConfig``,
- *   matching the component editor's delete UX).
+ * - ``yaml-updated`` after a successful delete (delete writes through
+ *   immediately via ``updateConfig``, matching the component editor's
+ *   delete UX), plus ``section-select`` unless the element was
+ *   re-pointed at a sibling mid-delete.
  *
  * Failures on either path surface a ``toast.error`` plus the host's
  * inline error message — per CLAUDE.md, a failed write must reach
@@ -284,7 +285,8 @@ export class AutoApplyController implements ReactiveController {
    * compute the new YAML via the backend's delete diff, write it via
    * ``api.updateConfig``, then dispatch ``yaml-updated`` (which
    * advances both ``_yaml`` AND ``_savedYaml`` on the page — a clean
-   * state). Navigates away from the deleted section after.
+   * state). Navigates away from the deleted section after, unless the
+   * reused element has already been re-pointed at a sibling.
    */
   async delete(): Promise<void> {
     const api = this._options.getApi();
@@ -363,12 +365,17 @@ export class AutoApplyController implements ReactiveController {
         suppressed &&
         suppressedFor &&
         this._connected &&
-        sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location)
+        this._host.location &&
+        sectionKeyFromLocation(suppressedFor) !== sectionKeyFromLocation(location) &&
+        sectionKeyFromLocation(this._host.location) ===
+          sectionKeyFromLocation(suppressedFor)
       ) {
         // The suppressed edit belongs to a sibling the reused
-        // element was re-pointed at mid-flush; the editor stayed
-        // mounted (no section-select above), so the re-armed timer
-        // lands the edit.
+        // element was re-pointed at mid-flush, and the element still
+        // shows that sibling — so the re-armed timer writes exactly
+        // the suppressed edit (autoApply reads host state at fire
+        // time, not the snapshot). The editor stayed mounted (no
+        // section-select above), so the timer lands.
         this.scheduleAutoApply();
       } else {
         // The deleted section's own edits die with it.
