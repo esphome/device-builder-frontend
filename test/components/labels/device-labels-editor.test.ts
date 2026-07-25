@@ -270,5 +270,8 @@ describe("device-labels-editor optimistic override lifecycle", () => {
 
     resolveSave();
     await saving;
+    // Save succeeded but the prop hasn't caught up — the override
+    // must survive until the push lands.
+    expect(chipIds(el)).toEqual(["a"]);
   });
 });
