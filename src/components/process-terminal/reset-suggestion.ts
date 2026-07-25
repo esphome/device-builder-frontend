@@ -26,17 +26,36 @@ export interface SuggestionHost extends RemoteBuildHintHost {
   _tryResetBuildEnv: () => void;
 }
 
-/** YAML validation failed → "open in editor". */
-export function renderValidationFailureSuggestion(host: SuggestionHost): TemplateResult {
-  const text = host._localize("command.validation_failed_suggestion");
-  const [before, after] = splitTemplate(text, "{editor_action}");
+/**
+ * Generic single-action suggestion line: *textKey* with *placeholder*
+ * replaced by a link labelled *actionKey* that runs *onAction*.
+ */
+export function renderActionSuggestion(
+  localize: LocalizeFunc,
+  textKey: string,
+  placeholder: string,
+  actionKey: string,
+  onAction: () => void
+): TemplateResult {
+  const [before, after] = splitTemplate(localize(textKey), placeholder);
   return html`
     <div class="reset-suggestion" role="status" slot="suggestion">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
-        ${host._localize("command.try_open_editor_button")}</button
+      ${before}<button class="reset-suggestion-link" @click=${onAction}>
+        ${localize(actionKey)}</button
       >${after}
     </div>
   `;
+}
+
+/** YAML validation failed → "open in editor". */
+export function renderValidationFailureSuggestion(host: SuggestionHost): TemplateResult {
+  return renderActionSuggestion(
+    host._localize,
+    "command.validation_failed_suggestion",
+    "{editor_action}",
+    "command.try_open_editor_button",
+    host._tryOpenInEditor
+  );
 }
 
 /**

@@ -125,34 +125,8 @@ export const commandDialogStyles = css`
     text-decoration: none;
   }
 
-  /* Reset-build-env suggestion — install/compile failures only. Muted
-     palette: a hint, not a second error. Slotted into the component's
-     suggestion slot. */
-  .reset-suggestion {
-    padding: 10px 20px;
-    border-top: 1px solid var(--term-border);
-    background: var(--term-bg-alt);
-    font-family: var(--term-mono-font);
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--term-fg-muted);
-  }
-  .reset-suggestion-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    color: var(--term-accent);
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-  .reset-suggestion-link:hover,
-  .reset-suggestion-link:focus-visible {
-    color: var(--term-accent);
-    text-decoration-thickness: 2px;
-    outline: none;
-  }
+  /* Reset-build-env suggestion (install/compile failures) is styled by the
+     shared termSuggestionStyles in the dialog's static styles. */
 
   /* Compile-elapsed counter, slotted lower-left where the streaming dot
      sits. Shares the dot's accent + a gentle pulse so the "still working"

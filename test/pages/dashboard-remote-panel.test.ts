@@ -8,33 +8,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // Rendering the loaded dashboard mounts every dialog child, and each
 // wa-dialog's internal form-associated elements (WaButton, WaCheckbox)
 // crash under happy-dom. The layout assertions here don't touch them,
-// so no-op the heavy children (device-platform-ready idiom).
-vi.mock("../../src/components/accept-peer-dialog.js", () => ({}));
-vi.mock("../../src/components/adopt-dialog.js", () => ({}));
-vi.mock("../../src/components/api-key-dialog.js", () => ({}));
-vi.mock("../../src/components/archived-devices-dialog.js", () => ({}));
-vi.mock("../../src/components/clone-device-dialog.js", () => ({}));
-vi.mock("../../src/components/command-dialog.js", () => ({}));
-vi.mock("../../src/components/confirm-dialog.js", () => ({}));
-vi.mock("../../src/components/dashboard/device-drawer.js", () => ({}));
-vi.mock("../../src/components/dashboard/device-table.js", () => ({}));
-vi.mock("../../src/components/dashboard/table-row-menu.js", () => ({}));
-vi.mock("../../src/components/device-card.js", () => ({}));
-vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
-vi.mock("../../src/components/discovered-device-card.js", () => ({}));
-vi.mock("../../src/components/firmware-install-dialog.js", () => ({}));
-vi.mock("../../src/components/friendly-name-dialog.js", () => ({}));
-vi.mock("../../src/components/install-method-dialog.js", () => ({}));
-vi.mock("../../src/components/labels/bulk-labels-dialog.js", () => ({}));
-vi.mock("../../src/components/labels/label-dialog.js", () => ({}));
-vi.mock("../../src/components/logs-dialog.js", () => ({}));
-vi.mock("../../src/components/rename-device-dialog.js", () => ({}));
-vi.mock("../../src/components/select-bar.js", () => ({}));
-vi.mock("../../src/components/wizard/create-config-dialog.js", () => ({}));
+// so no-op the heavy children.
+import "./_mock-dashboard-children.js";
 
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { JobStatus } from "../../src/api/types/firmware-jobs.js";

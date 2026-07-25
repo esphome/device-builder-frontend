@@ -3,12 +3,25 @@ import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
-import { notifyError } from "./notify.js";
+import { notifyError, notifyInfo } from "./notify.js";
 import {
   isPortPickerCancel,
   openLiveSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
+
+/**
+ * Route a device whose serial console is provably silent (logger baud_rate 0)
+ * to the network log stream, with a notice saying why (#1430).
+ */
+export function openNetworkLogsFallback(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  options: { onBackToInstall?: () => void } = {}
+): void {
+  notifyInfo(localize("dashboard.logs_serial_disabled_fallback"));
+  logsDialog.open(OTA_PORT, options);
+}
 
 /**
  * Human label for a Web Serial port, for error messages. Web Serial exposes
@@ -211,8 +224,7 @@ export async function handlePostInstallShowLogs(
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging disabled; the port would be silent.
-      notifyError(localize("dashboard.logs_serial_disabled"));
+      openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
       return;
     }
     logsDialog.openPassive({

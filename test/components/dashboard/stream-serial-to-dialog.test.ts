@@ -16,6 +16,7 @@ import { flushMicrotasks } from "../../_dom.js";
 interface MockDialog {
   _lines: string[];
   _enqueueLine(line: string): void;
+  _noteSerialActivity(): void;
 }
 
 // The real dialog batches via requestAnimationFrame; for these decode-focused
@@ -26,6 +27,7 @@ function mockDialog(): MockDialog {
     _enqueueLine(line: string) {
       d._lines.push(line);
     },
+    _noteSerialActivity() {},
   };
   return d;
 }

@@ -68,6 +68,7 @@ import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal
 import {
   fillTerminalOnMobile,
   termButtonStyles,
+  termSuggestionStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
 import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
@@ -255,6 +256,7 @@ export class ESPHomeCommandDialog extends LitElement {
     linkButtonStyles,
     termTokens,
     termButtonStyles,
+    termSuggestionStyles,
     commandDialogStyles,
     remoteBuildHintStyles,
     // Log output is content-heavy: full-screen on mobile, terminal fills it. #41

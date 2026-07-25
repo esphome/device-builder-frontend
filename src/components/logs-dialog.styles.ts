@@ -72,6 +72,9 @@ export const logsDialogStyles = css`
     background: var(--esphome-primary-hover);
   }
 
+  /* Quiet-serial escape hatch is styled by the shared termSuggestionStyles
+     in the dialog's static styles. */
+
   /* Expanded → "just give me logs": full viewport, the terminal fills the
      space between the slim title bar and the toolbar. The component fills the
      dialog body (height: 100%) and its content stretches via the height vars. */

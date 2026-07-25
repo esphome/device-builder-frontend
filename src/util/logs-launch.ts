@@ -6,6 +6,7 @@ import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError } from "./notify.js";
 import {
   attachSerialLogStream,
+  openNetworkLogsFallback,
   reconnectWebSerialLogs,
   requestAndOpenSerialPort,
 } from "./post-install-logs.js";
@@ -79,8 +80,10 @@ export async function launchLogsWithMethod(
     }
     const baudRate = resolveLogBaudRate(device.logger_baud_rate);
     if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging is disabled; serial would be silent.
-      notifyError(host.localize("dashboard.logs_serial_disabled"));
+      // Skip the port picker: the port would be silent.
+      host.logsDialog.configuration = device.configuration;
+      host.logsDialog.name = device.friendly_name || device.name;
+      openNetworkLogsFallback(host.logsDialog, host.localize);
       return;
     }
     let serialPort: SerialPort | null;

@@ -23,6 +23,7 @@ import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   "rocket-launch": mdiRocketLaunch,
@@ -97,37 +98,47 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
             ${this._localize("web.actions.prepare")}
           </button>
           <button
+            id="btn-install"
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("dashboard.install")}
             aria-label=${this._localize("dashboard.install")}
             @click=${this._showInstall}
           >
             <wa-icon library="mdi" name="upload"></wa-icon>
           </button>
+          <wa-tooltip for="btn-install"
+            >${this._localize("dashboard.install")}</wa-tooltip
+          >
           <button
+            id="btn-logs"
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("dashboard.logs")}
             aria-label=${this._localize("dashboard.logs")}
             @click=${this._showLogs}
           >
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
+          <wa-tooltip for="btn-logs">${this._localize("dashboard.logs")}</wa-tooltip>
           <button
+            id="btn-wifi"
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("web.actions.configure_wifi")}
             aria-label=${this._localize("web.actions.configure_wifi")}
             @click=${this._configureWifi}
           >
             <wa-icon library="mdi" name="wifi-cog"></wa-icon>
           </button>
+          <wa-tooltip for="btn-wifi"
+            >${this._localize("web.actions.configure_wifi")}</wa-tooltip
+          >
           <button
+            id="btn-disconnect"
             class="action-btn action-btn--ghost action-btn--icon-only"
-            title=${this._localize("web.actions.disconnect")}
             aria-label=${this._localize("web.actions.disconnect")}
             @click=${this._disconnect}
           >
             <wa-icon library="mdi" name="link-off"></wa-icon>
           </button>
+          <wa-tooltip for="btn-disconnect"
+            >${this._localize("web.actions.disconnect")}</wa-tooltip
+          >
         </div>
       </esphome-web-card>
       <esphome-web-install-adoptable-dialog
