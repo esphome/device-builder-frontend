@@ -1326,7 +1326,7 @@ export class ESPHomePageDevice extends LitElement {
    *  not this one. */
   private _onBack = () => {
     this._heldUnknownInstance = null;
-    this._guardSectionSwitch(() => {
+    void this._guardSectionSwitch(() => {
       const prev = this._sectionHistory.length
         ? this._sectionHistory[this._sectionHistory.length - 1]
         : null;
@@ -1579,7 +1579,7 @@ export class ESPHomePageDevice extends LitElement {
     // Cross-section: set the field path only when the switch actually
     // applies, so a guard veto (unsaved edits) can't point the old
     // section's form at a path meant for the new one.
-    this._guardSectionSwitch(() => {
+    void this._guardSectionSwitch(() => {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
       this._focusFieldPath = rel;
@@ -1724,7 +1724,7 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = false;
       return;
     }
-    this._guardSectionSwitch(() => {
+    void this._guardSectionSwitch(() => {
       // Back-stack bookkeeping: A → B pushes A so back returns to it.
       // Going back to no-section clears the trail — a later trip into
       // a section is a fresh navigation, not a continuation of the
@@ -1762,9 +1762,19 @@ export class ESPHomePageDevice extends LitElement {
    *  re-render in the form when they come back to this section.
    *  The leave-page guard (``_confirmLeave``) is the only thing
    *  that prompts about unsaved YAML, since *that's* the only
-   *  state that's actually at risk. */
-  private _guardSectionSwitch(action: () => void): void {
-    this._activeSection?.flushPending();
+   *  state that's actually at risk.
+   *
+   *  The flush is awaited before the switch: the automation
+   *  editors' flush is a backend upsert round trip, and swapping
+   *  the selection first can unmount the editor mid-flight — its
+   *  ``yaml-draft`` then fires from a detached element and never
+   *  reaches the page, silently dropping the last edit. */
+  private async _guardSectionSwitch(action: () => void): Promise<void> {
+    // Only a returned promise defers the switch; the component
+    // editor's sync flush (and no active section) keeps the switch
+    // synchronous, so cursor-driven selection stays re-entrant safe.
+    const pending = this._activeSection?.flushPending();
+    if (pending) await pending;
     action();
   }
 
