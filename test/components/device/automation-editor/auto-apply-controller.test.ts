@@ -226,6 +226,37 @@ describe("AutoApplyController auto-apply", () => {
     expect(upsertAutomation).toHaveBeenCalledTimes(1);
   });
 
+  it("flushPending waits out the re-run queued by a debounce cancelled into an in-flight apply", async () => {
+    const { controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const applying = controller.autoApply();
+    // A keystroke lands inside the debounce window while the round
+    // trip is outstanding.
+    controller.scheduleAutoApply();
+    let flushed = false;
+    const flushing = controller.flushPending().then(() => {
+      flushed = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(60);
+    // Releasing here would let the global save commit the
+    // pre-keystroke YAML while the queued re-run is still unwritten.
+    expect(flushed).toBe(false);
+
+    resolveFirst({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, flushing]);
+    expect(flushed).toBe(true);
+    // The queued re-run actually ran before the flush released.
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
+  });
+
   it("shouldSkipReload skips the echo of its own write, not a foreign edit", async () => {
     const { host, controller } = setup();
     expect(controller.shouldSkipReload()).toBe(false);
