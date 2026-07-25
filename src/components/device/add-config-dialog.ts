@@ -13,9 +13,9 @@ import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
  * configuration entries (api, wifi, logger, target platforms,
  * substitutions, …).
  *
- * Kept as its own custom element so the navigator / board-info host
- * can `@query("esphome-add-config-dialog")` and call `.open()`
- * without conflating the two entry points.
+ * Kept as its own custom element so the navigator host can
+ * `@query("esphome-add-config-dialog")` and call `.open()` without
+ * conflating the two entry points.
  */
 @customElement("esphome-add-config-dialog")
 export class ESPHomeAddConfigDialog extends LitElement {
