@@ -22,6 +22,10 @@ export const deviceNavigatorStyles = css`
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Busy dim fed from the host page (the host itself is
+       display: contents, so opacity must land on this box). */
+    opacity: var(--navigator-busy-opacity, 1);
+    transition: opacity 120ms ease var(--navigator-busy-delay, 0ms);
   }
 
   .card-header {

@@ -31,21 +31,21 @@ export const devicePageStyles = css`
   }
 
   /* Busy affordance while a section switch is parked behind the
-     active editor's flush (up to the WS command timeout). The dim
-     engages only after a delay so the common fast flush never
-     flickers; the base state carries no delay, so clearing un-dims
-     immediately. */
-  .layout-grid .desktop-nav {
-    transition: opacity 120ms ease;
-  }
-
+     active editor's flush (up to the WS command timeout). The dim is
+     fed through custom properties because the navigator host is
+     display: contents (opacity on the host is a no-op); it engages
+     only after a delay so the common fast flush never flickers, and
+     clears immediately (the shadow side's base delay is 0). Rows keep
+     their pointer cursor on purpose — clicking during the barrier
+     stays meaningful (last switch wins), so the progress cursor shows
+     on the non-interactive surface only. */
   .layout-grid.switch-pending {
     cursor: progress;
   }
 
   .layout-grid.switch-pending .desktop-nav {
-    opacity: 0.6;
-    transition-delay: 200ms;
+    --navigator-busy-opacity: 0.6;
+    --navigator-busy-delay: 200ms;
   }
 
   .layout-grid.nav-collapsed .desktop-nav {
