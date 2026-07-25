@@ -17,7 +17,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
+import type { SectionEditor } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
@@ -327,7 +327,7 @@ export class ESPHomePageDevice extends LitElement {
    *  three shadow roots between this page and the section
    *  editor, so the registration pattern keeps the call site
    *  for ``activeSection.save()`` cheap and direct. */
-  private _activeSection: ESPHomeDeviceSectionConfig | null = null;
+  private _activeSection: SectionEditor | null = null;
 
   @state()
   private _sectionDirty = false;
@@ -1780,13 +1780,13 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onSectionMount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    const ev = e as CustomEvent<{ node: SectionEditor }>;
     this._activeSection = ev.detail.node;
     this._sectionDirty = ev.detail.node.dirty;
   };
 
   private _onSectionUnmount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    const ev = e as CustomEvent<{ node: SectionEditor }>;
     if (this._activeSection === ev.detail.node) {
       this._activeSection = null;
       this._sectionDirty = false;

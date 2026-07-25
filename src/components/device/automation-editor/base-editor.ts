@@ -26,14 +26,16 @@ import { automationEditorStyles } from "./automation-editor.styles.js";
 import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
+import type { SectionEditor } from "../section-editor.js";
 import { renderDeleteRow } from "./render-delete-row.js";
 import { sectionKeyFromLocation } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
-export abstract class BaseAutomationEditor<
-  L extends AutomationLocation,
-> extends LitElement {
+export abstract class BaseAutomationEditor<L extends AutomationLocation>
+  extends LitElement
+  implements SectionEditor
+{
   @consume({ context: localizeContext, subscribe: true })
   @state()
   protected _localize: LocalizeFunc = (key) => key;
