@@ -451,6 +451,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _onAfterHide(): void {
     this._stop();
     this._lines = [];
+    // A reopen that starts portless (the flash receiver's open-first shape)
+    // renders before _start clears state — don't let last session's crash
+    // banner sit over the fresh "Waiting…" terminal.
+    this._crashKind = null;
     this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true }));
   }
 

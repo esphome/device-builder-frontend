@@ -371,4 +371,19 @@ describe("esphome-web-logs-dialog", () => {
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
   });
+
+  it("drops the crash banner on hide so a portless reopen starts clean", async () => {
+    const el = await mount();
+    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.open = true;
+    await el.updateComplete;
+    const calls = vi.mocked(streamSerialLines).mock.calls;
+    calls[calls.length - 1][1].onLine("Guru Meditation Error: Core  1 panic'ed");
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).not.toBeNull();
+
+    (el as any)._onAfterHide();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".crash-callout")).toBeNull();
+  });
 });
