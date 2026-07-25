@@ -261,12 +261,22 @@ describe("AutoApplyController delete", () => {
     expect(controller.deleting).toBe(false);
   });
 
-  it("cancels a pending auto-apply before deleting", async () => {
+  it("cancels a pending auto-apply before deleting and clears its dirty flag", async () => {
     const { controller, upsertAutomation } = setup();
     controller.scheduleAutoApply();
     await controller.delete();
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
     expect(upsertAutomation).not.toHaveBeenCalled();
+    expect(controller.dirty).toBe(false);
+  });
+
+  it("a failed delete re-arms the cancelled pending auto-apply", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    deleteAutomation.mockRejectedValueOnce(new Error("nope"));
+    controller.scheduleAutoApply();
+    await controller.delete();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a delete failure via toast.error and clears the deleting flag", async () => {

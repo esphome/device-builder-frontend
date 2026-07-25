@@ -276,6 +276,7 @@ export class AutoApplyController implements ReactiveController {
     const api = this._options.getApi();
     if (!api || !this._host.location || this._deleting) return;
     // Cancel any pending auto-apply — we're about to delete.
+    const hadPending = this._applyTimer !== null;
     this._clearTimer();
     this._setDeleting(true);
     this._options.setError("");
@@ -313,15 +314,16 @@ export class AutoApplyController implements ReactiveController {
       this._surfaceSaveError(err);
     } finally {
       this._setDeleting(false);
-      if (this._applySuppressed) {
-        this._applySuppressed = false;
-        if (failed) {
-          // The section survived — land the edit the delete window
-          // suppressed instead of silently dropping it.
-          this.scheduleAutoApply();
-        } else {
-          this._setDirty(false);
-        }
+      const suppressed = this._applySuppressed;
+      this._applySuppressed = false;
+      if (failed) {
+        // The section survived — land the edit the delete window
+        // suppressed or cancelled instead of silently dropping it.
+        if (suppressed || hadPending) this.scheduleAutoApply();
+      } else {
+        // The section is gone; nothing from this editor is left to
+        // save.
+        this._setDirty(false);
       }
     }
   }
