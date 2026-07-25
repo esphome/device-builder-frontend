@@ -79,8 +79,8 @@ interface DeleteMode {
  * Shared auto-apply / delete / dirty-tracking engine for the three
  * automation-section editors (automation, script, api-action).
  *
- * Owns the debounce timer, the in-flight/dirty coalescing state, the
- * self-written-YAML echo marker, and the ``section-mount`` /
+ * Owns the debounce timer, the apply phase (in-flight + queued
+ * re-run), the self-written-YAML echo marker, and the ``section-mount`` /
  * ``section-unmount`` lifecycle announcements the device page uses to
  * hold a direct ref to the active section (see device.ts
  * ``_onSectionMount``). The controller shape gives proper teardown:
