@@ -12,6 +12,8 @@ vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+import "../../_mock-webawesome.js";
+
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { onDeleteConfirmed } from "../../../src/components/device/device-section-config/draft-and-delete.js";
 
