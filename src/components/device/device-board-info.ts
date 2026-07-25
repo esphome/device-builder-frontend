@@ -33,9 +33,7 @@ import { SECTION_ICON } from "./section-icons.js";
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/callout/callout.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./add-automation-dialog.js";
 import "./add-component-dialog.js";
-import "./add-config-dialog.js";
 import "./automation-editor/api-action-editor.js";
 import "./automation-editor/automation-editor.js";
 import "./automation-editor/script-editor.js";
@@ -331,13 +329,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
             `
       }
 
-      <esphome-add-config-dialog
-        .boardName=${board?.name ?? ""}
-        .configuration=${this.configuration}
-        .platform=${board?.esphome.platform ?? ""}
-        .board=${board}
-        .yaml=${this.yaml}
-      ></esphome-add-config-dialog>
       <esphome-add-component-dialog
         .boardName=${board?.name ?? ""}
         .configuration=${this.configuration}
@@ -345,12 +336,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .board=${board}
         .yaml=${this.yaml}
       ></esphome-add-component-dialog>
-      <esphome-add-automation-dialog
-        .boardName=${board?.name ?? ""}
-        .configuration=${this.configuration}
-        .board=${board}
-        .yaml=${this.yaml}
-      ></esphome-add-automation-dialog>
       <esphome-change-board-dialog
         .currentBoard=${board}
         .boards=${this._alternateBoards}

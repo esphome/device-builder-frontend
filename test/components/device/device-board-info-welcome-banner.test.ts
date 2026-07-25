@@ -10,9 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
-vi.mock("../../../src/components/device/add-config-dialog.js", () => ({}));
 vi.mock(
   "../../../src/components/device/automation-editor/api-action-editor.js",
   () => ({})
