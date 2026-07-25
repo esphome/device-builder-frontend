@@ -286,7 +286,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
    */
   private async _openBootLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
     const gen = ++this._bootLogsGen;
-    this._logPort = undefined;
     this._logsOpen = true;
     const { port, error } = await openLiveLogPort(
       oldPort,
@@ -314,28 +313,18 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     } catch {
       // tolerate; the chip may already be fine
     }
-    // Superseded by a newer install or an unmount during the awaits above —
-    // reclaim the handle; nothing will ever stream it.
-    if (gen !== this._bootLogsGen) {
+    // Close the handle unless the open dialog is about to stream it (a
+    // dialog closed mid-hand-off gets it back closed, so an accidental
+    // Escape is a one-click recovery via the Logs button); park it unless
+    // a newer install or an unmount superseded this acquisition.
+    if (gen !== this._bootLogsGen || !this._logsOpen) {
       try {
         await port.close();
       } catch {
         // already closed
       }
-      return;
     }
-    // The user closed the dialog mid-hand-off: release the handle but keep
-    // it for the Logs button, so an accidental Escape is a one-click recovery.
-    if (!this._logsOpen) {
-      try {
-        await port.close();
-      } catch {
-        // already closed
-      }
-      this._logPort = port;
-      return;
-    }
-    this._logPort = port; // the open dialog picks it up and streams
+    if (gen === this._bootLogsGen) this._logPort = port;
   }
 
   // Reopen the boot-log dialog after the user closed it (the dialog closed
@@ -422,8 +411,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           <div class="card-actions-row" slot="actions">
             ${
               // Recovery affordance only: hidden while the dialog itself
-              // holds (and streams) the port.
-              this._flashDone && this._logPort && !this._logsOpen
+              // holds (and streams) the port. _logPort implies a completed
+              // flash — _runInstall clears it on every fresh attempt.
+              this._logPort && !this._logsOpen
                 ? html`<button
                     class="action-btn action-btn--ghost"
                     @click=${this._onViewLogs}

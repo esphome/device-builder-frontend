@@ -36,6 +36,19 @@ export function renderCrashCallout(
   </div>`;
 }
 
+/**
+ * Re-pin the terminal after the callout first appears: it shrinks the log
+ * container, which would otherwise push the crash tail out of view.
+ */
+export function repinTerminalForCallout(
+  updateComplete: Promise<unknown>,
+  terminal: () => { scrollToBottom(): void } | undefined
+): void {
+  void updateComplete
+    .then(() => terminal()?.scrollToBottom())
+    .catch((err) => console.warn("crash callout re-pin scroll failed", err));
+}
+
 /** Container shape only; an action button styles itself per consumer. */
 export const crashCalloutStyles = css`
   .crash-callout {

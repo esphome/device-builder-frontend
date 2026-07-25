@@ -15,6 +15,7 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -258,7 +259,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("renders a Clear label and toggles Stop ⇄ Start", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     // _start() flips _streaming inside updated(), which schedules a second
     // render — await both cycles before asserting on the toolbar.
@@ -285,7 +286,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("drops incoming lines while paused, keeps them while streaming", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
 
@@ -307,7 +308,7 @@ describe("esphome-web-logs-dialog", () => {
     await el.updateComplete;
     expect(streamSerialLines).not.toHaveBeenCalled();
 
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     await el.updateComplete;
     expect(streamSerialLines).toHaveBeenCalledOnce();
     expect((el as any)._streaming).toBe(true);
@@ -315,7 +316,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("ignores a port swap while a disconnect recovery is in flight", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
     expect(streamSerialLines).toHaveBeenCalledOnce();
@@ -324,14 +325,14 @@ describe("esphome-web-logs-dialog", () => {
     // handle retained; a parent watcher swapping .port here must not wipe
     // the rendered lines or race a second reader against the resume.
     (el as any)._cancel = undefined;
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     await el.updateComplete;
     expect(streamSerialLines).toHaveBeenCalledOnce();
   });
 
   it("does not latch the crash banner for lines dropped while paused", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
     const calls = vi.mocked(streamSerialLines).mock.calls;
@@ -346,7 +347,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("latches the crash banner on a panic line, upgrading previous-boot to live", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
     const calls = vi.mocked(streamSerialLines).mock.calls;
@@ -374,7 +375,7 @@ describe("esphome-web-logs-dialog", () => {
 
   it("drops the crash banner on hide so a portless reopen starts clean", async () => {
     const el = await mount();
-    el.port = { readable: {}, close: vi.fn(async () => {}) } as unknown as SerialPort;
+    el.port = makeWebSerialPort();
     el.open = true;
     await el.updateComplete;
     const calls = vi.mocked(streamSerialLines).mock.calls;

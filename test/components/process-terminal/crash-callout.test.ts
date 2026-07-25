@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { html, nothing, render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { html, nothing } from "lit";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
@@ -10,23 +10,15 @@ import {
   crashCalloutStyles,
 } from "../../../src/components/process-terminal/crash-callout.js";
 import type { CrashKind } from "../../../src/util/crash-detector.js";
-
-const localize = (key: string) => key;
+import { identityLocalize, renderInto } from "../../_dom.js";
 
 function mount(kind: CrashKind | null, action?: ReturnType<typeof html>): HTMLElement {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  render(renderCrashCallout(localize, kind, action), container);
-  return container;
+  return renderInto(renderCrashCallout(identityLocalize, kind, action));
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("renderCrashCallout", () => {
   it("renders nothing while no crash is latched", () => {
-    expect(renderCrashCallout(localize, null)).toBe(nothing);
+    expect(renderCrashCallout(identityLocalize, null)).toBe(nothing);
     expect(mount(null).querySelector(".crash-callout")).toBeNull();
   });
 

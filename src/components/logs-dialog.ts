@@ -31,6 +31,7 @@ import { CrashDecodeController } from "./crash-decode-controller.js";
 import {
   crashCalloutStyles,
   renderCrashCallout,
+  repinTerminalForCallout,
 } from "./process-terminal/crash-callout.js";
 import {
   abortSerialReconnect,
@@ -428,12 +429,8 @@ export class ESPHomeLogsDialog extends LitElement {
     if (next !== this._crashKind) {
       const firstDetection = this._crashKind === null;
       this._crashKind = next;
-      // The callout shrinks the log container; re-pin so the crash
-      // tail stays visible.
       if (firstDetection) {
-        void this.updateComplete
-          .then(() => this._terminal?.scrollToBottom())
-          .catch((err) => console.warn("crash callout re-pin scroll failed", err));
+        repinTerminalForCallout(this.updateComplete, () => this._terminal);
       }
     }
   }

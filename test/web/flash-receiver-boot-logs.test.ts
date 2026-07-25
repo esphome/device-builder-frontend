@@ -21,6 +21,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 import toast from "sonner-js";
 
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
+import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
 import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -31,15 +32,6 @@ async function mount(): Promise<ESPHomeWebFlashReceiver> {
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
-}
-
-function makePort(overrides: Record<string, unknown> = {}) {
-  return {
-    readable: {},
-    setSignals: vi.fn(async () => {}),
-    close: vi.fn(async () => {}),
-    ...overrides,
-  };
 }
 
 afterEach(() => {
@@ -72,11 +64,8 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     // An Escape during the re-enumeration wait must end the same way as one
     // a second later: closed handle in _logPort, Logs button available.
     const el = await mount();
-    // A stale handle from a previous install must not survive into this one.
-    (el as any)._logPort = makePort();
     const port = makePort();
     openLiveLogPort.mockImplementation(async (...args: unknown[]) => {
-      expect((el as any)._logPort).toBeUndefined(); // stale handle cleared
       (el as any)._logsOpen = false; // user closed the dialog mid-wait
       expect((args[4] as () => boolean)()).toBe(false); // acquisition continues
       return { port, error: null };
