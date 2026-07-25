@@ -123,7 +123,10 @@ export class ESPHomeComponentCatalog extends LitElement {
   @queryAll(".component-description--clamp[data-component-id]")
   private _clampedDescriptions!: NodeListOf<HTMLElement>;
 
-  private _resize = new ResizeController(this, () => this._measureDescriptionOverflow());
+  /** Side-effect controller; the field only keeps the registration alive. */
+  protected readonly _resize = new ResizeController(this, () =>
+    this._measureDescriptionOverflow()
+  );
 
   // Observes against the viewport (no rootSelector) so paging works whether
   // the grid scrolls itself or the surrounding dialog does; the sentinel is
@@ -135,7 +138,9 @@ export class ESPHomeComponentCatalog extends LitElement {
   // page far exceeds the container height and the only short page is the
   // last (hasMore=false, sentinel removed); a short non-final page never
   // occurs.
-  private _intersection = new IntersectionController(this, () => this._list.loadMore());
+  protected readonly _intersection = new IntersectionController(this, () =>
+    this._list.loadMore()
+  );
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
 

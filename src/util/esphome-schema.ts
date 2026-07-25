@@ -99,14 +99,7 @@ export async function getConfigVarDocsAtPath(
     );
     for (let i = 0; i < path.length; i++) {
       if (!cv) return null;
-      const found = await findCvInCv(
-        api,
-        bundleName,
-        componentKey,
-        cv,
-        path[i],
-        new Set()
-      );
+      const found = await findCvInCv(api, cv, path[i], new Set());
       if (!found) return null;
       if (i === path.length - 1) {
         // A typed discriminator's own docs name the variants only as a
@@ -132,8 +125,6 @@ export async function getConfigVarDocsAtPath(
  *  ``typed`` union's variants or a ``schema``'s config_vars/extends. */
 async function findCvInCv(
   api: ESPHomeAPI,
-  bundleName: string,
-  componentKey: string,
   cv: SchemaConfigVar,
   key: string,
   visited: Set<string>
@@ -144,29 +135,20 @@ async function findCvInCv(
     if (cv.typed_key === key) return cv;
     for (const variant of Object.values(cv.types ?? {})) {
       if (!variant) continue;
-      const found = await findCvInSchema(
-        api,
-        bundleName,
-        componentKey,
-        variant,
-        key,
-        visited
-      );
+      const found = await findCvInSchema(api, variant, key, visited);
       if (found) return found;
     }
     return null;
   }
   const schema = "schema" in cv ? cv.schema : undefined;
   if (!schema) return null;
-  return findCvInSchema(api, bundleName, componentKey, schema, key, visited);
+  return findCvInSchema(api, schema, key, visited);
 }
 
 /** Look up *key* in a ``SchemaSchema``: its own ``config_vars`` first,
  *  then each ``extends`` reference (recursively). */
 async function findCvInSchema(
   api: ESPHomeAPI,
-  bundleName: string,
-  componentKey: string,
   schema: SchemaSchema,
   key: string,
   visited: Set<string>
@@ -184,7 +166,7 @@ async function findCvInSchema(
       visited
     );
     if (!cv) continue;
-    const found = await findCvInCv(api, ref.bundle, ref.componentKey, cv, key, visited);
+    const found = await findCvInCv(api, cv, key, visited);
     if (found) return found;
   }
   return null;

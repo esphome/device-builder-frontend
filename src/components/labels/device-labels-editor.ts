@@ -77,12 +77,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @property({ attribute: false })
   device!: ConfiguredDevice;
 
-  /** True while a ``set_labels`` round trip is in flight. Used to
-   *  gate optimistic-state cleanup; toggle clicks are still
-   *  accepted and queued so fast multi-toggle feels responsive. */
-  @state()
-  private _saving = false;
-
   /** Snapshot of ``device.configuration`` taken when the user
    *  initiated a ``labels/create`` round trip. ``null`` means "no
    *  create in flight". A device swap mid-flight clears it (in
@@ -247,11 +241,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     // Only a real swap to a *different* device tears down the transient edit
     // state and closes the dialog; otherwise a half-typed "create" form would
     // persist into the next device's editor and a still-pending save chained
-    // against the previous device would gate this one's ``_saving`` indicator.
+    // against the previous device would keep gating this one through
+    // the stale _saveChain.
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
       this._dialog.open = false;
       this._createForm?.collapse();
-      this._saving = false;
       this._saveChain = Promise.resolve();
       // Drop any in-flight create snapshot so a late ``label-created``
       // arriving after the swap is ignored rather than misapplied.
@@ -388,7 +382,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     if (!this._api) return;
     const api = this._api;
     const config = this.device.configuration;
-    this._saving = true;
     const task = this._saveChain.then(async () => {
       try {
         await api.setDeviceLabels(config, nextIds);
@@ -399,9 +392,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     });
     this._saveChain = task;
     await task;
-    if (this._saveChain === task) {
-      this._saving = false;
-    }
   }
 
   private async _toggleAssignment(labelId: string, assign: boolean) {

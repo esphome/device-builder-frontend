@@ -10,7 +10,6 @@ import {
   type ConfigEntry,
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
-import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNumberField } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";

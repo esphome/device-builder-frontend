@@ -352,7 +352,6 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   protected render() {
     const board = this.board;
-    const isStarterKit = board && board.tags.includes("starter-kit");
 
     return html`
       <div class="header">

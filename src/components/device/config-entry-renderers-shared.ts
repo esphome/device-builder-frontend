@@ -14,7 +14,6 @@ import {
 } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
