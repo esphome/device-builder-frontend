@@ -38,7 +38,6 @@ import type {
 } from "../../../api/types/automations.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import { automationHeaderTitle } from "../../../util/automation-header-title.js";
-import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
 import { actionsFocus, entryFieldFocus } from "./automation-focus.js";
 import { BaseAutomationEditor } from "./base-editor.js";
@@ -68,23 +67,12 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
    *  resets to collapsed, matching the component-editor UX. */
   @state() private _showAdvanced = false;
 
-  /**
-   * Derived: edit-mode = not add-mode. Snapshot taken in
-   * ``connectedCallback`` so hydrate doesn't flip it back.
-   */
-  @state() private _editMode = false;
-
   /** Parse ``substitutions:`` from the current YAML once per edit so the
    *  read-only Target field can preview ${...} like the text fields do. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Snapshot the add-vs-edit context once at mount so subsequent
-    // property changes (the hydrate-from-backend cycle fills value
-    // and re-pins location) don't accidentally unlock the picker
-    // after it should stay locked.
-    this._editMode = !this.addMode;
     // ``_loadAvailable`` fires from ``updated()`` on the first
     // render once ``configuration`` lands — no separate kickoff
     // here, otherwise we'd send two ``automations/get_available``
@@ -119,41 +107,6 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
       this.board?.id
     );
     if (entry) this._intervalComponent = entry;
-  }
-
-  /**
-   * When the editor is mounted in edit mode (a navigator click
-   * landed us here with a ``location`` but no ``value``), pull the
-   * parsed automation list and match by stable section key. This
-   * keeps the editor self-contained — the parent only needs to
-   * pass the section key's location.
-   */
-  protected async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
-    try {
-      // Pass ``this.yaml`` so the parser sees the user's current
-      // draft buffer — without it the post-add hydrate would read
-      // the on-disk YAML, miss the just-inserted automation, and
-      // leave the form empty even though the YAML pane shows the
-      // user's input.
-      const parsed = await this._api.parseDeviceAutomations(
-        this.configuration,
-        this.yaml
-      );
-      // A successful parse clears any prior parse error, so the banner
-      // doesn't stick after the user fixes invalid YAML in the pane.
-      this._error = "";
-      // Re-pin location to the parser's canonical form (script id
-      // matched, light_effect index resolved against the actual YAML);
-      // the controller withholds a read-only automation's empty tree.
-      const m = this._parseError.resolve(parsed, this.location);
-      if (m) {
-        this.location = m.location;
-        this.value = m.tree;
-      }
-    } catch (err) {
-      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-    }
   }
 
   protected async _loadAvailable() {

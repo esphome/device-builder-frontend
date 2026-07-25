@@ -17,6 +17,7 @@ import type {
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
@@ -165,16 +166,42 @@ export abstract class BaseAutomationEditor<
     }`;
   }
 
-  /** Identity compared on navigator swaps — a different one means
-   *  the reused element's ``value`` is stale. The section key
-   *  already discriminates every location kind. */
-  protected _identityOf(location: L): string {
-    return sectionKeyFromLocation(location);
-  }
+  /** Section kind forwarded to the parse-error resolve; editors
+   *  spanning multiple kinds (the automation editor) leave it
+   *  unset. */
+  protected _sectionKind?: L["kind"];
 
+  /** Implementers own the ``_loading = false`` transition (directly
+   *  or via ``CallableAutomationEditor._load``), or the editor
+   *  sticks on the spinner forever. */
   protected abstract _loadAvailable(): Promise<void>;
 
-  protected abstract _hydrateFromBackend(): Promise<void>;
+  protected async _hydrateFromBackend() {
+    if (!this._api || !this.configuration || !this.location) return;
+    try {
+      // Pass ``this.yaml`` so the parser sees the user's current
+      // draft buffer — without it the post-add hydrate would read
+      // the on-disk YAML, miss the just-inserted section, and
+      // leave the form empty even though the YAML pane shows the
+      // user's input.
+      const parsed = await this._api.parseDeviceAutomations(
+        this.configuration,
+        this.yaml
+      );
+      // A successful parse clears any prior parse error, so the banner
+      // doesn't stick after the user fixes invalid YAML in the pane.
+      this._error = "";
+      // Re-pin location to the parser's canonical form; the
+      // controller withholds a read-only section's empty tree.
+      const m = this._parseError.resolve(parsed, this.location, this._sectionKind);
+      if (m) {
+        this.location = m.location;
+        this.value = m.tree;
+      }
+    } catch (err) {
+      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
+    }
+  }
 
   protected updated(changed: Map<string, unknown>) {
     if (changed.has("configuration")) {
@@ -189,7 +216,7 @@ export abstract class BaseAutomationEditor<
       if (
         prev &&
         this.location &&
-        this._identityOf(prev) !== this._identityOf(this.location)
+        sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
         this.value = null;
       }
