@@ -6,7 +6,7 @@
  * children are no-op mocked; the confirm dialog is stubbed with an
  * observable ``open()``.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import "./_editor-harness.js";
 

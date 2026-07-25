@@ -5,7 +5,7 @@
  * identity-less script / api action never writes, and dropping an
  * override would silently fall back to the base's permissive default.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import "./_editor-harness.js";
 
