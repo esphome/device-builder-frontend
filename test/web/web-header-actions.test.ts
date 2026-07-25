@@ -12,6 +12,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebHeaderActions } from "../../src/web/header/esphome-web-header-actions.js";
+import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 import { identityLocalize } from "../_dom.js";
 
 afterEach(() => {
@@ -69,5 +70,10 @@ describe("esphome-web-header-actions", () => {
     await el.updateComplete;
 
     expect(el.shadowRoot!.querySelector(".menu")).toBeNull();
+  });
+
+  it("anchors the kebab tooltip to the button id", async () => {
+    const el = await mount();
+    expectTooltipsAnchored(el, 1);
   });
 });

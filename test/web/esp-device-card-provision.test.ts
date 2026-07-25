@@ -21,6 +21,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebEspDeviceCard } from "../../src/web/dashboard/esphome-web-esp-device-card.js";
+import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -59,5 +60,10 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     (el as any)._configureWifi();
 
     expect(openImprovDialog).toHaveBeenCalledOnce();
+  });
+
+  it("anchors every action tooltip to a real button id", async () => {
+    const el = await mount();
+    expectTooltipsAnchored(el, 4);
   });
 });

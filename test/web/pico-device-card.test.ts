@@ -14,6 +14,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeWebPicoDeviceCard } from "../../src/web/dashboard/esphome-web-pico-device-card.js";
+import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -35,5 +36,14 @@ describe("esphome-web-pico-device-card", () => {
 
     expect(close).toHaveBeenCalledOnce();
     expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("anchors every action tooltip to a real button id", async () => {
+    const el = new ESPHomeWebPicoDeviceCard();
+    (el as any)._localize = (k: string) => k;
+    el.port = { close: vi.fn(async () => {}) } as unknown as SerialPort;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expectTooltipsAnchored(el, 2);
   });
 });

@@ -25,3 +25,10 @@ if (typeof crypto !== "undefined" && !crypto.randomUUID) {
 
 import "../styles/apply-theme.js";
 import "./esphome-web-app.js";
+
+import { installWaTooltipTouchSuppression } from "../util/wa-tooltip-touch-suppression.js";
+
+// Same guard the dashboard entrypoint installs: without it a tap's emulated
+// mouseover shows a wa-tooltip after the click already opened the dialog or
+// menu, with nothing to ever hide it.
+installWaTooltipTouchSuppression();
