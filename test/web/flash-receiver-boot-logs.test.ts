@@ -172,6 +172,22 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect(openPortForLogs).toHaveBeenCalledWith(port, expect.anything());
     expect((el as any)._logsOpen).toBe(true);
   });
+
+  it("a flash starting during the Logs reopen closes the orphaned handle", async () => {
+    const el = await mount();
+    const port = makePort();
+    (el as any)._logPort = port;
+    vi.mocked(openPortForLogs).mockImplementation(async () => {
+      (el as any)._bootLogsGen++; // _runInstall ran during the reopen
+      (el as any)._logPort = undefined;
+      return true;
+    });
+
+    await (el as any)._onViewLogs();
+
+    expect(port.close).toHaveBeenCalledOnce();
+    expect((el as any)._logsOpen).toBe(false);
+  });
 });
 
 describe("esphome-web-flash-receiver keep-visible warning", () => {

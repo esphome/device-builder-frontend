@@ -357,7 +357,15 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   private async _onViewLogs(): Promise<void> {
     const port = this._logPort;
     if (!port) return;
+    const gen = this._bootLogsGen;
     if (!(await openPortForLogs(port, this._localize))) return;
+    // A flash started (or the receiver unmounted) during the reopen: the
+    // dialog must not cover the new install, and the handle just opened
+    // would otherwise be orphaned open for the tab's lifetime.
+    if (gen !== this._bootLogsGen || this._logPort !== port) {
+      void port.close().catch(() => {});
+      return;
+    }
     this._logsOpen = true;
   }
 

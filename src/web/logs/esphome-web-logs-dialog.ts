@@ -193,7 +193,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
       // the dialog declines custody, so nothing else would ever release it.
       if (this.port !== this._activePort) {
         console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
-        void this.port.close().catch(() => {});
+        // A failure here is a genuinely leaked open port — log it loudly.
+        void this.port.close().catch((err) => {
+          console.error("[Web Serial] Failed to release the declined port:", err);
+        });
       }
       return;
     }
