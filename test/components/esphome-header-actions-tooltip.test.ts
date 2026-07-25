@@ -11,13 +11,12 @@ import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 describe("header-actions kebab tooltip", () => {
   it("anchors the wa-tooltip to the kebab button id, title gone", async () => {
     const el = await renderOpenHeaderMenu();
-    const tips = [...el.shadowRoot!.querySelectorAll("wa-tooltip[for]")];
-    expect(tips.length).toBe(1);
-    for (const tip of tips) {
-      const id = tip.getAttribute("for")!;
-      expect(el.shadowRoot!.getElementById(id), id).not.toBeNull();
-    }
-    const kebab = el.shadowRoot!.querySelector(".menu-kebab")!;
-    expect(kebab.hasAttribute("title")).toBe(false);
+    const tip = el.shadowRoot!.querySelector("wa-tooltip[for]");
+    expect(tip).not.toBeNull();
+    const id = tip!.getAttribute("for")!;
+    const kebab = el.shadowRoot!.getElementById(id);
+    expect(kebab).not.toBeNull();
+    expect(kebab!.classList.contains("menu-kebab")).toBe(true);
+    expect(kebab!.hasAttribute("title")).toBe(false);
   });
 });

@@ -6,6 +6,10 @@
  * gating prop they set first, so that boilerplate lives here rather than
  * getting copy-pasted per suite.
  */
+// Before the component import: it now pulls in real wa-tooltip, and the
+// webawesome components crash under happy-dom.
+import "../_mock-webawesome.js";
+
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
 
