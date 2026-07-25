@@ -25,7 +25,6 @@ export const automationEditorActionStyles = css`
     font-weight: var(--wa-font-weight-semibold);
     margin-top: var(--wa-space-s);
     transition:
-      background 0.12s,
       border-color 0.12s,
       color 0.12s;
   }
