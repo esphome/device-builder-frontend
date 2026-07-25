@@ -16,7 +16,13 @@ export const ESPRESSIF_USB_VID = 0x303a;
  *  discriminator (it gates on this PID alone). The vendor id alone is not
  *  native-USB proof: Espressif also ships real UART bridges under it
  *  (ESP-USB-Bridge, 0x1002); we pair both as the conservative check. */
-export const ESPRESSIF_USB_JTAG_PID = 0x1001;
+const ESPRESSIF_USB_JTAG_PID = 0x1001;
+
+/** Whether *port* is a chip's own USB-Serial-JTAG device (vs any bridge). */
+export function isEspressifUsbJtagPort(port: SerialPort): boolean {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
+}
 
 export interface DetectedChip {
   chipName: string;
@@ -478,8 +484,7 @@ async function hardResetChip(
   port: SerialPort
 ): Promise<void> {
   if (await watchdogReset(loader, transport)) return;
-  const { usbVendorId, usbProductId } = port.getInfo();
-  if (usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID) {
+  if (isEspressifUsbJtagPort(port)) {
     await new UsbJtagSerialReset(transport).reset();
   } else {
     await classicHardReset(transport);

@@ -1,5 +1,5 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { ESPRESSIF_USB_JTAG_PID, ESPRESSIF_USB_VID } from "./web-serial.js";
+import { isEspressifUsbJtagPort } from "./web-serial.js";
 
 // Vendors that make dedicated USB-UART bridge chips and nothing that
 // enumerates as a device's native USB console. A port from one of these can
@@ -35,17 +35,17 @@ export function serialPortCannotCarryConsole(
   port: SerialPort
 ): boolean {
   if (!loggerInterface) return false;
-  const { usbVendorId, usbProductId } = port.getInfo();
   if (USB_CONSOLE_INTERFACES.has(loggerInterface)) {
     // A dedicated bridge chip can't be the chip's own USB device. An
     // unknown or absent vendor could be a native CDC console (RP2040's
     // 0x2e8a, nRF52) - assume it works.
+    const { usbVendorId } = port.getInfo();
     return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
   }
   if (!UART_CONSOLE_RE.test(loggerInterface)) return false;
   // UART-family console: only the on-chip USB-Serial-JTAG device provably
   // can't carry it; any other port might be wired to the UART pins.
-  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
+  return isEspressifUsbJtagPort(port);
 }
 
 /**

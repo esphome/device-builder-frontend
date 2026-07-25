@@ -181,6 +181,17 @@ describe("switchToOtaLogs", () => {
     ]);
   });
 
+  it("appends the reason ahead of the switch line when given", () => {
+    const cancel = vi.fn();
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    el.setSerialStream(port, cancel as unknown as () => void);
+    switchToOtaLogs(el, "wrong port for this console");
+    expect((el as any)._log.lines.slice(0, 2)).toEqual([
+      "wrong port for this console",
+      "dashboard.logs_switched_to_network",
+    ]);
+  });
+
   it("keeps the back-to-install affordance across the switch", () => {
     el.openPassive({
       onReconnect: () => Promise.resolve(),

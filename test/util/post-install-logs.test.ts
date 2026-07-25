@@ -172,8 +172,11 @@ describe("reconnectWebSerialLogs", () => {
         "USB_SERIAL_JTAG"
       );
       expect(bridge.open).not.toHaveBeenCalled();
-      // Mid-session swap, not a fresh open: buffer + back-to-install survive.
-      expect(dialog.switchToNetworkLogs).toHaveBeenCalledTimes(1);
+      // Mid-session swap, not a fresh open: buffer + back-to-install survive;
+      // the reason rides into the pane so it outlives the toast.
+      expect(dialog.switchToNetworkLogs).toHaveBeenCalledWith(
+        expect.stringContaining("logger outputs on USB_SERIAL_JTAG")
+      );
       expect(dialog.open).not.toHaveBeenCalled();
       expect(toastInfo).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream).not.toHaveBeenCalled();

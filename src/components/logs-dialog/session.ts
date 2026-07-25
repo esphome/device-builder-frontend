@@ -138,12 +138,15 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
  * attach from an in-flight reconnect is absorbed by ``setSerialStream``'s
  * passive-session guard.
  */
-export function switchToOtaLogs(host: ESPHomeLogsDialog): void {
+export function switchToOtaLogs(host: ESPHomeLogsDialog, reason?: string): void {
   if (!isPassive(host._session)) return;
   void teardownSession(host);
   host._reconnect = null;
   host._session = { kind: "ota", port: OTA_PORT, streamId: null };
-  host._log.append([host._localize("dashboard.logs_switched_to_network")]);
+  const switched = host._localize("dashboard.logs_switched_to_network");
+  // The reason lands in the pane too, so a user who looked away still sees
+  // why the source changed after the toast expires.
+  host._log.append(reason ? [reason, switched] : [switched]);
   startOtaStream(host);
 }
 

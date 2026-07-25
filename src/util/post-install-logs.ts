@@ -93,7 +93,7 @@ export async function reconnectWebSerialLogs(
   const mismatch = serialConsoleMismatch(loggerInterface, port, localize);
   if (mismatch) {
     notifyInfo(mismatch.message);
-    logsDialog.switchToNetworkLogs();
+    logsDialog.switchToNetworkLogs(mismatch.message);
     return;
   }
   try {
