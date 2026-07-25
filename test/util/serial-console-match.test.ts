@@ -22,9 +22,14 @@ describe("serialPortCannotCarryConsole", () => {
     }
   );
 
-  it.each([0x1a86, 0x10c4, 0x0403, 0x067b])(
+  it.each([
+    ["1a86", 0x1a86],
+    ["10c4", 0x10c4],
+    ["0403", 0x0403],
+    ["067b", 0x067b],
+  ])(
     "a dedicated bridge chip (vendor 0x%s) cannot carry a native-USB console",
-    (vendor) => {
+    (_hex, vendor) => {
       // The #1430 heat-pump shape: C3 logger on USB_SERIAL_JTAG, user
       // watching through an external UART bridge.
       expect(
