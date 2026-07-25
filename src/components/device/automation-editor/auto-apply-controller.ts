@@ -226,7 +226,9 @@ export class AutoApplyController implements ReactiveController {
     // in-flight dirty requeue, a stray flushPending) must not run.
     if (this._deleting) {
       this._applySuppressed = true;
-      this._suppressedFor = this._host.location;
+      // The snapshot from the top of the call, so the suppression is
+      // tied to the apply attempt being blocked.
+      this._suppressedFor = location;
       return;
     }
     if (this._applyInFlight) {
