@@ -32,9 +32,8 @@ export interface AutoApplyHost
   addMode: boolean;
   value: AutomationTree | null;
   readonly location: AutomationLocation | null;
-  /** DOM surface the delete path needs to keep its events reachable
-   *  when the element is unmounted mid round trip (#1465). */
-  readonly isConnected: boolean;
+  /** Mount-time anchor the delete path needs to keep its events
+   *  reachable when the element is unmounted mid round trip (#1465). */
   readonly parentNode: ParentNode | null;
 }
 
@@ -363,7 +362,11 @@ export class AutoApplyController implements ReactiveController {
       const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await api.updateConfig(configuration, newYaml);
-      const target = this._host.isConnected ? this._host : dispatchAnchor;
+      // ``newYaml`` derives from the pre-round-trip snapshot; in the
+      // unmount case a draft the newly mounted section made in the
+      // interim is overwritten by this dispatch. Narrow window, and
+      // still net-positive versus resurrecting the deleted section.
+      const target = this._connected ? this._host : dispatchAnchor;
       target?.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-updated", {
           detail: { yaml: newYaml },
@@ -377,7 +380,7 @@ export class AutoApplyController implements ReactiveController {
       // the editor and cancel the sibling's re-armed edit below); after
       // an unmount they already navigated somewhere else entirely.
       if (
-        this._host.isConnected &&
+        this._connected &&
         (!this._host.location ||
           sectionKeyFromLocation(this._host.location) ===
             sectionKeyFromLocation(location))

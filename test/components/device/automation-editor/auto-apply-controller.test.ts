@@ -46,7 +46,6 @@ class Host extends EventTarget implements AutoApplyHost {
   addMode = false;
   value: AutomationTree | null = tree();
   location: AutomationLocation | null = SCRIPT;
-  isConnected = true;
   parentNode: ParentNode | null = null;
   // SectionEditor surface the real hosts delegate to the engine.
   dirty = false;
@@ -479,9 +478,13 @@ describe("AutoApplyController delete", () => {
 
   it("a mid-delete unmount still lands yaml-updated through the mount-time parent", async () => {
     const { host, controller, deleteAutomation } = setup();
+    // Listener on the grandparent so the assertion also pins that the
+    // fallback dispatch bubbles, not merely that the target swapped.
+    const grandparent = document.createElement("div");
     const parent = document.createElement("div");
+    grandparent.appendChild(parent);
     const updates: string[] = [];
-    parent.addEventListener("yaml-updated", (e) =>
+    grandparent.addEventListener("yaml-updated", (e) =>
       updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
     );
     host.parentNode = parent;
@@ -496,8 +499,9 @@ describe("AutoApplyController delete", () => {
     const deleting = controller.delete();
     await vi.advanceTimersByTimeAsync(1);
     // A different-kind section switch swaps the element out of the
-    // tree while the delete round trip is outstanding.
-    host.isConnected = false;
+    // tree while the delete round trip is outstanding — Lit tears it
+    // down through disconnectedCallback.
+    controller.hostDisconnected();
 
     resolveDelete({ yaml_diff: DIFF });
     await deleting;
