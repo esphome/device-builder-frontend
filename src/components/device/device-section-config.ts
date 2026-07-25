@@ -43,6 +43,7 @@ import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
+import type { SectionEditor } from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
@@ -90,7 +91,7 @@ registerMdiIcons({
 const UNDELETABLE_SECTIONS = new Set(["esphome"]);
 
 @customElement("esphome-device-section-config")
-export class ESPHomeDeviceSectionConfig extends LitElement {
+export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEditor {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;

@@ -17,7 +17,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
+import type { SectionEditor } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
@@ -320,14 +320,14 @@ export class ESPHomePageDevice extends LitElement {
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog!: ESPHomeUnsavedChangesDialog;
 
-  /** Live ref to the mounted section-config component, when one
-   *  is rendered. Captured via ``section-mount`` /
-   *  ``section-unmount`` events that the component fires on its
-   *  own lifecycle hooks; ``@query`` doesn't reach across the
-   *  three shadow roots between this page and the section
-   *  editor, so the registration pattern keeps the call site
-   *  for ``activeSection.save()`` cheap and direct. */
-  private _activeSection: ESPHomeDeviceSectionConfig | null = null;
+  /** Live ref to the mounted section editor (component editor or
+   *  one of the automation family), typed as the ``SectionEditor``
+   *  contract the page consumes (``dirty`` / ``flushPending``).
+   *  Captured via ``section-mount`` / ``section-unmount`` events
+   *  the editors fire on their own lifecycle hooks; ``@query``
+   *  doesn't reach across the three shadow roots between this
+   *  page and the section editor. */
+  private _activeSection: SectionEditor | null = null;
 
   @state()
   private _sectionDirty = false;
@@ -437,10 +437,12 @@ export class ESPHomePageDevice extends LitElement {
    *  even though the user explicitly typed it.
    *
    *  The leave-page / save / popstate paths call
-   *  ``_activeSection?.flushPending()`` synchronously before they
-   *  read this getter, so by the time ``_isDirty`` is consulted
-   *  any pending form edits have been promoted into ``_yaml`` and
-   *  the YAML branch is authoritative. */
+   *  ``_activeSection?.flushPending()`` before they read this
+   *  getter. The component editor's flush promotes pending form
+   *  edits into ``_yaml`` synchronously; the automation editors'
+   *  flush is a backend round-trip that only the save path awaits,
+   *  so the other paths lean on ``_sectionDirty`` staying set until
+   *  the upsert lands (they fail conservative). */
   private get _isDirty(): boolean {
     return this._isYamlDirty || this._sectionDirty;
   }
@@ -1780,13 +1782,13 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onSectionMount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    const ev = e as CustomEvent<{ node: SectionEditor }>;
     this._activeSection = ev.detail.node;
     this._sectionDirty = ev.detail.node.dirty;
   };
 
   private _onSectionUnmount = (e: Event) => {
-    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    const ev = e as CustomEvent<{ node: SectionEditor }>;
     if (this._activeSection === ev.detail.node) {
       this._activeSection = null;
       this._sectionDirty = false;
