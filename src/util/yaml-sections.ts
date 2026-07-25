@@ -353,6 +353,35 @@ export function resolveCurrentFromLine(
   const matches = parseYamlTopLevelSections(yaml).filter(
     (s) => sectionKeyOf(s) === sectionKey
   );
+  return _nearestFromLine(matches, staleFromLine);
+}
+
+/**
+ * Like ``resolveCurrentFromLine`` but consulting the same two layers
+ * as ``sectionAtLine``: ``automation:*`` keys resolve against
+ * ``parseYamlAutomations``, everything else against the top-level
+ * sections. Same closest-match heuristic and duplicate-instance
+ * caveats.
+ */
+export function resolveCurrentSectionLine(
+  yaml: string,
+  sectionKey: string,
+  staleFromLine?: number
+): number | undefined {
+  if (!yaml || !sectionKey) return undefined;
+  if (sectionKey.startsWith("automation:")) {
+    const matches = parseYamlAutomations(yaml).filter((s) => s.key === sectionKey);
+    return _nearestFromLine(matches, staleFromLine);
+  }
+  return resolveCurrentFromLine(yaml, sectionKey, staleFromLine);
+}
+
+/** Closest ``fromLine`` to *staleFromLine* among *matches* (first on
+ *  ties; sole/first match when no stale line is given). */
+function _nearestFromLine(
+  matches: { fromLine: number }[],
+  staleFromLine?: number
+): number | undefined {
   if (matches.length === 0) return undefined;
   if (matches.length === 1 || staleFromLine === undefined) {
     return matches[0].fromLine;
