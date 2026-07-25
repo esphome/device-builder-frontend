@@ -46,6 +46,7 @@ const slimAvailable = (): AvailableAutomations =>
 const makeApi = () => ({
   getAvailableAutomations: vi.fn().mockResolvedValue(slimAvailable()),
   getAutomationBodies: vi.fn().mockResolvedValue({}),
+  parseDeviceAutomations: vi.fn().mockResolvedValue([]),
   upsertAutomation: vi.fn().mockResolvedValue({
     yaml_diff: { fromLine: 0, toLine: 0, replacement: "" },
   }),
@@ -74,22 +75,25 @@ const CASES: Array<{
   make: () => ESPHomeScriptEditor | ESPHomeApiActionEditor;
   blocked: AutomationLocation;
   allowed: AutomationLocation;
+  sibling: AutomationLocation;
 }> = [
   {
     name: "script editor",
     make: () => new ESPHomeScriptEditor(),
     blocked: { kind: "script", id: "" },
     allowed: { kind: "script", id: "my_script" },
+    sibling: { kind: "script", id: "other_script" },
   },
   {
     name: "api-action editor",
     make: () => new ESPHomeApiActionEditor(),
     blocked: { kind: "api_action", action_name: "" },
     allowed: { kind: "api_action", action_name: "my_action" },
+    sibling: { kind: "api_action", action_name: "other_action" },
   },
 ];
 
-describe.each(CASES)("$name _canApply wiring", ({ make, blocked, allowed }) => {
+describe.each(CASES)("$name _canApply wiring", ({ make, blocked, allowed, sibling }) => {
   it("blocks the upsert while the identity is empty", async () => {
     const api = makeApi();
     await mountAndFlush(make(), api, blocked);
@@ -102,5 +106,19 @@ describe.each(CASES)("$name _canApply wiring", ({ make, blocked, allowed }) => {
     await mountAndFlush(make(), api, allowed);
 
     expect(api.upsertAutomation).toHaveBeenCalled();
+  });
+
+  it("a navigator swap to a sibling invalidates the stale value and re-hydrates", async () => {
+    const api = makeApi();
+    const editor = make();
+    await mountAndFlush(editor, api, allowed);
+    expect(api.parseDeviceAutomations).not.toHaveBeenCalled();
+
+    (editor as any).location = sibling;
+    await editor.updateComplete;
+    await flushMicrotasks(5);
+
+    expect((editor as any).value).toBeNull();
+    expect(api.parseDeviceAutomations).toHaveBeenCalled();
   });
 });

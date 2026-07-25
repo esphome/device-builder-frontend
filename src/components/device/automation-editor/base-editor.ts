@@ -166,11 +166,6 @@ export abstract class BaseAutomationEditor<
     }`;
   }
 
-  /** Section kind forwarded to the parse-error resolve; editors
-   *  spanning multiple kinds (the automation editor) leave it
-   *  unset. */
-  protected _sectionKind?: L["kind"];
-
   /** Implementers own the ``_loading = false`` transition (directly
    *  or via ``CallableAutomationEditor._load``), or the editor
    *  sticks on the spinner forever. */
@@ -193,7 +188,7 @@ export abstract class BaseAutomationEditor<
       this._error = "";
       // Re-pin location to the parser's canonical form; the
       // controller withholds a read-only section's empty tree.
-      const m = this._parseError.resolve(parsed, this.location, this._sectionKind);
+      const m = this._parseError.resolve(parsed, this.location);
       if (m) {
         this.location = m.location;
         this.value = m.tree;
