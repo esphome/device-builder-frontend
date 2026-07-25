@@ -22,7 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { fireEvent } from "../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -444,6 +444,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
+    // Mount-time parent carries the dispatch if a section switch
+    // unmounts this element mid round trip (#1465).
+    const dispatchAnchor = this.parentNode;
     try {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
@@ -452,7 +455,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
-      fireEvent(this, "yaml-updated", { yaml: newYaml });
+      fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
+        yaml: newYaml,
+      });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {

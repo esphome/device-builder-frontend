@@ -1,10 +1,11 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the component editor's delete path when the element is
- * unmounted mid round trip: the disk write's yaml-updated must still
- * reach the page through the mount-time parent, and no
- * section-select navigation fires at a user who already left.
+ * Pins the component editor's delete path against mid-round-trip
+ * navigation: an unmounted element's yaml-updated still reaches the
+ * page through the mount-time ShadowRoot anchor (composed included),
+ * and section-select never fires at a user who left the deleted
+ * section — by unmount or by same-kind element reuse.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,44 +20,74 @@ import { onDeleteConfirmed } from "../../../src/components/device/device-section
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-describe("onDeleteConfirmed unmounted mid round trip", () => {
-  it("lands yaml-updated through the mount-time parent and skips section-select", async () => {
-    const c = new ESPHomeDeviceSectionConfig();
-    const inner = c as any;
-    inner.yaml = "wifi:\n  ssid: home\nlogger:\n";
-    inner.sectionKey = "wifi";
-    inner.fromLine = 1;
-    inner.configuration = "device.yaml";
-    inner._config = { title: "WiFi", entries: [] };
-    let resolveWrite!: () => void;
-    inner._api = {
-      updateConfig: vi.fn(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveWrite = resolve;
-          })
-      ),
-    };
+function makeHost() {
+  const c = new ESPHomeDeviceSectionConfig();
+  const inner = c as any;
+  inner.yaml = "wifi:\n  ssid: home\nlogger:\n";
+  inner.sectionKey = "wifi";
+  inner.fromLine = 1;
+  inner.configuration = "device.yaml";
+  inner._config = { title: "WiFi", entries: [] };
+  let resolveWrite!: () => void;
+  inner._api = {
+    updateConfig: vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveWrite = resolve;
+        })
+    ),
+  };
+  return { c, inner, release: () => resolveWrite() };
+}
 
-    // Detached grandparent chain: isConnected stays false (the
-    // unmounted state under test), the parent carries the dispatch,
-    // and the grandparent listener pins that it bubbles.
-    const grandparent = document.createElement("div");
-    const parent = document.createElement("div");
-    grandparent.appendChild(parent);
-    parent.appendChild(c);
+describe("onDeleteConfirmed mid-round-trip navigation", () => {
+  it("unmounted: lands yaml-updated through the ShadowRoot anchor, no section-select", async () => {
+    const { c, release } = makeHost();
+    // Production's anchor is board-info's ShadowRoot; the listener on
+    // the shadow host pins that the fallback dispatch crosses the
+    // boundary (composed), not merely that the target swapped.
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
+    shadow.appendChild(c);
     const updates: string[] = [];
-    grandparent.addEventListener("yaml-updated", (e) =>
+    outer.addEventListener("yaml-updated", (e) =>
       updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
     );
     const selections: unknown[] = [];
-    grandparent.addEventListener("section-select", (e) => selections.push(e));
+    outer.addEventListener("section-select", (e) => selections.push(e));
 
     const deleting = onDeleteConfirmed(c);
-    resolveWrite();
+    release();
     await deleting;
 
     expect(updates).toEqual(["logger:\n"]);
     expect(selections).toHaveLength(0);
+  });
+
+  it("same-kind reuse: a retargeted but still-connected element does not navigate away", async () => {
+    const { c, inner, release } = makeHost();
+    document.body.appendChild(c);
+    const updates: string[] = [];
+    document.body.addEventListener("yaml-updated", (e) =>
+      updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
+    );
+    const selections: unknown[] = [];
+    document.body.addEventListener("section-select", (e) => selections.push(e));
+
+    try {
+      const deleting = onDeleteConfirmed(c);
+      // Lit reuses this element across same-kind switches: the user
+      // opens logger while wifi's delete is still in flight.
+      inner.sectionKey = "logger";
+      release();
+      await deleting;
+
+      expect(updates).toEqual(["logger:\n"]);
+      // isConnected is true here — only the deletedKey snapshot
+      // stops the navigation.
+      expect(selections).toHaveLength(0);
+    } finally {
+      c.remove();
+    }
   });
 });

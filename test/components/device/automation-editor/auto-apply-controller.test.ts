@@ -478,16 +478,17 @@ describe("AutoApplyController delete", () => {
 
   it("a mid-delete unmount still lands yaml-updated through the mount-time parent", async () => {
     const { host, controller, deleteAutomation } = setup();
-    // Listener on the grandparent so the assertion also pins that the
-    // fallback dispatch bubbles, not merely that the target swapped.
-    const grandparent = document.createElement("div");
-    const parent = document.createElement("div");
-    grandparent.appendChild(parent);
+    // Production's anchor is board-info's ShadowRoot, so the listener
+    // sits on the shadow host outside the boundary — the assertion
+    // then pins the composed flag the whole fix rides on, not merely
+    // that the dispatch target swapped.
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
     const updates: string[] = [];
-    grandparent.addEventListener("yaml-updated", (e) =>
+    outer.addEventListener("yaml-updated", (e) =>
       updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
     );
-    host.parentNode = parent;
+    host.parentNode = shadow;
     const selections = captureEvents(host, "section-select");
     let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
     deleteAutomation.mockImplementationOnce(

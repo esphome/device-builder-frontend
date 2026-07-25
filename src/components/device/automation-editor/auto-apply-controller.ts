@@ -6,7 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { fireEvent } from "../../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
@@ -366,14 +366,9 @@ export class AutoApplyController implements ReactiveController {
       // unmount case a draft the newly mounted section made in the
       // interim is overwritten by this dispatch. Narrow window, and
       // still net-positive versus resurrecting the deleted section.
-      const target = this._connected ? this._host : dispatchAnchor;
-      target?.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireFromAnchor(this._host, this._connected, dispatchAnchor, "yaml-updated", {
+        yaml: newYaml,
+      });
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is
       // already on a sibling (yanking them to null would also unmount

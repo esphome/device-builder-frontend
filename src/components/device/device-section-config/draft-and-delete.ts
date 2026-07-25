@@ -1,8 +1,8 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent } from "../../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
-import { notifySuccess } from "../../../util/notify.js";
+import { notifyError, notifySuccess } from "../../../util/notify.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
@@ -133,8 +133,9 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    const target = host.isConnected ? host : dispatchAnchor;
-    if (target) fireEvent(target, "yaml-updated", { yaml: newYaml });
+    fireFromAnchor(host, host.isConnected, dispatchAnchor, "yaml-updated", {
+      yaml: newYaml,
+    });
     // Navigate away only while the user is still here, on the
     // section that was deleted.
     if (host.isConnected && host.sectionKey === deletedKey) {
@@ -142,7 +143,11 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     notifySuccess(host._localize("device.section_deleted", { name: title }));
   } catch (e) {
-    host._error = formatApiError(e, host._localize, "device.section_delete_error");
+    const msg = formatApiError(e, host._localize, "device.section_delete_error");
+    host._error = msg;
+    // The inline error renders nowhere on an unmounted host; the
+    // toast is page-level and survives the teardown.
+    notifyError(host._localize("device.section_delete_error"), { description: msg });
   } finally {
     host._deleting = false;
   }
