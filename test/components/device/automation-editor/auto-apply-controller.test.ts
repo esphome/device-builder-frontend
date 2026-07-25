@@ -501,8 +501,10 @@ describe("AutoApplyController delete", () => {
     await vi.advanceTimersByTimeAsync(1);
     // A different-kind section switch swaps the element out of the
     // tree while the delete round trip is outstanding — Lit tears it
-    // down through disconnectedCallback.
+    // down through disconnectedCallback. parentNode nulls too, so a
+    // regression that snapshots the anchor after the awaits fails.
     controller.hostDisconnected();
+    host.parentNode = null;
 
     resolveDelete({ yaml_diff: DIFF });
     await deleting;
