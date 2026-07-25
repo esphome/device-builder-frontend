@@ -497,6 +497,35 @@ describe("section-switch flush barrier", () => {
     expect(internals(page)._selectedFromLine).toBe(5);
   });
 
+  it("Back leaves the line unset when the restored key vanished mid-flush", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._yaml = ["i2c:", "  sda: 1", "logger:", "  level: DEBUG"].join("\n");
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+    // History points at a section the flush is about to remove; its
+    // old line now holds an unrelated section.
+    internals(page)._sectionHistory = [{ key: "sensor.aht10", fromLine: 3 }];
+
+    internals(page)._onBack();
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+
+    expect(internals(page)._selectedSection).toBe("sensor.aht10");
+    // Unset, not the stale 3 — downstream resolution must fall back
+    // to the key rather than the logger section sitting on line 3.
+    expect(internals(page)._selectedFromLine).toBeUndefined();
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;
