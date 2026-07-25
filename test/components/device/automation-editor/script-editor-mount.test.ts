@@ -9,59 +9,31 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-action-list.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/callable-params-editor.js",
-  () => ({})
-);
-vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
-vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+import "./_editor-harness.js";
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
-import { flushMicrotasks } from "../../../_dom.js";
 
-const slimWithLoggerAction = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [{ id: "logger.log", config_entries: [] }],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
-
-const loggerBodies = () => ({
-  "actions/logger.log": {
-    id: "logger.log",
-    config_entries: [{ key: "format", type: "string", label: "Format", required: true }],
-  },
-});
+import {
+  loggerBodies,
+  mountEditor as mountHarness,
+  slimWithLoggerAction,
+} from "./_editor-harness.js";
 
 async function mountEditor(
   api: ESPHomeAPI,
   configuration?: string,
   props: object = {}
 ): Promise<ESPHomeScriptEditor> {
-  const editor = new ESPHomeScriptEditor();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (editor as any)._api = api;
-  if (configuration !== undefined) editor.configuration = configuration;
-  Object.assign(editor, props);
-  document.body.appendChild(editor);
-  await editor.updateComplete;
-  await flushMicrotasks(30);
-  return editor;
+  const editor = Object.assign(new ESPHomeScriptEditor(), props);
+  return mountHarness(
+    editor,
+    api,
+    configuration !== undefined ? { configuration, settle: 30 } : { settle: 30 }
+  );
 }
 
 describe("script-editor action-catalog hydration (#1286)", () => {

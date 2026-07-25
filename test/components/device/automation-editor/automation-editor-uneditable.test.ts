@@ -7,29 +7,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-action-list.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-target-picker.js",
-  () => ({})
-);
-vi.mock(
-  "../../../../src/components/device/automation-editor/automation-trigger-picker.js",
-  () => ({})
-);
-vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
-vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+import "./_editor-harness.js";
+import { mountEditor, slimAvailable } from "./_editor-harness.js";
 
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
-  AvailableAutomations,
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
@@ -63,15 +46,6 @@ const validParse = (): ParsedAutomation[] => [
   } as unknown as ParsedAutomation,
 ];
 
-const slimAvailable = (): AvailableAutomations =>
-  ({
-    triggers: [],
-    actions: [],
-    conditions: [],
-    scripts: [],
-    devices: [],
-  }) as unknown as AvailableAutomations;
-
 describe("automation-editor uneditable (errored parse)", () => {
   it("renders read-only and never upserts when the parsed automation has an error", async () => {
     const upsertAutomation = vi.fn();
@@ -82,14 +56,11 @@ describe("automation-editor uneditable (errored parse)", () => {
       upsertAutomation,
     } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    editor.configuration = "device.yaml";
-    editor.location = ON_BOOT;
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    await flushMicrotasks(8);
+    const editor = await mountEditor(new ESPHomeAutomationEditor(), api, {
+      configuration: "device.yaml",
+      location: ON_BOOT,
+      settle: 8,
+    });
 
     // The errored automation is flagged read-only; its empty tree was
     // not adopted, and the error surfaces in the rendered panel.
@@ -109,6 +80,8 @@ describe("automation-editor uneditable (errored parse)", () => {
       upsertAutomation,
     } as unknown as ESPHomeAPI;
 
+    // Inline mount: unlike the harness helper this seeds a non-null
+    // value and stops at updateComplete with no microtask flush.
     const editor = new ESPHomeAutomationEditor();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor as any)._api = api;
