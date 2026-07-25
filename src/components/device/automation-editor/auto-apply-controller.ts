@@ -117,6 +117,8 @@ export class AutoApplyController implements ReactiveController {
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
+  /** Mount-time parent carrying the detached-host unmount dispatch. */
+  private _mountAnchor: ParentNode | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -130,6 +132,10 @@ export class AutoApplyController implements ReactiveController {
    *  device-section-config's section-mount event. */
   hostConnected(): void {
     this._connected = true;
+    // The unmount announcement must ride the mount-time parent:
+    // disconnectedCallback order means the host has already left the
+    // tree, and a detached dispatch bubbles nowhere (#1483).
+    this._mountAnchor = this._host.parentNode;
     fireSectionEvent(this._host, "section-mount", { node: this._host });
   }
 
@@ -138,7 +144,9 @@ export class AutoApplyController implements ReactiveController {
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._cancelDebounce();
-    fireSectionEvent(this._host, "section-unmount", { node: this._host });
+    fireSectionEvent(this._mountAnchor ?? this._host, "section-unmount", {
+      node: this._host,
+    });
   }
 
   /** Brief-window dirty flag covering the debounce gap so the global

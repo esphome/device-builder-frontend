@@ -515,6 +515,25 @@ describe("AutoApplyController delete", () => {
     expect(selections).toHaveLength(0);
   });
 
+  it("the unmount announcement rides the mount-time parent past detachment", () => {
+    const { host, controller } = setup();
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
+    const unmounts: unknown[] = [];
+    outer.addEventListener("section-unmount", (e) =>
+      unmounts.push((e as CustomEvent<{ node: unknown }>).detail.node)
+    );
+    host.parentNode = shadow;
+    // Re-run the connect with the anchor in place (setup connected
+    // before the parent existed), then tear down like Lit does —
+    // after the host has left the tree.
+    controller.hostConnected();
+    host.parentNode = null;
+    controller.hostDisconnected();
+
+    expect(unmounts).toEqual([host]);
+  });
+
   it("a mid-flush retarget without an edit stays on the sibling with nothing re-armed", async () => {
     const { host, controller, upsertAutomation, deleteAutomation } = setup();
     const selections = captureEvents(host, "section-select");

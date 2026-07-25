@@ -189,6 +189,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   _loadId = 0;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Mount-time parent carrying the detached-host unmount dispatch. */
+  private _mountAnchor: ParentNode | null = null;
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
   _apiListFlashKey?: string;
   // Parent loops yaml-draft events back through our yaml prop, which would
@@ -289,6 +291,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   connectedCallback() {
     super.connectedCallback();
+    // The unmount announcement below must ride the mount-time parent:
+    // disconnectedCallback runs after the node left the tree, and a
+    // detached dispatch bubbles nowhere (#1483).
+    this._mountAnchor = this.parentNode;
     // Announce so the page-level navigation guard (device.ts) can hold a
     // direct ref. The tree is page → device-editor → device-board-info → us;
     // a property passthrough chain would cost three edits per API change.
@@ -301,7 +307,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       clearTimeout(this._draftTimer);
       this._draftTimer = null;
     }
-    fireSectionEvent(this, "section-unmount", { node: this });
+    fireSectionEvent(this._mountAnchor ?? this, "section-unmount", { node: this });
   }
 
   // Flush pending draft sync now. The page calls this before save / section
