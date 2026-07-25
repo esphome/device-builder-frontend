@@ -448,18 +448,20 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // unmounts this element mid round trip (#1465).
     const dispatchAnchor = this.parentNode;
     try {
-      // Read the buffer exactly once: the backend computes the diff's
-      // line coordinates against the string we send, so splicing into
-      // a later re-read (the prop reassigned mid round trip) would
-      // silently mangle the write-through.
+      // Read the buffer and target exactly once: the backend computes
+      // the diff's line coordinates against the string we send, and a
+      // router-level device swap reassigns ``configuration`` from
+      // above — splicing into a later re-read would silently mangle
+      // the write-through (or write it to the wrong file).
+      const configuration = this.configuration;
       const yaml = this.yaml;
       const { yaml_diff } = await this._api.deleteAutomation(
-        this.configuration,
+        configuration,
         location,
         yaml
       );
       const newYaml = applyYamlDiff(yaml, yaml_diff);
-      await this._api.updateConfig(this.configuration, newYaml);
+      await this._api.updateConfig(configuration, newYaml);
       fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
         yaml: newYaml,
       });

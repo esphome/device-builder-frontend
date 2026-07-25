@@ -128,6 +128,41 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     }
   });
 
+  it("row delete splices the diff into the buffer it was computed against", async () => {
+    const c = new ESPHomeDeviceSectionConfig();
+    const inner = c as any;
+    inner.yaml = ROW_YAML;
+    inner.sectionKey = "binary_sensor.gpio";
+    inner.fromLine = 2;
+    inner.configuration = "device.yaml";
+    let resolveDelete!: (v: unknown) => void;
+    inner._api = {
+      deleteAutomation: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveDelete = resolve;
+          })
+      ),
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const deleting = inner._onDeleteRow(
+      new CustomEvent("delete-row", {
+        detail: { key: "automation:component_on:btn:on_press" },
+      })
+    );
+    // The prop is reassigned mid round trip (a sibling's yaml-updated
+    // pushed a shifted buffer down); the write-through must still
+    // splice into the snapshot the diff's coordinates refer to.
+    inner.yaml = "shifted:\n" + ROW_YAML;
+    resolveDelete({ yaml_diff: { fromLine: 4, toLine: 5, replacement: "" } });
+    await deleting;
+
+    const written = inner._api.updateConfig.mock.calls[0][1] as string;
+    expect(written).not.toContain("shifted:");
+    expect(written).not.toContain("on_press");
+  });
+
   it("same-kind reuse: a retargeted but still-connected element does not navigate away", async () => {
     const { c, inner, release } = makeHost();
     const container = document.createElement("div");
