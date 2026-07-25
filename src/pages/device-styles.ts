@@ -46,6 +46,10 @@ export const devicePageStyles = css`
   .layout-grid.switch-pending .desktop-nav {
     --navigator-busy-opacity: 0.6;
     --navigator-busy-delay: 200ms;
+    /* Rows stay clickable (last switch wins under the supersede
+       token); the cursor still signals the wait where the pointer
+       actually sits. */
+    --navigator-busy-cursor: progress;
   }
 
   .layout-grid.nav-collapsed .desktop-nav {

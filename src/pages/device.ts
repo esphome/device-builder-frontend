@@ -1203,6 +1203,7 @@ export class ESPHomePageDevice extends LitElement {
           class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""} ${
             this._switchPending ? "switch-pending" : ""
           }"
+          aria-busy=${this._switchPending}
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}

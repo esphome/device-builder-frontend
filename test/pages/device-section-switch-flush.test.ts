@@ -9,6 +9,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import "./_mock-device-children.js";
+// The render-level case attaches the real page; the reselect dialog
+// is not in the shared preamble and its WebAwesome button crashes
+// happy-dom (same local mock as the platform-ready suite).
+vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import type { SectionEditor } from "../../src/components/device/section-editor.js";
@@ -516,6 +520,29 @@ describe("section-switch flush barrier", () => {
     resolvers[1]();
     await s2;
     expect(internals(page)._switchPending).toBe(false);
+  });
+
+  it("the pending flag reaches the DOM: switch-pending class and aria-busy", async () => {
+    const page = new ESPHomePageDevice();
+    page.id = "kitchen.yaml";
+    document.body.appendChild(page);
+    try {
+      await page.updateComplete;
+      const resolveFlush = gateFlush(page);
+      const switching = internals(page)._guardSectionSwitch(vi.fn()) as Promise<void>;
+      await page.updateComplete;
+      const grid = page.shadowRoot!.querySelector(".layout-grid")!;
+      expect(grid.classList.contains("switch-pending")).toBe(true);
+      expect(grid.getAttribute("aria-busy")).toBe("true");
+
+      resolveFlush();
+      await switching;
+      await page.updateComplete;
+      expect(grid.classList.contains("switch-pending")).toBe(false);
+      expect(grid.getAttribute("aria-busy")).toBe("false");
+    } finally {
+      page.remove();
+    }
   });
 
   it("a rejecting flush still clears the affordance", async () => {

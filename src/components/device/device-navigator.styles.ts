@@ -118,7 +118,7 @@ export const deviceNavigatorStyles = css`
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--wa-space-m);
-    cursor: pointer;
+    cursor: var(--navigator-busy-cursor, pointer);
     user-select: none;
     flex-shrink: 0;
   }
@@ -161,7 +161,7 @@ export const deviceNavigatorStyles = css`
        as the rows do; the header-to-rows gap lives on .nav-items--grouped. */
     padding: 0 var(--wa-space-m);
     margin-top: var(--wa-space-2xs);
-    cursor: pointer;
+    cursor: var(--navigator-busy-cursor, pointer);
     user-select: none;
     flex-shrink: 0;
   }
@@ -255,7 +255,7 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-xs);
-    cursor: pointer;
+    cursor: var(--navigator-busy-cursor, pointer);
     user-select: none;
     transition:
       background 0.1s,
@@ -346,7 +346,7 @@ export const deviceNavigatorStyles = css`
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     justify-content: space-between;
-    cursor: pointer;
+    cursor: var(--navigator-busy-cursor, pointer);
     user-select: none;
     transition:
       background 0.1s,
