@@ -330,8 +330,9 @@ export class ESPHomePageDevice extends LitElement {
    *  page and the section editor. */
   private _activeSection: SectionEditor | null = null;
 
-  /** Supersede token for the section-switch guard: a switch queued
-   *  behind the flush barrier yields to any later one. */
+  /** Supersede token for the section-switch guard: a queued absolute
+   *  switch yields to any later one; composing actions (Back) always
+   *  land but still bump the token. */
   private _switchSeq = 0;
 
   @state()
