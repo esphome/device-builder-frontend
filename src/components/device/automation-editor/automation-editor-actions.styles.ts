@@ -31,8 +31,8 @@ export const automationEditorActionStyles = css`
   }
 
   .ae-add:hover:not(:disabled) {
-    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    border-color: var(--wa-color-brand-fill-loud, var(--esphome-primary));
+    color: var(--wa-color-brand-fill-loud, var(--esphome-primary));
     background: transparent;
   }
 
