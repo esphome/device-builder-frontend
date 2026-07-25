@@ -213,6 +213,36 @@ describe("section-switch flush barrier", () => {
     expect(internals(page)._selectedFromLine).toBe(1);
   });
 
+  it("re-clicking the displayed section cancels the switch queued behind the flush", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+
+    const select = (sectionKey: string, fromLine: number) =>
+      internals(page)._onSectionSelect(
+        new CustomEvent("section-select", { detail: { sectionKey, fromLine } })
+      );
+    // Click sensor — cross-section, queued behind the flush…
+    select("sensor", 3);
+    // …then click the still-displayed i2c again before it resolves.
+    select("i2c", 1);
+
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+    expect(internals(page)._selectedSection).toBe("i2c");
+    expect(internals(page)._selectedFromLine).toBe(1);
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;

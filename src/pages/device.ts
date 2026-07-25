@@ -1737,6 +1737,10 @@ export class ESPHomePageDevice extends LitElement {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
     if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
+      // Also supersede any switch still queued behind the flush
+      // barrier — the displayed section is the pre-switch one for the
+      // whole window, so a click on it is the user's newest intent.
+      this._switchSeq++;
       this._drawerOpen = false;
       return;
     }
