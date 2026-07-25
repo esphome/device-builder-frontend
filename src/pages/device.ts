@@ -1597,8 +1597,15 @@ export class ESPHomePageDevice extends LitElement {
     // unmounted during it), so it can't point the old section's form
     // at a path meant for the new one.
     void this._guardSectionSwitch(() => {
+      // The awaited flush can rewrite the buffer (an upsert's diff
+      // shifts every section below it), making the snapshot's
+      // fromLine a pre-flush coordinate that _focusedSection and the
+      // URL would then mis-resolve (#1470). Re-resolve the intended
+      // section against the settled buffer: same key, instance
+      // nearest the snapshot; keep the snapshot if the key vanished.
       this._selectedSection = sectionKey;
-      this._selectedFromLine = match.fromLine;
+      this._selectedFromLine =
+        this._nearestSectionLine(sectionKey, match.fromLine) ?? match.fromLine;
       this._focusFieldPath = rel;
       this._focusYamlPath = e.detail.indexedPath;
       // The navigator selection follows the caret; a block highlight
@@ -1608,6 +1615,15 @@ export class ESPHomePageDevice extends LitElement {
       this._clearBlockHighlight();
       this._updateUrl();
     });
+  }
+
+  /** Current fromLine of *sectionKey*'s instance nearest *near*. */
+  private _nearestSectionLine(sectionKey: string, near: number): number | undefined {
+    const lines = parseYamlTopLevelSections(this._yaml)
+      .filter((s) => sectionKeyOf(s) === sectionKey)
+      .map((s) => s.fromLine);
+    if (!lines.length) return undefined;
+    return lines.reduce((a, b) => (Math.abs(b - near) < Math.abs(a - near) ? b : a));
   }
 
   /** The YamlSection backing the current selection, resolved by line

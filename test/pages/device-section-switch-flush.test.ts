@@ -272,6 +272,50 @@ describe("section-switch flush barrier", () => {
     await new Promise((r) => setTimeout(r));
   });
 
+  it("re-resolves the target section's line against the buffer the flush settled", async () => {
+    const page = new ESPHomePageDevice();
+    setConnected(page, true);
+    let resolveFlush!: () => void;
+    internals(page)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          resolveFlush = resolve;
+        }),
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
+      "\n"
+    );
+    internals(page)._savedYaml = internals(page)._yaml;
+    internals(page)._knownTopLevelKeys = new Set(["i2c", "sensor"]);
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+
+    // Caret clicks into sensor (line 3 pre-flush) — queued behind the flush.
+    internals(page)._onYamlCursorLine(
+      new CustomEvent("yaml-cursor-line", {
+        detail: { line: 4, path: [], viaEdit: false },
+      })
+    );
+    // The flush's upsert grows the i2c block, shifting sensor to line 5.
+    internals(page)._yaml = [
+      "i2c:",
+      "  sda: 1",
+      "  scl: 0",
+      "  frequency: 100khz",
+      "sensor:",
+      "  - platform: aht10",
+    ].join("\n");
+
+    resolveFlush();
+    await new Promise((r) => setTimeout(r));
+    expect(internals(page)._selectedSection).toBe("sensor.aht10");
+    // The post-flush coordinate (platform item now on line 6), not
+    // the pre-flush 4.
+    expect(internals(page)._selectedFromLine).toBe(6);
+  });
+
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
     let resolveFlush!: () => void;
