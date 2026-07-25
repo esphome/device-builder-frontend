@@ -24,7 +24,7 @@
 import { consume } from "@lit/context";
 import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -45,7 +45,6 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
-import type { ESPHomeConfirmDialog } from "../../confirm-dialog.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -116,9 +115,6 @@ export class ESPHomeApiActionEditor extends LitElement {
   focusYamlPath?: YamlPathSegment[];
 
   private _resolveFocus = createFocusResolver();
-
-  @query("esphome-confirm-dialog")
-  private _deleteConfirm?: ESPHomeConfirmDialog;
 
   /** Scoped catalog response — drives the action / condition / script
    *  / device pickers inside the action list. */
@@ -263,7 +259,6 @@ export class ESPHomeApiActionEditor extends LitElement {
               label: this._localize("device.delete_api_action"),
               message: this._localize("device.confirm_delete_api_action"),
               disabled,
-              onOpenConfirm: this._onDeleteClick,
               onConfirm: this._onDelete,
             })
           : nothing
@@ -421,10 +416,6 @@ export class ESPHomeApiActionEditor extends LitElement {
   private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._engine.withValue({ actions: e.detail.actions });
-  };
-
-  private _onDeleteClick = () => {
-    this._deleteConfirm?.open();
   };
 
   private _onDelete = () => {

@@ -117,7 +117,7 @@ export class ESPHomeAutomationActionList extends LitElement {
           type="button"
           class="ae-add"
           ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this.openPicker}
+          @click=${this._openPicker}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_action")}
@@ -132,7 +132,7 @@ export class ESPHomeAutomationActionList extends LitElement {
     `;
   }
 
-  public openPicker = () => {
+  private _openPicker = () => {
     if (this.catalog.length === 0) return;
     this._picker.open();
   };

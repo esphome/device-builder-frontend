@@ -1,14 +1,15 @@
 /**
  * Edit-mode footer shared by the automation / script / api-action
  * editors: the destructive Delete button plus the confirm dialog
- * that gates it. Pure render function; the host owns the dialog
- * ref that ``onOpenConfirm`` opens and routes ``onConfirm`` to its
- * delete engine.
+ * that gates it. Pure render function; the row owns the
+ * button-to-dialog wiring and the host only supplies ``onConfirm``.
  */
 import { mdiDelete } from "@mdi/js";
 import { html } from "lit";
+import { createRef, ref } from "lit/directives/ref.js";
 
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import type { ESPHomeConfirmDialog } from "../../confirm-dialog.js";
 import "../../confirm-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -19,21 +20,22 @@ export function renderDeleteRow(opts: {
   label: string;
   message: string;
   disabled: boolean;
-  onOpenConfirm: () => void;
   onConfirm: () => void;
 }) {
+  const dialog = createRef<ESPHomeConfirmDialog>();
   return html`<div class="ae-actions">
       <button
         type="button"
         class="ae-danger"
         ?disabled=${opts.disabled}
-        @click=${opts.onOpenConfirm}
+        @click=${() => dialog.value?.open()}
       >
         <wa-icon library="mdi" name="delete"></wa-icon>
         ${opts.label}
       </button>
     </div>
     <esphome-confirm-dialog
+      ${ref(dialog)}
       heading=${opts.label}
       confirm-label=${opts.label}
       message=${opts.message}

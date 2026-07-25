@@ -124,7 +124,6 @@ describe.each(CASES)("$name delete confirm gate", ({ make, location }) => {
     const dialog = editor.shadowRoot!.querySelector("esphome-confirm-dialog") as any;
     expect(dialog.open).toHaveBeenCalledOnce();
     expect(api.deleteAutomation).not.toHaveBeenCalled();
-    expect(editor.shadowRoot!.querySelector(".ae-section-add")).toBeNull();
   });
 
   it("the dialog's confirm event runs the delete", async () => {

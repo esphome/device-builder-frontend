@@ -28,7 +28,7 @@
  */
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
@@ -47,7 +47,6 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
-import type { ESPHomeConfirmDialog } from "../../confirm-dialog.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
@@ -119,9 +118,6 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  or field. Ignored when it doesn't land inside this automation. */
   @property({ attribute: false })
   focusYamlPath?: YamlPathSegment[];
-
-  @query("esphome-confirm-dialog")
-  private _deleteConfirm?: ESPHomeConfirmDialog;
 
   /** Scoped catalog response. Trigger / action / condition lists
    *  come from here (the backend filters to what's actually in the
@@ -453,7 +449,6 @@ export class ESPHomeAutomationEditor extends LitElement {
               label: this._localize("device.delete_automation"),
               message: this._localize("device.confirm_delete_automation"),
               disabled,
-              onOpenConfirm: this._onDeleteClick,
               onConfirm: this._onDelete,
             })
           : nothing
@@ -533,10 +528,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   // ─── Delete ──────────────────────────────────────────────────
-
-  private _onDeleteClick = () => {
-    this._deleteConfirm?.open();
-  };
 
   private _onDelete = () => {
     void this._engine.delete();
