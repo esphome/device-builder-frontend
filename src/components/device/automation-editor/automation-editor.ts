@@ -26,40 +26,24 @@
  * the post-reconnect re-parse path can short-circuit while a write
  * is outstanding.
  */
-import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 
-import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
   AutomationTrigger,
-  AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
 } from "../../../api/types/automations.js";
-import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
-import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
-import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { automationHeaderTitle } from "../../../util/automation-header-title.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
-import { AutoApplyController } from "./auto-apply-controller.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
-import {
-  actionsFocus,
-  createFocusResolver,
-  entryFieldFocus,
-  type YamlPathSegment,
-} from "./automation-focus.js";
-import { CatalogLoadController } from "./catalog-load-controller.js";
+import { actionsFocus, entryFieldFocus } from "./automation-focus.js";
+import { BaseAutomationEditor } from "./base-editor.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
-import { ParseErrorController } from "./parse-error-controller.js";
 import { renderAutomationHeader } from "./render-automation-header.js";
 import {
   renderActionsSection,
@@ -67,7 +51,6 @@ import {
   renderIdentityFields,
   renderTriggerParamsForm,
 } from "./render-automation-sections.js";
-import { renderDeleteRow } from "./render-delete-row.js";
 import {
   applyParamChange,
   emptyAutomationTree,
@@ -78,54 +61,7 @@ import { bareTriggerKey, effectiveTriggerIdFor } from "./trigger-identity.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 @customElement("esphome-automation-editor")
-export class ESPHomeAutomationEditor extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
-
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @property() configuration = "";
-
-  @property({ attribute: false })
-  board: BoardCatalogEntry | null = null;
-
-  @property() platform = "";
-
-  @property({ attribute: false })
-  value: AutomationTree | null = null;
-
-  @property({ attribute: false })
-  location: AutomationLocation | null = null;
-
-  /**
-   * True when the editor is mounted from the "+ Add automation" /
-   * "+ Add script" entry point. Add-mode lets the user pick / edit
-   * the target (kind + component / script id); edit-mode locks the
-   * target picker (changing it would move the YAML splice to a
-   * different range, which we don't support inline).
-   *
-   * The add-dialog passes a seed ``location`` (so the editor knows
-   * which target kind to render) AND sets ``addMode``, which is
-   * what we'd otherwise have to infer racily.
-   */
-  @property({ type: Boolean, attribute: "add-mode" })
-  addMode = false;
-
-  @property() yaml = "";
-
-  /** Document-absolute indexed key path at the YAML cursor; resolved
-   *  against the hydrated tree to scroll/highlight the matching node
-   *  or field. Ignored when it doesn't land inside this automation. */
-  @property({ attribute: false })
-  focusYamlPath?: YamlPathSegment[];
-
-  /** Scoped catalog response. Trigger / action / condition lists
-   *  come from here (the backend filters to what's actually in the
-   *  device's YAML) so the dropdowns only show what's usable. */
-  @state() private _available: AvailableAutomations | null = null;
-
+export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLocation> {
   /** Component catalog entry for the ``interval`` component, lazily
    *  fetched the first time we render an interval automation. Drives
    *  the header (name / description / docs / image) and the inline
@@ -133,40 +69,11 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  live in a dead "Target #N" readonly box). */
   @state() private _intervalComponent: ComponentCatalogEntry | null = null;
 
-  @state() private _loading = true;
-  @state() private _error = "";
-  /** Renders read-only + blocks auto-apply for a parse-errored
-   *  automation so its empty tree can't overwrite the real YAML. */
-  private readonly _parseError = new ParseErrorController(this);
-
-  /** Owns the catalog-load concurrency guard (sequence token +
-   *  host-disconnect invalidation) so an overlapping load can't
-   *  clobber ``_available``, paint a stale slim catalog, or
-   *  double-fire the partial-hydration toast. Shared with the
-   *  trigger-less editors (script, api-action). */
-  private readonly _catalogLoad = new CatalogLoadController(this);
-
   /** "Show advanced settings" toggle state for the params form.
    *  Mirrors ``device-section-config``'s same-named state but
    *  scoped to this editor instance — switching away and back
    *  resets to collapsed, matching the component-editor UX. */
   @state() private _showAdvanced = false;
-
-  /** Shared auto-apply / delete / dirty-tracking engine — same
-   *  instance shape as the script and api-action editors so the
-   *  page-level save guard can treat all three uniformly. */
-  private readonly _engine = new AutoApplyController(this, {
-    getApi: () => this._api,
-    getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active,
-    setError: (message) => {
-      this._error = message;
-    },
-  });
-
-  public get dirty(): boolean {
-    return this._engine.dirty;
-  }
 
   /**
    * Derived: edit-mode = not add-mode. Snapshot taken in
@@ -174,19 +81,9 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   @state() private _editMode = false;
 
-  /** In-flight write guard — parents that re-fetch on reconnect
-   *  should consult this to skip clobbering an optimistic update. */
-  public get inFlightWrite(): boolean {
-    return this._engine.inFlightWrite;
-  }
-
   /** Parse ``substitutions:`` from the current YAML once per edit so the
    *  read-only Target field can preview ${...} like the text fields do. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
-
-  private _resolveFocus = createFocusResolver();
-
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -444,19 +341,12 @@ export class ESPHomeAutomationEditor extends LitElement {
         focusTarget: actionsFocus(focus),
         onActionsChange: this._onActionsChange,
       })}
-      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${
-        this.location && this.value && !this.addMode
-          ? renderDeleteRow({
-              label: this._localize("device.delete_automation"),
-              message: this._localize("device.confirm_delete_automation", {
-                name: this._deleteTargetName(activeTrigger),
-              }),
-              disabled,
-              onConfirm: this._onDelete,
-            })
-          : nothing
-      }
+      ${this.renderFooter({
+        label: this._localize("device.delete_automation"),
+        message: this._localize("device.confirm_delete_automation", {
+          name: this._deleteTargetName(activeTrigger),
+        }),
+      })}
     `;
   }
 
@@ -477,16 +367,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   // ─── State mutations ─────────────────────────────────────────
-
-  /**
-   * Force a pending debounced auto-apply to flush immediately.
-   * The device page calls this on the active section before its
-   * global save so the YAML buffer is fully caught up with the
-   * editor state.
-   */
-  public flushPending(): Promise<void> {
-    return this._engine.flushPending();
-  }
 
   private _onTargetChange = (e: CustomEvent<{ target: AutomationLocation | null }>) => {
     e.stopPropagation();
@@ -546,10 +426,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     }
     return automationHeaderTitle(location, activeTrigger, this._localize);
   }
-
-  private _onDelete = () => {
-    void this._engine.delete();
-  };
 
   /** Filter declaration for the action buttons (referenced from
    *  the inline styles to keep the editor.styles file generic). */

@@ -21,23 +21,15 @@
  * ``inFlightWrite`` signals to the parent's reconnect handler to
  * skip clobbering an in-flight write.
  */
-import { consume } from "@lit/context";
 import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
 
-import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AvailableAutomations,
 } from "../../../api/types/automations.js";
-import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
-import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { formatApiError } from "../../../util/format-api-error.js";
@@ -45,21 +37,15 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
-import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
-  createFocusResolver,
   entryFieldFocus,
   focusKey,
   paramFocus,
-  type YamlPathSegment,
 } from "./automation-focus.js";
+import { BaseAutomationEditor } from "./base-editor.js";
 import "./callable-params-editor.js";
-import { CatalogLoadController } from "./catalog-load-controller.js";
-import { ParseErrorController } from "./parse-error-controller.js";
-import { renderDeleteRow } from "./render-delete-row.js";
 import { emptyAutomationTree } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -81,84 +67,12 @@ const API_DOCS_URL = `${ESPHOME_DOCS_BASE}/components/api.html`;
 type ApiActionLocation = Extract<AutomationLocation, { kind: "api_action" }>;
 
 @customElement("esphome-api-action-editor")
-export class ESPHomeApiActionEditor extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
+export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocation> {
+  // Can't upsert an api action with no name.
+  protected _canApply = (location: AutomationLocation) =>
+    location.kind === "api_action" && !!location.action_name;
 
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @property() configuration = "";
-
-  @property({ attribute: false })
-  board: BoardCatalogEntry | null = null;
-
-  @property() platform = "";
-
-  @property({ attribute: false })
-  value: AutomationTree | null = null;
-
-  @property({ attribute: false })
-  location: ApiActionLocation | null = null;
-
-  /** True when mounted from the "+ Add API action" dialog. Add-mode
-   *  lets the user type the action name; edit-mode locks it. */
-  @property({ type: Boolean, attribute: "add-mode" })
-  addMode = false;
-
-  @property() yaml = "";
-
-  /** Indexed key path at the YAML cursor; resolved against the
-   *  hydrated tree to scroll/highlight the matching action node. */
-  @property({ attribute: false })
-  focusYamlPath?: YamlPathSegment[];
-
-  private _resolveFocus = createFocusResolver();
-
-  /** Scoped catalog response — drives the action / condition / script
-   *  / device pickers inside the action list. */
-  @state() private _available: AvailableAutomations | null = null;
-
-  @state() private _loading = true;
-  @state() private _error = "";
-  /** Renders read-only + blocks auto-apply for a parse-errored
-   *  action so its empty tree can't overwrite the real YAML. */
-  private readonly _parseError = new ParseErrorController(this);
-
-  /** Shared auto-apply / delete / dirty-tracking engine — same
-   *  instance shape as the automation and script editors so the
-   *  page-level save guard can treat all three uniformly. */
-  private readonly _engine = new AutoApplyController(this, {
-    getApi: () => this._api,
-    getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active,
-    // Can't upsert an api action with no name.
-    canApply: (location) => location.kind === "api_action" && !!location.action_name,
-    setError: (message) => {
-      this._error = message;
-    },
-  });
-
-  /** Catalog loader; owns the concurrency guard so overlapping loads
-   *  (connectedCallback + updated both reaching ``_loadAvailable``)
-   *  can't clobber ``_available`` or double-fire the toast. */
-  private readonly _catalogLoad = new CatalogLoadController(this);
-
-  public get dirty(): boolean {
-    return this._engine.dirty;
-  }
-
-  public get inFlightWrite(): boolean {
-    return this._engine.inFlightWrite;
-  }
-
-  static styles = [
-    espHomeStyles,
-    inputStyles,
-    automationEditorStyles,
-    fieldHighlightStyles,
-  ];
+  static styles = [...BaseAutomationEditor.styles, fieldHighlightStyles];
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -193,15 +107,6 @@ export class ESPHomeApiActionEditor extends LitElement {
     ) {
       void this._hydrateFromBackend();
     }
-  }
-
-  /**
-   * Force a pending debounced auto-apply to flush immediately.
-   * The device page calls this on the active section before its
-   * global save so the YAML buffer is fully caught up.
-   */
-  public flushPending(): Promise<void> {
-    return this._engine.flushPending();
   }
 
   protected render() {
@@ -252,19 +157,12 @@ export class ESPHomeApiActionEditor extends LitElement {
           @actions-change=${this._onActionsChange}
         ></esphome-automation-action-list>
       </div>
-      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${
-        this.location && this.value && !this.addMode
-          ? renderDeleteRow({
-              label: this._localize("device.delete_api_action"),
-              message: this._localize("device.confirm_delete_api_action", {
-                name: this.location.action_name,
-              }),
-              disabled,
-              onConfirm: this._onDelete,
-            })
-          : nothing
-      }
+      ${this.renderFooter({
+        label: this._localize("device.delete_api_action"),
+        message: this._localize("device.confirm_delete_api_action", {
+          name: this.location?.action_name ?? "",
+        }),
+      })}
     `;
   }
 
@@ -418,10 +316,6 @@ export class ESPHomeApiActionEditor extends LitElement {
   private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._engine.withValue({ actions: e.detail.actions });
-  };
-
-  private _onDelete = () => {
-    void this._engine.delete();
   };
 }
 

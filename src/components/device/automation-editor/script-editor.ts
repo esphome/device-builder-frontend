@@ -20,24 +20,16 @@
  *   parent's reconnect handler to skip clobbering an in-flight
  *   write.
  */
-import { consume } from "@lit/context";
 import { mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
 
-import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AvailableAutomations,
 } from "../../../api/types/automations.js";
-import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
-import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -48,22 +40,16 @@ import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
-import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
   type AutomationFocus,
-  createFocusResolver,
   entryFieldFocus,
   focusKey,
   paramFocus,
-  type YamlPathSegment,
 } from "./automation-focus.js";
+import { BaseAutomationEditor } from "./base-editor.js";
 import "./callable-params-editor.js";
-import { CatalogLoadController } from "./catalog-load-controller.js";
-import { ParseErrorController } from "./parse-error-controller.js";
-import { renderDeleteRow } from "./render-delete-row.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 
 /** ``AutomationLocation`` variant for top-level ``script:`` blocks
@@ -82,41 +68,7 @@ registerMdiIcons({
 });
 
 @customElement("esphome-script-editor")
-export class ESPHomeScriptEditor extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
-
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @property() configuration = "";
-
-  @property({ attribute: false })
-  board: BoardCatalogEntry | null = null;
-
-  @property() platform = "";
-
-  @property({ attribute: false })
-  value: AutomationTree | null = null;
-
-  @property({ attribute: false })
-  location: ScriptLocation | null = null;
-
-  /** True when mounted from the "+ Add script" wizard. Add-mode
-   *  lets the user type the id; edit-mode locks it. */
-  @property({ type: Boolean, attribute: "add-mode" })
-  addMode = false;
-
-  @property() yaml = "";
-
-  /** Indexed key path at the YAML cursor; resolved against the
-   *  hydrated tree to scroll/highlight the matching node or field. */
-  @property({ attribute: false })
-  focusYamlPath?: YamlPathSegment[];
-
-  private _resolveFocus = createFocusResolver();
-
+export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
   /** ``focusKey`` already advanced-revealed — one-shot per target so a
    *  later deliberate collapse sticks. */
   private _paramsRevealKey?: string;
@@ -131,13 +83,6 @@ export class ESPHomeScriptEditor extends LitElement {
     if (paramFocus(focus, "parameters") !== null) this._showAdvanced = true;
   }
 
-  @state() private _available: AvailableAutomations | null = null;
-  @state() private _loading = true;
-  @state() private _error = "";
-  /** Renders read-only + blocks auto-apply for a parse-errored
-   *  script so its empty tree can't overwrite the real YAML. */
-  private readonly _parseError = new ParseErrorController(this);
-
   /** Component catalog entry for the ``script`` component, lazily
    *  fetched on mount. Drives the header (name / description /
    *  docs / image) and the inline config-entry form (``id``,
@@ -151,34 +96,9 @@ export class ESPHomeScriptEditor extends LitElement {
    *  isn't drowned out by the rarely-used options. */
   @state() private _showAdvanced = false;
 
-  /** Shared auto-apply / delete / dirty-tracking engine — same
-   *  instance shape as the automation and api-action editors so the
-   *  page-level save guard can treat all three uniformly. */
-  private readonly _engine = new AutoApplyController(this, {
-    getApi: () => this._api,
-    getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active,
-    // Can't upsert a script with no id.
-    canApply: (location) => location.kind === "script" && !!location.id,
-    setError: (message) => {
-      this._error = message;
-    },
-  });
-
-  /** Catalog loader; owns the concurrency guard so overlapping loads
-   *  (connectedCallback + updated both reaching ``_loadAvailable``)
-   *  can't clobber ``_available`` or double-fire the toast. */
-  private readonly _catalogLoad = new CatalogLoadController(this);
-
-  public get dirty(): boolean {
-    return this._engine.dirty;
-  }
-
-  public get inFlightWrite(): boolean {
-    return this._engine.inFlightWrite;
-  }
-
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  // Can't upsert a script with no id.
+  protected _canApply = (location: AutomationLocation) =>
+    location.kind === "script" && !!location.id;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -338,19 +258,12 @@ export class ESPHomeScriptEditor extends LitElement {
           @actions-change=${this._onActionsChange}
         ></esphome-automation-action-list>
       </div>
-      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${
-        this.location && this.value && !this.addMode
-          ? renderDeleteRow({
-              label: this._localize("device.delete_script"),
-              message: this._localize("device.confirm_delete_script", {
-                name: this.location.id,
-              }),
-              disabled,
-              onConfirm: this._onDelete,
-            })
-          : nothing
-      }
+      ${this.renderFooter({
+        label: this._localize("device.delete_script"),
+        message: this._localize("device.confirm_delete_script", {
+          name: this.location?.id ?? "",
+        }),
+      })}
     `;
   }
 
@@ -520,14 +433,6 @@ export class ESPHomeScriptEditor extends LitElement {
   private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._engine.withValue({ actions: e.detail.actions });
-  };
-
-  public flushPending(): Promise<void> {
-    return this._engine.flushPending();
-  }
-
-  private _onDelete = () => {
-    void this._engine.delete();
   };
 }
 
