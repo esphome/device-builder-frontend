@@ -302,7 +302,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       clearTimeout(this._draftTimer);
       this._draftTimer = null;
     }
+    // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
+    this._announceUnmount = null;
   }
 
   // Flush pending draft sync now. The page calls this before save / section

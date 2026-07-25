@@ -62,8 +62,12 @@ class Host extends EventTarget implements AutoApplyHost {
 
 const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
-function setup(over: Partial<AutoApplyOptions> = {}) {
+function setup(
+  over: Partial<AutoApplyOptions> = {},
+  parentNode: ParentNode | null = null
+) {
   const host = new Host();
+  host.parentNode = parentNode;
   const upsertAutomation = vi.fn().mockResolvedValue({ yaml_diff: DIFF });
   const deleteAutomation = vi.fn().mockResolvedValue({ yaml_diff: DIFF });
   const updateConfig = vi.fn().mockResolvedValue(undefined);
@@ -516,18 +520,14 @@ describe("AutoApplyController delete", () => {
   });
 
   it("the unmount announcement rides the mount-time parent past detachment", () => {
-    const { host, controller } = setup();
     const outer = document.createElement("div");
     const shadow = outer.attachShadow({ mode: "open" });
+    const { host, controller } = setup({}, shadow);
     const unmounts: unknown[] = [];
     outer.addEventListener("section-unmount", (e) =>
       unmounts.push((e as CustomEvent<{ node: unknown }>).detail.node)
     );
-    host.parentNode = shadow;
-    // Re-run the connect with the anchor in place (setup connected
-    // before the parent existed), then tear down like Lit does —
-    // after the host has left the tree.
-    controller.hostConnected();
+    // Tear down like Lit does — after the host has left the tree.
     host.parentNode = null;
     controller.hostDisconnected();
 

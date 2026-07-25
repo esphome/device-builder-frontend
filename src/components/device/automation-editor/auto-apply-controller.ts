@@ -139,7 +139,9 @@ export class AutoApplyController implements ReactiveController {
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._cancelDebounce();
+    // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
+    this._announceUnmount = null;
   }
 
   /** Brief-window dirty flag covering the debounce gap so the global
