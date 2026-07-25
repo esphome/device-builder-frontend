@@ -208,14 +208,24 @@ export class AutoApplyController implements ReactiveController {
    * Force a pending debounced auto-apply to flush immediately. The
    * device page calls this (via the host) on the active section
    * before its global save so the YAML buffer is fully caught up.
+   * Resolves only once nothing is pending — neither a debounce
+   * (even one armed mid-poll by a late keystroke) nor an in-flight
+   * call, including the queued re-run a cancelled debounce leaves
+   * on one.
    */
   async flushPending(): Promise<void> {
-    if (this._debounce) {
-      this._cancelDebounce();
-      await this.autoApply();
-    } else {
-      // Wait for the in-flight call to settle.
-      while (this._apply.kind === "applying") {
+    // Terminates: during a delete, ``scheduleAutoApply`` refuses to
+    // arm (the delete mode suppresses instead), so ``delete()``'s
+    // call site can't spin; outside one, each iteration retires the
+    // pending work that gated it.
+    while (this._debounce || this._apply.kind === "applying") {
+      if (this._debounce) {
+        this._cancelDebounce();
+        // With a call already in flight this only queues a re-run —
+        // loop back to the poll so the caller isn't released while
+        // the keystroke it came to flush is still unwritten.
+        await this.autoApply();
+      } else {
         await new Promise((r) => setTimeout(r, 20));
       }
     }

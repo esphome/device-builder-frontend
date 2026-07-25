@@ -226,6 +226,61 @@ describe("AutoApplyController auto-apply", () => {
     expect(upsertAutomation).toHaveBeenCalledTimes(1);
   });
 
+  it("flushPending waits out the re-run queued by a debounce cancelled into an in-flight apply", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const order: string[] = [];
+    host.addEventListener("yaml-draft", () => order.push("draft"));
+    const applying = controller.autoApply();
+    // A keystroke lands inside the debounce window while the round
+    // trip is outstanding.
+    controller.scheduleAutoApply();
+    const flushing = controller.flushPending().then(() => order.push("flushed"));
+
+    await vi.advanceTimersByTimeAsync(60);
+    // Releasing here would let the global save commit the
+    // pre-keystroke YAML while the queued re-run is still unwritten.
+    expect(order).not.toContain("flushed");
+
+    resolveFirst({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(60);
+    await Promise.all([applying, flushing]);
+    // Both drafts reached the page buffer before the caller was
+    // released, not merely before this assertion.
+    expect(order).toEqual(["draft", "draft", "flushed"]);
+  });
+
+  it("flushPending waits out a debounce armed while it was already polling", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const order: string[] = [];
+    host.addEventListener("yaml-draft", () => order.push("draft"));
+    const applying = controller.autoApply();
+    // No debounce yet — the flush enters the settle poll directly.
+    const flushing = controller.flushPending().then(() => order.push("flushed"));
+    await vi.advanceTimersByTimeAsync(30);
+    // The keystroke lands during the poll, after the debounce check.
+    controller.scheduleAutoApply();
+
+    resolveFirst({ yaml_diff: DIFF });
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 60);
+    await Promise.all([applying, flushing]);
+    // The late keystroke's upsert still lands before the release.
+    expect(order).toEqual(["draft", "draft", "flushed"]);
+  });
+
   it("shouldSkipReload skips the echo of its own write, not a foreign edit", async () => {
     const { host, controller } = setup();
     expect(controller.shouldSkipReload()).toBe(false);
