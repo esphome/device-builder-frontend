@@ -22,8 +22,8 @@
  * skip clobbering an in-flight write.
  */
 import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
-import { html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { html } from "lit";
+import { customElement } from "lit/decorators.js";
 
 import type {
   AutomationLocation,
@@ -69,8 +69,9 @@ type ApiActionLocation = Extract<AutomationLocation, { kind: "api_action" }>;
 @customElement("esphome-api-action-editor")
 export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocation> {
   // Can't upsert an api action with no name.
-  protected _canApply = (location: AutomationLocation) =>
-    location.kind === "api_action" && !!location.action_name;
+  protected override _canApply(location: AutomationLocation): boolean {
+    return location.kind === "api_action" && !!location.action_name;
+  }
 
   static styles = [...BaseAutomationEditor.styles, fieldHighlightStyles];
 
@@ -159,9 +160,10 @@ export class ESPHomeApiActionEditor extends BaseAutomationEditor<ApiActionLocati
       </div>
       ${this.renderFooter({
         label: this._localize("device.delete_api_action"),
-        message: this._localize("device.confirm_delete_api_action", {
-          name: this.location?.action_name ?? "",
-        }),
+        message: (location) =>
+          this._localize("device.confirm_delete_api_action", {
+            name: location.action_name,
+          }),
       })}
     `;
   }

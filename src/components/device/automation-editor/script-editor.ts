@@ -97,8 +97,9 @@ export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
   @state() private _showAdvanced = false;
 
   // Can't upsert a script with no id.
-  protected _canApply = (location: AutomationLocation) =>
-    location.kind === "script" && !!location.id;
+  protected override _canApply(location: AutomationLocation): boolean {
+    return location.kind === "script" && !!location.id;
+  }
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -260,9 +261,8 @@ export class ESPHomeScriptEditor extends BaseAutomationEditor<ScriptLocation> {
       </div>
       ${this.renderFooter({
         label: this._localize("device.delete_script"),
-        message: this._localize("device.confirm_delete_script", {
-          name: this.location?.id ?? "",
-        }),
+        message: (location) =>
+          this._localize("device.confirm_delete_script", { name: location.id }),
       })}
     `;
   }

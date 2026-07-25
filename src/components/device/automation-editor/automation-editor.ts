@@ -26,7 +26,7 @@
  * the post-reconnect re-parse path can short-circuit while a write
  * is outstanding.
  */
-import { html, nothing } from "lit";
+import { html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 
@@ -343,9 +343,10 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
       })}
       ${this.renderFooter({
         label: this._localize("device.delete_automation"),
-        message: this._localize("device.confirm_delete_automation", {
-          name: this._deleteTargetName(activeTrigger),
-        }),
+        message: () =>
+          this._localize("device.confirm_delete_automation", {
+            name: this._deleteTargetName(activeTrigger),
+          }),
       })}
     `;
   }

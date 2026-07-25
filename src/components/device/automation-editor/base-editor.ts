@@ -50,15 +50,22 @@ export abstract class BaseAutomationEditor<
   @property({ attribute: false })
   location: L | null = null;
 
-  /** True when mounted from an add entry point; edit-mode locks the
-   *  identity the wizard collected. */
+  /**
+   * True when mounted from an add entry point (the add-automation /
+   * add-script / add-api-action dialogs). Edit-mode locks the
+   * section's identity — changing it would move the YAML splice to
+   * a different range, which isn't supported inline. The add dialog
+   * passes a seed ``location`` alongside this flag, which we'd
+   * otherwise have to infer racily.
+   */
   @property({ type: Boolean, attribute: "add-mode" })
   addMode = false;
 
   @property() yaml = "";
 
-  /** Indexed key path at the YAML cursor; resolved against the
-   *  hydrated tree to scroll/highlight the matching node or field. */
+  /** Document-absolute indexed key path at the YAML cursor; resolved
+   *  against the hydrated tree to scroll/highlight the matching node
+   *  or field. Ignored when it doesn't land inside this section. */
   @property({ attribute: false })
   focusYamlPath?: YamlPathSegment[];
 
@@ -81,7 +88,9 @@ export abstract class BaseAutomationEditor<
 
   /** Per-editor upsert guard (a script can't upsert with an empty
    *  ``id``, an api action with an empty ``action_name``). */
-  protected _canApply?: (location: AutomationLocation) => boolean;
+  protected _canApply(_location: AutomationLocation): boolean {
+    return true;
+  }
 
   /** Shared auto-apply / delete / dirty-tracking engine — one
    *  instance shape so the page-level save guard treats all three
@@ -90,7 +99,7 @@ export abstract class BaseAutomationEditor<
     getApi: () => this._api,
     getLocalize: () => this._localize,
     isReadOnly: () => this._parseError.active,
-    canApply: (location) => this._canApply?.(location) ?? true,
+    canApply: (location) => this._canApply(location),
     setError: (message) => {
       this._error = message;
     },
@@ -117,14 +126,20 @@ export abstract class BaseAutomationEditor<
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
-  /** Inline error line + the confirm-gated delete footer. */
-  protected renderFooter(deleteOpts: { label: string; message: string }) {
+  /** Inline error line + the confirm-gated delete footer. The
+   *  message factory receives the non-null ``location`` so callers
+   *  build it inside the narrowing. */
+  protected renderFooter(deleteOpts: {
+    label: string;
+    message: (location: L) => string;
+  }) {
     return html`${
       this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing
     }${
       this.location && this.value && !this.addMode
         ? renderDeleteRow({
-            ...deleteOpts,
+            label: deleteOpts.label,
+            message: deleteOpts.message(this.location),
             disabled: this._engine.deleting,
             onConfirm: this._onDelete,
           })
