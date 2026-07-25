@@ -1792,9 +1792,11 @@ export class ESPHomePageDevice extends LitElement {
       // The navigator captured fromLine against the click-time buffer;
       // the awaited flush can shift every section below its upsert
       // (#1470). Re-resolve against the settled buffer, same rule and
-      // same vanished-key handling as the cursor path.
+      // same vanished-key handling as the cursor path. Emitters that
+      // send no fromLine keep an unset line (key-based resolution),
+      // as before.
       this._selectedFromLine =
-        sectionKey !== null
+        sectionKey !== null && fromLine !== undefined
           ? resolveCurrentSectionLine(this._yaml, sectionKey, fromLine)
           : undefined;
       // A navigator click carries no field intent — a stale cursor path

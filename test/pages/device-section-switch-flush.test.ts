@@ -21,6 +21,20 @@ const internals = (page: ESPHomePageDevice) => page as any;
 const setConnected = (page: ESPHomePageDevice, value: boolean) =>
   Object.defineProperty(page, "isConnected", { value, configurable: true });
 
+/** Stub the active section with a flush the test resolves on demand. */
+const gateFlush = (page: ESPHomePageDevice) => {
+  let resolve!: () => void;
+  internals(page)._activeSection = {
+    dirty: true,
+    flushPending: () =>
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    reload: () => {},
+  } satisfies SectionEditor;
+  return () => resolve();
+};
+
 describe("section-switch flush barrier", () => {
   it("defers the switch until an async flushPending resolves", async () => {
     const page = new ESPHomePageDevice();
@@ -174,15 +188,7 @@ describe("section-switch flush barrier", () => {
   it("a caret returning home cancels the switch queued behind the flush", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     // Two top-level sections; the selection sits on i2c (line 1).
     internals(page)._yaml = [
       "i2c:",
@@ -216,15 +222,7 @@ describe("section-switch flush barrier", () => {
   it("re-clicking the displayed section cancels the switch queued behind the flush", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._selectedSection = "i2c";
     internals(page)._selectedFromLine = 1;
 
@@ -246,15 +244,7 @@ describe("section-switch flush barrier", () => {
   it("closes the drawer before the flush barrier (mobile tap feedback)", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._selectedSection = "i2c";
     internals(page)._selectedFromLine = 1;
     internals(page)._drawerOpen = true;
@@ -275,15 +265,7 @@ describe("section-switch flush barrier", () => {
   it("re-resolves the target section's line against the buffer the flush settled", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
       "\n"
     );
@@ -319,15 +301,7 @@ describe("section-switch flush barrier", () => {
   it("re-resolves a navigator click's line against the buffer the flush settled", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
       "\n"
     );
@@ -359,15 +333,7 @@ describe("section-switch flush barrier", () => {
   it("re-resolves an automation target's line — the section kind whose flush defers", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = [
       "i2c:",
       "  sda: 1",
@@ -410,15 +376,7 @@ describe("section-switch flush barrier", () => {
   it("re-resolves a multi-instance key onto the instance nearest the snapshot", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = [
       "i2c:",
       "  sda: 1",
@@ -464,15 +422,7 @@ describe("section-switch flush barrier", () => {
   it("Back re-resolves the restored history entry against the settled buffer", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
       "\n"
     );
@@ -500,15 +450,7 @@ describe("section-switch flush barrier", () => {
   it("Back leaves the line unset when the restored key vanished mid-flush", async () => {
     const page = new ESPHomePageDevice();
     setConnected(page, true);
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     internals(page)._yaml = ["i2c:", "  sda: 1", "logger:", "  level: DEBUG"].join("\n");
     internals(page)._selectedSection = "i2c";
     internals(page)._selectedFromLine = 1;
@@ -528,15 +470,7 @@ describe("section-switch flush barrier", () => {
 
   it("skips the action when the page unmounts during the flush", async () => {
     const page = new ESPHomePageDevice();
-    let resolveFlush!: () => void;
-    internals(page)._activeSection = {
-      dirty: true,
-      flushPending: () =>
-        new Promise<void>((resolve) => {
-          resolveFlush = resolve;
-        }),
-      reload: () => {},
-    } satisfies SectionEditor;
+    const resolveFlush = gateFlush(page);
     setConnected(page, true);
     const action = vi.fn();
     const switching = internals(page)._guardSectionSwitch(action) as Promise<void>;

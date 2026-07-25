@@ -343,6 +343,9 @@ export function sectionKeyOf(section: YamlSection): string {
  * recovery for that case. Equidistant ties prefer the first
  * match (the test pins this; `reduce` with `<` keeps the
  * accumulator on ties).
+ *
+ * Top-level sections only — `automation:*` keys never match here;
+ * use `resolveCurrentSectionLine` for a key that may be either.
  */
 export function resolveCurrentFromLine(
   yaml: string,
