@@ -299,12 +299,13 @@ export class AutoApplyController implements ReactiveController {
       // the deleted section (#1451). ``_deleting`` blocks the dirty
       // requeue, so this terminates.
       await this.flushPending();
-      const { yaml_diff } = await api.deleteAutomation(
-        configuration,
-        location,
-        this._host.yaml
-      );
-      const newYaml = applyYamlDiff(this._host.yaml, yaml_diff);
+      // Read the settled buffer exactly once: the backend computes
+      // the diff's line coordinates against the string we send, so
+      // splicing into a later re-read (a YAML-pane keystroke during
+      // the round-trip) would silently mangle the write-through.
+      const yaml = this._host.yaml;
+      const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
+      const newYaml = applyYamlDiff(yaml, yaml_diff);
       await api.updateConfig(configuration, newYaml);
       this._host.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-updated", {

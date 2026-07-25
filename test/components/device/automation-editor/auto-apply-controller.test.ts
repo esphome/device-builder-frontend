@@ -359,6 +359,26 @@ describe("AutoApplyController delete", () => {
     expect(deleteAutomation.mock.calls[0][1]).toBe(SCRIPT);
   });
 
+  it("a failed delete re-arms an edit scheduled during the delete window", async () => {
+    const { controller, upsertAutomation, deleteAutomation } = setup();
+    let rejectDelete!: (e: Error) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectDelete = reject;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    controller.scheduleAutoApply();
+
+    rejectDelete(new Error("nope"));
+    await deleting;
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+  });
+
   it("a failed delete does not re-arm a torn-down section", async () => {
     const { controller, upsertAutomation, deleteAutomation } = setup();
     deleteAutomation.mockRejectedValueOnce(new Error("nope"));
