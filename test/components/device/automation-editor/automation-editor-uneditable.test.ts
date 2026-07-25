@@ -20,6 +20,7 @@ vi.mock(
   "../../../../src/components/device/automation-editor/automation-trigger-picker.js",
   () => ({})
 );
+vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));

@@ -22,7 +22,7 @@
  * skip clobbering an in-flight write.
  */
 import { consume } from "@lit/context";
-import { mdiDelete, mdiOpenInNew, mdiWebhook } from "@mdi/js";
+import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
@@ -59,13 +59,13 @@ import {
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
+import { renderDeleteRow } from "./render-delete-row.js";
 import { emptyAutomationTree } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
-  delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
   webhook: mdiWebhook,
 });
@@ -255,17 +255,14 @@ export class ESPHomeApiActionEditor extends LitElement {
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${
         this.location && this.value && !this.addMode
-          ? html`<div class="ae-actions">
-              <button
-                type="button"
-                class="ae-danger"
-                ?disabled=${disabled}
-                @click=${this._onDelete}
-              >
-                <wa-icon library="mdi" name="delete"></wa-icon>
-                ${this._localize("dashboard.delete")}
-              </button>
-            </div>`
+          ? renderDeleteRow({
+              label: this._localize("device.delete_api_action"),
+              message: this._localize("device.confirm_delete_api_action", {
+                name: this.location.action_name,
+              }),
+              disabled,
+              onConfirm: this._onDelete,
+            })
           : nothing
       }
     `;

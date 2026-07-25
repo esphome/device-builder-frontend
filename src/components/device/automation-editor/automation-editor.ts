@@ -28,13 +28,14 @@
  */
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
+  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
@@ -45,10 +46,10 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { automationHeaderTitle } from "../../../util/automation-header-title.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
-import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
@@ -63,10 +64,10 @@ import { renderAutomationHeader } from "./render-automation-header.js";
 import {
   renderActionsSection,
   renderAddModePickers,
-  renderDeleteRow,
   renderIdentityFields,
   renderTriggerParamsForm,
 } from "./render-automation-sections.js";
+import { renderDeleteRow } from "./render-delete-row.js";
 import {
   applyParamChange,
   emptyAutomationTree,
@@ -119,12 +120,6 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  or field. Ignored when it doesn't land inside this automation. */
   @property({ attribute: false })
   focusYamlPath?: YamlPathSegment[];
-
-  /** Action-list reference — used by the header-positioned Add
-   *  button to open the catalog picker dialog that lives inside
-   *  the action-list component. */
-  @query("esphome-automation-action-list")
-  private _actionList?: ESPHomeAutomationActionList;
 
   /** Scoped catalog response. Trigger / action / condition lists
    *  come from here (the backend filters to what's actually in the
@@ -447,13 +442,19 @@ export class ESPHomeAutomationEditor extends LitElement {
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
-        onOpenPicker: () => this._actionList?.openPicker(),
         onActionsChange: this._onActionsChange,
       })}
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${
         this.location && this.value && !this.addMode
-          ? renderDeleteRow(this._localize, disabled, this._onDelete)
+          ? renderDeleteRow({
+              label: this._localize("device.delete_automation"),
+              message: this._localize("device.confirm_delete_automation", {
+                name: this._deleteTargetName(activeTrigger),
+              }),
+              disabled,
+              onConfirm: this._onDelete,
+            })
           : nothing
       }
     `;
@@ -531,6 +532,20 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   // ─── Delete ──────────────────────────────────────────────────
+
+  /** Identity for the delete prompt; before the trigger catalog
+   *  resolves, the raw ``on_*`` key still names the automation
+   *  where the header title would degrade to "Automation". */
+  private _deleteTargetName(activeTrigger: AutomationTrigger | null): string {
+    const location = this.location;
+    if (
+      !activeTrigger &&
+      (location?.kind === "device_on" || location?.kind === "component_on")
+    ) {
+      return location.trigger;
+    }
+    return automationHeaderTitle(location, activeTrigger, this._localize);
+  }
 
   private _onDelete = () => {
     void this._engine.delete();

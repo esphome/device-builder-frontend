@@ -1,12 +1,11 @@
 /**
  * The automation editor's body sections, as pure render functions
  * (matching ``render-target-field.ts``): the legacy add-mode
- * pickers, the edit-mode trigger-params form, the actions list
- * section, and the delete footer. State stays in
- * ``<esphome-automation-editor>``; each section receives values
- * plus the host's stable handler references.
+ * pickers, the edit-mode trigger-params form, and the actions
+ * list section. State stays in ``<esphome-automation-editor>``;
+ * each section receives values plus the host's stable handler
+ * references.
  */
-import { mdiDelete } from "@mdi/js";
 import { html, nothing } from "lit";
 
 import type {
@@ -22,7 +21,6 @@ import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
@@ -31,10 +29,6 @@ import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import { renderTargetField } from "./render-target-field.js";
 import { targetMetadataValue } from "./trigger-identity.js";
-
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-
-registerMdiIcons({ delete: mdiDelete });
 
 /**
  * Legacy add-mode pickers. The "+ Add automation" wizard now
@@ -138,9 +132,8 @@ export function renderTriggerParamsForm(opts: {
   `;
 }
 
-/** The Actions section: label + header-positioned Add button
- *  (opens the picker dialog living inside the action-list) and
- *  the recursive action list itself. */
+/** The Actions section: label, description, and the recursive
+ *  action list (whose bottom Add button opens the picker). */
 export function renderActionsSection(opts: {
   automation: AutomationTree;
   catalog: AutomationAction[];
@@ -152,29 +145,16 @@ export function renderActionsSection(opts: {
   disabled: boolean;
   localize: LocalizeFunc;
   focusTarget?: AutomationFocus | null;
-  onOpenPicker: () => void;
   onActionsChange: (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => void;
 }) {
   return html`
     <div class="field">
-      <div class="ae-actions-header">
-        <label class="field-label"> ${opts.localize("device.automation_action")} </label>
-        <button
-          type="button"
-          class="ae-section-add"
-          ?disabled=${opts.disabled || opts.catalog.length === 0}
-          @click=${opts.onOpenPicker}
-        >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${opts.localize("device.add_action")}
-        </button>
-      </div>
+      <label class="field-label"> ${opts.localize("device.automation_action")} </label>
       <p class="field-description">
         ${renderMarkdown(opts.localize("device.automation_actions_description"))}
       </p>
       <esphome-automation-action-list
         no-header
-        hide-add
         .focusTarget=${opts.focusTarget ?? null}
         .actions=${opts.automation.actions}
         .catalog=${opts.catalog}
@@ -216,18 +196,4 @@ export function renderIdentityFields(
     substitutions,
     localize
   );
-}
-
-/** Edit-mode footer: the destructive Delete button. */
-export function renderDeleteRow(
-  localize: LocalizeFunc,
-  disabled: boolean,
-  onDelete: () => void
-) {
-  return html`<div class="ae-actions">
-    <button type="button" class="ae-danger" ?disabled=${disabled} @click=${onDelete}>
-      <wa-icon library="mdi" name="delete"></wa-icon>
-      ${localize("device.delete_automation")}
-    </button>
-  </div>`;
 }

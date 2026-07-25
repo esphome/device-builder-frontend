@@ -17,6 +17,7 @@ vi.mock(
   "../../../../src/components/device/automation-editor/callable-params-editor.js",
   () => ({})
 );
+vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));

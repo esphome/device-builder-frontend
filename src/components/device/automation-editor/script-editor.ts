@@ -21,9 +21,9 @@
  *   write.
  */
 import { consume } from "@lit/context";
-import { mdiDelete, mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
+import { mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -50,7 +50,6 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
-import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
@@ -64,6 +63,7 @@ import {
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
+import { renderDeleteRow } from "./render-delete-row.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 
 /** ``AutomationLocation`` variant for top-level ``script:`` blocks
@@ -77,7 +77,6 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
-  delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
   "script-text-outline": mdiScriptTextOutline,
 });
@@ -115,12 +114,6 @@ export class ESPHomeScriptEditor extends LitElement {
    *  hydrated tree to scroll/highlight the matching node or field. */
   @property({ attribute: false })
   focusYamlPath?: YamlPathSegment[];
-
-  /** Action-list reference — used by the header-positioned Add
-   *  button to open the catalog picker dialog that lives inside
-   *  the action-list component. */
-  @query("esphome-automation-action-list")
-  private _actionList?: ESPHomeAutomationActionList;
 
   private _resolveFocus = createFocusResolver();
 
@@ -327,26 +320,12 @@ export class ESPHomeScriptEditor extends LitElement {
           : nothing
       }
       <div class="field">
-        <div class="ae-actions-header">
-          <label class="field-label">
-            ${this._localize("device.automation_action")}
-          </label>
-          <button
-            type="button"
-            class="ae-section-add"
-            ?disabled=${disabled || actions.length === 0}
-            @click=${() => this._actionList?.openPicker()}
-          >
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("device.add_action")}
-          </button>
-        </div>
+        <label class="field-label"> ${this._localize("device.automation_action")} </label>
         <p class="field-description">
           ${renderMarkdown(this._localize("device.script_actions_description"))}
         </p>
         <esphome-automation-action-list
           no-header
-          hide-add
           .focusTarget=${actionsFocus(focus)}
           .actions=${automation.actions}
           .catalog=${actions}
@@ -362,17 +341,14 @@ export class ESPHomeScriptEditor extends LitElement {
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${
         this.location && this.value && !this.addMode
-          ? html`<div class="ae-actions">
-              <button
-                type="button"
-                class="ae-danger"
-                ?disabled=${disabled}
-                @click=${this._onDelete}
-              >
-                <wa-icon library="mdi" name="delete"></wa-icon>
-                ${this._localize("device.delete_script")}
-              </button>
-            </div>`
+          ? renderDeleteRow({
+              label: this._localize("device.delete_script"),
+              message: this._localize("device.confirm_delete_script", {
+                name: this.location.id,
+              }),
+              disabled,
+              onConfirm: this._onDelete,
+            })
           : nothing
       }
     `;

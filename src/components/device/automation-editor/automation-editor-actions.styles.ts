@@ -76,54 +76,6 @@ export const automationEditorActionStyles = css`
     font-style: italic;
   }
 
-  .ae-actions-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--wa-space-s);
-  }
-
-  .ae-section-add {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    background: var(--wa-color-brand-fill-loud, var(--esphome-primary));
-    color: var(--wa-color-brand-on-loud, var(--esphome-on-primary));
-    border: var(--wa-border-width-s) solid
-      var(--wa-color-brand-fill-loud, var(--esphome-primary));
-    padding: 2px var(--wa-space-s);
-    border-radius: var(--wa-border-radius-m);
-    cursor: pointer;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-semibold);
-    font-family: inherit;
-    transition:
-      background 0.12s,
-      border-color 0.12s;
-  }
-
-  .ae-section-add:hover:not(:disabled) {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-brand-fill-loud, var(--esphome-primary)),
-      black 10%
-    );
-    border-color: color-mix(
-      in srgb,
-      var(--wa-color-brand-fill-loud, var(--esphome-primary)),
-      black 10%
-    );
-  }
-
-  .ae-section-add:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .ae-section-add wa-icon {
-    font-size: 14px;
-  }
-
   /* Bottom-of-editor save / delete buttons. */
   .ae-actions {
     display: flex;

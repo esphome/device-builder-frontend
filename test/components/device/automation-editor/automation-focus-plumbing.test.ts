@@ -21,6 +21,7 @@ vi.mock(
   "../../../../src/components/device/automation-editor/catalog-picker-dialog.js",
   () => ({})
 );
+vi.mock("../../../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
