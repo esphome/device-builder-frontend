@@ -6,7 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { fireEvent } from "../../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
@@ -32,6 +32,9 @@ export interface AutoApplyHost
   addMode: boolean;
   value: AutomationTree | null;
   readonly location: AutomationLocation | null;
+  /** Mount-time anchor the delete path needs to keep its events
+   *  reachable when the element is unmounted mid round trip (#1465). */
+  readonly parentNode: ParentNode | null;
 }
 
 export interface AutoApplyOptions {
@@ -326,6 +329,12 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
+    // The parent stays mounted across section switches, so it can
+    // carry the ``yaml-updated`` when a different-kind switch swaps
+    // the element out mid round trip — a detached dispatch bubbles
+    // nowhere and the page's saved buffer would go stale against the
+    // disk write, resurrecting the section on the next global save.
+    const dispatchAnchor = this._host.parentNode;
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
@@ -353,20 +362,23 @@ export class AutoApplyController implements ReactiveController {
       const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await api.updateConfig(configuration, newYaml);
-      this._host.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      // Navigate away only while the editor still shows the deleted
-      // section. After a mid-flush retarget the user is already on a
-      // sibling; yanking them to null would also unmount the editor
-      // and cancel the sibling's re-armed edit below.
+      // ``newYaml`` derives from the pre-round-trip snapshot; in the
+      // unmount case a draft the newly mounted section made in the
+      // interim is overwritten by this dispatch. Narrow window, and
+      // still net-positive versus resurrecting the deleted section.
+      fireFromAnchor(this._host, this._connected, dispatchAnchor, "yaml-updated", {
+        yaml: newYaml,
+      });
+      // Navigate away only while the editor is still on screen showing
+      // the deleted section. After a mid-flush retarget the user is
+      // already on a sibling (yanking them to null would also unmount
+      // the editor and cancel the sibling's re-armed edit below); after
+      // an unmount they already navigated somewhere else entirely.
       if (
-        !this._host.location ||
-        sectionKeyFromLocation(this._host.location) === sectionKeyFromLocation(location)
+        this._connected &&
+        (!this._host.location ||
+          sectionKeyFromLocation(this._host.location) ===
+            sectionKeyFromLocation(location))
       ) {
         this._host.dispatchEvent(
           new CustomEvent<{ sectionKey: string | null }>("section-select", {

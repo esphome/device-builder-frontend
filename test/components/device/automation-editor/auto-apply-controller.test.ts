@@ -46,6 +46,7 @@ class Host extends EventTarget implements AutoApplyHost {
   addMode = false;
   value: AutomationTree | null = tree();
   location: AutomationLocation | null = SCRIPT;
+  parentNode: ParentNode | null = null;
   // SectionEditor surface the real hosts delegate to the engine.
   dirty = false;
   flushPending(): void {}
@@ -472,6 +473,45 @@ describe("AutoApplyController delete", () => {
     );
     // The user is on the sibling; the delete must not navigate away
     // (that unmount would cancel the re-armed edit).
+    expect(selections).toHaveLength(0);
+  });
+
+  it("a mid-delete unmount still lands yaml-updated through the mount-time parent", async () => {
+    const { host, controller, deleteAutomation } = setup();
+    // Production's anchor is board-info's ShadowRoot, so the listener
+    // sits on the shadow host outside the boundary — the assertion
+    // then pins the composed flag the whole fix rides on, not merely
+    // that the dispatch target swapped.
+    const outer = document.createElement("div");
+    const shadow = outer.attachShadow({ mode: "open" });
+    const updates: string[] = [];
+    outer.addEventListener("yaml-updated", (e) =>
+      updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
+    );
+    host.parentNode = shadow;
+    const selections = captureEvents(host, "section-select");
+    let resolveDelete!: (v: { yaml_diff: YamlDiff }) => void;
+    deleteAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveDelete = r;
+        })
+    );
+    const deleting = controller.delete();
+    await vi.advanceTimersByTimeAsync(1);
+    // A different-kind section switch swaps the element out of the
+    // tree while the delete round trip is outstanding — Lit tears it
+    // down through disconnectedCallback. parentNode nulls too, so a
+    // regression that snapshots the anchor after the awaits fails.
+    controller.hostDisconnected();
+    host.parentNode = null;
+
+    resolveDelete({ yaml_diff: DIFF });
+    await deleting;
+
+    // The disk write still reaches the page's buffer via the parent…
+    expect(updates).toEqual(["replaced\nline2"]);
+    // …and no navigation fires at a user who already left.
     expect(selections).toHaveLength(0);
   });
 

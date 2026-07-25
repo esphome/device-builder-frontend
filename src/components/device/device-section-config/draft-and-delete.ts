@@ -1,8 +1,8 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent } from "../../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
-import { notifySuccess } from "../../../util/notify.js";
+import { notifyError, notifySuccess } from "../../../util/notify.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
@@ -116,6 +116,15 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
+  // The parent stays mounted across section switches, so it can carry
+  // the ``yaml-updated`` when a switch unmounts the editor mid round
+  // trip — a detached dispatch bubbles nowhere and the page's saved
+  // buffer would go stale against the disk write (#1465). The section
+  // key is snapshotted too: Lit reuses this element across same-kind
+  // switches, so a mid-round-trip retarget keeps it connected while
+  // the deleted section is no longer the one on screen.
+  const dispatchAnchor = host.parentNode;
+  const deletedKey = host.sectionKey;
   try {
     const newYaml = removeSectionFromYaml(host.yaml, host.sectionKey, fromLine);
     if (newYaml === host.yaml) {
@@ -124,11 +133,21 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    fireEvent(host, "yaml-updated", { yaml: newYaml });
-    fireEvent(host, "section-select", { sectionKey: null });
+    fireFromAnchor(host, host.isConnected, dispatchAnchor, "yaml-updated", {
+      yaml: newYaml,
+    });
+    // Navigate away only while the user is still here, on the
+    // section that was deleted.
+    if (host.isConnected && host.sectionKey === deletedKey) {
+      fireEvent(host, "section-select", { sectionKey: null });
+    }
     notifySuccess(host._localize("device.section_deleted", { name: title }));
   } catch (e) {
-    host._error = formatApiError(e, host._localize, "device.section_delete_error");
+    const msg = formatApiError(e, host._localize, "device.section_delete_error");
+    host._error = msg;
+    // The inline error renders nowhere on an unmounted host; the
+    // toast is page-level and survives the teardown.
+    notifyError(host._localize("device.section_delete_error"), { description: msg });
   } finally {
     host._deleting = false;
   }

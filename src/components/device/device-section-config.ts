@@ -22,7 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { fireEvent } from "../../util/fire-event.js";
+import { fireEvent, fireFromAnchor } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -444,15 +444,27 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
+    // Mount-time parent carries the dispatch if a section switch
+    // unmounts this element mid round trip (#1465).
+    const dispatchAnchor = this.parentNode;
     try {
+      // Read the buffer and target exactly once: the backend computes
+      // the diff's line coordinates against the string we send, and a
+      // router-level device swap reassigns ``configuration`` from
+      // above — splicing into a later re-read would silently mangle
+      // the write-through (or write it to the wrong file).
+      const configuration = this.configuration;
+      const yaml = this.yaml;
       const { yaml_diff } = await this._api.deleteAutomation(
-        this.configuration,
+        configuration,
         location,
-        this.yaml
+        yaml
       );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      await this._api.updateConfig(this.configuration, newYaml);
-      fireEvent(this, "yaml-updated", { yaml: newYaml });
+      const newYaml = applyYamlDiff(yaml, yaml_diff);
+      await this._api.updateConfig(configuration, newYaml);
+      fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
+        yaml: newYaml,
+      });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {
