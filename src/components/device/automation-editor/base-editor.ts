@@ -26,6 +26,7 @@ import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import { renderDeleteRow } from "./render-delete-row.js";
+import { sectionKeyFromLocation } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
@@ -162,6 +163,66 @@ export abstract class BaseAutomationEditor<
           })
         : nothing
     }`;
+  }
+
+  /** Identity compared on navigator swaps — a different one means
+   *  the reused element's ``value`` is stale. The section key
+   *  already discriminates every location kind. */
+  protected _identityOf(location: L): string {
+    return sectionKeyFromLocation(location);
+  }
+
+  protected abstract _loadAvailable(): Promise<void>;
+
+  protected abstract _hydrateFromBackend(): Promise<void>;
+
+  protected updated(changed: Map<string, unknown>) {
+    if (changed.has("configuration")) {
+      void this._loadAvailable();
+    }
+    // Navigator-driven location swap: when the parent passes in a
+    // different ``location`` (user clicked a sibling section), the
+    // editor element is reused — its previous ``value`` is stale.
+    // Invalidate it so the hydrate path below re-fetches.
+    if (changed.has("location") && !this.addMode) {
+      const prev = changed.get("location") as L | null | undefined;
+      if (
+        prev &&
+        this.location &&
+        this._identityOf(prev) !== this._identityOf(this.location)
+      ) {
+        this.value = null;
+      }
+    }
+    // Hydrate from the backend in edit-mode: mounted with a known
+    // location but no value. Triggering on ``_loading`` covers the
+    // common case where the location was already set at mount — the
+    // first change fires while ``_loading=true``, so re-check after
+    // catalogs finish loading rather than waiting for another
+    // location mutation that may never come.
+    if (
+      !this.addMode &&
+      (changed.has("location") ||
+        changed.has("configuration") ||
+        changed.has("_loading")) &&
+      this.location &&
+      this.value === null &&
+      !this._loading
+    ) {
+      void this._hydrateFromBackend();
+    }
+  }
+
+  /**
+   * Re-hydrate from the live YAML. Called by the parent
+   * (``device-board-info``) when the YAML pane changes the document
+   * out from under us — mirrors the device-section-config reload
+   * pattern so editing YAML in the pane updates the visual editor.
+   */
+  public reload(): void {
+    if (this.addMode || !this.location) return;
+    if (this._engine.shouldSkipReload()) return;
+    void this._hydrateFromBackend();
   }
 
   protected _onDelete = () => {

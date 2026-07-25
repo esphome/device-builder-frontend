@@ -50,11 +50,7 @@ import {
   renderIdentityFields,
   renderTriggerParamsForm,
 } from "./render-automation-sections.js";
-import {
-  applyParamChange,
-  emptyAutomationTree,
-  sectionKeyFromLocation,
-} from "./serialise.js";
+import { applyParamChange, emptyAutomationTree } from "./serialise.js";
 import { bareTriggerKey, effectiveTriggerIdFor } from "./trigger-identity.js";
 
 @customElement("esphome-automation-editor")
@@ -98,46 +94,8 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     // shared engine's hostConnected.
   }
 
-  protected updated(changed: Map<string, unknown>) {
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
-    // Navigator-driven location swap: when the parent passes in a
-    // different ``location`` (user clicked a sibling automation),
-    // the editor element is reused — its previous ``value`` is
-    // stale. Invalidate it so the hydrate path below re-fetches
-    // the matching ParsedAutomation. Without this guard the
-    // trigger / actions panels keep showing the old automation's
-    // content while the location-derived metadata fields update.
-    if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as AutomationLocation | null | undefined;
-      if (
-        prev &&
-        this.location &&
-        sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
-      ) {
-        this.value = null;
-      }
-    }
-    // Hydrate from the backend in edit-mode: when the editor was
-    // mounted with a known location but no value, we look up the
-    // matching ParsedAutomation and populate value/location from
-    // it. Triggering on ``_loading`` covers the common case where
-    // the editor was mounted with the location already set — the
-    // first ``location`` change fires while ``_loading=true``, so
-    // we re-check after catalogs finish loading rather than waiting
-    // for another location mutation that may never come.
-    if (
-      !this.addMode &&
-      (changed.has("location") ||
-        changed.has("configuration") ||
-        changed.has("_loading")) &&
-      this.location &&
-      this.value === null &&
-      !this._loading
-    ) {
-      void this._hydrateFromBackend();
-    }
+  protected override updated(changed: Map<string, unknown>) {
+    super.updated(changed);
     // Interval automations need the ``interval`` component schema
     // so the header can show its description + docs link + image
     // and the form can render its config_entries (the actual
@@ -170,7 +128,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
    * keeps the editor self-contained — the parent only needs to
    * pass the section key's location.
    */
-  private async _hydrateFromBackend() {
+  protected async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) return;
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
@@ -198,26 +156,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     }
   }
 
-  /**
-   * Re-hydrate from the live YAML. Called by the parent
-   * (``device-board-info``) when the YAML pane changes the document
-   * out from under us — mirrors the device-section-config reload
-   * pattern so editing YAML in the pane updates the visual editor.
-   *
-   * Skip cases:
-   *  - Our own write echoing back via the prop (avoid clobbering the
-   *    user's just-applied edit).
-   *  - An auto-apply currently in flight (we're already writing /
-   *    about to overwrite; let it finish).
-   *  - Add mode (no location to hydrate from yet).
-   */
-  public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
-    void this._hydrateFromBackend();
-  }
-
-  private async _loadAvailable() {
+  protected async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     this._loading = true;
     this._error = "";

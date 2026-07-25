@@ -100,10 +100,6 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
 
   protected readonly _sectionKind = "script" as const;
 
-  protected _identityOf(location: ScriptLocation): string {
-    return location.id;
-  }
-
   /** The script-component fetch rides along with the shared load. */
   protected override async _load() {
     await super._load();

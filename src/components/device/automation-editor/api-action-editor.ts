@@ -69,10 +69,6 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
 
   protected readonly _sectionKind = "api_action" as const;
 
-  protected _identityOf(location: ApiActionLocation): string {
-    return location.action_name;
-  }
-
   static styles = [CallableAutomationEditor.styles, fieldHighlightStyles];
 
   /** ``focusKey`` already name-flashed — one-shot per target. */

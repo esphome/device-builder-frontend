@@ -1,8 +1,7 @@
 /**
  * Intermediate base for the two trigger-less (callable) editors —
- * script and api-action. Owns the shared lifecycle the automation
- * editor diverges from: the mount-time catalog load, the
- * navigator-swap invalidation, the backend hydrate, and reload.
+ * script and api-action. Owns the mount-time catalog load and the
+ * shared hydrate the automation editor diverges from.
  */
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { getErrorMessage } from "../../../util/error-message.js";
@@ -15,56 +14,9 @@ export abstract class CallableAutomationEditor<
   /** Section kind forwarded to the parse-error resolve. */
   protected abstract readonly _sectionKind: L["kind"];
 
-  /** Identity compared on navigator swaps — a different one means
-   *  the reused element's ``value`` is stale. */
-  protected abstract _identityOf(location: L): string;
-
   connectedCallback(): void {
     super.connectedCallback();
     void this._load();
-  }
-
-  protected updated(changed: Map<string, unknown>) {
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
-    // Navigator-driven location swap (user clicked a different
-    // section in the navigator) — invalidate the stale value so
-    // the hydrate path below re-fetches.
-    if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as L | null | undefined;
-      if (
-        prev &&
-        this.location &&
-        this._identityOf(prev) !== this._identityOf(this.location)
-      ) {
-        this.value = null;
-      }
-    }
-    if (
-      !this.addMode &&
-      (changed.has("location") ||
-        changed.has("configuration") ||
-        changed.has("_loading")) &&
-      this.location &&
-      this.value === null &&
-      !this._loading
-    ) {
-      void this._hydrateFromBackend();
-    }
-  }
-
-  /**
-   * Re-hydrate from the live YAML. Called by the parent
-   * (``device-board-info``) when the YAML pane changes the document
-   * out from under us — mirrors device-section-config.reload() and
-   * automation-editor.reload() so editing YAML in the pane updates
-   * the visual editor.
-   */
-  public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
-    void this._hydrateFromBackend();
   }
 
   protected async _load() {
