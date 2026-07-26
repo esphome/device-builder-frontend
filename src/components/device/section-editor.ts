@@ -10,8 +10,12 @@
  * ``HTMLElementEventMap``, so a renamed event or a reshaped detail
  * is a compile error on both ends.
  */
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { AutomationLocation } from "../../api/types/automations.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { removeSectionFromYaml } from "../../util/yaml-section-values.js";
+import { resolveCurrentSectionLine } from "../../util/yaml-sections.js";
+import { applyYamlDiff } from "./automation-editor/serialise.js";
 export interface SectionEditor {
   /** Brief-window dirty flag so the global save button arms as
    *  soon as the user edits. */
@@ -41,13 +45,36 @@ export interface SectionDirtyChangeDetail {
 }
 
 /** What a delete removed, so a superseded write can be re-based
- *  onto the live buffer (#1490): the section key plus either the
- *  pre-delete line hint (component sections, removed client-side)
- *  or the automation location (recomputed via the backend). */
-export interface RemovedSectionRef {
-  sectionKey: string;
-  fromLine?: number;
-  location?: AutomationLocation;
+ *  onto the live buffer (#1490): component sections carry the key
+ *  plus the pre-delete line hint and splice client-side; automations
+ *  carry their location and recompute via the backend. */
+export type RemovedSectionRef =
+  | { kind: "component"; sectionKey: string; fromLine: number }
+  | { kind: "automation"; location: AutomationLocation };
+
+/**
+ * Re-apply *removed* to a buffer the delete was not computed
+ * against. Returns the re-based buffer, or ``null`` when the
+ * removal cannot land in it.
+ */
+export async function applyRemoval(
+  removed: RemovedSectionRef,
+  buffer: string,
+  api: Pick<ESPHomeAPI, "deleteAutomation">,
+  configuration: string
+): Promise<string | null> {
+  if (removed.kind === "automation") {
+    const { yaml_diff } = await api.deleteAutomation(
+      configuration,
+      removed.location,
+      buffer
+    );
+    return applyYamlDiff(buffer, yaml_diff);
+  }
+  const line = resolveCurrentSectionLine(buffer, removed.sectionKey, removed.fromLine);
+  if (line === undefined) return null;
+  const next = removeSectionFromYaml(buffer, removed.sectionKey, line);
+  return next === buffer ? null : next;
 }
 
 /** A completed disk write, the buffer it was computed against — the

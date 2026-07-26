@@ -17,9 +17,10 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import type {
-  SectionEditor,
-  YamlUpdatedDetail,
+import {
+  applyRemoval,
+  type SectionEditor,
+  type YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
@@ -68,8 +69,6 @@ import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
-import { removeSectionFromYaml } from "../util/yaml-section-values.js";
-import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
@@ -1777,38 +1776,18 @@ export class ESPHomePageDevice extends LitElement {
     this._savedYaml = yaml;
   }
 
-  /** Apply a superseded delete's removal to the live buffer (#1490).
-   *  Component sections splice client-side; automations recompute
-   *  their diff via the side-effect-free ``deleteAutomation``. */
+  /** Apply a superseded delete's removal to the live buffer (#1490). */
   private async _rebaseSupersededDelete(detail: YamlUpdatedDetail): Promise<void> {
-    const { removed } = detail;
     const live = this._yaml;
     let rebased: string | null = null;
     try {
-      if (removed.location && this._api) {
-        const { yaml_diff } = await this._api.deleteAutomation(
-          this.id,
-          removed.location,
-          live
-        );
-        // The pane moved again while the diff was computed — its
-        // coordinates no longer apply.
-        rebased = live === this._yaml ? applyYamlDiff(live, yaml_diff) : null;
-      } else if (!removed.location) {
-        const line = resolveCurrentSectionLine(
-          live,
-          removed.sectionKey,
-          removed.fromLine
-        );
-        if (line !== undefined) {
-          const next = removeSectionFromYaml(live, removed.sectionKey, line);
-          rebased = next === live ? null : next;
-        }
-      }
+      rebased = await applyRemoval(detail.removed, live, this._api, this.id);
     } catch {
       rebased = null;
     }
-    if (rebased !== null) {
+    // Land the re-base only if the pane didn't move again while it
+    // was computed — stale coordinates no longer apply.
+    if (rebased !== null && live === this._yaml) {
       this._setYaml(rebased);
       return;
     }

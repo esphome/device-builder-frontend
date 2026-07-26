@@ -79,7 +79,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
         {
           yaml: "logger:\n",
           basedOn: "wifi:\n  ssid: home\nlogger:\n",
-          removed: { sectionKey: "wifi", fromLine: 1 },
+          removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
         },
       ]);
       expect(selections).toHaveLength(0);
@@ -134,7 +134,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       // The basis is the pre-delete buffer the diff was computed on.
       expect(updates[0].basedOn).toBe(ROW_YAML);
       expect(updates[0].removed).toEqual({
-        sectionKey: "automation:component_on:btn:on_press",
+        kind: "automation",
         location: expect.anything(),
       });
     } finally {

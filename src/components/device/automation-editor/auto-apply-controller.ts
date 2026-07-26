@@ -376,7 +376,7 @@ export class AutoApplyController implements ReactiveController {
       announceUpdated(this._connected, {
         yaml: newYaml,
         basedOn: yaml,
-        removed: { sectionKey: sectionKeyFromLocation(location), location },
+        removed: { kind: "automation", location },
       });
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is

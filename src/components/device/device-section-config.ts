@@ -473,7 +473,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       announceUpdated(this.isConnected, {
         yaml: newYaml,
         basedOn: yaml,
-        removed: { sectionKey: key, location },
+        removed: { kind: "automation", location },
       });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");

@@ -438,7 +438,7 @@ describe("AutoApplyController delete", () => {
       {
         yaml: "replaced\nline2",
         basedOn: "replaced\nline2",
-        removed: { sectionKey: expect.any(String), location: SCRIPT },
+        removed: { kind: "automation", location: SCRIPT },
       },
     ]);
   });

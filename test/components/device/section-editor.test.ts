@@ -24,11 +24,15 @@ describe("prepareYamlUpdated", () => {
     announce(false, {
       yaml: "b:\n",
       basedOn: "a:\n",
-      removed: { sectionKey: "wifi" },
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
     });
 
     expect(seen).toEqual([
-      { yaml: "b:\n", basedOn: "a:\n", removed: { sectionKey: "wifi" } },
+      {
+        yaml: "b:\n",
+        basedOn: "a:\n",
+        removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+      },
     ]);
   });
 
@@ -41,7 +45,11 @@ describe("prepareYamlUpdated", () => {
     host.addEventListener("yaml-updated", () => seen.push("host"));
     anchor.addEventListener("yaml-updated", () => seen.push("anchor"));
 
-    prepareYamlUpdated(host)(true, { yaml: "b:\n", basedOn: "a:\n" });
+    prepareYamlUpdated(host)(true, {
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+    });
 
     expect(seen).toEqual(["host"]);
   });
@@ -53,7 +61,11 @@ describe("prepareYamlUpdated", () => {
 
     // Deliberate contract: a host that never mounted has nowhere to
     // deliver — swallow rather than throw.
-    prepareYamlUpdated(host)(false, { yaml: "b:\n", basedOn: "a:\n" });
+    prepareYamlUpdated(host)(false, {
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+    });
 
     expect(seen).toEqual([]);
   });
