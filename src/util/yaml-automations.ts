@@ -77,8 +77,9 @@ let _automationsValue: YamlSection[] | undefined;
 
 function _parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
-  // Memoised on `yaml`, so resolving an id-less host's positional id is
-  // free when the caller already parsed sections this render.
+  // `parseYamlTopLevelSections` has its own memo, so resolving an
+  // id-less host's positional id is free when the caller already
+  // parsed sections this render.
   const sections = parseYamlTopLevelSections(yaml);
   const automations: YamlSection[] = [];
 
