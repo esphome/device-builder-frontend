@@ -380,6 +380,46 @@ describe("config-entry-form advanced-section", () => {
     expect(text).not.toContain("Hidden Adv");
   });
 
+  it("renders no control when the only advanced field is hidden", () => {
+    // output.gpio shape (issue device-builder#2347): setup_priority is the
+    // sole advanced entry and it's hidden, so the control would reveal
+    // nothing at all.
+    const c = renderForm([
+      BASIC,
+      makeConfigEntry({
+        key: "setup_priority",
+        type: ConfigEntryType.STRING,
+        label: "Hidden Adv",
+        advanced: true,
+        hidden: true,
+      }),
+    ]);
+    expect(control(c)).toBeNull();
+    expect(c.textContent).not.toContain("Hidden Adv");
+  });
+
+  it("renders no control when the only advanced field is hidden inside a nested group", () => {
+    const c = renderForm([
+      BASIC,
+      makeConfigEntry({
+        key: "group",
+        type: ConfigEntryType.NESTED,
+        label: "Group",
+        config_entries: [
+          makeConfigEntry({
+            key: "setup_priority",
+            type: ConfigEntryType.STRING,
+            label: "Nested Hidden Adv",
+            advanced: true,
+            hidden: true,
+          }),
+        ],
+      }),
+    ]);
+    expect(control(c)).toBeNull();
+    expect(c.textContent).not.toContain("Nested Hidden Adv");
+  });
+
   it("counts a constraint cluster as one advanced unit, not per member", () => {
     // Two advanced fields sharing an inclusive group fold into one cluster box
     // painted at the first member's slot; the "(N)" count must be 1, not 2.
