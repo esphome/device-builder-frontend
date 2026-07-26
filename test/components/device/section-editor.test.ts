@@ -24,14 +24,14 @@ describe("prepareYamlUpdated", () => {
     announce(false, {
       yaml: "b:\n",
       basedOn: "a:\n",
-      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
     });
 
     expect(seen).toEqual([
       {
         yaml: "b:\n",
         basedOn: "a:\n",
-        removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+        removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
       },
     ]);
   });
@@ -48,7 +48,7 @@ describe("prepareYamlUpdated", () => {
     prepareYamlUpdated(host)(true, {
       yaml: "b:\n",
       basedOn: "a:\n",
-      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
     });
 
     expect(seen).toEqual(["host"]);
@@ -64,7 +64,7 @@ describe("prepareYamlUpdated", () => {
     prepareYamlUpdated(host)(false, {
       yaml: "b:\n",
       basedOn: "a:\n",
-      removed: { kind: "component", sectionKey: "wifi", fromLine: 0 },
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
     });
 
     expect(seen).toEqual([]);

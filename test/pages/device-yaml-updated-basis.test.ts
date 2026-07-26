@@ -50,7 +50,7 @@ describe("yaml-updated supersede check", () => {
     updated(page, {
       yaml: "b:\n",
       basedOn: "a:\n",
-      removed: { kind: "component", sectionKey: "a", fromLine: 0 },
+      removed: { kind: "component", sectionKey: "a", fromLine: 1 },
     });
 
     expect(page._yaml).toBe("b:\n");

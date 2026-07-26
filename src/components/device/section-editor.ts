@@ -42,7 +42,8 @@ export interface SectionDirtyChangeDetail {
 
 /** What a delete removed, so a superseded write can be re-based
  *  onto the live buffer (#1490): component sections carry the key
- *  plus the pre-delete line hint and splice client-side; automations
+ *  plus the 1-indexed pre-delete line hint (matching
+ *  ``YamlSection.fromLine``) and splice client-side; automations
  *  carry their location and recompute via the backend. */
 export type RemovedSectionRef =
   | { kind: "component"; sectionKey: string; fromLine: number }
