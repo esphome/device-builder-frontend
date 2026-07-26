@@ -67,6 +67,10 @@ export class ImportFlowController implements ReactiveController {
 
   /** Begin importing the picked file (YAML upload or bundle). */
   start(file: File): void {
+    // Don't clobber the file/state of an import already in flight — its
+    // conflict round-trip re-uploads this._file, so overwriting it mid-flight
+    // would resolve against the wrong archive.
+    if (this._host.importBusy) return;
     // Clear any prior pick's cached bytes / conflicts so a re-selection
     // can't re-submit the previous file or its stale state.
     this.reset();

@@ -832,11 +832,15 @@ export class ESPHomeAPI {
     });
     if (!response.ok) {
       let errorCode = "http_error";
-      let details = `Bundle upload failed: ${response.status}`;
+      let details =
+        `Bundle upload failed: ${response.status} ${response.statusText}`.trim();
       try {
-        const body = await response.json();
-        errorCode = body.error_code ?? errorCode;
-        details = body.details ?? details;
+        const body: unknown = await response.json();
+        if (body && typeof body === "object") {
+          const { error_code, details: d } = body as Record<string, unknown>;
+          if (typeof error_code === "string") errorCode = error_code;
+          if (typeof d === "string") details = d;
+        }
       } catch {
         // A non-JSON body (e.g. a 413's plain text) keeps the generic message.
       }
