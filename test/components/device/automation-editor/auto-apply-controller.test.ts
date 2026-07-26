@@ -271,6 +271,38 @@ describe("AutoApplyController auto-apply", () => {
     expect(controller.lastRoundFailed).toBe(false);
   });
 
+  it("a retarget drops a latched failure — the sibling holds no failed form state", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    // Lit reuses the element across same-kind switches; the render
+    // after the re-point runs hostUpdated.
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    controller.hostUpdated();
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
+  it("a failure settling after a mid-flight retarget never latches", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let rejectFirst!: (e: Error) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((_r, reject) => {
+          rejectFirst = reject;
+        })
+    );
+
+    const applying = controller.autoApply();
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    rejectFirst(new Error("boom"));
+    await applying;
+
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
   it("flushPending flushes the pending debounce immediately and cancels the timer", async () => {
     const { controller, upsertAutomation } = setup();
     controller.scheduleAutoApply();
