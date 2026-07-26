@@ -490,19 +490,23 @@ export class ESPHomePageDevice extends LitElement {
     // automation editors' backend upsert settles too — a kicked
     // flush would show the dialog against ``_sectionDirty``
     // (transient) rather than the YAML diff ``Save`` will commit.
-    // The dirty *decision* was never at risk: ``_sectionDirty``
-    // stays set until the upsert lands, so the guard fails
-    // conservative either way (#1503).
+    // ``_sectionDirty`` stays set only until the upsert *settles*:
+    // a failed round clears it without landing a draft, so the
+    // post-flush read alone would fail open. Snapshot the pre-flush
+    // decision and OR it in — the decision only gets more
+    // conservative, while the dialog content still reflects the
+    // settled buffer.
+    const dirtyBefore = this._isDirty;
     try {
       await this._activeSection?.flushPending();
     } catch (err) {
-      // The editor already surfaced its own failure; run the guard
-      // with the freshest state available, but keep the cause
-      // diagnosable like the kick does.
+      // The editors self-catch their upsert failures, so this only
+      // sees a synchronous throw — a backstop, not the live error
+      // path (that path is the failed-round case handled above).
       console.error("Section flush before leave failed:", err);
     }
     const ok = await this._unsavedGuard.run({
-      dirty: this._isDirty,
+      dirty: dirtyBefore || this._isDirty,
       open: () => this._unsavedDialog?.open(),
       save: async () => {
         // ``_saveYaml`` may open the validation prompt and await

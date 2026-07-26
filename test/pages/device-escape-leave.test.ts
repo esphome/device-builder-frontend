@@ -16,7 +16,13 @@ interface EscapeView {
   id: string;
   _yaml: string;
   _savedYaml: string;
+  _sectionDirty: boolean;
   _drawerOpen: boolean;
+  _activeSection: {
+    dirty: boolean;
+    flushPending: () => void | Promise<void>;
+    reload: () => void;
+  } | null;
   _onKeydown(e: KeyboardEvent): void;
   _onUnsavedDiscard(): void;
   _onUnsavedCancel(): void;
@@ -151,8 +157,7 @@ describe("leave guard flush ordering (#1503)", () => {
     const { page, dialogOpen } = makePage();
     const order: string[] = [];
     let settle!: () => void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (page as any)._activeSection = {
+    page._activeSection = {
       dirty: true,
       flushPending: () =>
         new Promise<void>((resolve) => {
@@ -181,12 +186,37 @@ describe("leave guard flush ordering (#1503)", () => {
     await leaving;
   });
 
+  test("a failed round that clears the transient flag still prompts", async () => {
+    const { page, dialogOpen } = makePage();
+    // Otherwise-clean buffer: the only pending change is the edit
+    // inside the debounce window, represented by _sectionDirty.
+    page._savedYaml = page._yaml;
+    page._sectionDirty = true;
+    page._activeSection = {
+      dirty: true,
+      // The engine settles a FAILED round by clearing the dirty
+      // flag without landing a draft (its own catch already
+      // toasted); the leave decision must not fail open on that.
+      flushPending: async () => {
+        page._sectionDirty = false;
+      },
+      reload: () => {},
+    };
+
+    const leaving = page._confirmLeave();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    page._onUnsavedDiscard();
+    await leaving;
+  });
+
   test("a rejecting flush still runs the guard, with the cause logged", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const { page, dialogOpen } = makePage();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (page as any)._activeSection = {
+      page._activeSection = {
         dirty: true,
         flushPending: () => Promise.reject(new Error("upsert failed")),
         reload: () => {},
