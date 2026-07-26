@@ -14,9 +14,10 @@ import { sectionKeyFromLocation } from "./serialise.js";
  * editors.
  *
  * When the backend flags one automation with a parse error (unknown
- * action/condition id) its tree comes back empty; the editor must
- * render read-only and never upsert, or that empty tree would
- * overwrite the real YAML block (#1050). Each host:
+ * condition id, or a misrouted body — an uncatalogued action instead
+ * becomes a read-only passthrough node) its tree comes back empty; the
+ * editor must render read-only and never upsert, or that empty tree
+ * would overwrite the real YAML block (#1050). Each host:
  *
  *   1. Calls ``resolve(parsed, location[, kind])`` in its hydrate path
  *      and adopts the returned tree (``null`` = leave ``value`` alone).

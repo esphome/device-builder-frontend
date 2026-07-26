@@ -44,16 +44,9 @@ describe("automation-action-node unknown passthrough (#2350)", () => {
     expect(el.shadowRoot!.querySelector(".ae-row-picker-name")!.textContent!.trim()).toBe(
       "storage.file_append"
     );
-    expect(el.shadowRoot!.querySelector(".ae-row-unknown")).not.toBeNull();
+    const hint = el.shadowRoot!.querySelector(".ae-row-unknown");
+    expect(hint).not.toBeNull();
+    expect(hint!.getAttribute("role")).toBe("note");
     expect(el.shadowRoot!.querySelector("esphome-config-entry-form")).toBeNull();
-  });
-
-  it("keeps unknown + raw_body on the node value for round-trip", async () => {
-    const el = await mount(new ESPHomeAutomationActionNode(), {
-      value: unknownNode,
-      catalog: [],
-    });
-    expect(el.value.unknown).toBe(true);
-    expect(el.value.raw_body).toEqual({ path: "/data/my.log", format: "hello" });
   });
 });

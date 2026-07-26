@@ -315,20 +315,22 @@ export class ESPHomeAutomationActionNode extends LitElement {
             ? nothing
             : html`<div class="ae-row-body">
                 ${
+                  // An unknown action is by definition absent from the catalog,
+                  // so def is undefined and the four renderers below already
+                  // yield nothing; the hint is the only body it shows.
                   this.value.unknown
-                    ? html`<p class="ae-row-unknown">
+                    ? html`<p class="ae-row-unknown" role="note">
                         ${this._localize("device.automation_action_unknown")}
                       </p>`
-                    : html`${
-                        def?.description
-                          ? html`<p class="ae-row-desc">
-                              ${renderMarkdown(def.description)}
-                            </p>`
-                          : nothing
-                      }
-                      ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
-                      ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}`
+                    : nothing
                 }
+                ${
+                  def?.description
+                    ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
+                    : nothing
+                }
+                ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
+                ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
               </div>`
         }
       </div>
