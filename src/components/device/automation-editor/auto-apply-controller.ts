@@ -224,7 +224,7 @@ export class AutoApplyController implements ReactiveController {
    * device page calls this (via the host) on the active section
    * before its global save so the YAML buffer is fully caught up.
    * Resolves only once nothing is pending — neither a debounce
-   * (even one armed mid-poll by a late keystroke) nor an in-flight
+   * (even one armed mid-wait by a late keystroke) nor an in-flight
    * call, including the queued re-run a cancelled debounce leaves
    * on one.
    */
@@ -246,7 +246,9 @@ export class AutoApplyController implements ReactiveController {
         // cycles carry the settling upsert's ``yaml-draft`` back
         // into ``.yaml`` on microtasks, so resolving straight off
         // the settle would release the caller against a stale
-        // buffer and reintroduce #1451.
+        // buffer and reintroduce #1451. Only this settled branch
+        // hops — ``delete()`` relies on entering with
+        // ``_debounce === null`` so its wait lands here.
         await new Promise((r) => setTimeout(r));
       }
     }

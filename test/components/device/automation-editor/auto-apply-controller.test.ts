@@ -291,7 +291,7 @@ describe("AutoApplyController auto-apply", () => {
     expect(order).toEqual(["draft", "draft", "flushed"]);
   });
 
-  it("flushPending waits out a debounce armed while it was already polling", async () => {
+  it("flushPending waits out a debounce armed while it was already settle-waiting", async () => {
     const { host, controller, upsertAutomation } = setup();
     let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
     upsertAutomation.mockImplementationOnce(
@@ -303,10 +303,10 @@ describe("AutoApplyController auto-apply", () => {
     const order: string[] = [];
     host.addEventListener("yaml-draft", () => order.push("draft"));
     const applying = controller.autoApply();
-    // No debounce yet — the flush enters the settle poll directly.
+    // No debounce yet — the flush parks on the settled promise.
     const flushing = controller.flushPending().then(() => order.push("flushed"));
     await vi.advanceTimersByTimeAsync(30);
-    // The keystroke lands during the poll, after the debounce check.
+    // The keystroke lands mid-wait, after the debounce check.
     controller.scheduleAutoApply();
 
     resolveFirst({ yaml_diff: DIFF });
@@ -427,8 +427,8 @@ describe("AutoApplyController delete", () => {
       order.push("draft");
       // Mirror the page faithfully: three nested Lit update cycles
       // carry the draft back down, each on its own microtask — only
-      // the flush poll's macrotask boundary drains them all before
-      // the delete reads the buffer.
+      // the flush's macrotask hop drains them all before the delete
+      // reads the buffer.
       const yaml = (e as CustomEvent<{ yaml: string }>).detail.yaml;
       void Promise.resolve()
         .then(() => Promise.resolve())
