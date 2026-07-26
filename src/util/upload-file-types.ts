@@ -22,3 +22,9 @@ export function isBundleFilename(filename: string): boolean {
   const lower = filename.toLowerCase();
   return BUNDLE_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
+
+/** True when *filename* is a plain YAML config. */
+export function isYamlFilename(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return YAML_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}

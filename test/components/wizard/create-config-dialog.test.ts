@@ -785,6 +785,23 @@ describe("create-config-dialog bundle import", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((partialStep as any).kept).toEqual(["device.yaml", "common/wifi.yaml"]);
   });
+
+  it("rejects a bare .gz that isn't a bundle instead of reading binary as YAML", async () => {
+    // The file input accepts ".gz" so macOS can select a compound ".tar.gz";
+    // a bare ".gz" must be refused, not routed through the YAML text path.
+    const createDevice = vi.fn();
+    const importBundleUpload = vi.fn();
+    const el = await mount({ createDevice, importBundleUpload });
+
+    emitImport(el, new File([new Uint8Array([0x1f, 0x8b])], "log.gz"));
+    await flush();
+    await el.updateComplete;
+
+    expect(importBundleUpload).not.toHaveBeenCalled();
+    expect(createDevice).not.toHaveBeenCalled();
+    expect(step(el)).toBe("method");
+    expect(el.shadowRoot!.querySelector("p.error")).not.toBeNull();
+  });
 });
 
 // A YAML upload that collides routes to a confirm step; confirming
