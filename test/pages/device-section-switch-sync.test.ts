@@ -27,6 +27,7 @@ const gateFlush = (page: ESPHomePageDevice) => {
   );
   internals(page)._activeSection = {
     dirty: true,
+    lastFlushFailed: false,
     flushPending,
     reload: () => {},
   } satisfies SectionEditor;
@@ -62,6 +63,7 @@ describe("synchronous section switch", () => {
     const page = new ESPHomePageDevice();
     internals(page)._activeSection = {
       dirty: true,
+      lastFlushFailed: false,
       flushPending: () => Promise.reject(new Error("upsert failed")),
       reload: () => {},
     } satisfies SectionEditor;
@@ -115,6 +117,7 @@ describe("synchronous section switch", () => {
     // time it is still the active section (Lit hasn't committed).
     const editor = {
       dirty: true,
+      lastFlushFailed: false,
       flushPending: () => {
         internals(page)._onYamlDraft(
           new CustomEvent("yaml-draft", {

@@ -50,6 +50,7 @@ class Host extends EventTarget implements AutoApplyHost {
   parentNode: ParentNode | null = null;
   // SectionEditor surface the real hosts delegate to the engine.
   dirty = false;
+  lastFlushFailed = false;
   flushPending(): void {}
   reload(): void {}
   updates = 0;
@@ -254,6 +255,86 @@ describe("AutoApplyController auto-apply", () => {
       description: "boom",
       richColors: true,
     });
+  });
+
+  it("lastRoundFailed reports a failed round and clears on the next landing", async () => {
+    const { controller, upsertAutomation } = setup();
+    controller.hostUpdated(); // bind the section key
+    expect(controller.lastRoundFailed).toBe(false);
+
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    // The failed round's own _setDirty(false) re-renders the host,
+    // so a same-section hostUpdated fires immediately after every
+    // failure — it must not drop the latch, or the whole signal
+    // silently no-ops.
+    controller.hostUpdated();
+    expect(controller.lastRoundFailed).toBe(true);
+
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
+  it("a retarget drops a latched failure — the sibling holds no failed form state", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    controller.hostUpdated(); // bind the section key, so the drop below proves the change
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    // Lit reuses the element across same-kind switches; the render
+    // after the re-point runs hostUpdated.
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    controller.hostUpdated();
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
+  it("a remount drops a latched failure — the form rebuilt from live YAML", async () => {
+    const { controller, upsertAutomation } = setup();
+    controller.hostUpdated();
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    controller.hostDisconnected();
+    controller.hostConnected();
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
+  it("a fresh hydrate drops a latched failure — the failed edit left with the form state", async () => {
+    const { controller, upsertAutomation } = setup();
+    controller.hostUpdated();
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    controller.notifyHydrated();
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
+  it("a failure settling after a mid-flight retarget never latches", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let rejectFirst!: (e: Error) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((_r, reject) => {
+          rejectFirst = reject;
+        })
+    );
+
+    const applying = controller.autoApply();
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    rejectFirst(new Error("boom"));
+    await applying;
+
+    expect(controller.lastRoundFailed).toBe(false);
   });
 
   it("flushPending flushes the pending debounce immediately and cancels the timer", async () => {

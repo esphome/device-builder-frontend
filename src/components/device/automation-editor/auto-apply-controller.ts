@@ -136,6 +136,10 @@ export class AutoApplyController implements ReactiveController {
    *  re-pointed host loses the exemption via ``RETARGETED_EMITTER``. */
   private _detachedBasis: string | null = null;
   private _dirty = false;
+  private _lastRoundFailed = false;
+  /** Section key the host was last seen bound to, so a retarget can
+   *  drop a latched failure (see ``hostUpdated``). */
+  private _boundSectionKey: string | null = null;
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
@@ -159,6 +163,9 @@ export class AutoApplyController implements ReactiveController {
     this._connected = true;
     this._detachedBasis = null;
     this._anchor = this._host.parentNode;
+    // A remount rebuilds the form from live YAML; the failed edit a
+    // latch protected is gone with the old form state.
+    this._lastRoundFailed = false;
     this._announceUnmount = announceSectionMount(this._host);
   }
 
@@ -186,10 +193,40 @@ export class AutoApplyController implements ReactiveController {
     this._announceUnmount = null;
   }
 
+  hostUpdated(): void {
+    // Lit reuses the element across same-kind switches; a failure
+    // latched for the previous section must not block leaving the
+    // clean sibling the host now points at (its form state is gone
+    // with the retarget, so the latch protects nothing).
+    const key = this._host.location ? sectionKeyFromLocation(this._host.location) : null;
+    if (key === this._boundSectionKey) return;
+    this._boundSectionKey = key;
+    this._lastRoundFailed = false;
+  }
+
+  /** The host replaced its form state with a fresh hydrate; the
+   *  failed edit the latch protected no longer exists, so keeping
+   *  it would refuse a leave over nothing. */
+  notifyHydrated(): void {
+    this._lastRoundFailed = false;
+  }
+
   /** Brief-window dirty flag covering the debounce gap so the global
    *  save button activates as soon as the user types. */
   get dirty(): boolean {
     return this._dirty;
+  }
+
+  /** Whether the most recent settled round failed — its edit never
+   *  landed in the page's buffer and a settled round cannot be
+   *  re-run, so leaving would discard it. Cleared by the next
+   *  round that lands, and dropped on a retarget, hydrate, or
+   *  remount (replaced form state holds nothing to protect).
+   *  Tracks settle failures only: a round that lands but whose
+   *  draft the page rejects as superseded counts as landed — that
+   *  path already toasts its own discard. */
+  get lastRoundFailed(): boolean {
+    return this._lastRoundFailed;
   }
 
   /** Disables the host's form chrome while a delete is running. */
@@ -366,7 +403,18 @@ export class AutoApplyController implements ReactiveController {
         basedOn: yaml,
         node: retargeted ? RETARGETED_EMITTER : this._host,
       });
+      this._lastRoundFailed = false;
     } catch (err) {
+      // A failure latched onto a re-pointed host would block leaving
+      // a clean sibling; the failed section's form state is gone with
+      // the retarget, so there is nothing left for the latch to
+      // protect. Same guard as the announce above.
+      if (
+        this._host.location !== null &&
+        sectionKeyFromLocation(this._host.location) === sectionKeyFromLocation(location)
+      ) {
+        this._lastRoundFailed = true;
+      }
       // A switch-path round resolves after the editor unmounted, so
       // ``_connected`` alone would silence the dominant path. The
       // page still being alive (live anchor) means the user must

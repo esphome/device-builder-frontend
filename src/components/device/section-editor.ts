@@ -24,6 +24,13 @@ export interface SectionEditor {
    *  settled buffer. */
   flushPending(): void | Promise<void>;
 
+  /** Whether the editor's most recent settled write round failed —
+   *  the edit never reached the page's buffer, ``dirty`` was
+   *  cleared on settle, and a settled round cannot be re-run, so a
+   *  leave would silently discard it. Always ``false`` for the
+   *  component editor (its flush is a local splice). */
+  readonly lastFlushFailed: boolean;
+
   /** Re-hydrate from the live YAML after the pane changes the
    *  document out from under the editor. */
   reload(): void;

@@ -130,6 +130,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     return this._engine.flushPending();
   }
 
+  public get lastFlushFailed(): boolean {
+    return this._engine.lastRoundFailed;
+  }
+
   static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
 
   /** Loading spinner / parse-error panel that preempts the body
@@ -194,6 +198,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       if (m) {
         this.location = m.location;
         this.value = m.tree;
+        // The re-read tree replaced the form state, failed edit
+        // included — a still-latched flush failure would refuse a
+        // leave over an edit that no longer exists.
+        this._engine.notifyHydrated();
       }
     } catch (err) {
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");

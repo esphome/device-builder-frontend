@@ -26,6 +26,7 @@ const view = (page: ESPHomePageDevice) => page as unknown as DirtyGuardView;
 
 const editor = (dirty = false): SectionEditor => ({
   dirty,
+  lastFlushFailed: false,
   flushPending: () => {},
   reload: () => {},
 });

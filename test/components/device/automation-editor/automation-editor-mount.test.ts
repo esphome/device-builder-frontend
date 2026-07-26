@@ -111,3 +111,39 @@ describe("automation-editor mount-time load (behavioral)", () => {
     expect(editor.shadowRoot?.textContent ?? "").toContain("Open action");
   });
 });
+
+describe("reload clears a latched flush failure (behavioral)", () => {
+  it("a hydrate through reload() drops lastFlushFailed with the replaced form state", async () => {
+    const ON_BOOT = { kind: "device_on", trigger: "on_boot" } as never;
+    const parsed = [
+      {
+        location: ON_BOOT,
+        label: "On Boot",
+        automation: { trigger_id: "on_boot", trigger_params: {}, actions: [] },
+        from_line: 1,
+        to_line: 2,
+        raw_yaml: "on_boot:\n  then: []\n",
+      },
+    ];
+    const api = makeEditorApi({
+      parseDeviceAutomations: vi.fn().mockResolvedValue(parsed) as never,
+      upsertAutomation: vi.fn().mockRejectedValue(new Error("boom")) as never,
+    });
+    const editor = await mountEditor(new ESPHomeAutomationEditor(), api, {
+      configuration: "device.yaml",
+      location: ON_BOOT,
+      settle: 8,
+    });
+
+    // Drive a real failed round so the engine latches.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (editor as any)._engine.autoApply();
+    expect(editor.lastFlushFailed).toBe(true);
+
+    // The parent's YAML-driven reload replaces the form state; the
+    // latch must not survive to refuse a leave over a vanished edit.
+    editor.reload();
+    await flushMicrotasks(8);
+    expect(editor.lastFlushFailed).toBe(false);
+  });
+});
