@@ -153,7 +153,11 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    announceUpdated(host.isConnected, { yaml: newYaml, basedOn: baseYaml });
+    announceUpdated(host.isConnected, {
+      yaml: newYaml,
+      basedOn: baseYaml,
+      removed: { sectionKey: deletedKey, fromLine },
+    });
     // Navigate away only while the user is still here, on the
     // section that was deleted.
     if (host.isConnected && host.sectionKey === deletedKey) {

@@ -373,7 +373,11 @@ export class AutoApplyController implements ReactiveController {
       // basis lets the page supersede-check it, so a draft a newly
       // mounted section made in the interim survives as visible
       // dirty state instead of being overwritten (#1476).
-      announceUpdated(this._connected, { yaml: newYaml, basedOn: yaml });
+      announceUpdated(this._connected, {
+        yaml: newYaml,
+        basedOn: yaml,
+        removed: { sectionKey: sectionKeyFromLocation(location), location },
+      });
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is
       // already on a sibling (yanking them to null would also unmount

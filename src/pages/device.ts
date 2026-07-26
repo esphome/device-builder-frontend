@@ -17,7 +17,10 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import type { SectionEditor } from "../components/device/section-editor.js";
+import type {
+  SectionEditor,
+  YamlUpdatedDetail,
+} from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
@@ -65,6 +68,8 @@ import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
+import { removeSectionFromYaml } from "../util/yaml-section-values.js";
+import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
@@ -1741,7 +1746,7 @@ export class ESPHomePageDevice extends LitElement {
     this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
-  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn: string }>) {
+  private _onYamlUpdated(e: CustomEvent<YamlUpdatedDetail>) {
     /* ``yaml-updated`` fires from the three disk-writing delete
      * paths only (the automation editors' engine, the component
      * editor's section delete, and its manage-list row delete), all
@@ -1758,21 +1763,58 @@ export class ESPHomePageDevice extends LitElement {
     if (basedOn !== this._yaml) {
       // The write was computed against a buffer this pane has moved
       // past (a delete landing after a newer draft, #1476). Advance
-      // only the saved side: the pane keeps what the user sees and
-      // the page shows honestly dirty. Note the trade: the retained
-      // buffer predates the on-disk deletion (a section draft was
-      // spliced into the pre-delete buffer; a pane edit advanced it
-      // directly), so a later wholesale Save may undo the deletion —
-      // the toast makes that visible instead of silent (re-basing
-      // the delete onto the live buffer is tracked in #1490).
+      // the saved side and re-base the removal onto the live buffer
+      // (#1490) so the retained draft no longer carries the deleted
+      // section and a later wholesale Save cannot undo the deletion.
+      // When the re-base cannot land (the section is unresolvable in
+      // the moved buffer, or it moved again mid-recompute), fall back
+      // to honestly dirty plus the visibility toast.
       this._savedYaml = yaml;
-      notifyInfo(this._localize("device.delete_superseded"), {
-        description: this._localize("device.delete_superseded_detail"),
-      });
+      void this._rebaseSupersededDelete(e.detail);
       return;
     }
     this._setYaml(yaml);
     this._savedYaml = yaml;
+  }
+
+  /** Apply a superseded delete's removal to the live buffer (#1490).
+   *  Component sections splice client-side; automations recompute
+   *  their diff via the side-effect-free ``deleteAutomation``. */
+  private async _rebaseSupersededDelete(detail: YamlUpdatedDetail): Promise<void> {
+    const { removed } = detail;
+    const live = this._yaml;
+    let rebased: string | null = null;
+    try {
+      if (removed.location && this._api) {
+        const { yaml_diff } = await this._api.deleteAutomation(
+          this.id,
+          removed.location,
+          live
+        );
+        // The pane moved again while the diff was computed — its
+        // coordinates no longer apply.
+        rebased = live === this._yaml ? applyYamlDiff(live, yaml_diff) : null;
+      } else if (!removed.location) {
+        const line = resolveCurrentSectionLine(
+          live,
+          removed.sectionKey,
+          removed.fromLine
+        );
+        if (line !== undefined) {
+          const next = removeSectionFromYaml(live, removed.sectionKey, line);
+          rebased = next === live ? null : next;
+        }
+      }
+    } catch {
+      rebased = null;
+    }
+    if (rebased !== null) {
+      this._setYaml(rebased);
+      return;
+    }
+    notifyInfo(this._localize("device.delete_superseded"), {
+      description: this._localize("device.delete_superseded_detail"),
+    });
   }
 
   private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {

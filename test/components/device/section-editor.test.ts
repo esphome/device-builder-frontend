@@ -21,9 +21,15 @@ describe("prepareYamlUpdated", () => {
     // The host unmounts mid round trip; the announcement still rides
     // the anchor captured up front and carries the write's basis.
     host.parentNode = null as unknown as ParentNode;
-    announce(false, { yaml: "b:\n", basedOn: "a:\n" });
+    announce(false, {
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { sectionKey: "wifi" },
+    });
 
-    expect(seen).toEqual([{ yaml: "b:\n", basedOn: "a:\n" }]);
+    expect(seen).toEqual([
+      { yaml: "b:\n", basedOn: "a:\n", removed: { sectionKey: "wifi" } },
+    ]);
   });
 
   it("dispatches from the host while it is still connected", () => {

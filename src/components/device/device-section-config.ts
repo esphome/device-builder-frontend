@@ -470,7 +470,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       );
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await this._api.updateConfig(configuration, newYaml);
-      announceUpdated(this.isConnected, { yaml: newYaml, basedOn: yaml });
+      announceUpdated(this.isConnected, {
+        yaml: newYaml,
+        basedOn: yaml,
+        removed: { sectionKey: key, location },
+      });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {
