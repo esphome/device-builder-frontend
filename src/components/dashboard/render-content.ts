@@ -280,7 +280,8 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       }}
       @open-logs=${(e: CustomEvent) => {
         host._drawerOpen = false;
-        void host._openLogs(e.detail);
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+        host._openLogs(e.detail);
       }}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;

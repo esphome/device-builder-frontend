@@ -11,6 +11,9 @@
 // - The pin below is disconnected from package.json and nothing warns
 //   on drift (the peer dependency is deleted on purpose).
 // DELETE THIS WHOLE FILE once typescript-eslint supports the TS 7 API.
+// NOTE: any edit to this file (comments included) changes the
+// pnpmfileChecksum pnpm stamps into the lockfile; run `pnpm install`
+// afterwards or --frozen-lockfile installs fail.
 function readPackage(pkg) {
   if (pkg.name === "typescript-eslint" || pkg.name?.startsWith("@typescript-eslint/")) {
     if (pkg.peerDependencies?.typescript) delete pkg.peerDependencies.typescript;

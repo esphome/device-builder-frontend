@@ -1036,7 +1036,8 @@ export class ESPHomePageDashboard extends LitElement {
     () => this._localize
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
-    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
   /** Chip-mismatch recovery hand-off from the install dialog. */

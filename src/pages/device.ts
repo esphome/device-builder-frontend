@@ -533,7 +533,8 @@ export class ESPHomePageDevice extends LitElement {
     if (!this._isDirty) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", withBase(`/device/${this.id}`));
-    void this._confirmLeave().then((canLeave) => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+    this._confirmLeave().then((canLeave) => {
       if (canLeave) {
         this._allowingLeave = true;
         window.history.back();
@@ -543,7 +544,8 @@ export class ESPHomePageDevice extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    void this._loadPreferences();
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+    this._loadPreferences();
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
@@ -609,7 +611,8 @@ export class ESPHomePageDevice extends LitElement {
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
       this._kickKnownKeys();
-      void this._loadYaml();
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+      this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
     // fetch as soon as we have a `board_id` (and re-fetch only when it
@@ -622,7 +625,8 @@ export class ESPHomePageDevice extends LitElement {
       // ``board_id``. Restored on success, left null on failure.
       this._board = null;
       this._platformReady = false;
-      void this._loadBoard(boardId);
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+      this._loadBoard(boardId);
     } else if (!boardId) {
       // No manifest to fetch (device has no ``board_id`` or our
       // id isn't in the loaded context — deleted / stale link).
@@ -1155,7 +1159,8 @@ export class ESPHomePageDevice extends LitElement {
   private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
-    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
   static styles = [espHomeStyles, devicePageStyles];

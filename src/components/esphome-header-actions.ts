@@ -387,7 +387,8 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openSecrets() {
     this._close();
-    void navigate("/secrets");
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
+    navigate("/secrets");
   }
 
   /** Opens the Wi-Fi credentials dialog on demand. The kebab item
