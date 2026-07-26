@@ -58,9 +58,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const shadow = outer.attachShadow({ mode: "open" });
     shadow.appendChild(c);
     document.body.appendChild(outer);
-    const updates: string[] = [];
+    const updates: { yaml: string; basedOn: string }[] = [];
     outer.addEventListener("yaml-updated", (e) =>
-      updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
+      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
     );
     const selections: unknown[] = [];
     outer.addEventListener("section-select", (e) => selections.push(e));
@@ -73,7 +73,10 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       release();
       await deleting;
 
-      expect(updates).toEqual(["logger:\n"]);
+      // The basis is the pre-delete snapshot, not the write.
+      expect(updates).toEqual([
+        { yaml: "logger:\n", basedOn: "wifi:\n  ssid: home\nlogger:\n" },
+      ]);
       expect(selections).toHaveLength(0);
     } finally {
       outer.remove();
@@ -103,9 +106,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const shadow = outer.attachShadow({ mode: "open" });
     shadow.appendChild(c);
     document.body.appendChild(outer);
-    const updates: string[] = [];
+    const updates: { yaml: string; basedOn: string }[] = [];
     outer.addEventListener("yaml-updated", (e) =>
-      updates.push((e as CustomEvent<{ yaml: string }>).detail.yaml)
+      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
     );
 
     try {
@@ -122,7 +125,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       await deleting;
 
       expect(updates).toHaveLength(1);
-      expect(updates[0]).not.toContain("on_press");
+      expect(updates[0].yaml).not.toContain("on_press");
+      // The basis is the pre-delete buffer the diff was computed on.
+      expect(updates[0].basedOn).toBe(ROW_YAML);
     } finally {
       outer.remove();
     }
@@ -161,6 +166,35 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const written = inner._api.updateConfig.mock.calls[0][1] as string;
     expect(written).not.toContain("shifted:");
     expect(written).not.toContain("on_press");
+  });
+
+  it("settles its own pending draft into the basis before deleting", async () => {
+    const { c, inner, release } = makeHost();
+    inner._presentComponents = new Set<string>();
+    inner._fieldErrors = new Map();
+    // A form edit is still sitting in the debounce when the delete
+    // starts; the basis must include it or the element supersedes
+    // its own delete.
+    inner._values = { ssid: "changed" };
+    inner._draftTimer = setTimeout(() => {}, 1000);
+    const container = document.createElement("div");
+    container.appendChild(c);
+    document.body.appendChild(container);
+    const updates: { yaml: string; basedOn: string }[] = [];
+    container.addEventListener("yaml-updated", (e) =>
+      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
+    );
+
+    try {
+      const deleting = onDeleteConfirmed(c);
+      release();
+      await deleting;
+
+      expect(updates).toHaveLength(1);
+      expect(updates[0].basedOn).toContain("ssid: changed");
+    } finally {
+      container.remove();
+    }
   });
 
   it("same-kind reuse: a retargeted but still-connected element does not navigate away", async () => {

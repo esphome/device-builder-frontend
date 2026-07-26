@@ -22,7 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { fireEvent, fireFromAnchor } from "../../util/fire-event.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -44,12 +44,17 @@ import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import type { SectionEditor } from "./section-editor.js";
-import { announceSectionMount, fireSectionEvent } from "./section-editor.js";
+import {
+  announceSectionMount,
+  fireSectionEvent,
+  prepareYamlUpdated,
+} from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
+  settleOwnDraft,
 } from "./device-section-config/draft-and-delete.js";
 import {
   loadConfig,
@@ -310,12 +315,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   // Flush pending draft sync now. The page calls this before save / section
   // switch / leave so the user's last keystroke isn't lost in the debounce.
   // Dispatches yaml-draft synchronously so callers reading page._yaml on
-  // the next line see the up-to-date value.
+  // the next line see the up-to-date value. Void by contract (the
+  // section-switch guard treats a truthy return as a deferred flush);
+  // the delete paths use ``settleOwnDraft`` directly when they need
+  // the settled buffer back.
   public flushPending(): void {
-    if (this._draftTimer === null) return;
-    clearTimeout(this._draftTimer);
-    this._draftTimer = null;
-    flushDraft(this);
+    settleOwnDraft(this);
   }
 
   // Reload config from live YAML. Two skip cases: (a) yaml exactly matches
@@ -447,17 +452,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
-    // Mount-time parent carries the dispatch if a section switch
-    // unmounts this element mid round trip (#1465).
-    const dispatchAnchor = this.parentNode;
+    const announceUpdated = prepareYamlUpdated(this);
     try {
       // Read the buffer and target exactly once: the backend computes
       // the diff's line coordinates against the string we send, and a
       // router-level device swap reassigns ``configuration`` from
       // above — splicing into a later re-read would silently mangle
-      // the write-through (or write it to the wrong file).
+      // the write-through (or write it to the wrong file). Settling
+      // our own pending draft first keeps the delete from superseding
+      // itself.
       const configuration = this.configuration;
-      const yaml = this.yaml;
+      const yaml = settleOwnDraft(this);
       const { yaml_diff } = await this._api.deleteAutomation(
         configuration,
         location,
@@ -465,9 +470,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       );
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await this._api.updateConfig(configuration, newYaml);
-      fireFromAnchor(this, this.isConnected, dispatchAnchor, "yaml-updated", {
-        yaml: newYaml,
-      });
+      announceUpdated(this.isConnected, { yaml: newYaml, basedOn: yaml });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {

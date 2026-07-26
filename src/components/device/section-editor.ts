@@ -4,8 +4,8 @@
  * automation-family editors. Both sides implement it explicitly so
  * drift is a compile error instead of a save-guard edge case; the
  * page's ``section-mount`` / ``section-unmount`` handlers and the
- * YAML-driven reload path type against it. The event trio the same
- * editors dispatch is covered too: firers go through
+ * YAML-driven reload path type against it. The events the same
+ * editors dispatch are covered too: firers go through
  * ``fireSectionEvent`` and consumers read the augmented
  * ``HTMLElementEventMap``, so a renamed event or a reshaped detail
  * is a compile error on both ends.
@@ -39,21 +39,49 @@ export interface SectionDirtyChangeDetail {
   node: SectionEditor;
 }
 
+/** A completed disk write and the buffer it was computed against —
+ *  the page supersede-checks the basis and advances only the saved
+ *  side when the pane has moved past it (#1476). */
+export interface YamlUpdatedDetail {
+  yaml: string;
+  basedOn: string;
+}
+
 /** The events every section editor dispatches for the device page. */
 export interface SectionEditorEventMap {
   "section-mount": SectionLifecycleDetail;
   "section-unmount": SectionLifecycleDetail;
   "dirty-change": SectionDirtyChangeDetail;
+  "yaml-updated": YamlUpdatedDetail;
 }
 
-/** ``fireEvent`` narrowed to the section-editor trio so both the
- *  name and the detail shape are checked at the firer. */
+/** ``fireEvent`` narrowed to the section-editor event map so both
+ *  the name and the detail shape are checked at the firer. */
 export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
   target: EventTarget,
   name: K,
   detail: SectionEditorEventMap[K]
 ): void {
   fireEvent(target, name, detail);
+}
+
+/**
+ * Capture what a disk-writing delete needs to announce its
+ * ``yaml-updated`` after the round trip, before any await: the
+ * mount-time parent (the host may be unmounted by dispatch time —
+ * detached dispatches bubble nowhere, #1465). The returned announcer
+ * takes the host's connectedness at dispatch time and the write with
+ * its required basis, typed through the section event map so a
+ * future emitter cannot drop the basis and compile.
+ */
+export function prepareYamlUpdated(
+  host: EventTarget & { readonly parentNode: ParentNode | null }
+): (connected: boolean, write: YamlUpdatedDetail) => void {
+  const anchor = host.parentNode;
+  return (connected, write) => {
+    const target = connected ? host : anchor;
+    if (target) fireSectionEvent(target, "yaml-updated", write);
+  };
 }
 
 /**
@@ -76,5 +104,6 @@ declare global {
     "section-mount": CustomEvent<SectionEditorEventMap["section-mount"]>;
     "section-unmount": CustomEvent<SectionEditorEventMap["section-unmount"]>;
     "dirty-change": CustomEvent<SectionEditorEventMap["dirty-change"]>;
+    "yaml-updated": CustomEvent<SectionEditorEventMap["yaml-updated"]>;
   }
 }

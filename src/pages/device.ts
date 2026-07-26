@@ -12,7 +12,7 @@ import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
-import { notifyError, notifySuccess } from "../util/notify.js";
+import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // `NavSectionName` is consumed by the section-show event handler; the
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
@@ -1741,19 +1741,38 @@ export class ESPHomePageDevice extends LitElement {
     this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
-  private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
-    /* ``yaml-updated`` fires from completed-API-call paths only —
-     * the add-component dialog and the section-delete branch.
-     * Both ``await`` the API call before dispatching, so by the
-     * time we see this event the new YAML is already on disk and
-     * ``_savedYaml`` can safely advance to match.
+  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn: string }>) {
+    /* ``yaml-updated`` fires from the three disk-writing delete
+     * paths only (the automation editors' engine, the component
+     * editor's section delete, and its manage-list row delete), all
+     * via ``prepareYamlUpdated``. Each ``await``s the write before
+     * dispatching, so the new YAML is already on disk; ``basedOn``
+     * is required so a future emitter cannot silently opt into the
+     * clobbering replace.
      *
      * Form edits in the section editor flow through the separate
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
-    this._setYaml(e.detail.yaml);
-    this._savedYaml = e.detail.yaml;
+    const { yaml, basedOn } = e.detail;
+    if (basedOn !== this._yaml) {
+      // The write was computed against a buffer this pane has moved
+      // past (a delete landing after a newer draft, #1476). Advance
+      // only the saved side: the pane keeps what the user sees and
+      // the page shows honestly dirty. Note the trade: the retained
+      // buffer predates the on-disk deletion (a section draft was
+      // spliced into the pre-delete buffer; a pane edit advanced it
+      // directly), so a later wholesale Save may undo the deletion —
+      // the toast makes that visible instead of silent (re-basing
+      // the delete onto the live buffer is tracked in #1490).
+      this._savedYaml = yaml;
+      notifyInfo(this._localize("device.delete_superseded"), {
+        description: this._localize("device.delete_superseded_detail"),
+      });
+      return;
+    }
+    this._setYaml(yaml);
+    this._savedYaml = yaml;
   }
 
   private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {

@@ -1,5 +1,5 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
@@ -14,14 +14,15 @@ import {
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
+import { prepareYamlUpdated } from "../section-editor.js";
 
 // Validates against the *render* schema (resolveSectionEntries), not the raw
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
 // catalog schema that doesn't match what the user actually edits in the form —
 // using it would surface phantom "missing required" errors per keystroke.
-export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
+export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   host._draftTimer = null;
-  if (!host._config) return;
+  if (!host._config) return null;
 
   const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
   host._fieldErrors = validateEntries(
@@ -38,7 +39,7 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
     // (paste / external edit). Drop the splice silently — next picker
     // click re-runs loadConfig against the current YAML.
     host._setDirty(false);
-    return;
+    return null;
   }
 
   const newYaml = updateSectionInYaml(
@@ -55,10 +56,11 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
 
   host._setDirty(false);
 
-  if (newYaml === host.yaml) return;
+  if (newYaml === host.yaml) return null;
 
   host._lastSelfWrittenYaml = newYaml;
   fireEvent(host, "yaml-draft", { yaml: newYaml });
+  return newYaml;
 }
 
 export function onValueChange(
@@ -99,16 +101,38 @@ export function applySectionValues(
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
-  if (host._draftTimer) {
+  if (host._draftTimer !== null) {
     clearTimeout(host._draftTimer);
-    host._draftTimer = null;
   }
   flushDraft(host);
 }
 
+/**
+ * Settle any pending debounced draft and return the freshest buffer
+ * this element knows — its ``yaml`` prop lags its own ``yaml-draft``
+ * by a render, so a delete basing itself on the raw prop would let
+ * the element supersede its own delete. The single settle
+ * implementation; ``flushPending`` (the ``SectionEditor`` contract)
+ * delegates here but must stay void-returning — the section-switch
+ * guard treats any truthy return as a deferred flush. One sub-frame
+ * window remains: a draft flushed just before the call whose prop
+ * echo hasn't landed returns the pre-flush prop; the page's basis
+ * check catches it conservatively (saved-only advance plus toast).
+ */
+export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
+  if (host._draftTimer !== null) {
+    clearTimeout(host._draftTimer);
+    return flushDraft(host) ?? host.yaml;
+  }
+  return host.yaml;
+}
+
 export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
   if (!host._config) return;
-  const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
+  // Settle our own pending draft first: the basis must include the
+  // user's last keystroke, or the delete supersedes itself.
+  const baseYaml = settleOwnDraft(host);
+  const fromLine = resolveCurrentFromLine(baseYaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
     host._error = host._localize("device.section_delete_error");
     return;
@@ -116,26 +140,20 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
-  // The parent stays mounted across section switches, so it can carry
-  // the ``yaml-updated`` when a switch unmounts the editor mid round
-  // trip — a detached dispatch bubbles nowhere and the page's saved
-  // buffer would go stale against the disk write (#1465). The section
-  // key is snapshotted too: Lit reuses this element across same-kind
-  // switches, so a mid-round-trip retarget keeps it connected while
-  // the deleted section is no longer the one on screen.
-  const dispatchAnchor = host.parentNode;
+  const announceUpdated = prepareYamlUpdated(host);
+  // The section key is snapshotted: Lit reuses this element across
+  // same-kind switches, so a mid-round-trip retarget keeps it
+  // connected while the deleted section is no longer on screen.
   const deletedKey = host.sectionKey;
   try {
-    const newYaml = removeSectionFromYaml(host.yaml, host.sectionKey, fromLine);
-    if (newYaml === host.yaml) {
+    const newYaml = removeSectionFromYaml(baseYaml, host.sectionKey, fromLine);
+    if (newYaml === baseYaml) {
       host._error = host._localize("device.section_delete_error");
       return;
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    fireFromAnchor(host, host.isConnected, dispatchAnchor, "yaml-updated", {
-      yaml: newYaml,
-    });
+    announceUpdated(host.isConnected, { yaml: newYaml, basedOn: baseYaml });
     // Navigate away only while the user is still here, on the
     // section that was deleted.
     if (host.isConnected && host.sectionKey === deletedKey) {

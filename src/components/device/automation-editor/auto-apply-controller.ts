@@ -6,11 +6,15 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { fireEvent, fireFromAnchor } from "../../../util/fire-event.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
-import { announceSectionMount, fireSectionEvent } from "../section-editor.js";
+import {
+  announceSectionMount,
+  fireSectionEvent,
+  prepareYamlUpdated,
+} from "../section-editor.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
@@ -321,10 +325,12 @@ export class AutoApplyController implements ReactiveController {
    * Delete writes to disk directly (matches the component-editor
    * delete pattern in ``device-section-config/draft-and-delete``):
    * compute the new YAML via the backend's delete diff, write it via
-   * ``api.updateConfig``, then dispatch ``yaml-updated`` (which
-   * advances both ``_yaml`` AND ``_savedYaml`` on the page — a clean
-   * state). Navigates away from the deleted section after, unless the
-   * reused element has already been re-pointed at a sibling.
+   * ``api.updateConfig``, then dispatch ``yaml-updated`` with its
+   * basis — the page advances both ``_yaml`` and ``_savedYaml`` when
+   * the basis still matches, or only ``_savedYaml`` when the pane
+   * moved past it (#1476). Navigates away from the deleted section
+   * after, unless the reused element has already been re-pointed at
+   * a sibling.
    */
   async delete(): Promise<void> {
     const api = this._options.getApi();
@@ -335,12 +341,7 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
-    // The parent stays mounted across section switches, so it can
-    // carry the ``yaml-updated`` when a different-kind switch swaps
-    // the element out mid round trip — a detached dispatch bubbles
-    // nowhere and the page's saved buffer would go stale against the
-    // disk write, resurrecting the section on the next global save.
-    const dispatchAnchor = this._host.parentNode;
+    const announceUpdated = prepareYamlUpdated(this._host);
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
@@ -368,13 +369,11 @@ export class AutoApplyController implements ReactiveController {
       const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
       const newYaml = applyYamlDiff(yaml, yaml_diff);
       await api.updateConfig(configuration, newYaml);
-      // ``newYaml`` derives from the pre-round-trip snapshot; in the
-      // unmount case a draft the newly mounted section made in the
-      // interim is overwritten by this dispatch. Narrow window, and
-      // still net-positive versus resurrecting the deleted section.
-      fireFromAnchor(this._host, this._connected, dispatchAnchor, "yaml-updated", {
-        yaml: newYaml,
-      });
+      // ``newYaml`` derives from the pre-round-trip snapshot; the
+      // basis lets the page supersede-check it, so a draft a newly
+      // mounted section made in the interim survives as visible
+      // dirty state instead of being overwritten (#1476).
+      announceUpdated(this._connected, { yaml: newYaml, basedOn: yaml });
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is
       // already on a sibling (yanking them to null would also unmount
