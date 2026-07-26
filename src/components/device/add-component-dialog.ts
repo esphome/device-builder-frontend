@@ -561,12 +561,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     let draft = this.yaml || undefined;
     let lastAdded: { domain: string; id: string } | null = null;
     let addedAny = false;
+    // Every exit that merged anything publishes the same draft; the
+    // per-exit comments explain why each one publishes.
+    const publishDraft = () => {
+      if (!addedAny) return;
+      this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+    };
     // Publish the merged draft so far, then resume from member *idx* through the
     // interactive queue, carrying the just-added dependency's id into the opened
     // form's matching reference field (the chaining bundles rely on).
     const handOff = async (idx: number) => {
-      if (addedAny)
-        this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+      publishDraft();
       // Keep `_submitting` set across the hydrate so the dialog can't be
       // dismissed or a new selection started mid-hand-off (which would make the
       // hydrate stale); release it once the form is up.
@@ -604,16 +609,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
           // A newer selection superseded this batch; publish what merged so far
           // for symmetry with the throw/hand-off paths (the superseding flow
           // also threads `this.yaml`, but don't rely on it cancelling).
-          if (addedAny)
-            this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+          publishDraft();
           return;
         }
         if (result.kind === "error") {
           // A body fetch failed; routing through hand-off would only re-fetch
           // the same member and drop this message. Surface it directly and keep
           // what merged so far.
-          if (addedAny)
-            this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+          publishDraft();
           this._submitError = result.message;
           return;
         }
@@ -652,8 +655,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this.yaml = yaml;
         lastAdded = this._chainReference(entry, fields);
       }
-      if (addedAny)
-        this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+      publishDraft();
       this._dialog.open = false;
       this._selected = null;
       this._resetDetourState();
@@ -666,8 +668,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // A member failed mid-batch: publish what merged so far so the host keeps
       // the already-added members (the draft is otherwise only published on the
       // success or hand-off paths, not on a throw).
-      if (addedAny)
-        this._dispatchDraft({ configuration, yaml: this.yaml, basedOn: baseYaml });
+      publishDraft();
       this._submitError = formatApiError(
         err,
         this._localize,
