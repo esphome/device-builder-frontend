@@ -22,6 +22,11 @@ import {
   sectionKeyFromLocation,
 } from "./serialise.js";
 
+/** Non-exempt stand-in emitter for a round whose element was
+ *  re-pointed mid flight: never the active section, so the page
+ *  applies its landing basis check instead of the exemption. */
+const RETARGETED_EMITTER = new EventTarget();
+
 /** Debounce window between a value change and the auto-apply upsert.
  *  Coalesces bursts (typing into a templatable string param, dragging
  *  an action up/down repeatedly) into one backend round-trip. */
@@ -352,10 +357,13 @@ export class AutoApplyController implements ReactiveController {
         configuration,
         yaml: newYaml,
         basedOn: yaml,
-        node: retargeted ? new EventTarget() : this._host,
+        node: retargeted ? RETARGETED_EMITTER : this._host,
       });
     } catch (err) {
-      this._surfaceSaveError(err);
+      // A detached round's failure has no editor left to act on; a
+      // toast would land on whatever page the user is on now.
+      if (this._connected) this._surfaceSaveError(err);
+      else console.error("Detached auto-apply round failed:", err);
     } finally {
       this._apply = { kind: "idle" };
       if (phase.queued) {

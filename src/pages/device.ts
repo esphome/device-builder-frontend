@@ -1750,6 +1750,15 @@ export class ESPHomePageDevice extends LitElement {
       this._selectedFromLine
     );
     if (next === this._selectedFromLine) return;
+    // A pending field-line upgrade pinned to the pre-shift line
+    // moves with the selection, or the retry's identity check would
+    // abandon it over a foreign draft's line shift.
+    if (
+      this._pendingFieldSection !== undefined &&
+      this._pendingFieldSection.fromLine === this._selectedFromLine
+    ) {
+      this._pendingFieldSection.fromLine = next;
+    }
     this._selectedFromLine = next;
     // The URL persists the line; leaving it stale would bias a
     // reload's duplicate-key resolution toward the wrong instance.
