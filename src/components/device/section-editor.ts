@@ -117,9 +117,13 @@ export function prepareSectionEvent<K extends keyof SectionEditorEventMap>(
   const anchor = host.parentNode ?? fallbackAnchor ?? null;
   return (connected, detail) => {
     const target = connected ? host : anchor;
+    // A never-mounted host has nowhere to deliver — deliberate
+    // silent no-op. A detached anchor still dispatches (a direct
+    // listener sees it) but bubbles nowhere, which is the #1465
+    // loss shape — trace it.
+    if (!connected && anchor && !anchor.isConnected)
+      console.warn(`Dispatching ${name} on a detached anchor; it may go nowhere`);
     if (target) fireSectionEvent(target, name, detail);
-    // The #1465 failure mode is invisible without a trace.
-    else console.error(`Dropped ${name}: emitter detached with no anchor`);
   };
 }
 

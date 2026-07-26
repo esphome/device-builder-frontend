@@ -880,6 +880,46 @@ describe("AutoApplyController host lifecycle", () => {
     parent.remove();
   });
 
+  it("a failed switch-path round still toasts while the page is alive", async () => {
+    vi.mocked(toast.error).mockClear();
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+
+    const applying = controller.autoApply();
+    // The switch unmounts the editor before the round trip resolves —
+    // the dominant path; the page (anchor) is still alive.
+    host.parentNode = null;
+    controller.hostDisconnected();
+    await applying;
+    await flushTimers();
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    parent.remove();
+  });
+
+  it("a failed round after a full teardown logs instead of toasting", async () => {
+    vi.mocked(toast.error).mockClear();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const parent = document.createElement("div");
+      const { host, controller, upsertAutomation } = setup({}, parent);
+      upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+
+      const applying = controller.autoApply();
+      host.parentNode = null;
+      controller.hostDisconnected();
+      await applying;
+      await flushTimers();
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("skips the drain when the whole page is gone", async () => {
     // Anchor never in the document: a failed detached round would
     // toast onto whatever page the user is on now, so the edit is

@@ -117,9 +117,10 @@ interface DeleteMode {
  *   delete UX), plus ``section-select`` unless the element was
  *   re-pointed at a sibling mid-delete.
  *
- * Failures on either path surface a ``toast.error`` plus the host's
- * inline error message — per CLAUDE.md, a failed write must reach
- * the user instead of silently dropping.
+ * Failures on either path surface a ``toast.error`` (plus, while
+ * the host is still mounted, its inline error message) — per
+ * CLAUDE.md, a failed write must reach the user instead of silently
+ * dropping. Only a full page teardown downgrades to the console.
  */
 export class AutoApplyController implements ReactiveController {
   private _debounce: ReturnType<typeof setTimeout> | null = null;
@@ -169,16 +170,12 @@ export class AutoApplyController implements ReactiveController {
     // Drain a pending debounced edit instead of dropping it. The
     // switch paths' kick already flushes before unmount, so this
     // covers the unkicked unmounts only (a YAML-pane edit removing
-    // the section, a reconnect reload, a device switch). Gated on
-    // the anchor still being in the document: with the whole page
-    // gone the draft has nowhere to land, and a failed round would
-    // toast onto whatever page the user is on now.
+    // the section, a reconnect reload, a device switch). The cancel
+    // is unconditional — a timer surviving the unmount would fire an
+    // upsert for a torn-down section — and the drain is gated on the
+    // anchor still being in the document: with the whole page gone
+    // the draft has nowhere to land.
     const hadPending = this._debounce !== null;
-    // Cancel unconditionally — a timer surviving the unmount would
-    // fire an upsert for a torn-down section — then drain only when
-    // the anchor is still in the document (a full page teardown has
-    // nowhere to land the draft, and a failed round would toast on
-    // whatever page the user is on now).
     this._cancelDebounce();
     if (hadPending && this._anchor?.isConnected) void this.autoApply();
     // One-shot: the closure pairs with exactly one mount.
@@ -367,9 +364,12 @@ export class AutoApplyController implements ReactiveController {
         node: retargeted ? RETARGETED_EMITTER : this._host,
       });
     } catch (err) {
-      // A detached round's failure has no editor left to act on; a
-      // toast would land on whatever page the user is on now.
-      if (this._connected) this._surfaceSaveError(err);
+      // A switch-path round resolves after the editor unmounted, so
+      // ``_connected`` alone would silence the dominant path. The
+      // page still being alive (live anchor) means the user must
+      // learn the write didn't land; only a full teardown routes to
+      // the console (a toast there would land on an unrelated page).
+      if (this._connected || this._anchor?.isConnected) this._surfaceSaveError(err);
       else console.error("Detached auto-apply round failed:", err);
     } finally {
       this._apply = { kind: "idle" };
