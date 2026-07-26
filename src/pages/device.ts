@@ -17,10 +17,10 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import {
-  applyRemoval,
-  type SectionEditor,
-  type YamlUpdatedDetail,
+import { applyRemoval } from "../components/device/apply-removal.js";
+import type {
+  SectionEditor,
+  YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
@@ -1782,7 +1782,8 @@ export class ESPHomePageDevice extends LitElement {
     let rebased: string | null = null;
     try {
       rebased = await applyRemoval(detail.removed, live, this._api, this.id);
-    } catch {
+    } catch (err) {
+      console.error("Re-base of superseded delete failed:", err);
       rebased = null;
     }
     // Land the re-base only if the pane didn't move again while it

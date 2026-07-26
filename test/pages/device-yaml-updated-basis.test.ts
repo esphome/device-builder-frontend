@@ -126,4 +126,84 @@ describe("yaml-updated supersede check", () => {
     expect(page._savedYaml).toBe("logger:\n");
     expect(toast.info).not.toHaveBeenCalled();
   });
+
+  it("bails to the toast when the pane moves again mid-recompute", async () => {
+    const page = makePage(
+      "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
+      "logger:\nscript:\n  - id: s1\n"
+    );
+    page.id = "device.yaml";
+    const deleteAutomation = vi.fn().mockImplementation(async () => {
+      // The user keeps editing while the diff is recomputed.
+      page._yaml = "moved:\n";
+      return { yaml_diff: { fromLine: 3, toLine: 4, replacement: "" } };
+    });
+    page._api = { deleteAutomation } as unknown as ESPHomeAPI;
+
+    updated(page, {
+      yaml: "logger:\n",
+      basedOn: "logger:\nscript:\n  - id: s1\n",
+      removed: { kind: "automation", location: { kind: "script", id: "s1" } },
+    });
+    await settle();
+
+    // The stale re-base must not land on the moved buffer.
+    expect(page._yaml).toBe("moved:\n");
+    expect(page._savedYaml).toBe("logger:\n");
+    expect(toast.info).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a no-op recompute diff as an unlandable re-base", async () => {
+    const page = makePage(
+      "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
+      "logger:\nscript:\n  - id: s1\n"
+    );
+    page.id = "device.yaml";
+    page._api = {
+      deleteAutomation: vi
+        .fn()
+        .mockResolvedValue({ yaml_diff: { fromLine: 1, toLine: 0, replacement: "" } }),
+    } as unknown as ESPHomeAPI;
+
+    updated(page, {
+      yaml: "logger:\n",
+      basedOn: "logger:\nscript:\n  - id: s1\n",
+      removed: { kind: "automation", location: { kind: "script", id: "s1" } },
+    });
+    await settle();
+
+    // A diff that removes nothing must not report success and
+    // silence the divergence warning.
+    expect(page._yaml).toBe("logger:\n  level: DEBUG\nscript:\n  - id: s1\n");
+    expect(toast.info).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the toast when the recompute call fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const page = makePage(
+        "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
+        "logger:\nscript:\n  - id: s1\n"
+      );
+      page.id = "device.yaml";
+      page._api = {
+        deleteAutomation: vi.fn().mockRejectedValue(new Error("backend down")),
+      } as unknown as ESPHomeAPI;
+
+      updated(page, {
+        yaml: "logger:\n",
+        basedOn: "logger:\nscript:\n  - id: s1\n",
+        removed: { kind: "automation", location: { kind: "script", id: "s1" } },
+      });
+      await settle();
+
+      expect(page._yaml).toBe("logger:\n  level: DEBUG\nscript:\n  - id: s1\n");
+      expect(page._savedYaml).toBe("logger:\n");
+      expect(toast.info).toHaveBeenCalledTimes(1);
+      // The cause survives for bug reports instead of vanishing.
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

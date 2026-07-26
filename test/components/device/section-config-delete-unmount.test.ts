@@ -17,6 +17,7 @@ import "../../_mock-webawesome.js";
 
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { onDeleteConfirmed } from "../../../src/components/device/device-section-config/draft-and-delete.js";
+import { locationFromSectionKey } from "../../../src/components/device/automation-editor/serialise.js";
 import type { YamlUpdatedDetail } from "../../../src/components/device/section-editor.js";
 
 const ROW_YAML = [
@@ -135,7 +136,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       expect(updates[0].basedOn).toBe(ROW_YAML);
       expect(updates[0].removed).toEqual({
         kind: "automation",
-        location: expect.anything(),
+        location: locationFromSectionKey("automation:component_on:btn:on_press"),
       });
     } finally {
       outer.remove();
