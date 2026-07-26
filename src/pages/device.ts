@@ -1757,7 +1757,11 @@ export class ESPHomePageDevice extends LitElement {
       this._pendingFieldSection !== undefined &&
       this._pendingFieldSection.fromLine === this._selectedFromLine
     ) {
-      this._pendingFieldSection.fromLine = next;
+      // A vanished key clears the upgrade — carrying ``undefined``
+      // would keep the retry waiting forever on a section that no
+      // longer exists.
+      if (next === undefined) this._clearPendingFieldLine();
+      else this._pendingFieldSection.fromLine = next;
     }
     this._selectedFromLine = next;
     // The URL persists the line; leaving it stale would bias a
