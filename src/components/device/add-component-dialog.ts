@@ -15,6 +15,7 @@ import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { fireSectionEvent } from "./section-editor.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -542,6 +543,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     if (this._submitting) return;
     const { bundle, boardId } = e.detail;
     if (!boardId || bundle.component_ids.length === 0 || !this.configuration) return;
+    // Snapshot the target before the awaits: a router-level device
+    // swap reassigns the prop from above, and a live re-read would
+    // slip the merged draft past the page's identity guard.
+    const configuration = this.configuration;
     const fullIds = bundle.component_ids.map((localId) =>
       buildFeaturedId(boardId, localId)
     );
@@ -559,7 +564,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // interactive queue, carrying the just-added dependency's id into the opened
     // form's matching reference field (the chaining bundles rely on).
     const handOff = async (idx: number) => {
-      if (addedAny) this._dispatchDraft(this.yaml);
+      if (addedAny) this._dispatchDraft(configuration, this.yaml);
       // Keep `_submitting` set across the hydrate so the dialog can't be
       // dismissed or a new selection started mid-hand-off (which would make the
       // hydrate stale); release it once the form is up.
@@ -597,14 +602,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
           // A newer selection superseded this batch; publish what merged so far
           // for symmetry with the throw/hand-off paths (the superseding flow
           // also threads `this.yaml`, but don't rely on it cancelling).
-          if (addedAny) this._dispatchDraft(this.yaml);
+          if (addedAny) this._dispatchDraft(configuration, this.yaml);
           return;
         }
         if (result.kind === "error") {
           // A body fetch failed; routing through hand-off would only re-fetch
           // the same member and drop this message. Surface it directly and keep
           // what merged so far.
-          if (addedAny) this._dispatchDraft(this.yaml);
+          if (addedAny) this._dispatchDraft(configuration, this.yaml);
           this._submitError = result.message;
           return;
         }
@@ -630,7 +635,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           continue;
         }
         const { yaml } = await this._api.addComponent(
-          this.configuration,
+          configuration,
           { component_id: fullIds[i], fields },
           draft
         );
@@ -643,7 +648,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this.yaml = yaml;
         lastAdded = this._chainReference(entry, fields);
       }
-      if (addedAny) this._dispatchDraft(this.yaml);
+      if (addedAny) this._dispatchDraft(configuration, this.yaml);
       this._dialog.open = false;
       this._selected = null;
       this._resetDetourState();
@@ -656,7 +661,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // A member failed mid-batch: publish what merged so far so the host keeps
       // the already-added members (the draft is otherwise only published on the
       // success or hand-off paths, not on a throw).
-      if (addedAny) this._dispatchDraft(this.yaml);
+      if (addedAny) this._dispatchDraft(configuration, this.yaml);
       this._submitError = formatApiError(
         err,
         this._localize,
@@ -669,8 +674,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   /** Surface the merged YAML as an unsaved editor draft (host saves explicitly). */
-  private _dispatchDraft(yaml: string) {
-    fireEvent(this, "yaml-draft", { yaml });
+  private _dispatchDraft(configuration: string, yaml: string) {
+    fireSectionEvent(this, "yaml-draft", { configuration, yaml });
   }
 
   /**
@@ -739,6 +744,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   private async _submitComponent(fields: Record<string, unknown>, notify = false) {
     if (!this._selected || !this.configuration || this._submitting) return;
+    // Same pre-await target snapshot as the bundle flow.
+    const configuration = this.configuration;
     this._submitting = true;
     this._submitError = "";
     // Invalidate any in-flight dep-nav lookup — a late resolve must
@@ -752,7 +759,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // merging into "" would drop the on-disk config, so an empty draft
       // omits the arg and the backend falls back to the on-disk YAML.
       const { yaml } = await this._api.addComponent(
-        this.configuration,
+        configuration,
         {
           component_id: this._selected.id,
           fields,
@@ -766,7 +773,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // (so the dependency we just added shows up in the original
       // component's dropdown). `yaml-draft` advances only the working
       // buffer, leaving the dirty flag on so the user saves explicitly.
-      this._dispatchDraft(yaml);
+      this._dispatchDraft(configuration, yaml);
 
       if (this._returnTo) {
         // Just finished adding a dependency — restore the original

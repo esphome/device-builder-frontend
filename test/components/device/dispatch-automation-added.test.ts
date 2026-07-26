@@ -49,13 +49,22 @@ describe("dispatchAutomationAdded", () => {
       });
     }
 
-    dispatchAutomationAdded(host, YAML, { kind: "script", id: "my_script" }, DIFF);
+    dispatchAutomationAdded(
+      host,
+      "device.yaml",
+      YAML,
+      { kind: "script", id: "my_script" },
+      DIFF
+    );
 
     expect(seen.map((s) => s.type)).toEqual(["yaml-draft", "automation-added"]);
     // The dispatch contract is "the diff-applied YAML", not a
     // particular splice formatting, so compare against
     // applyYamlDiff (which has its own unit tests) ...
-    expect(seen[0].detail).toEqual({ yaml: applyYamlDiff(YAML, DIFF) });
+    expect(seen[0].detail).toEqual({
+      configuration: "device.yaml",
+      yaml: applyYamlDiff(YAML, DIFF),
+    });
     // ... and pin that the new block actually made it into the
     // draft, so a wrong-yaml dispatch still fails loudly here.
     expect((seen[0].detail as { yaml: string }).yaml).toContain(
@@ -75,6 +84,7 @@ describe("dispatchAutomationAdded", () => {
 
     dispatchAutomationAdded(
       host,
+      "device.yaml",
       YAML,
       { kind: "component_on", component_id: "my_switch", trigger: "on_turn_on" },
       DIFF

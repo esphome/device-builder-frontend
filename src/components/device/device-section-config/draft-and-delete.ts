@@ -14,7 +14,7 @@ import {
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
-import { prepareYamlUpdated } from "../section-editor.js";
+import { fireSectionEvent, prepareYamlUpdated } from "../section-editor.js";
 
 // Validates against the *render* schema (resolveSectionEntries), not the raw
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
@@ -59,7 +59,10 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   if (newYaml === host.yaml) return null;
 
   host._lastSelfWrittenYaml = newYaml;
-  fireEvent(host, "yaml-draft", { yaml: newYaml });
+  fireSectionEvent(host, "yaml-draft", {
+    configuration: host.configuration,
+    yaml: newYaml,
+  });
   return newYaml;
 }
 

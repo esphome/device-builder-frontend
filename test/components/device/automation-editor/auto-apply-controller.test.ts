@@ -124,8 +124,10 @@ describe("AutoApplyController auto-apply", () => {
       SCRIPT,
       "line1\nline2"
     );
-    // The returned diff is applied locally and pushed up as a draft.
+    // The returned diff is applied locally and pushed up as a draft
+    // carrying its snapshotted target for the page's identity guard.
     expect(drafts.map((e) => e.detail.yaml)).toEqual(["replaced\nline2"]);
+    expect(drafts[0].detail.configuration).toBe("device.yaml");
   });
 
   it("withValue patches the host value, announces automation-change, and schedules", async () => {

@@ -49,6 +49,15 @@ export type RemovedSectionRef =
   | { kind: "component"; sectionKey: string; fromLine: number }
   | { kind: "automation"; location: AutomationLocation };
 
+/** A draft advance of the page's YAML buffer (unsaved; the global
+ *  Save writes it). ``configuration`` is the emitter's snapshotted
+ *  target so a draft landing after a device switch is dropped
+ *  instead of spliced into the wrong device's buffer (#1479). */
+export interface YamlDraftDetail {
+  configuration: string;
+  yaml: string;
+}
+
 /** A completed disk write, the buffer it was computed against — the
  *  page supersede-checks the basis and advances only the saved side
  *  when the pane has moved past it (#1476) — and what it removed,
@@ -68,6 +77,7 @@ export interface SectionEditorEventMap {
   "section-mount": SectionLifecycleDetail;
   "section-unmount": SectionLifecycleDetail;
   "dirty-change": SectionDirtyChangeDetail;
+  "yaml-draft": YamlDraftDetail;
   "yaml-updated": YamlUpdatedDetail;
 }
 
@@ -120,6 +130,7 @@ declare global {
     "section-mount": CustomEvent<SectionEditorEventMap["section-mount"]>;
     "section-unmount": CustomEvent<SectionEditorEventMap["section-unmount"]>;
     "dirty-change": CustomEvent<SectionEditorEventMap["dirty-change"]>;
+    "yaml-draft": CustomEvent<SectionEditorEventMap["yaml-draft"]>;
     "yaml-updated": CustomEvent<SectionEditorEventMap["yaml-updated"]>;
   }
 }
