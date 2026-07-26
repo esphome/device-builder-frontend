@@ -97,6 +97,45 @@ describe("synchronous section switch", () => {
     expect(internals(page)._drawerOpen).toBe(false);
   });
 
+  it("the outgoing component editor's sync splice re-pins the fresh selection", () => {
+    const page = new ESPHomePageDevice();
+    page.id = "kitchen.yaml";
+    const before = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join("\n");
+    const after = ["i2c:", "  sda: 1", "  scl: 0", "sensor:", "  - platform: aht10"].join(
+      "\n"
+    );
+    internals(page)._yaml = before;
+    internals(page)._selectedSection = "i2c";
+    internals(page)._selectedFromLine = 1;
+    // The outgoing editor's flush splices synchronously — at kick
+    // time it is still the active section (Lit hasn't committed).
+    const editor = {
+      dirty: true,
+      flushPending: () => {
+        internals(page)._onYamlDraft(
+          new CustomEvent("yaml-draft", {
+            detail: {
+              configuration: "kitchen.yaml",
+              yaml: after,
+              basedOn: before,
+              node: editor,
+            },
+          })
+        );
+      },
+      reload: () => {},
+    } satisfies SectionEditor;
+    internals(page)._activeSection = editor;
+
+    // Click sensor at its pre-splice item line; the kick's splice
+    // shifts it down by one.
+    select(page, "sensor.aht10", 4);
+
+    expect(internals(page)._selectedSection).toBe("sensor.aht10");
+    // Re-pinned against the post-splice buffer, not the stale 4.
+    expect(internals(page)._selectedFromLine).toBe(5);
+  });
+
   it("a landing draft re-pins the selection line (#1470)", () => {
     const page = new ESPHomePageDevice();
     page.id = "kitchen.yaml";

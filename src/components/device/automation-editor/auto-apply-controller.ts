@@ -131,6 +131,10 @@ export class AutoApplyController implements ReactiveController {
   // schedule a write for a torn-down section.
   private _connected = false;
   private _announceUnmount: (() => void) | null = null;
+  /** Mount-time parent for rounds prepared after the element left
+   *  the tree (the drain, a detached queued re-run) — their
+   *  ``parentNode`` is already null by then. */
+  private _anchor: ParentNode | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -145,6 +149,7 @@ export class AutoApplyController implements ReactiveController {
   hostConnected(): void {
     this._connected = true;
     this._detachedBasis = null;
+    this._anchor = this._host.parentNode;
     this._announceUnmount = announceSectionMount(this._host);
   }
 
@@ -319,7 +324,7 @@ export class AutoApplyController implements ReactiveController {
         : (this._detachedBasis ?? this._host.yaml);
       // Anchor captured before the await: a mid-flight unmount
       // (Back's composed switch) must not lose the draft (#1479).
-      const announceDraft = prepareSectionEvent(this._host, "yaml-draft");
+      const announceDraft = prepareSectionEvent(this._host, "yaml-draft", this._anchor);
       const { yaml_diff } = await api.upsertAutomation(
         configuration,
         value,

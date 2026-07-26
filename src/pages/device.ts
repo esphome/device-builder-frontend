@@ -1802,9 +1802,12 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._setYaml(e.detail.yaml);
-    // The active section's own splice never moves its own start
-    // line, so its debounced typing stream skips the re-pin parse.
-    if (emitter !== this._activeSection) this._repinSelection(e.detail.yaml);
+    // Unconditional: at kick time the outgoing editor is still the
+    // active section (Lit hasn't committed), and its synchronous
+    // splice must re-pin the just-set selection. The typing stream
+    // pays only a memoized parse — an own-section splice re-resolves
+    // to the same line.
+    this._repinSelection(e.detail.yaml);
     this._retryPendingFieldLine();
   }
 
@@ -1865,10 +1868,26 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_values`` are always already in the draft YAML buffer (or a
    *  round trip away, delivered by the anchor). The leave-page
    *  guard (``_confirmLeave``) is the only thing that prompts about
-   *  unsaved YAML, since that's the only state actually at risk. */
+   *  unsaved YAML, since that's the only state actually at risk.
+   *
+   *  The deliberate trade (#1479): a buffer write landing inside
+   *  the kicked round trip (typing in the next section or the YAML
+   *  pane within the RTT) supersedes the late draft's basis, and
+   *  the guard drops the old section's last debounce window of
+   *  keystrokes with the visibility toast. The barrier prevented
+   *  that ordering by stalling every switch instead; if the toast
+   *  shows up in practice, the escalation is re-basing late drafts
+   *  the way ``_rebaseSupersededDelete`` does for deletes. */
   private _kickSectionFlush(): void {
-    // A failed flush already surfaced its own error toast.
-    void Promise.resolve(this._activeSection?.flushPending()).catch(() => {});
+    // Navigation deliberately doesn't block on the flush; a failed
+    // upsert already toasts, so just keep the cause diagnosable.
+    try {
+      void Promise.resolve(this._activeSection?.flushPending()).catch((err) =>
+        console.error("Outgoing section flush failed:", err)
+      );
+    } catch (err) {
+      console.error("Outgoing section flush failed:", err);
+    }
   }
 
   /** Resolve the known-top-level-key set off the session-cached catalog.

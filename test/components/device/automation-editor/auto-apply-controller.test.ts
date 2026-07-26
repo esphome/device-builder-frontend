@@ -348,7 +348,7 @@ describe("AutoApplyController auto-apply", () => {
 
   it("a queued re-run chains its basis after the host unmounts", async () => {
     const parent = document.createElement("div");
-    const { controller, upsertAutomation } = setup({}, parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
     let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
     upsertAutomation.mockImplementationOnce(
       () =>
@@ -360,8 +360,12 @@ describe("AutoApplyController auto-apply", () => {
     parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
 
     const applying = controller.autoApply();
-    // A keystroke queues a re-run, then the section unmounts.
+    // A keystroke queues a re-run, then the section unmounts. Real
+    // DOM order: the node leaves the tree before disconnectedCallback
+    // runs, so the re-run's own parentNode read yields null and only
+    // the mount-time anchor can deliver its draft.
     void controller.autoApply();
+    host.parentNode = null;
     controller.hostDisconnected();
     resolveFirst({ yaml_diff: DIFF });
     await applying;
@@ -829,11 +833,14 @@ describe("AutoApplyController host lifecycle", () => {
 
   it("drains the pending debounced upsert into a detached round on disconnect", async () => {
     const parent = document.createElement("div");
-    const { controller, upsertAutomation } = setup({}, parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
     const seen: CustomEvent[] = [];
     parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
 
     controller.scheduleAutoApply();
+    // Real DOM order: parentNode is already null in the disconnect
+    // callback; the drain round dispatches via the mount-time anchor.
+    host.parentNode = null;
     controller.hostDisconnected();
     await flushTimers();
 

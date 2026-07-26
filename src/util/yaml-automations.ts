@@ -61,7 +61,8 @@ const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
  *
  * Single-entry memo, same shape as ``parseYamlTopLevelSections``:
  * one buffer is parsed by the navigator, the manage tables, and the
- * selection re-pin within a single update.
+ * selection re-pin within a single update. Callers share one array
+ * instance and must not mutate it.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   if (_automationsKey === yaml && _automationsValue) return _automationsValue;
