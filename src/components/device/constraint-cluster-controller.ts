@@ -68,13 +68,19 @@ export class ConstraintClusterController implements ReactiveController {
     // ones that are and let the next render recover, rather than aborting the
     // whole pass (don't "fix" this into a throw).
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
-    // Same tolerance as the settle above: a group whose sync rejects
-    // just isn't ready; the next render recovers. Promise.resolve
-    // normalises the void-returning implementations, and the warn
-    // leaves a trace if a cluster sticks desynced.
-    for (const group of groups)
-      Promise.resolve(group.syncRadioElements?.()).catch((err) =>
-        console.warn("Radio group sync failed:", err)
-      );
+    // Same tolerance as the settle above: a group whose sync fails
+    // just isn't ready; the next render recovers. The try covers a
+    // void-returning implementation that throws synchronously, the
+    // catch a rejecting one, and the warn leaves a trace if a
+    // cluster sticks desynced.
+    for (const group of groups) {
+      try {
+        Promise.resolve(group.syncRadioElements?.()).catch((err) =>
+          console.warn("Radio group sync failed:", err)
+        );
+      } catch (err) {
+        console.warn("Radio group sync failed:", err);
+      }
+    }
   }
 }

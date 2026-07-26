@@ -35,12 +35,21 @@ function radioGroup(sync: () => void | Promise<void>): HTMLElement {
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("constraint-cluster radio sync tolerance", () => {
-  it("a rejecting group's sync neither blocks its siblings nor escapes unhandled", async () => {
+  it("a failing group's sync neither blocks its siblings nor escapes unhandled", async () => {
     const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const failing = vi.fn(() => Promise.reject(new Error("not ready")));
+      const rejecting = vi.fn(() => Promise.reject(new Error("not ready")));
+      // The declared type is void | Promise<void>, so a synchronous
+      // throw is the other failure shape the loop must tolerate.
+      const throwing = vi.fn(() => {
+        throw new Error("sync throw");
+      });
       const healthy = vi.fn(() => {});
-      const host = makeHost([radioGroup(failing), radioGroup(healthy)]);
+      const host = makeHost([
+        radioGroup(rejecting),
+        radioGroup(throwing),
+        radioGroup(healthy),
+      ]);
       const controller = new ConstraintClusterController(
         host as unknown as ConstructorParameters<typeof ConstraintClusterController>[0]
       );
@@ -48,8 +57,10 @@ describe("constraint-cluster radio sync tolerance", () => {
       controller.hostUpdated();
       await settle();
 
-      expect(failing).toHaveBeenCalledTimes(1);
+      expect(rejecting).toHaveBeenCalledTimes(1);
+      expect(throwing).toHaveBeenCalledTimes(1);
       expect(healthy).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledTimes(2);
       expect(consoleWarn).toHaveBeenCalledWith(
         "Radio group sync failed:",
         expect.any(Error)
