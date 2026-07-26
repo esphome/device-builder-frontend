@@ -24,6 +24,8 @@ interface EscapeView {
   _saveYaml(): Promise<boolean>;
   _onUnsavedSave(): void;
   _drawerOpen: boolean;
+  _saving: boolean;
+  _pendingValidationResolve: ((saved: boolean) => void) | null;
   _activeSection: {
     dirty: boolean;
     lastFlushFailed: boolean;
@@ -202,8 +204,7 @@ describe("leave guard flush ordering (#1503)", () => {
     expect(order).toEqual([]);
 
     settle();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
     expect(order[0]).toBe("flushed");
     expect(order).toContain("dialog");
 
@@ -225,8 +226,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._activeSection = settlingSection(page, { failed: true });
 
     const leaving = page._confirmLeave();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
 
     expect(dialogOpen).toHaveBeenCalledTimes(1);
     page._onUnsavedDiscard();
@@ -255,8 +255,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._saveYaml = saveYaml;
 
     const leaving = page._confirmLeave();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
 
     // The user picked "keep my work". _saveYaml cannot re-run the
@@ -279,8 +278,7 @@ describe("leave guard flush ordering (#1503)", () => {
     });
 
     const leaving = page._confirmLeave();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
 
     page._onUnsavedSave();
@@ -299,8 +297,7 @@ describe("leave guard flush ordering (#1503)", () => {
       };
 
       const leaving = page._confirmLeave();
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
 
       // The editor already surfaced its own failure; the guard still
       // runs with the freshest available state.
@@ -332,8 +329,7 @@ describe("leave guard flush ordering (#1503)", () => {
       page._saveYaml = vi.fn(async () => true);
 
       const leaving = page._confirmLeave();
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
       expect(dialogOpen).toHaveBeenCalledTimes(1);
 
       page._onUnsavedSave();
@@ -342,6 +338,35 @@ describe("leave guard flush ordering (#1503)", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  test("an armed validation prompt keeps the busy borrow off", async () => {
+    const { page } = makePage();
+    // The validation dialog is open: _saving is false but the
+    // resolver is armed. The leave flush must not borrow the flag —
+    // its finally would clear a "Save anyway" write's re-entrancy
+    // lock out from under it.
+    page._pendingValidationResolve = () => {};
+    let settle!: () => void;
+    page._activeSection = {
+      dirty: true,
+      lastFlushFailed: false,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          settle = resolve;
+        }),
+      reload: () => {},
+    };
+
+    const leaving = page._confirmLeave();
+    await Promise.resolve();
+    expect(page._saving).toBe(false);
+
+    settle();
+    await flush();
+    page._onUnsavedCancel();
+    await leaving;
+    expect(page._saving).toBe(false);
   });
 
   test("a settled-as-failed round arms the beforeunload warning", () => {
@@ -371,8 +396,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._onPopState({
       stopImmediatePropagation,
     } as unknown as PopStateEvent);
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
 
     // The popped entry is held (re-pushed) and the guard runs
     // instead of the router unmounting the page over a lost edit.
@@ -391,8 +415,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._saveYaml = vi.fn(async () => true);
 
     const leaving = page._confirmLeave();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
 
     // A reload timer's hydrate replaced the form state and cleared

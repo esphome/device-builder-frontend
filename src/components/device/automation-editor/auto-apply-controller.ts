@@ -220,8 +220,11 @@ export class AutoApplyController implements ReactiveController {
   /** Whether the most recent settled round failed — its edit never
    *  landed in the page's buffer and a settled round cannot be
    *  re-run, so leaving would discard it. Cleared by the next
-   *  round that lands, and dropped on a retarget (a reused element
-   *  re-pointed at a sibling holds no failed form state to protect). */
+   *  round that lands, and dropped on a retarget, hydrate, or
+   *  remount (replaced form state holds nothing to protect).
+   *  Tracks settle failures only: a round that lands but whose
+   *  draft the page rejects as superseded counts as landed — that
+   *  path already toasts its own discard. */
   get lastRoundFailed(): boolean {
     return this._lastRoundFailed;
   }

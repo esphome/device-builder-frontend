@@ -294,6 +294,19 @@ describe("AutoApplyController auto-apply", () => {
     expect(controller.lastRoundFailed).toBe(false);
   });
 
+  it("a remount drops a latched failure — the form rebuilt from live YAML", async () => {
+    const { controller, upsertAutomation } = setup();
+    controller.hostUpdated();
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    controller.hostDisconnected();
+    controller.hostConnected();
+    expect(controller.lastRoundFailed).toBe(false);
+  });
+
   it("a fresh hydrate drops a latched failure — the failed edit left with the form state", async () => {
     const { controller, upsertAutomation } = setup();
     controller.hostUpdated();
