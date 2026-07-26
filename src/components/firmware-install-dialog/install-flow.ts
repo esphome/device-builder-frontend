@@ -596,12 +596,14 @@ export function compileAndWait(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<void> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     // Capture reject on the dialog so a mid-flight detach (header-X / Escape /
     // reopen) can settle this promise. followJob callbacks clear the hook to
     // null on fire so a normal completion doesn't double-reject on teardown.
     host._compileReject = reject;
-    try {
+    // Not an async executor: a throw before the first await would be
+    // swallowed by the Promise constructor instead of rejecting.
+    const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
       host._jobId = job.job_id;
       // Capture so a compile failure can pick the right hint variant:
@@ -645,9 +647,10 @@ export function compileAndWait(
           reject(new Error(error));
         },
       });
-    } catch (err) {
+    };
+    start().catch((err: unknown) => {
       host._compileReject = null;
-      reject(err);
-    }
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
   });
 }

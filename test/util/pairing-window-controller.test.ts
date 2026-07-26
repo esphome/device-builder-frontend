@@ -79,6 +79,7 @@ describe("PairingWindowController", () => {
   });
 
   it("auto-open parks quietly until the api context lands, then opens", () => {
+    // eslint-disable-next-line prefer-const -- assigned later to simulate the api context landing
     let api: ReturnType<typeof makeApi> | undefined;
     const onOpenFailed = vi.fn();
     const host = new FakeHost();

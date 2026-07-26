@@ -87,7 +87,6 @@ export class TrailingEdgeDispatcher<T> {
       try {
         await this._runner(input);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.debug("TrailingEdgeDispatcher: runner threw", err);
       }
     } finally {

@@ -24,11 +24,19 @@ const CRASH = [
 
 describe("logs-dialog inline backtrace decode", () => {
   let el: ESPHomeLogsDialog;
-  let decodeBacktrace: ReturnType<typeof vi.fn>;
+  type DecodeMock = (
+    configuration: string,
+    lines: string[]
+  ) => Promise<{
+    decoded: { index: number; text: string }[];
+    stale_build: boolean;
+    unavailable_reason: string;
+  }>;
+  let decodeBacktrace: ReturnType<typeof vi.fn<DecodeMock>>;
 
   beforeEach(() => {
     el = new ESPHomeLogsDialog();
-    decodeBacktrace = vi.fn(async () => ({
+    decodeBacktrace = vi.fn<DecodeMock>(async () => ({
       decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop() at main.cpp:42" }],
       stale_build: false,
       unavailable_reason: "",

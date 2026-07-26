@@ -472,7 +472,7 @@ export class ESPHomeApp extends LitElement {
   private async _afterAuthenticated() {
     this._authState = "authed";
     this._authError = null;
-    this._subscribeToEvents();
+    void this._subscribeToEvents();
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
     void loadLabels(this);

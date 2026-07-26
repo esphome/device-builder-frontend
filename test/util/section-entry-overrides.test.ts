@@ -169,11 +169,11 @@ describe("device-section-config wiring", () => {
   it("forwards renderEntries / resolveSectionEntries to the form's .entries prop", async () => {
     // tsconfig restricts `types` to @types/w3c-web-serial, so node
     // module specifiers don't type-check; vitest resolves them fine.
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const fs = await import("node:fs");
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const path = await import("node:path");
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
@@ -219,11 +219,11 @@ describe("device-section-config wiring", () => {
     // continuously, and the explicit Validate button runs the
     // full ESPHome compile against the saved file. The "x y is
     // invalid" feedback now flows through those two surfaces.
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const fs = await import("node:fs");
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const path = await import("node:path");
-    // @ts-ignore — node-only module
+    // @ts-expect-error node-only module; tsconfig types are restricted
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(

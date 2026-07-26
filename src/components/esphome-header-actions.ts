@@ -387,7 +387,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openSecrets() {
     this._close();
-    navigate("/secrets");
+    void navigate("/secrets");
   }
 
   /** Opens the Wi-Fi credentials dialog on demand. The kebab item

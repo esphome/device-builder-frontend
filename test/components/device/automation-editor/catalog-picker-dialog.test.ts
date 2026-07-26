@@ -15,11 +15,11 @@
 import { describe, expect, it } from "vitest";
 
 async function readSource(): Promise<string> {
-  // @ts-ignore — node-only modules
+  // @ts-expect-error node-only module; tsconfig types are restricted
   const fs = await import("node:fs");
-  // @ts-ignore
+  // @ts-expect-error node-only module; tsconfig types are restricted
   const path = await import("node:path");
-  // @ts-ignore
+  // @ts-expect-error node-only module; tsconfig types are restricted
   const url = await import("node:url");
   const here = path.dirname(url.fileURLToPath(import.meta.url));
   return fs.readFileSync(

@@ -140,7 +140,7 @@ describe("ESPHomeAPI — sendCommand", () => {
   it("omits args when none are given", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.sendCommand("ping");
+    void api.sendCommand("ping");
     const sent = ws.sentAs<{ args?: unknown }>(0);
     expect(sent.args).toBeUndefined();
   });
@@ -191,8 +191,8 @@ describe("ESPHomeAPI — sendCommand", () => {
   it("assigns sequential message_ids", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.sendCommand("a");
-    api.sendCommand("b");
+    void api.sendCommand("a");
+    void api.sendCommand("b");
     const id0 = ws.sentAs<{ message_id: string }>(0).message_id;
     const id1 = ws.sentAs<{ message_id: string }>(1).message_id;
     expect(Number(id1)).toBe(Number(id0) + 1);
@@ -289,7 +289,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    api.cloneDevice("kitchen.yaml", "bedroom-bulb");
+    void api.cloneDevice("kitchen.yaml", "bedroom-bulb");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
 
     expect(sent.args).toEqual({
@@ -309,7 +309,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    api.cloneDevice("kitchen.yaml", "bedroom-bulb", "");
+    void api.cloneDevice("kitchen.yaml", "bedroom-bulb", "");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
 
     expect(sent.args).toEqual({
@@ -621,7 +621,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     ws.receive({ message_id: streamId, event: "output", data: "before-stop" });
     expect(onOutput).toHaveBeenCalledWith("before-stop");
 
-    api.stopStream(streamId);
+    void api.stopStream(streamId);
 
     // Anything that arrives after stop — whether genuinely racing or a
     // misbehaving backend that keeps sending — must not reach the caller.
@@ -775,7 +775,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("firmwareInstall defaults port to OTA, force_local and bootloader to false", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.firmwareInstall("foo.yaml");
+    void api.firmwareInstall("foo.yaml");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -788,7 +788,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("firmwareInstall threads force_local through to the backend", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.firmwareInstall("foo.yaml", "OTA", true);
+    void api.firmwareInstall("foo.yaml", "OTA", true);
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -801,7 +801,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("firmwareInstall threads bootloader through to the backend", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.firmwareInstall("foo.yaml", "OTA", false, true);
+    void api.firmwareInstall("foo.yaml", "OTA", false, true);
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -854,7 +854,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("updatePreferences passes the partial prefs as args", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    api.updatePreferences({ theme: "dark" as never });
+    void api.updatePreferences({ theme: "dark" as never });
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("config/set_preferences");
     expect(sent.args).toEqual({ theme: "dark" });
@@ -1682,7 +1682,7 @@ describe("ESPHomeAPI — automations catalog", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    api.getAutomationTriggers("esp32", "esp32-s3-devkitc-1");
+    void api.getAutomationTriggers("esp32", "esp32-s3-devkitc-1");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       platform: "esp32",
@@ -1796,7 +1796,7 @@ describe("ESPHomeAPI — getComponentBodies", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1");
+    void api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       component_ids: ["wifi"],
@@ -1809,7 +1809,7 @@ describe("ESPHomeAPI — getComponentBodies", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    api.getComponentBodies(["wifi"]);
+    void api.getComponentBodies(["wifi"]);
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({ component_ids: ["wifi"] });
     expect("platform" in sent.args).toBe(false);

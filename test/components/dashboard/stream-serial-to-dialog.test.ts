@@ -65,6 +65,11 @@ function createMockPort(chunks: Uint8Array[]) {
     },
     close: vi.fn(async () => {}),
     _reader: reader,
+    // Structural stand-in for the real port; the stream only touches
+    // readable/close.
+  } as unknown as SerialPort & {
+    _reader: typeof reader;
+    close: ReturnType<typeof vi.fn>;
   };
 }
 

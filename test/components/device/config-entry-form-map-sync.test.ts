@@ -47,8 +47,7 @@ const logsEntry = () =>
  *  routed through the real select renderer, and return every
  *  ``data-field-key`` decoded back to a path. */
 function renderedFieldPaths(values: Record<string, unknown>): string[][] {
-  let ctx: RenderCtx;
-  ctx = makeRenderCtx(values, {
+  const ctx: RenderCtx = makeRenderCtx(values, {
     overrides: { renderEntry: (entry, path) => renderSelectField(entry, path, ctx) },
   });
   const result = renderMapField(logsEntry(), ["logs"], ctx);

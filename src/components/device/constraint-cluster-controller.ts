@@ -68,6 +68,6 @@ export class ConstraintClusterController implements ReactiveController {
     // ones that are and let the next render recover, rather than aborting the
     // whole pass (don't "fix" this into a throw).
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
-    for (const group of groups) group.syncRadioElements?.();
+    for (const group of groups) void group.syncRadioElements?.();
   }
 }

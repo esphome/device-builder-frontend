@@ -199,7 +199,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    this.updateComplete.then(() => this._catalog?.load());
+    void this.updateComplete.then(() => this._catalog?.load());
   }
 
   /**
@@ -215,7 +215,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
+    void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */

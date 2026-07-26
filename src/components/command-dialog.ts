@@ -318,7 +318,7 @@ export class ESPHomeCommandDialog extends LitElement {
   _resetAnsiLogScroll() {
     // The ansi-log instance is reused across opens; scrollToBottom clears
     // its _isUserScrolled latch so streaming-to-bottom re-engages.
-    this.updateComplete.then(() => this._terminal?.scrollToBottom());
+    void this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
   // Attach to a firmware job's stream. Handles any state — terminal jobs

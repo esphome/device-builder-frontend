@@ -301,7 +301,7 @@ export class ESPHomeTableRowMenu extends LitElement {
     const vh = window.innerHeight;
     const pad = 8;
 
-    let x = this.position.x;
+    const x = this.position.x;
     let y = this.position.y;
     let useRight = this.anchorRight;
 

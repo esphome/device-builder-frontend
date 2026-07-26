@@ -280,7 +280,7 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       }}
       @open-logs=${(e: CustomEvent) => {
         host._drawerOpen = false;
-        host._openLogs(e.detail);
+        void host._openLogs(e.detail);
       }}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;

@@ -55,7 +55,7 @@ function renderSnippetBlock(
       @click=${(e: MouseEvent) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
-        navigate(href);
+        void navigate(href);
       }}
     >
       ${block.lines.map((text, i) => {
@@ -91,7 +91,7 @@ function renderYamlDeviceTitle(
           @click=${(e: MouseEvent) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
             e.preventDefault();
-            navigate(deviceHref);
+            void navigate(deviceHref);
           }}
           >${label}</a
         >

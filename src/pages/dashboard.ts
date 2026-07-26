@@ -390,7 +390,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!this._showIgnored) this._showDiscovered = true;
     this._toggleShowIgnored();
   };
-  private _onShowArchivedDialog = () => this._archivedDialog?.open();
+  private _onShowArchivedDialog = () => void this._archivedDialog?.open();
 
   _onEnterSelectMode = (configuration?: string) => {
     this._selectMode = true;
@@ -1036,7 +1036,7 @@ export class ESPHomePageDashboard extends LitElement {
     () => this._localize
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
-    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
