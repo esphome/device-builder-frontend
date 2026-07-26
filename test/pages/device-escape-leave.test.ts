@@ -1,9 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("sonner-js", () => ({
-  default: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() },
-}));
+import "./_mock-device-children.js";
 
 import toast from "sonner-js";
 
@@ -34,6 +32,7 @@ interface EscapeView {
   } | null;
   _onKeydown(e: KeyboardEvent): void;
   _onBeforeUnload(e: BeforeUnloadEvent): void;
+  _onPopState(e: PopStateEvent): void;
   _onUnsavedDiscard(): void;
   _onUnsavedCancel(): void;
   _confirmLeave(): Promise<boolean>;
@@ -328,5 +327,51 @@ describe("leave guard flush ordering (#1503)", () => {
     const preventDefault = vi.fn();
     page._onBeforeUnload({ preventDefault } as unknown as BeforeUnloadEvent);
     expect(preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  test("a settled-as-failed round intercepts popstate and prompts", async () => {
+    const { page, dialogOpen } = makePage();
+    page._savedYaml = page._yaml;
+    page._sectionDirty = false;
+    const section = settlingSection(page, { failed: true });
+    section.lastFlushFailed = true;
+    page._activeSection = section;
+
+    const stopImmediatePropagation = vi.fn();
+    page._onPopState({
+      stopImmediatePropagation,
+    } as unknown as PopStateEvent);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The popped entry is held (re-pushed) and the guard runs
+    // instead of the router unmounting the page over a lost edit.
+    expect(stopImmediatePropagation).toHaveBeenCalledTimes(1);
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    // Cancel settles the guard without a history pop.
+    page._onUnsavedCancel();
+  });
+
+  test("Save leaves once a hydrate clears the latch under the open dialog", async () => {
+    const { page, dialogOpen } = makePage();
+    page._savedYaml = page._yaml;
+    page._sectionDirty = true;
+    const section = settlingSection(page, { failed: true });
+    page._activeSection = section;
+    page._saveYaml = vi.fn(async () => true);
+
+    const leaving = page._confirmLeave();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+
+    // A reload timer's hydrate replaced the form state and cleared
+    // the latch while the dialog sat open; the refusal must read
+    // the live signal, not the pre-dialog snapshot, or "Save and
+    // leave" refuses over an edit that no longer exists.
+    section.lastFlushFailed = false;
+    page._onUnsavedSave();
+    expect(await leaving).toBe(true);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

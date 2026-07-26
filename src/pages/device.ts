@@ -499,12 +499,15 @@ export class ESPHomePageDevice extends LitElement {
     // editor reports it through ``lastFlushFailed`` — the real
     // signal, so a flush that settles as a no-op (the user typed
     // and undid a keystroke) still leaves silently.
-    let flushFailed = false;
+    let flushThrew = false;
     // The awaited flush is the same slow phase ``_saveYaml`` covers
     // with the Save spinner; borrow the flag so Back doesn't read as
     // dead for the length of the upsert. Own it only if free — a
-    // save already in flight keeps its own lifecycle.
-    const ownBusy = !this._saving;
+    // save already in flight keeps its own lifecycle, and while the
+    // validation prompt waits (``_saving`` false, resolver armed) a
+    // "Save anyway" started mid-flush must not have its lock and
+    // spinner cleared by our finally.
+    const ownBusy = !this._saving && this._pendingValidationResolve === null;
     if (ownBusy) this._saving = true;
     try {
       await this._activeSection?.flushPending();
@@ -513,13 +516,19 @@ export class ESPHomePageDevice extends LitElement {
       // rejection here is a backstop, not the live error path (that
       // path is ``lastFlushFailed`` below).
       console.error("Section flush before leave failed:", err);
-      flushFailed = true;
+      flushThrew = true;
     } finally {
       if (ownBusy) this._saving = false;
     }
-    flushFailed ||= this._activeSection?.lastFlushFailed ?? false;
+    // The throw backstop is sticky; the latch reads live at each
+    // decision, because the dialog can stay open across a reload
+    // timer's hydrate that clears the latch along with the failed
+    // edit it protected — a stale snapshot would refuse a leave
+    // over an edit that no longer exists.
+    const flushFailed = () =>
+      flushThrew || (this._activeSection?.lastFlushFailed ?? false);
     const ok = await this._unsavedGuard.run({
-      dirty: flushFailed || this._isDirty,
+      dirty: flushFailed() || this._isDirty,
       open: () => this._unsavedDialog?.open(),
       save: async () => {
         // ``_saveYaml`` may open the validation prompt and await
@@ -529,7 +538,7 @@ export class ESPHomePageDevice extends LitElement {
         // shouldn't proceed with navigation.
         const saved = await this._saveYaml();
         if (!saved) return false;
-        if (flushFailed) {
+        if (flushFailed()) {
           // The failed round's edit never reached the buffer and a
           // settled round cannot be re-run, so "Save" must not
           // pretend it saved it. Stay put — the editor still holds
