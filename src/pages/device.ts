@@ -1744,11 +1744,16 @@ export class ESPHomePageDevice extends LitElement {
    *  selection there. A vanished key leaves the line unset. */
   private _repinSelection(yaml: string): void {
     if (!this._selectedSection) return;
-    this._selectedFromLine = resolveCurrentSectionLine(
+    const next = resolveCurrentSectionLine(
       yaml,
       this._selectedSection,
       this._selectedFromLine
     );
+    if (next === this._selectedFromLine) return;
+    this._selectedFromLine = next;
+    // The URL persists the line; leaving it stale would bias a
+    // reload's duplicate-key resolution toward the wrong instance.
+    this._updateUrl();
   }
 
   /** Apply a superseded delete's removal to the live buffer (#1490). */
