@@ -30,21 +30,3 @@ export function fireFromAnchor(
   const target = connected ? host : anchor;
   if (target) fireEvent(target, name, detail);
 }
-
-/**
- * Capture what a disk-writing delete needs to announce its
- * ``yaml-updated`` after the round trip, before any await: the
- * mount-time parent (the host may be unmounted by dispatch time —
- * detached dispatches bubble nowhere, #1465). The returned announcer
- * takes the write, its basis (the buffer it was computed against —
- * the page supersede-checks it and advances only the saved side when
- * the pane has moved past it, #1476), and the host's connectedness
- * at dispatch time.
- */
-export function prepareYamlUpdated(
-  host: EventTarget & { readonly parentNode: ParentNode | null }
-): (connected: boolean, write: { yaml: string; basedOn: string }) => void {
-  const anchor = host.parentNode;
-  return (connected, write) =>
-    fireFromAnchor(host, connected, anchor, "yaml-updated", write);
-}

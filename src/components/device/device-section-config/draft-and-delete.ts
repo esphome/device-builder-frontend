@@ -1,5 +1,5 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent, prepareYamlUpdated } from "../../../util/fire-event.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
@@ -14,6 +14,7 @@ import {
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
+import { prepareYamlUpdated } from "../section-editor.js";
 
 // Validates against the *render* schema (resolveSectionEntries), not the raw
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat

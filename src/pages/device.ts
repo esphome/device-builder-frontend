@@ -12,7 +12,7 @@ import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
-import { notifyError, notifySuccess } from "../util/notify.js";
+import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // `NavSectionName` is consumed by the section-show event handler; the
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
@@ -1758,9 +1758,14 @@ export class ESPHomePageDevice extends LitElement {
     if (basedOn !== this._yaml) {
       // The write was computed against a buffer this pane has moved
       // past (a delete landing after a newer draft, #1476). Advance
-      // only the saved side: the pane keeps what the user sees, the
-      // page shows honestly dirty, and Save writes exactly that.
+      // only the saved side: the pane keeps what the user sees and
+      // the page shows honestly dirty. Note the trade: the retained
+      // draft was spliced into the pre-delete buffer, so a later
+      // Save writes the deleted section back — the toast makes that
+      // visible instead of silent (full re-base of the delete onto
+      // the live buffer is tracked separately).
       this._savedYaml = yaml;
+      notifyInfo(this._localize("device.delete_superseded"));
       return;
     }
     this._setYaml(yaml);

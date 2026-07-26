@@ -680,6 +680,7 @@
     "section_saved": "Section saved",
     "section_save_error": "Failed to save section",
     "section_deleted": "'{name}' section deleted",
+    "delete_superseded": "Deleted on disk. Your unsaved buffer still contains the section; saving will restore it.",
     "section_delete_error": "Failed to delete section",
     "yaml_saved": "YAML saved",
     "yaml_save_error": "Failed to save YAML",

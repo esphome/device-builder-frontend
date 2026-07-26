@@ -6,11 +6,15 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { fireEvent, prepareYamlUpdated } from "../../../util/fire-event.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import type { SectionEditor } from "../section-editor.js";
-import { announceSectionMount, fireSectionEvent } from "../section-editor.js";
+import {
+  announceSectionMount,
+  fireSectionEvent,
+  prepareYamlUpdated,
+} from "../section-editor.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,

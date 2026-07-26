@@ -37,10 +37,19 @@ export interface SectionDirtyChangeDetail {
 }
 
 /** The events every section editor dispatches for the device page. */
+/** A completed disk write and the buffer it was computed against —
+ *  the page supersede-checks the basis and advances only the saved
+ *  side when the pane has moved past it (#1476). */
+export interface YamlUpdatedDetail {
+  yaml: string;
+  basedOn: string;
+}
+
 export interface SectionEditorEventMap {
   "section-mount": SectionLifecycleDetail;
   "section-unmount": SectionLifecycleDetail;
   "dirty-change": SectionDirtyChangeDetail;
+  "yaml-updated": YamlUpdatedDetail;
 }
 
 /** ``fireEvent`` narrowed to the section-editor trio so both the
@@ -51,6 +60,25 @@ export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
   detail: SectionEditorEventMap[K]
 ): void {
   fireEvent(target, name, detail);
+}
+
+/**
+ * Capture what a disk-writing delete needs to announce its
+ * ``yaml-updated`` after the round trip, before any await: the
+ * mount-time parent (the host may be unmounted by dispatch time —
+ * detached dispatches bubble nowhere, #1465). The returned announcer
+ * takes the host's connectedness at dispatch time and the write with
+ * its required basis, typed through the section event map so a
+ * future emitter cannot drop the basis and compile.
+ */
+export function prepareYamlUpdated(
+  host: EventTarget & { readonly parentNode: ParentNode | null }
+): (connected: boolean, write: YamlUpdatedDetail) => void {
+  const anchor = host.parentNode;
+  return (connected, write) => {
+    const target = connected ? host : anchor;
+    if (target) fireSectionEvent(target, "yaml-updated", write);
+  };
 }
 
 /**
@@ -73,5 +101,6 @@ declare global {
     "section-mount": CustomEvent<SectionEditorEventMap["section-mount"]>;
     "section-unmount": CustomEvent<SectionEditorEventMap["section-unmount"]>;
     "dirty-change": CustomEvent<SectionEditorEventMap["dirty-change"]>;
+    "yaml-updated": CustomEvent<SectionEditorEventMap["yaml-updated"]>;
   }
 }

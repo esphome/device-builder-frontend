@@ -22,7 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { fireEvent, prepareYamlUpdated } from "../../util/fire-event.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -44,7 +44,11 @@ import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import type { SectionEditor } from "./section-editor.js";
-import { announceSectionMount, fireSectionEvent } from "./section-editor.js";
+import {
+  announceSectionMount,
+  fireSectionEvent,
+  prepareYamlUpdated,
+} from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
