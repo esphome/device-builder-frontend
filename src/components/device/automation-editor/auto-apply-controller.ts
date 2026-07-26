@@ -158,11 +158,14 @@ export class AutoApplyController implements ReactiveController {
     // The frozen prop is the freshest buffer this element saw; the
     // first detached round bases on it, later ones chain (#1479).
     this._detachedBasis = this._host.yaml;
-    // Drain a pending debounced edit instead of dropping it: the
-    // synchronous switch no longer waits for the flush, so the
-    // keystrokes inside the debounce window ride a detached round
-    // whose draft lands through the anchor.
-    if (this._debounce !== null) {
+    // Drain a pending debounced edit instead of dropping it. The
+    // switch paths' kick already flushes before unmount, so this
+    // covers the unkicked unmounts only (a YAML-pane edit removing
+    // the section, a reconnect reload, a device switch). Gated on
+    // the anchor still being in the document: with the whole page
+    // gone the draft has nowhere to land, and a failed round would
+    // toast onto whatever page the user is on now.
+    if (this._debounce !== null && this._anchor?.isConnected) {
       this._cancelDebounce();
       void this.autoApply();
     }
@@ -391,7 +394,7 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
-    const announceUpdated = prepareSectionEvent(this._host, "yaml-updated");
+    const announceUpdated = prepareSectionEvent(this._host, "yaml-updated", this._anchor);
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();

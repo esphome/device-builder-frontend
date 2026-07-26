@@ -1858,11 +1858,11 @@ export class ESPHomePageDevice extends LitElement {
    *  flush splices synchronously (its draft lands and re-pins the
    *  fresh selection via ``_onYamlDraft``), and the automation
    *  editors start their upsert, whose draft arrives later through
-   *  the mount-time anchor with its basis checked on landing. The
-   *  engine drains a debounce armed at unmount time on its own
-   *  (``hostDisconnected``), so this kick is belt and suspenders
-   *  for the async family and load-bearing only for the component
-   *  editor's synchronous splice.
+   *  the mount-time anchor with its basis checked on landing. This
+   *  kick is the primary drain on every switch path; the engine's
+   *  ``hostDisconnected`` drain covers only the unmounts nobody
+   *  kicked (a YAML-pane edit removing the section, a reconnect
+   *  reload, a device switch).
    *
    *  No unsaved-changes dialog: with auto-sync, the form's current
    *  ``_values`` are always already in the draft YAML buffer (or a

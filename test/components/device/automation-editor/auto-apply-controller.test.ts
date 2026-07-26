@@ -833,6 +833,9 @@ describe("AutoApplyController host lifecycle", () => {
 
   it("drains the pending debounced upsert into a detached round on disconnect", async () => {
     const parent = document.createElement("div");
+    // The drain is gated on the anchor still being in the document
+    // (a full page teardown must not fire a doomed round).
+    document.body.appendChild(parent);
     const { host, controller, upsertAutomation } = setup({}, parent);
     const seen: CustomEvent[] = [];
     parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
@@ -850,5 +853,20 @@ describe("AutoApplyController host lifecycle", () => {
     expect(upsertAutomation).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(1);
     expect(seen[0].detail.basedOn).toBe("line1\nline2");
+    parent.remove();
+  });
+
+  it("skips the drain when the whole page is gone", async () => {
+    // Anchor never in the document: a failed detached round would
+    // toast onto whatever page the user is on now, so the edit is
+    // dropped instead.
+    const parent = document.createElement("div");
+    const { host, controller, upsertAutomation } = setup({}, parent);
+    controller.scheduleAutoApply();
+    host.parentNode = null;
+    controller.hostDisconnected();
+    await flushTimers();
+
+    expect(upsertAutomation).not.toHaveBeenCalled();
   });
 });
