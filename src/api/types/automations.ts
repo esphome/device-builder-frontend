@@ -155,12 +155,17 @@ export type AutomationLocation =
  *  action's ``accepts_action_list`` entries (e.g.
  *  ``{ then: [...], else: [...] }`` for ``if``). ``conditions`` is
  *  populated only for ``if`` (the boolean gate) — other control-flow
- *  actions have their gate elsewhere. */
+ *  actions have their gate elsewhere. ``unknown`` marks an uncatalogued
+ *  action (from an ``external_components`` source, or a typo): it's
+ *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
+ *  sibling actions stay editable. */
 export interface ActionNode {
   action_id: string;
   params: Record<string, unknown>;
   children?: Record<string, ActionNode[]>;
   conditions?: ConditionNode[];
+  unknown?: boolean;
+  raw_body?: unknown;
 }
 
 /** A single condition inside an ``if`` / ``while`` / ``wait_until``.
@@ -207,8 +212,11 @@ export interface ParsedAutomation {
    *  form is unrecoverable. */
   raw_yaml: string;
   /** Set when this one automation failed to decompose (unknown
-   *  action / condition id). Siblings still parse; the editor renders
-   *  it read-only so its empty tree can't overwrite the real YAML. */
+   *  condition id, or a misrouted body). An uncatalogued *action* no
+   *  longer fails here — it becomes a read-only passthrough node
+   *  (see ``ActionNode.unknown``). Siblings still parse; the editor
+   *  renders a flagged automation read-only so its empty tree can't
+   *  overwrite the real YAML. */
   error?: string | null;
   /** True when ``error`` is a *known* action with no structured form
    *  (an oversized LVGL ``*.update``) rather than a genuine parse

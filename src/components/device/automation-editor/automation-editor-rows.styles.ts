@@ -49,6 +49,16 @@ export const automationEditorRowStyles = css`
     line-height: 1.5;
   }
 
+  .ae-row-unknown {
+    margin: 0;
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-s);
+    background: var(--wa-color-neutral-fill-quiet);
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.5;
+  }
+
   /* Each action / condition row lives inside its own custom
      element shadow, so .ae-row + .ae-row would never match — the
      rows aren't siblings in any one tree. The selector below
