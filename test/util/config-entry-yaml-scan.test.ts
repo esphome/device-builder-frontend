@@ -457,6 +457,29 @@ describe("findReferenceCandidates (LIST_SECTIONS domain)", () => {
     expect(isCertainlyDanglingId("id_global", candidates, yaml)).toBe(false);
     expect(isCertainlyDanglingId("id_typo", candidates, yaml)).toBe(true);
   });
+
+  it("handles the zero-indented sequence form", () => {
+    const zeroIndent = [
+      "globals:",
+      "- id: id_global",
+      "  type: int",
+      "- id: id_other",
+      "  type: bool",
+      "",
+    ].join("\n");
+    expect(findReferenceCandidates(zeroIndent, "globals", [])).toEqual([
+      { id: "id_global", name: "" },
+      { id: "id_other", name: "" },
+    ]);
+  });
+
+  it("does not leak an adjacent top-level section's ids", () => {
+    const config = [yaml, "sensor:", "  - platform: adc", "    id: adc_a", ""].join("\n");
+    expect(findReferenceCandidates(config, "globals", [])).toEqual([
+      { id: "id_global", name: "" },
+      { id: "id_other", name: "" },
+    ]);
+  });
 });
 
 describe("findComponentsByProviders", () => {
