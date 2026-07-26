@@ -19,6 +19,7 @@
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
+import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { hasSubstitutionReference } from "./substitutions.js";
 import { indentOf } from "./yaml-line-walker.js";
 import {
@@ -412,8 +413,16 @@ export function findComponentsByProviders(
     // not add the section's own id on top: for a multi-entity platform it is
     // the hub (the wrong type for the reference), and a hybrid's root entity
     // already arrived through its ["id"] path.
-    if (ownIdMatched && !hasIdPathProvider && section.id) {
-      add(section.id, section.name ?? "");
+    if (ownIdMatched && !hasIdPathProvider) {
+      if (section.id) {
+        add(section.id, section.name ?? "");
+      } else if (LIST_SECTIONS.has(section.key)) {
+        // A LIST_SECTIONS block stays un-expanded (no per-item sections
+        // carrying an id), so enumerate its item ids directly.
+        lines ??= yaml.split("\n");
+        for (const inst of collectIdsAtPath(lines, section, ["id"]))
+          add(inst.id, inst.name);
+      }
     }
   }
   providerMemo.set(probe, result);

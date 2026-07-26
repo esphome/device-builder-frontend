@@ -431,6 +431,57 @@ describe("findReferenceCandidates (same-domain base case)", () => {
   });
 });
 
+describe("findReferenceCandidates (LIST_SECTIONS domain)", () => {
+  // The globals: block stays one un-expanded section (LIST_SECTIONS), so
+  // candidates come from the per-item id scan, not the section's own id.
+  const yaml = [
+    "globals:",
+    "  - id: id_global",
+    "    type: int",
+    '    initial_value: "0"',
+    "    restore_value: true",
+    "  - id: id_other",
+    "    type: bool",
+    "",
+  ].join("\n");
+
+  it("returns every item id in a globals block", () => {
+    expect(findReferenceCandidates(yaml, "globals", [])).toEqual([
+      { id: "id_global", name: "" },
+      { id: "id_other", name: "" },
+    ]);
+  });
+
+  it("does not report a defined global as dangling", () => {
+    const candidates = findReferenceCandidates(yaml, "globals", []);
+    expect(isCertainlyDanglingId("id_global", candidates, yaml)).toBe(false);
+    expect(isCertainlyDanglingId("id_typo", candidates, yaml)).toBe(true);
+  });
+
+  it("handles the zero-indented sequence form", () => {
+    const zeroIndent = [
+      "globals:",
+      "- id: id_global",
+      "  type: int",
+      "- id: id_other",
+      "  type: bool",
+      "",
+    ].join("\n");
+    expect(findReferenceCandidates(zeroIndent, "globals", [])).toEqual([
+      { id: "id_global", name: "" },
+      { id: "id_other", name: "" },
+    ]);
+  });
+
+  it("does not leak an adjacent top-level section's ids", () => {
+    const config = [yaml, "sensor:", "  - platform: adc", "    id: adc_a", ""].join("\n");
+    expect(findReferenceCandidates(config, "globals", [])).toEqual([
+      { id: "id_global", name: "" },
+      { id: "id_other", name: "" },
+    ]);
+  });
+});
+
 describe("findComponentsByProviders", () => {
   const yaml = [
     "sensor:",
