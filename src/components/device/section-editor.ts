@@ -36,7 +36,6 @@ export interface SectionDirtyChangeDetail {
   dirty: boolean;
 }
 
-/** The events every section editor dispatches for the device page. */
 /** A completed disk write and the buffer it was computed against —
  *  the page supersede-checks the basis and advances only the saved
  *  side when the pane has moved past it (#1476). */
@@ -45,6 +44,7 @@ export interface YamlUpdatedDetail {
   basedOn: string;
 }
 
+/** The events every section editor dispatches for the device page. */
 export interface SectionEditorEventMap {
   "section-mount": SectionLifecycleDetail;
   "section-unmount": SectionLifecycleDetail;
@@ -52,8 +52,8 @@ export interface SectionEditorEventMap {
   "yaml-updated": YamlUpdatedDetail;
 }
 
-/** ``fireEvent`` narrowed to the section-editor trio so both the
- *  name and the detail shape are checked at the firer. */
+/** ``fireEvent`` narrowed to the section-editor event map so both
+ *  the name and the detail shape are checked at the firer. */
 export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
   target: EventTarget,
   name: K,

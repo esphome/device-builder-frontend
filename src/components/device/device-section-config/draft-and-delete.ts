@@ -114,7 +114,10 @@ export function applySectionValues(
  * the element supersede its own delete. The single settle
  * implementation; ``flushPending`` (the ``SectionEditor`` contract)
  * delegates here but must stay void-returning — the section-switch
- * guard treats any truthy return as a deferred flush.
+ * guard treats any truthy return as a deferred flush. One sub-frame
+ * window remains: a draft flushed just before the call whose prop
+ * echo hasn't landed returns the pre-flush prop; the page's basis
+ * check catches it conservatively (saved-only advance plus toast).
  */
 export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
   if (host._draftTimer !== null) {
