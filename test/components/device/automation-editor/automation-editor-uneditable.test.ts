@@ -30,8 +30,11 @@ const erroredParse = (): ParsedAutomation[] => [
     automation: { trigger_id: "on_boot", trigger_params: {}, actions: [] },
     from_line: 1,
     to_line: 3,
-    raw_yaml: "on_boot:\n  then:\n    - made_up: 1\n",
-    error: "Unknown action id: 'made_up'",
+    // An unknown condition still fails the whole automation (an uncatalogued
+    // action instead becomes a passthrough node, so it's no longer a trigger).
+    raw_yaml:
+      "on_boot:\n  then:\n    - if:\n        condition:\n          - made_up:\n        then: []\n",
+    error: "Unknown condition id: 'made_up'",
   } as unknown as ParsedAutomation,
 ];
 

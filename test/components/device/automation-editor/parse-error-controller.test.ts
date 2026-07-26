@@ -49,7 +49,7 @@ describe("ParseErrorController.resolve", () => {
   it("goes read-only and withholds the tree on a parse error", () => {
     const c = new ParseErrorController(fakeHost());
     expect(
-      c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script")
+      c.resolve([parsed({ error: "Unknown condition id: 'x'" })], SCRIPT, "script")
     ).toBeNull();
     expect(c.active).toBe(true);
   });
@@ -114,7 +114,7 @@ describe("ParseErrorController.resolve", () => {
 
   it("renders the error alert for a genuine parse error", () => {
     const c = new ParseErrorController(fakeHost());
-    c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
+    c.resolve([parsed({ error: "Unknown condition id: 'x'" })], SCRIPT, "script");
     const localize = vi.fn(identityLocalize);
     c.renderPanel(localize as never);
     expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
@@ -132,7 +132,7 @@ describe("ParseErrorController.resolve", () => {
   it("swaps the unsupported hint for the error alert when a later resolve is a plain error", () => {
     const c = new ParseErrorController(fakeHost());
     c.resolve([parsed({ error: "boom", unsupported: true })], SCRIPT, "script");
-    c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
+    c.resolve([parsed({ error: "Unknown condition id: 'x'" })], SCRIPT, "script");
     expect(c.active).toBe(true);
     const localize = vi.fn(identityLocalize);
     c.renderPanel(localize as never);
