@@ -143,6 +143,10 @@ describe("esphome-page-device Escape leave guard", () => {
 });
 
 describe("leave guard flush ordering (#1503)", () => {
+  afterEach(() => {
+    setLeaveGuard(null);
+  });
+
   test("the dialog runs only after the automation editor's flush settles", async () => {
     const { page, dialogOpen } = makePage();
     const order: string[] = [];
