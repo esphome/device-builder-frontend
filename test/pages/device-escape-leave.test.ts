@@ -180,4 +180,31 @@ describe("leave guard flush ordering (#1503)", () => {
     page._onUnsavedDiscard();
     await leaving;
   });
+
+  test("a rejecting flush still runs the guard, with the cause logged", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { page, dialogOpen } = makePage();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (page as any)._activeSection = {
+        dirty: true,
+        flushPending: () => Promise.reject(new Error("upsert failed")),
+        reload: () => {},
+      };
+
+      const leaving = page._confirmLeave();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The editor already surfaced its own failure; the guard still
+      // runs with the freshest available state.
+      expect(dialogOpen).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalled();
+
+      page._onUnsavedDiscard();
+      await leaving;
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });
