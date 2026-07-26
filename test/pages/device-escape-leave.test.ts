@@ -17,6 +17,8 @@ interface EscapeView {
   _yaml: string;
   _savedYaml: string;
   _sectionDirty: boolean;
+  _saveYaml(): Promise<boolean>;
+  _onUnsavedSave(): void;
   _drawerOpen: boolean;
   _activeSection: {
     dirty: boolean;
@@ -210,6 +212,34 @@ describe("leave guard flush ordering (#1503)", () => {
     expect(dialogOpen).toHaveBeenCalledTimes(1);
     page._onUnsavedDiscard();
     await leaving;
+  });
+
+  test("Save on the failed-round path retries through _saveYaml", async () => {
+    const { page, dialogOpen } = makePage();
+    page._savedYaml = page._yaml;
+    page._sectionDirty = true;
+    page._activeSection = {
+      dirty: true,
+      flushPending: async () => {
+        page._sectionDirty = false;
+      },
+      reload: () => {},
+    };
+    const saveYaml = vi.fn(async () => true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (page as any)._saveYaml = saveYaml;
+
+    const leaving = page._confirmLeave();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+
+    // The user picked "keep my work": the save lambda must retry
+    // through _saveYaml (whose own awaited flush re-runs the
+    // upsert) instead of no-opping on the clean-looking buffer.
+    page._onUnsavedSave();
+    expect(await leaving).toBe(true);
+    expect(saveYaml).toHaveBeenCalledTimes(1);
   });
 
   test("a rejecting flush still runs the guard, with the cause logged", async () => {

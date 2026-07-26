@@ -449,9 +449,12 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_activeSection?.flushPending()`` before they read this
    *  getter. The component editor's flush promotes pending form
    *  edits into ``_yaml`` synchronously; the automation editors'
-   *  flush is a backend round-trip that only the save path awaits,
-   *  so the other paths lean on ``_sectionDirty`` staying set until
-   *  the upsert lands (they fail conservative). */
+   *  flush is a backend round-trip that the save and leave paths
+   *  await; the synchronous paths (beforeunload, popstate) lean on
+   *  ``_sectionDirty`` staying set until the upsert *settles*. A
+   *  settled-as-failed round clears the flag without landing a
+   *  draft, which is why the leave path ORs in a pre-flush
+   *  snapshot rather than trusting the post-flush read. */
   private get _isDirty(): boolean {
     return this._isYamlDirty || this._sectionDirty;
   }
@@ -514,7 +517,11 @@ export class ESPHomePageDevice extends LitElement {
         // it resolves ``false`` and we propagate that up — the
         // user isn't done editing, so the page-leave guard
         // shouldn't proceed with navigation.
-        if (this._isYamlDirty) {
+        // Gated on the same conservative decision the guard used:
+        // on the failed-round path the buffer looks clean, and
+        // ``_saveYaml``'s own awaited flush is the retry that can
+        // land the draft (it early-outs itself when nothing did).
+        if (dirtyBefore || this._isYamlDirty) {
           const saved = await this._saveYaml();
           if (!saved) return false;
         }
