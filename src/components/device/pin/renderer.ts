@@ -523,9 +523,9 @@ function renderSubstitutionPin(
   ctx: RenderCtx,
   rawValue: unknown
 ): TemplateResult {
-  const isLongForm = isPlainObject(rawValue);
-  const number = (isLongForm ? rawValue.number : rawValue) as string;
-  const numberPath = isLongForm ? [...path, "number"] : path;
+  const longForm = isPlainObject(rawValue) ? rawValue : null;
+  const number = (longForm ? longForm.number : rawValue) as string;
+  const numberPath = longForm ? [...path, "number"] : path;
   const invalid = ctx.errorAt(numberPath) !== null;
   const fieldDisabled = effectiveDisabled(entry, ctx);
   // The ``${var}`` can still resolve to the board's designation for this
@@ -540,7 +540,7 @@ function renderSubstitutionPin(
   const pins = ctx.board?.pins ?? [];
   const resolvedNumber = resolveSubstitutions(number, ctx.substitutions);
   const resolved =
-    parsePinGpio(isLongForm ? { ...rawValue, number: resolvedNumber } : resolvedNumber) ??
+    parsePinGpio(longForm ? { ...longForm, number: resolvedNumber } : resolvedNumber) ??
     (isExpanderPinValue(rawValue) ? null : gpioFromAlias(resolvedNumber, pins));
   const boardPins = boardPinsForSection(ctx, entry.key);
   const boardPreset =
