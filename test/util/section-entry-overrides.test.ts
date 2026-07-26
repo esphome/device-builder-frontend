@@ -154,98 +154,10 @@ describe("resolveSectionEntries", () => {
   });
 });
 
-describe("device-section-config wiring", () => {
-  // The section component imports Lit decorators that need DOM
-  // globals (vitest runs in ``node``), so we can't render it
-  // here. Instead, scan the source for the wiring contract:
-  // the form's ``.entries`` prop must bind to the resolver's
-  // output, not the catalog's raw ``this._config.entries``.
-  //
-  // Regression pin: a previous iteration of #160 had
-  // ``MAP_SECTIONS`` and the synthesised MAP entries defined in
-  // the section component but bound the form's ``.entries``
-  // prop directly to the catalog source — leaving the
-  // substitutions section silently empty in the UI.
-  it("forwards renderEntries / resolveSectionEntries to the form's .entries prop", async () => {
-    // tsconfig restricts `types` to @types/w3c-web-serial, so node
-    // module specifiers don't type-check; vitest resolves them fine.
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const fs = await import("node:fs");
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const path = await import("node:path");
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const url = await import("node:url");
-    const here = path.dirname(url.fileURLToPath(import.meta.url));
-    const sourcePath = path.resolve(
-      here,
-      "../../src/components/device/device-section-config/render-branches.ts"
-    );
-    const src = fs.readFileSync(sourcePath, "utf-8");
-
-    // The form binding must reference the resolver-derived
-    // entries — accept either the local ``renderEntries`` const
-    // or a direct ``resolveSectionEntries(...)`` call.
-    const entriesBinding = /\.entries\s*=\s*\$\{([^}]+)\}/;
-    const match = src.match(entriesBinding);
-    expect(match, "form's .entries prop binding is missing").not.toBeNull();
-    const expr = match![1].trim();
-    expect(
-      expr.includes("renderEntries") || expr.includes("resolveSectionEntries"),
-      `form's .entries binds to '${expr}', not to the resolver's output`
-    ).toBe(true);
-
-    // Pin the inverse too: the catalog source ``this._config.entries``
-    // must NOT be the value bound to the form's ``.entries`` prop.
-    expect(
-      expr.includes("this._config.entries"),
-      "form's .entries binds to the raw catalog entries — substitutions override is bypassed"
-    ).toBe(false);
-  });
-
-  it("routes form-driven validation through the resolver, not the catalog", async () => {
-    // Regression pin for the "Save click does nothing" bug on
-    // ``packages:`` (and the latent equivalent on
-    // ``substitutions:``). The form rendered the resolver's
-    // user-keyed MAP shape, but the form's validation ran against
-    // the catalog's flat schema — whose required fields (``url``
-    // etc. for packages) were absent from the user-named rows, so
-    // ``_fieldErrors`` filled up and the save bailed silently.
-    // ``validateEntries`` must see the same entries the form
-    // rendered.
-    //
-    // Architecture note: pre-save backend lint (``validateYaml``)
-    // is no longer wired into the form. The YAML pane's red
-    // squiggles (``yaml-lint-backend.ts``) provide the same lint
-    // continuously, and the explicit Validate button runs the
-    // full ESPHome compile against the saved file. The "x y is
-    // invalid" feedback now flows through those two surfaces.
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const fs = await import("node:fs");
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const path = await import("node:path");
-    // @ts-expect-error node-only module; tsconfig types are restricted
-    const url = await import("node:url");
-    const here = path.dirname(url.fileURLToPath(import.meta.url));
-    const sourcePath = path.resolve(
-      here,
-      "../../src/components/device/device-section-config/draft-and-delete.ts"
-    );
-    const src = fs.readFileSync(sourcePath, "utf-8");
-
-    const validateCall = /validateEntries\s*\(\s*([^,)]+)\s*,/;
-    const match = src.match(validateCall);
-    expect(match, "validateEntries call not found").not.toBeNull();
-    const firstArg = match![1].trim();
-    expect(
-      firstArg.includes("renderEntries") || firstArg.includes("resolveSectionEntries"),
-      `validateEntries' first arg is '${firstArg}', not the resolver's output`
-    ).toBe(true);
-    expect(
-      firstArg === "this._config.entries",
-      "validateEntries reads the raw catalog — MAP-section saves silently bail on the catalog's required fields"
-    ).toBe(false);
-  });
-});
+// The component-side wiring (the form's ``.entries`` binding and
+// ``flushDraft``'s validation both consuming the resolver) is pinned
+// behaviorally in
+// ``test/components/device/section-config-entries-wiring.test.ts``.
 
 describe("save validation contract", () => {
   // ``_onSave`` must validate against the *render* schema. Pin
