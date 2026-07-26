@@ -311,12 +311,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   // Flush pending draft sync now. The page calls this before save / section
   // switch / leave so the user's last keystroke isn't lost in the debounce.
   // Dispatches yaml-draft synchronously so callers reading page._yaml on
-  // the next line see the up-to-date value.
+  // the next line see the up-to-date value. Void by contract (the
+  // section-switch guard treats a truthy return as a deferred flush);
+  // the delete paths use ``settleOwnDraft`` directly when they need
+  // the settled buffer back.
   public flushPending(): void {
-    if (this._draftTimer === null) return;
-    clearTimeout(this._draftTimer);
-    this._draftTimer = null;
-    flushDraft(this);
+    settleOwnDraft(this);
   }
 
   // Reload config from live YAML. Two skip cases: (a) yaml exactly matches

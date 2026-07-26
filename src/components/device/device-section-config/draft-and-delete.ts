@@ -62,19 +62,6 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   return newYaml;
 }
 
-/** Settle any pending debounced draft and return the freshest buffer
- *  this element knows — its ``yaml`` prop lags its own ``yaml-draft``
- *  by a render, so a delete basing itself on the raw prop would let
- *  the element supersede its own delete. */
-export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
-  if (host._draftTimer !== null) {
-    clearTimeout(host._draftTimer);
-    host._draftTimer = null;
-    return flushDraft(host) ?? host.yaml;
-  }
-  return host.yaml;
-}
-
 export function onValueChange(
   host: ESPHomeDeviceSectionConfig,
   e: CustomEvent<ConfigEntryValueChange>
@@ -113,11 +100,27 @@ export function applySectionValues(
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
-  if (host._draftTimer) {
+  if (host._draftTimer !== null) {
     clearTimeout(host._draftTimer);
-    host._draftTimer = null;
   }
   flushDraft(host);
+}
+
+/**
+ * Settle any pending debounced draft and return the freshest buffer
+ * this element knows — its ``yaml`` prop lags its own ``yaml-draft``
+ * by a render, so a delete basing itself on the raw prop would let
+ * the element supersede its own delete. The single settle
+ * implementation; ``flushPending`` (the ``SectionEditor`` contract)
+ * delegates here but must stay void-returning — the section-switch
+ * guard treats any truthy return as a deferred flush.
+ */
+export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
+  if (host._draftTimer !== null) {
+    clearTimeout(host._draftTimer);
+    return flushDraft(host) ?? host.yaml;
+  }
+  return host.yaml;
 }
 
 export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
