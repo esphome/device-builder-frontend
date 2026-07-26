@@ -916,9 +916,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // A ${var} value can't drive a typed widget (number/select/switch): it
     // blanks the literal and the first interaction clobbers it. Edit it as
     // text so the token round-trips and stays editable mid-keystroke;
-    // SECURE_STRING stays masked (#1391).
+    // SECURE_STRING stays masked (#1391). PIN is exempt — renderPinField owns
+    // its own ${var} handling (scalar and long-form) so the Mode/Wiring
+    // panels still render (#2348).
     const raw = ctx.getAt(path);
-    if (isSubstitutionString(raw)) {
+    if (isSubstitutionString(raw) && entry.type !== ConfigEntryType.PIN) {
       const inputType =
         entry.type === ConfigEntryType.SECURE_STRING ? "password" : "text";
       return renderStringField(entry, inputType, path, ctx);

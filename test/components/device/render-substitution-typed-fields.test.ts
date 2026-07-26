@@ -12,7 +12,7 @@ import {
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { findElementBindings, makeRenderCtx } from "./_renderer-fixtures.js";
+import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const YAML = ["substitutions:", '  current_res: "0.05"', '  voltage_div: "720"', ""].join(
   "\n"
@@ -123,5 +123,38 @@ describe("leaf dispatch routes ${var} values to an editable text field (#1391)",
     const json = serialize(result);
     expect(json).not.toContain("substitution-note");
     expect(json).not.toContain("720");
+  });
+
+  it("exempts a PIN ${var}: reaches renderPinField, keeping the wiring panel (#2348)", () => {
+    // Unlike the typed fields above, a scalar `pin: ${var}` must NOT be
+    // flattened to a bare text input — it reaches renderPinField, which still
+    // renders the Advanced/Mode disclosure (`pin-advanced`) the plain gate can't.
+    const modeChild = makeEntry(ConfigEntryType.NESTED, {
+      key: "mode",
+      config_entries: [
+        makeEntry(ConfigEntryType.BOOLEAN, { key: "output", advanced: true }),
+      ],
+    });
+    const invertedChild = makeEntry(ConfigEntryType.BOOLEAN, {
+      key: "inverted",
+      advanced: true,
+    });
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "field",
+      required: true,
+      pin_features: [],
+      config_entries: [modeChild, invertedChild],
+    });
+    const form = new ESPHomeConfigEntryForm();
+    const ctx: RenderCtx = makeRenderCtx(
+      { field: "${current_res}" },
+      { overrides: { sectionKey: "sensor.gpio", yaml: YAML } }
+    );
+    const result = (
+      form as unknown as {
+        _renderEntryLeaf(e: ConfigEntry, p: string[], c: RenderCtx): unknown;
+      }
+    )._renderEntryLeaf(entry, ["field"], ctx);
+    expect(serialize(result)).toContain("pin-advanced");
   });
 });

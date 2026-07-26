@@ -938,3 +938,49 @@ describe("renderPinField long-form substitution number", () => {
     expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(1);
   });
 });
+
+describe("renderPinField scalar substitution", () => {
+  // esphome/device-builder#2348: a bare `pin: ${testpin1}` was swallowed by
+  // the config-entry-form ${var} gate and rendered as plain text, hiding the
+  // Mode/Wiring panels. It now reaches renderPinField and behaves like the
+  // long-form ${var} case: a reference input plus the Advanced disclosure.
+  const subEntry = () =>
+    makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] });
+
+  it("renders a text input for the reference instead of the picker", () => {
+    const ctx = makeRenderCtx({ pin: "${testpin1}" });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
+    const input = findElementBindings(result, "input")[0];
+    expect(input[".value"]).toBe("${testpin1}");
+  });
+
+  it("routes edits to the scalar path, not path.number", () => {
+    const ctx = makeRenderCtx({ pin: "${testpin1}" });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    const input = findTemplatesByAnchor(result, "<input")[0];
+    const onInput = extractAttributeBindings(input)["@input"] as (e: Event) => void;
+    onInput({ target: { value: "${testpin2}" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "${testpin2}");
+  });
+
+  it("previews the resolved value from the file's substitutions", () => {
+    const yaml = "substitutions:\n  testpin1: GPIO10\n";
+    const ctx = makeRenderCtx({ pin: "${testpin1}" }, { overrides: { yaml } });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    const hint = findTemplatesByAnchor(result, "substitution-note")[0];
+    expect(hint.values).toContain("GPIO10");
+  });
+
+  it("marks an unresolvable reference as external", () => {
+    const ctx = makeRenderCtx({ pin: "${from_package}" });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "substitution-note--external").length).toBe(1);
+  });
+
+  it("still renders the board picker for a literal scalar pin", () => {
+    const ctx = makeRenderCtx({ pin: "GPIO5" });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(1);
+  });
+});
