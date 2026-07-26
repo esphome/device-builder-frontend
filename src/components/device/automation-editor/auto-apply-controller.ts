@@ -9,6 +9,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
+import { writeAutomationDelete } from "../apply-removal.js";
 import type { SectionEditor } from "../section-editor.js";
 import {
   announceSectionMount,
@@ -366,18 +367,18 @@ export class AutoApplyController implements ReactiveController {
       // splicing into a later re-read (a YAML-pane keystroke during
       // the round-trip) would silently mangle the write-through.
       const yaml = this._host.yaml;
-      const { yaml_diff } = await api.deleteAutomation(configuration, location, yaml);
-      const newYaml = applyYamlDiff(yaml, yaml_diff);
-      await api.updateConfig(configuration, newYaml);
-      // ``newYaml`` derives from the pre-round-trip snapshot; the
-      // basis lets the page supersede-check it, so a draft a newly
-      // mounted section made in the interim survives as visible
-      // dirty state instead of being overwritten (#1476).
-      announceUpdated(this._connected, {
-        yaml: newYaml,
-        basedOn: yaml,
-        removed: { kind: "automation", location },
-      });
+      // The written YAML derives from the pre-round-trip snapshot;
+      // the basis lets the page supersede-check it, so a draft a
+      // newly mounted section made in the interim survives as
+      // visible dirty state instead of being overwritten (#1476).
+      await writeAutomationDelete(
+        api,
+        configuration,
+        location,
+        yaml,
+        announceUpdated,
+        () => this._connected
+      );
       // Navigate away only while the editor is still on screen showing
       // the deleted section. After a mid-flush retarget the user is
       // already on a sibling (yanking them to null would also unmount

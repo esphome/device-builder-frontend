@@ -28,7 +28,6 @@ import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import {
-  applyYamlDiff,
   locationFromSectionKey,
   sectionKeyFromLocation,
 } from "./automation-editor/serialise.js";
@@ -43,6 +42,7 @@ import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
+import { writeAutomationDelete } from "./apply-removal.js";
 import type { SectionEditor } from "./section-editor.js";
 import {
   announceSectionMount,
@@ -463,18 +463,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       // itself.
       const configuration = this.configuration;
       const yaml = settleOwnDraft(this);
-      const { yaml_diff } = await this._api.deleteAutomation(
+      await writeAutomationDelete(
+        this._api,
         configuration,
         location,
-        yaml
+        yaml,
+        announceUpdated,
+        () => this.isConnected
       );
-      const newYaml = applyYamlDiff(yaml, yaml_diff);
-      await this._api.updateConfig(configuration, newYaml);
-      announceUpdated(this.isConnected, {
-        yaml: newYaml,
-        basedOn: yaml,
-        removed: { kind: "automation", location },
-      });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {
