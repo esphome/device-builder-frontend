@@ -150,6 +150,8 @@ describe("AutoApplyController auto-apply", () => {
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
     expect(controller.dirty).toBe(false);
     expect(dirtyEvents.map((e) => e.detail.dirty)).toEqual([true, false]);
+    // Every flip names its emitter so the page can identity-guard.
+    expect(dirtyEvents.every((e) => e.detail.node === host)).toBe(true);
   });
 
   it("never schedules in add-mode", async () => {
@@ -178,6 +180,33 @@ describe("AutoApplyController auto-apply", () => {
     controller.scheduleAutoApply();
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
     expect(upsertAutomation).not.toHaveBeenCalled();
+  });
+
+  it("an older apply's settle does not disarm edits still in the debounce window", async () => {
+    const { controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    // A keystroke lands during the round trip — possibly for a
+    // sibling the reused element was re-pointed at (#1486).
+    controller.scheduleAutoApply();
+    expect(controller.dirty).toBe(true);
+
+    resolveFirst({ yaml_diff: DIFF });
+    await flushTimers();
+    // The stale settle must not disarm the newer edit's brief-window
+    // flag; its own settle clears it.
+    expect(controller.dirty).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 20);
+    expect(controller.dirty).toBe(false);
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
   });
 
   it("coalesces a change landing mid-flight into one follow-up upsert", async () => {

@@ -304,11 +304,14 @@ export class AutoApplyController implements ReactiveController {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
         void this.autoApply();
-      } else {
+      } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
         // with our state. Clear the section-dirty flag; the page
         // still tracks _isYamlDirty separately (_yaml vs _savedYaml)
-        // so the global save button stays armed.
+        // so the global save button stays armed. A still-armed
+        // debounce means newer edits exist (a keystroke during this
+        // round trip — possibly for a sibling the reused element was
+        // re-pointed at, #1486); their own settle clears the flag.
         this._setDirty(false);
       }
     }
@@ -458,7 +461,7 @@ export class AutoApplyController implements ReactiveController {
     if (this._dirty === value) return;
     this._dirty = value;
     this._host.requestUpdate();
-    fireSectionEvent(this._host, "dirty-change", { dirty: value });
+    fireSectionEvent(this._host, "dirty-change", { dirty: value, node: this._host });
   }
 
   private _setDeleteMode(mode: DeleteMode | null): void {
