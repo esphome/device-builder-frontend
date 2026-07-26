@@ -631,7 +631,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // Logged so a mis-bound configuration prop is distinguishable
     // from a genuine device switch.
     if (e.detail.configuration !== this.configuration) {
-      console.warn("Dropped automation-added for", e.detail.configuration);
+      console.warn(
+        "Dropped automation-added for",
+        e.detail.configuration,
+        "while showing",
+        this.configuration
+      );
       return;
     }
     this._emitSectionSelect(e.detail.sectionKey, undefined);
