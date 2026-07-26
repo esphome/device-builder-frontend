@@ -211,7 +211,7 @@ export class ESPHomeAdoptDialog extends LitElement {
   private readonly _dialog = new DialogOpenController(this);
 
   // Enter submits; _submit self-guards on name validity and re-entry.
-  private _enter = new EnterController(this, () => this._submit());
+  private _enter = new EnterController(this, () => void this._submit());
 
   protected willUpdate(): void {
     // Re-sync every update (set() no-ops on same value) — the open flag
@@ -241,6 +241,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     // validate (esphome/device-builder#1742). Probe the shared secrets so
     // the Wi-Fi step can prompt + store them before importing.
     if (this._needsWifi && this._api) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
       fetchSecretKeys(this._api).then((keys) => {
         this._hasWifiSecrets = hasSharedWifiSecret(keys);
       });

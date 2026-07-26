@@ -55,9 +55,7 @@ export function openFlasher(
 
   let bytes: ArrayBuffer | null = firmware;
   const controller = new AbortController();
-  let readyTimer: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
-  let closePoll: ReturnType<typeof setInterval> | undefined;
   let finished = false;
   let handedOff = false;
   // True while the user is sitting on a delivered error (the tab stays open for
@@ -73,9 +71,9 @@ export function openFlasher(
     if (finished) return;
     finished = true;
     controller.abort();
-    if (readyTimer !== undefined) clearTimeout(readyTimer);
+    clearTimeout(readyTimer);
     if (watchdog !== undefined) clearTimeout(watchdog);
-    if (closePoll !== undefined) clearInterval(closePoll);
+    clearInterval(closePoll);
   };
   const lost = () => {
     if (finished) return;
@@ -94,7 +92,7 @@ export function openFlasher(
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
-      if (readyTimer !== undefined) clearTimeout(readyTimer);
+      clearTimeout(readyTimer);
       if (handedOff || !bytes) return;
       // Forward-compat: a flasher advertising a newer protocol still gets our
       // v1 frame (additive fields are ignored); just note the mismatch. When a
@@ -169,13 +167,13 @@ export function openFlasher(
   };
 
   window.addEventListener("message", onMessage, { signal: controller.signal });
-  closePoll = setInterval(() => {
+  const closePoll = setInterval(() => {
     if (!win.closed) return;
     // The dialog already shows the real error; a quiet finish keeps it instead
     // of overwriting with "lost contact".
     if (errored) finish();
     else lost();
   }, 1000);
-  readyTimer = setTimeout(lost, READY_TIMEOUT_MS);
+  const readyTimer = setTimeout(lost, READY_TIMEOUT_MS);
   return finish;
 }

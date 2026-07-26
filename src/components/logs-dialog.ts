@@ -272,6 +272,7 @@ export class ESPHomeLogsDialog extends LitElement {
        back to the bottom themselves. ``scrollToBottom()`` clears the
        flag and forces a scroll. updateComplete makes sure the @query
        has resolved on first open. */
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
     this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
@@ -320,7 +321,7 @@ export class ESPHomeLogsDialog extends LitElement {
                     icon: "arrow-left",
                     label: this._localize("dashboard.logs_back_to_install"),
                     title: this._localize("dashboard.logs_back_to_install_tooltip"),
-                    onClick: this._onBackToInstall,
+                    onClick: () => void this._onBackToInstall(),
                   })}
                 </div>`
               : ""
@@ -359,14 +360,14 @@ export class ESPHomeLogsDialog extends LitElement {
                     icon: "restart",
                     label: this._localize("dashboard.logs_reset_device"),
                     disabled: !hasSerialPort(s),
-                    onClick: this._onResetDevice,
+                    onClick: () => void this._onResetDevice(),
                   })
                 : isOtaNetwork(s)
                   ? // States arrive only over the network/API connection, so the
                     // toggle is hidden for a server serial source (#539).
                     renderTermToggle({
                       active: this._showStates,
-                      onClick: this._toggleShowStates,
+                      onClick: () => void this._toggleShowStates(),
                       icon: "pulse",
                       label: this._localize("dashboard.logs_states"),
                       title: toggleLabel,

@@ -53,7 +53,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   // Enter submits; _save() self-guards on a blank SSID / too-short password.
-  private _enter = new EnterController(this, () => this._save());
+  private _enter = new EnterController(this, () => void this._save());
 
   open() {
     this._ssid = "";

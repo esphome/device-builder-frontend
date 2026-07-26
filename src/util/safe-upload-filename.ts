@@ -72,7 +72,6 @@ const WINDOWS_RESERVED_NAMES = new Set([
 export function safeUploadFilename(stem: string): string {
   const cleaned = stem
     .replace(/[/\\]/g, "")
-    // eslint-disable-next-line no-control-regex
     .replace(/[<>:"|?*#\x00-\x1f]/g, "")
     .replace(/^[\s.]+|[\s.]+$/g, "");
   // Windows reserves the device name regardless of any trailing

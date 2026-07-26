@@ -268,8 +268,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // Enter submits the current step; the read-only "sent" step has no action.
   // Each handler self-guards on its own validity (empty hostname, labels).
   private _enterAction(): (() => void) | undefined {
-    if (this._step === "input") return this._onPreviewSubmit;
-    if (this._step === "confirm") return this._onConfirmSubmit;
+    if (this._step === "input") return () => void this._onPreviewSubmit();
+    if (this._step === "confirm") return () => void this._onConfirmSubmit();
     return undefined;
   }
 }

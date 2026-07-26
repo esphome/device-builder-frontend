@@ -399,7 +399,14 @@ export async function fetchApiKey(
  * next session — a Copilot find on PR #68). The cancel stops the loop AND
  * closes the port; a Stop pause never calls it.
  */
-export function streamSerialToDialog(port: any, dialog: any): () => void {
+export function streamSerialToDialog(
+  port: SerialPort,
+  dialog: {
+    _serialPaused?: boolean;
+    _noteSerialActivity(): void;
+    _enqueueLine(line: string): void;
+  }
+): () => void {
   return streamSerialLines(port, {
     onLine: (line) => {
       // Keep draining while paused (Stop) but don't display (#526).

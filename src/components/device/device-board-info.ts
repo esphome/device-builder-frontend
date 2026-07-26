@@ -141,6 +141,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     // await; doing that in willUpdate folds it into the in-progress render
     // instead of scheduling a second one.
     if (changedProperties.has("board")) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
       this._refreshAlternateBoards();
     }
   }

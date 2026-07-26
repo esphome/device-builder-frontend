@@ -62,10 +62,9 @@ class HostedDecoder {
     if (!target) return null;
     const id = `d${++this._seq}`;
     return new Promise((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
       const done = (frames: DecodedFrame[] | null) => {
         window.removeEventListener("message", onMessage);
-        if (timer !== undefined) clearTimeout(timer);
+        clearTimeout(timer);
         resolve(frames);
       };
       const onMessage = (ev: MessageEvent) => {
@@ -76,7 +75,7 @@ class HostedDecoder {
         else if (data.type === MSG_ERROR) done(null);
       };
       window.addEventListener("message", onMessage);
-      timer = setTimeout(() => done(null), DECODE_TIMEOUT_MS);
+      const timer = setTimeout(() => done(null), DECODE_TIMEOUT_MS);
       try {
         // Cloned, not transferred. The decoder is a foreign origin, so the
         // bytes cross a process boundary and get copied either way; transferring
@@ -117,10 +116,9 @@ class HostedDecoder {
       frame.src = `${DECODER_URL}#nonce=${encodeURIComponent(nonce)}&origin=${encodeURIComponent(
         location.origin
       )}`;
-      let timer: ReturnType<typeof setTimeout> | undefined;
       const settle = (ok: boolean) => {
         window.removeEventListener("message", onReady);
-        if (timer !== undefined) clearTimeout(timer);
+        clearTimeout(timer);
         if (!ok) frame.remove();
         resolve(ok);
       };
@@ -154,7 +152,7 @@ class HostedDecoder {
       window.addEventListener("message", onReady);
       // The page is unreachable when offline or when Pages is down, and an
       // iframe that never loads fires no error we can rely on, so time out.
-      timer = setTimeout(() => settle(false), READY_TIMEOUT_MS);
+      const timer = setTimeout(() => settle(false), READY_TIMEOUT_MS);
       document.body.appendChild(frame);
     });
   }

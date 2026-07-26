@@ -210,7 +210,11 @@ describe("resolveAvailableEntries (platform-merged)", () => {
             .map((id) => [id, platformEntry])
         ),
     } as never;
-    const out = await (resolveAvailableEntries as unknown as Function)(
+    const out = await (
+      resolveAvailableEntries as unknown as (
+        ...args: unknown[]
+      ) => Promise<{ key: string }[]>
+    )(
       fakeApi,
       c,
       "platform", // parentKey from indent walker
@@ -237,13 +241,11 @@ describe("resolveAvailableEntries (platform-merged)", () => {
       getComponentBodies: async (ids: string[]) =>
         Object.fromEntries(ids.filter((id) => id === "wifi").map((id) => [id, body])),
     } as never;
-    const out = await (resolveAvailableEntries as unknown as Function)(
-      fakeApi,
-      c,
-      "wifi",
-      null,
-      null
-    );
+    const out = await (
+      resolveAvailableEntries as unknown as (
+        ...args: unknown[]
+      ) => Promise<{ key: string }[]>
+    )(fakeApi, c, "wifi", null, null);
     expect(out.map((e: { key: string }) => e.key)).toContain("ssid");
   });
 });

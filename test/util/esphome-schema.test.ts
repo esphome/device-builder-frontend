@@ -63,11 +63,11 @@ const SENSOR_BUNDLE = {
   },
 };
 
-let fetchSpy: ReturnType<typeof vi.fn>;
+let fetchSpy: ReturnType<typeof vi.fn<(url: string) => Promise<Response>>>;
 
 beforeEach(() => {
   _resetSchemaCacheForTests();
-  fetchSpy = vi.fn();
+  fetchSpy = vi.fn<(url: string) => Promise<Response>>();
   // ``vi.stubGlobal`` is the repo's convention for swapping
   // built-ins; matching ``vi.unstubAllGlobals`` in afterEach
   // restores the original ``fetch`` so a later test that doesn't

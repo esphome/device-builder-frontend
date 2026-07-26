@@ -309,7 +309,8 @@ export class ESPHomeSecretValue extends LitElement {
       @keydown=${(e: KeyboardEvent) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          this.present ? this._save() : this._create();
+          if (this.present) this._save();
+          else this._create();
         }
       }}
     ></esphome-password-input>`;

@@ -385,7 +385,7 @@ function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof noth
             icon: "refresh",
             label: host._localize("command.retry"),
             variant: "start",
-            onClick: host._start,
+            onClick: () => void host._start(),
           })}
           ${close}`;
     case "success":

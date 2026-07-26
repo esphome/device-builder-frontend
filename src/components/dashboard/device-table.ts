@@ -58,6 +58,7 @@ import {
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
+import type { Row, Table } from "@tanstack/lit-table";
 import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -217,7 +218,7 @@ export class ESPHomeDeviceTable extends LitElement {
   };
 
   private _globalFilterFn = (
-    row: any,
+    row: Row<DeviceRow>,
     _columnId: string,
     filterValue: unknown
   ): boolean => {
@@ -323,9 +324,9 @@ export class ESPHomeDeviceTable extends LitElement {
         globalFilter: this.search,
         pagination: { pageSize: effectivePageSize, pageIndex: effectivePageIndex },
       },
-      onSortingChange: this._handleSortingChange as any,
-      onColumnVisibilityChange: this._handleVisibilityChange as any,
-      onPaginationChange: this._handlePaginationChange as any,
+      onSortingChange: this._handleSortingChange,
+      onColumnVisibilityChange: this._handleVisibilityChange,
+      onPaginationChange: this._handlePaginationChange,
       getCoreRowModel: coreRowModel,
       getSortedRowModel: sortedRowModel,
       getFilteredRowModel: filteredRowModel,
@@ -475,7 +476,7 @@ export class ESPHomeDeviceTable extends LitElement {
     `;
   }
 
-  private _renderControls(table: any, toggleCols: ToggleableColumn[]) {
+  private _renderControls(table: Table<DeviceRow>, toggleCols: ToggleableColumn[]) {
     return html`
       <div class="controls">
         <slot name="toolbar"></slot>
@@ -530,9 +531,8 @@ export class ESPHomeDeviceTable extends LitElement {
        behind it. */
     if ((e.target as Element)?.closest("button, a")) return;
     e.preventDefault();
-    this.selectMode
-      ? this._onToggleSelect(device.configuration)
-      : this._onRowClick(device);
+    if (this.selectMode) this._onToggleSelect(device.configuration);
+    else this._onRowClick(device);
   }
 
   private _openActionsMenu(e: MouseEvent, device: ConfiguredDevice) {

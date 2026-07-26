@@ -1,3 +1,4 @@
 pnpm run format:check
 pnpm run lint
+pnpm run lint:eslint
 pnpm test

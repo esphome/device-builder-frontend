@@ -67,7 +67,7 @@ export class BatchedCache<V, Ctx> {
       if (bucket === undefined) {
         bucket = { api, ctx, pending: new Map() };
         this._batches.set(bk, bucket);
-        queueMicrotask(() => this._flush(bk));
+        queueMicrotask(() => void this._flush(bk));
       }
       bucket.pending.set(key, { resolve, reject });
     }).finally(() => {

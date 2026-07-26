@@ -16,6 +16,7 @@
     "build:web": "node build-scripts/build-web.cjs",
     "gen:languages": "node build-scripts/gen-language-manifest.cjs",
     "lint": "node build-scripts/gen-language-manifest.cjs && tsc --noEmit",
+    "lint:eslint": "node build-scripts/gen-language-manifest.cjs && eslint src test --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "vitest run",
@@ -61,12 +62,14 @@
     "@swc/helpers": "0.5.23",
     "@types/node": "26.1.1",
     "@types/w3c-web-serial": "^1.0.8",
+    "eslint": "^10.8.0",
     "fflate": "^0.8.3",
     "happy-dom": "^20.11.1",
     "husky": "^9.1.7",
     "prettier": "3.9.6",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "7.0.2",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   },
   "browserslist": {

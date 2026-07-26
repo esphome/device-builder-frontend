@@ -52,7 +52,7 @@ async function mount(
   internals._localize = (key, args) =>
     args?.count !== undefined ? `${key}:${args.count}` : key;
   document.body.appendChild(el);
-  el.open();
+  void el.open();
   await el.updateComplete;
   return el;
 }

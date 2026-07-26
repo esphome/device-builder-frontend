@@ -1,4 +1,6 @@
 import { flexRender } from "@tanstack/lit-table";
+import type { Cell, Header, HeaderGroup, Row, Table } from "@tanstack/lit-table";
+import type { DeviceRow } from "./table-columns.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -8,15 +10,15 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
 
 export interface DeviceTableHeadProps {
-  table: any;
+  table: Table<DeviceRow>;
   selectMode: boolean;
   allSelected: boolean;
   onToggleAll: () => void;
 }
 
 export interface DeviceTableBodyProps {
-  table: any;
-  rows: any[];
+  table: Table<DeviceRow>;
+  rows: Row<DeviceRow>[];
   selectMode: boolean;
   selectedDevices: Set<string>;
   highlightConfiguration: string | null;
@@ -38,7 +40,7 @@ export function renderDeviceTableHead(p: DeviceTableHeadProps): TemplateResult {
   return html`
     <thead>
       ${p.table.getHeaderGroups().map(
-        (hg: any) => html`
+        (hg: HeaderGroup<DeviceRow>) => html`
           <tr role="row">
             ${
               p.selectMode
@@ -52,7 +54,7 @@ export function renderDeviceTableHead(p: DeviceTableHeadProps): TemplateResult {
                   </th>`
                 : nothing
             }
-            ${hg.headers.map((header: any) => {
+            ${hg.headers.map((header: Header<DeviceRow, unknown>) => {
               const sorted = header.column.getIsSorted();
               const canSort = header.column.getCanSort();
               return html`
@@ -159,7 +161,7 @@ export function renderDeviceTableBody(p: DeviceTableBodyProps): TemplateResult {
                         </td>`
                       : nothing
                   }
-                  ${row.getVisibleCells().map((cell: any) => {
+                  ${row.getVisibleCells().map((cell: Cell<DeviceRow, unknown>) => {
                     // The stacked mobile layout (table-styles.ts) shows each
                     // cell's column header as a field label. It's a real
                     // span (not a CSS ::before) so screen readers announce

@@ -422,9 +422,10 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
       "aht20_temperature",
     ]);
     // Entity triggers are now offered.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(
-      (dialog as any)._filteredTriggers().map((t: { id: string }) => t.id)
+      (dialog as unknown as { _filteredTriggers(): { id: string }[] })
+        ._filteredTriggers()
+        .map((t) => t.id)
     ).toContain("sensor.on_value_range");
   });
 

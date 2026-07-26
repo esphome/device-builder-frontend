@@ -390,7 +390,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!this._showIgnored) this._showDiscovered = true;
     this._toggleShowIgnored();
   };
-  private _onShowArchivedDialog = () => this._archivedDialog?.open();
+  private _onShowArchivedDialog = () => void this._archivedDialog?.open();
 
   _onEnterSelectMode = (configuration?: string) => {
     this._selectMode = true;
@@ -1036,6 +1036,7 @@ export class ESPHomePageDashboard extends LitElement {
     () => this._localize
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 

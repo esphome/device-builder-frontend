@@ -49,7 +49,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
       label: t("command_palette.go_dashboard"),
       icon: "home",
       keywords: ["dashboard", "devices"],
-      run: () => navigate("/"),
+      run: () => void navigate("/"),
     },
     {
       id: "nav.secrets",
@@ -57,7 +57,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
       label: t("layout.secrets"),
       icon: "key-variant",
       keywords: ["password", "wifi"],
-      run: () => navigate("/secrets"),
+      run: () => void navigate("/secrets"),
     },
   ];
 

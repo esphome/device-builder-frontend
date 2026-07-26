@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { detectEnvironment } from "../../src/util/environment.js";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const origLocation = Object.getOwnPropertyDescriptor(window, "location");
 const setHost = (hostname: string) =>
   Object.defineProperty(window, "location", { configurable: true, value: { hostname } });
@@ -14,7 +13,6 @@ const api = (haAddon = false) => ({ serverInfo: { ha_addon: haAddon } }) as ESPH
 afterEach(() => {
   if (origLocation) Object.defineProperty(window, "location", origLocation);
 });
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe("detectEnvironment", () => {
   it("ha_addon wins regardless of host", () => {
