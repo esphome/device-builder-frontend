@@ -315,12 +315,20 @@ export class ESPHomeAutomationActionNode extends LitElement {
             ? nothing
             : html`<div class="ae-row-body">
                 ${
-                  def?.description
-                    ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
-                    : nothing
+                  this.value.unknown
+                    ? html`<p class="ae-row-unknown">
+                        ${this._localize("device.automation_action_unknown")}
+                      </p>`
+                    : html`${
+                        def?.description
+                          ? html`<p class="ae-row-desc">
+                              ${renderMarkdown(def.description)}
+                            </p>`
+                          : nothing
+                      }
+                      ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
+                      ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}`
                 }
-                ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
-                ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
               </div>`
         }
       </div>

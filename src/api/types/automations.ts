@@ -155,12 +155,17 @@ export type AutomationLocation =
  *  action's ``accepts_action_list`` entries (e.g.
  *  ``{ then: [...], else: [...] }`` for ``if``). ``conditions`` is
  *  populated only for ``if`` (the boolean gate) — other control-flow
- *  actions have their gate elsewhere. */
+ *  actions have their gate elsewhere. ``unknown`` marks an uncatalogued
+ *  action (from an ``external_components`` source, or a typo): it's
+ *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
+ *  sibling actions stay editable. */
 export interface ActionNode {
   action_id: string;
   params: Record<string, unknown>;
   children?: Record<string, ActionNode[]>;
   conditions?: ConditionNode[];
+  unknown?: boolean;
+  raw_body?: unknown;
 }
 
 /** A single condition inside an ``if`` / ``while`` / ``wait_until``.

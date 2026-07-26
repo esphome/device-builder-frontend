@@ -971,6 +971,7 @@
     "automation_action_collapse": "Collapse",
     "automation_action_expand": "Expand",
     "automation_action_pick": "Change action",
+    "automation_action_unknown": "This action isn't in the catalog (it comes from an external component, or the id is a typo), so it can't be edited here. Edit it in the YAML view; it's kept as-is when you save the rest of the automation.",
     "automation_action_delay_unit_us": "Microseconds",
     "automation_action_delay_unit_ms": "Milliseconds",
     "automation_action_delay_unit_s": "Seconds",
