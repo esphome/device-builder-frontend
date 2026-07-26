@@ -13,7 +13,7 @@
  * inline pane has the full width of the screen instead of the
  * dialog's 640px clamp.
  *
- * Emits ``automation-added`` (``detail: { sectionKey, yamlDiff }``)
+ * Emits ``automation-added`` (``detail: { configuration, sectionKey }``)
  * on successful upsert so the parent navigator can switch to the
  * new section.
  */

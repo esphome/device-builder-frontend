@@ -889,7 +889,9 @@ describe("AutoApplyController host lifecycle", () => {
     controller.scheduleAutoApply();
     host.parentNode = null;
     controller.hostDisconnected();
-    await flushTimers();
+    // Past the full debounce window: the timer must be cancelled,
+    // not merely outrun by a 0ms flush.
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 60);
 
     expect(upsertAutomation).not.toHaveBeenCalled();
   });

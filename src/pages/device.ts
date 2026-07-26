@@ -1762,7 +1762,9 @@ export class ESPHomePageDevice extends LitElement {
     this._selectedFromLine = next;
     // The URL persists the line; leaving it stale would bias a
     // reload's duplicate-key resolution toward the wrong instance.
-    this._updateUrl();
+    // A late anchored draft can land after this page unmounted —
+    // replaceState would then pollute an unrelated route's URL.
+    if (this.isConnected) this._updateUrl();
   }
 
   /** Apply a superseded delete's removal to the live buffer (#1490). */
@@ -1849,11 +1851,15 @@ export class ESPHomePageDevice extends LitElement {
       this._sectionHistory = [...this._sectionHistory, { key: prev, fromLine: prevLine }];
     }
     this._selectedSection = sectionKey;
-    // The switch is synchronous, so the navigator's click-time
-    // fromLine matches the click-time buffer; a draft landing later
-    // re-pins it in ``_onYamlDraft``.
+    // The navigator's rows can be one render behind a draft that
+    // already advanced the buffer, so the click-time hint still
+    // re-resolves against the live buffer (idempotent when they
+    // agree, memo-cheap, unset when the key vanished); drafts
+    // landing later re-pin via ``_onYamlDraft``.
     this._selectedFromLine =
-      sectionKey !== null && fromLine !== undefined ? fromLine : undefined;
+      sectionKey !== null && fromLine !== undefined
+        ? resolveCurrentSectionLine(this._yaml, sectionKey, fromLine)
+        : undefined;
     // A navigator click carries no field intent — a stale cursor path
     // would scroll/flash a target in the newly mounted editor that the
     // user never pointed at.

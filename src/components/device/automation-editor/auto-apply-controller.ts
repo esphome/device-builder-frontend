@@ -129,7 +129,10 @@ export class AutoApplyController implements ReactiveController {
   private _lastSelfWrittenYaml: string | null = null;
   /** Basis for rounds running after an unmount: the detached prop
    *  can no longer echo the page's buffer, so each detached round
-   *  chains onto its own previous result instead (#1479). */
+   *  chains onto its own previous result instead (#1479). A remount
+   *  mid-flight resets it (``hostConnected``); a chained round that
+   *  resolves after one still passes the landing basis check, and a
+   *  re-pointed host loses the exemption via ``RETARGETED_EMITTER``. */
   private _detachedBasis: string | null = null;
   private _dirty = false;
   // Whether the host element is on screen; a failure-path re-arm must not
@@ -170,10 +173,14 @@ export class AutoApplyController implements ReactiveController {
     // the anchor still being in the document: with the whole page
     // gone the draft has nowhere to land, and a failed round would
     // toast onto whatever page the user is on now.
-    if (this._debounce !== null && this._anchor?.isConnected) {
-      this._cancelDebounce();
-      void this.autoApply();
-    }
+    const hadPending = this._debounce !== null;
+    // Cancel unconditionally — a timer surviving the unmount would
+    // fire an upsert for a torn-down section — then drain only when
+    // the anchor is still in the document (a full page teardown has
+    // nowhere to land the draft, and a failed round would toast on
+    // whatever page the user is on now).
+    this._cancelDebounce();
+    if (hadPending && this._anchor?.isConnected) void this.autoApply();
     // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
     this._announceUnmount = null;

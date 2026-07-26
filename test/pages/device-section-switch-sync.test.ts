@@ -42,15 +42,19 @@ describe("synchronous section switch", () => {
   it("lands the switch synchronously while an async flush is in flight", () => {
     const page = new ESPHomePageDevice();
     const { flushPending } = gateFlush(page);
+    internals(page)._yaml = ["i2c:", "  sda: 1", "sensor:", "  - platform: aht10"].join(
+      "\n"
+    );
     internals(page)._selectedSection = "i2c";
     internals(page)._selectedFromLine = 1;
 
-    select(page, "sensor.aht10", 3);
+    select(page, "sensor.aht10", 4);
 
     // No await: the selection moved before the flush settled, and
-    // the outgoing editor's flush was kicked exactly once.
+    // the outgoing editor's flush was kicked exactly once. The
+    // click-time hint re-resolves against the live buffer.
     expect(internals(page)._selectedSection).toBe("sensor.aht10");
-    expect(internals(page)._selectedFromLine).toBe(3);
+    expect(internals(page)._selectedFromLine).toBe(4);
     expect(flushPending).toHaveBeenCalledTimes(1);
   });
 
