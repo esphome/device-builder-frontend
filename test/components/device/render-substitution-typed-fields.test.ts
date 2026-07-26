@@ -157,4 +157,20 @@ describe("leaf dispatch routes ${var} values to an editable text field (#1391)",
     )._renderEntryLeaf(entry, ["field"], ctx);
     expect(serialize(result)).toContain("pin-advanced");
   });
+
+  it("keeps the gate for a multi_value PIN ${var} (routes to the list, not the pin renderer)", () => {
+    // A whole-value ${var} on a multi_value PIN (octal SPI data_pins) never
+    // reaches renderPinField — the exemption is scoped to single-value PINs so
+    // it still edits as text rather than an empty list the Add button clobbers.
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "field",
+      multi_value: true,
+      pin_features: [],
+    });
+    const result = renderLeaf(entry, "${current_res}");
+    const inputs = findElementBindings(result, "input");
+    expect(inputs[0]["type"]).toBe("text");
+    expect(inputs[0][".value"]).toBe("${current_res}");
+    expect(serialize(result)).not.toContain("pin-advanced");
+  });
 });
