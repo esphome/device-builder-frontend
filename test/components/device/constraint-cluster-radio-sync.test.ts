@@ -65,6 +65,12 @@ describe("constraint-cluster radio sync tolerance", () => {
         "Radio group sync failed:",
         expect.any(Error)
       );
+
+      // A persistently failing group warns once, not once per render.
+      controller.hostUpdated();
+      await settle();
+      expect(rejecting).toHaveBeenCalledTimes(2);
+      expect(consoleWarn).toHaveBeenCalledTimes(2);
     } finally {
       consoleWarn.mockRestore();
     }
