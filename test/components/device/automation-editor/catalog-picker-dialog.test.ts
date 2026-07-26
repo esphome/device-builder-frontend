@@ -57,11 +57,19 @@ async function mountDialog(opts: {
   (dialog as any)._localize = identityLocalize; // no context provider in the test tree
   document.body.appendChild(dialog);
   dialog.open();
-  if (opts.tab) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._activeTab = opts.tab;
-  }
   await dialog.updateComplete;
+  if (opts.tab) {
+    // Switch tabs the way the user does — through the rendered tab
+    // strip — so the @click wiring is covered too.
+    const tabs: string[] =
+      dialog.kind === "action"
+        ? ["by-target", "by-type", "building-blocks"]
+        : ["by-type", "building-blocks"];
+    dialog
+      .shadowRoot!.querySelectorAll<HTMLElement>(".picker-tab")
+      [tabs.indexOf(opts.tab)].click();
+    await dialog.updateComplete;
+  }
   return dialog;
 }
 
@@ -156,17 +164,15 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
     config_entries: [makeConfigEntry({ key: "id", references_component: "switch" })],
   });
 
-  async function pickFirstRow(
-    dialog: ESPHomeCatalogPickerDialog
-  ): Promise<CatalogPickedDetail> {
+  /** Click the first row; the cell asserts the emitted detail (an
+   *  undefined return means the pick never fired). */
+  function pickFirstRow(dialog: ESPHomeCatalogPickerDialog): CatalogPickedDetail {
     const picked = vi.fn();
     dialog.addEventListener("catalog-picked", (e) =>
       picked((e as CustomEvent<CatalogPickedDetail>).detail)
     );
-    const row = dialog.shadowRoot!.querySelector<HTMLElement>(".picker-row")!;
-    row.click();
-    expect(picked).toHaveBeenCalledTimes(1);
-    return picked.mock.calls[0][0] as CatalogPickedDetail;
+    dialog.shadowRoot!.querySelector<HTMLElement>(".picker-row")!.click();
+    return picked.mock.calls[0]?.[0] as CatalogPickedDetail;
   }
 
   it("picking under a declared-id device pre-fills the id-shaped param", async () => {
@@ -182,7 +188,7 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
       ],
       tab: "by-target",
     });
-    expect(await pickFirstRow(dialog)).toEqual({
+    expect(pickFirstRow(dialog)).toEqual({
       id: "switch.turn_on",
       preFilledParams: { id: "relay1" },
     });
@@ -194,7 +200,7 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
       devices: [{ component_id: "switch.gpio", id: "switch_0", name: "Warmtepomp" }],
       tab: "by-target",
     });
-    expect(await pickFirstRow(dialog)).toEqual({
+    expect(pickFirstRow(dialog)).toEqual({
       id: "switch.turn_on",
       preFilledParams: undefined,
     });

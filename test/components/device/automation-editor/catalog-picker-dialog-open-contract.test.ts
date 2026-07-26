@@ -5,9 +5,9 @@
  * migration onto ``esphome-base-dialog``. The wrapper never mutates
  * its own ``open`` on a user-driven close, so the host owns the
  * reactive ``_open`` flag: ``open()`` sets it, ``@request-close``
- * clears it, and picking an item clears it. (The sibling source-scan
- * test in this folder stays node-env; this file opts into happy-dom
- * per-file so the element can mount.)
+ * clears it, and picking an item clears it. The sibling
+ * ``catalog-picker-dialog.test.ts`` covers the filter / grouping
+ * contract; this file owns the open/close lifecycle.
  */
 import { describe, expect, it, vi } from "vitest";
 

@@ -20,6 +20,10 @@ import { fireSectionEvent, prepareSectionEvent } from "../section-editor.js";
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
 // catalog schema that doesn't match what the user actually edits in the form —
 // using it would surface phantom "missing required" errors per keystroke.
+// Pre-save backend lint (validateYaml) is deliberately not wired in here: the
+// YAML pane's squiggles (yaml-lint-backend.ts) provide the same lint
+// continuously, and the explicit Validate button runs the full ESPHome
+// compile against the saved file.
 export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   host._draftTimer = null;
   if (!host._config) return null;
