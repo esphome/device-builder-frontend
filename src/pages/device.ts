@@ -1790,6 +1790,11 @@ export class ESPHomePageDevice extends LitElement {
       console.error("Re-base of superseded delete failed:", err);
       rebased = null;
     }
+    // The device switched mid-recompute: the continuation (and its
+    // toast) belongs to the previous device. ``_loadYaml`` doesn't
+    // clear ``_yaml`` before its fetch, so the buffer guard below
+    // can't catch this window.
+    if (detail.configuration !== this.id) return;
     // Land the re-base only if the pane didn't move again while it
     // was computed — stale coordinates no longer apply.
     if (rebased !== null && live === this._yaml) {
