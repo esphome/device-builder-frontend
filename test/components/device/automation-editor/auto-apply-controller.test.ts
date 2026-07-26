@@ -346,7 +346,7 @@ describe("AutoApplyController auto-apply", () => {
     expect(seen[0].detail.basedOn).toBe("line1\nline2");
   });
 
-  it("a queued re-run does not fire after the host unmounts", async () => {
+  it("a queued re-run chains its basis after the host unmounts", async () => {
     const parent = document.createElement("div");
     const { controller, upsertAutomation } = setup({}, parent);
     let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
@@ -367,11 +367,14 @@ describe("AutoApplyController auto-apply", () => {
     await applying;
     await flushTimers();
 
-    // Only the in-flight round's draft lands via the anchor; the
-    // detached re-run is skipped rather than toasting a discard of
-    // a draft whose basis can no longer echo.
-    expect(upsertAutomation).toHaveBeenCalledTimes(1);
-    expect(seen).toHaveLength(1);
+    // Both rounds land through the anchor; the detached re-run's
+    // basis chains onto the first round's result instead of the
+    // frozen prop, so its draft applies rather than toasting.
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
+    expect(seen).toHaveLength(2);
+    expect(seen[0].detail.basedOn).toBe("line1\nline2");
+    expect(seen[1].detail.basedOn).toBe("replaced\nline2");
+    expect(upsertAutomation.mock.calls[1][3]).toBe("replaced\nline2");
   });
 
   it("flushPending wakes on the settle boundary, not a poll tick", async () => {
@@ -824,11 +827,21 @@ describe("AutoApplyController host lifecycle", () => {
     expect(unmounts).toEqual([host]);
   });
 
-  it("cancels the pending debounced upsert on host disconnect", async () => {
-    const { controller, upsertAutomation } = setup();
+  it("drains the pending debounced upsert into a detached round on disconnect", async () => {
+    const parent = document.createElement("div");
+    const { controller, upsertAutomation } = setup({}, parent);
+    const seen: CustomEvent[] = [];
+    parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
+
     controller.scheduleAutoApply();
     controller.hostDisconnected();
-    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
-    expect(upsertAutomation).not.toHaveBeenCalled();
+    await flushTimers();
+
+    // The keystrokes inside the debounce window are not dropped:
+    // the round starts immediately (no timer left to fire) and its
+    // draft rides the anchor with the frozen prop as its basis.
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].detail.basedOn).toBe("line1\nline2");
   });
 });

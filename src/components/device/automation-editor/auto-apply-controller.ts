@@ -122,6 +122,10 @@ export class AutoApplyController implements ReactiveController {
   /** Non-null while a delete owns the section. */
   private _deleteMode: DeleteMode | null = null;
   private _lastSelfWrittenYaml: string | null = null;
+  /** Basis for rounds running after an unmount: the detached prop
+   *  can no longer echo the page's buffer, so each detached round
+   *  chains onto its own previous result instead (#1479). */
+  private _detachedBasis: string | null = null;
   private _dirty = false;
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
@@ -140,14 +144,23 @@ export class AutoApplyController implements ReactiveController {
    *  device-section-config's section-mount event. */
   hostConnected(): void {
     this._connected = true;
+    this._detachedBasis = null;
     this._announceUnmount = announceSectionMount(this._host);
   }
 
   hostDisconnected(): void {
     this._connected = false;
-    // Cancel the pending debounced upsert — a write scheduled by a
-    // section that's no longer on screen must not fire.
-    this._cancelDebounce();
+    // The frozen prop is the freshest buffer this element saw; the
+    // first detached round bases on it, later ones chain (#1479).
+    this._detachedBasis = this._host.yaml;
+    // Drain a pending debounced edit instead of dropping it: the
+    // synchronous switch no longer waits for the flush, so the
+    // keystrokes inside the debounce window ride a detached round
+    // whose draft lands through the anchor.
+    if (this._debounce !== null) {
+      this._cancelDebounce();
+      void this.autoApply();
+    }
     // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
     this._announceUnmount = null;
@@ -300,7 +313,10 @@ export class AutoApplyController implements ReactiveController {
       // Read the buffer exactly once: the backend computes the
       // diff's line coordinates against the string we send, so
       // splicing into a later re-read would silently mangle it.
-      const yaml = this._host.yaml;
+      // Detached rounds chain instead — their prop cannot echo.
+      const yaml = this._connected
+        ? this._host.yaml
+        : (this._detachedBasis ?? this._host.yaml);
       // Anchor captured before the await: a mid-flight unmount
       // (Back's composed switch) must not lose the draft (#1479).
       const announceDraft = prepareSectionEvent(this._host, "yaml-draft");
@@ -316,6 +332,7 @@ export class AutoApplyController implements ReactiveController {
       // synchronous and may already trigger ``updated()`` on the way
       // back, which is where the skip check runs.
       this._lastSelfWrittenYaml = newYaml;
+      if (!this._connected) this._detachedBasis = newYaml;
       announceDraft(this._connected, {
         configuration,
         yaml: newYaml,
@@ -326,14 +343,14 @@ export class AutoApplyController implements ReactiveController {
       this._surfaceSaveError(err);
     } finally {
       this._apply = { kind: "idle" };
-      if (phase.queued && this._connected) {
+      if (phase.queued) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
         // Synchronously installs the re-run's phase, so a waiter
-        // woken by the settle below re-checks against it. Skipped
-        // after an unmount for the same reason the debounce is
-        // cancelled there: the detached prop can't echo, so the
-        // re-run's stale-basis draft could only toast a discard.
+        // woken by the settle below re-checks against it. Detached
+        // re-runs are safe: they chain their basis through
+        // ``_detachedBasis``, so the draft lands instead of
+        // toasting a discard.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync

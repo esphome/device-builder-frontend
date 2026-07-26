@@ -104,22 +104,6 @@ describe("cursor-driven YAML highlight (#1885)", () => {
     expect(internals(page)._highlightRange).toBe(first);
   });
 
-  it("leaves highlight and selection on the old section when the guarded switch never lands", () => {
-    const page = makePage();
-    clickYamlLine(page, 2); // select i2c
-    highlightViaNavigator(page, 1, 3);
-    const before = internals(page)._highlightRange;
-    expect(before).toEqual({ fromLine: 1, toLine: 3 });
-
-    // A switch whose action never runs (superseded, or the page
-    // unmounted during the flush) must leave the old state intact.
-    vi.spyOn(internals(page), "_guardSectionSwitch").mockImplementation(() => {});
-    clickYamlLine(page, 5); // would move to sensor; the action never lands
-
-    expect(internals(page)._selectedSection).toBe("i2c");
-    expect(internals(page)._highlightRange).toBe(before);
-  });
-
   it("drops an active highlight on a hand edit in the YAML pane", () => {
     const page = makePage();
     highlightViaNavigator(page, 1, 3);

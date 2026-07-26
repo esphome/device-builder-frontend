@@ -22,10 +22,6 @@ export const deviceNavigatorStyles = css`
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Busy dim fed from the host page (the host itself is
-       display: contents, so opacity must land on this box). */
-    opacity: var(--navigator-busy-opacity, 1);
-    transition: opacity 120ms ease var(--navigator-busy-delay, 0ms);
   }
 
   .card-header {
@@ -118,7 +114,7 @@ export const deviceNavigatorStyles = css`
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--wa-space-m);
-    cursor: var(--navigator-busy-cursor, pointer);
+    cursor: pointer;
     user-select: none;
     flex-shrink: 0;
   }
@@ -161,7 +157,7 @@ export const deviceNavigatorStyles = css`
        as the rows do; the header-to-rows gap lives on .nav-items--grouped. */
     padding: 0 var(--wa-space-m);
     margin-top: var(--wa-space-2xs);
-    cursor: var(--navigator-busy-cursor, pointer);
+    cursor: pointer;
     user-select: none;
     flex-shrink: 0;
   }
@@ -255,7 +251,7 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-xs);
-    cursor: var(--navigator-busy-cursor, pointer);
+    cursor: pointer;
     user-select: none;
     transition:
       background 0.1s,
@@ -346,7 +342,7 @@ export const deviceNavigatorStyles = css`
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     justify-content: space-between;
-    cursor: var(--navigator-busy-cursor, pointer);
+    cursor: pointer;
     user-select: none;
     transition:
       background 0.1s,

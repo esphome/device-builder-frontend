@@ -30,26 +30,6 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(0, 5fr);
   }
 
-  /* Busy affordance while a section switch is parked behind the
-     active editor's flush (up to the WS command timeout). The dim and
-     cursor are fed through custom properties because the navigator
-     host is display: contents (box properties on the host are a
-     no-op) and its rows sit behind the shadow boundary; the dim
-     engages only after a delay so the common fast flush never
-     flickers, and clears immediately (the shadow side's base delay
-     is 0). */
-  .layout-grid.switch-pending {
-    cursor: progress;
-  }
-
-  .layout-grid.switch-pending .desktop-nav {
-    --navigator-busy-opacity: 0.6;
-    --navigator-busy-delay: 200ms;
-    /* Rows show the wait where the pointer actually sits but stay
-       clickable (last switch wins under the supersede token). */
-    --navigator-busy-cursor: progress;
-  }
-
   .layout-grid.nav-collapsed .desktop-nav {
     display: none;
   }
