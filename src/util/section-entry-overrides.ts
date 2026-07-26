@@ -68,8 +68,8 @@ export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set(["substit
  *  as a red squiggle, so the form's save path delegates to that
  *  same backend lint. Duplicating ESPHome's validators in the
  *  frontend would silently drift the moment upstream's accepted
- *  shape changes. The save path's roundtrip lives in
- *  ``device-section-config``'s ``_onSave``. */
+ *  shape changes. The section path's validation call site is
+ *  ``draft-and-delete.ts``'s ``flushDraft``. */
 const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   makeConfigEntry({
     type: ConfigEntryType.MAP,

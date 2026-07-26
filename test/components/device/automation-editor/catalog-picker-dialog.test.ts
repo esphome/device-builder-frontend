@@ -1,112 +1,235 @@
 /**
- * Source-scan tests for ``<esphome-catalog-picker-dialog>``.
+ * @vitest-environment happy-dom
  *
- * We can't mount the Lit element under vitest (no DOM), but the
- * filter / grouping logic is the load-bearing surface and can be
- * pinned via the source-level shape. The behavioural contract is:
+ * Behavioral tests for ``<esphome-catalog-picker-dialog>``'s filter /
+ * grouping contract (#1504):
  *
- * - "By type" groups by the bare domain (``switch.template`` and
- *   ``switch.gpio`` both land under ``switch``).
- * - "Building blocks" filters to ``domain === "core"`` items.
- * - "By target" pre-fills the picked action's id-shaped
- *   ConfigEntry with the picked device's id.
  * - Search applies case-insensitively across id, name, description.
+ * - "By type" groups by the bare domain (``switch.template`` and
+ *   ``switch.gpio`` both land under ``switch``) and skips core items.
+ * - "Building blocks" filters to ``domain === "core"`` items.
+ * - "By target" pre-fills the picked action's id-shaped ConfigEntry
+ *   with the picked device's declared id.
+ * - The tab strip drops "By target" for conditions.
+ *
+ * ``open()``'s default-tab contract lives in the sibling
+ * ``catalog-picker-dialog-open-contract.test.ts``.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-async function readSource(): Promise<string> {
-  // @ts-expect-error node-only module; tsconfig types are restricted
-  const fs = await import("node:fs");
-  // @ts-expect-error node-only module; tsconfig types are restricted
-  const path = await import("node:path");
-  // @ts-expect-error node-only module; tsconfig types are restricted
-  const url = await import("node:url");
-  const here = path.dirname(url.fileURLToPath(import.meta.url));
-  return fs.readFileSync(
-    path.resolve(
-      here,
-      "../../../../src/components/device/automation-editor/catalog-picker-dialog.ts"
-    ),
-    "utf-8"
-  );
+vi.mock("../../../../src/components/base-dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+
+import type {
+  AutomationAction,
+  AvailableComponentInstance,
+} from "../../../../src/api/types/automations.js";
+import type { CatalogPickedDetail } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
+import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
+import { makeConfigEntry } from "../../../../src/util/config-entry-defaults.js";
+import { identityLocalize } from "../../../_dom.js";
+
+function action(
+  over: Pick<AutomationAction, "id" | "name" | "domain"> & Partial<AutomationAction>
+): AutomationAction {
+  return {
+    description: "",
+    docs_url: "",
+    config_entries: [],
+    is_control_flow: false,
+    has_else_branch: false,
+    accepts_action_list: [],
+    ...over,
+  };
 }
 
-describe("catalog-picker-dialog filtering contract", () => {
-  /**
-   * Extract the body of a private method definition. Anchors on
-   * ``private <name>`` (including arrow-form ``= (`` and regular
-   * ``(``) and slurps until the next ``private`` / ``}`` boundary.
-   */
-  function methodBody(src: string, name: string): string {
-    const re = new RegExp(
-      `private\\s+${name}[\\s\\S]*?(?=\\n {2}(private|static|public|protected|@|\\}))`
+async function mountDialog(opts: {
+  kind?: "action" | "condition";
+  items?: AutomationAction[];
+  devices?: AvailableComponentInstance[];
+  tab?: "by-target" | "by-type" | "building-blocks";
+}): Promise<ESPHomeCatalogPickerDialog> {
+  const dialog = new ESPHomeCatalogPickerDialog();
+  dialog.kind = opts.kind ?? "action";
+  dialog.items = opts.items ?? [];
+  dialog.devices = opts.devices ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (dialog as any)._localize = identityLocalize; // no context provider in the test tree
+  document.body.appendChild(dialog);
+  dialog.open();
+  await dialog.updateComplete;
+  if (opts.tab) {
+    // Switch tabs the way the user does — through the rendered tab
+    // strip — so the @click wiring is covered too.
+    const tabs: string[] =
+      dialog.kind === "action"
+        ? ["by-target", "by-type", "building-blocks"]
+        : ["by-type", "building-blocks"];
+    const tab =
+      dialog.shadowRoot!.querySelectorAll<HTMLElement>(".picker-tab")[
+        tabs.indexOf(opts.tab)
+      ];
+    if (!tab) throw new Error(`Tab ${opts.tab} not rendered for kind ${dialog.kind}`);
+    tab.click();
+    await dialog.updateComplete;
+  }
+  return dialog;
+}
+
+const rowTitles = (dialog: ESPHomeCatalogPickerDialog): string[] =>
+  Array.from(dialog.shadowRoot!.querySelectorAll(".picker-row-title")).map(
+    (n) => n.textContent?.trim() ?? ""
+  );
+
+const groupLabels = (dialog: ESPHomeCatalogPickerDialog): string[] =>
+  Array.from(dialog.shadowRoot!.querySelectorAll(".picker-group-label")).map(
+    (n) => n.textContent?.trim() ?? ""
+  );
+
+async function search(dialog: ESPHomeCatalogPickerDialog, query: string): Promise<void> {
+  const input = dialog.shadowRoot!.querySelector("input")!;
+  input.value = query;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  await dialog.updateComplete;
+}
+
+describe("catalog-picker-dialog search", () => {
+  const items = [
+    action({ id: "fan.turn_on", name: "Spin", domain: "fan" }),
+    action({ id: "light.turn_on", name: "Flicker Glow", domain: "light" }),
+    action({
+      id: "switch.toggle",
+      name: "Toggle",
+      domain: "switch",
+      description: "Makes things glow nicely",
+    }),
+  ];
+
+  it("matches case-insensitively across name and description", async () => {
+    const dialog = await mountDialog({ items, tab: "by-type" });
+    await search(dialog, "GLOW");
+    // "Flicker Glow" by name, "Toggle" by description; "Spin" filtered out.
+    expect(rowTitles(dialog).sort()).toEqual(["Flicker Glow", "Toggle"]);
+  });
+
+  it("matches against the catalog id", async () => {
+    const dialog = await mountDialog({ items, tab: "by-type" });
+    await search(dialog, "fan.turn");
+    expect(rowTitles(dialog)).toEqual(["Spin"]);
+  });
+
+  it("shows the empty state when nothing matches", async () => {
+    const dialog = await mountDialog({ items, tab: "by-type" });
+    await search(dialog, "zzz-no-match");
+    expect(rowTitles(dialog)).toEqual([]);
+    expect(dialog.shadowRoot!.querySelector(".picker-empty")).not.toBeNull();
+  });
+});
+
+describe("catalog-picker-dialog grouping", () => {
+  it("By type groups platform items under their bare domain and skips core", async () => {
+    const dialog = await mountDialog({
+      items: [
+        action({
+          id: "switch.template.toggle",
+          name: "Toggle T",
+          domain: "switch.template",
+        }),
+        action({ id: "switch.gpio.toggle", name: "Toggle G", domain: "switch.gpio" }),
+        action({ id: "light.turn_on", name: "Turn On", domain: "light" }),
+        action({ id: "delay", name: "Delay", domain: "core" }),
+      ],
+      tab: "by-type",
+    });
+    // Domains sorted; switch.template + switch.gpio share one "switch"
+    // group; the core item lives under Building blocks instead.
+    expect(groupLabels(dialog)).toEqual(["light", "switch"]);
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Toggle T", "Toggle G"]);
+  });
+
+  it("Building blocks lists only domain === 'core' items", async () => {
+    const dialog = await mountDialog({
+      items: [
+        action({ id: "delay", name: "Delay", domain: "core" }),
+        action({ id: "switch.toggle", name: "Toggle", domain: "switch" }),
+      ],
+      tab: "building-blocks",
+    });
+    expect(rowTitles(dialog)).toEqual(["Delay"]);
+  });
+});
+
+describe("catalog-picker-dialog by-target pre-fill", () => {
+  const turnOn = action({
+    id: "switch.turn_on",
+    name: "Turn On",
+    domain: "switch",
+    config_entries: [makeConfigEntry({ key: "id", references_component: "switch" })],
+  });
+
+  /** Click the first row; the cell asserts the emitted detail (an
+   *  undefined return means the pick never fired). */
+  function pickFirstRow(dialog: ESPHomeCatalogPickerDialog): CatalogPickedDetail {
+    const picked = vi.fn();
+    dialog.addEventListener("catalog-picked", (e) =>
+      picked((e as CustomEvent<CatalogPickedDetail>).detail)
     );
-    const m = src.match(re);
-    if (!m) throw new Error(`Method ${name} not found`);
-    return m[0];
+    dialog.shadowRoot!.querySelector<HTMLElement>(".picker-row")!.click();
+    return picked.mock.calls[0]?.[0] as CatalogPickedDetail;
   }
 
-  it("applies the search query against id, name, and description", async () => {
-    const src = await readSource();
-    // Pin the _applyQuery body — must consult all three fields,
-    // case-insensitive. A future refactor that drops the
-    // description match (the most surprising hit) should fail this
-    // test.
-    const body = methodBody(src, "_applyQuery");
-    expect(body).toMatch(/\.id\.toLowerCase\(\)\.includes\(q\)/);
-    expect(body).toMatch(/\.name\.toLowerCase\(\)\.includes\(q\)/);
-    expect(body).toMatch(/description.*toLowerCase\(\)\.includes\(q\)/);
+  it("picking under a declared-id device pre-fills the id-shaped param", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: [
+        {
+          component_id: "switch.gpio",
+          id: "relay1",
+          name: "Warmtepomp",
+          has_explicit_id: true,
+        },
+      ],
+      tab: "by-target",
+    });
+    expect(pickFirstRow(dialog)).toEqual({
+      id: "switch.turn_on",
+      preFilledParams: { id: "relay1" },
+    });
   });
 
-  it("filters Building blocks to domain === 'core' items", async () => {
-    const src = await readSource();
-    const body = methodBody(src, "_renderBuildingBlocks");
-    expect(body).toMatch(/domain === "core"/);
-  });
-
-  it("By-type skips core items and normalises to bare domain", async () => {
-    const src = await readSource();
-    const body = methodBody(src, "_renderByType");
-    // Must skip core (those go under Building blocks) and split
-    // <domain>.<platform> down to its bare <domain> so
-    // switch.template + switch.gpio land under the same "switch"
-    // header.
-    expect(body).toMatch(/domain === "core"/);
-    expect(body).toMatch(/componentDomain\(item\.domain\)/);
-  });
-
-  it("By-target routes each pick through the shared pre-fill helper", async () => {
-    // The pre-fill behavior itself (declared-id-only, #2208) is pinned by
-    // the pure-function tests in component-targets.test.ts.
-    const src = await readSource();
-    const body = methodBody(src, "_renderByTarget");
-    expect(body).toMatch(/preFillIdParam\(item, device\)/);
+  it("picking under a synthesized-id device leaves the param empty (#2208)", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: [{ component_id: "switch.gpio", id: "switch_0", name: "Warmtepomp" }],
+      tab: "by-target",
+    });
+    expect(pickFirstRow(dialog)).toEqual({
+      id: "switch.turn_on",
+      preFilledParams: undefined,
+    });
   });
 });
 
 describe("catalog-picker-dialog tab strip", () => {
-  it("hides 'by-target' for conditions (they have no target)", async () => {
-    const src = await readSource();
-    const m = src.match(/this\.kind === "action"\s*\?\s*\[([^\]]+)\]\s*:\s*\[([^\]]+)\]/);
-    expect(m).not.toBeNull();
-    const actionTabs = m![1];
-    const conditionTabs = m![2];
-    expect(actionTabs).toMatch(/by-target/);
-    expect(conditionTabs).not.toMatch(/by-target/);
-    expect(conditionTabs).toMatch(/by-type/);
-    expect(conditionTabs).toMatch(/building-blocks/);
+  const tabLabels = (dialog: ESPHomeCatalogPickerDialog): string[] =>
+    Array.from(dialog.shadowRoot!.querySelectorAll(".picker-tab")).map(
+      (n) => n.textContent?.trim() ?? ""
+    );
+
+  it("actions get all three tabs, by-target first", async () => {
+    const dialog = await mountDialog({ kind: "action" });
+    expect(tabLabels(dialog)).toEqual([
+      "device.automation_pick_tab_by_target",
+      "device.automation_pick_tab_by_type",
+      "device.automation_pick_tab_building_blocks",
+    ]);
   });
 
-  it("defaults the active tab to by-target for actions, by-type for conditions", async () => {
-    const src = await readSource();
-    // open() pins the initial tab — actions land on "by-target"
-    // because the user usually knows what they want to control,
-    // and conditions skip straight to "by-type" since they don't
-    // have a target axis.
-    const m = src.match(/public open[\s\S]*?_activeTab = ([\s\S]*?);/);
-    expect(m).not.toBeNull();
-    expect(m![1]).toMatch(/"action"/);
-    expect(m![1]).toMatch(/"by-target"/);
-    expect(m![1]).toMatch(/"by-type"/);
+  it("conditions drop by-target (they have no target)", async () => {
+    const dialog = await mountDialog({ kind: "condition" });
+    expect(tabLabels(dialog)).toEqual([
+      "device.automation_pick_tab_by_type",
+      "device.automation_pick_tab_building_blocks",
+    ]);
   });
 });
