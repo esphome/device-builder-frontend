@@ -68,7 +68,10 @@ export class ConstraintClusterController implements ReactiveController {
     // ones that are and let the next render recover, rather than aborting the
     // whole pass (don't "fix" this into a throw).
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    for (const group of groups) group.syncRadioElements?.();
+    // Same tolerance as the settle above: a group whose sync rejects
+    // just isn't ready; the next render recovers. Promise.resolve
+    // normalises the void-returning implementations.
+    for (const group of groups)
+      void Promise.resolve(group.syncRadioElements?.()).catch(() => {});
   }
 }

@@ -199,8 +199,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this.updateComplete.then(() => this._catalog?.load());
+    void this.updateComplete.then(() => this._catalog?.load());
   }
 
   /**
@@ -216,8 +215,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
+    void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */

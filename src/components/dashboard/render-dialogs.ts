@@ -149,16 +149,14 @@ export function executeConfirm(
       const selected = [...host._selectedDevices];
       host._selectMode = false;
       host._selectedDevices = new Set();
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-      deleteBulkDevices(selected, host._devices, host._api, host._localize);
+      void deleteBulkDevices(selected, host._devices, host._api, host._localize);
       return;
     }
     case "archive-bulk": {
       const selected = [...host._selectedDevices];
       host._selectMode = false;
       host._selectedDevices = new Set();
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-      archiveBulkDevices(selected, host._devices, host._api, host._localize);
+      void archiveBulkDevices(selected, host._devices, host._api, host._localize);
       return;
     }
     case "delete-single":

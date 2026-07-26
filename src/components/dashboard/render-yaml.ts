@@ -55,8 +55,7 @@ function renderSnippetBlock(
       @click=${(e: MouseEvent) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-        navigate(href);
+        void navigate(href);
       }}
     >
       ${block.lines.map((text, i) => {
@@ -92,8 +91,7 @@ function renderYamlDeviceTitle(
           @click=${(e: MouseEvent) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
             e.preventDefault();
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-            navigate(deviceHref);
+            void navigate(deviceHref);
           }}
           >${label}</a
         >

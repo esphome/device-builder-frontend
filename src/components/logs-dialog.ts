@@ -272,8 +272,7 @@ export class ESPHomeLogsDialog extends LitElement {
        back to the bottom themselves. ``scrollToBottom()`` clears the
        flag and forces a scroll. updateComplete makes sure the @query
        has resolved on first open. */
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this.updateComplete.then(() => this._terminal?.scrollToBottom());
+    void this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
   protected render() {
