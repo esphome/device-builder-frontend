@@ -33,6 +33,13 @@ const ADVANCED = makeConfigEntry({
   label: "Advanced Field",
   advanced: true,
 });
+const HIDDEN_ADV = makeConfigEntry({
+  key: "setup_priority",
+  type: ConfigEntryType.STRING,
+  label: "Hidden Adv",
+  advanced: true,
+  hidden: true,
+});
 
 function renderForm(
   entries: ConfigEntry[],
@@ -378,6 +385,54 @@ describe("config-entry-form advanced-section", () => {
     expect(text).toContain("Adv A");
     expect(text).toContain("Adv B");
     expect(text).not.toContain("Hidden Adv");
+  });
+
+  it("renders no control when the only advanced field is hidden", () => {
+    // output.gpio shape (issue device-builder#2347): setup_priority is the
+    // sole advanced entry and it's hidden, so the control would reveal
+    // nothing at all.
+    const c = renderForm([BASIC, HIDDEN_ADV]);
+    expect(control(c)).toBeNull();
+    expect(c.textContent).not.toContain("Hidden Adv");
+  });
+
+  it("still paints a hidden advanced field that has a value, with no control", () => {
+    const c = renderForm([BASIC, HIDDEN_ADV], {
+      values: { setup_priority: "-100" },
+    });
+    expect(control(c)).toBeNull();
+    expect(c.textContent).toContain("Hidden Adv");
+  });
+
+  it("still paints a value-bearing hidden advanced field under gate-advanced", () => {
+    const c = renderForm([BASIC, HIDDEN_ADV], {
+      values: { setup_priority: "-100" },
+      gateAdvanced: true,
+    });
+    expect(control(c)).toBeNull();
+    expect(c.textContent).toContain("Hidden Adv");
+  });
+
+  it("renders no control when the only advanced field is hidden inside a nested group", () => {
+    const c = renderForm([
+      BASIC,
+      makeConfigEntry({
+        key: "group",
+        type: ConfigEntryType.NESTED,
+        label: "Group",
+        config_entries: [
+          makeConfigEntry({
+            key: "setup_priority",
+            type: ConfigEntryType.STRING,
+            label: "Nested Hidden Adv",
+            advanced: true,
+            hidden: true,
+          }),
+        ],
+      }),
+    ]);
+    expect(control(c)).toBeNull();
+    expect(c.textContent).not.toContain("Nested Hidden Adv");
   });
 
   it("counts a constraint cluster as one advanced unit, not per member", () => {
