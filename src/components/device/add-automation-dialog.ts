@@ -486,16 +486,21 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             : {},
         actions: [],
       };
-      // Hand the backend our current draft yaml so the splice
-      // lands relative to any pending edits the user hasn't saved
-      // yet — matches the auto-apply path in the editor.
+      // Snapshot the target and buffer together, before the await:
+      // the diff's line coordinates are relative to the string we
+      // send, and a router-level device swap reassigns both props
+      // from above mid round trip. The buffer is the current draft
+      // so the splice lands relative to any pending edits the user
+      // hasn't saved yet — matches the auto-apply path in the editor.
+      const configuration = this.configuration;
+      const yaml = this.yaml;
       const { yaml_diff } = await this._api.upsertAutomation(
-        this.configuration,
+        configuration,
         tree,
         location,
-        this.yaml
+        yaml
       );
-      dispatchAutomationAdded(this, this.configuration, this.yaml, location, yaml_diff);
+      dispatchAutomationAdded(this, configuration, yaml, location, yaml_diff);
       this._dialog.open = false;
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
