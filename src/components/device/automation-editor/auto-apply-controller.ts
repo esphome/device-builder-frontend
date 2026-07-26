@@ -67,8 +67,12 @@ export interface AutoApplyOptions {
  *  is now one value. The debounce timer stays a separate handle:
  *  typing during an in-flight round trip legitimately arms it
  *  while applying, and teardown cancels it without touching the
- *  in-flight call. */
-type ApplyPhase = { kind: "idle" } | { kind: "applying"; queued: boolean };
+ *  in-flight call. ``settled`` resolves in the finally, after the
+ *  queued re-run decision (its phase is installed first), so a
+ *  waiter observes each round at its actual boundary. */
+type ApplyPhase =
+  | { kind: "idle" }
+  | { kind: "applying"; queued: boolean; settled: Promise<void>; settle(): void };
 
 /** A delete owning the section. Carrying the suppression record
  *  inside the mode means it cannot exist without a delete and
@@ -233,11 +237,17 @@ export class AutoApplyController implements ReactiveController {
       if (this._debounce) {
         this._cancelDebounce();
         // With a call already in flight this only queues a re-run —
-        // loop back to the poll so the caller isn't released while
-        // the keystroke it came to flush is still unwritten.
+        // loop back so the caller isn't released while the keystroke
+        // it came to flush is still unwritten.
         await this.autoApply();
-      } else {
-        await new Promise((r) => setTimeout(r, 20));
+      } else if (this._apply.kind === "applying") {
+        await this._apply.settled;
+        // Macrotask hop before the re-check: nested Lit update
+        // cycles carry the settling upsert's ``yaml-draft`` back
+        // into ``.yaml`` on microtasks, so resolving straight off
+        // the settle would release the caller against a stale
+        // buffer and reintroduce #1451.
+        await new Promise((r) => setTimeout(r));
       }
     }
   }
@@ -274,7 +284,10 @@ export class AutoApplyController implements ReactiveController {
       this._apply.queued = true;
       return;
     }
-    this._apply = { kind: "applying", queued: false };
+    let settle!: () => void;
+    const settled = new Promise<void>((resolve) => (settle = resolve));
+    const phase = { kind: "applying" as const, queued: false, settled, settle };
+    this._apply = phase;
     try {
       // Pass the host's YAML so the backend computes the diff against
       // the current draft buffer rather than the on-disk YAML —
@@ -303,11 +316,12 @@ export class AutoApplyController implements ReactiveController {
     } catch (err) {
       this._surfaceSaveError(err);
     } finally {
-      const queued = this._apply.queued;
       this._apply = { kind: "idle" };
-      if (queued) {
+      if (phase.queued) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
+        // Synchronously installs the re-run's phase, so a waiter
+        // woken by the settle below re-checks against it.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
@@ -319,6 +333,7 @@ export class AutoApplyController implements ReactiveController {
         // re-pointed at, #1486); their own settle clears the flag.
         this._setDirty(false);
       }
+      phase.settle();
     }
   }
 
@@ -356,11 +371,10 @@ export class AutoApplyController implements ReactiveController {
       // would otherwise land after our ``yaml-updated`` and resurrect
       // the deleted section (#1451). The delete mode blocks the
       // queued re-run, so this terminates.
-      // ``flushPending`` must resolve on a MACROTASK: three nested
-      // Lit update cycles carry the settling upsert's ``yaml-draft``
-      // back down into ``.yaml``, and only the poll's setTimeout
-      // drains them all. A promise-await refactor of the poll would
-      // resolve on a microtask and reintroduce #1451.
+      // ``flushPending`` must resolve on a MACROTASK — its settled
+      // wait's setTimeout hop is load bearing here, not decorative:
+      // dropping it would release this call against a stale
+      // ``.yaml`` and reintroduce #1451.
       await this.flushPending();
       // Read the settled buffer exactly once: the backend computes
       // the diff's line coordinates against the string we send, so

@@ -316,6 +316,32 @@ describe("AutoApplyController auto-apply", () => {
     expect(order).toEqual(["draft", "draft", "flushed"]);
   });
 
+  it("flushPending wakes on the settle boundary, not a poll tick", async () => {
+    const { controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const applying = controller.autoApply();
+    let flushed = false;
+    const flushing = controller.flushPending().then(() => (flushed = true));
+
+    // Parked on the in-flight round trip: no amount of waiting
+    // releases the caller while the upsert is outstanding.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(flushed).toBe(false);
+
+    resolveFirst({ yaml_diff: DIFF });
+    // One zero-delay macrotask hop after the settle releases the
+    // caller — a poll would still be asleep in its interval here.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(flushed).toBe(true);
+    await Promise.all([applying, flushing]);
+  });
+
   it("shouldSkipReload skips the echo of its own write, not a foreign edit", async () => {
     const { host, controller } = setup();
     expect(controller.shouldSkipReload()).toBe(false);
