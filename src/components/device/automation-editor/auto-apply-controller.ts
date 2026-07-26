@@ -341,11 +341,18 @@ export class AutoApplyController implements ReactiveController {
       // back, which is where the skip check runs.
       this._lastSelfWrittenYaml = newYaml;
       if (!this._connected) this._detachedBasis = newYaml;
+      // A reused element re-pointed at a sibling mid round trip must
+      // not ride the active-section exemption with this round's
+      // pre-retarget basis — a non-exempt node forces the landing
+      // basis check instead.
+      const retargeted =
+        this._host.location === null ||
+        sectionKeyFromLocation(this._host.location) !== sectionKeyFromLocation(location);
       announceDraft(this._connected, {
         configuration,
         yaml: newYaml,
         basedOn: yaml,
-        node: this._host,
+        node: retargeted ? new EventTarget() : this._host,
       });
     } catch (err) {
       this._surfaceSaveError(err);

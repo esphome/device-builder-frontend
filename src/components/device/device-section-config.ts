@@ -429,7 +429,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     e.stopPropagation();
     // Same identity rule as the navigator relay: a round trip that
     // outlived a device switch must not drive the selection.
-    if (e.detail.configuration !== this.configuration) return;
+    if (e.detail.configuration !== this.configuration) {
+      console.warn("Dropped automation-added for", e.detail.configuration);
+      return;
+    }
     fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 
@@ -520,7 +523,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     e: CustomEvent<{ configuration: string; sectionKey: string }>
   ) => {
     e.stopPropagation();
-    if (e.detail.configuration !== this.configuration) return;
+    if (e.detail.configuration !== this.configuration) {
+      console.warn("Dropped automation-added for", e.detail.configuration);
+      return;
+    }
     fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 

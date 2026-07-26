@@ -628,7 +628,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
     e.stopPropagation();
     // A wizard whose round trip outlived a device switch names the
     // previous device; routing to its key would select a phantom.
-    if (e.detail.configuration !== this.configuration) return;
+    // Logged so a mis-bound configuration prop is distinguishable
+    // from a genuine device switch.
+    if (e.detail.configuration !== this.configuration) {
+      console.warn("Dropped automation-added for", e.detail.configuration);
+      return;
+    }
     this._emitSectionSelect(e.detail.sectionKey, undefined);
   };
 }

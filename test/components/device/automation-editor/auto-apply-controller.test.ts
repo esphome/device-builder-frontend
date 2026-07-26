@@ -320,6 +320,30 @@ describe("AutoApplyController auto-apply", () => {
     expect(order).toEqual(["draft", "draft", "flushed"]);
   });
 
+  it("a retargeted element's late round does not ride the active-section exemption", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const drafts = captureEvents(host, "yaml-draft");
+
+    const applying = controller.autoApply();
+    // Lit reuses the element across same-kind switches: the parent
+    // re-points it at a sibling while the round is out.
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    resolveFirst({ yaml_diff: DIFF });
+    await applying;
+
+    // The draft still lands, but with a non-exempt node so the page
+    // applies its basis check instead of the active-section pass.
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].detail.node).not.toBe(host);
+  });
+
   it("a mid-flight unmount still delivers the draft through the anchor", async () => {
     const parent = document.createElement("div");
     const { controller, upsertAutomation } = setup({}, parent);

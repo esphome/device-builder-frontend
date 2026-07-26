@@ -118,6 +118,8 @@ export function prepareSectionEvent<K extends keyof SectionEditorEventMap>(
   return (connected, detail) => {
     const target = connected ? host : anchor;
     if (target) fireSectionEvent(target, name, detail);
+    // The #1465 failure mode is invisible without a trace.
+    else console.error(`Dropped ${name}: emitter detached with no anchor`);
   };
 }
 
