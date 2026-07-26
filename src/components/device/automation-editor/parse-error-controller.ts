@@ -13,11 +13,12 @@ import { sectionKeyFromLocation } from "./serialise.js";
  * Shared read-only behaviour for the automation / script / api-action
  * editors.
  *
- * When the backend flags one automation with a parse error (unknown
- * condition id, or a misrouted body — an uncatalogued action instead
- * becomes a read-only passthrough node) its tree comes back empty; the
+ * When the backend flags one automation with a parse error (an unknown
+ * condition id, or a misrouted body), its tree comes back empty; the
  * editor must render read-only and never upsert, or that empty tree
- * would overwrite the real YAML block (#1050). Each host:
+ * would overwrite the real YAML block (#1050). An uncatalogued action
+ * no longer triggers this: it decomposes to a read-only passthrough
+ * node, leaving the rest of the automation editable. Each host:
  *
  *   1. Calls ``resolve(parsed, location[, kind])`` in its hydrate path
  *      and adopts the returned tree (``null`` = leave ``value`` alone).
