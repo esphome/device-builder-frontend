@@ -314,6 +314,36 @@ describe("leave guard flush ordering (#1503)", () => {
     }
   });
 
+  test("Save leaves after a one-off flush throw when the retry lands", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { page, dialogOpen } = makePage();
+      // Buffer clean; only the throw backstop arms the prompt.
+      page._savedYaml = page._yaml;
+      page._activeSection = {
+        dirty: true,
+        lastFlushFailed: false,
+        flushPending: () => Promise.reject(new Error("transient")),
+        reload: () => {},
+      };
+      // ``_saveYaml`` re-runs the flush for real; a one-off throw
+      // that its retry survives leaves nothing stranded, so Save
+      // must leave rather than dead-end on the sticky backstop.
+      page._saveYaml = vi.fn(async () => true);
+
+      const leaving = page._confirmLeave();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(dialogOpen).toHaveBeenCalledTimes(1);
+
+      page._onUnsavedSave();
+      expect(await leaving).toBe(true);
+      expect(toast.error).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   test("a settled-as-failed round arms the beforeunload warning", () => {
     const { page } = makePage();
     // Buffer clean, transient flag already cleared by the settle —

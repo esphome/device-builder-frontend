@@ -520,15 +520,19 @@ export class ESPHomePageDevice extends LitElement {
     } finally {
       if (ownBusy) this._saving = false;
     }
-    // The throw backstop is sticky; the latch reads live at each
-    // decision, because the dialog can stay open across a reload
-    // timer's hydrate that clears the latch along with the failed
-    // edit it protected — a stale snapshot would refuse a leave
-    // over an edit that no longer exists.
-    const flushFailed = () =>
-      flushThrew || (this._activeSection?.lastFlushFailed ?? false);
+    // Two distinct failure signals. The throw backstop only arms
+    // the prompt (fail conservative on an unknown state); the latch
+    // additionally gates Save, read live at each decision because
+    // the dialog can stay open across a reload timer's hydrate that
+    // clears it along with the failed edit it protected — a stale
+    // snapshot would refuse a leave over an edit that no longer
+    // exists. A one-off throw does NOT gate Save: ``_saveYaml``
+    // re-runs the flush for real, so either its retry lands the
+    // edit (leaving is correct) or it fails again and ``saved``
+    // already blocks the leave.
+    const latched = () => this._activeSection?.lastFlushFailed ?? false;
     const ok = await this._unsavedGuard.run({
-      dirty: flushFailed() || this._isDirty,
+      dirty: flushThrew || latched() || this._isDirty,
       open: () => this._unsavedDialog?.open(),
       save: async () => {
         // ``_saveYaml`` may open the validation prompt and await
@@ -538,7 +542,7 @@ export class ESPHomePageDevice extends LitElement {
         // shouldn't proceed with navigation.
         const saved = await this._saveYaml();
         if (!saved) return false;
-        if (flushFailed()) {
+        if (latched()) {
           // The failed round's edit never reached the buffer and a
           // settled round cannot be re-run, so "Save" must not
           // pretend it saved it. Stay put — the editor still holds
