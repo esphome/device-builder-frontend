@@ -52,8 +52,12 @@ export type RemovedSectionRef =
 /** A completed disk write, the buffer it was computed against — the
  *  page supersede-checks the basis and advances only the saved side
  *  when the pane has moved past it (#1476) — and what it removed,
- *  for the re-base onto the live buffer (#1490). */
+ *  for the re-base onto the live buffer (#1490). ``configuration``
+ *  is the emitter's snapshotted target so a write landing after a
+ *  device switch is dropped instead of spliced into the wrong
+ *  device's buffer. */
 export interface YamlUpdatedDetail {
+  configuration: string;
   yaml: string;
   basedOn: string;
   removed: RemovedSectionRef;

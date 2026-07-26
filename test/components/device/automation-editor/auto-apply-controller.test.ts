@@ -436,6 +436,7 @@ describe("AutoApplyController delete", () => {
     // The basis is the settled pre-delete buffer, not the write.
     expect(updatedDetails).toEqual([
       {
+        configuration: "device.yaml",
         yaml: "replaced\nline2",
         basedOn: "replaced\nline2",
         removed: { kind: "automation", location: SCRIPT },

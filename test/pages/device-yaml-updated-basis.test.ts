@@ -29,6 +29,7 @@ interface BasisView {
 
 const makePage = (yaml: string, saved: string): BasisView => {
   const page = new ESPHomePageDevice() as unknown as BasisView;
+  page.id = "device.yaml";
   page._yaml = yaml;
   page._savedYaml = saved;
   return page;
@@ -48,6 +49,7 @@ describe("yaml-updated supersede check", () => {
     const page = makePage("a:\n", "a:\n");
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "b:\n",
       basedOn: "a:\n",
       removed: { kind: "component", sectionKey: "a", fromLine: 1 },
@@ -67,6 +69,7 @@ describe("yaml-updated supersede check", () => {
     );
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "logger:\n",
       basedOn: "wifi:\n  ssid: home\nlogger:\n",
       removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
@@ -86,6 +89,7 @@ describe("yaml-updated supersede check", () => {
     const page = makePage("logger:\n  level: DEBUG\n", "wifi:\n  ssid: home\nlogger:\n");
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "logger:\n",
       basedOn: "wifi:\n  ssid: home\nlogger:\n",
       removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
@@ -102,7 +106,6 @@ describe("yaml-updated supersede check", () => {
       "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
       "logger:\nscript:\n  - id: s1\n"
     );
-    page.id = "device.yaml";
     const deleteAutomation = vi
       .fn()
       .mockResolvedValue({ yaml_diff: { fromLine: 3, toLine: 4, replacement: "" } });
@@ -110,6 +113,7 @@ describe("yaml-updated supersede check", () => {
     const location: AutomationLocation = { kind: "script", id: "s1" };
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "logger:\n",
       basedOn: "logger:\nscript:\n  - id: s1\n",
       removed: { kind: "automation", location },
@@ -132,7 +136,6 @@ describe("yaml-updated supersede check", () => {
       "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
       "logger:\nscript:\n  - id: s1\n"
     );
-    page.id = "device.yaml";
     const deleteAutomation = vi.fn().mockImplementation(async () => {
       // The user keeps editing while the diff is recomputed.
       page._yaml = "moved:\n";
@@ -141,6 +144,7 @@ describe("yaml-updated supersede check", () => {
     page._api = { deleteAutomation } as unknown as ESPHomeAPI;
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "logger:\n",
       basedOn: "logger:\nscript:\n  - id: s1\n",
       removed: { kind: "automation", location: { kind: "script", id: "s1" } },
@@ -158,7 +162,6 @@ describe("yaml-updated supersede check", () => {
       "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
       "logger:\nscript:\n  - id: s1\n"
     );
-    page.id = "device.yaml";
     page._api = {
       deleteAutomation: vi
         .fn()
@@ -166,6 +169,7 @@ describe("yaml-updated supersede check", () => {
     } as unknown as ESPHomeAPI;
 
     updated(page, {
+      configuration: "device.yaml",
       yaml: "logger:\n",
       basedOn: "logger:\nscript:\n  - id: s1\n",
       removed: { kind: "automation", location: { kind: "script", id: "s1" } },
@@ -178,6 +182,51 @@ describe("yaml-updated supersede check", () => {
     expect(toast.info).toHaveBeenCalledTimes(1);
   });
 
+  it("drops a write announced for a different device", () => {
+    const page = makePage("draft:\n", "a:\n");
+    const deleteAutomation = vi.fn();
+    page._api = { deleteAutomation } as unknown as ESPHomeAPI;
+
+    updated(page, {
+      configuration: "other.yaml",
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "automation", location: { kind: "script", id: "s1" } },
+    });
+
+    // The router reuses the page element across devices; a late
+    // announcement from the previous device must not touch this one.
+    expect(page._yaml).toBe("draft:\n");
+    expect(page._savedYaml).toBe("a:\n");
+    expect(deleteAutomation).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("rejects a re-base that removed different lines than the delete", async () => {
+    const page = makePage(
+      "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
+      "logger:\nscript:\n  - id: s1\n"
+    );
+    // The recompute resolves to the wrong sibling: the diff removes
+    // the logger lines instead of the script block the delete took.
+    page._api = {
+      deleteAutomation: vi
+        .fn()
+        .mockResolvedValue({ yaml_diff: { fromLine: 1, toLine: 2, replacement: "" } }),
+    } as unknown as ESPHomeAPI;
+
+    updated(page, {
+      configuration: "device.yaml",
+      yaml: "logger:\n",
+      basedOn: "logger:\nscript:\n  - id: s1\n",
+      removed: { kind: "automation", location: { kind: "script", id: "s1" } },
+    });
+    await settle();
+
+    expect(page._yaml).toBe("logger:\n  level: DEBUG\nscript:\n  - id: s1\n");
+    expect(toast.info).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to the toast when the recompute call fails", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -185,12 +234,12 @@ describe("yaml-updated supersede check", () => {
         "logger:\n  level: DEBUG\nscript:\n  - id: s1\n",
         "logger:\nscript:\n  - id: s1\n"
       );
-      page.id = "device.yaml";
       page._api = {
         deleteAutomation: vi.fn().mockRejectedValue(new Error("backend down")),
       } as unknown as ESPHomeAPI;
 
       updated(page, {
+        configuration: "device.yaml",
         yaml: "logger:\n",
         basedOn: "logger:\nscript:\n  - id: s1\n",
         removed: { kind: "automation", location: { kind: "script", id: "s1" } },

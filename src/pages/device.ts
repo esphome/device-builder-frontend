@@ -1758,7 +1758,11 @@ export class ESPHomePageDevice extends LitElement {
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
-    const { yaml, basedOn } = e.detail;
+    const { configuration, yaml, basedOn } = e.detail;
+    // A write landing after a device switch belongs to the previous
+    // device — the router reuses this element, so acting on it would
+    // splice the wrong device's buffer (#1489-style identity guard).
+    if (configuration !== this.id) return;
     if (basedOn !== this._yaml) {
       // The write was computed against a buffer this pane has moved
       // past (a delete landing after a newer draft, #1476). Advance
@@ -1781,7 +1785,7 @@ export class ESPHomePageDevice extends LitElement {
     const live = this._yaml;
     let rebased: string | null = null;
     try {
-      rebased = await applyRemoval(detail.removed, live, this._api, this.id);
+      rebased = await applyRemoval(detail, live, this._api);
     } catch (err) {
       console.error("Re-base of superseded delete failed:", err);
       rebased = null;
@@ -1790,6 +1794,15 @@ export class ESPHomePageDevice extends LitElement {
     // was computed — stale coordinates no longer apply.
     if (rebased !== null && live === this._yaml) {
       this._setYaml(rebased);
+      // The removal shifted lines under the selection; re-pin it so
+      // line-keyed lookups don't latch onto a neighbour (#1470).
+      if (this._selectedSection) {
+        this._selectedFromLine = resolveCurrentSectionLine(
+          rebased,
+          this._selectedSection,
+          this._selectedFromLine
+        );
+      }
       return;
     }
     notifyInfo(this._localize("device.delete_superseded"), {

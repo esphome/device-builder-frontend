@@ -141,19 +141,22 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._error = "";
   const title = host._config.title;
   const announceUpdated = prepareYamlUpdated(host);
-  // The section key is snapshotted: Lit reuses this element across
-  // same-kind switches, so a mid-round-trip retarget keeps it
-  // connected while the deleted section is no longer on screen.
+  // The section key and target are snapshotted: Lit reuses this
+  // element across same-kind switches, so a mid-round-trip retarget
+  // keeps it connected while the deleted section is no longer on
+  // screen.
   const deletedKey = host.sectionKey;
+  const configuration = host.configuration;
   try {
     const newYaml = removeSectionFromYaml(baseYaml, host.sectionKey, fromLine);
     if (newYaml === baseYaml) {
       host._error = host._localize("device.section_delete_error");
       return;
     }
-    await host._api.updateConfig(host.configuration, newYaml);
+    await host._api.updateConfig(configuration, newYaml);
     host._setDirty(false);
     announceUpdated(host.isConnected, {
+      configuration,
       yaml: newYaml,
       basedOn: baseYaml,
       removed: { kind: "component", sectionKey: deletedKey, fromLine },

@@ -82,7 +82,12 @@ describe("error-jump highlight lifecycle (#1404)", () => {
 
     internals(page)._onYamlUpdated(
       new CustomEvent("yaml-updated", {
-        detail: { yaml: YAML + "    pin: GPIO11\n", basedOn: YAML },
+        detail: {
+          configuration: "kitchen.yaml",
+          yaml: YAML + "    pin: GPIO11\n",
+          basedOn: YAML,
+          removed: { kind: "component", sectionKey: "switch", fromLine: 3 },
+        },
       })
     );
     lintCompleted(page);

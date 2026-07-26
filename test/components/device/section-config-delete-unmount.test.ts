@@ -78,6 +78,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       // The basis is the pre-delete snapshot, not the write.
       expect(updates).toEqual([
         {
+          configuration: "device.yaml",
           yaml: "logger:\n",
           basedOn: "wifi:\n  ssid: home\nlogger:\n",
           removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
@@ -134,6 +135,7 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       expect(updates[0].yaml).not.toContain("on_press");
       // The basis is the pre-delete buffer the diff was computed on.
       expect(updates[0].basedOn).toBe(ROW_YAML);
+      expect(updates[0].configuration).toBe("device.yaml");
       expect(updates[0].removed).toEqual({
         kind: "automation",
         location: locationFromSectionKey("automation:component_on:btn:on_press"),

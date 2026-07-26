@@ -9,7 +9,7 @@ import type { AutomationLocation } from "../../api/types/automations.js";
 import { removeSectionFromYaml } from "../../util/yaml-section-values.js";
 import { resolveCurrentSectionLine } from "../../util/yaml-sections.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";
-import type { RemovedSectionRef, YamlUpdatedDetail } from "./section-editor.js";
+import type { YamlUpdatedDetail } from "./section-editor.js";
 
 /**
  * Shared core of the disk-writing automation deletes (editor engine,
@@ -29,6 +29,7 @@ export async function writeAutomationDelete(
   const newYaml = applyYamlDiff(yaml, yaml_diff);
   await api.updateConfig(configuration, newYaml);
   announce(connected(), {
+    configuration,
     yaml: newYaml,
     basedOn: yaml,
     removed: { kind: "automation", location },
@@ -36,28 +37,59 @@ export async function writeAutomationDelete(
 }
 
 /**
- * Re-apply *removed* to *buffer*. Component sections splice
+ * Re-apply *write*'s removal to *buffer*. Component sections splice
  * client-side; automations recompute their diff via the
  * side-effect-free ``deleteAutomation``. Returns the re-based
- * buffer, or ``null`` when the removal cannot land in it.
+ * buffer, or ``null`` when the removal cannot land in it — including
+ * when the re-resolved target removed different lines than the
+ * delete did (positional locations and the nearest-line heuristic
+ * are not authoritative in a diverged buffer).
  */
 export async function applyRemoval(
-  removed: RemovedSectionRef,
+  write: YamlUpdatedDetail,
   buffer: string,
-  api: Pick<ESPHomeAPI, "deleteAutomation">,
-  configuration: string
+  api: Pick<ESPHomeAPI, "deleteAutomation">
 ): Promise<string | null> {
+  const { removed, configuration } = write;
+  let next: string;
   if (removed.kind === "automation") {
     const { yaml_diff } = await api.deleteAutomation(
       configuration,
       removed.location,
       buffer
     );
-    const next = applyYamlDiff(buffer, yaml_diff);
-    return next === buffer ? null : next;
+    next = applyYamlDiff(buffer, yaml_diff);
+  } else {
+    const line = resolveCurrentSectionLine(buffer, removed.sectionKey, removed.fromLine);
+    if (line === undefined) return null;
+    next = removeSectionFromYaml(buffer, removed.sectionKey, line);
   }
-  const line = resolveCurrentSectionLine(buffer, removed.sectionKey, removed.fromLine);
-  if (line === undefined) return null;
-  const next = removeSectionFromYaml(buffer, removed.sectionKey, line);
-  return next === buffer ? null : next;
+  const expected = removedLines(write.basedOn, write.yaml);
+  const actual = removedLines(buffer, next);
+  if (
+    expected === null ||
+    actual === null ||
+    actual.length === 0 ||
+    expected.join("\n") !== actual.join("\n")
+  ) {
+    return null;
+  }
+  return next;
+}
+
+/** Lines removed going from *before* to *after*, or ``null`` when
+ *  the edit is not a pure contiguous removal. */
+function removedLines(before: string, after: string): string[] | null {
+  const b = before.split("\n");
+  const a = after.split("\n");
+  let start = 0;
+  while (start < a.length && b[start] === a[start]) start++;
+  let endB = b.length - 1;
+  let endA = a.length - 1;
+  while (endA >= start && endB >= start && b[endB] === a[endA]) {
+    endB--;
+    endA--;
+  }
+  if (endA >= start) return null;
+  return b.slice(start, endB + 1);
 }
