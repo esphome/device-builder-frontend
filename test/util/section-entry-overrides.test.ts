@@ -160,7 +160,7 @@ describe("resolveSectionEntries", () => {
 // ``test/components/device/section-config-entries-wiring.test.ts``.
 
 describe("save validation contract", () => {
-  // ``_onSave`` must validate against the *render* schema. Pin
+  // ``flushDraft`` must validate against the *render* schema. Pin
   // the contract directly: a packages-shaped catalog (some
   // required fields the user-keyed rows don't carry) produces
   // errors when validated raw, but no errors once routed through

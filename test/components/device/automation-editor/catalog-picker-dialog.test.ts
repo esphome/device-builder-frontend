@@ -65,9 +65,12 @@ async function mountDialog(opts: {
       dialog.kind === "action"
         ? ["by-target", "by-type", "building-blocks"]
         : ["by-type", "building-blocks"];
-    dialog
-      .shadowRoot!.querySelectorAll<HTMLElement>(".picker-tab")
-      [tabs.indexOf(opts.tab)].click();
+    const tab =
+      dialog.shadowRoot!.querySelectorAll<HTMLElement>(".picker-tab")[
+        tabs.indexOf(opts.tab)
+      ];
+    if (!tab) throw new Error(`Tab ${opts.tab} not rendered for kind ${dialog.kind}`);
+    tab.click();
     await dialog.updateComplete;
   }
   return dialog;
