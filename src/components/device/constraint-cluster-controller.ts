@@ -21,6 +21,9 @@ export class ConstraintClusterController implements ReactiveController {
 
   private _stash = new Map<string, unknown>();
 
+  /** Groups whose sync failure was already traced (one warn each). */
+  private _warnedGroups = new WeakSet<RadioGroupElement>();
+
   constructor(private _host: Host) {
     _host.addController(this);
   }
@@ -68,7 +71,26 @@ export class ConstraintClusterController implements ReactiveController {
     // ones that are and let the next render recover, rather than aborting the
     // whole pass (don't "fix" this into a throw).
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    for (const group of groups) group.syncRadioElements?.();
+    // Same tolerance as the settle above: a group whose sync fails
+    // just isn't ready; the next render recovers. The try covers a
+    // void-returning implementation that throws synchronously, the
+    // catch a rejecting one, and the warn leaves a trace if a
+    // cluster sticks desynced — once per group, or a deterministic
+    // failure would log every render of an actively edited form.
+    for (const group of groups) {
+      try {
+        Promise.resolve(group.syncRadioElements?.()).catch((err) =>
+          this._warnSyncFailed(group, err)
+        );
+      } catch (err) {
+        this._warnSyncFailed(group, err);
+      }
+    }
+  }
+
+  private _warnSyncFailed(group: RadioGroupElement, err: unknown): void {
+    if (this._warnedGroups.has(group)) return;
+    this._warnedGroups.add(group);
+    console.warn("Radio group sync failed:", err);
   }
 }

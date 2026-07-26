@@ -241,8 +241,9 @@ export class ESPHomeAdoptDialog extends LitElement {
     // validate (esphome/device-builder#1742). Probe the shared secrets so
     // the Wi-Fi step can prompt + store them before importing.
     if (this._needsWifi && this._api) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-      fetchSecretKeys(this._api).then((keys) => {
+      // The cache resolves its fallback ([]) on a failed fetch, so this
+      // never rejects; the Wi-Fi step then prompts, the safe default.
+      void fetchSecretKeys(this._api).then((keys) => {
         this._hasWifiSecrets = hasSharedWifiSecret(keys);
       });
     }

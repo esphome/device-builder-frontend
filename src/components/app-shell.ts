@@ -472,8 +472,7 @@ export class ESPHomeApp extends LitElement {
   private async _afterAuthenticated() {
     this._authState = "authed";
     this._authError = null;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this._subscribeToEvents();
+    void this._subscribeToEvents();
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
     void loadLabels(this);

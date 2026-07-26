@@ -585,19 +585,21 @@ export class ESPHomePageDevice extends LitElement {
     if (!this._isDirty && !this._activeSection?.lastFlushFailed) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", withBase(`/device/${this.id}`));
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this._confirmLeave().then((canLeave) => {
-      if (canLeave) {
-        this._allowingLeave = true;
-        window.history.back();
-      }
-    });
+    this._confirmLeave()
+      .then((canLeave) => {
+        if (canLeave) {
+          this._allowingLeave = true;
+          window.history.back();
+        }
+      })
+      // The entry was already re-pushed, so staying put is the
+      // fail-safe on an unexpected guard failure.
+      .catch((err) => console.error("Leave confirmation failed:", err));
   };
 
   async connectedCallback() {
     super.connectedCallback();
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    this._loadPreferences();
+    void this._loadPreferences();
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
@@ -663,8 +665,7 @@ export class ESPHomePageDevice extends LitElement {
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
       this._kickKnownKeys();
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-      this._loadYaml();
+      void this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
     // fetch as soon as we have a `board_id` (and re-fetch only when it
@@ -677,8 +678,7 @@ export class ESPHomePageDevice extends LitElement {
       // ``board_id``. Restored on success, left null on failure.
       this._board = null;
       this._platformReady = false;
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-      this._loadBoard(boardId);
+      void this._loadBoard(boardId);
     } else if (!boardId) {
       // No manifest to fetch (device has no ``board_id`` or our
       // id isn't in the loaded context — deleted / stale link).
@@ -1213,8 +1213,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
-    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
   static styles = [espHomeStyles, devicePageStyles];
