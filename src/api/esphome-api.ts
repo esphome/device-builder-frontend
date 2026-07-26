@@ -806,23 +806,21 @@ export class ESPHomeAPI {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }
 
-  /** Mint a single-use token authorizing the HTTP upload of one bundle. */
-  async importBundleToken(): Promise<{ token: string }> {
-    return this.sendCommand<{ token: string }>("devices/import_bundle_token");
-  }
-
   /** Upload an `esphome bundle` archive over HTTP and import it.
    *
    * HTTP, not the WS, so a large bundle isn't capped by a proxy's
    * WebSocket `max_msg_size`. Omit `overwrite` on the first (detect) call;
    * if the response is 'conflicts', let the user pick which paths to
    * replace and re-call with those paths in `overwrite` (paths left out
-   * keep the on-disk file). The token is the route's auth. */
+   * keep the on-disk file). A single-use token minted over the WS is the
+   * route's auth. */
   async importBundleUpload(
     file: Blob,
     overwrite?: string[]
   ): Promise<ImportBundleResponse> {
-    const { token } = await this.importBundleToken();
+    const { token } = await this.sendCommand<{ token: string }>(
+      "devices/import_bundle_token"
+    );
     const params = new URLSearchParams({ token });
     if (overwrite !== undefined) {
       params.set("mode", "resolve");
