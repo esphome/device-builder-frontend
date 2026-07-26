@@ -299,14 +299,17 @@ export function renderPinField(
   ctx: RenderCtx
 ): TemplateResult {
   const rawValue = ctx.getAt(path);
-  // A long-form pin whose ``number`` is a ``${var}`` reference can't drive
-  // the board-GPIO picker — no option matches, so the select rendered blank
-  // (#2268) — and a pick would clobber the reference with a literal. Edit
-  // ``number`` as text with the resolves-to hint, mirroring the scalar
-  // ${var} gate in ``config-entry-form``. Checked before the boardless
-  // fallback, which would bail an object value to the YAML-only shell.
-  if (isPlainObject(rawValue) && isSubstitutionString(rawValue.number)) {
-    return renderSubstitutionPin(entry, path, ctx, rawValue, rawValue.number);
+  // A ``${var}`` reference can't drive the board-GPIO picker — no option
+  // matches, so the select rendered blank (#2268) — and a pick would clobber
+  // the reference with a literal. Edit it as text with the resolves-to hint,
+  // both for a scalar ``pin: ${var}`` (#2348) and a long-form ``number``.
+  // Checked before the boardless fallback, which would bail an object value
+  // to the YAML-only shell.
+  if (
+    isSubstitutionString(rawValue) ||
+    (isPlainObject(rawValue) && isSubstitutionString(rawValue.number))
+  ) {
+    return renderSubstitutionPin(entry, path, ctx, rawValue);
   }
   if (!ctx.board || ctx.board.pins.length === 0) {
     return renderStringField(entry, "text", path, ctx);
@@ -510,17 +513,19 @@ export function renderPinField(
   `;
 }
 
-/** Long-form pin with a ``${var}`` ``number``: a text input for the
- *  reference (edits route to ``path.number``, so mode / inverted are
- *  preserved) plus the Advanced disclosure the normal path renders. */
+/** Pin whose ``${var}`` reference can't drive the picker: a text input for
+ *  the reference plus the Advanced disclosure the normal path renders.
+ *  Long-form edits route to ``path.number`` (mode / inverted preserved);
+ *  a scalar ``pin: ${var}`` edits ``path`` itself. */
 function renderSubstitutionPin(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
-  rawValue: Record<string, unknown>,
-  number: string
+  rawValue: unknown
 ): TemplateResult {
-  const numberPath = [...path, "number"];
+  const longForm = isPlainObject(rawValue) ? rawValue : null;
+  const number = (longForm ? longForm.number : rawValue) as string;
+  const numberPath = longForm ? [...path, "number"] : path;
   const invalid = ctx.errorAt(numberPath) !== null;
   const fieldDisabled = effectiveDisabled(entry, ctx);
   // The ``${var}`` can still resolve to the board's designation for this
@@ -535,7 +540,7 @@ function renderSubstitutionPin(
   const pins = ctx.board?.pins ?? [];
   const resolvedNumber = resolveSubstitutions(number, ctx.substitutions);
   const resolved =
-    parsePinGpio({ ...rawValue, number: resolvedNumber }) ??
+    parsePinGpio(longForm ? { ...longForm, number: resolvedNumber } : resolvedNumber) ??
     (isExpanderPinValue(rawValue) ? null : gpioFromAlias(resolvedNumber, pins));
   const boardPins = boardPinsForSection(ctx, entry.key);
   const boardPreset =
