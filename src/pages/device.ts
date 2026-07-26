@@ -503,9 +503,9 @@ export class ESPHomePageDevice extends LitElement {
     try {
       await this._activeSection?.flushPending();
     } catch (err) {
-      // The editors self-catch their upsert failures, so this only
-      // sees a synchronous throw — a backstop, not the live error
-      // path (that path is the failed-round case handled above).
+      // The editors self-catch their upsert failures, so a throw or
+      // rejection here is a backstop, not the live error path (that
+      // path is the failed-round case handled above).
       console.error("Section flush before leave failed:", err);
     }
     const ok = await this._unsavedGuard.run({

@@ -214,7 +214,7 @@ describe("leave guard flush ordering (#1503)", () => {
     await leaving;
   });
 
-  test("Save on the failed-round path retries through _saveYaml", async () => {
+  test("Save on the failed-round path stays put when nothing landed", async () => {
     const { page, dialogOpen } = makePage();
     page._savedYaml = page._yaml;
     page._sectionDirty = true;
