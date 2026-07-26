@@ -41,10 +41,10 @@ export function fireFromAnchor(
  * the pane has moved past it, #1476), and the host's connectedness
  * at dispatch time.
  */
-export function prepareYamlWritten(
+export function prepareYamlUpdated(
   host: EventTarget & { readonly parentNode: ParentNode | null }
-): (connected: boolean, yaml: string, basedOn: string) => void {
+): (connected: boolean, write: { yaml: string; basedOn: string }) => void {
   const anchor = host.parentNode;
-  return (connected, yaml, basedOn) =>
-    fireFromAnchor(host, connected, anchor, "yaml-updated", { yaml, basedOn });
+  return (connected, write) =>
+    fireFromAnchor(host, connected, anchor, "yaml-updated", write);
 }

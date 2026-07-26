@@ -81,7 +81,9 @@ describe("error-jump highlight lifecycle (#1404)", () => {
     goToError(page);
 
     internals(page)._onYamlUpdated(
-      new CustomEvent("yaml-updated", { detail: { yaml: YAML + "    pin: GPIO11\n" } })
+      new CustomEvent("yaml-updated", {
+        detail: { yaml: YAML + "    pin: GPIO11\n", basedOn: YAML },
+      })
     );
     lintCompleted(page);
     expect(internals(page)._highlightRange).toBeNull();

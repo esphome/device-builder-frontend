@@ -15,7 +15,7 @@ import { ESPHomePageDevice } from "../../src/pages/device.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internals = (page: ESPHomePageDevice) => page as any;
 
-const updated = (page: ESPHomePageDevice, detail: { yaml: string; basedOn?: string }) =>
+const updated = (page: ESPHomePageDevice, detail: { yaml: string; basedOn: string }) =>
   internals(page)._onYamlUpdated(new CustomEvent("yaml-updated", { detail }));
 
 describe("yaml-updated supersede check", () => {
@@ -41,17 +41,6 @@ describe("yaml-updated supersede check", () => {
     // The pane keeps what the user sees; the page shows honestly
     // dirty against the disk truth.
     expect(internals(page)._yaml).toBe("draft:\n");
-    expect(internals(page)._savedYaml).toBe("b:\n");
-  });
-
-  it("keeps the legacy replace for emitters that carry no basis", () => {
-    const page = new ESPHomePageDevice();
-    internals(page)._yaml = "draft:\n";
-    internals(page)._savedYaml = "a:\n";
-
-    updated(page, { yaml: "b:\n" });
-
-    expect(internals(page)._yaml).toBe("b:\n");
     expect(internals(page)._savedYaml).toBe("b:\n");
   });
 });

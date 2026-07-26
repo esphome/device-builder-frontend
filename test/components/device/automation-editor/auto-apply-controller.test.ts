@@ -381,7 +381,11 @@ describe("AutoApplyController delete", () => {
           host.yaml = yaml;
         });
     });
-    host.addEventListener("yaml-updated", () => order.push("updated"));
+    const updatedDetails: { yaml: string; basedOn: string }[] = [];
+    host.addEventListener("yaml-updated", (e) => {
+      order.push("updated");
+      updatedDetails.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail);
+    });
 
     const applying = controller.autoApply();
     const deleting = controller.delete();
@@ -399,6 +403,10 @@ describe("AutoApplyController delete", () => {
       "replaced\nline2"
     );
     expect(order).toEqual(["draft", "updated"]);
+    // The basis is the settled pre-delete buffer, not the write.
+    expect(updatedDetails).toEqual([
+      { yaml: "replaced\nline2", basedOn: "replaced\nline2" },
+    ]);
   });
 
   it("a mid-flush section switch cannot retarget the delete", async () => {

@@ -1,5 +1,5 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
-import { fireEvent, prepareYamlWritten } from "../../../util/fire-event.js";
+import { fireEvent, prepareYamlUpdated } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
@@ -19,9 +19,9 @@ import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
 // catalog schema that doesn't match what the user actually edits in the form —
 // using it would surface phantom "missing required" errors per keystroke.
-export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
+export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   host._draftTimer = null;
-  if (!host._config) return;
+  if (!host._config) return null;
 
   const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
   host._fieldErrors = validateEntries(
@@ -38,7 +38,7 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
     // (paste / external edit). Drop the splice silently — next picker
     // click re-runs loadConfig against the current YAML.
     host._setDirty(false);
-    return;
+    return null;
   }
 
   const newYaml = updateSectionInYaml(
@@ -55,10 +55,24 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
 
   host._setDirty(false);
 
-  if (newYaml === host.yaml) return;
+  if (newYaml === host.yaml) return null;
 
   host._lastSelfWrittenYaml = newYaml;
   fireEvent(host, "yaml-draft", { yaml: newYaml });
+  return newYaml;
+}
+
+/** Settle any pending debounced draft and return the freshest buffer
+ *  this element knows — its ``yaml`` prop lags its own ``yaml-draft``
+ *  by a render, so a delete basing itself on the raw prop would let
+ *  the element supersede its own delete. */
+export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
+  if (host._draftTimer !== null) {
+    clearTimeout(host._draftTimer);
+    host._draftTimer = null;
+    return flushDraft(host) ?? host.yaml;
+  }
+  return host.yaml;
 }
 
 export function onValueChange(
@@ -108,7 +122,10 @@ export function applySectionValues(
 
 export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
   if (!host._config) return;
-  const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
+  // Settle our own pending draft first: the basis must include the
+  // user's last keystroke, or the delete supersedes itself.
+  const baseYaml = settleOwnDraft(host);
+  const fromLine = resolveCurrentFromLine(baseYaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
     host._error = host._localize("device.section_delete_error");
     return;
@@ -116,13 +133,12 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
-  const announceWritten = prepareYamlWritten(host);
+  const announceUpdated = prepareYamlUpdated(host);
   // The section key is snapshotted: Lit reuses this element across
   // same-kind switches, so a mid-round-trip retarget keeps it
   // connected while the deleted section is no longer on screen.
   const deletedKey = host.sectionKey;
   try {
-    const baseYaml = host.yaml;
     const newYaml = removeSectionFromYaml(baseYaml, host.sectionKey, fromLine);
     if (newYaml === baseYaml) {
       host._error = host._localize("device.section_delete_error");
@@ -130,7 +146,7 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    announceWritten(host.isConnected, newYaml, baseYaml);
+    announceUpdated(host.isConnected, { yaml: newYaml, basedOn: baseYaml });
     // Navigate away only while the user is still here, on the
     // section that was deleted.
     if (host.isConnected && host.sectionKey === deletedKey) {

@@ -1741,19 +1741,21 @@ export class ESPHomePageDevice extends LitElement {
     this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
-  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn?: string }>) {
-    /* ``yaml-updated`` fires from completed-API-call paths only —
-     * the add-component dialog and the section-delete branch.
-     * Both ``await`` the API call before dispatching, so by the
-     * time we see this event the new YAML is already on disk and
-     * ``_savedYaml`` can safely advance to match.
+  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn: string }>) {
+    /* ``yaml-updated`` fires from the three disk-writing delete
+     * paths only (the automation editors' engine, the component
+     * editor's section delete, and its manage-list row delete), all
+     * via ``prepareYamlUpdated``. Each ``await``s the write before
+     * dispatching, so the new YAML is already on disk; ``basedOn``
+     * is required so a future emitter cannot silently opt into the
+     * clobbering replace.
      *
      * Form edits in the section editor flow through the separate
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
     const { yaml, basedOn } = e.detail;
-    if (basedOn !== undefined && basedOn !== this._yaml) {
+    if (basedOn !== this._yaml) {
       // The write was computed against a buffer this pane has moved
       // past (a delete landing after a newer draft, #1476). Advance
       // only the saved side: the pane keeps what the user sees, the
