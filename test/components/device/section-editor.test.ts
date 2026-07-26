@@ -21,9 +21,21 @@ describe("prepareYamlUpdated", () => {
     // The host unmounts mid round trip; the announcement still rides
     // the anchor captured up front and carries the write's basis.
     host.parentNode = null as unknown as ParentNode;
-    announce(false, { yaml: "b:\n", basedOn: "a:\n" });
+    announce(false, {
+      configuration: "device.yaml",
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+    });
 
-    expect(seen).toEqual([{ yaml: "b:\n", basedOn: "a:\n" }]);
+    expect(seen).toEqual([
+      {
+        configuration: "device.yaml",
+        yaml: "b:\n",
+        basedOn: "a:\n",
+        removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+      },
+    ]);
   });
 
   it("dispatches from the host while it is still connected", () => {
@@ -35,7 +47,12 @@ describe("prepareYamlUpdated", () => {
     host.addEventListener("yaml-updated", () => seen.push("host"));
     anchor.addEventListener("yaml-updated", () => seen.push("anchor"));
 
-    prepareYamlUpdated(host)(true, { yaml: "b:\n", basedOn: "a:\n" });
+    prepareYamlUpdated(host)(true, {
+      configuration: "device.yaml",
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+    });
 
     expect(seen).toEqual(["host"]);
   });
@@ -47,7 +64,12 @@ describe("prepareYamlUpdated", () => {
 
     // Deliberate contract: a host that never mounted has nowhere to
     // deliver — swallow rather than throw.
-    prepareYamlUpdated(host)(false, { yaml: "b:\n", basedOn: "a:\n" });
+    prepareYamlUpdated(host)(false, {
+      configuration: "device.yaml",
+      yaml: "b:\n",
+      basedOn: "a:\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+    });
 
     expect(seen).toEqual([]);
   });

@@ -17,6 +17,8 @@ import "../../_mock-webawesome.js";
 
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { onDeleteConfirmed } from "../../../src/components/device/device-section-config/draft-and-delete.js";
+import { locationFromSectionKey } from "../../../src/components/device/automation-editor/serialise.js";
+import type { YamlUpdatedDetail } from "../../../src/components/device/section-editor.js";
 
 const ROW_YAML = [
   "binary_sensor:",
@@ -58,9 +60,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const shadow = outer.attachShadow({ mode: "open" });
     shadow.appendChild(c);
     document.body.appendChild(outer);
-    const updates: { yaml: string; basedOn: string }[] = [];
+    const updates: YamlUpdatedDetail[] = [];
     outer.addEventListener("yaml-updated", (e) =>
-      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
+      updates.push((e as CustomEvent<YamlUpdatedDetail>).detail)
     );
     const selections: unknown[] = [];
     outer.addEventListener("section-select", (e) => selections.push(e));
@@ -75,7 +77,12 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
 
       // The basis is the pre-delete snapshot, not the write.
       expect(updates).toEqual([
-        { yaml: "logger:\n", basedOn: "wifi:\n  ssid: home\nlogger:\n" },
+        {
+          configuration: "device.yaml",
+          yaml: "logger:\n",
+          basedOn: "wifi:\n  ssid: home\nlogger:\n",
+          removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+        },
       ]);
       expect(selections).toHaveLength(0);
     } finally {
@@ -106,9 +113,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const shadow = outer.attachShadow({ mode: "open" });
     shadow.appendChild(c);
     document.body.appendChild(outer);
-    const updates: { yaml: string; basedOn: string }[] = [];
+    const updates: YamlUpdatedDetail[] = [];
     outer.addEventListener("yaml-updated", (e) =>
-      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
+      updates.push((e as CustomEvent<YamlUpdatedDetail>).detail)
     );
 
     try {
@@ -128,6 +135,11 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
       expect(updates[0].yaml).not.toContain("on_press");
       // The basis is the pre-delete buffer the diff was computed on.
       expect(updates[0].basedOn).toBe(ROW_YAML);
+      expect(updates[0].configuration).toBe("device.yaml");
+      expect(updates[0].removed).toEqual({
+        kind: "automation",
+        location: locationFromSectionKey("automation:component_on:btn:on_press"),
+      });
     } finally {
       outer.remove();
     }
@@ -180,9 +192,9 @@ describe("onDeleteConfirmed mid-round-trip navigation", () => {
     const container = document.createElement("div");
     container.appendChild(c);
     document.body.appendChild(container);
-    const updates: { yaml: string; basedOn: string }[] = [];
+    const updates: YamlUpdatedDetail[] = [];
     container.addEventListener("yaml-updated", (e) =>
-      updates.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail)
+      updates.push((e as CustomEvent<YamlUpdatedDetail>).detail)
     );
 
     try {
