@@ -226,20 +226,44 @@ describe("leave guard flush ordering (#1503)", () => {
       reload: () => {},
     };
     const saveYaml = vi.fn(async () => true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (page as any)._saveYaml = saveYaml;
+    page._saveYaml = saveYaml;
 
     const leaving = page._confirmLeave();
     await Promise.resolve();
     await Promise.resolve();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
 
-    // The user picked "keep my work": the save lambda must retry
-    // through _saveYaml (whose own awaited flush re-runs the
-    // upsert) instead of no-opping on the clean-looking buffer.
+    // The user picked "keep my work". _saveYaml flushes pending
+    // work but cannot re-run the settled failed round; with the
+    // buffer untouched and nothing written, "Save and leave" must
+    // stay put rather than discard the edit it claimed to keep.
+    page._onUnsavedSave();
+    expect(await leaving).toBe(false);
+    expect(saveYaml).toHaveBeenCalledTimes(1);
+  });
+
+  test("Save leaves normally when the save actually writes", async () => {
+    const { page, dialogOpen } = makePage();
+    page._sectionDirty = true;
+    page._activeSection = {
+      dirty: true,
+      flushPending: async () => {
+        page._sectionDirty = false;
+      },
+      reload: () => {},
+    };
+    page._saveYaml = vi.fn(async () => {
+      page._savedYaml = page._yaml;
+      return true;
+    });
+
+    const leaving = page._confirmLeave();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+
     page._onUnsavedSave();
     expect(await leaving).toBe(true);
-    expect(saveYaml).toHaveBeenCalledTimes(1);
   });
 
   test("a rejecting flush still runs the guard, with the cause logged", async () => {

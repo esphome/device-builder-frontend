@@ -517,13 +517,25 @@ export class ESPHomePageDevice extends LitElement {
         // it resolves ``false`` and we propagate that up — the
         // user isn't done editing, so the page-leave guard
         // shouldn't proceed with navigation.
-        // Gated on the same conservative decision the guard used:
-        // on the failed-round path the buffer looks clean, and
-        // ``_saveYaml``'s own awaited flush is the retry that can
-        // land the draft (it early-outs itself when nothing did).
+        // Gated on the same conservative decision the guard used.
+        // ``_saveYaml`` flushes still-pending work and early-outs
+        // when nothing landed — it cannot re-run a settled failed
+        // round, so "Save" must not pretend it did: if the buffer
+        // is untouched and nothing was written while the pre-flush
+        // decision said dirty, the pending edit never reached the
+        // buffer. Stay put — the editor still holds the form state
+        // and has already surfaced the failure.
         if (dirtyBefore || this._isYamlDirty) {
+          const savedYamlBefore = this._savedYaml;
           const saved = await this._saveYaml();
           if (!saved) return false;
+          if (
+            dirtyBefore &&
+            this._savedYaml === savedYamlBefore &&
+            this._yaml === savedYamlBefore
+          ) {
+            return false;
+          }
         }
         this._allowingLeave = true;
         return true;
