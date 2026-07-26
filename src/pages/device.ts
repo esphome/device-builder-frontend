@@ -1760,10 +1760,11 @@ export class ESPHomePageDevice extends LitElement {
       // past (a delete landing after a newer draft, #1476). Advance
       // only the saved side: the pane keeps what the user sees and
       // the page shows honestly dirty. Note the trade: the retained
-      // draft was spliced into the pre-delete buffer, so a later
-      // Save writes the deleted section back — the toast makes that
-      // visible instead of silent (full re-base of the delete onto
-      // the live buffer is tracked separately).
+      // buffer predates the on-disk deletion (a section draft was
+      // spliced into the pre-delete buffer; a pane edit advanced it
+      // directly), so a later wholesale Save may undo the deletion —
+      // the toast makes that visible instead of silent (re-basing
+      // the delete onto the live buffer is tracked in #1490).
       this._savedYaml = yaml;
       notifyInfo(this._localize("device.delete_superseded"));
       return;
