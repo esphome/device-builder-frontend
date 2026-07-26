@@ -163,6 +163,9 @@ export class AutoApplyController implements ReactiveController {
     this._connected = true;
     this._detachedBasis = null;
     this._anchor = this._host.parentNode;
+    // A remount rebuilds the form from live YAML; the failed edit a
+    // latch protected is gone with the old form state.
+    this._lastRoundFailed = false;
     this._announceUnmount = announceSectionMount(this._host);
   }
 
@@ -198,6 +201,13 @@ export class AutoApplyController implements ReactiveController {
     const key = this._host.location ? sectionKeyFromLocation(this._host.location) : null;
     if (key === this._boundSectionKey) return;
     this._boundSectionKey = key;
+    this._lastRoundFailed = false;
+  }
+
+  /** The host replaced its form state with a fresh hydrate; the
+   *  failed edit the latch protected no longer exists, so keeping
+   *  it would refuse a leave over nothing. */
+  notifyHydrated(): void {
     this._lastRoundFailed = false;
   }
 

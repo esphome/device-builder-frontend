@@ -500,6 +500,12 @@ export class ESPHomePageDevice extends LitElement {
     // signal, so a flush that settles as a no-op (the user typed
     // and undid a keystroke) still leaves silently.
     let flushFailed = false;
+    // The awaited flush is the same slow phase ``_saveYaml`` covers
+    // with the Save spinner; borrow the flag so Back doesn't read as
+    // dead for the length of the upsert. Own it only if free — a
+    // save already in flight keeps its own lifecycle.
+    const ownBusy = !this._saving;
+    if (ownBusy) this._saving = true;
     try {
       await this._activeSection?.flushPending();
     } catch (err) {
@@ -508,6 +514,8 @@ export class ESPHomePageDevice extends LitElement {
       // path is ``lastFlushFailed`` below).
       console.error("Section flush before leave failed:", err);
       flushFailed = true;
+    } finally {
+      if (ownBusy) this._saving = false;
     }
     flushFailed ||= this._activeSection?.lastFlushFailed ?? false;
     const ok = await this._unsavedGuard.run({
