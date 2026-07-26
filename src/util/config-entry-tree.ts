@@ -25,7 +25,8 @@ export function choicePinned(
  *  the advanced-settings control shows at all: a nested advanced field reveals
  *  in place (it can't move to the bottom section), so the control must surface
  *  even when no *top-level* unit is advanced, or the field is unreachable.
- *  Hidden entries never render, so they don't count. */
+ *  Hidden entries don't count: empty ones never render, and value-bearing
+ *  ones paint regardless of the toggle. */
 export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   for (const entry of entries) {
     if (entry.hidden) continue;
