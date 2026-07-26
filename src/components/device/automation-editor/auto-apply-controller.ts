@@ -178,6 +178,9 @@ export class AutoApplyController implements ReactiveController {
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
     if (hadPending && this._anchor?.isConnected) void this.autoApply();
+    // The one remaining invisible loss: the page is gone, so the
+    // last debounce window has nowhere to land — leave a trace.
+    else if (hadPending) console.warn("Dropped pending auto-apply: anchor detached");
     // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
     this._announceUnmount = null;
@@ -380,7 +383,10 @@ export class AutoApplyController implements ReactiveController {
         // woken by the settle below re-checks against it. Detached
         // re-runs are safe: they chain their basis through
         // ``_detachedBasis``, so the draft lands instead of
-        // toasting a discard.
+        // toasting a discard. If the page rejected round one's
+        // draft, the chained basis was never adopted either and
+        // each rejected round toasts — a switch can toast more
+        // than once in that already-conflicted case.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
