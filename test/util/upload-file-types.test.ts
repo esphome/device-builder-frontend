@@ -4,6 +4,7 @@ import {
   ACCEPTED_UPLOAD_EXTENSIONS,
   FILE_INPUT_ACCEPT,
   isBundleFilename,
+  isYamlFilename,
 } from "../../src/util/upload-file-types.js";
 
 describe("isBundleFilename", () => {
@@ -17,6 +18,15 @@ describe("isBundleFilename", () => {
   it("treats plain YAML as not-a-bundle", () => {
     expect(isBundleFilename("device.yaml")).toBe(false);
     expect(isBundleFilename("device.yml")).toBe(false);
+  });
+});
+
+describe("isYamlFilename", () => {
+  it("accepts both YAML extensions, case-insensitively", () => {
+    expect(isYamlFilename("device.yaml")).toBe(true);
+    expect(isYamlFilename("DEVICE.YML")).toBe(true);
+    expect(isYamlFilename("device.tar.gz")).toBe(false);
+    expect(isYamlFilename("log.gz")).toBe(false);
   });
 });
 
