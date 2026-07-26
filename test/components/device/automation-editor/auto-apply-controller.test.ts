@@ -346,6 +346,34 @@ describe("AutoApplyController auto-apply", () => {
     expect(seen[0].detail.basedOn).toBe("line1\nline2");
   });
 
+  it("a queued re-run does not fire after the host unmounts", async () => {
+    const parent = document.createElement("div");
+    const { controller, upsertAutomation } = setup({}, parent);
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const seen: CustomEvent[] = [];
+    parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
+
+    const applying = controller.autoApply();
+    // A keystroke queues a re-run, then the section unmounts.
+    void controller.autoApply();
+    controller.hostDisconnected();
+    resolveFirst({ yaml_diff: DIFF });
+    await applying;
+    await flushTimers();
+
+    // Only the in-flight round's draft lands via the anchor; the
+    // detached re-run is skipped rather than toasting a discard of
+    // a draft whose basis can no longer echo.
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveLength(1);
+  });
+
   it("flushPending wakes on the settle boundary, not a poll tick", async () => {
     const { controller, upsertAutomation } = setup();
     let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;

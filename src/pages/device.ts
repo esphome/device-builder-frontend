@@ -1910,9 +1910,10 @@ export class ESPHomePageDevice extends LitElement {
    *
    *  The flush is awaited before the switch: the automation
    *  editors' flush is a backend upsert round trip, and swapping
-   *  the selection first can unmount the editor mid-flight — its
-   *  ``yaml-draft`` then fires from a detached element and never
-   *  reaches the page, silently dropping the last edit. The wait is
+   *  the selection first can unmount the editor mid-flight. The
+   *  anchored dispatch (#1479) still delivers that late draft, but
+   *  only the await guarantees it lands with a matching basis —
+   *  unawaited, the yaml-draft guard drops it as superseded. The wait is
    *  bounded by the WS command timeout (~10s worst case);
    *  ``_switchPending`` surfaces it as the desktop busy affordance
    *  (progress cursor + delayed navigator dim), and repeat clicks

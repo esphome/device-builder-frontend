@@ -105,6 +105,24 @@ describe("yaml-draft guards", () => {
     expect(toast.info).toHaveBeenCalledTimes(1);
   });
 
+  it("drops a dialog add whose basis the pane moved past", () => {
+    const page = makePage("moved:\n");
+
+    // Dialog emitters are never the active section, so a buffer
+    // that moved during their round trip routes them through the
+    // same conservative drop (a trade against the pre-#1497 silent
+    // clobber of the concurrent edit).
+    draft(page, {
+      configuration: "device.yaml",
+      yaml: "merged-add:\n",
+      basedOn: "before-add:\n",
+      node: new EventTarget(),
+    });
+
+    expect(page._yaml).toBe("moved:\n");
+    expect(toast.info).toHaveBeenCalledTimes(1);
+  });
+
   it("applies a late anchored draft whose basis still matches", () => {
     const page = makePage("a:\n");
 

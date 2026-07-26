@@ -326,11 +326,14 @@ export class AutoApplyController implements ReactiveController {
       this._surfaceSaveError(err);
     } finally {
       this._apply = { kind: "idle" };
-      if (phase.queued) {
+      if (phase.queued && this._connected) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
         // Synchronously installs the re-run's phase, so a waiter
-        // woken by the settle below re-checks against it.
+        // woken by the settle below re-checks against it. Skipped
+        // after an unmount for the same reason the debounce is
+        // cancelled there: the detached prop can't echo, so the
+        // re-run's stale-basis draft could only toast a discard.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
