@@ -64,6 +64,8 @@ describe("dispatchAutomationAdded", () => {
     expect(seen[0].detail).toEqual({
       configuration: "device.yaml",
       yaml: applyYamlDiff(YAML, DIFF),
+      basedOn: YAML,
+      node: host,
     });
     // ... and pin that the new block actually made it into the
     // draft, so a wrong-yaml dispatch still fails loudly here.

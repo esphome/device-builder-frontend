@@ -14,7 +14,7 @@ import {
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
-import { fireSectionEvent, prepareYamlUpdated } from "../section-editor.js";
+import { fireSectionEvent, prepareSectionEvent } from "../section-editor.js";
 
 // Validates against the *render* schema (resolveSectionEntries), not the raw
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
@@ -62,6 +62,8 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   fireSectionEvent(host, "yaml-draft", {
     configuration: host.configuration,
     yaml: newYaml,
+    basedOn: host.yaml,
+    node: host,
   });
   return newYaml;
 }
@@ -143,7 +145,7 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
   host._deleting = true;
   host._error = "";
   const title = host._config.title;
-  const announceUpdated = prepareYamlUpdated(host);
+  const announceUpdated = prepareSectionEvent(host, "yaml-updated");
   // The section key and target are snapshotted: Lit reuses this
   // element across same-kind switches, so a mid-round-trip retarget
   // keeps it connected while the deleted section is no longer on

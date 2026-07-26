@@ -52,10 +52,17 @@ export type RemovedSectionRef =
 /** A draft advance of the page's YAML buffer (unsaved; the global
  *  Save writes it). ``configuration`` is the emitter's snapshotted
  *  target so a draft landing after a device switch is dropped
- *  instead of spliced into the wrong device's buffer (#1479). */
+ *  instead of spliced into the wrong device's buffer (#1479).
+ *  ``basedOn`` is the buffer the draft was computed against and
+ *  ``node`` names the emitter: the page applies the active
+ *  section's drafts regardless (its prop echo legitimately lags a
+ *  render) but drops a late anchored draft whose basis the pane
+ *  has moved past. */
 export interface YamlDraftDetail {
   configuration: string;
   yaml: string;
+  basedOn: string;
+  node: EventTarget;
 }
 
 /** A completed disk write, the buffer it was computed against — the
@@ -92,21 +99,22 @@ export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
 }
 
 /**
- * Capture what a disk-writing delete needs to announce its
- * ``yaml-updated`` after the round trip, before any await: the
- * mount-time parent (the host may be unmounted by dispatch time —
- * detached dispatches bubble nowhere, #1465). The returned announcer
- * takes the host's connectedness at dispatch time and the write with
- * its required basis, typed through the section event map so a
- * future emitter cannot drop the basis and compile.
+ * Capture what an async emitter needs to announce *name* after its
+ * round trip, before any await: the mount-time parent (the host may
+ * be unmounted by dispatch time — detached dispatches bubble
+ * nowhere, #1465). The returned announcer takes the host's
+ * connectedness at dispatch time and the detail, typed through the
+ * section event map so a future emitter cannot drop a field and
+ * compile.
  */
-export function prepareYamlUpdated(
-  host: EventTarget & { readonly parentNode: ParentNode | null }
-): (connected: boolean, write: YamlUpdatedDetail) => void {
+export function prepareSectionEvent<K extends keyof SectionEditorEventMap>(
+  host: EventTarget & { readonly parentNode: ParentNode | null },
+  name: K
+): (connected: boolean, detail: SectionEditorEventMap[K]) => void {
   const anchor = host.parentNode;
-  return (connected, write) => {
+  return (connected, detail) => {
     const target = connected ? host : anchor;
-    if (target) fireSectionEvent(target, "yaml-updated", write);
+    if (target) fireSectionEvent(target, name, detail);
   };
 }
 

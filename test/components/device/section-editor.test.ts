@@ -4,9 +4,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { prepareYamlUpdated } from "../../../src/components/device/section-editor.js";
+import { prepareSectionEvent } from "../../../src/components/device/section-editor.js";
 
-describe("prepareYamlUpdated", () => {
+describe("prepareSectionEvent", () => {
   it("captures the anchor before the awaits and carries the basis", () => {
     const anchor = new EventTarget();
     const host = Object.assign(new EventTarget(), {
@@ -17,7 +17,7 @@ describe("prepareYamlUpdated", () => {
       seen.push((e as CustomEvent<{ yaml: string; basedOn?: string }>).detail)
     );
 
-    const announce = prepareYamlUpdated(host);
+    const announce = prepareSectionEvent(host, "yaml-updated");
     // The host unmounts mid round trip; the announcement still rides
     // the anchor captured up front and carries the write's basis.
     host.parentNode = null as unknown as ParentNode;
@@ -47,7 +47,7 @@ describe("prepareYamlUpdated", () => {
     host.addEventListener("yaml-updated", () => seen.push("host"));
     anchor.addEventListener("yaml-updated", () => seen.push("anchor"));
 
-    prepareYamlUpdated(host)(true, {
+    prepareSectionEvent(host, "yaml-updated")(true, {
       configuration: "device.yaml",
       yaml: "b:\n",
       basedOn: "a:\n",
@@ -64,7 +64,7 @@ describe("prepareYamlUpdated", () => {
 
     // Deliberate contract: a host that never mounted has nowhere to
     // deliver — swallow rather than throw.
-    prepareYamlUpdated(host)(false, {
+    prepareSectionEvent(host, "yaml-updated")(false, {
       configuration: "device.yaml",
       yaml: "b:\n",
       basedOn: "a:\n",

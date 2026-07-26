@@ -1750,7 +1750,7 @@ export class ESPHomePageDevice extends LitElement {
     /* ``yaml-updated`` fires from the three disk-writing delete
      * paths only (the automation editors' engine, the component
      * editor's section delete, and its manage-list row delete), all
-     * via ``prepareYamlUpdated``. Each ``await``s the write before
+     * via ``prepareSectionEvent``. Each ``await``s the write before
      * dispatching, so the new YAML is already on disk; ``basedOn``
      * is required so a future emitter cannot silently opt into the
      * clobbering replace.
@@ -1827,6 +1827,18 @@ export class ESPHomePageDevice extends LitElement {
     // would put the old device's section into the new device's
     // buffer (the yaml-updated identity guard's sibling, #1479).
     if (e.detail.configuration !== this.id) return;
+    // A late anchored draft (its editor already unmounted) computed
+    // against a buffer this pane has moved past would clobber the
+    // newer draft — drop it visibly. The active section is exempt:
+    // its ``yaml`` prop legitimately lags its own last draft by a
+    // render, and its splice re-carries the section's full values.
+    const emitter: unknown = e.detail.node;
+    if (e.detail.basedOn !== this._yaml && emitter !== this._activeSection) {
+      notifyInfo(this._localize("device.draft_superseded"), {
+        description: this._localize("device.draft_superseded_detail"),
+      });
+      return;
+    }
     this._setYaml(e.detail.yaml);
     this._retryPendingFieldLine();
   }

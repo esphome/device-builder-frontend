@@ -32,7 +32,12 @@ export function dispatchAutomationAdded(
   yamlDiff: YamlDiff
 ): void {
   const newYaml = applyYamlDiff(yaml, yamlDiff);
-  fireSectionEvent(host, "yaml-draft", { configuration, yaml: newYaml });
+  fireSectionEvent(host, "yaml-draft", {
+    configuration,
+    yaml: newYaml,
+    basedOn: yaml,
+    node: host,
+  });
   host.dispatchEvent(
     new CustomEvent<{ sectionKey: string }>("automation-added", {
       detail: { sectionKey: sectionKeyFromLocation(location) },
