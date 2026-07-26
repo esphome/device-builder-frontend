@@ -10,6 +10,7 @@
  * ``HTMLElementEventMap``, so a renamed event or a reshaped detail
  * is a compile error on both ends.
  */
+import type { AutomationLocation } from "../../api/types/automations.js";
 import { fireEvent } from "../../util/fire-event.js";
 export interface SectionEditor {
   /** Brief-window dirty flag so the global save button arms as
@@ -39,12 +40,27 @@ export interface SectionDirtyChangeDetail {
   node: SectionEditor;
 }
 
-/** A completed disk write and the buffer it was computed against —
- *  the page supersede-checks the basis and advances only the saved
- *  side when the pane has moved past it (#1476). */
+/** What a delete removed, so a superseded write can be re-based
+ *  onto the live buffer (#1490): component sections carry the key
+ *  plus the 1-indexed pre-delete line hint (matching
+ *  ``YamlSection.fromLine``) and splice client-side; automations
+ *  carry their location and recompute via the backend. */
+export type RemovedSectionRef =
+  | { kind: "component"; sectionKey: string; fromLine: number }
+  | { kind: "automation"; location: AutomationLocation };
+
+/** A completed disk write, the buffer it was computed against — the
+ *  page supersede-checks the basis and advances only the saved side
+ *  when the pane has moved past it (#1476) — and what it removed,
+ *  for the re-base onto the live buffer (#1490). ``configuration``
+ *  is the emitter's snapshotted target so a write landing after a
+ *  device switch is dropped instead of spliced into the wrong
+ *  device's buffer. */
 export interface YamlUpdatedDetail {
+  configuration: string;
   yaml: string;
   basedOn: string;
+  removed: RemovedSectionRef;
 }
 
 /** The events every section editor dispatches for the device page. */

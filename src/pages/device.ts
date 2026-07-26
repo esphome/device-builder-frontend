@@ -17,7 +17,11 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import type { SectionEditor } from "../components/device/section-editor.js";
+import { applyRemoval } from "../components/device/apply-removal.js";
+import type {
+  SectionEditor,
+  YamlUpdatedDetail,
+} from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
@@ -1741,7 +1745,7 @@ export class ESPHomePageDevice extends LitElement {
     this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
-  private _onYamlUpdated(e: CustomEvent<{ yaml: string; basedOn: string }>) {
+  private _onYamlUpdated(e: CustomEvent<YamlUpdatedDetail>) {
     /* ``yaml-updated`` fires from the three disk-writing delete
      * paths only (the automation editors' engine, the component
      * editor's section delete, and its manage-list row delete), all
@@ -1754,25 +1758,61 @@ export class ESPHomePageDevice extends LitElement {
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
-    const { yaml, basedOn } = e.detail;
+    const { configuration, yaml, basedOn } = e.detail;
+    // A write landing after a device switch belongs to the previous
+    // device — the router reuses this element, so acting on it would
+    // splice the wrong device's buffer (#1489-style identity guard).
+    if (configuration !== this.id) return;
     if (basedOn !== this._yaml) {
       // The write was computed against a buffer this pane has moved
       // past (a delete landing after a newer draft, #1476). Advance
-      // only the saved side: the pane keeps what the user sees and
-      // the page shows honestly dirty. Note the trade: the retained
-      // buffer predates the on-disk deletion (a section draft was
-      // spliced into the pre-delete buffer; a pane edit advanced it
-      // directly), so a later wholesale Save may undo the deletion —
-      // the toast makes that visible instead of silent (re-basing
-      // the delete onto the live buffer is tracked in #1490).
+      // the saved side and re-base the removal onto the live buffer
+      // (#1490) so the retained draft no longer carries the deleted
+      // section and a later wholesale Save cannot undo the deletion.
+      // When the re-base cannot land (the section is unresolvable in
+      // the moved buffer, or it moved again mid-recompute), fall back
+      // to honestly dirty plus the visibility toast.
       this._savedYaml = yaml;
-      notifyInfo(this._localize("device.delete_superseded"), {
-        description: this._localize("device.delete_superseded_detail"),
-      });
+      void this._rebaseSupersededDelete(e.detail);
       return;
     }
     this._setYaml(yaml);
     this._savedYaml = yaml;
+  }
+
+  /** Apply a superseded delete's removal to the live buffer (#1490). */
+  private async _rebaseSupersededDelete(detail: YamlUpdatedDetail): Promise<void> {
+    const live = this._yaml;
+    let rebased: string | null = null;
+    try {
+      rebased = await applyRemoval(detail, live, this._api);
+    } catch (err) {
+      console.error("Re-base of superseded delete failed:", err);
+      rebased = null;
+    }
+    // The device switched mid-recompute: the continuation (and its
+    // toast) belongs to the previous device. ``_loadYaml`` doesn't
+    // clear ``_yaml`` before its fetch, so the buffer guard below
+    // can't catch this window.
+    if (detail.configuration !== this.id) return;
+    // Land the re-base only if the pane didn't move again while it
+    // was computed — stale coordinates no longer apply.
+    if (rebased !== null && live === this._yaml) {
+      this._setYaml(rebased);
+      // The removal shifted lines under the selection; re-pin it so
+      // line-keyed lookups don't latch onto a neighbour (#1470).
+      if (this._selectedSection) {
+        this._selectedFromLine = resolveCurrentSectionLine(
+          rebased,
+          this._selectedSection,
+          this._selectedFromLine
+        );
+      }
+      return;
+    }
+    notifyInfo(this._localize("device.delete_superseded"), {
+      description: this._localize("device.delete_superseded_detail"),
+    });
   }
 
   private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {

@@ -27,6 +27,7 @@ import {
   type AutoApplyHost,
   type AutoApplyOptions,
 } from "../../../../src/components/device/automation-editor/auto-apply-controller.js";
+import type { YamlUpdatedDetail } from "../../../../src/components/device/section-editor.js";
 import { flushTimers, identityLocalize } from "../../../_dom.js";
 
 const SCRIPT: AutomationLocation = {
@@ -410,10 +411,10 @@ describe("AutoApplyController delete", () => {
           host.yaml = yaml;
         });
     });
-    const updatedDetails: { yaml: string; basedOn: string }[] = [];
+    const updatedDetails: YamlUpdatedDetail[] = [];
     host.addEventListener("yaml-updated", (e) => {
       order.push("updated");
-      updatedDetails.push((e as CustomEvent<{ yaml: string; basedOn: string }>).detail);
+      updatedDetails.push((e as CustomEvent<YamlUpdatedDetail>).detail);
     });
 
     const applying = controller.autoApply();
@@ -434,7 +435,12 @@ describe("AutoApplyController delete", () => {
     expect(order).toEqual(["draft", "updated"]);
     // The basis is the settled pre-delete buffer, not the write.
     expect(updatedDetails).toEqual([
-      { yaml: "replaced\nline2", basedOn: "replaced\nline2" },
+      {
+        configuration: "device.yaml",
+        yaml: "replaced\nline2",
+        basedOn: "replaced\nline2",
+        removed: { kind: "automation", location: SCRIPT },
+      },
     ]);
   });
 
