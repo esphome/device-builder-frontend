@@ -24,6 +24,8 @@ interface BasisView {
   _savedYaml: string;
   _api?: ESPHomeAPI;
   id: string;
+  _selectedSection: string | null;
+  _selectedFromLine?: number;
   _onYamlUpdated(e: CustomEvent<YamlUpdatedDetail>): void;
 }
 
@@ -58,6 +60,26 @@ describe("yaml-updated supersede check", () => {
     expect(page._yaml).toBe("b:\n");
     expect(page._savedYaml).toBe("b:\n");
     expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("a clean delete re-pins the selection below the removed section", () => {
+    const page = makePage(
+      "wifi:\n  ssid: home\nlogger:\n  level: DEBUG\n",
+      "wifi:\n  ssid: home\nlogger:\n  level: DEBUG\n"
+    );
+    page._selectedSection = "logger";
+    page._selectedFromLine = 3;
+
+    updated(page, {
+      configuration: "device.yaml",
+      yaml: "logger:\n  level: DEBUG\n",
+      basedOn: "wifi:\n  ssid: home\nlogger:\n  level: DEBUG\n",
+      removed: { kind: "component", sectionKey: "wifi", fromLine: 1 },
+    });
+
+    // The delete shifted logger up; a stale pin would latch line 3
+    // onto whatever sits there now (#1470).
+    expect(page._selectedFromLine).toBe(1);
   });
 
   it("re-bases a superseded component-section delete onto the live buffer", async () => {

@@ -488,7 +488,7 @@ export class ESPHomePageDevice extends LitElement {
     // form and immediately hit back would see the dialog reflect
     // ``_sectionDirty`` (transient) rather than the YAML diff that
     // ``Save`` is going to commit.
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
@@ -515,7 +515,7 @@ export class ESPHomePageDevice extends LitElement {
     // form and immediately closed the tab gets warned (the form's
     // own keystroke would otherwise sit in the debounce window with
     // no representation in ``_yaml``).
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     if (this._isDirty) {
       e.preventDefault();
       e.returnValue = "";
@@ -527,7 +527,7 @@ export class ESPHomePageDevice extends LitElement {
       this._allowingLeave = false;
       return;
     }
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     if (!this._isDirty) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", withBase(`/device/${this.id}`));
@@ -1734,6 +1734,21 @@ export class ESPHomePageDevice extends LitElement {
     }
     this._setYaml(yaml);
     this._savedYaml = yaml;
+    this._repinSelection(yaml);
+  }
+
+  /** Re-pin the selection's line after a programmatic buffer rewrite
+   *  (a landed delete, re-base, or draft shifts every section below
+   *  its splice) so line-keyed lookups don't latch onto a neighbour
+   *  (#1470). Hand edits stay out — the cursor-line handler owns the
+   *  selection there. A vanished key leaves the line unset. */
+  private _repinSelection(yaml: string): void {
+    if (!this._selectedSection) return;
+    this._selectedFromLine = resolveCurrentSectionLine(
+      yaml,
+      this._selectedSection,
+      this._selectedFromLine
+    );
   }
 
   /** Apply a superseded delete's removal to the live buffer (#1490). */
@@ -1755,15 +1770,7 @@ export class ESPHomePageDevice extends LitElement {
     // was computed — stale coordinates no longer apply.
     if (rebased !== null && live === this._yaml) {
       this._setYaml(rebased);
-      // The removal shifted lines under the selection; re-pin it so
-      // line-keyed lookups don't latch onto a neighbour (#1470).
-      if (this._selectedSection) {
-        this._selectedFromLine = resolveCurrentSectionLine(
-          rebased,
-          this._selectedSection,
-          this._selectedFromLine
-        );
-      }
+      this._repinSelection(rebased);
       return;
     }
     notifyInfo(this._localize("device.delete_superseded"), {
@@ -1795,16 +1802,9 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._setYaml(e.detail.yaml);
-    // A landing draft can shift lines under the selection (an
-    // upsert's diff moves every section below it); re-pin so
-    // line-keyed lookups don't latch onto a neighbour (#1470).
-    if (this._selectedSection) {
-      this._selectedFromLine = resolveCurrentSectionLine(
-        e.detail.yaml,
-        this._selectedSection,
-        this._selectedFromLine
-      );
-    }
+    // The active section's own splice never moves its own start
+    // line, so its debounced typing stream skips the re-pin parse.
+    if (emitter !== this._activeSection) this._repinSelection(e.detail.yaml);
     this._retryPendingFieldLine();
   }
 
