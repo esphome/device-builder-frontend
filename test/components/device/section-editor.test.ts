@@ -25,4 +25,30 @@ describe("prepareYamlUpdated", () => {
 
     expect(seen).toEqual([{ yaml: "b:\n", basedOn: "a:\n" }]);
   });
+
+  it("dispatches from the host while it is still connected", () => {
+    const anchor = new EventTarget();
+    const host = Object.assign(new EventTarget(), {
+      parentNode: anchor as unknown as ParentNode,
+    });
+    const seen: string[] = [];
+    host.addEventListener("yaml-updated", () => seen.push("host"));
+    anchor.addEventListener("yaml-updated", () => seen.push("anchor"));
+
+    prepareYamlUpdated(host)(true, { yaml: "b:\n", basedOn: "a:\n" });
+
+    expect(seen).toEqual(["host"]);
+  });
+
+  it("silently no-ops when a never-mounted host is disconnected", () => {
+    const host = Object.assign(new EventTarget(), { parentNode: null });
+    const seen: string[] = [];
+    host.addEventListener("yaml-updated", () => seen.push("host"));
+
+    // Deliberate contract: a host that never mounted has nowhere to
+    // deliver — swallow rather than throw.
+    prepareYamlUpdated(host)(false, { yaml: "b:\n", basedOn: "a:\n" });
+
+    expect(seen).toEqual([]);
+  });
 });

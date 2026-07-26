@@ -1766,7 +1766,9 @@ export class ESPHomePageDevice extends LitElement {
       // the toast makes that visible instead of silent (re-basing
       // the delete onto the live buffer is tracked in #1490).
       this._savedYaml = yaml;
-      notifyInfo(this._localize("device.delete_superseded"));
+      notifyInfo(this._localize("device.delete_superseded"), {
+        description: this._localize("device.delete_superseded_detail"),
+      });
       return;
     }
     this._setYaml(yaml);

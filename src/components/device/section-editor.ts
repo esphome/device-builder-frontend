@@ -4,8 +4,8 @@
  * automation-family editors. Both sides implement it explicitly so
  * drift is a compile error instead of a save-guard edge case; the
  * page's ``section-mount`` / ``section-unmount`` handlers and the
- * YAML-driven reload path type against it. The event trio the same
- * editors dispatch is covered too: firers go through
+ * YAML-driven reload path type against it. The events the same
+ * editors dispatch are covered too: firers go through
  * ``fireSectionEvent`` and consumers read the augmented
  * ``HTMLElementEventMap``, so a renamed event or a reshaped detail
  * is a compile error on both ends.
