@@ -296,8 +296,9 @@ export class AutoApplyController implements ReactiveController {
       // otherwise repeated auto-applies (the user typing into the
       // same field) would each re-insert the automation on top of
       // the previous draft's insertion.
+      const configuration = this._host.configuration;
       const { yaml_diff } = await api.upsertAutomation(
-        this._host.configuration,
+        configuration,
         value,
         location,
         this._host.yaml
@@ -308,13 +309,7 @@ export class AutoApplyController implements ReactiveController {
       // synchronous and may already trigger ``updated()`` on the way
       // back, which is where the skip check runs.
       this._lastSelfWrittenYaml = newYaml;
-      this._host.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireSectionEvent(this._host, "yaml-draft", { configuration, yaml: newYaml });
     } catch (err) {
       this._surfaceSaveError(err);
     } finally {

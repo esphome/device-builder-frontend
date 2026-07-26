@@ -15,6 +15,7 @@ import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { fireSectionEvent } from "./section-editor.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -670,7 +671,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   /** Surface the merged YAML as an unsaved editor draft (host saves explicitly). */
   private _dispatchDraft(yaml: string) {
-    fireEvent(this, "yaml-draft", { yaml });
+    fireSectionEvent(this, "yaml-draft", { configuration: this.configuration, yaml });
   }
 
   /**

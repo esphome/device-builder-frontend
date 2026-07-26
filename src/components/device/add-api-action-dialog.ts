@@ -31,6 +31,7 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
+import { fireSectionEvent } from "./section-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
@@ -220,20 +221,18 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         trigger_params: {},
         actions: [],
       };
+      // Snapshot the target and buffer together: the diff's line
+      // coordinates are relative to the string we send.
+      const configuration = this.configuration;
+      const yaml = this.yaml;
       const { yaml_diff } = await this._api.upsertAutomation(
-        this.configuration,
+        configuration,
         tree,
         location,
-        this.yaml
+        yaml
       );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      const newYaml = applyYamlDiff(yaml, yaml_diff);
+      fireSectionEvent(this, "yaml-draft", { configuration, yaml: newYaml });
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string }>("automation-added", {
           detail: { sectionKey: sectionKeyFromLocation(location) },

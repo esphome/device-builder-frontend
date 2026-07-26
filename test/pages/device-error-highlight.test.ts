@@ -70,7 +70,9 @@ describe("error-jump highlight lifecycle (#1404)", () => {
     goToError(page);
 
     internals(page)._onYamlDraft(
-      new CustomEvent("yaml-draft", { detail: { yaml: YAML + "    pin: GPIO11\n" } })
+      new CustomEvent("yaml-draft", {
+        detail: { configuration: "kitchen.yaml", yaml: YAML + "    pin: GPIO11\n" },
+      })
     );
     lintCompleted(page);
     expect(internals(page)._highlightRange).toBeNull();

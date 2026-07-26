@@ -244,7 +244,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
         location,
         this.yaml
       );
-      dispatchAutomationAdded(this, this.yaml, location, yaml_diff);
+      dispatchAutomationAdded(this, this.configuration, this.yaml, location, yaml_diff);
       this._dialog.open = false;
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");

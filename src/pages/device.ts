@@ -20,6 +20,7 @@ import { DeviceInstallController } from "../components/device/device-install-con
 import { applyRemoval } from "../components/device/apply-removal.js";
 import type {
   SectionEditor,
+  YamlDraftDetail,
   YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
@@ -1815,12 +1816,17 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {
+  private _onYamlDraft(e: CustomEvent<YamlDraftDetail>) {
     /* Form auto-sync: the section editor spliced its current
      * ``_values`` into the YAML and is asking us to surface that
      * in the YAML pane. Only ``_yaml`` advances; ``_savedYaml``
      * stays put so the right-pane Save button activates and the
      * user sees the buffer is dirty. */
+    // A draft landing after a device switch belongs to the previous
+    // device — the router reuses this element, so splicing it here
+    // would put the old device's section into the new device's
+    // buffer (the yaml-updated identity guard's sibling, #1479).
+    if (e.detail.configuration !== this.id) return;
     this._setYaml(e.detail.yaml);
     this._retryPendingFieldLine();
   }

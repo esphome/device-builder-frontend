@@ -10,12 +10,13 @@
  */
 import type { AutomationLocation, YamlDiff } from "../../api/types/automations.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
+import { fireSectionEvent } from "./section-editor.js";
 
 /**
  * Apply ``yamlDiff`` to ``yaml`` and dispatch the two bubbling,
  * composed events the device page listens for:
  *
- * - ``yaml-draft`` (``detail: { yaml }``) — the spliced YAML, so
+ * - ``yaml-draft`` (``detail: { configuration, yaml }``) — the spliced YAML, so
  *   the new automation lands in the page's YAML state (and thus
  *   the YAML pane + the global save button see the change). The
  *   page advances ``_yaml`` without touching ``_savedYaml`` —
@@ -25,18 +26,13 @@ import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/seria
  */
 export function dispatchAutomationAdded(
   host: HTMLElement,
+  configuration: string,
   yaml: string,
   location: AutomationLocation,
   yamlDiff: YamlDiff
 ): void {
   const newYaml = applyYamlDiff(yaml, yamlDiff);
-  host.dispatchEvent(
-    new CustomEvent<{ yaml: string }>("yaml-draft", {
-      detail: { yaml: newYaml },
-      bubbles: true,
-      composed: true,
-    })
-  );
+  fireSectionEvent(host, "yaml-draft", { configuration, yaml: newYaml });
   host.dispatchEvent(
     new CustomEvent<{ sectionKey: string }>("automation-added", {
       detail: { sectionKey: sectionKeyFromLocation(location) },
