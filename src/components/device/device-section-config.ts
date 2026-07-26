@@ -323,6 +323,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     settleOwnDraft(this);
   }
 
+  // The flush is a local splice — it cannot fail.
+  public readonly lastFlushFailed = false;
+
   // Reload config from live YAML. Two skip cases: (a) yaml exactly matches
   // what we wrote in _flushDraft (reload would re-parse our own write and
   // lose field focus), (b) a debounced flush is pending (form is mid-edit,

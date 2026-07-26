@@ -686,6 +686,7 @@
     "draft_superseded": "Change not applied",
     "draft_superseded_detail": "It finished after the buffer changed and no longer applies. Redo it if needed.",
     "section_delete_error": "Failed to delete section",
+    "leave_last_change_unsaved": "Your last change failed to save. Fix or discard it before leaving.",
     "yaml_saved": "YAML saved",
     "yaml_save_error": "Failed to save YAML",
     "yaml_invalid_title": "Configuration has errors",

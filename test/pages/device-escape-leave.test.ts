@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("sonner-js", () => ({
+  default: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
+
+import toast from "sonner-js";
+
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import { setLeaveGuard } from "../../src/util/navigation.js";
 
@@ -22,10 +28,12 @@ interface EscapeView {
   _drawerOpen: boolean;
   _activeSection: {
     dirty: boolean;
+    lastFlushFailed: boolean;
     flushPending: () => void | Promise<void>;
     reload: () => void;
   } | null;
   _onKeydown(e: KeyboardEvent): void;
+  _onBeforeUnload(e: BeforeUnloadEvent): void;
   _onUnsavedDiscard(): void;
   _onUnsavedCancel(): void;
   _confirmLeave(): Promise<boolean>;
@@ -153,7 +161,23 @@ describe("esphome-page-device Escape leave guard", () => {
 describe("leave guard flush ordering (#1503)", () => {
   afterEach(() => {
     setLeaveGuard(null);
+    vi.mocked(toast.error).mockClear();
   });
+
+  /** A section whose flush settles a round: clears the transient
+   *  dirty flag and reports whether the round landed. */
+  function settlingSection(page: EscapeView, opts: { failed: boolean }) {
+    const section = {
+      dirty: true,
+      lastFlushFailed: false,
+      flushPending: async () => {
+        page._sectionDirty = false;
+        section.lastFlushFailed = opts.failed;
+      },
+      reload: () => {},
+    };
+    return section;
+  }
 
   test("the dialog runs only after the automation editor's flush settles", async () => {
     const { page, dialogOpen } = makePage();
@@ -161,6 +185,7 @@ describe("leave guard flush ordering (#1503)", () => {
     let settle!: () => void;
     page._activeSection = {
       dirty: true,
+      lastFlushFailed: false,
       flushPending: () =>
         new Promise<void>((resolve) => {
           settle = () => {
@@ -194,16 +219,11 @@ describe("leave guard flush ordering (#1503)", () => {
     // inside the debounce window, represented by _sectionDirty.
     page._savedYaml = page._yaml;
     page._sectionDirty = true;
-    page._activeSection = {
-      dirty: true,
-      // The engine settles a FAILED round by clearing the dirty
-      // flag without landing a draft (its own catch already
-      // toasted); the leave decision must not fail open on that.
-      flushPending: async () => {
-        page._sectionDirty = false;
-      },
-      reload: () => {},
-    };
+    // The engine settles a FAILED round by clearing the dirty flag
+    // without landing a draft (its own catch already toasted); it
+    // reports that through lastFlushFailed, which the leave
+    // decision reads instead of failing open.
+    page._activeSection = settlingSection(page, { failed: true });
 
     const leaving = page._confirmLeave();
     await Promise.resolve();
@@ -214,17 +234,24 @@ describe("leave guard flush ordering (#1503)", () => {
     await leaving;
   });
 
-  test("Save on the failed-round path stays put when nothing landed", async () => {
+  test("a no-op flush leaves silently, exactly as before (#1503)", async () => {
+    const { page, dialogOpen } = makePage();
+    // The user typed and undid a keystroke inside the debounce
+    // window: the round settles clean with nothing to land. That
+    // must not prompt — there is genuinely nothing unsaved.
+    page._savedYaml = page._yaml;
+    page._sectionDirty = true;
+    page._activeSection = settlingSection(page, { failed: false });
+
+    expect(await page._confirmLeave()).toBe(true);
+    expect(dialogOpen).not.toHaveBeenCalled();
+  });
+
+  test("Save on the failed-round path stays put and says why", async () => {
     const { page, dialogOpen } = makePage();
     page._savedYaml = page._yaml;
     page._sectionDirty = true;
-    page._activeSection = {
-      dirty: true,
-      flushPending: async () => {
-        page._sectionDirty = false;
-      },
-      reload: () => {},
-    };
+    page._activeSection = settlingSection(page, { failed: true });
     const saveYaml = vi.fn(async () => true);
     page._saveYaml = saveYaml;
 
@@ -233,25 +260,20 @@ describe("leave guard flush ordering (#1503)", () => {
     await Promise.resolve();
     expect(dialogOpen).toHaveBeenCalledTimes(1);
 
-    // The user picked "keep my work". _saveYaml flushes pending
-    // work but cannot re-run the settled failed round; with the
-    // buffer untouched and nothing written, "Save and leave" must
-    // stay put rather than discard the edit it claimed to keep.
+    // The user picked "keep my work". _saveYaml cannot re-run the
+    // settled failed round, so "Save and leave" must stay put
+    // rather than discard the edit it claimed to keep — and toast,
+    // or the refusal reads as a dead button.
     page._onUnsavedSave();
     expect(await leaving).toBe(false);
     expect(saveYaml).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   test("Save leaves normally when the save actually writes", async () => {
     const { page, dialogOpen } = makePage();
     page._sectionDirty = true;
-    page._activeSection = {
-      dirty: true,
-      flushPending: async () => {
-        page._sectionDirty = false;
-      },
-      reload: () => {},
-    };
+    page._activeSection = settlingSection(page, { failed: false });
     page._saveYaml = vi.fn(async () => {
       page._savedYaml = page._yaml;
       return true;
@@ -272,6 +294,7 @@ describe("leave guard flush ordering (#1503)", () => {
       const { page, dialogOpen } = makePage();
       page._activeSection = {
         dirty: true,
+        lastFlushFailed: false,
         flushPending: () => Promise.reject(new Error("upsert failed")),
         reload: () => {},
       };
@@ -290,5 +313,20 @@ describe("leave guard flush ordering (#1503)", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  test("a settled-as-failed round arms the beforeunload warning", () => {
+    const { page } = makePage();
+    // Buffer clean, transient flag already cleared by the settle —
+    // only lastFlushFailed knows the edit never landed.
+    page._savedYaml = page._yaml;
+    page._sectionDirty = false;
+    const section = settlingSection(page, { failed: true });
+    section.lastFlushFailed = true;
+    page._activeSection = section;
+
+    const preventDefault = vi.fn();
+    page._onBeforeUnload({ preventDefault } as unknown as BeforeUnloadEvent);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
   });
 });

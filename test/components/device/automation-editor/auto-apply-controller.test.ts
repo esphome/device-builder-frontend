@@ -50,6 +50,7 @@ class Host extends EventTarget implements AutoApplyHost {
   parentNode: ParentNode | null = null;
   // SectionEditor surface the real hosts delegate to the engine.
   dirty = false;
+  lastFlushFailed = false;
   flushPending(): void {}
   reload(): void {}
   updates = 0;
@@ -254,6 +255,20 @@ describe("AutoApplyController auto-apply", () => {
       description: "boom",
       richColors: true,
     });
+  });
+
+  it("lastRoundFailed reports a failed round and clears on the next landing", async () => {
+    const { controller, upsertAutomation } = setup();
+    expect(controller.lastRoundFailed).toBe(false);
+
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(true);
+
+    controller.scheduleAutoApply();
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    expect(controller.lastRoundFailed).toBe(false);
   });
 
   it("flushPending flushes the pending debounce immediately and cancels the timer", async () => {

@@ -450,11 +450,12 @@ export class ESPHomePageDevice extends LitElement {
    *  getter. The component editor's flush promotes pending form
    *  edits into ``_yaml`` synchronously; the automation editors'
    *  flush is a backend round-trip that the save and leave paths
-   *  await; the synchronous paths (beforeunload, popstate) lean on
-   *  ``_sectionDirty`` staying set until the upsert *settles*. A
-   *  settled-as-failed round clears the flag without landing a
-   *  draft, which is why the leave path ORs in a pre-flush
-   *  snapshot rather than trusting the post-flush read. */
+   *  await. A settled-as-failed round clears ``_sectionDirty``
+   *  without landing a draft, so every leave path additionally
+   *  reads the editor's ``lastFlushFailed`` — including the
+   *  synchronous ones (beforeunload, popstate), where
+   *  ``_sectionDirty`` covers a round still pending and
+   *  ``lastFlushFailed`` covers one already settled as failed. */
   private get _isDirty(): boolean {
     return this._isYamlDirty || this._sectionDirty;
   }
@@ -493,23 +494,24 @@ export class ESPHomePageDevice extends LitElement {
     // automation editors' backend upsert settles too — a kicked
     // flush would show the dialog against ``_sectionDirty``
     // (transient) rather than the YAML diff ``Save`` will commit.
-    // ``_sectionDirty`` stays set only until the upsert *settles*:
-    // a failed round clears it without landing a draft, so the
-    // post-flush read alone would fail open. Snapshot the pre-flush
-    // decision and OR it in — the decision only gets more
-    // conservative, while the dialog content still reflects the
-    // settled buffer.
-    const dirtyBefore = this._isDirty;
+    // A failed round clears ``_sectionDirty`` without landing a
+    // draft, so the post-flush read alone would fail open; the
+    // editor reports it through ``lastFlushFailed`` — the real
+    // signal, so a flush that settles as a no-op (the user typed
+    // and undid a keystroke) still leaves silently.
+    let flushFailed = false;
     try {
       await this._activeSection?.flushPending();
     } catch (err) {
       // The editors self-catch their upsert failures, so a throw or
       // rejection here is a backstop, not the live error path (that
-      // path is the failed-round case handled above).
+      // path is ``lastFlushFailed`` below).
       console.error("Section flush before leave failed:", err);
+      flushFailed = true;
     }
+    flushFailed ||= this._activeSection?.lastFlushFailed ?? false;
     const ok = await this._unsavedGuard.run({
-      dirty: dirtyBefore || this._isDirty,
+      dirty: flushFailed || this._isDirty,
       open: () => this._unsavedDialog?.open(),
       save: async () => {
         // ``_saveYaml`` may open the validation prompt and await
@@ -517,25 +519,15 @@ export class ESPHomePageDevice extends LitElement {
         // it resolves ``false`` and we propagate that up — the
         // user isn't done editing, so the page-leave guard
         // shouldn't proceed with navigation.
-        // Gated on the same conservative decision the guard used.
-        // ``_saveYaml`` flushes still-pending work and early-outs
-        // when nothing landed — it cannot re-run a settled failed
-        // round, so "Save" must not pretend it did: if the buffer
-        // is untouched and nothing was written while the pre-flush
-        // decision said dirty, the pending edit never reached the
-        // buffer. Stay put — the editor still holds the form state
-        // and has already surfaced the failure.
-        if (dirtyBefore || this._isYamlDirty) {
-          const savedYamlBefore = this._savedYaml;
-          const saved = await this._saveYaml();
-          if (!saved) return false;
-          if (
-            dirtyBefore &&
-            this._savedYaml === savedYamlBefore &&
-            this._yaml === savedYamlBefore
-          ) {
-            return false;
-          }
+        const saved = await this._saveYaml();
+        if (!saved) return false;
+        if (flushFailed) {
+          // The failed round's edit never reached the buffer and a
+          // settled round cannot be re-run, so "Save" must not
+          // pretend it saved it. Stay put — the editor still holds
+          // the form state — and say why the leave didn't happen.
+          notifyError(this._localize("device.leave_last_change_unsaved"));
+          return false;
         }
         this._allowingLeave = true;
         return true;
@@ -549,9 +541,11 @@ export class ESPHomePageDevice extends LitElement {
     // Synchronous by contract — the browser reads the decision on
     // return, so the async flush cannot be awaited here. Safe
     // regardless: ``_sectionDirty`` arms ``_isDirty`` from the
-    // first keystroke, so the warning fails conservative (#1503).
+    // first keystroke, and ``lastFlushFailed`` covers a round
+    // already settled as failed, so the warning fails
+    // conservative (#1503).
     this._kickSectionFlush();
-    if (this._isDirty) {
+    if (this._isDirty || this._activeSection?.lastFlushFailed) {
       e.preventDefault();
       e.returnValue = "";
     }
@@ -564,9 +558,10 @@ export class ESPHomePageDevice extends LitElement {
     }
     // Synchronous by contract (the popped entry must be re-pushed
     // in the same task); the dirty pre-check fails conservative via
-    // ``_sectionDirty``, same as beforeunload (#1503).
+    // ``_sectionDirty`` (round pending) plus ``lastFlushFailed``
+    // (round settled as failed), same as beforeunload (#1503).
     this._kickSectionFlush();
-    if (!this._isDirty) return;
+    if (!this._isDirty && !this._activeSection?.lastFlushFailed) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", withBase(`/device/${this.id}`));
     // eslint-disable-next-line @typescript-eslint/no-floating-promises -- FIXME(#1505): unaudited dropped promise
@@ -835,8 +830,10 @@ export class ESPHomePageDevice extends LitElement {
    *
    * Also resolves ``true`` for the no-op "save when not dirty"
    * case (the guard treats that as "nothing to save, fine to
-   * leave"); the page's user-facing Save button doesn't read
-   * the return value.
+   * leave" — unless the editor's ``lastFlushFailed`` says the
+   * buffer is clean only because a failed round never landed,
+   * which the leave guard checks separately); the page's
+   * user-facing Save button doesn't read the return value.
    */
   private _saveYaml = async (): Promise<boolean> => {
     // Refuse to start a second save while one is already in progress.

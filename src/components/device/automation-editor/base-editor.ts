@@ -130,6 +130,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     return this._engine.flushPending();
   }
 
+  public get lastFlushFailed(): boolean {
+    return this._engine.lastRoundFailed;
+  }
+
   static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
 
   /** Loading spinner / parse-error panel that preempts the body

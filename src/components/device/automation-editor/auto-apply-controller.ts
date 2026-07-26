@@ -136,6 +136,7 @@ export class AutoApplyController implements ReactiveController {
    *  re-pointed host loses the exemption via ``RETARGETED_EMITTER``. */
   private _detachedBasis: string | null = null;
   private _dirty = false;
+  private _lastRoundFailed = false;
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
@@ -190,6 +191,14 @@ export class AutoApplyController implements ReactiveController {
    *  save button activates as soon as the user types. */
   get dirty(): boolean {
     return this._dirty;
+  }
+
+  /** Whether the most recent settled round failed — its edit never
+   *  landed in the page's buffer and a settled round cannot be
+   *  re-run, so leaving would discard it. Cleared by the next
+   *  round that lands. */
+  get lastRoundFailed(): boolean {
+    return this._lastRoundFailed;
   }
 
   /** Disables the host's form chrome while a delete is running. */
@@ -366,7 +375,9 @@ export class AutoApplyController implements ReactiveController {
         basedOn: yaml,
         node: retargeted ? RETARGETED_EMITTER : this._host,
       });
+      this._lastRoundFailed = false;
     } catch (err) {
+      this._lastRoundFailed = true;
       // A switch-path round resolves after the editor unmounted, so
       // ``_connected`` alone would silence the dominant path. The
       // page still being alive (live anchor) means the user must
