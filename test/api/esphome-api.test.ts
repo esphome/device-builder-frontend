@@ -2191,6 +2191,129 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
   });
 });
 
+describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
+  const IMPORTED = {
+    status: "imported",
+    configuration: "device.yaml",
+    conflicts: [],
+    written: ["device.yaml"],
+    kept: [],
+    has_secrets: false,
+    esphome_version: "2026.6.0",
+  };
+
+  afterEach(() => {
+    uninstallMockWebSocket();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  // Mint the upload token the inlined WS command expects, so the POST proceeds.
+  async function upload(
+    api: ESPHomeAPI,
+    ws: MockWebSocket,
+    file: Blob,
+    overwrite?: string[]
+  ): ReturnType<ESPHomeAPI["importBundleUpload"]> {
+    const pending = api.importBundleUpload(file, overwrite);
+    const sent = ws.sentAs<{ command: string; message_id: string }>(0);
+    expect(sent.command).toBe("devices/import_bundle_token");
+    ws.receive({ message_id: sent.message_id, result: { token: "a b/c" } });
+    return pending;
+  }
+
+  it("mints a token over the WS then POSTs the file (detect pass)", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
+    vi.stubGlobal("fetch", fetchFn);
+    const file = new File([new Uint8Array([1, 2, 3])], "device.esphomebundle.tar.gz");
+
+    const result = await upload(api, ws, file);
+
+    expect(result).toEqual(IMPORTED);
+    // token is URL-encoded and no mode/overwrite params on the detect pass.
+    expect(fetchFn).toHaveBeenCalledWith("/api/devices/import_bundle?token=a+b%2Fc", {
+      method: "POST",
+      body: file,
+    });
+  });
+
+  it("adds mode=resolve and a repeated overwrite param per path", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
+    vi.stubGlobal("fetch", fetchFn);
+    const file = new File([new Uint8Array([1])], "device.esphomebundle.tar.gz");
+
+    await upload(api, ws, file, ["device.yaml", "common/wifi.yaml"]);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "/api/devices/import_bundle?token=a+b%2Fc&mode=resolve&overwrite=device.yaml&overwrite=common%2Fwifi.yaml",
+      { method: "POST", body: file }
+    );
+  });
+
+  it("emits mode=resolve with no overwrite params for an empty resolve (keep all)", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
+    vi.stubGlobal("fetch", fetchFn);
+    const file = new File([new Uint8Array([1])], "device.esphomebundle.tar.gz");
+
+    await upload(api, ws, file, []);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "/api/devices/import_bundle?token=a+b%2Fc&mode=resolve",
+      { method: "POST", body: file }
+    );
+  });
+
+  it("surfaces the server's {error_code, details} on a non-OK JSON response", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: async () => ({
+          error_code: "invalid_args",
+          details: "Not a valid ESPHome bundle",
+        }),
+      }))
+    );
+    const file = new File([new Uint8Array([1])], "device.esphomebundle.tar.gz");
+
+    await expect(upload(api, ws, file)).rejects.toThrow("Not a valid ESPHome bundle");
+  });
+
+  it("falls back to status + statusText when the error body isn't JSON (e.g. a 413)", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 413,
+        statusText: "Request Entity Too Large",
+        json: async () => {
+          throw new Error("not json");
+        },
+      }))
+    );
+    const file = new File([new Uint8Array([1])], "device.esphomebundle.tar.gz");
+
+    await expect(upload(api, ws, file)).rejects.toThrow(/413 Request Entity Too Large/);
+  });
+});
+
 describe("ESPHomeAPI — console-debug redaction", () => {
   beforeEach(() => {
     installMockWebSocket();
