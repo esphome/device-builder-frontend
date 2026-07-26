@@ -72,7 +72,10 @@ describe("dispatchAutomationAdded", () => {
     expect((seen[0].detail as { yaml: string }).yaml).toContain(
       "script:\n  - id: my_script"
     );
-    expect(seen[1].detail).toEqual({ sectionKey: "automation:script:my_script" });
+    expect(seen[1].detail).toEqual({
+      configuration: "device.yaml",
+      sectionKey: "automation:script:my_script",
+    });
     // Both events must cross shadow boundaries to reach the page.
     expect(seen.every((s) => s.composed)).toBe(true);
   });

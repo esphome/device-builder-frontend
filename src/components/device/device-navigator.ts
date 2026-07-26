@@ -622,8 +622,23 @@ export class ESPHomeDeviceNavigator extends LitElement {
    * the same key parseYamlAutomations will produce on the next
    * navigator render once the YAML refresh propagates.
    */
-  private _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+  private _onAutomationAdded = (
+    e: CustomEvent<{ configuration: string; sectionKey: string }>
+  ) => {
     e.stopPropagation();
+    // A wizard whose round trip outlived a device switch names the
+    // previous device; routing to its key would select a phantom.
+    // Logged so a mis-bound configuration prop is distinguishable
+    // from a genuine device switch.
+    if (e.detail.configuration !== this.configuration) {
+      console.warn(
+        "Dropped automation-added for",
+        e.detail.configuration,
+        "while showing",
+        this.configuration
+      );
+      return;
+    }
     this._emitSectionSelect(e.detail.sectionKey, undefined);
   };
 }

@@ -239,11 +239,14 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         node: this,
       });
       this.dispatchEvent(
-        new CustomEvent<{ sectionKey: string }>("automation-added", {
-          detail: { sectionKey: sectionKeyFromLocation(location) },
-          bubbles: true,
-          composed: true,
-        })
+        new CustomEvent<{ configuration: string; sectionKey: string }>(
+          "automation-added",
+          {
+            detail: { configuration, sectionKey: sectionKeyFromLocation(location) },
+            bubbles: true,
+            composed: true,
+          }
+        )
       );
       this._dialog.open = false;
     } catch (err) {

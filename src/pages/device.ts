@@ -336,20 +336,6 @@ export class ESPHomePageDevice extends LitElement {
    *  page and the section editor. */
   private _activeSection: SectionEditor | null = null;
 
-  /** Supersede token for the section-switch guard: a queued absolute
-   *  switch yields to any later one; composing actions (Back) always
-   *  land but still bump the token. */
-  private _switchSeq = 0;
-
-  /** True while at least one section switch is parked behind the
-   *  flush barrier — drives the desktop busy affordance (#1478). */
-  @state()
-  private _switchPending = false;
-
-  /** Guard calls currently awaiting their flush; the affordance
-   *  clears only when the last one settles. */
-  private _switchWaiters = 0;
-
   @state()
   private _sectionDirty = false;
 
@@ -502,7 +488,7 @@ export class ESPHomePageDevice extends LitElement {
     // form and immediately hit back would see the dialog reflect
     // ``_sectionDirty`` (transient) rather than the YAML diff that
     // ``Save`` is going to commit.
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
@@ -529,7 +515,7 @@ export class ESPHomePageDevice extends LitElement {
     // form and immediately closed the tab gets warned (the form's
     // own keystroke would otherwise sit in the debounce window with
     // no representation in ``_yaml``).
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     if (this._isDirty) {
       e.preventDefault();
       e.returnValue = "";
@@ -541,7 +527,7 @@ export class ESPHomePageDevice extends LitElement {
       this._allowingLeave = false;
       return;
     }
-    this._activeSection?.flushPending();
+    this._kickSectionFlush();
     if (!this._isDirty) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", withBase(`/device/${this.id}`));
@@ -1205,10 +1191,7 @@ export class ESPHomePageDevice extends LitElement {
 
       <div class="page">
         <div
-          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""} ${
-            this._switchPending ? "switch-pending" : ""
-          }"
-          aria-busy=${this._switchPending}
+          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
@@ -1349,34 +1332,27 @@ export class ESPHomePageDevice extends LitElement {
    *  not this one. */
   private _onBack = () => {
     this._heldUnknownInstance = null;
-    // compose: each press pops one entry, so two presses inside one
-    // flush window must both land rather than the newest winning.
-    void this._guardSectionSwitch(
-      () => {
-        const prev = this._sectionHistory.length
-          ? this._sectionHistory[this._sectionHistory.length - 1]
-          : null;
-        if (prev) {
-          this._sectionHistory = this._sectionHistory.slice(0, -1);
-          this._selectedSection = prev.key;
-          // History entries were recorded against an older buffer;
-          // re-resolve like the click paths (#1470). A vanished key
-          // leaves the line unset rather than pointing at whatever
-          // now sits on the stale line.
-          this._selectedFromLine = resolveCurrentSectionLine(
-            this._yaml,
-            prev.key,
-            prev.fromLine
-          );
-        } else {
-          this._selectedSection = null;
-          this._selectedFromLine = undefined;
-        }
-        this._setHighlight(null, false);
-        this._updateUrl();
-      },
-      { compose: true }
-    );
+    const prev = this._sectionHistory.length
+      ? this._sectionHistory[this._sectionHistory.length - 1]
+      : null;
+    if (prev) {
+      this._sectionHistory = this._sectionHistory.slice(0, -1);
+      this._selectedSection = prev.key;
+      // History entries were recorded against an older buffer;
+      // re-resolve (#1470). A vanished key leaves the line unset
+      // rather than pointing at whatever now sits on the stale line.
+      this._selectedFromLine = resolveCurrentSectionLine(
+        this._yaml,
+        prev.key,
+        prev.fromLine
+      );
+    } else {
+      this._selectedSection = null;
+      this._selectedFromLine = undefined;
+    }
+    this._setHighlight(null, false);
+    this._updateUrl();
+    this._kickSectionFlush();
   };
 
   /** Left-edge expand affordance. On mobile it opens the drawer; on
@@ -1590,13 +1566,7 @@ export class ESPHomePageDevice extends LitElement {
       match.fromLine === this._selectedFromLine
     ) {
       // Same section: update the field target directly for intra-section
-      // moves (the switch below would early-return and freeze it).
-      // Also supersede any switch still queued behind the flush
-      // barrier — a caret that left and came home must not be yanked
-      // back out when the queued action fires. Safe against spurious
-      // cancellation: yaml-cursor-line only fires on selectionSet,
-      // which the flush's own draft sync never carries.
-      this._switchSeq++;
+      // moves (the cross-section path below would no-op and freeze it).
       this._focusFieldPath = rel;
       this._focusYamlPath = e.detail.indexedPath;
       return;
@@ -1618,35 +1588,20 @@ export class ESPHomePageDevice extends LitElement {
       }
     }
     this._heldUnknownInstance = null;
-    // Cross-section: set the field path only when the switch actually
-    // applies (after the flush barrier, and not at all if the page
-    // unmounted during it), so it can't point the old section's form
-    // at a path meant for the new one.
-    void this._guardSectionSwitch(() => {
-      // The awaited flush can rewrite the buffer (an upsert's diff
-      // shifts every section below it), making the snapshot's
-      // fromLine a pre-flush coordinate that _focusedSection and the
-      // URL would then mis-resolve (#1470). Re-resolve the intended
-      // section against the settled buffer — same key (automation or
-      // top-level), instance nearest the snapshot. A key with no
-      // instance left leaves the line unset: downstream resolution
-      // then falls back to the key instead of latching onto whatever
-      // unrelated section now starts at the stale line.
-      this._selectedSection = sectionKey;
-      this._selectedFromLine = resolveCurrentSectionLine(
-        this._yaml,
-        sectionKey,
-        match.fromLine
-      );
-      this._focusFieldPath = rel;
-      this._focusYamlPath = e.detail.indexedPath;
-      // The navigator selection follows the caret; a block highlight
-      // left on the previously clicked component would disagree with
-      // it (#1885). The highlight is a navigator/form affordance —
-      // clear it rather than dragging it under the caret.
-      this._clearBlockHighlight();
-      this._updateUrl();
-    });
+    // Cross-section: the switch is synchronous, so the click-time
+    // coordinates are read against the click-time buffer; a draft
+    // landing later re-pins the selection in ``_onYamlDraft``.
+    this._selectedSection = sectionKey;
+    this._selectedFromLine = match.fromLine;
+    this._focusFieldPath = rel;
+    this._focusYamlPath = e.detail.indexedPath;
+    // The navigator selection follows the caret; a block highlight
+    // left on the previously clicked component would disagree with
+    // it (#1885). The highlight is a navigator/form affordance —
+    // clear it rather than dragging it under the caret.
+    this._clearBlockHighlight();
+    this._updateUrl();
+    this._kickSectionFlush();
   }
 
   /** The YamlSection backing the current selection, resolved by line
@@ -1779,6 +1734,41 @@ export class ESPHomePageDevice extends LitElement {
     }
     this._setYaml(yaml);
     this._savedYaml = yaml;
+    this._repinSelection(yaml);
+  }
+
+  /** Re-pin the selection's line after a programmatic buffer rewrite
+   *  (a landed delete, re-base, or draft shifts every section below
+   *  its splice) so line-keyed lookups don't latch onto a neighbour
+   *  (#1470). Hand edits stay out — the cursor-line handler owns the
+   *  selection there. A vanished key leaves the line unset. */
+  private _repinSelection(yaml: string): void {
+    if (!this._selectedSection) return;
+    const next = resolveCurrentSectionLine(
+      yaml,
+      this._selectedSection,
+      this._selectedFromLine
+    );
+    if (next === this._selectedFromLine) return;
+    // A pending field-line upgrade pinned to the pre-shift line
+    // moves with the selection, or the retry's identity check would
+    // abandon it over a foreign draft's line shift.
+    if (
+      this._pendingFieldSection !== undefined &&
+      this._pendingFieldSection.fromLine === this._selectedFromLine
+    ) {
+      // A vanished key clears the upgrade — carrying ``undefined``
+      // would keep the retry waiting forever on a section that no
+      // longer exists.
+      if (next === undefined) this._clearPendingFieldLine();
+      else this._pendingFieldSection.fromLine = next;
+    }
+    this._selectedFromLine = next;
+    // The URL persists the line; leaving it stale would bias a
+    // reload's duplicate-key resolution toward the wrong instance.
+    // A late anchored draft can land after this page unmounted —
+    // replaceState would then pollute an unrelated route's URL.
+    if (this.isConnected) this._updateUrl();
   }
 
   /** Apply a superseded delete's removal to the live buffer (#1490). */
@@ -1800,15 +1790,7 @@ export class ESPHomePageDevice extends LitElement {
     // was computed — stale coordinates no longer apply.
     if (rebased !== null && live === this._yaml) {
       this._setYaml(rebased);
-      // The removal shifted lines under the selection; re-pin it so
-      // line-keyed lookups don't latch onto a neighbour (#1470).
-      if (this._selectedSection) {
-        this._selectedFromLine = resolveCurrentSectionLine(
-          rebased,
-          this._selectedSection,
-          this._selectedFromLine
-        );
-      }
+      this._repinSelection(rebased);
       return;
     }
     notifyInfo(this._localize("device.delete_superseded"), {
@@ -1840,6 +1822,12 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._setYaml(e.detail.yaml);
+    // Unconditional: at kick time the outgoing editor is still the
+    // active section (Lit hasn't committed), and its synchronous
+    // splice must re-pin the just-set selection. The typing stream
+    // pays only a memoized parse — an own-section splice re-resolves
+    // to the same line.
+    this._repinSelection(e.detail.yaml);
     this._retryPendingFieldLine();
   }
 
@@ -1849,111 +1837,81 @@ export class ESPHomePageDevice extends LitElement {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
     if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
-      // Also supersede any switch still queued behind the flush
-      // barrier — the displayed section is the pre-switch one for the
-      // whole window, so a click on it is the user's newest intent.
-      this._switchSeq++;
       this._drawerOpen = false;
       return;
     }
-    // Close the drawer before the guard's flush barrier: on mobile it
-    // is the only visual acknowledgement of the tap, and it is pure
-    // chrome — nothing about it depends on the flushed buffer.
     this._drawerOpen = false;
-    void this._guardSectionSwitch(() => {
-      // Back-stack bookkeeping: A → B pushes A so back returns to it.
-      // Going back to no-section clears the trail — a later trip into
-      // a section is a fresh navigation, not a continuation of the
-      // last one. The null-to-X case (first selection of the session)
-      // also leaves the stack untouched, which is what we want: back
-      // from there should land on board info regardless.
-      const prev = this._selectedSection;
-      const prevLine = this._selectedFromLine;
-      if (sectionKey === null) {
-        this._sectionHistory = [];
-      } else if (prev !== null) {
-        this._sectionHistory = [
-          ...this._sectionHistory,
-          { key: prev, fromLine: prevLine },
-        ];
-      }
-      this._selectedSection = sectionKey;
-      // The navigator captured fromLine against the click-time buffer;
-      // the awaited flush can shift every section below its upsert
-      // (#1470). Re-resolve against the settled buffer, same rule and
-      // same vanished-key handling as the cursor path. Emitters that
-      // send no fromLine keep an unset line (key-based resolution),
-      // as before.
-      this._selectedFromLine =
-        sectionKey !== null && fromLine !== undefined
-          ? resolveCurrentSectionLine(this._yaml, sectionKey, fromLine)
-          : undefined;
-      // A navigator click carries no field intent — a stale cursor path
-      // would scroll/flash a target in the newly mounted editor that the
-      // user never pointed at.
-      this._focusFieldPath = undefined;
-      this._focusYamlPath = undefined;
-      this._updateUrl();
-    });
+    // Back-stack bookkeeping: A → B pushes A so back returns to it.
+    // Going back to no-section clears the trail — a later trip into
+    // a section is a fresh navigation, not a continuation of the
+    // last one. The null-to-X case (first selection of the session)
+    // also leaves the stack untouched, which is what we want: back
+    // from there should land on board info regardless.
+    const prev = this._selectedSection;
+    const prevLine = this._selectedFromLine;
+    if (sectionKey === null) {
+      this._sectionHistory = [];
+    } else if (prev !== null) {
+      this._sectionHistory = [...this._sectionHistory, { key: prev, fromLine: prevLine }];
+    }
+    this._selectedSection = sectionKey;
+    // The navigator's rows can be one render behind a draft that
+    // already advanced the buffer, so the click-time hint still
+    // re-resolves against the live buffer (idempotent when they
+    // agree, memo-cheap, unset when the key vanished); drafts
+    // landing later re-pin via ``_onYamlDraft``.
+    this._selectedFromLine =
+      sectionKey !== null && fromLine !== undefined
+        ? resolveCurrentSectionLine(this._yaml, sectionKey, fromLine)
+        : undefined;
+    // A navigator click carries no field intent — a stale cursor path
+    // would scroll/flash a target in the newly mounted editor that the
+    // user never pointed at.
+    this._focusFieldPath = undefined;
+    this._focusYamlPath = undefined;
+    this._updateUrl();
+    this._kickSectionFlush();
   }
 
-  /** Switch sections, flushing any pending form draft first.
+  /** Start the outgoing section's flush without waiting for it.
    *
-   *  No unsaved-changes dialog: with auto-sync, the form's
-   *  current ``_values`` are always already in the draft YAML
-   *  buffer (or a sync-microtask away). Switching never loses
-   *  work — the user's edits stay visible in the YAML pane and
-   *  re-render in the form when they come back to this section.
-   *  The leave-page guard (``_confirmLeave``) is the only thing
-   *  that prompts about unsaved YAML, since *that's* the only
-   *  state that's actually at risk.
+   *  The switch itself is synchronous — the section swap must never
+   *  sit behind a backend round trip (#1479). The kick runs after
+   *  the selection state changes but before Lit commits, so it
+   *  still reaches the outgoing editor: the component editor's
+   *  flush splices synchronously (its draft lands and re-pins the
+   *  fresh selection via ``_onYamlDraft``), and the automation
+   *  editors start their upsert, whose draft arrives later through
+   *  the mount-time anchor with its basis checked on landing. This
+   *  kick is the primary drain on every switch path; the engine's
+   *  ``hostDisconnected`` drain covers only the unmounts nobody
+   *  kicked (a YAML-pane edit removing the section, a reconnect
+   *  reload, a device switch).
    *
-   *  The flush is awaited before the switch: the automation
-   *  editors' flush is a backend upsert round trip, and swapping
-   *  the selection first can unmount the editor mid-flight. The
-   *  anchored dispatch (#1479) still delivers that late draft, but
-   *  only the await guarantees it lands with a matching basis —
-   *  unawaited, the yaml-draft guard drops it as superseded. The wait is
-   *  bounded by the WS command timeout (~10s worst case);
-   *  ``_switchPending`` surfaces it as the desktop busy affordance
-   *  (progress cursor + delayed navigator dim), and repeat clicks
-   *  are harmless under the supersede token. */
-  private async _guardSectionSwitch(
-    action: () => void,
-    opts: { compose?: boolean } = {}
-  ): Promise<void> {
-    // Only a returned promise defers the switch; the component
-    // editor's sync flush (and no active section) keeps the switch
-    // synchronous, so cursor-driven selection stays re-entrant safe.
-    // The automation editors' flushPending is async, so switching out
-    // of one always defers — idle or not.
-    const seq = ++this._switchSeq;
-    const pending = this._activeSection?.flushPending();
-    if (pending) {
-      this._switchWaiters++;
-      this._switchPending = true;
-      // A failed flush already surfaced its own error; still switch —
-      // blocking navigation on it is strictly worse than a stale draft.
-      try {
-        await pending;
-      } catch {
-        // Handled by the editor.
-      } finally {
-        if (--this._switchWaiters === 0) this._switchPending = false;
-      }
-      // The page can unmount across the flush (a late action would
-      // replaceState on whatever URL the user has since landed on),
-      // and a later switch supersedes this one — the callers' dedupe
-      // reads pre-switch state for the whole window, so without the
-      // token a duplicate click double-pushes the back stack and a
-      // caret returning home still gets yanked away. Composing
-      // actions (Back's relative history pop) are never dropped —
-      // two Back presses must pop twice — but still take the token,
-      // so a pending absolute switch yields to them.
-      if (!this.isConnected) return;
-      if (!opts.compose && seq !== this._switchSeq) return;
+   *  No unsaved-changes dialog: with auto-sync, the form's current
+   *  ``_values`` are always already in the draft YAML buffer (or a
+   *  round trip away, delivered by the anchor). The leave-page
+   *  guard (``_confirmLeave``) is the only thing that prompts about
+   *  unsaved YAML, since that's the only state actually at risk.
+   *
+   *  The deliberate trade (#1479): a buffer write landing inside
+   *  the kicked round trip (typing in the next section or the YAML
+   *  pane within the RTT) supersedes the late draft's basis, and
+   *  the guard drops the old section's last debounce window of
+   *  keystrokes with the visibility toast. The barrier prevented
+   *  that ordering by stalling every switch instead; if the toast
+   *  shows up in practice, the escalation is re-basing late drafts
+   *  the way ``_rebaseSupersededDelete`` does for deletes. */
+  private _kickSectionFlush(): void {
+    // Navigation deliberately doesn't block on the flush; a failed
+    // upsert already toasts, so just keep the cause diagnosable.
+    try {
+      void Promise.resolve(this._activeSection?.flushPending()).catch((err) =>
+        console.error("Outgoing section flush failed:", err)
+      );
+    } catch (err) {
+      console.error("Outgoing section flush failed:", err);
     }
-    action();
   }
 
   /** Resolve the known-top-level-key set off the session-cached catalog.

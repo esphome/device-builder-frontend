@@ -22,6 +22,11 @@ import {
   sectionKeyFromLocation,
 } from "./serialise.js";
 
+/** Non-exempt stand-in emitter for a round whose element was
+ *  re-pointed mid flight: never the active section, so the page
+ *  applies its landing basis check instead of the exemption. */
+const RETARGETED_EMITTER = new EventTarget();
+
 /** Debounce window between a value change and the auto-apply upsert.
  *  Coalesces bursts (typing into a templatable string param, dragging
  *  an action up/down repeatedly) into one backend round-trip. */
@@ -112,9 +117,10 @@ interface DeleteMode {
  *   delete UX), plus ``section-select`` unless the element was
  *   re-pointed at a sibling mid-delete.
  *
- * Failures on either path surface a ``toast.error`` plus the host's
- * inline error message — per CLAUDE.md, a failed write must reach
- * the user instead of silently dropping.
+ * Failures on either path surface a ``toast.error`` (plus, while
+ * the host is still mounted, its inline error message) — per
+ * CLAUDE.md, a failed write must reach the user instead of silently
+ * dropping. Only a full page teardown downgrades to the console.
  */
 export class AutoApplyController implements ReactiveController {
   private _debounce: ReturnType<typeof setTimeout> | null = null;
@@ -122,11 +128,22 @@ export class AutoApplyController implements ReactiveController {
   /** Non-null while a delete owns the section. */
   private _deleteMode: DeleteMode | null = null;
   private _lastSelfWrittenYaml: string | null = null;
+  /** Basis for rounds running after an unmount: the detached prop
+   *  can no longer echo the page's buffer, so each detached round
+   *  chains onto its own previous result instead (#1479). A remount
+   *  mid-flight resets it (``hostConnected``); a chained round that
+   *  resolves after one still passes the landing basis check, and a
+   *  re-pointed host loses the exemption via ``RETARGETED_EMITTER``. */
+  private _detachedBasis: string | null = null;
   private _dirty = false;
   // Whether the host element is on screen; a failure-path re-arm must not
   // schedule a write for a torn-down section.
   private _connected = false;
   private _announceUnmount: (() => void) | null = null;
+  /** Mount-time parent for rounds prepared after the element left
+   *  the tree (the drain, a detached queued re-run) — their
+   *  ``parentNode`` is already null by then. */
+  private _anchor: ParentNode | null = null;
 
   constructor(
     private readonly _host: AutoApplyHost,
@@ -140,14 +157,30 @@ export class AutoApplyController implements ReactiveController {
    *  device-section-config's section-mount event. */
   hostConnected(): void {
     this._connected = true;
+    this._detachedBasis = null;
+    this._anchor = this._host.parentNode;
     this._announceUnmount = announceSectionMount(this._host);
   }
 
   hostDisconnected(): void {
     this._connected = false;
-    // Cancel the pending debounced upsert — a write scheduled by a
-    // section that's no longer on screen must not fire.
+    // The frozen prop is the freshest buffer this element saw; the
+    // first detached round bases on it, later ones chain (#1479).
+    this._detachedBasis = this._host.yaml;
+    // Drain a pending debounced edit instead of dropping it. The
+    // switch paths' kick already flushes before unmount, so this
+    // covers the unkicked unmounts only (a YAML-pane edit removing
+    // the section, a reconnect reload, a device switch). The cancel
+    // is unconditional — a timer surviving the unmount would fire an
+    // upsert for a torn-down section — and the drain is gated on the
+    // anchor still being in the document: with the whole page gone
+    // the draft has nowhere to land.
+    const hadPending = this._debounce !== null;
     this._cancelDebounce();
+    if (hadPending && this._anchor?.isConnected) void this.autoApply();
+    // The one remaining invisible loss: the page is gone, so the
+    // last debounce window has nowhere to land — leave a trace.
+    else if (hadPending) console.warn("Dropped pending auto-apply: anchor detached");
     // One-shot: the closure pairs with exactly one mount.
     this._announceUnmount?.();
     this._announceUnmount = null;
@@ -300,10 +333,13 @@ export class AutoApplyController implements ReactiveController {
       // Read the buffer exactly once: the backend computes the
       // diff's line coordinates against the string we send, so
       // splicing into a later re-read would silently mangle it.
-      const yaml = this._host.yaml;
+      // Detached rounds chain instead — their prop cannot echo.
+      const yaml = this._connected
+        ? this._host.yaml
+        : (this._detachedBasis ?? this._host.yaml);
       // Anchor captured before the await: a mid-flight unmount
       // (Back's composed switch) must not lose the draft (#1479).
-      const announceDraft = prepareSectionEvent(this._host, "yaml-draft");
+      const announceDraft = prepareSectionEvent(this._host, "yaml-draft", this._anchor);
       const { yaml_diff } = await api.upsertAutomation(
         configuration,
         value,
@@ -316,24 +352,41 @@ export class AutoApplyController implements ReactiveController {
       // synchronous and may already trigger ``updated()`` on the way
       // back, which is where the skip check runs.
       this._lastSelfWrittenYaml = newYaml;
+      if (!this._connected) this._detachedBasis = newYaml;
+      // A reused element re-pointed at a sibling mid round trip must
+      // not ride the active-section exemption with this round's
+      // pre-retarget basis — a non-exempt node forces the landing
+      // basis check instead.
+      const retargeted =
+        this._host.location === null ||
+        sectionKeyFromLocation(this._host.location) !== sectionKeyFromLocation(location);
       announceDraft(this._connected, {
         configuration,
         yaml: newYaml,
         basedOn: yaml,
-        node: this._host,
+        node: retargeted ? RETARGETED_EMITTER : this._host,
       });
     } catch (err) {
-      this._surfaceSaveError(err);
+      // A switch-path round resolves after the editor unmounted, so
+      // ``_connected`` alone would silence the dominant path. The
+      // page still being alive (live anchor) means the user must
+      // learn the write didn't land; only a full teardown routes to
+      // the console (a toast there would land on an unrelated page).
+      if (this._connected || this._anchor?.isConnected) this._surfaceSaveError(err);
+      else console.error("Detached auto-apply round failed:", err);
     } finally {
       this._apply = { kind: "idle" };
-      if (phase.queued && this._connected) {
+      if (phase.queued) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
         // Synchronously installs the re-run's phase, so a waiter
-        // woken by the settle below re-checks against it. Skipped
-        // after an unmount for the same reason the debounce is
-        // cancelled there: the detached prop can't echo, so the
-        // re-run's stale-basis draft could only toast a discard.
+        // woken by the settle below re-checks against it. Detached
+        // re-runs are safe: they chain their basis through
+        // ``_detachedBasis``, so the draft lands instead of
+        // toasting a discard. If the page rejected round one's
+        // draft, the chained basis was never adopted either and
+        // each rejected round toasts — a switch can toast more
+        // than once in that already-conflicted case.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
@@ -369,7 +422,7 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
-    const announceUpdated = prepareSectionEvent(this._host, "yaml-updated");
+    const announceUpdated = prepareSectionEvent(this._host, "yaml-updated", this._anchor);
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();

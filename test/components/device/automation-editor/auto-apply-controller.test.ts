@@ -320,6 +320,30 @@ describe("AutoApplyController auto-apply", () => {
     expect(order).toEqual(["draft", "draft", "flushed"]);
   });
 
+  it("a retargeted element's late round does not ride the active-section exemption", async () => {
+    const { host, controller, upsertAutomation } = setup();
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const drafts = captureEvents(host, "yaml-draft");
+
+    const applying = controller.autoApply();
+    // Lit reuses the element across same-kind switches: the parent
+    // re-points it at a sibling while the round is out.
+    host.location = { kind: "script", id: "other" } as unknown as AutomationLocation;
+    resolveFirst({ yaml_diff: DIFF });
+    await applying;
+
+    // The draft still lands, but with a non-exempt node so the page
+    // applies its basis check instead of the active-section pass.
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].detail.node).not.toBe(host);
+  });
+
   it("a mid-flight unmount still delivers the draft through the anchor", async () => {
     const parent = document.createElement("div");
     const { controller, upsertAutomation } = setup({}, parent);
@@ -346,9 +370,9 @@ describe("AutoApplyController auto-apply", () => {
     expect(seen[0].detail.basedOn).toBe("line1\nline2");
   });
 
-  it("a queued re-run does not fire after the host unmounts", async () => {
+  it("a queued re-run chains its basis after the host unmounts", async () => {
     const parent = document.createElement("div");
-    const { controller, upsertAutomation } = setup({}, parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
     let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
     upsertAutomation.mockImplementationOnce(
       () =>
@@ -360,18 +384,25 @@ describe("AutoApplyController auto-apply", () => {
     parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
 
     const applying = controller.autoApply();
-    // A keystroke queues a re-run, then the section unmounts.
+    // A keystroke queues a re-run, then the section unmounts. Real
+    // DOM order: the node leaves the tree before disconnectedCallback
+    // runs, so the re-run's own parentNode read yields null and only
+    // the mount-time anchor can deliver its draft.
     void controller.autoApply();
+    host.parentNode = null;
     controller.hostDisconnected();
     resolveFirst({ yaml_diff: DIFF });
     await applying;
     await flushTimers();
 
-    // Only the in-flight round's draft lands via the anchor; the
-    // detached re-run is skipped rather than toasting a discard of
-    // a draft whose basis can no longer echo.
-    expect(upsertAutomation).toHaveBeenCalledTimes(1);
-    expect(seen).toHaveLength(1);
+    // Both rounds land through the anchor; the detached re-run's
+    // basis chains onto the first round's result instead of the
+    // frozen prop, so its draft applies rather than toasting.
+    expect(upsertAutomation).toHaveBeenCalledTimes(2);
+    expect(seen).toHaveLength(2);
+    expect(seen[0].detail.basedOn).toBe("line1\nline2");
+    expect(seen[1].detail.basedOn).toBe("replaced\nline2");
+    expect(upsertAutomation.mock.calls[1][3]).toBe("replaced\nline2");
   });
 
   it("flushPending wakes on the settle boundary, not a poll tick", async () => {
@@ -824,11 +855,84 @@ describe("AutoApplyController host lifecycle", () => {
     expect(unmounts).toEqual([host]);
   });
 
-  it("cancels the pending debounced upsert on host disconnect", async () => {
-    const { controller, upsertAutomation } = setup();
+  it("drains the pending debounced upsert into a detached round on disconnect", async () => {
+    const parent = document.createElement("div");
+    // The drain is gated on the anchor still being in the document
+    // (a full page teardown must not fire a doomed round).
+    document.body.appendChild(parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
+    const seen: CustomEvent[] = [];
+    parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
+
     controller.scheduleAutoApply();
+    // Real DOM order: parentNode is already null in the disconnect
+    // callback; the drain round dispatches via the mount-time anchor.
+    host.parentNode = null;
     controller.hostDisconnected();
-    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
+    await flushTimers();
+
+    // The keystrokes inside the debounce window are not dropped:
+    // the round starts immediately (no timer left to fire) and its
+    // draft rides the anchor with the frozen prop as its basis.
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].detail.basedOn).toBe("line1\nline2");
+    parent.remove();
+  });
+
+  it("a failed switch-path round still toasts while the page is alive", async () => {
+    vi.mocked(toast.error).mockClear();
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const { host, controller, upsertAutomation } = setup({}, parent);
+    upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+
+    const applying = controller.autoApply();
+    // The switch unmounts the editor before the round trip resolves —
+    // the dominant path; the page (anchor) is still alive.
+    host.parentNode = null;
+    controller.hostDisconnected();
+    await applying;
+    await flushTimers();
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    parent.remove();
+  });
+
+  it("a failed round after a full teardown logs instead of toasting", async () => {
+    vi.mocked(toast.error).mockClear();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const parent = document.createElement("div");
+      const { host, controller, upsertAutomation } = setup({}, parent);
+      upsertAutomation.mockRejectedValueOnce(new Error("boom"));
+
+      const applying = controller.autoApply();
+      host.parentNode = null;
+      controller.hostDisconnected();
+      await applying;
+      await flushTimers();
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("skips the drain when the whole page is gone", async () => {
+    // Anchor never in the document: a failed detached round would
+    // toast onto whatever page the user is on now, so the edit is
+    // dropped instead.
+    const parent = document.createElement("div");
+    const { host, controller, upsertAutomation } = setup({}, parent);
+    controller.scheduleAutoApply();
+    host.parentNode = null;
+    controller.hostDisconnected();
+    // Past the full debounce window: the timer must be cancelled,
+    // not merely outrun by a 0ms flush.
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS + 60);
+
     expect(upsertAutomation).not.toHaveBeenCalled();
   });
 });

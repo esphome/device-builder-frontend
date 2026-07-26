@@ -105,15 +105,24 @@ export function fireSectionEvent<K extends keyof SectionEditorEventMap>(
  * nowhere, #1465). The returned announcer takes the host's
  * connectedness at dispatch time and the detail, typed through the
  * section event map so a future emitter cannot drop a field and
- * compile.
+ * compile. A round prepared after the host already left the tree
+ * has a null ``parentNode`` — *fallbackAnchor* (captured at mount,
+ * like ``announceSectionMount``'s) keeps those dispatches alive.
  */
 export function prepareSectionEvent<K extends keyof SectionEditorEventMap>(
   host: EventTarget & { readonly parentNode: ParentNode | null },
-  name: K
+  name: K,
+  fallbackAnchor?: ParentNode | null
 ): (connected: boolean, detail: SectionEditorEventMap[K]) => void {
-  const anchor = host.parentNode;
+  const anchor = host.parentNode ?? fallbackAnchor ?? null;
   return (connected, detail) => {
     const target = connected ? host : anchor;
+    // A never-mounted host has nowhere to deliver — deliberate
+    // silent no-op. A detached anchor still dispatches (a direct
+    // listener sees it) but bubbles nowhere, which is the #1465
+    // loss shape — trace it.
+    if (!connected && anchor && !anchor.isConnected)
+      console.warn(`Dispatching ${name} on a detached anchor; it may go nowhere`);
     if (target) fireSectionEvent(target, name, detail);
   };
 }

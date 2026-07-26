@@ -58,11 +58,28 @@ const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
  * The backend's ``automations/parse`` is the canonical source — this
  * fallback only sees what the regex catches, but it's load-bearing
  * for keystroke-time UI responsiveness.
+ *
+ * Single-entry memo, same shape as ``parseYamlTopLevelSections``:
+ * one buffer is parsed by the navigator, the manage tables, and the
+ * selection re-pin within a single update. Callers share one array
+ * instance and must not mutate it.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
+  if (_automationsKey === yaml && _automationsValue) return _automationsValue;
+  const result = _parseYamlAutomations(yaml);
+  _automationsKey = yaml;
+  _automationsValue = result;
+  return result;
+}
+
+let _automationsKey: string | undefined;
+let _automationsValue: YamlSection[] | undefined;
+
+function _parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
-  // Memoised on `yaml`, so resolving an id-less host's positional id is
-  // free when the caller already parsed sections this render.
+  // `parseYamlTopLevelSections` has its own memo, so resolving an
+  // id-less host's positional id is free when the caller already
+  // parsed sections this render.
   const sections = parseYamlTopLevelSections(yaml);
   const automations: YamlSection[] = [];
 

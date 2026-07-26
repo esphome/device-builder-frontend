@@ -425,8 +425,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   /** Backend confirmed the new api_action landed. Route the
    *  navigator (and the right pane) to its editor so the user can
    *  fill in variables + actions immediately. */
-  _onApiActionAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+  _onApiActionAdded = (e: CustomEvent<{ configuration: string; sectionKey: string }>) => {
     e.stopPropagation();
+    // Same identity rule as the navigator relay: a round trip that
+    // outlived a device switch must not drive the selection.
+    if (e.detail.configuration !== this.configuration) {
+      console.warn(
+        "Dropped automation-added for",
+        e.detail.configuration,
+        "while showing",
+        this.configuration
+      );
+      return;
+    }
     fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 
@@ -513,8 +524,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
   };
 
-  _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+  _onAutomationAdded = (
+    e: CustomEvent<{ configuration: string; sectionKey: string }>
+  ) => {
     e.stopPropagation();
+    if (e.detail.configuration !== this.configuration) {
+      console.warn(
+        "Dropped automation-added for",
+        e.detail.configuration,
+        "while showing",
+        this.configuration
+      );
+      return;
+    }
     fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 

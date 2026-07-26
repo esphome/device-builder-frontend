@@ -21,7 +21,7 @@ import { fireSectionEvent } from "./section-editor.js";
  *   the YAML pane + the global save button see the change). The
  *   page advances ``_yaml`` without touching ``_savedYaml`` —
  *   that's the existing "dirty buffer, click Save to write" path.
- * - ``automation-added`` (``detail: { sectionKey }``) — so the
+ * - ``automation-added`` (``detail: { configuration, sectionKey }``) — so the
  *   parent navigator can route to the new section's editor.
  */
 export function dispatchAutomationAdded(
@@ -39,8 +39,8 @@ export function dispatchAutomationAdded(
     node: host,
   });
   host.dispatchEvent(
-    new CustomEvent<{ sectionKey: string }>("automation-added", {
-      detail: { sectionKey: sectionKeyFromLocation(location) },
+    new CustomEvent<{ configuration: string; sectionKey: string }>("automation-added", {
+      detail: { configuration, sectionKey: sectionKeyFromLocation(location) },
       bubbles: true,
       composed: true,
     })
