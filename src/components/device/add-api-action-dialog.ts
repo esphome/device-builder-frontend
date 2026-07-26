@@ -232,7 +232,12 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         yaml
       );
       const newYaml = applyYamlDiff(yaml, yaml_diff);
-      fireSectionEvent(this, "yaml-draft", { configuration, yaml: newYaml });
+      fireSectionEvent(this, "yaml-draft", {
+        configuration,
+        yaml: newYaml,
+        basedOn: yaml,
+        node: this,
+      });
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string }>("automation-added", {
           detail: { sectionKey: sectionKeyFromLocation(location) },

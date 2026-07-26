@@ -1750,7 +1750,7 @@ export class ESPHomePageDevice extends LitElement {
     /* ``yaml-updated`` fires from the three disk-writing delete
      * paths only (the automation editors' engine, the component
      * editor's section delete, and its manage-list row delete), all
-     * via ``prepareYamlUpdated``. Each ``await``s the write before
+     * via ``prepareSectionEvent``. Each ``await``s the write before
      * dispatching, so the new YAML is already on disk; ``basedOn``
      * is required so a future emitter cannot silently opt into the
      * clobbering replace.
@@ -1827,6 +1827,18 @@ export class ESPHomePageDevice extends LitElement {
     // would put the old device's section into the new device's
     // buffer (the yaml-updated identity guard's sibling, #1479).
     if (e.detail.configuration !== this.id) return;
+    // A late anchored draft (its editor already unmounted) computed
+    // against a buffer this pane has moved past would clobber the
+    // newer draft — drop it visibly. The active section is exempt:
+    // its ``yaml`` prop legitimately lags its own last draft by a
+    // render, and its splice re-carries the section's full values.
+    const emitter: unknown = e.detail.node;
+    if (e.detail.basedOn !== this._yaml && emitter !== this._activeSection) {
+      notifyInfo(this._localize("device.draft_superseded"), {
+        description: this._localize("device.draft_superseded_detail"),
+      });
+      return;
+    }
     this._setYaml(e.detail.yaml);
     this._retryPendingFieldLine();
   }
@@ -1898,9 +1910,10 @@ export class ESPHomePageDevice extends LitElement {
    *
    *  The flush is awaited before the switch: the automation
    *  editors' flush is a backend upsert round trip, and swapping
-   *  the selection first can unmount the editor mid-flight — its
-   *  ``yaml-draft`` then fires from a detached element and never
-   *  reaches the page, silently dropping the last edit. The wait is
+   *  the selection first can unmount the editor mid-flight. The
+   *  anchored dispatch (#1479) still delivers that late draft, but
+   *  only the await guarantees it lands with a matching basis —
+   *  unawaited, the yaml-draft guard drops it as superseded. The wait is
    *  bounded by the WS command timeout (~10s worst case);
    *  ``_switchPending`` surfaces it as the desktop busy affordance
    *  (progress cursor + delayed navigator dim), and repeat clicks

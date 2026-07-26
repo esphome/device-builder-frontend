@@ -14,7 +14,7 @@ import type { SectionEditor } from "../section-editor.js";
 import {
   announceSectionMount,
   fireSectionEvent,
-  prepareYamlUpdated,
+  prepareSectionEvent,
 } from "../section-editor.js";
 import {
   applyYamlDiff,
@@ -297,28 +297,43 @@ export class AutoApplyController implements ReactiveController {
       // same field) would each re-insert the automation on top of
       // the previous draft's insertion.
       const configuration = this._host.configuration;
+      // Read the buffer exactly once: the backend computes the
+      // diff's line coordinates against the string we send, so
+      // splicing into a later re-read would silently mangle it.
+      const yaml = this._host.yaml;
+      // Anchor captured before the await: a mid-flight unmount
+      // (Back's composed switch) must not lose the draft (#1479).
+      const announceDraft = prepareSectionEvent(this._host, "yaml-draft");
       const { yaml_diff } = await api.upsertAutomation(
         configuration,
         value,
         location,
-        this._host.yaml
+        yaml
       );
-      const newYaml = applyYamlDiff(this._host.yaml, yaml_diff);
+      const newYaml = applyYamlDiff(yaml, yaml_diff);
       // Track our own write so the parent's YAML-driven reload skips
       // the prop echo. Set before dispatch — the event handler is
       // synchronous and may already trigger ``updated()`` on the way
       // back, which is where the skip check runs.
       this._lastSelfWrittenYaml = newYaml;
-      fireSectionEvent(this._host, "yaml-draft", { configuration, yaml: newYaml });
+      announceDraft(this._connected, {
+        configuration,
+        yaml: newYaml,
+        basedOn: yaml,
+        node: this._host,
+      });
     } catch (err) {
       this._surfaceSaveError(err);
     } finally {
       this._apply = { kind: "idle" };
-      if (phase.queued) {
+      if (phase.queued && this._connected) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
         // Synchronously installs the re-run's phase, so a waiter
-        // woken by the settle below re-checks against it.
+        // woken by the settle below re-checks against it. Skipped
+        // after an unmount for the same reason the debounce is
+        // cancelled there: the detached prop can't echo, so the
+        // re-run's stale-basis draft could only toast a discard.
         void this.autoApply();
       } else if (this._debounce === null) {
         // No further pending change — the page's YAML is now in sync
@@ -354,7 +369,7 @@ export class AutoApplyController implements ReactiveController {
     // the delete.
     const location = this._host.location;
     const configuration = this._host.configuration;
-    const announceUpdated = prepareYamlUpdated(this._host);
+    const announceUpdated = prepareSectionEvent(this._host, "yaml-updated");
     // Cancel any pending auto-apply — we're about to delete.
     const hadPending = this._debounce !== null;
     this._cancelDebounce();

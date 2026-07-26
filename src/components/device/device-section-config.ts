@@ -47,7 +47,7 @@ import type { SectionEditor } from "./section-editor.js";
 import {
   announceSectionMount,
   fireSectionEvent,
-  prepareYamlUpdated,
+  prepareSectionEvent,
 } from "./section-editor.js";
 import {
   applySectionValues,
@@ -452,7 +452,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
-    const announceUpdated = prepareYamlUpdated(this);
+    const announceUpdated = prepareSectionEvent(this, "yaml-updated");
     try {
       // Read the buffer and target exactly once: the backend computes
       // the diff's line coordinates against the string we send, and a

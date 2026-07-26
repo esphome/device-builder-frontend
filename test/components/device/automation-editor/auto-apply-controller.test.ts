@@ -125,9 +125,11 @@ describe("AutoApplyController auto-apply", () => {
       "line1\nline2"
     );
     // The returned diff is applied locally and pushed up as a draft
-    // carrying its snapshotted target for the page's identity guard.
+    // carrying its snapshotted target and basis for the page guards.
     expect(drafts.map((e) => e.detail.yaml)).toEqual(["replaced\nline2"]);
     expect(drafts[0].detail.configuration).toBe("device.yaml");
+    expect(drafts[0].detail.basedOn).toBe("line1\nline2");
+    expect(drafts[0].detail.node).toBe(host);
   });
 
   it("withValue patches the host value, announces automation-change, and schedules", async () => {
@@ -316,6 +318,60 @@ describe("AutoApplyController auto-apply", () => {
     await Promise.all([applying, flushing]);
     // The late keystroke's upsert still lands before the release.
     expect(order).toEqual(["draft", "draft", "flushed"]);
+  });
+
+  it("a mid-flight unmount still delivers the draft through the anchor", async () => {
+    const parent = document.createElement("div");
+    const { controller, upsertAutomation } = setup({}, parent);
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const seen: CustomEvent[] = [];
+    parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
+
+    const applying = controller.autoApply();
+    // Back's composed switch unmounts the editor mid round trip.
+    controller.hostDisconnected();
+    resolveFirst({ yaml_diff: DIFF });
+    await applying;
+
+    // The draft rides the mount-time anchor instead of vanishing
+    // with the detached element (#1479).
+    expect(seen).toHaveLength(1);
+    expect(seen[0].detail.yaml).toBe("replaced\nline2");
+    expect(seen[0].detail.basedOn).toBe("line1\nline2");
+  });
+
+  it("a queued re-run does not fire after the host unmounts", async () => {
+    const parent = document.createElement("div");
+    const { controller, upsertAutomation } = setup({}, parent);
+    let resolveFirst!: (v: { yaml_diff: YamlDiff }) => void;
+    upsertAutomation.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        })
+    );
+    const seen: CustomEvent[] = [];
+    parent.addEventListener("yaml-draft", (e) => seen.push(e as CustomEvent));
+
+    const applying = controller.autoApply();
+    // A keystroke queues a re-run, then the section unmounts.
+    void controller.autoApply();
+    controller.hostDisconnected();
+    resolveFirst({ yaml_diff: DIFF });
+    await applying;
+    await flushTimers();
+
+    // Only the in-flight round's draft lands via the anchor; the
+    // detached re-run is skipped rather than toasting a discard of
+    // a draft whose basis can no longer echo.
+    expect(upsertAutomation).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveLength(1);
   });
 
   it("flushPending wakes on the settle boundary, not a poll tick", async () => {

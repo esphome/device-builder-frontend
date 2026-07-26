@@ -117,6 +117,13 @@ describe("add dialogs snapshot their target before the await", () => {
     add.resolve({ yaml: "MERGED" });
     await submitting;
 
-    expect(seen).toEqual([{ configuration: "device.yaml", yaml: "MERGED" }]);
+    expect(seen).toEqual([
+      {
+        configuration: "device.yaml",
+        yaml: "MERGED",
+        basedOn: "esphome:\n",
+        node: dialog,
+      },
+    ]);
   });
 });
