@@ -486,11 +486,19 @@ export class ESPHomePageDevice extends LitElement {
   private _confirmLeave = async (): Promise<boolean> => {
     // Promote any pending form keystrokes into ``_yaml`` before the
     // dialog so the user is shown the canonical "do you want to
-    // save?" question. Without this flush, a user who typed in the
-    // form and immediately hit back would see the dialog reflect
-    // ``_sectionDirty`` (transient) rather than the YAML diff that
-    // ``Save`` is going to commit.
-    this._kickSectionFlush();
+    // save?" question. Awaited (mirroring ``_saveYaml``) so the
+    // automation editors' backend upsert settles too — a kicked
+    // flush would show the dialog against ``_sectionDirty``
+    // (transient) rather than the YAML diff ``Save`` will commit.
+    // The dirty *decision* was never at risk: ``_sectionDirty``
+    // stays set until the upsert lands, so the guard fails
+    // conservative either way (#1503).
+    try {
+      await this._activeSection?.flushPending();
+    } catch {
+      // The editor already surfaced its own failure; run the guard
+      // with the freshest state available.
+    }
     const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
@@ -513,10 +521,10 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _onBeforeUnload = (e: BeforeUnloadEvent) => {
-    // Flush the form's pending debounce so a user who typed in the
-    // form and immediately closed the tab gets warned (the form's
-    // own keystroke would otherwise sit in the debounce window with
-    // no representation in ``_yaml``).
+    // Synchronous by contract — the browser reads the decision on
+    // return, so the async flush cannot be awaited here. Safe
+    // regardless: ``_sectionDirty`` arms ``_isDirty`` from the
+    // first keystroke, so the warning fails conservative (#1503).
     this._kickSectionFlush();
     if (this._isDirty) {
       e.preventDefault();
@@ -529,6 +537,9 @@ export class ESPHomePageDevice extends LitElement {
       this._allowingLeave = false;
       return;
     }
+    // Synchronous by contract (the popped entry must be re-pushed
+    // in the same task); the dirty pre-check fails conservative via
+    // ``_sectionDirty``, same as beforeunload (#1503).
     this._kickSectionFlush();
     if (!this._isDirty) return;
     e.stopImmediatePropagation();

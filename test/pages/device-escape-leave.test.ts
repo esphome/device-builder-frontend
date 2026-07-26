@@ -141,3 +141,39 @@ describe("esphome-page-device Escape leave guard", () => {
     expect(backSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("leave guard flush ordering (#1503)", () => {
+  test("the dialog runs only after the automation editor's flush settles", async () => {
+    const { page, dialogOpen } = makePage();
+    const order: string[] = [];
+    let settle!: () => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (page as any)._activeSection = {
+      dirty: true,
+      flushPending: () =>
+        new Promise<void>((resolve) => {
+          settle = () => {
+            order.push("flushed");
+            resolve();
+          };
+        }),
+      reload: () => {},
+    };
+    dialogOpen.mockImplementation(() => order.push("dialog"));
+
+    const leaving = page._confirmLeave();
+    // The dialog must not open against a pre-flush buffer.
+    await Promise.resolve();
+    expect(order).toEqual([]);
+
+    settle();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order[0]).toBe("flushed");
+    expect(order).toContain("dialog");
+
+    // Settle the guard so the promise resolves.
+    page._onUnsavedDiscard();
+    await leaving;
+  });
+});
