@@ -652,16 +652,16 @@ describe("create-config-dialog open/close contract", () => {
   });
 });
 
-// A .tar.gz is binary, so the wizard routes it to importBundle (base64)
-// instead of reading it as text and shoving garbage into createDevice.
+// A .tar.gz is binary, so the wizard routes it to importBundleUpload (HTTP
+// POST) instead of reading it as text and shoving garbage into createDevice.
 describe("create-config-dialog bundle import", () => {
   const step = (el: ESPHomeCreateConfigDialog): string =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._step;
 
-  it("imports a bundle as base64 and never calls createDevice", async () => {
+  it("uploads a bundle over HTTP and never calls createDevice", async () => {
     const createDevice = vi.fn();
-    const importBundle = vi.fn().mockResolvedValue({
+    const importBundleUpload = vi.fn().mockResolvedValue({
       status: "imported",
       configuration: "device.yaml",
       conflicts: [],
@@ -670,20 +670,20 @@ describe("create-config-dialog bundle import", () => {
       has_secrets: false,
       esphome_version: "2026.6.0",
     });
-    const el = await mount({ createDevice, importBundle });
+    const el = await mount({ createDevice, importBundleUpload });
 
     emitImport(el, bundleFile());
     await flush();
 
     expect(createDevice).not.toHaveBeenCalled();
-    expect(importBundle).toHaveBeenCalledTimes(1);
-    const arg = importBundle.mock.calls[0][0];
-    expect(arg.file_content_b64).toBeTruthy();
-    expect(arg.overwrite).toBeUndefined();
+    expect(importBundleUpload).toHaveBeenCalledTimes(1);
+    const [file, overwrite] = importBundleUpload.mock.calls[0];
+    expect(file).toBeInstanceOf(File);
+    expect(overwrite).toBeUndefined();
   });
 
-  it("routes a conflicts response to the resolve step, then re-submits the same bytes with overwrite", async () => {
-    const importBundle = vi
+  it("routes a conflicts response to the resolve step, then re-uploads the same file with overwrite", async () => {
+    const importBundleUpload = vi
       .fn()
       .mockResolvedValueOnce({
         status: "conflicts",
@@ -701,28 +701,28 @@ describe("create-config-dialog bundle import", () => {
         has_secrets: true,
         esphome_version: "2026.6.0",
       });
-    const el = await mount({ importBundle });
+    const el = await mount({ importBundleUpload });
 
     emitImport(el, bundleFile());
     await flush();
     await el.updateComplete;
 
     expect(step(el)).toBe("resolve-conflicts");
-    const firstB64 = importBundle.mock.calls[0][0].file_content_b64;
+    const firstFile = importBundleUpload.mock.calls[0][0];
 
     emitResolve(el, ["device.yaml"]);
     await flush();
 
-    expect(importBundle).toHaveBeenCalledTimes(2);
-    const secondArg = importBundle.mock.calls[1][0];
-    expect(secondArg.overwrite).toEqual(["device.yaml"]);
-    // Same cached bytes re-sent; the file isn't re-read.
-    expect(secondArg.file_content_b64).toBe(firstB64);
+    expect(importBundleUpload).toHaveBeenCalledTimes(2);
+    const [secondFile, overwrite] = importBundleUpload.mock.calls[1];
+    expect(overwrite).toEqual(["device.yaml"]);
+    // The same File is re-uploaded; it isn't re-read or re-wrapped.
+    expect(secondFile).toBe(firstFile);
   });
 
   it("ignores a second Import click while a resolve submit is in flight", async () => {
     const inflight = deferred<{ status: string }>();
-    const importBundle = vi
+    const importBundleUpload = vi
       .fn()
       .mockResolvedValueOnce({
         status: "conflicts",
@@ -732,7 +732,7 @@ describe("create-config-dialog bundle import", () => {
         esphome_version: "2026.6.0",
       })
       .mockReturnValueOnce(inflight.promise);
-    const el = await mount({ importBundle });
+    const el = await mount({ importBundleUpload });
 
     emitImport(el, bundleFile());
     await flush();
@@ -743,24 +743,24 @@ describe("create-config-dialog bundle import", () => {
     await flush();
 
     // Initial conflicts call + one resolve call; the double-click is dropped.
-    expect(importBundle).toHaveBeenCalledTimes(2);
+    expect(importBundleUpload).toHaveBeenCalledTimes(2);
   });
 
-  it("guards a double-click on the first import (across the file-read window)", async () => {
+  it("guards a double-click on the first import (across the upload window)", async () => {
     const inflight = deferred<{ status: string }>();
-    const importBundle = vi.fn().mockReturnValueOnce(inflight.promise);
-    const el = await mount({ importBundle });
+    const importBundleUpload = vi.fn().mockReturnValueOnce(inflight.promise);
+    const el = await mount({ importBundleUpload });
 
-    // Two synchronous picks before the awaited arrayBuffer() resolves.
+    // Two synchronous picks before the awaited upload resolves.
     emitImport(el, bundleFile());
     emitImport(el, bundleFile());
     await flush();
 
-    expect(importBundle).toHaveBeenCalledTimes(1);
+    expect(importBundleUpload).toHaveBeenCalledTimes(1);
   });
 
   it("shows a distinct partial-import result when the backend keeps files", async () => {
-    const importBundle = vi.fn().mockResolvedValue({
+    const importBundleUpload = vi.fn().mockResolvedValue({
       status: "imported",
       configuration: "device.yaml",
       conflicts: [],
@@ -769,7 +769,7 @@ describe("create-config-dialog bundle import", () => {
       has_secrets: false,
       esphome_version: "2026.6.0",
     });
-    const el = await mount({ importBundle });
+    const el = await mount({ importBundleUpload });
 
     emitImport(el, bundleFile());
     await flush();

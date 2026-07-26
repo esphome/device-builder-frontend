@@ -2,7 +2,6 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { APIError, apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { arrayBufferToBase64 } from "../../util/base64.js";
 import { safeUploadFilename } from "../../util/safe-upload-filename.js";
 import { isBundleFilename } from "../../util/upload-file-types.js";
 
@@ -40,8 +39,6 @@ export class ImportFlowController implements ReactiveController {
 
   private readonly _host: ImportFlowHost;
   private _file: File | null = null;
-  /** Cached base64 so the conflict round-trip re-submits the same bytes. */
-  private _bundleB64: string | null = null;
   private _pendingUpload: { slug: string; fileContent: string } | null = null;
 
   constructor(host: ImportFlowHost) {
@@ -61,7 +58,6 @@ export class ImportFlowController implements ReactiveController {
   /** Clear all flow state (called when the dialog (re)opens). */
   reset(): void {
     this._file = null;
-    this._bundleB64 = null;
     this.conflicts = [];
     this.hasSecrets = false;
     this.mainConfig = "";
@@ -157,31 +153,19 @@ export class ImportFlowController implements ReactiveController {
     }
   }
 
-  /** Import an esphome bundle. The first call sends the bytes; a 'conflicts'
+  /** Import an esphome bundle. The first call uploads the file; a 'conflicts'
    *  response routes to the resolve step, whose confirm re-enters here with
-   *  the chosen `overwrite` paths (the cached base64 is reused). */
+   *  the chosen `overwrite` paths (the same file is re-uploaded). */
   private async _importBundleFlow(overwrite?: string[]): Promise<void> {
-    // Flip busy synchronously, before the first await (the file read), so a
-    // fast double-click can't fire two parallel import_bundle commands.
+    // Flip busy synchronously, before the first await (the upload), so a
+    // fast double-click can't fire two parallel imports.
     if (this._host.importBusy) return;
     if (!this._file) return;
     this._host.resetErrors();
     this._host.importBusy = true;
 
     try {
-      if (this._bundleB64 === null) {
-        try {
-          this._bundleB64 = arrayBufferToBase64(await this._file.arrayBuffer());
-        } catch {
-          this._host.setImportError(this._host.localize("wizard.import_read_error"));
-          return;
-        }
-      }
-
-      const res = await this._host.api.importBundle({
-        file_content_b64: this._bundleB64,
-        ...(overwrite !== undefined ? { overwrite } : {}),
-      });
+      const res = await this._host.api.importBundleUpload(this._file, overwrite);
       if (res.status === "conflicts") {
         this.conflicts = res.conflicts;
         this.hasSecrets = res.has_secrets;

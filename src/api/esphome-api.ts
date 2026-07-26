@@ -806,17 +806,45 @@ export class ESPHomeAPI {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }
 
-  /** Import an `esphome bundle` archive as a device.
+  /** Mint a single-use token authorizing the HTTP upload of one bundle. */
+  async importBundleToken(): Promise<{ token: string }> {
+    return this.sendCommand<{ token: string }>("devices/import_bundle_token");
+  }
+
+  /** Upload an `esphome bundle` archive over HTTP and import it.
    *
-   * `file_content_b64` is the base64 of the raw `.tar.gz`. Omit
-   * `overwrite` on the first call; if the response is 'conflicts', let
-   * the user pick which paths to replace and re-call with those paths in
-   * `overwrite` (paths left out keep the on-disk file). */
-  async importBundle(args: {
-    file_content_b64: string;
-    overwrite?: string[];
-  }): Promise<ImportBundleResponse> {
-    return this.sendCommand<ImportBundleResponse>("devices/import_bundle", args, 60000);
+   * HTTP, not the WS, so a large bundle isn't capped by a proxy's
+   * WebSocket `max_msg_size`. Omit `overwrite` on the first (detect) call;
+   * if the response is 'conflicts', let the user pick which paths to
+   * replace and re-call with those paths in `overwrite` (paths left out
+   * keep the on-disk file). The token is the route's auth. */
+  async importBundleUpload(
+    file: Blob,
+    overwrite?: string[]
+  ): Promise<ImportBundleResponse> {
+    const { token } = await this.importBundleToken();
+    const params = new URLSearchParams({ token });
+    if (overwrite !== undefined) {
+      params.set("mode", "resolve");
+      for (const path of overwrite) params.append("overwrite", path);
+    }
+    const response = await fetch(`${BASE_PATH}api/devices/import_bundle?${params}`, {
+      method: "POST",
+      body: file,
+    });
+    if (!response.ok) {
+      let errorCode = "http_error";
+      let details = `Bundle upload failed: ${response.status}`;
+      try {
+        const body = await response.json();
+        errorCode = body.error_code ?? errorCode;
+        details = body.details ?? details;
+      } catch {
+        // A non-JSON body (e.g. a 413's plain text) keeps the generic message.
+      }
+      throw new APIError(errorCode, details);
+    }
+    return response.json() as Promise<ImportBundleResponse>;
   }
 
   /** Update device metadata. Keyed by `configuration` (the YAML filename),
