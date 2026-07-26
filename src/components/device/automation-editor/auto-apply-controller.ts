@@ -9,6 +9,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
+import { acquire } from "../../../util/scoped.js";
 import { writeAutomationDelete } from "../apply-removal.js";
 import type { SectionEditor } from "../section-editor.js";
 import {
@@ -356,8 +357,13 @@ export class AutoApplyController implements ReactiveController {
     let settle!: () => void;
     const settled = new Promise<void>((resolve) => (settle = resolve));
     const phase = { kind: "applying" as const, queued: false, settled, settle };
-    this._apply = phase;
     try {
+      this._apply = phase;
+      // Scope-bound: back to idle on every exit of the try — before
+      // the catch and the finally, matching the old finally-first
+      // reset, so the queued re-run below installs its own phase
+      // unclobbered.
+      using _applying = acquire(() => (this._apply = { kind: "idle" }));
       // Pass the host's YAML so the backend computes the diff against
       // the current draft buffer rather than the on-disk YAML —
       // otherwise repeated auto-applies (the user typing into the
@@ -420,7 +426,6 @@ export class AutoApplyController implements ReactiveController {
       if (this._connected || this._anchor?.isConnected) this._surfaceSaveError(err);
       else console.error("Detached auto-apply round failed:", err);
     } finally {
-      this._apply = { kind: "idle" };
       if (phase.queued) {
         // A value-change landed while we were running. Re-run with
         // the latest value so we don't drop the user's last edit.
@@ -472,10 +477,14 @@ export class AutoApplyController implements ReactiveController {
     const hadPending = this._debounce !== null;
     this._cancelDebounce();
     const mode: DeleteMode = { suppressed: false, suppressedFor: null };
-    this._setDeleteMode(mode);
     this._options.setError("");
     let failed = false;
     try {
+      this._setDeleteMode(mode);
+      // Scope-bound: released at try exit, before ``_settleDelete``
+      // re-arms — ``scheduleAutoApply`` refuses to arm while a
+      // delete owns the section.
+      using _deleting = acquire(() => this._setDeleteMode(null));
       // Settle the in-flight upsert (the timer is already cancelled)
       // before computing the delete diff: its late ``yaml-draft``
       // would otherwise land after our ``yaml-updated`` and resurrect
@@ -526,7 +535,6 @@ export class AutoApplyController implements ReactiveController {
       failed = true;
       this._surfaceSaveError(err);
     } finally {
-      this._setDeleteMode(null);
       this._settleDelete(mode, { failed, hadPending, location });
     }
   }

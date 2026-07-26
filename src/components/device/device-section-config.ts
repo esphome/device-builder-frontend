@@ -26,6 +26,7 @@ import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { acquire } from "../../util/scoped.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import {
   locationFromSectionKey,
@@ -466,6 +467,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const location = locationFromSectionKey(key);
     if (!this._api || !location || this._deletingRow) return;
     this._deletingRow = key;
+    // Scope-bound: the lists unlock on every exit path.
+    using _row = acquire(() => (this._deletingRow = ""));
     const announceUpdated = prepareSectionEvent(this, "yaml-updated");
     try {
       // Read the buffer and target exactly once: the backend computes
@@ -490,8 +493,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       notifyError(this._localize("device.automation_save_error"), {
         description: msg,
       });
-    } finally {
-      this._deletingRow = "";
     }
   };
 

@@ -46,6 +46,7 @@ import {
 import { labelChipStyleString } from "../../util/label-style.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { acquire } from "../../util/scoped.js";
 import { setsEqual } from "../../util/set-equal.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
@@ -251,10 +252,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       // Drop any in-flight create snapshot so a late ``label-created``
       // arriving after the swap is ignored rather than misapplied.
       this._pendingCreateConfig = null;
-      // _pendingSaves is deliberately NOT reset: the orphaned task
-      // still runs its finally. Zeroing it here would drive the
-      // counter negative and permanently disable the same-device
-      // clear below.
+      // _pendingSaves is deliberately NOT reset: the orphaned
+      // ``_persist`` still releases its scope-bound hold when its
+      // task settles. Zeroing it here would drive the counter
+      // negative and permanently disable the same-device clear
+      // below.
     } else if (this._pendingSaves === 0) {
       // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
       // after our own ``set_labels`` — now carries the saved labels, so drop
@@ -396,6 +398,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     const api = this._api;
     const config = this.device.configuration;
     this._pendingSaves++;
+    // Scope-bound: the decrement runs when this call settles, on
+    // every exit path — the pairing the counter's invariant needs
+    // (a miss or a double release permanently disables the
+    // same-device clear in ``willUpdate``).
+    using _pending = acquire(() => this._pendingSaves--);
     const task = this._saveChain.then(async () => {
       let failed = false;
       try {
@@ -405,7 +412,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         console.warn("set_labels failed", err);
         notifyError(this._localize("dashboard.labels_save_failed"));
       } finally {
-        this._pendingSaves--;
         // Failure: the prop is the truth the write never changed —
         // revert. Success: hand authority back only once the prop
         // actually carries the saved labels (covers a no-op save the
