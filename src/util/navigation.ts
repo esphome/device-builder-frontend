@@ -19,10 +19,18 @@ export async function navigate(url: string): Promise<void> {
  * (no guard, or the guard resolved "proceed"). Used by ``navigate`` and by
  * back-navigations that bypass it but still must honour the guard — the header
  * back arrow's ``history.back()``, whose raw popstate the router commits before
- * the device editor's own popstate guard can veto it.
+ * the device editor's own popstate guard can veto it. A guard that throws
+ * resolves ``false``: navigating through unsaved state on a broken guard
+ * would lose it silently, so staying put is the fail-safe.
  */
 export async function runLeaveGuard(): Promise<boolean> {
-  return activeGuard ? activeGuard() : true;
+  if (!activeGuard) return true;
+  try {
+    return await activeGuard();
+  } catch (err) {
+    console.error("Leave guard failed; staying on the page:", err);
+    return false;
+  }
 }
 
 /**

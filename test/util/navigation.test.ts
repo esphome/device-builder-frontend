@@ -248,6 +248,23 @@ describe("runLeaveGuard", () => {
     await expect(runLeaveGuard()).resolves.toBe(true);
     expect(stale).not.toHaveBeenCalled();
   });
+
+  it("a throwing guard blocks the leave instead of rejecting (#1505)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      setLeaveGuard(() => Promise.reject(new Error("guard broke")));
+      // Fail-safe: navigating through unsaved state on a broken
+      // guard would lose it silently, and every ``void navigate()``
+      // caller would surface it as an unhandled rejection.
+      await expect(runLeaveGuard()).resolves.toBe(false);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Leave guard failed; staying on the page:",
+        expect.any(Error)
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });
 
 /**

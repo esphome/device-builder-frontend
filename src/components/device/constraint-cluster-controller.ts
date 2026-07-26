@@ -70,8 +70,11 @@ export class ConstraintClusterController implements ReactiveController {
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
     // Same tolerance as the settle above: a group whose sync rejects
     // just isn't ready; the next render recovers. Promise.resolve
-    // normalises the void-returning implementations.
+    // normalises the void-returning implementations, and the warn
+    // leaves a trace if a cluster sticks desynced.
     for (const group of groups)
-      void Promise.resolve(group.syncRadioElements?.()).catch(() => {});
+      Promise.resolve(group.syncRadioElements?.()).catch((err) =>
+        console.warn("Radio group sync failed:", err)
+      );
   }
 }
