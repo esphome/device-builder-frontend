@@ -2256,6 +2256,22 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
     );
   });
 
+  it("emits mode=resolve with no overwrite params for an empty resolve (keep all)", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
+    vi.stubGlobal("fetch", fetchFn);
+    const file = new File([new Uint8Array([1])], "device.esphomebundle.tar.gz");
+
+    await upload(api, ws, file, []);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "/api/devices/import_bundle?token=a+b%2Fc&mode=resolve",
+      { method: "POST", body: file }
+    );
+  });
+
   it("surfaces the server's {error_code, details} on a non-OK JSON response", async () => {
     installMockWebSocket();
     const api = new ESPHomeAPI();
