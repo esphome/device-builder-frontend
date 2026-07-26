@@ -458,7 +458,7 @@ export class AutoApplyController implements ReactiveController {
     if (this._dirty === value) return;
     this._dirty = value;
     this._host.requestUpdate();
-    fireSectionEvent(this._host, "dirty-change", { dirty: value });
+    fireSectionEvent(this._host, "dirty-change", { dirty: value, node: this._host });
   }
 
   private _setDeleteMode(mode: DeleteMode | null): void {

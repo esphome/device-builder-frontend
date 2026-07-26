@@ -150,6 +150,8 @@ describe("AutoApplyController auto-apply", () => {
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_DEBOUNCE_MS);
     expect(controller.dirty).toBe(false);
     expect(dirtyEvents.map((e) => e.detail.dirty)).toEqual([true, false]);
+    // Every flip names its emitter so the page can identity-guard.
+    expect(dirtyEvents.every((e) => e.detail.node === host)).toBe(true);
   });
 
   it("never schedules in add-mode", async () => {

@@ -34,6 +34,9 @@ export interface SectionLifecycleDetail {
 
 export interface SectionDirtyChangeDetail {
   dirty: boolean;
+  /** Which editor spoke — the page ignores a stale emitter's flip
+   *  so it cannot overwrite the active section's dirty state. */
+  node: SectionEditor;
 }
 
 /** The events every section editor dispatches for the device page. */

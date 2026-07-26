@@ -338,7 +338,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   _setDirty(value: boolean): void {
     if (this._dirty === value) return;
     this._dirty = value;
-    fireSectionEvent(this, "dirty-change", { dirty: value });
+    fireSectionEvent(this, "dirty-change", { dirty: value, node: this });
   }
 
   _scheduleDraftFlush() {

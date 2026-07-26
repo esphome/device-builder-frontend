@@ -1905,6 +1905,10 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _onSectionDirtyChange = (e: HTMLElementEventMap["dirty-change"]) => {
+    // Identity-guarded like section-unmount: a late flip from a
+    // previous editor (an in-flight upsert settling after a same-kind
+    // retarget) must not overwrite the active section's dirty state.
+    if (this._activeSection !== e.detail.node) return;
     this._sectionDirty = e.detail.dirty;
   };
 
