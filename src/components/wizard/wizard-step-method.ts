@@ -10,7 +10,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { FileDropController } from "../../util/file-drop-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { ACCEPTED_UPLOAD_EXTENSIONS } from "../../util/upload-file-types.js";
+import { FILE_INPUT_ACCEPT } from "../../util/upload-file-types.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 
@@ -199,7 +199,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
         <input
           id="file-input"
           type="file"
-          accept=${ACCEPTED_UPLOAD_EXTENSIONS.join(",")}
+          accept=${FILE_INPUT_ACCEPT}
           hidden
           @change=${this._onFileSelected}
         />
