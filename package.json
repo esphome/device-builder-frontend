@@ -16,7 +16,7 @@
     "build:web": "node build-scripts/build-web.cjs",
     "gen:languages": "node build-scripts/gen-language-manifest.cjs",
     "lint": "node build-scripts/gen-language-manifest.cjs && tsc --noEmit",
-    "lint:eslint": "eslint src test --max-warnings=0 --cache --cache-location node_modules/.cache/eslint/",
+    "lint:eslint": "eslint src test --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "vitest run",

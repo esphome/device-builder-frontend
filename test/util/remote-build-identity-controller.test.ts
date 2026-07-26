@@ -45,7 +45,6 @@ describe("RemoteBuildIdentityController", () => {
 
   it("retries on a later host update once the api context lands", async () => {
     const host = new FakeHost();
-    // eslint-disable-next-line prefer-const -- assigned later to simulate the api context landing
     let api: ESPHomeAPI | undefined;
     const ctrl = new RemoteBuildIdentityController(host, () => api);
     ctrl.hostConnected();

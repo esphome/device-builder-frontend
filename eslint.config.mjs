@@ -4,6 +4,10 @@
 // eslint-disable comments were already written against.
 import tseslint from "typescript-eslint";
 
+// No --cache in the script: type-aware rules depend on other files'
+// types, which ESLint's per-file cache cannot invalidate. Scope is
+// deliberately src + test only — the config files and build-scripts
+// live outside tsconfig's include, so projectService cannot type them.
 export default tseslint.config({
   files: ["src/**/*.ts", "test/**/*.ts"],
   extends: [...tseslint.configs.recommended],
@@ -14,6 +18,10 @@ export default tseslint.config({
     },
   },
   rules: {
+    // A variable read by a closure before its single assignment
+    // cannot be a const; the option covers the pattern instead of
+    // per-site disables.
+    "prefer-const": ["error", { ignoreReadBeforeAssign: true }],
     "@typescript-eslint/no-floating-promises": "error",
     // inheritedMethods off: Lit's async lifecycle overrides
     // (connectedCallback et al.) are idiomatic; the base class never

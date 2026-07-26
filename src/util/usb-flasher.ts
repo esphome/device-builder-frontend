@@ -71,9 +71,9 @@ export function openFlasher(
     if (finished) return;
     finished = true;
     controller.abort();
-    if (readyTimer !== undefined) clearTimeout(readyTimer);
+    clearTimeout(readyTimer);
     if (watchdog !== undefined) clearTimeout(watchdog);
-    if (closePoll !== undefined) clearInterval(closePoll);
+    clearInterval(closePoll);
   };
   const lost = () => {
     if (finished) return;
@@ -92,7 +92,7 @@ export function openFlasher(
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
-      if (readyTimer !== undefined) clearTimeout(readyTimer);
+      clearTimeout(readyTimer);
       if (handedOff || !bytes) return;
       // Forward-compat: a flasher advertising a newer protocol still gets our
       // v1 frame (additive fields are ignored); just note the mismatch. When a

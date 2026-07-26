@@ -601,8 +601,8 @@ export function compileAndWait(
     // reopen) can settle this promise. followJob callbacks clear the hook to
     // null on fire so a normal completion doesn't double-reject on teardown.
     host._compileReject = reject;
-    // Not an async executor: a throw before the first await would be
-    // swallowed by the Promise constructor instead of rejecting.
+    // Not an async executor (no-misused-promises): an async function
+    // where the constructor expects a void-returning one.
     const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
       host._jobId = job.job_id;
@@ -650,7 +650,8 @@ export function compileAndWait(
     };
     start().catch((err: unknown) => {
       host._compileReject = null;
-      reject(err instanceof Error ? err : new Error(String(err)));
+      // Raw rejection: compileFailureDetail normalizes downstream.
+      reject(err);
     });
   });
 }

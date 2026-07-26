@@ -422,7 +422,6 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
       "aht20_temperature",
     ]);
     // Entity triggers are now offered.
-
     expect(
       (dialog as unknown as { _filteredTriggers(): { id: string }[] })
         ._filteredTriggers()

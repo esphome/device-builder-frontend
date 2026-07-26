@@ -52,7 +52,6 @@ describe("SessionBlobCacheController", () => {
 
   it("does not fetch while the api is absent, then fetches once it arrives", async () => {
     const { binding, fetcher } = bindingFor(["x"]);
-    // eslint-disable-next-line prefer-const -- assigned later to simulate the api context landing
     let api: ESPHomeAPI | undefined;
     const c = new SessionBlobCacheController(fakeHost(), binding, () => api);
     c.hostUpdated();

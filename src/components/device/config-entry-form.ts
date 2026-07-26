@@ -874,7 +874,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // shape is wrong) leaves the user staring at empty space —
       // the visible form looks correct, the data appears gone,
       // and the only signal is in the dev console.
-
       console.error(
         "esphome-config-entry-form: render failed for entry",
         { key: entry.key, type: entry.type, path },
