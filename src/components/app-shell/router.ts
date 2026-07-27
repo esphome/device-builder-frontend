@@ -56,12 +56,24 @@ export async function lazyEnter(
 ): Promise<boolean> {
   const target = window.location.pathname;
   let counted = false;
+  const release = () => {
+    if (!counted) return;
+    counted = false;
+    if (--pendingLoads === 0) hooks.onPending(false);
+  };
+  // An import can't be cancelled, so a navigation away mid-load would
+  // otherwise keep the bar up on the new page until the stale chunk
+  // settles (up to chunkLoadTimeout).
+  const onNavigatedAway = () => {
+    if (window.location.pathname !== target) release();
+  };
   const pendingTimer = setTimeout(() => {
-    // An import can't be cancelled, so this fires even for a navigation the
-    // user has already walked away from; don't advertise progress for it.
+    // This fires even for a navigation the user has already walked away
+    // from; don't advertise progress for it.
     if (window.location.pathname !== target) return;
     counted = true;
     if (++pendingLoads === 1) hooks.onPending(true);
+    window.addEventListener("popstate", onNavigatedAway);
   }, PENDING_FEEDBACK_DELAY_MS);
   try {
     for (let attempt = 1; ; attempt++) {
@@ -89,7 +101,8 @@ export async function lazyEnter(
     }
   } finally {
     clearTimeout(pendingTimer);
-    if (counted && --pendingLoads === 0) hooks.onPending(false);
+    window.removeEventListener("popstate", onNavigatedAway);
+    release();
   }
 }
 

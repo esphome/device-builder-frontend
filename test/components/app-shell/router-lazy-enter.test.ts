@@ -142,6 +142,22 @@ describe("lazyEnter", () => {
     expect(pendingCalls).toEqual([true, false]);
   });
 
+  it("drops the bar when the user navigates away mid-load", async () => {
+    const { pendingCalls, hooks } = makeHooks();
+    const result = lazyEnter(() => new Promise<void>(() => {}), hooks);
+
+    await vi.advanceTimersByTimeAsync(200);
+    expect(pendingCalls).toEqual([true]);
+
+    // The user gave up and clicked elsewhere; the stale chunk stays in
+    // flight (up to chunkLoadTimeout) and must not pin the bar there.
+    window.history.pushState({}, "", "/");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(pendingCalls).toEqual([true, false]);
+    void result;
+  });
+
   it("does not show the bar for a navigation abandoned before the delay", async () => {
     const { pendingCalls, hooks } = makeHooks();
     const result = lazyEnter(() => new Promise<void>(() => {}), hooks);
