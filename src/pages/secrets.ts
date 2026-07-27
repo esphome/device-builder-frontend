@@ -17,7 +17,6 @@ import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-
 import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
-
 import {
   prefToSecretsLayout,
   secretsLayoutToPref,
