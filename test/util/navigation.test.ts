@@ -81,7 +81,7 @@ describe("navigate", () => {
 
     expect(pushStateSpy).toHaveBeenCalledTimes(1);
     expect(pushStateSpy).toHaveBeenCalledWith(
-      { n: expect.any(Number) },
+      { d: expect.any(String), n: expect.any(Number) },
       "",
       "/dashboard"
     );
@@ -133,7 +133,11 @@ describe("navigate", () => {
 
     await navigate("/");
 
-    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { d: expect.any(String), n: expect.any(Number) },
+      "",
+      "/"
+    );
     const popstateCalls = dispatchSpy.mock.calls.filter(
       (call) => (call[0] as Event).type === "popstate"
     );
@@ -149,7 +153,7 @@ describe("navigate", () => {
 
     expect(guard).not.toHaveBeenCalled();
     expect(pushStateSpy).toHaveBeenCalledWith(
-      { n: expect.any(Number) },
+      { d: expect.any(String), n: expect.any(Number) },
       "",
       "/dashboard"
     );
@@ -169,7 +173,11 @@ describe("navigate", () => {
 
     expect(stale).not.toHaveBeenCalled();
     expect(fresh).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { d: expect.any(String), n: expect.any(Number) },
+      "",
+      "/"
+    );
   });
 
   it("awaits an asynchronous guard before pushing state", async () => {
@@ -196,7 +204,7 @@ describe("navigate", () => {
     await navPromise;
 
     expect(pushStateSpy).toHaveBeenCalledWith(
-      { n: expect.any(Number) },
+      { d: expect.any(String), n: expect.any(Number) },
       "",
       "/dashboard"
     );
@@ -357,7 +365,11 @@ describe("goBackOrHome", () => {
     expect(backSpy).not.toHaveBeenCalled();
     // navigate() owns the guard on this branch — exactly one prompt.
     expect(guard).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { d: expect.any(String), n: expect.any(Number) },
+      "",
+      "/"
+    );
   });
 
   it("fallback navigation honours a blocking guard", async () => {

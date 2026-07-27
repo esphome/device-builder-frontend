@@ -210,12 +210,16 @@ describe("lazyEnter", () => {
     expect(consumePopGuardSuppression()).toBe(true);
   });
 
-  it("leaves a Back/Forward entry alone when its chunk fails", async () => {
+  it("leaves a same-document Back/Forward entry alone when its chunk fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { hooks } = makeHooks();
-    // beforeEach's raw pushState models an entry the triggering click did
-    // not push — the user arrived here via Back/Forward.
+    await navigate("/device/kitchen.yaml");
+    const earlierEntryState = window.history.state;
+    await navigate("/device/other.yaml");
+    // Simulate Back into the earlier entry: this document's stamp, but
+    // no longer the latest push.
+    window.history.pushState(earlierEntryState, "", "/device/kitchen.yaml");
     const result = lazyEnter(
       vi.fn().mockRejectedValue(new Error("chunk load failed")),
       hooks
@@ -225,6 +229,26 @@ describe("lazyEnter", () => {
     await expect(result).resolves.toBe(false);
     // Popping would move the user a second step back.
     expect(back).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/device/kitchen.yaml");
+  });
+
+  it("falls back to the dashboard when a reloaded entry's chunk fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { hooks } = makeHooks();
+    // A reload keeps the pre-reload document's stamp while this document
+    // has committed nothing — same empty outlet as a cold deep link.
+    window.history.pushState({ d: "pre-reload-doc", n: 5 }, "", "/device/kitchen.yaml");
+    const result = lazyEnter(
+      vi.fn().mockRejectedValue(new Error("chunk load failed")),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(result).resolves.toBe(false);
+    expect(back).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.location.pathname).toBe("/");
   });
 
   it("falls back to the dashboard when a deep link's chunk fails", async () => {

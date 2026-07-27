@@ -76,3 +76,33 @@ export function renderReconnectPill(localize: LocalizeFunc): TemplateResult {
     ${localize("layout.reconnecting")}
   </div>`;
 }
+
+/**
+ * Timer gate for the reconnect pill: a blip shorter than the delay never
+ * shows it (nor fires its ``role="status"`` announcement — a CSS delay
+ * would still announce). Repeat disconnects while armed keep the first
+ * outage's clock.
+ */
+export class ReconnectPillGate {
+  private _timer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    private readonly _delayMs: number,
+    private readonly _onChange: (visible: boolean) => void
+  ) {}
+
+  disconnected(): void {
+    this._timer ??= setTimeout(() => {
+      this._timer = null;
+      this._onChange(true);
+    }, this._delayMs);
+  }
+
+  connected(): void {
+    if (this._timer !== null) {
+      clearTimeout(this._timer);
+      this._timer = null;
+    }
+    this._onChange(false);
+  }
+}

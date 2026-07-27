@@ -3,8 +3,8 @@ import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import {
-  hasPushedHistoryEntry,
   isFreshNavigatePush,
+  isSameDocumentPush,
   navigate,
   popPushedEntrySilently,
 } from "../../util/navigation.js";
@@ -88,12 +88,13 @@ export async function lazyEnter(
           // A fresh navigate() push is undone so the address bar doesn't
           // describe a page that never mounted — silently, or the still-
           // mounted page's popstate guard re-prompts over a leave the user
-          // already answered. A Back/Forward entry is left alone (popping
-          // would move the user a second step back), and a cold deep link
-          // has nothing to undo, so it falls back to the dashboard rather
-          // than an empty outlet.
+          // already answered. A same-document Back/Forward entry is left
+          // alone (popping would move the user a second step back). Any
+          // other entry — cold deep link, reload — has nothing rendered
+          // behind it, so it falls back to the dashboard rather than an
+          // empty outlet.
           if (isFreshNavigatePush()) popPushedEntrySilently();
-          else if (!hasPushedHistoryEntry()) void navigate("/");
+          else if (!isSameDocumentPush()) void navigate("/");
           return false;
         }
         await sleep(RETRY_DELAY_MS);

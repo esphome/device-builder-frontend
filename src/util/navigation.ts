@@ -8,11 +8,15 @@ export function setLeaveGuard(guard: LeaveGuard | null): void {
   activeGuard = guard;
 }
 
+// history.state survives a reload while module state doesn't, so the
+// counter alone can't tell a fresh push from a pre-reload entry whose
+// number happens to collide; the token scopes the stamp to this document.
+const DOC_TOKEN = Math.random().toString(36).slice(2);
 let pushCounter = 0;
 
 export async function navigate(url: string): Promise<void> {
   if (!(await runLeaveGuard())) return;
-  window.history.pushState({ n: ++pushCounter }, "", withBase(url));
+  window.history.pushState({ d: DOC_TOKEN, n: ++pushCounter }, "", withBase(url));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
@@ -35,19 +39,28 @@ export async function runLeaveGuard(): Promise<boolean> {
   }
 }
 
-/** True when the current entry came from ``navigate()`` (which stamps a
- *  state object) rather than a fresh page load, so there is something to
- *  pop. */
+/** True when the current entry carries a non-null object state (a
+ *  ``navigate()`` stamp or a guard's re-push) rather than a fresh page
+ *  load, so there is a same-session entry to pop back to. */
 export function hasPushedHistoryEntry(): boolean {
   return window.history.state !== null && typeof window.history.state === "object";
 }
 
-/** True when the current entry is the latest ``navigate()`` push — just
- *  pushed by the click being handled, so undoing it is safe. False for
- *  an entry reached via Back/Forward or a fresh page load. */
+/** True when the current entry was pushed by this document's
+ *  ``navigate()`` — false after a reload, whose entry keeps the stamp of
+ *  the document that made it. */
+export function isSameDocumentPush(): boolean {
+  const state = window.history.state as { d?: string } | null;
+  return state?.d === DOC_TOKEN;
+}
+
+/** True when the current entry is this document's latest ``navigate()``
+ *  push — just pushed by the click being handled, so undoing it is safe.
+ *  False for an entry reached via Back/Forward, a reload, or a fresh
+ *  page load. */
 export function isFreshNavigatePush(): boolean {
-  const state = window.history.state as { n?: number } | null;
-  return typeof state?.n === "number" && state.n === pushCounter;
+  const state = window.history.state as { d?: string; n?: number } | null;
+  return state?.d === DOC_TOKEN && state.n === pushCounter;
 }
 
 let popGuardSuppressed = false;
