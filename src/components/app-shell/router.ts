@@ -123,6 +123,9 @@ export async function lazyEnter(
           return false;
         }
         await sleep(RETRY_DELAY_MS);
+        // Re-check after the backoff: a navigation during the sleep must
+        // not spend the retry import on an abandoned route.
+        if (window.location.pathname !== target) return false;
       }
     }
   } finally {

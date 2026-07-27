@@ -122,6 +122,20 @@ describe("lazyEnter", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("skips the retry import when the user leaves during the backoff", async () => {
+    const { hooks } = makeHooks();
+    const importThunk = vi.fn().mockRejectedValue(new Error("chunk load failed"));
+    const result = lazyEnter(importThunk, hooks);
+
+    // First failure processed while still on the route; backoff armed.
+    await vi.advanceTimersByTimeAsync(100);
+    window.history.pushState({}, "", "/");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    await expect(result).resolves.toBe(false);
+    expect(importThunk).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the bar up until the last overlapping load settles", async () => {
     const { pendingCalls, hooks } = makeHooks();
     let resolveFirst!: () => void;
