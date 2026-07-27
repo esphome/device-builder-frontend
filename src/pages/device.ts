@@ -843,23 +843,27 @@ export class ESPHomePageDevice extends LitElement {
     const id = this.id;
     const gen = ++this._loadGen;
     this._yamlState = "loading";
+    let yaml: string | null;
     try {
-      const yaml = await loadConfigWithRecovery(this._api, id, {
+      yaml = await loadConfigWithRecovery(this._api, id, {
         // Unmount counts as abandoned too, or a slow load keeps fetching
         // (and re-rendering) against a page that is already gone.
         abandoned: () => !this.isConnected || this.id !== id || gen !== this._loadGen,
         attempts: LOAD_YAML_ATTEMPTS,
         timeoutMs: LOAD_YAML_TIMEOUT_MS,
       });
-      if (yaml === null) return;
-      this._yaml = yaml;
-      this._savedYaml = yaml;
-      this._yamlState = "ready";
-      this._maybeResolveLineFromUrl();
     } catch (e) {
       console.error("Failed to load YAML:", e);
       this._yamlState = isApiErrorCode(e, ErrorCode.NOT_FOUND) ? "missing" : "error";
+      return;
     }
+    if (yaml === null) return;
+    this._yaml = yaml;
+    this._savedYaml = yaml;
+    this._yamlState = "ready";
+    // Outside the catch: a resolver throw must not repaint a loaded
+    // config as a load failure.
+    this._maybeResolveLineFromUrl();
   }
 
   private _retryLoadYaml = () => void this._loadYaml();

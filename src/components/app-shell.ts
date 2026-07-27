@@ -88,7 +88,7 @@ import {
   renderReconnectPill,
   renderRouteLoadingBar,
 } from "./app-shell/connection-overlays.js";
-import { createRouter } from "./app-shell/router.js";
+import { consumePreAuthExhaustion, createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
@@ -495,18 +495,15 @@ export class ESPHomeApp extends LitElement {
     }
   }
 
-  // One-shot: re-resolve the URL the router gave up on pre-auth (a deep
-  // link whose chunk failed behind the login screen) now that a retry can
-  // be seen. Fires before any routed page mounts, so no popstate guard
-  // intercepts the synthetic event.
-  private _routerRekicked = false;
-
   // Idempotent across reconnects.
   private async _afterAuthenticated() {
     this._authState = "authed";
     this._authError = null;
-    if (!this._routerRekicked) {
-      this._routerRekicked = true;
+    // Re-resolve a URL the router gave up on pre-auth (a deep link whose
+    // chunk failed behind the login screen) now that a retry can be seen.
+    // A pre-auth exhaustion means no routed page ever mounted, so no
+    // popstate guard sees the synthetic event.
+    if (consumePreAuthExhaustion()) {
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
     void this._subscribeToEvents();

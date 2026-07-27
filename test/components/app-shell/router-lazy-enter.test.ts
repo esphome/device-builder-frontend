@@ -7,7 +7,11 @@ vi.mock("sonner-js", () => ({
 
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
-import { lazyEnter, type RouterHooks } from "../../../src/components/app-shell/router.js";
+import {
+  consumePreAuthExhaustion,
+  lazyEnter,
+  type RouterHooks,
+} from "../../../src/components/app-shell/router.js";
 import { consumePopGuardSuppression, navigate } from "../../../src/util/navigation.js";
 import { identityLocalize } from "../../_dom.js";
 
@@ -37,8 +41,9 @@ describe("lazyEnter", () => {
     // Module-factory mock, so restoreAllMocks never clears its history;
     // without this the not.toHaveBeenCalled cells are order-dependent.
     vi.mocked(toast.error).mockClear();
-    // Module state in navigation.ts; drain any leftover arming.
+    // Module state in navigation.ts / router.ts; drain leftover arming.
     consumePopGuardSuppression();
+    consumePreAuthExhaustion();
   });
 
   afterEach(() => {
@@ -228,6 +233,9 @@ describe("lazyEnter", () => {
     expect(toast.error).not.toHaveBeenCalled();
     expect(back).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe("/device/kitchen.yaml");
+    // The shell's post-auth re-resolve reads this exactly once.
+    expect(consumePreAuthExhaustion()).toBe(true);
+    expect(consumePreAuthExhaustion()).toBe(false);
   });
 
   it("leaves a same-document Back/Forward entry alone when its chunk fails", async () => {

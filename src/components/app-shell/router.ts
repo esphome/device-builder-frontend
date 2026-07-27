@@ -42,6 +42,17 @@ const RETRY_DELAY_MS = 500;
 // overlapping navigations can't hide each other's progress bar.
 let pendingLoads = 0;
 
+let preAuthExhausted = false;
+
+/** True once a chunk exhausted behind the login screen; reading resets,
+ *  so the shell's post-auth re-resolve fires only when there is a failed
+ *  route to recover. */
+export function consumePreAuthExhaustion(): boolean {
+  const was = preAuthExhausted;
+  preAuthExhausted = false;
+  return was;
+}
+
 /**
  * Await a lazy route chunk with pending feedback and retries.
  *
@@ -90,7 +101,10 @@ export async function lazyEnter(
           // Behind the login screen there is nothing to see or undo, and
           // rewriting the URL here would lose the deep link the user is
           // about to authenticate into.
-          if (!hooks.isAuthed()) return false;
+          if (!hooks.isAuthed()) {
+            preAuthExhausted = true;
+            return false;
+          }
           notifyError(hooks.localize()("layout.page_load_failed"));
           // A fresh navigate() push is undone so the address bar doesn't
           // describe a page that never mounted — silently, or the still-
