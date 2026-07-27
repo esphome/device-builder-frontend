@@ -8,7 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { apiErrorDetails, APIError } from "../api/api-error.js";
+import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
@@ -22,11 +22,11 @@ import {
   type SecretsLayout,
 } from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
+import { LoadAbandonedError, loadWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
-import { sleep } from "../util/sleep.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { secretsStyles } from "./secrets.styles.js";
 
@@ -47,10 +47,6 @@ registerMdiIcons({
 });
 
 const SECRETS_FILE = "secrets.yaml";
-
-// Backoff between transport-fault reloads of secrets.yaml; keeps the
-// retry loop from spinning when the socket is up but requests time out.
-const RELOAD_RETRY_DELAY_MS = 2000;
 
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
@@ -237,26 +233,22 @@ export class ESPHomePageSecrets extends LitElement {
    * Transport faults retry once the connection is ready again.
    */
   private async _loadFromServer() {
-    for (;;) {
-      await this._api.ready;
-      try {
-        const yaml = await this._api.getConfig(SECRETS_FILE);
-        this._yaml = yaml;
-        this._savedYaml = yaml;
-        break;
-      } catch (err) {
-        if (err instanceof APIError) {
-          const yaml = this._localize("secrets.file_header");
-          this._yaml = yaml;
-          this._savedYaml = yaml;
-          break;
-        }
-        console.warn("Failed to load secrets.yaml; retrying:", err);
-        await sleep(RELOAD_RETRY_DELAY_MS);
-        // The page may have unmounted during the backoff.
-        if (this._unmounted) return;
-      }
+    let yaml: string;
+    try {
+      yaml = await loadWithRecovery({
+        ready: () => this._api.ready,
+        load: () => this._api.getConfig(SECRETS_FILE),
+        abandoned: () => this._unmounted,
+      });
+    } catch (err) {
+      // Abandoned means the page is gone; leave the buffers untouched.
+      if (err instanceof LoadAbandonedError) return;
+      // Only a server reply reaches here (transport faults retry), so
+      // this really is a missing file rather than an unreachable one.
+      yaml = this._localize("secrets.file_header");
     }
+    this._yaml = yaml;
+    this._savedYaml = yaml;
     this._loaded = true;
   }
 

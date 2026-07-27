@@ -1022,8 +1022,8 @@ export class ESPHomeAPI {
   }
 
   /** Get device YAML config. */
-  async getConfig(configuration: string): Promise<string> {
-    return this.sendCommand<string>("devices/get_config", { configuration });
+  async getConfig(configuration: string, timeout?: number): Promise<string> {
+    return this.sendCommand<string>("devices/get_config", { configuration }, timeout);
   }
 
   /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml. */

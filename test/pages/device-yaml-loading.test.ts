@@ -79,28 +79,78 @@ describe("device page initial YAML loading gate", () => {
     expect((editor as any).yaml).toBe("wifi:\n  ssid: x\n");
   });
 
-  it("shows the retry panel when getConfig fails and recovers on Retry", async () => {
+  it("keeps the spinner and retries when the socket drops mid-fetch", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      // A dropped socket rejects every in-flight request at once, so this
+      // arrives in milliseconds — the panel must not flash for it.
+      const getConfig = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("WebSocket connection closed"))
+        .mockResolvedValueOnce("wifi:\n  ssid: x\n");
+      const page = await mountPage(makeApi(getConfig));
+
+      const panel = loadPanelIn(page);
+      expect(panel).not.toBeNull();
+      expect(panel!.querySelector("wa-spinner")).not.toBeNull();
+      expect(panel!.querySelector("wa-button")).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await flushMicrotasks(8);
+      await page.updateComplete;
+
+      expect(getConfig).toHaveBeenCalledTimes(2);
+      expect(loadPanelIn(page)).toBeNull();
+      expect(editorIn(page)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the retry panel once the transport attempts are spent", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const getConfig = vi
+        .fn()
+        .mockRejectedValue(new Error("WebSocket connection closed"));
+      const page = await mountPage(makeApi(getConfig));
+
+      await vi.advanceTimersByTimeAsync(1500 * 4);
+      await flushMicrotasks(8);
+      await page.updateComplete;
+
+      expect(getConfig).toHaveBeenCalledTimes(4);
+      const panel = loadPanelIn(page);
+      expect(panel!.querySelector("wa-spinner")).toBeNull();
+      expect(panel!.textContent).toContain("device.load_failed");
+
+      // Retry re-arms the whole recovery loop from scratch.
+      getConfig.mockResolvedValueOnce("wifi:\n  ssid: x\n");
+      (panel!.querySelector("wa-button") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
+      await flushMicrotasks(8);
+      await page.updateComplete;
+
+      expect(editorIn(page)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("surfaces a server-side failure without burning retries", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const getConfig = vi
       .fn()
-      .mockRejectedValueOnce(new Error("WebSocket connection closed"))
-      .mockResolvedValueOnce("wifi:\n  ssid: x\n");
+      .mockRejectedValue(new APIError(ErrorCode.INTERNAL_ERROR, "boom"));
     const page = await mountPage(makeApi(getConfig));
 
-    expect(editorIn(page)).toBeNull();
-    const panel = loadPanelIn(page);
-    expect(panel).not.toBeNull();
-    const retry = panel!.querySelector("wa-button");
-    expect(retry).not.toBeNull();
-    expect(panel!.querySelector("wa-spinner")).toBeNull();
-
-    (retry as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flushMicrotasks(8);
-    await page.updateComplete;
-
-    expect(getConfig).toHaveBeenCalledTimes(2);
-    expect(loadPanelIn(page)).toBeNull();
-    expect(editorIn(page)).not.toBeNull();
+    // The server answered, so retrying the same request is pointless.
+    expect(getConfig).toHaveBeenCalledTimes(1);
+    expect(loadPanelIn(page)!.textContent).toContain("device.load_failed");
   });
 
   it("offers a way back instead of a retry when the config is gone", async () => {
@@ -144,7 +194,8 @@ describe("device page initial YAML loading gate", () => {
     await flushMicrotasks(8);
     await page.updateComplete;
 
-    expect(getConfig).toHaveBeenCalledWith("kitchen.yaml");
+    // The initial fetch carries its own longer bound, not the 10s default.
+    expect(getConfig).toHaveBeenCalledWith("kitchen.yaml", 30_000);
     expect(editorIn(page)).not.toBeNull();
   });
 });

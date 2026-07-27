@@ -55,6 +55,7 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
+import { LoadAbandonedError, loadWithRecovery } from "../util/load-with-recovery.js";
 import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -111,6 +112,13 @@ registerMdiIcons({
   "chevron-right": mdiChevronRight,
   menu: mdiMenu,
 });
+
+// The user is staring at a spinner, so the initial config fetch gets a
+// longer leash than the 10s command default: a big YAML over a degraded
+// link is slow, not broken. Attempts burn only while the socket is up
+// (``ready`` parks otherwise), so an outage never spends them.
+const LOAD_YAML_TIMEOUT_MS = 30_000;
+const LOAD_YAML_ATTEMPTS = 4;
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -800,18 +808,23 @@ export class ESPHomePageDevice extends LitElement {
     const id = this.id;
     this._yamlState = "loading";
     try {
-      // Ready gates on (re)connect + auth, so a mount during a reconnect
-      // window waits instead of throwing "WebSocket not connected".
-      await this._api.ready;
-      const yaml = await this._api.getConfig(id);
-      if (this.id !== id) return;
+      const yaml = await loadWithRecovery({
+        // Ready parks on a dropped socket, so a reconnect window waits
+        // rather than throwing "WebSocket not connected".
+        ready: () => this._api.ready,
+        // A dropped socket rejects every in-flight request at once, so
+        // without the retry a blip mid-fetch reads as a hard failure.
+        load: () => this._api.getConfig(id, LOAD_YAML_TIMEOUT_MS),
+        abandoned: () => this.id !== id,
+        attempts: LOAD_YAML_ATTEMPTS,
+      });
       this._yaml = yaml;
       this._savedYaml = yaml;
       this._yamlState = "ready";
       this._maybeResolveLineFromUrl();
     } catch (e) {
+      if (e instanceof LoadAbandonedError) return;
       console.error("Failed to load YAML:", e);
-      if (this.id !== id) return;
       this._yamlState =
         e instanceof APIError && e.errorCode === ErrorCode.NOT_FOUND
           ? "missing"
