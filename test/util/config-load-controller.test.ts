@@ -122,6 +122,8 @@ describe("ConfigLoadController", () => {
     await controller.start();
     expect(commit).toHaveBeenCalledWith("# header\n");
     expect(controller.state).toBe("ready");
+    // The seed is a first-run outcome, not a failure; it stays log-free.
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it("parks terminally on a missing reply; a reconnect leaves it alone", async () => {
@@ -133,6 +135,11 @@ describe("ConfigLoadController", () => {
     });
     await controller.start();
     expect(controller.state).toBe("missing");
+    // The terminal panel doesn't name the file; the console entry does.
+    expect(console.error).toHaveBeenCalledWith(
+      "Failed to load kitchen.yaml:",
+      expect.any(APIError)
+    );
 
     connected = false;
     host.update();
