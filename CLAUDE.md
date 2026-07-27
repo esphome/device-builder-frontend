@@ -178,6 +178,14 @@ for the full flow. The load-bearing rules:
 - When you remove a `_localize("foo")` call site, delete the key
   from `en.json` at the same time (the next `upload --cleanup`
   prunes it from Lokalise). No legacy keys retained.
+- **Transport copy never says "wireless".** Devices run Ethernet
+  and Thread too, so "wireless logs" / "installed wirelessly"
+  misdescribes them; say "over the network" (or OTA where the
+  surrounding UI already uses it). Outside contributors have had
+  to correct this twice (#1409, #1521), both times for a string
+  that shipped inside an unrelated PR. Key *names* are frozen API
+  (`logs_method_wireless` keeps its name); the rule is about
+  user-visible values.
 - The language picker is data-driven: each locale's autonym +
   flag come from its file's top-level `language` / `flag` keys,
   surfaced via a generated manifest
