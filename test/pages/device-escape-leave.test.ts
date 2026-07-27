@@ -34,7 +34,7 @@ interface EscapeView {
   } | null;
   _onKeydown(e: KeyboardEvent): void;
   _onBeforeUnload(e: BeforeUnloadEvent): void;
-  _onPopState(e: PopStateEvent): void;
+  _leaveGuard: { handlePopState(e: PopStateEvent): void };
   _onUnsavedDiscard(): void;
   _onUnsavedCancel(): void;
   _confirmLeave(): Promise<boolean>;
@@ -49,8 +49,9 @@ function makePage(): { page: EscapeView; dialogOpen: ReturnType<typeof vi.fn> } 
   // ``_unsavedDialog`` is a @query getter on the prototype; shadow it so the
   // guard's ``open`` lands on the spy without mounting the component tree.
   Object.defineProperty(page, "_unsavedDialog", { value: { open: dialogOpen } });
-  // Mirror connectedCallback's registration — the piece of mounting the
-  // Escape path actually depends on.
+  // Register the raw confirm as the leave guard — production registers
+  // the controller's wrapped guard, but these cells only exercise the
+  // confirm flow, not the allow-flag handshake.
   setLeaveGuard(page._confirmLeave);
   return { page, dialogOpen };
 }
@@ -393,7 +394,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._activeSection = section;
 
     const stopImmediatePropagation = vi.fn();
-    page._onPopState({
+    page._leaveGuard.handlePopState({
       stopImmediatePropagation,
     } as unknown as PopStateEvent);
     await flush();

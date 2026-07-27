@@ -17,13 +17,13 @@ import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-
 import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { withBase } from "../util/base-path.js";
+
 import {
   prefToSecretsLayout,
   secretsLayoutToPref,
   type SecretsLayout,
 } from "../util/editor-layout.js";
-import { consumePopGuardSuppression, setLeaveGuard } from "../util/navigation.js";
+import { PopLeaveGuardController } from "../util/navigation.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -115,9 +115,11 @@ export class ESPHomePageSecrets extends LitElement {
     }
   });
 
-  // Set true once the leave guard has cleared a navigation, so the
-  // synthetic popstate it triggers isn't re-intercepted.
-  private _allowingLeave = false;
+  protected readonly _leaveGuard = new PopLeaveGuardController(this, {
+    confirmLeave: () => this._confirmLeave(),
+    isDirty: () => this._isDirty,
+    url: () => "/secrets",
+  });
 
   // Resolver for an in-flight wipe confirm, settled (as cancelled) on
   // disconnect so the awaiting _save() can't hang if the page unmounts
@@ -133,9 +135,7 @@ export class ESPHomePageSecrets extends LitElement {
       // No local choice (new browser): restore from the backend pref.
       void this._seedLayoutFromBackend();
     }
-    setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
-    window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
@@ -183,9 +183,7 @@ export class ESPHomePageSecrets extends LitElement {
   }
 
   disconnectedCallback() {
-    setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
-    window.removeEventListener("popstate", this._onPopState, { capture: true });
     this._unsavedGuard.cancelPending();
     // A wipe confirm open at unmount resolves as cancelled, never dangling.
     this._settlePendingWipe?.(false);
@@ -203,17 +201,11 @@ export class ESPHomePageSecrets extends LitElement {
   // In-app navigation (nav links, header back arrow, command palette) runs
   // this through ``runLeaveGuard``; prompt to save / discard when dirty.
   private _confirmLeave = async (): Promise<boolean> => {
-    const ok = await this._unsavedGuard.run({
+    return this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
-      save: async () => {
-        const saved = await this._save();
-        if (saved) this._allowingLeave = true;
-        return saved;
-      },
+      save: () => this._save(),
     });
-    if (ok) this._allowingLeave = true;
-    return ok;
   };
 
   // Native tab / window close: a dirty buffer triggers the browser's own
@@ -223,28 +215,6 @@ export class ESPHomePageSecrets extends LitElement {
       e.preventDefault();
       e.returnValue = "";
     }
-  };
-
-  // The browser back/forward buttons fire popstate straight at the router,
-  // bypassing ``navigate``; re-assert our URL and run the guard, then replay
-  // the back once the user has decided.
-  private _onPopState = (e: PopStateEvent) => {
-    // A failed route chunk rolling back its own push is a return to
-    // this page, not a leave.
-    if (consumePopGuardSuppression()) return;
-    if (this._allowingLeave) {
-      this._allowingLeave = false;
-      return;
-    }
-    if (!this._isDirty) return;
-    e.stopImmediatePropagation();
-    window.history.pushState({}, "", withBase("/secrets"));
-    void this._confirmLeave().then((canLeave) => {
-      if (canLeave) {
-        this._allowingLeave = true;
-        window.history.back();
-      }
-    });
   };
 
   private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
