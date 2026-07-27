@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
 import toast from "sonner-js";
 
 import "../_mock-webawesome.js";
@@ -12,10 +16,6 @@ import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../_lit-template-walker.js";
-
-vi.mock("sonner-js", () => ({
-  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
-}));
 
 // The load cells below mount the page for real, which upgrades these
 // children; Web Awesome's form-associated base and CodeMirror both crash
