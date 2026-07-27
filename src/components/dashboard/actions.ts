@@ -21,7 +21,7 @@ import {
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 export function editDevice(device: ConfiguredDevice) {
-  void navigate(`/device/${device.configuration}`);
+  void navigate(`/device/${encodeURIComponent(device.configuration)}`);
 }
 
 /**

@@ -117,7 +117,28 @@ describe("launchLogs", () => {
       // A timeout isn't an answer: say the probe was skipped rather than
       // let the serial option silently vanish for a user who has one.
       expect(toast.info).toHaveBeenCalledWith(
-        "dashboard.logs_serial_probe_timeout",
+        "dashboard.logs_serial_probe_failed",
+        expect.anything()
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("says the probe was skipped when the socket drops mid-probe", async () => {
+    vi.mocked(toast.info).mockClear();
+    const restore = withWebSerial(false);
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const host = makeHost(async () => {
+        throw new Error("WebSocket connection closed");
+      });
+      await launchLogs(host, makeDevice(), vi.fn());
+
+      // A transport fault is no more an answer than a timeout.
+      expect(host.logsDialog.open).toHaveBeenCalledTimes(1);
+      expect(toast.info).toHaveBeenCalledWith(
+        "dashboard.logs_serial_probe_failed",
         expect.anything()
       );
     } finally {

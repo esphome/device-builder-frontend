@@ -1,4 +1,4 @@
-import { CommandTimeoutError, type ESPHomeAPI } from "../api/index.js";
+import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
@@ -47,12 +47,11 @@ export async function launchLogs(
       // Lockstep deployment means this command exists, so a rejection is a real
       // WS/backend fault or the bounded probe timing out on a degraded link;
       // either way fall through to OTA logs so the user isn't left without any
-      // path. A timeout is not an answer, though: say so rather than let the
-      // serial option silently disappear for someone who has a serial device.
+      // path. Neither failure is an answer, though: say the probe was skipped
+      // rather than let the serial option silently disappear for someone who
+      // has a serial device.
       console.warn("getSerialPorts failed; falling back to OTA logs", err);
-      if (err instanceof CommandTimeoutError) {
-        notifyInfo(host.localize("dashboard.logs_serial_probe_timeout"));
-      }
+      notifyInfo(host.localize("dashboard.logs_serial_probe_failed"));
       hasServerPorts = false;
     }
   }

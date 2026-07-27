@@ -28,6 +28,9 @@ export interface RouterHooks {
   onPending(pending: boolean): void;
   /** Read at failure time — the shell's localize loads async after mount. */
   localize(): LocalizeFunc;
+  /** Pre-auth exhaustion stays silent and leaves the URL alone; the shell
+   *  re-resolves it after sign-in, giving the chunk a fresh try. */
+  isAuthed(): boolean;
 }
 
 const PENDING_FEEDBACK_DELAY_MS = 200;
@@ -84,6 +87,10 @@ export async function lazyEnter(
         if (window.location.pathname !== target) return false;
         if (attempt >= CHUNK_LOAD_ATTEMPTS) {
           console.error("Failed to load route chunk:", err);
+          // Behind the login screen there is nothing to see or undo, and
+          // rewriting the URL here would lose the deep link the user is
+          // about to authenticate into.
+          if (!hooks.isAuthed()) return false;
           notifyError(hooks.localize()("layout.page_load_failed"));
           // A fresh navigate() push is undone so the address bar doesn't
           // describe a page that never mounted — silently, or the still-

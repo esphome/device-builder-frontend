@@ -18,13 +18,14 @@ import { identityLocalize } from "../../_dom.js";
  * no runtime surface to test.)
  */
 
-function makeHooks(): { pendingCalls: boolean[]; hooks: RouterHooks } {
+function makeHooks(authed = true): { pendingCalls: boolean[]; hooks: RouterHooks } {
   const pendingCalls: boolean[] = [];
   return {
     pendingCalls,
     hooks: {
       onPending: (pending: boolean) => pendingCalls.push(pending),
       localize: () => identityLocalize as LocalizeFunc,
+      isAuthed: () => authed,
     },
   };
 }
@@ -208,6 +209,25 @@ describe("lazyEnter", () => {
     // The still-mounted page's guard consumes this and lets the rollback
     // popstate through instead of re-prompting a leave already answered.
     expect(consumePopGuardSuppression()).toBe(true);
+  });
+
+  it("keeps a pre-auth failure silent and leaves the deep link intact", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { hooks } = makeHooks(false);
+    // A cold deep link failing behind the login screen: the shell
+    // re-resolves the URL after sign-in, so nothing may be rewritten.
+    window.history.pushState(null, "", "/device/kitchen.yaml");
+    const result = lazyEnter(
+      vi.fn().mockRejectedValue(new Error("chunk load failed")),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(result).resolves.toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/device/kitchen.yaml");
   });
 
   it("leaves a same-document Back/Forward entry alone when its chunk fails", async () => {

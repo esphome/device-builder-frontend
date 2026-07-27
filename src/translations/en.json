@@ -391,7 +391,7 @@
     "compile_selected_aria": "Compile {count} selected without installing",
     "builder_stack_heading": "Device builder",
     "builder_stack_tagline": "create and manage your devices",
-    "logs_serial_probe_timeout": "Could not check for serial ports in time; showing wireless logs."
+    "logs_serial_probe_failed": "Could not check for serial ports; showing wireless logs."
   },
   "command": {
     "install_title": "Install — {name}",
