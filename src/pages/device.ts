@@ -336,7 +336,7 @@ export class ESPHomePageDevice extends LitElement {
    *  instead of an empty editor. A transport failure offers a retry;
    *  a NOT_FOUND config (deleted, renamed, stale bookmark) is terminal,
    *  so it routes back to the dashboard instead. */
-  readonly _load = new ConfigLoadController(this, {
+  protected readonly _load = new ConfigLoadController(this, {
     api: () => this._api,
     connected: () => this._apiConnected,
     configuration: () => this.id,

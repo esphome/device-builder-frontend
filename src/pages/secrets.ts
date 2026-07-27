@@ -76,7 +76,7 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _saving = false;
 
-  readonly _load = new ConfigLoadController(this, {
+  protected readonly _load = new ConfigLoadController(this, {
     api: () => this._api,
     connected: () => this._apiConnected,
     configuration: () => SECRETS_FILE,

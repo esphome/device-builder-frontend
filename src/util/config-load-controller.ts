@@ -97,6 +97,7 @@ export class ConfigLoadController implements ReactiveController {
     } catch (err) {
       const handled = err instanceof APIError ? this._opts.onApiError?.(err) : undefined;
       if (handled === "missing") {
+        console.error(`Failed to load ${configuration}:`, err);
         this._setState("missing");
         return;
       }

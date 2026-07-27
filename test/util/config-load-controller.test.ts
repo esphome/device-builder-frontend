@@ -173,6 +173,21 @@ describe("ConfigLoadController", () => {
     expect(controller.state).toBe("ready");
   });
 
+  it("drops a reply that lands after the host disconnected", async () => {
+    let settle!: (yaml: string) => void;
+    const getConfig = vi.fn(() => new Promise<string>((r) => (settle = r)));
+    const { host, controller, commit } = makeLoad({ getConfig });
+
+    const load = controller.start();
+    await flushMicrotasks(2);
+    host.disconnect();
+    settle("late");
+    await load;
+
+    // The page is gone; a late reply must not write into its buffers.
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it("drops a reply for a configuration the host moved past", async () => {
     let configuration = "a.yaml";
     let settle!: (yaml: string) => void;
