@@ -115,7 +115,7 @@ export class ESPHomePageSecrets extends LitElement {
     }
   });
 
-  readonly _leaveGuard = new PopLeaveGuardController(this, {
+  protected readonly _leaveGuard = new PopLeaveGuardController(this, {
     confirmLeave: () => this._confirmLeave(),
     isDirty: () => this._isDirty,
     url: () => "/secrets",

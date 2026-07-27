@@ -9,6 +9,12 @@ export function setLeaveGuard(guard: LeaveGuard | null): void {
   activeGuard = guard;
 }
 
+/** Clear only while *guard* is still the active one — a departing page
+ *  must not disarm a successor that already registered. */
+export function clearLeaveGuard(guard: LeaveGuard): void {
+  if (activeGuard === guard) activeGuard = null;
+}
+
 // history.state survives a reload while module state doesn't, so the
 // counter alone can't tell a fresh push from a pre-reload entry whose
 // number happens to collide; the token scopes the stamp to this document.
@@ -140,7 +146,7 @@ export class PopLeaveGuardController implements ReactiveController {
   }
 
   hostDisconnected(): void {
-    setLeaveGuard(null);
+    clearLeaveGuard(this._guard);
     window.removeEventListener("popstate", this.handlePopState, { capture: true });
     this._allowingLeave = false;
   }

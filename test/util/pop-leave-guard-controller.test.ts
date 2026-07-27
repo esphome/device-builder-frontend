@@ -149,15 +149,26 @@ describe("PopLeaveGuardController", () => {
   });
 
   it("resets the allow flag when the host disconnects", async () => {
-    const first = connect();
+    const { host } = connect();
     await runLeaveGuard();
-    first.host.disconnect();
+    host.disconnect();
+    host.connect();
 
-    const second = connect();
     const e = popState();
     window.dispatchEvent(e);
-    // A fresh page must not inherit the previous page's answered leave.
+    // A remounted page must not inherit its previous mount's answered
+    // leave — the pop intercepts instead of falling through.
     expect(e.stopImmediatePropagation).toHaveBeenCalledTimes(1);
-    void second;
+  });
+
+  it("a departing controller doesn't disarm a successor's guard", async () => {
+    const first = connect();
+    const second = connect();
+    first.host.disconnect();
+
+    await expect(runLeaveGuard()).resolves.toBe(true);
+    // Ownership check: only the active guard's owner may clear it.
+    expect(second.confirm).toHaveBeenCalledTimes(1);
+    expect(first.confirm).not.toHaveBeenCalled();
   });
 });

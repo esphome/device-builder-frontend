@@ -456,7 +456,7 @@ export class ESPHomePageDevice extends LitElement {
    *  lets the logic be unit-tested in node without happy-dom. */
   private _unsavedGuard = new UnsavedGuard();
 
-  readonly _leaveGuard = new PopLeaveGuardController(this, {
+  protected readonly _leaveGuard = new PopLeaveGuardController(this, {
     confirmLeave: () => this._confirmLeave(),
     // Fails conservative via ``_sectionDirty`` (round pending) plus
     // ``lastFlushFailed`` (round settled as failed), same as beforeunload
