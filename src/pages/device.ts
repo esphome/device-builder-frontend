@@ -5,7 +5,7 @@ import { cache } from "lit/directives/cache.js";
 import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import { type ESPHomeAPI, isApiErrorCode } from "../api/index.js";
+import type { ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
@@ -57,7 +57,7 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
+import { ConfigLoadController } from "../util/config-load-controller.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -115,13 +115,6 @@ registerMdiIcons({
   "chevron-right": mdiChevronRight,
   menu: mdiMenu,
 });
-
-// The user is staring at a spinner, so the initial config fetch gets a
-// longer leash than the 10s command default: a big YAML over a degraded
-// link is slow, not broken. Attempts burn only while the socket is up
-// (``ready`` parks otherwise), so an outage never spends them.
-const LOAD_YAML_TIMEOUT_MS = 30_000;
-const LOAD_YAML_ATTEMPTS = 4;
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -224,7 +217,7 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_maybeResolveLineFromUrl`` once the YAML is loaded. Kept apart
    *  from ``_selectedFromLine`` — that field is durable section-instance
    *  state the URL round-trips, so parking the intent there would
-   *  re-derive focus on every later ``_loadYaml`` (board swap). */
+   *  re-derive focus on every later load (board swap). */
   private _pendingUrlLine?: number = this._readUrlLine();
 
   /** Instance-relative field path the YAML cursor is on, for the form to
@@ -343,8 +336,24 @@ export class ESPHomePageDevice extends LitElement {
    *  instead of an empty editor. A transport failure offers a retry;
    *  a NOT_FOUND config (deleted, renamed, stale bookmark) is terminal,
    *  so it routes back to the dashboard instead. */
-  @state()
-  private _yamlState: "loading" | "ready" | "error" | "missing" = "loading";
+  protected readonly _load = new ConfigLoadController(this, {
+    api: () => this._api,
+    connected: () => this._apiConnected,
+    configuration: () => this.id,
+    // The user is staring at a spinner, so the initial fetch gets a
+    // longer leash than the 10s command default: a big YAML over a
+    // degraded link is slow, not broken.
+    attempts: 4,
+    timeoutMs: 30_000,
+    commit: (yaml) => {
+      this._yaml = yaml;
+      this._savedYaml = yaml;
+    },
+    // Outside the failure path: a resolver throw must not repaint a
+    // loaded config as a load failure.
+    onReady: () => this._maybeResolveLineFromUrl(),
+    onApiError: (err) => (err.errorCode === ErrorCode.NOT_FOUND ? "missing" : undefined),
+  });
 
   @state()
   private _savedYaml = "";
@@ -633,16 +642,6 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   updated(changedProperties: Map<string, unknown>) {
-    // Socket is back: a load that gave up while it was down goes again
-    // without the user hunting for the Retry button. "missing" is a server
-    // answer, so it stays put.
-    if (
-      changedProperties.has("_apiConnected") &&
-      this._apiConnected &&
-      this._yamlState === "error"
-    ) {
-      this._retryLoadYaml();
-    }
     if (changedProperties.has("id") && this.id) {
       // Consume the wizard's "just-created" handoff once per id. Each
       // call to consumeJustCreated atomically reads + clears the flag,
@@ -668,7 +667,7 @@ export class ESPHomePageDevice extends LitElement {
       // YAML rides the reused element and Save writes it to this file.
       this._yaml = "";
       this._savedYaml = "";
-      void this._loadYaml();
+      void this._load.start();
     }
     // Devices context arrives async after connect; kick off the board
     // fetch as soon as we have a `board_id` (and re-fetch only when it
@@ -781,39 +780,6 @@ export class ESPHomePageDevice extends LitElement {
       }
     }
   }
-
-  /** Bumped per load; a superseded loop self-cancels via ``abandoned``,
-   *  so an a → b → a switch can't commit the first load's stale reply. */
-  private _loadGen = 0;
-
-  private async _loadYaml() {
-    const id = this.id;
-    const gen = ++this._loadGen;
-    this._yamlState = "loading";
-    let yaml: string | null;
-    try {
-      yaml = await loadConfigWithRecovery(this._api, id, {
-        // Unmount counts as abandoned too, or a slow load keeps fetching
-        // (and re-rendering) against a page that is already gone.
-        abandoned: () => !this.isConnected || this.id !== id || gen !== this._loadGen,
-        attempts: LOAD_YAML_ATTEMPTS,
-        timeoutMs: LOAD_YAML_TIMEOUT_MS,
-      });
-    } catch (e) {
-      console.error("Failed to load YAML:", e);
-      this._yamlState = isApiErrorCode(e, ErrorCode.NOT_FOUND) ? "missing" : "error";
-      return;
-    }
-    if (yaml === null) return;
-    this._yaml = yaml;
-    this._savedYaml = yaml;
-    this._yamlState = "ready";
-    // Outside the catch: a resolver throw must not repaint a loaded
-    // config as a load failure.
-    this._maybeResolveLineFromUrl();
-  }
-
-  private _retryLoadYaml = () => void this._loadYaml();
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.
@@ -1271,7 +1237,7 @@ export class ESPHomePageDevice extends LitElement {
         @yaml-draft=${this._onYamlDraft}
         @nav-collapse=${this._onNavCollapse}
       >
-        ${this._yamlState === "ready" ? this._renderNavigator("drawer-nav") : nothing}
+        ${this._load.state === "ready" ? this._renderNavigator("drawer-nav") : nothing}
       </div>
 
       <div class="page">
@@ -1279,7 +1245,7 @@ export class ESPHomePageDevice extends LitElement {
           class=${classMap({
             "layout-grid": true,
             "nav-collapsed": this._navCollapsed,
-            "load-state": this._yamlState !== "ready",
+            "load-state": this._load.state !== "ready",
           })}
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
@@ -1304,7 +1270,7 @@ export class ESPHomePageDevice extends LitElement {
           @update-device=${this._saveThenUpdate}
         >
           ${cache(
-            this._yamlState === "ready"
+            this._load.state === "ready"
               ? this._renderEditor(deviceTitle, showEdgeTab, backLabel)
               : this._renderLoadState()
           )}
@@ -1580,8 +1546,8 @@ export class ESPHomePageDevice extends LitElement {
   /** The editor's stand-in until the config lands. A gone config is
    *  terminal, so it offers a way out rather than a retry. */
   private _renderLoadState() {
-    const loading = this._yamlState === "loading";
-    const missing = this._yamlState === "missing";
+    const loading = this._load.state === "loading";
+    const missing = this._load.state === "missing";
     return renderAsyncState({
       loading,
       loadingMessage: this._localize("device.loading_config"),
@@ -1592,7 +1558,7 @@ export class ESPHomePageDevice extends LitElement {
       errorActions: () =>
         html`<wa-button
           size="small"
-          @click=${missing ? () => navigate("/") : this._retryLoadYaml}
+          @click=${missing ? () => navigate("/") : this._load.retry}
         >
           ${this._localize(missing ? "device.back_to_dashboard" : "command.retry")}
         </wa-button>`,

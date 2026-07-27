@@ -49,7 +49,11 @@ vi.mock("../../src/util/save-shortcut-controller.js", () => ({
  */
 
 interface PageView {
-  _loadState: "loading" | "ready" | "error";
+  _load: {
+    state: "loading" | "ready" | "error" | "missing";
+    start(): Promise<void>;
+    refresh(): Promise<void>;
+  };
   _yaml: string;
   _savedYaml: string;
   _saving: boolean;
@@ -57,7 +61,6 @@ interface PageView {
   _layout: "form" | "yaml";
   _readStoredLayout(): "form" | "yaml" | null;
   _seedLayoutFromBackend(): Promise<void>;
-  _loadFromServer(): Promise<void>;
   _setLayout(layout: "form" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _confirmLeave(): Promise<boolean>;
@@ -71,13 +74,19 @@ interface PageView {
   render(): unknown;
 }
 
-function makePage(overrides: Partial<PageView> = {}): PageView {
+function makePage(
+  overrides: Partial<PageView> & {
+    /** Routed into the load controller's public state field. */
+    _loadState?: "loading" | "ready" | "error";
+  } = {}
+): PageView {
+  const { _loadState, ...rest } = overrides;
   const page = new ESPHomePageSecrets() as unknown as PageView;
-  page._loadState = "loading";
+  page._load.state = _loadState ?? "loading";
   page._yaml = "";
   page._savedYaml = "";
   page._saving = false;
-  Object.assign(page, overrides);
+  Object.assign(page, rest);
   return page;
 }
 
@@ -311,7 +320,7 @@ describe("esphome-page-secrets initial load", () => {
 
     expect(page._yaml).not.toBe("");
     expect(page._savedYaml).toBe(page._yaml);
-    expect(page._loadState).toBe("ready");
+    expect(page._load.state).toBe("ready");
   });
 
   test("does not template over the real file on a non-not-found server error", async () => {
@@ -324,7 +333,7 @@ describe("esphome-page-secrets initial load", () => {
     // past the clear-all wipe confirm on the next save.
     expect(page._yaml).toBe("");
     expect(page._savedYaml).toBe("");
-    expect(page._loadState).toBe("error");
+    expect(page._load.state).toBe("error");
   });
 
   test("retries a transport failure instead of templating over the real file", async () => {
@@ -355,15 +364,15 @@ describe("esphome-page-secrets initial load", () => {
       .mockResolvedValueOnce("wifi_password: hunter2\n")
       .mockRejectedValueOnce(new APIError("internal_error", "boom"));
     const page = await mountWithApi(getConfig);
-    expect(page._loadState).toBe("ready");
+    expect(page._load.state).toBe("ready");
     vi.mocked(toast.error).mockClear();
 
-    await page._loadFromServer();
+    await page._load.refresh();
     await flushMicrotasks(8);
 
     // The content is still in memory; demoting to the error panel would
     // hide it behind an unnecessary Retry.
-    expect(page._loadState).toBe("ready");
+    expect(page._load.state).toBe("ready");
     expect(page._yaml).toBe("wifi_password: hunter2\n");
     expect(toast.error).toHaveBeenCalled();
   });
@@ -379,7 +388,7 @@ describe("esphome-page-secrets initial load", () => {
     // The wizard wrote secrets.yaml while the mount's read was in
     // flight; that reply predates the write, so a fresh read must win
     // and the stale one must be dropped even though it settles later.
-    void page._loadFromServer();
+    void page._load.refresh();
     settleFirst("wifi_password: stale\n");
     await flushMicrotasks(8);
 
@@ -399,14 +408,14 @@ describe("esphome-page-secrets initial load", () => {
       const page = await mountWithApi(getConfig);
       await vi.advanceTimersByTimeAsync(1500 * 4);
       await flushMicrotasks(8);
-      expect(page._loadState).toBe("error");
+      expect(page._load.state).toBe("error");
 
       getConfig.mockResolvedValueOnce("wifi_password: hunter2\n");
       (page as unknown as { _apiConnected: boolean })._apiConnected = true;
       (page as unknown as { requestUpdate(): void }).requestUpdate();
       await flushMicrotasks(8);
 
-      expect(page._loadState).toBe("ready");
+      expect(page._load.state).toBe("ready");
     } finally {
       vi.useRealTimers();
     }

@@ -109,7 +109,10 @@ describe("device page initial YAML loading gate", () => {
       () => new Promise<string>((resolve) => settlers.push(resolve))
     );
     const page = await mountPage(makeApi(getConfig));
-    const view = page as unknown as { _yaml: string; _yamlState: string };
+    const view = page as unknown as {
+      _yaml: string;
+      _load: { state: string };
+    };
 
     page.id = "porch.yaml";
     await page.updateComplete;
@@ -121,12 +124,12 @@ describe("device page initial YAML loading gate", () => {
     settlers[0]("esphome:\n  name: stale\n");
     await flushMicrotasks(8);
     expect(view._yaml).toBe("");
-    expect(view._yamlState).toBe("loading");
+    expect(view._load.state).toBe("loading");
 
     settlers[2]("esphome:\n  name: fresh\n");
     await flushMicrotasks(8);
     expect(view._yaml).toBe("esphome:\n  name: fresh\n");
-    expect(view._yamlState).toBe("ready");
+    expect(view._load.state).toBe("ready");
   });
 
   it("keeps the spinner and retries when the socket drops mid-fetch", async () => {
