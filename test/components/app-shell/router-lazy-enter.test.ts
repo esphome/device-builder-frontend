@@ -247,8 +247,9 @@ describe("lazyEnter", () => {
     await vi.advanceTimersByTimeAsync(500);
     await expect(result).resolves.toBe(false);
     expect(back).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(0);
+    // Replaced in place — no broken entry left underneath for Back.
     expect(window.location.pathname).toBe("/");
+    expect(window.history.state).toBeNull();
   });
 
   it("falls back to the dashboard when a deep link's chunk fails", async () => {
@@ -265,8 +266,8 @@ describe("lazyEnter", () => {
     await vi.advanceTimersByTimeAsync(500);
     await expect(result).resolves.toBe(false);
     expect(back).not.toHaveBeenCalled();
-    // The fallback lands on the dashboard instead of an empty outlet.
-    await vi.advanceTimersByTimeAsync(0);
+    // Replaced in place — no broken entry left underneath for Back.
     expect(window.location.pathname).toBe("/");
+    expect(window.history.state).toBeNull();
   });
 });

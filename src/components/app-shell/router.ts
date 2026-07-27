@@ -5,7 +5,6 @@ import { withBase } from "../../util/base-path.js";
 import {
   isFreshNavigatePush,
   isSameDocumentPush,
-  navigate,
   popPushedEntrySilently,
 } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
@@ -91,10 +90,14 @@ export async function lazyEnter(
           // already answered. A same-document Back/Forward entry is left
           // alone (popping would move the user a second step back). Any
           // other entry — cold deep link, reload — has nothing rendered
-          // behind it, so it falls back to the dashboard rather than an
-          // empty outlet.
+          // behind it, so it becomes the dashboard rather than an empty
+          // outlet. Replaced, not pushed: a push would leave the broken
+          // URL underneath as a Back-button fail loop.
           if (isFreshNavigatePush()) popPushedEntrySilently();
-          else if (!isSameDocumentPush()) void navigate("/");
+          else if (!isSameDocumentPush()) {
+            window.history.replaceState(null, "", withBase("/"));
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }
           return false;
         }
         await sleep(RETRY_DELAY_MS);

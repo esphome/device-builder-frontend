@@ -103,6 +103,32 @@ describe("device page initial YAML loading gate", () => {
     expect(view._savedYaml).toBe("");
   });
 
+  it("drops a stale reply when the id changes away and back mid-flight", async () => {
+    const settlers: Array<(yaml: string) => void> = [];
+    const getConfig = vi.fn(
+      () => new Promise<string>((resolve) => settlers.push(resolve))
+    );
+    const page = await mountPage(makeApi(getConfig));
+    const view = page as unknown as { _yaml: string; _yamlState: string };
+
+    page.id = "porch.yaml";
+    await page.updateComplete;
+    page.id = "kitchen.yaml";
+    await page.updateComplete;
+
+    // The first load's reply lands after the round trip; the id matches
+    // again, so only the generation tells it apart from the live load.
+    settlers[0]("esphome:\n  name: stale\n");
+    await flushMicrotasks(8);
+    expect(view._yaml).toBe("");
+    expect(view._yamlState).toBe("loading");
+
+    settlers[2]("esphome:\n  name: fresh\n");
+    await flushMicrotasks(8);
+    expect(view._yaml).toBe("esphome:\n  name: fresh\n");
+    expect(view._yamlState).toBe("ready");
+  });
+
   it("keeps the spinner and retries when the socket drops mid-fetch", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.useFakeTimers();

@@ -835,14 +835,19 @@ export class ESPHomePageDevice extends LitElement {
     }
   }
 
+  /** Bumped per load; a superseded loop self-cancels via ``abandoned``,
+   *  so an a → b → a switch can't commit the first load's stale reply. */
+  private _loadGen = 0;
+
   private async _loadYaml() {
     const id = this.id;
+    const gen = ++this._loadGen;
     this._yamlState = "loading";
     try {
       const yaml = await loadConfigWithRecovery(this._api, id, {
         // Unmount counts as abandoned too, or a slow load keeps fetching
         // (and re-rendering) against a page that is already gone.
-        abandoned: () => !this.isConnected || this.id !== id,
+        abandoned: () => !this.isConnected || this.id !== id || gen !== this._loadGen,
         attempts: LOAD_YAML_ATTEMPTS,
         timeoutMs: LOAD_YAML_TIMEOUT_MS,
       });
