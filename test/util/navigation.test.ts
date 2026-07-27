@@ -21,12 +21,11 @@
  * The MasterOfNone bug (Discard does nothing on the in-app Back
  * button while the visual editor's Save left ``_isDirty=true``)
  * traced to the synthetic popstate that ``navigate()`` fires
- * being re-intercepted by the device-page's popstate guard. The
- * fix landed in ``pages/device.ts`` (``_onLeaveDiscard`` /
- * ``_onLeaveSave`` flip ``_allowingLeave=true`` before resolving),
- * but the tests here pin the underlying ``navigate`` contract so
- * a future refactor that drops the synthetic popstate or skips
- * the guard surfaces immediately.
+ * being re-intercepted by the page's popstate guard. That guard
+ * (now ``PopLeaveGuardController``) sets its allow flag before the
+ * guard Promise resolves, but the tests here pin the underlying
+ * ``navigate`` contract so a future refactor that drops the
+ * synthetic popstate or skips the guard surfaces immediately.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -124,10 +123,9 @@ describe("navigate", () => {
     // Mirrors the Discard-from-unsaved-changes-dialog flow: the
     // page's guard opens a dialog, the user clicks Discard, the
     // dialog resolves the Promise to true, and ``navigate`` then
-    // pushes the new URL synchronously. The device-page popstate
-    // listener is supposed to short-circuit on the synthetic
-    // popstate that follows (via ``_allowingLeave``), which is
-    // the bit the MasterOfNone bug missed.
+    // pushes the new URL synchronously. PopLeaveGuardController
+    // short-circuits on the synthetic popstate that follows (its
+    // allow flag), which is the bit the MasterOfNone bug missed.
     const guard = vi.fn(() => Promise.resolve(true));
     setLeaveGuard(guard);
 

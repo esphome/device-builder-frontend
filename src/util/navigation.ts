@@ -43,7 +43,7 @@ export async function runLeaveGuard(): Promise<boolean> {
 /** True when the current entry carries a non-null object state (a
  *  ``navigate()`` stamp or a guard's re-push) rather than a fresh page
  *  load, so there is a same-session entry to pop back to. */
-export function hasPushedHistoryEntry(): boolean {
+function hasPushedHistoryEntry(): boolean {
   return window.history.state !== null && typeof window.history.state === "object";
 }
 
@@ -81,7 +81,8 @@ export function popPushedEntrySilently(): void {
   window.history.back();
 }
 
-/** One-shot check page popstate guards consume before intercepting. */
+/** One-shot check the pop-guard controller consumes before intercepting.
+ *  Exported for tests; production consumers live in this module. */
 export function consumePopGuardSuppression(): boolean {
   const suppressed = popGuardSuppressed;
   popGuardSuppressed = false;
