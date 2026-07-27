@@ -34,7 +34,7 @@ interface EscapeView {
   } | null;
   _onKeydown(e: KeyboardEvent): void;
   _onBeforeUnload(e: BeforeUnloadEvent): void;
-  _onPopState(e: PopStateEvent): void;
+  _leaveGuard: { handlePopState(e: PopStateEvent): void };
   _onUnsavedDiscard(): void;
   _onUnsavedCancel(): void;
   _confirmLeave(): Promise<boolean>;
@@ -393,7 +393,7 @@ describe("leave guard flush ordering (#1503)", () => {
     page._activeSection = section;
 
     const stopImmediatePropagation = vi.fn();
-    page._onPopState({
+    page._leaveGuard.handlePopState({
       stopImmediatePropagation,
     } as unknown as PopStateEvent);
     await flush();

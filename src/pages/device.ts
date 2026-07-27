@@ -51,7 +51,6 @@ import {
   resolveBackendErrors,
   type BackendFieldError,
 } from "../util/backend-field-errors.js";
-import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
 import { applyBoardChange, openBoardReselect } from "../util/board-change.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
@@ -60,12 +59,7 @@ import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { renderAsyncState } from "../util/render-async-state.js";
-import {
-  consumePopGuardSuppression,
-  goBackOrHome,
-  navigate,
-  setLeaveGuard,
-} from "../util/navigation.js";
+import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isTypingTarget } from "../util/typing-target.js";
@@ -462,8 +456,18 @@ export class ESPHomePageDevice extends LitElement {
    *  lets the logic be unit-tested in node without happy-dom. */
   private _unsavedGuard = new UnsavedGuard();
 
-  /** When true, the next popstate is allowed to fall through to the router. */
-  private _allowingLeave = false;
+  readonly _leaveGuard = new PopLeaveGuardController(this, {
+    confirmLeave: () => this._confirmLeave(),
+    // Fails conservative via ``_sectionDirty`` (round pending) plus
+    // ``lastFlushFailed`` (round settled as failed), same as beforeunload
+    // (#1503); the flush kick rides here so it runs only for a real
+    // leave, after the controller's suppression checks.
+    isDirty: () => {
+      this._kickSectionFlush();
+      return this._isDirty || (this._activeSection?.lastFlushFailed ?? false);
+    },
+    url: () => `/device/${this.id}`,
+  });
 
   private get _isYamlDirty(): boolean {
     return this._yaml !== this._savedYaml;
@@ -494,29 +498,6 @@ export class ESPHomePageDevice extends LitElement {
     return this._isYamlDirty || this._sectionDirty;
   }
 
-  /* ``_allowingLeave`` is flipped BEFORE the guard Promise
-   * resolves so the page-leave callers see a coherent state on
-   * the next microtask:
-   *
-   *   - The browser-back path ``.then``s on the resolved
-   *     Promise and calls ``history.back()`` itself.
-   *   - ``navigate()`` (in-app Back / logo click) on
-   *     ``canLeave=true`` does ``pushState + dispatchEvent(popstate)``
-   *     synchronously. That synthetic popstate would otherwise
-   *     be re-intercepted by ``_onPopState`` (because ``_isDirty``
-   *     stays true — Discard doesn't revert the buffer) and
-   *     bounced back to the device URL, leaving the user stuck.
-   *     Flipping the flag here short-circuits that.
-   *
-   * The flip happens inside the page-leave save lambda (so it
-   * lands synchronously before the guard's resolve when the
-   * user picks Save) and again in ``_confirmLeave`` after the
-   * await (so it covers the Discard path too — Discard doesn't
-   * route through the save lambda). The redundant write on Save
-   * is idempotent. The section-switch guard never sets the flag
-   * — its ``save`` returns to the page synchronously after the
-   * await without leaving the page.
-   */
   private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
   private _onUnsavedSave = () => this._unsavedGuard.onSave();
   private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
@@ -584,11 +565,9 @@ export class ESPHomePageDevice extends LitElement {
           notifyError(this._localize("device.leave_last_change_unsaved"));
           return false;
         }
-        this._allowingLeave = true;
         return true;
       },
     });
-    if (ok) this._allowingLeave = true;
     return ok;
   };
 
@@ -606,49 +585,17 @@ export class ESPHomePageDevice extends LitElement {
     }
   };
 
-  private _onPopState = (e: PopStateEvent) => {
-    // A failed route chunk rolling back its own push is a return to
-    // this page, not a leave.
-    if (consumePopGuardSuppression()) return;
-    if (this._allowingLeave) {
-      this._allowingLeave = false;
-      return;
-    }
-    // Synchronous by contract (the popped entry must be re-pushed
-    // in the same task); the dirty pre-check fails conservative via
-    // ``_sectionDirty`` (round pending) plus ``lastFlushFailed``
-    // (round settled as failed), same as beforeunload (#1503).
-    this._kickSectionFlush();
-    if (!this._isDirty && !this._activeSection?.lastFlushFailed) return;
-    e.stopImmediatePropagation();
-    window.history.pushState({}, "", withBase(`/device/${this.id}`));
-    this._confirmLeave()
-      .then((canLeave) => {
-        if (canLeave) {
-          this._allowingLeave = true;
-          window.history.back();
-        }
-      })
-      // The entry was already re-pushed, so staying put is the
-      // fail-safe on an unexpected guard failure.
-      .catch((err) => console.error("Leave confirmation failed:", err));
-  };
-
   async connectedCallback() {
     super.connectedCallback();
     void this._loadPreferences();
-    setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
-    window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener("keydown", this._onKeydown);
     this._mql.addEventListener("change", this._onMqlChange);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
-    window.removeEventListener("popstate", this._onPopState, { capture: true });
     window.removeEventListener("keydown", this._onKeydown);
     this._mql.removeEventListener("change", this._onMqlChange);
     // Drop any in-flight unsaved-changes guard so its caller's
