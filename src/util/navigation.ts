@@ -28,13 +28,11 @@ export async function navigate(url: string): Promise<void> {
 }
 
 /**
- * Run the active page-leave guard. Resolves ``true`` when it's safe to leave
- * (no guard, or the guard resolved "proceed"). Used by ``navigate`` and by
- * the header back arrow's ``history.back()``, which prompts before the pop
- * rather than leaving it to the popstate interceptor's after-the-pop
- * re-push. A guard that throws resolves ``false``: navigating through
- * unsaved state on a broken guard would lose it silently, so staying put
- * is the fail-safe.
+ * Run the active page-leave guard. Resolves ``true`` when it's safe to
+ * leave (no guard, or the guard resolved "proceed"). Used by ``navigate``
+ * and by ``goBackOrHome``. A guard that throws resolves ``false``:
+ * navigating through unsaved state on a broken guard would lose it
+ * silently, so staying put is the fail-safe.
  */
 export async function runLeaveGuard(): Promise<boolean> {
   if (!activeGuard) return true;
@@ -107,34 +105,32 @@ export interface PopLeaveGuardOptions {
 }
 
 let activeLeaveGuardController: PopLeaveGuardController | null = null;
-let interceptorInstalled = false;
 
 function claimPopstateDelivery(controller: PopLeaveGuardController): void {
   activeLeaveGuardController = controller;
 }
 
-/** Release only while *controller* still holds delivery — a departing
- *  page must not disarm a successor that already claimed it. */
+/** Ownership check, as in ``clearLeaveGuard``. */
 function releasePopstateDelivery(controller: PopLeaveGuardController): void {
   if (activeLeaveGuardController === controller) activeLeaveGuardController = null;
 }
 
+const popstateInterceptor = (e: PopStateEvent) =>
+  activeLeaveGuardController?.handlePopState(e);
+
 /**
  * Install the single popstate listener that delivers to the active
- * ``PopLeaveGuardController``. Must run before the router is constructed:
- * popstate targets ``window``, where listeners fire in registration order
- * (the capture flag confers no priority), so registering ahead of the
- * router's listener is the only way an interception can veto the
- * router's route commit (#1520). Idempotent.
+ * ``PopLeaveGuardController``. Must run before the router registers its
+ * own popstate listener: popstate targets ``window``, where listeners
+ * fire in registration order (the capture flag confers no priority), so
+ * registering ahead of the router's is the only way an interception can
+ * veto the route commit (#1520). Idempotent — the DOM dedupes an
+ * identical (type, listener, capture) triple. ``capture`` matches the
+ * module's transient rollback drain so the interceptor never sorts
+ * behind it in environments that order capture-first at target.
  */
 export function installLeaveGuardInterceptor(): void {
-  if (interceptorInstalled) return;
-  interceptorInstalled = true;
-  window.addEventListener(
-    "popstate",
-    (e) => activeLeaveGuardController?.handlePopState(e),
-    { capture: true }
-  );
+  window.addEventListener("popstate", popstateInterceptor, { capture: true });
 }
 
 /**
@@ -142,8 +138,7 @@ export function installLeaveGuardInterceptor(): void {
  * re-asserts the page URL, runs the confirm flow, and replays the pop on
  * proceed. Registers the confirm flow as the active leave guard for the
  * host's connected lifetime; popstate delivery arrives through the
- * module's single interceptor, which registers ahead of the router so
- * ``stopImmediatePropagation`` genuinely blocks the route commit.
+ * module interceptor.
  */
 export class PopLeaveGuardController implements ReactiveController {
   /* The allow flag is flipped inside the wrapped guard BEFORE its caller
@@ -153,6 +148,7 @@ export class PopLeaveGuardController implements ReactiveController {
    *
    *   - ``navigate()`` on ``canLeave=true`` does ``pushState +
    *     dispatchEvent(popstate)`` synchronously after the guard resolves.
+   *   - ``goBackOrHome()`` calls ``history.back()`` after the guard.
    *   - The intercepted-pop replay below calls ``history.back()``.
    *
    * Microtasks run to completion, so no popstate task can interleave
@@ -184,7 +180,8 @@ export class PopLeaveGuardController implements ReactiveController {
     this._allowingLeave = false;
   }
 
-  readonly handlePopState = (e: PopStateEvent) => {
+  /** Called by the module interceptor for every window popstate. */
+  handlePopState(e: PopStateEvent): void {
     // A failed route chunk rolling back its own push is a return to the
     // page, not a leave.
     if (consumePopGuardSuppression()) return;
@@ -206,7 +203,7 @@ export class PopLeaveGuardController implements ReactiveController {
       // The entry was already re-pushed, so staying put is the fail-safe
       // on an unexpected guard failure.
       .catch((err) => console.error("Leave confirmation failed:", err));
-  };
+  }
 }
 
 /**
@@ -220,10 +217,9 @@ export class PopLeaveGuardController implements ReactiveController {
 export async function goBackOrHome(): Promise<void> {
   if (hasPushedHistoryEntry()) {
     // Prompt before popping: the user answers while the URL still shows
-    // their page. The popstate interceptor would catch a raw back too,
-    // but only after the pop, via re-push; and the allow flag the guard
-    // sets lets this pop fall through it. navigate("/") runs the guard
-    // itself, so the fallback isn't double-prompted.
+    // their page, rather than through the interceptor's after-the-pop
+    // re-push. navigate("/") runs the guard itself, so the fallback
+    // isn't double-prompted.
     if (!(await runLeaveGuard())) return;
     window.history.back();
     return;

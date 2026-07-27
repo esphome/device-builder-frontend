@@ -10,15 +10,15 @@ import {
 } from "../../src/util/navigation.js";
 import { flushMicrotasks } from "../_dom.js";
 
+/**
+ * Pins the centralized popstate leave-guard: suppression first, one-shot
+ * allow fall-through, dirty intercept with same-task re-push, replay only
+ * on confirm, and interception ordering ahead of the router's listener.
+ */
+
 // Production installs this in createRouter, before the router's own
 // popstate listener registers; delivery to the controller runs through it.
 installLeaveGuardInterceptor();
-
-/**
- * Pins the centralized popstate leave-guard: suppression first, one-shot
- * allow fall-through, dirty intercept with same-task re-push, and replay
- * only on confirm.
- */
 
 class FakeHost {
   private _controllers: ReactiveController[] = [];
@@ -175,10 +175,13 @@ describe("PopLeaveGuardController", () => {
     // Ownership check: only the active guard's owner may clear it.
     expect(second.confirm).toHaveBeenCalledTimes(1);
     expect(first.confirm).not.toHaveBeenCalled();
+  });
 
-    // The answered guard's own pop falls through; the next one shows
-    // popstate delivery follows the successor too.
-    window.dispatchEvent(popState());
+  it("delivers popstate to the successor controller", () => {
+    const first = connect();
+    const second = connect();
+    first.host.disconnect();
+
     window.dispatchEvent(popState());
     expect(second.dirty).toHaveBeenCalledTimes(1);
     expect(first.dirty).not.toHaveBeenCalled();

@@ -632,10 +632,7 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = false;
       return;
     }
-    /* Otherwise leave the editor via the header back arrow's guarded
-       path, which prompts before the pop — nicer than a raw
-       history.back(), which the popstate interceptor would catch only
-       after the URL changed, via re-push. */
+    // Otherwise leave via goBackOrHome(), which prompts before the pop.
     e.preventDefault();
     void goBackOrHome();
   };

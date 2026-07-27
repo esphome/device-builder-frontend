@@ -141,9 +141,7 @@ export function createRouter(
   host: ReactiveControllerHost & HTMLElement,
   hooks: RouterHooks
 ): Router {
-  // Before the Router exists: its popstate listener must register after
-  // the leave-guard interceptor's, or a dirty Back commits the route
-  // change ahead of the guard's veto (#1520).
+  // Ordering is load-bearing; see installLeaveGuardInterceptor's doc.
   installLeaveGuardInterceptor();
   return new Router(host, [
     {
