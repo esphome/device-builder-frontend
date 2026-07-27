@@ -212,9 +212,9 @@ describe("navigate", () => {
 /**
  * ``runLeaveGuard`` is the guard-only gate for back-navigations that bypass
  * ``navigate()`` but must still honour the leave guard — the header back
- * arrow's ``history.back()``, whose raw popstate the router commits before the
- * device editor's own popstate guard can veto it. It must mirror the gating
- * half of ``navigate()`` without touching history.
+ * arrow's ``history.back()``, which prompts before the pop rather than
+ * relying on the interceptor's after-the-pop re-push. It must mirror the
+ * gating half of ``navigate()`` without touching history.
  */
 describe("runLeaveGuard", () => {
   afterEach(() => {
@@ -287,9 +287,9 @@ describe("runLeaveGuard", () => {
 
 /**
  * ``goBackOrHome`` is the shared header-back-arrow / Escape-key leave path.
- * It must run the guard BEFORE ``history.back()`` — issue
- * esphome/device-builder#2259 was Escape calling raw ``history.back()`` and
- * losing the dirty buffer to the router's popstate listener.
+ * It must run the guard BEFORE ``history.back()`` — prompting while the URL
+ * still shows the page (issue esphome/device-builder#2259 was Escape calling
+ * raw ``history.back()`` and losing the buffer in the pre-interceptor era).
  */
 describe("goBackOrHome", () => {
   let pushStateSpy: ReturnType<typeof vi.fn>;

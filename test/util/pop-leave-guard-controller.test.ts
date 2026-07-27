@@ -223,10 +223,22 @@ describe("PopLeaveGuardController", () => {
   it("installs the interceptor once", () => {
     installLeaveGuardInterceptor();
     installLeaveGuardInterceptor();
-    const { dirty } = connect();
+    // Clean pop: nothing stops propagation, so a duplicate listener
+    // would consult the dirty check twice.
+    const { dirty } = connect({ dirty: () => false });
 
     window.dispatchEvent(popState());
-    // A duplicate listener would double-consult the dirty check.
     expect(dirty).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases delivery when the last controller disconnects", () => {
+    const { host, dirty } = connect();
+    host.disconnect();
+
+    const e = popState();
+    window.dispatchEvent(e);
+    // A stale slot would veto dashboard pops with an unmounted page.
+    expect(dirty).not.toHaveBeenCalled();
+    expect(e.stopImmediatePropagation).not.toHaveBeenCalled();
   });
 });
