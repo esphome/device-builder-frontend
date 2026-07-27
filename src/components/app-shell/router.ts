@@ -2,7 +2,12 @@ import { Router } from "@lit-labs/router";
 import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
-import { hasPushedHistoryEntry, popPushedEntrySilently } from "../../util/navigation.js";
+import {
+  hasPushedHistoryEntry,
+  isFreshNavigatePush,
+  navigate,
+  popPushedEntrySilently,
+} from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { sleep } from "../../util/sleep.js";
 
@@ -68,12 +73,15 @@ export async function lazyEnter(
         if (attempt >= CHUNK_LOAD_ATTEMPTS) {
           console.error("Failed to load route chunk:", err);
           notifyError(hooks.localize()("layout.page_load_failed"));
-          // navigate() pushed this URL before the router ran enter, and a
-          // false return leaves the old page rendered; undo the push so the
-          // address bar doesn't describe a page that never mounted. Silent,
-          // or the still-mounted page's popstate guard re-prompts over a
-          // leave the user already answered at navigate() time.
-          if (hasPushedHistoryEntry()) popPushedEntrySilently();
+          // A fresh navigate() push is undone so the address bar doesn't
+          // describe a page that never mounted — silently, or the still-
+          // mounted page's popstate guard re-prompts over a leave the user
+          // already answered. A Back/Forward entry is left alone (popping
+          // would move the user a second step back), and a cold deep link
+          // has nothing to undo, so it falls back to the dashboard rather
+          // than an empty outlet.
+          if (isFreshNavigatePush()) popPushedEntrySilently();
+          else if (!hasPushedHistoryEntry()) void navigate("/");
           return false;
         }
         await sleep(RETRY_DELAY_MS);

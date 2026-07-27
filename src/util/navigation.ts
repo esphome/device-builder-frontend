@@ -8,9 +8,11 @@ export function setLeaveGuard(guard: LeaveGuard | null): void {
   activeGuard = guard;
 }
 
+let pushCounter = 0;
+
 export async function navigate(url: string): Promise<void> {
   if (!(await runLeaveGuard())) return;
-  window.history.pushState({}, "", withBase(url));
+  window.history.pushState({ n: ++pushCounter }, "", withBase(url));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
@@ -33,10 +35,19 @@ export async function runLeaveGuard(): Promise<boolean> {
   }
 }
 
-/** True when the current entry came from ``navigate()`` (which stamps
- *  ``{}``) rather than a fresh page load, so there is something to pop. */
+/** True when the current entry came from ``navigate()`` (which stamps a
+ *  state object) rather than a fresh page load, so there is something to
+ *  pop. */
 export function hasPushedHistoryEntry(): boolean {
   return window.history.state !== null && typeof window.history.state === "object";
+}
+
+/** True when the current entry is the latest ``navigate()`` push — just
+ *  pushed by the click being handled, so undoing it is safe. False for
+ *  an entry reached via Back/Forward or a fresh page load. */
+export function isFreshNavigatePush(): boolean {
+  const state = window.history.state as { n?: number } | null;
+  return typeof state?.n === "number" && state.n === pushCounter;
 }
 
 let popGuardSuppressed = false;
@@ -67,7 +78,7 @@ export function consumePopGuardSuppression(): boolean {
  * Leave the current page the way the header back arrow does. Prefer popping
  * the history stack so the previous URL — and therefore the dashboard's
  * filter / search state encoded in its query string — is restored verbatim.
- * ``history.state`` is set to ``{}`` by ``navigate()`` on every pushState;
+ * ``history.state`` is stamped by ``navigate()`` on every pushState;
  * ``null`` means a fresh page load (deep link / refresh) so there's nothing
  * useful to pop and we fall back to ``navigate("/")`` to stay inside the SPA.
  */

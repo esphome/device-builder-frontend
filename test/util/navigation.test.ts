@@ -80,7 +80,11 @@ describe("navigate", () => {
     await navigate("/dashboard");
 
     expect(pushStateSpy).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/dashboard");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { n: expect.any(Number) },
+      "",
+      "/dashboard"
+    );
     const popstateCalls = dispatchSpy.mock.calls.filter(
       (call) => (call[0] as Event).type === "popstate"
     );
@@ -129,7 +133,7 @@ describe("navigate", () => {
 
     await navigate("/");
 
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
     const popstateCalls = dispatchSpy.mock.calls.filter(
       (call) => (call[0] as Event).type === "popstate"
     );
@@ -144,7 +148,11 @@ describe("navigate", () => {
     await navigate("/dashboard");
 
     expect(guard).not.toHaveBeenCalled();
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/dashboard");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { n: expect.any(Number) },
+      "",
+      "/dashboard"
+    );
   });
 
   it("uses the latest registered guard when multiple are set in sequence", async () => {
@@ -161,7 +169,7 @@ describe("navigate", () => {
 
     expect(stale).not.toHaveBeenCalled();
     expect(fresh).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
   });
 
   it("awaits an asynchronous guard before pushing state", async () => {
@@ -187,7 +195,11 @@ describe("navigate", () => {
     resolveGuard?.(true);
     await navPromise;
 
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/dashboard");
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      { n: expect.any(Number) },
+      "",
+      "/dashboard"
+    );
   });
 });
 
@@ -345,7 +357,7 @@ describe("goBackOrHome", () => {
     expect(backSpy).not.toHaveBeenCalled();
     // navigate() owns the guard on this branch — exactly one prompt.
     expect(guard).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/");
+    expect(pushStateSpy).toHaveBeenCalledWith({ n: expect.any(Number) }, "", "/");
   });
 
   it("fallback navigation honours a blocking guard", async () => {

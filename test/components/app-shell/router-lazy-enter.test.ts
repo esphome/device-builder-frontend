@@ -8,7 +8,7 @@ vi.mock("sonner-js", () => ({
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { lazyEnter, type RouterHooks } from "../../../src/components/app-shell/router.js";
-import { consumePopGuardSuppression } from "../../../src/util/navigation.js";
+import { consumePopGuardSuppression, navigate } from "../../../src/util/navigation.js";
 import { identityLocalize } from "../../_dom.js";
 
 /**
@@ -159,6 +159,8 @@ describe("lazyEnter", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { pendingCalls, hooks } = makeHooks();
+    // The click's own navigate() push is the entry the rollback undoes.
+    await navigate("/device/kitchen.yaml");
     const importThunk = vi.fn().mockRejectedValue(new Error("chunk load failed"));
     const result = lazyEnter(importThunk, hooks);
 
@@ -179,6 +181,7 @@ describe("lazyEnter", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { hooks } = makeHooks();
+    await navigate("/device/kitchen.yaml");
     const result = lazyEnter(
       vi.fn().mockRejectedValue(new Error("chunk load failed")),
       hooks
@@ -189,5 +192,41 @@ describe("lazyEnter", () => {
     // The still-mounted page's guard consumes this and lets the rollback
     // popstate through instead of re-prompting a leave already answered.
     expect(consumePopGuardSuppression()).toBe(true);
+  });
+
+  it("leaves a Back/Forward entry alone when its chunk fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { hooks } = makeHooks();
+    // beforeEach's raw pushState models an entry the triggering click did
+    // not push — the user arrived here via Back/Forward.
+    const result = lazyEnter(
+      vi.fn().mockRejectedValue(new Error("chunk load failed")),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(result).resolves.toBe(false);
+    // Popping would move the user a second step back.
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the dashboard when a deep link's chunk fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { hooks } = makeHooks();
+    // A cold deep link has no navigate() stamp and nothing to undo.
+    window.history.pushState(null, "", "/device/kitchen.yaml");
+    const result = lazyEnter(
+      vi.fn().mockRejectedValue(new Error("chunk load failed")),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(result).resolves.toBe(false);
+    expect(back).not.toHaveBeenCalled();
+    // The fallback lands on the dashboard instead of an empty outlet.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.location.pathname).toBe("/");
   });
 });

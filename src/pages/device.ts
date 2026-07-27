@@ -1947,9 +1947,8 @@ export class ESPHomePageDevice extends LitElement {
       rebased = null;
     }
     // The device switched mid-recompute: the continuation (and its
-    // toast) belongs to the previous device. ``_loadYaml`` doesn't
-    // clear ``_yaml`` before its fetch, so the buffer guard below
-    // can't catch this window.
+    // toast) belongs to the previous device. Bail before the buffer
+    // comparison below can route it to the superseded toast.
     if (detail.configuration !== this.id) return;
     // Land the re-base only if the pane didn't move again while it
     // was computed — stale coordinates no longer apply.
