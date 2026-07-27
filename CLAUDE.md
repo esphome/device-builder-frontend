@@ -180,7 +180,7 @@ for the full flow. The load-bearing rules:
   prunes it from Lokalise). No legacy keys retained.
 - **Transport copy never says "wireless".** Devices run Ethernet
   and Thread too, so "wireless logs" / "installed wirelessly"
-  misdescribes them; say "over the network" (or OTA where the
+  misdescribe them; say "over the network" (or OTA where the
   surrounding UI already uses it). Outside contributors have had
   to correct this twice (#1409, #1521), both times for a string
   that shipped inside an unrelated PR. Key *names* are frozen API
