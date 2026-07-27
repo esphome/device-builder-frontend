@@ -6,14 +6,16 @@ import {
   mdiEyeOff,
   mdiFormTextbox,
 } from "@mdi/js";
-import { html, LitElement } from "lit";
+import { html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { apiErrorDetails } from "../api/api-error.js";
+import { apiErrorDetails, isApiErrorCode } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import {
@@ -21,9 +23,11 @@ import {
   secretsLayoutToPref,
   type SecretsLayout,
 } from "../util/editor-layout.js";
-import { setLeaveGuard } from "../util/navigation.js";
+import { consumePopGuardSuppression, setLeaveGuard } from "../util/navigation.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
@@ -47,6 +51,10 @@ registerMdiIcons({
 
 const SECRETS_FILE = "secrets.yaml";
 
+// Transport attempts before the load surfaces as an error the user can
+// retry; attempts are only spent while the socket is up.
+const LOAD_ATTEMPTS = 4;
+
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
 
@@ -59,6 +67,11 @@ export class ESPHomePageSecrets extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
+  /** WS liveness; the false→true edge re-runs a load that gave up. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
+
   @state()
   private _yaml = "";
 
@@ -69,7 +82,11 @@ export class ESPHomePageSecrets extends LitElement {
   private _saving = false;
 
   @state()
-  private _loaded = false;
+  private _loadState: "loading" | "ready" | "error" = "loading";
+
+  /** Bumped per load; a superseded loop self-cancels via ``abandoned``,
+   *  so a fresh read (external save) never settles on a stale reply. */
+  private _loadGen = 0;
 
   // Mirrors the device editor's per-field reveal toggle. Default
   // hidden so values render as bullets the moment the page paints —
@@ -124,6 +141,18 @@ export class ESPHomePageSecrets extends LitElement {
       this._onExternalSecretsSaved as EventListener
     );
     await this._loadFromServer();
+  }
+
+  protected updated(changed: PropertyValues) {
+    // Socket is back: a load that gave up while it was down goes again
+    // without the user hunting for the Retry button.
+    if (
+      changed.has("_apiConnected") &&
+      this._apiConnected &&
+      this._loadState === "error"
+    ) {
+      void this._loadFromServer();
+    }
   }
 
   private _readStoredLayout(): SecretsLayout | null {
@@ -200,6 +229,9 @@ export class ESPHomePageSecrets extends LitElement {
   // bypassing ``navigate``; re-assert our URL and run the guard, then replay
   // the back once the user has decided.
   private _onPopState = (e: PopStateEvent) => {
+    // A failed route chunk rolling back its own push is a return to
+    // this page, not a leave.
+    if (consumePopGuardSuppression()) return;
     if (this._allowingLeave) {
       this._allowingLeave = false;
       return;
@@ -219,21 +251,50 @@ export class ESPHomePageSecrets extends LitElement {
   private _onUnsavedSave = () => this._unsavedGuard.onSave();
   private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
-  /** Pull `secrets.yaml` from the server and reset both buffers.
-   *  On read error (file missing) seeds the editor with the
-   *  localized header so the user has a starting point. */
-  private async _loadFromServer() {
+  /**
+   * Pull `secrets.yaml` from the server and reset both buffers.
+   *
+   * Only a NOT_FOUND reply seeds the localized header template. Any other
+   * failure leaves the buffers empty behind the error state: an editable
+   * blank buffer would parse to zero entries, which slips past the
+   * clear-all wipe confirm and lets the next save replace a file that is
+   * still intact on disk.
+   */
+  private async _loadFromServer(): Promise<void> {
+    const gen = ++this._loadGen;
+    if (this._loadState === "error") this._loadState = "loading";
+    let yaml: string | null;
     try {
-      const yaml = await this._api.getConfig(SECRETS_FILE);
-      this._yaml = yaml;
-      this._savedYaml = yaml;
-    } catch {
-      const yaml = this._localize("secrets.file_header");
-      this._yaml = yaml;
-      this._savedYaml = yaml;
+      yaml = await loadConfigWithRecovery(this._api, SECRETS_FILE, {
+        abandoned: () => !this.isConnected || gen !== this._loadGen,
+        attempts: LOAD_ATTEMPTS,
+      });
+    } catch (err) {
+      if (isApiErrorCode(err, ErrorCode.NOT_FOUND)) {
+        // First run: no secrets.yaml yet, so offer the header as a start.
+        yaml = this._localize("secrets.file_header");
+      } else {
+        console.error("Failed to load secrets.yaml:", err);
+        // A reload over a rendered buffer keeps the content on screen
+        // and surfaces the staleness; only a load with nothing behind
+        // it gets the error panel.
+        if (this._loadState === "ready") {
+          notifyError(this._localize("secrets.reload_failed"));
+        } else {
+          this._loadState = "error";
+        }
+        return;
+      }
     }
-    this._loaded = true;
+    // Null means the page is gone or a newer load took over; leave the
+    // buffers to it.
+    if (yaml === null) return;
+    this._yaml = yaml;
+    this._savedYaml = yaml;
+    this._loadState = "ready";
   }
+
+  private _retryLoad = () => void this._loadFromServer();
 
   /** Another component (typically the onboarding wizard) just
    *  wrote `secrets.yaml`. Reload from the server so the editor
@@ -248,7 +309,7 @@ export class ESPHomePageSecrets extends LitElement {
     void this._loadFromServer();
   };
 
-  static styles = [espHomeStyles, secretsStyles];
+  static styles = [espHomeStyles, loadMessageStyles, secretsStyles];
 
   protected render() {
     const revealLabel = this._localize(
@@ -299,41 +360,48 @@ export class ESPHomePageSecrets extends LitElement {
           </button>
         </div>
         <div class="editor-card">
-          ${
-            this._loaded
-              ? html`
-                  <button
-                    type="button"
-                    class="save-button"
-                    ?disabled=${this._saving || this._yaml === this._savedYaml}
-                    @click=${this._save}
-                  >
-                    <wa-icon library="mdi" name="content-save"></wa-icon>
-                    ${
-                      this._saving
-                        ? this._localize("secrets.saving")
-                        : this._localize("secrets.save")
-                    }
-                  </button>
-                  <div class="editor-pane">
-                    ${
-                      this._layout === "form"
-                        ? html`<esphome-secrets-structured-editor
-                            .value=${this._yaml}
-                            .revealSensitive=${this._revealSensitive}
-                            @yaml-change=${this._onYamlChange}
-                          ></esphome-secrets-structured-editor>`
-                        : html`<esphome-yaml-editor
-                            .value=${this._yaml}
-                            .maskAllValues=${true}
-                            .revealSensitive=${this._revealSensitive}
-                            @yaml-change=${this._onYamlChange}
-                          ></esphome-yaml-editor>`
-                    }
-                  </div>
-                `
-              : html`<div class="loading"><wa-spinner></wa-spinner></div>`
-          }
+          ${renderAsyncState({
+            loading: this._loadState === "loading",
+            loadingMessage: this._localize("secrets.loading"),
+            loadingLead: html`<wa-spinner></wa-spinner>`,
+            error:
+              this._loadState === "error" ? this._localize("secrets.load_failed") : null,
+            errorActions: () =>
+              html`<wa-button size="small" @click=${this._retryLoad}>
+                ${this._localize("command.retry")}
+              </wa-button>`,
+            content: () => html`
+              <button
+                type="button"
+                class="save-button"
+                ?disabled=${this._saving || this._yaml === this._savedYaml}
+                @click=${this._save}
+              >
+                <wa-icon library="mdi" name="content-save"></wa-icon>
+                ${
+                  this._saving
+                    ? this._localize("secrets.saving")
+                    : this._localize("secrets.save")
+                }
+              </button>
+              <div class="editor-pane">
+                ${
+                  this._layout === "form"
+                    ? html`<esphome-secrets-structured-editor
+                        .value=${this._yaml}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-secrets-structured-editor>`
+                    : html`<esphome-yaml-editor
+                        .value=${this._yaml}
+                        .maskAllValues=${true}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-yaml-editor>`
+                }
+              </div>
+            `,
+          })}
         </div>
       </div>
       <esphome-unsaved-changes-dialog

@@ -30,6 +30,17 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(0, 5fr);
   }
 
+  /* Load ladder in place of the editor: the grid holds a message and an
+     optional action button instead of the nav + editor columns, so drop
+     the column split and the 1px gap's border colour. */
+  .layout-grid.load-state {
+    grid-template-columns: 1fr;
+    align-content: center;
+    justify-items: center;
+    gap: var(--wa-space-m);
+    background: var(--wa-color-surface-default);
+  }
+
   .layout-grid.nav-collapsed .desktop-nav {
     display: none;
   }

@@ -182,12 +182,19 @@ export const secretsStyles = css`
     }
   }
 
-  .loading {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: var(--wa-color-text-quiet);
+  /* Placement only; the block itself comes from loadMessageStyles. The
+     auto-margin pairing centers the ladder — the message alone, or the
+     message plus the Retry button, which sizes to content instead of
+     stretching to the card's width. */
+  .message {
+    margin-top: auto;
+  }
+  .message:last-child {
+    margin-bottom: auto;
+  }
+  .message ~ wa-button {
+    align-self: center;
+    margin-top: var(--wa-space-m);
+    margin-bottom: auto;
   }
 `;

@@ -62,6 +62,12 @@ export const devicesLoadedContext = createContext<boolean>(
   Symbol("esphome-devices-loaded")
 );
 
+/** WS liveness. Consumers watch the false→true edge to redo work that
+ *  gave up while the socket was down. */
+export const apiConnectedContext = createContext<boolean>(
+  Symbol("esphome-api-connected")
+);
+
 /** Context for whether the frontend is running inside HA ingress. */
 export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 

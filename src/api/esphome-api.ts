@@ -9,7 +9,7 @@
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
-import { APIError } from "./api-error.js";
+import { APIError, CommandTimeoutError } from "./api-error.js";
 import type {
   AutomationAction,
   AutomationCatalogBody,
@@ -498,7 +498,7 @@ export class ESPHomeAPI {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this._pendingRequests.delete(messageId);
-        reject(new Error(`Command "${command}" timed out after ${timeout}ms`));
+        reject(new CommandTimeoutError(command, timeout));
       }, timeout);
 
       this._pendingRequests.set(messageId, {
@@ -1022,8 +1022,8 @@ export class ESPHomeAPI {
   }
 
   /** Get device YAML config. */
-  async getConfig(configuration: string): Promise<string> {
-    return this.sendCommand<string>("devices/get_config", { configuration });
+  async getConfig(configuration: string, timeout?: number): Promise<string> {
+    return this.sendCommand<string>("devices/get_config", { configuration }, timeout);
   }
 
   /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml. */
@@ -1792,8 +1792,8 @@ export class ESPHomeAPI {
   }
 
   /** List available serial ports. */
-  async getSerialPorts(): Promise<SerialPort[]> {
-    return this.sendCommand<SerialPort[]>("config/serial_ports");
+  async getSerialPorts(timeout?: number): Promise<SerialPort[]> {
+    return this.sendCommand<SerialPort[]>("config/serial_ports", undefined, timeout);
   }
 
   /**

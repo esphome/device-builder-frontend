@@ -390,7 +390,8 @@
     "update_selected_aria": "Update {count} selected",
     "compile_selected_aria": "Compile {count} selected without installing",
     "builder_stack_heading": "Device builder",
-    "builder_stack_tagline": "create and manage your devices"
+    "builder_stack_tagline": "create and manage your devices",
+    "logs_serial_probe_failed": "Could not check for serial ports; showing wireless logs."
   },
   "command": {
     "install_title": "Install — {name}",
@@ -1051,7 +1052,11 @@
     "unsaved_message": "You have unsaved changes in this device. If you leave without saving, they will be lost.",
     "leave_anyway": "Leave anyway",
     "discard_changes": "Discard",
-    "save_and_leave": "Save"
+    "save_and_leave": "Save",
+    "loading_config": "Loading configuration…",
+    "load_failed": "The configuration could not be loaded. Check your connection and retry.",
+    "load_not_found": "This configuration no longer exists. It may have been deleted or renamed.",
+    "back_to_dashboard": "Back to devices"
   },
   "naming": {
     "hostname_disclosure": "Hostname: {hostname}",
@@ -1246,7 +1251,9 @@
     "close": "Close",
     "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})",
     "editor": "Editor",
-    "preview_badge": "Beta"
+    "preview_badge": "Beta",
+    "page_load_failed": "The page failed to load. Check your connection and try again.",
+    "reconnecting": "Connection lost. Reconnecting…"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",
@@ -1665,7 +1672,10 @@
     "empty": "No secrets yet. Add one below or switch to YAML.",
     "invalid_key": "Names may use letters, numbers, dots, dashes and underscores, and can't start with a number.",
     "duplicate_key": "A secret with this name already exists.",
-    "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
+    "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n",
+    "loading": "Loading secrets…",
+    "load_failed": "Secrets could not be loaded. Check your connection and retry.",
+    "reload_failed": "Couldn't refresh secrets after an external change; the editor may be out of date."
   },
   "auth": {
     "connecting": "Connecting…",

@@ -1,5 +1,5 @@
 import { provide } from "@lit/context";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
@@ -21,6 +21,7 @@ import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/loca
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
@@ -81,7 +82,13 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
-import { createRouter } from "./app-shell/router.js";
+import {
+  connectionOverlayStyles,
+  ReconnectPillGate,
+  renderReconnectPill,
+  renderRouteLoadingBar,
+} from "./app-shell/connection-overlays.js";
+import { consumePreAuthExhaustion, createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
@@ -120,6 +127,10 @@ import "./update-all-dialog.js";
 import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
 export type AuthState = "connecting" | "needs-login" | "authing" | "authed";
+
+// A healthy reconnect lands well inside this, so the pill (and its
+// screen-reader announcement) never fires for a momentary blip.
+const RECONNECT_PILL_DELAY_MS = 800;
 
 @customElement("esphome-app")
 export class ESPHomeApp extends LitElement {
@@ -226,7 +237,13 @@ export class ESPHomeApp extends LitElement {
   @state() _rateLimitedUntil = 0;
   // Tracks the WS connection independently from auth — we don't flip _authState
   // on disconnect, that would unmount routed pages and lose unsaved YAML buffers.
-  @state() _apiConnected = false;
+  // Provided so a routed page can redo work that failed while it was down.
+  @provide({ context: apiConnectedContext }) @state() _apiConnected = false;
+  @state() private _routeLoading = false;
+  @state() private _showReconnectPill = false;
+  private _pillGate = new ReconnectPillGate(RECONNECT_PILL_DELAY_MS, (visible) => {
+    this._showReconnectPill = visible;
+  });
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
@@ -241,7 +258,13 @@ export class ESPHomeApp extends LitElement {
   // mid-write can't revert the optimistic value. Counter for overlapping flips.
   _offloaderWritesInFlight = 0;
 
-  private _router = createRouter(this);
+  private _router = createRouter(this, {
+    onPending: (pending) => {
+      this._routeLoading = pending;
+    },
+    localize: () => this._localize,
+    isAuthed: () => this._authState === "authed",
+  });
 
   @query("esphome-settings-dialog") private _settingsDialog!: ESPHomeSettingsDialog;
   @query("esphome-firmware-jobs-dialog")
@@ -300,6 +323,7 @@ export class ESPHomeApp extends LitElement {
         }
       }
     `,
+    connectionOverlayStyles,
   ];
 
   private _portToastMs = new Map<SerialPort, number>();
@@ -399,6 +423,7 @@ export class ESPHomeApp extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._api.disconnect();
+    this._pillGate.connected();
     clearRecentJobs(this);
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
@@ -449,6 +474,7 @@ export class ESPHomeApp extends LitElement {
       this._isHaIngress = info.ha_ingress;
       this._isHaAddon = info.ha_addon;
       this._apiConnected = true;
+      this._pillGate.connected();
       void this._api.ready.then(() => this._afterAuthenticated());
     };
     this._api.onAuthRequired = () => {
@@ -459,6 +485,7 @@ export class ESPHomeApp extends LitElement {
     this._api.onDisconnected = () => {
       console.warn("WebSocket disconnected, will auto-reconnect...");
       this._apiConnected = false;
+      this._pillGate.disconnected();
     };
 
     try {
@@ -472,6 +499,13 @@ export class ESPHomeApp extends LitElement {
   private async _afterAuthenticated() {
     this._authState = "authed";
     this._authError = null;
+    // Re-resolve a URL the router gave up on pre-auth (a deep link whose
+    // chunk failed behind the login screen) now that a retry can be seen.
+    // A pre-auth exhaustion means no routed page ever mounted, so no
+    // popstate guard sees the synthetic event.
+    if (consumePreAuthExhaustion()) {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
     void this._subscribeToEvents();
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
@@ -530,6 +564,8 @@ export class ESPHomeApp extends LitElement {
     }
 
     return html`
+      ${this._routeLoading ? renderRouteLoadingBar() : nothing}
+      ${this._showReconnectPill ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

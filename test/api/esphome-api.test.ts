@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { APIError } from "../../src/api/api-error.js";
+import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   MockWebSocket,
@@ -180,7 +180,12 @@ describe("ESPHomeAPI — sendCommand", () => {
 
     const cmd = api.sendCommand("slow", undefined, 500);
     vi.advanceTimersByTime(500);
-    await expect(cmd).rejects.toThrow(/timed out after 500ms/);
+    // The instance is what retry/probe callers branch on; the substring
+    // is what the lenient-save paths string-match.
+    await expect(cmd).rejects.toSatisfy(
+      (err) =>
+        err instanceof CommandTimeoutError && /timed out after 500ms/.test(err.message)
+    );
   });
 
   it("throws when the socket is not open", async () => {

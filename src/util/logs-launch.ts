@@ -3,7 +3,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
-import { notifyError } from "./notify.js";
+import { notifyError, notifyInfo } from "./notify.js";
 import {
   attachSerialLogStream,
   openNetworkLogsFallback,
@@ -18,6 +18,10 @@ export interface LogsLaunchHost {
   readonly logsDialog: ESPHomeLogsDialog;
   readonly localize: LocalizeFunc;
 }
+
+// Upper bound on the serial-port probe so a degraded link opens OTA logs
+// after a short beat instead of blocking silently on the 10s command timeout.
+const SERIAL_PORT_PROBE_TIMEOUT_MS = 2500;
 
 /**
  * Open live logs, offering the OTA-vs-serial picker when a serial path exists.
@@ -37,12 +41,17 @@ export async function launchLogs(
     // Only pay the backend round-trip when WebSerial can't already provide a
     // serial path.
     try {
-      hasServerPorts = (await host.api.getSerialPorts()).length > 0;
+      hasServerPorts =
+        (await host.api.getSerialPorts(SERIAL_PORT_PROBE_TIMEOUT_MS)).length > 0;
     } catch (err) {
       // Lockstep deployment means this command exists, so a rejection is a real
-      // WS/backend fault, not version drift; log it but still fall through to
-      // OTA logs so the user isn't left without any path.
+      // WS/backend fault or the bounded probe timing out on a degraded link;
+      // either way fall through to OTA logs so the user isn't left without any
+      // path. Neither failure is an answer, though: say the probe was skipped
+      // rather than let the serial option silently disappear for someone who
+      // has a serial device.
       console.warn("getSerialPorts failed; falling back to OTA logs", err);
+      notifyInfo(host.localize("dashboard.logs_serial_probe_failed"));
       hasServerPorts = false;
     }
   }

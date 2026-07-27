@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { openLogs } from "../../../src/components/dashboard/install.js";
@@ -16,6 +21,7 @@ function makeDevice(): ConfiguredDevice {
 interface StubHost {
   _api: Pick<ESPHomeAPI, "getSerialPorts">;
   _logsDialog: { configuration?: string; name?: string; open: ReturnType<typeof vi.fn> };
+  _localize: (key: string) => string;
   _installMethodDevice?: ConfiguredDevice;
   _installMethodMode?: "install" | "logs";
   _installMethodOpen: boolean;
@@ -25,6 +31,7 @@ function makeHost(getSerialPorts: () => Promise<unknown>): StubHost {
   return {
     _api: { getSerialPorts: vi.fn(getSerialPorts) } as unknown as StubHost["_api"],
     _logsDialog: { open: vi.fn() },
+    _localize: (key) => key,
     _installMethodOpen: false,
   };
 }
@@ -82,6 +89,7 @@ describe("openLogs", () => {
   });
 
   it("falls back to OTA logs when the serial-port lookup fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const restore = withWebSerial(false);
     try {
       const host = makeHost(async () => {

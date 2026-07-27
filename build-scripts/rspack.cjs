@@ -207,6 +207,12 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
   output: {
     filename: isProdBuild ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: isProdBuild ? "[name].[contenthash].js" : "[name].js",
+    // The default is 120s, which a route's retry loop would multiply into
+    // minutes of dead progress bar on a stalled request. Global: it also
+    // bounds imports with no retry path (@mdi/js, locale chunks), and it
+    // is a wall clock on slow-but-working downloads — hence 30s rather
+    // than something tighter.
+    chunkLoadTimeout: 30000,
     path: OUTPUT_DIR,
     // ``auto`` makes the runtime derive the public path from
     // ``document.currentScript.src`` and HtmlRspackPlugin emit the

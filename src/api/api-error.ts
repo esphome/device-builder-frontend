@@ -26,3 +26,25 @@ export class APIError extends Error {
 export function apiErrorDetails(err: unknown): string {
   return err instanceof APIError && err.details.trim() ? err.details.trim() : "";
 }
+
+/** True when *err* is an ``APIError`` carrying exactly *code*. */
+export function isApiErrorCode(err: unknown, code: string): err is APIError {
+  return err instanceof APIError && err.errorCode === code;
+}
+
+/**
+ * A command that never got a reply within its timeout. Distinct from
+ * ``APIError`` (the server answered) and from a bare transport ``Error``,
+ * so callers can tell "we gave up waiting" from "there is nothing there".
+ */
+export class CommandTimeoutError extends Error {
+  command: string;
+  timeoutMs: number;
+
+  constructor(command: string, timeoutMs: number) {
+    super(`Command "${command}" timed out after ${timeoutMs}ms`);
+    this.name = "CommandTimeoutError";
+    this.command = command;
+    this.timeoutMs = timeoutMs;
+  }
+}

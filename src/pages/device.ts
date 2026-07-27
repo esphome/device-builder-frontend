@@ -1,12 +1,15 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
+import { cache } from "lit/directives/cache.js";
+import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import type { ESPHomeAPI } from "../api/index.js";
+import { type ESPHomeAPI, isApiErrorCode } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
@@ -32,11 +35,13 @@ import type { HighlightRange } from "../components/yaml-editor.js";
 import type { ESPHomeYamlValidationDialog } from "../components/yaml-validation-dialog.js";
 import {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   devicesContext,
   devicesLoadedContext,
   localizeContext,
 } from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import {
   backendErrorCounts,
@@ -53,7 +58,14 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
+import { renderAsyncState } from "../util/render-async-state.js";
+import {
+  consumePopGuardSuppression,
+  goBackOrHome,
+  navigate,
+  setLeaveGuard,
+} from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isTypingTarget } from "../util/typing-target.js";
@@ -91,7 +103,9 @@ import {
   readUrlSections,
 } from "./device-url-state.js";
 
+import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/command-dialog.js";
 import "../components/device/board-reselect-dialog.js";
 import "../components/device/device-editor.js";
@@ -107,6 +121,13 @@ registerMdiIcons({
   "chevron-right": mdiChevronRight,
   menu: mdiMenu,
 });
+
+// The user is staring at a spinner, so the initial config fetch gets a
+// longer leash than the 10s command default: a big YAML over a degraded
+// link is slow, not broken. Attempts burn only while the socket is up
+// (``ready`` parks otherwise), so an outage never spends them.
+const LOAD_YAML_TIMEOUT_MS = 30_000;
+const LOAD_YAML_ATTEMPTS = 4;
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -125,6 +146,11 @@ export class ESPHomePageDevice extends LitElement {
   @consume({ context: devicesLoadedContext, subscribe: true })
   @state()
   private _devicesLoaded = false;
+
+  /** WS liveness; the false→true edge re-runs a load that gave up. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -317,6 +343,14 @@ export class ESPHomePageDevice extends LitElement {
    */
   @state()
   private _yaml = "";
+
+  /** Initial-fetch gate for the current id: the editor and navigator
+   *  render only once "ready", so a slow ``getConfig`` shows a spinner
+   *  instead of an empty editor. A transport failure offers a retry;
+   *  a NOT_FOUND config (deleted, renamed, stale bookmark) is terminal,
+   *  so it routes back to the dashboard instead. */
+  @state()
+  private _yamlState: "loading" | "ready" | "error" | "missing" = "loading";
 
   @state()
   private _savedYaml = "";
@@ -573,6 +607,9 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _onPopState = (e: PopStateEvent) => {
+    // A failed route chunk rolling back its own push is a return to
+    // this page, not a leave.
+    if (consumePopGuardSuppression()) return;
     if (this._allowingLeave) {
       this._allowingLeave = false;
       return;
@@ -649,6 +686,16 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   updated(changedProperties: Map<string, unknown>) {
+    // Socket is back: a load that gave up while it was down goes again
+    // without the user hunting for the Retry button. "missing" is a server
+    // answer, so it stays put.
+    if (
+      changedProperties.has("_apiConnected") &&
+      this._apiConnected &&
+      this._yamlState === "error"
+    ) {
+      this._retryLoadYaml();
+    }
     if (changedProperties.has("id") && this.id) {
       // Consume the wizard's "just-created" handoff once per id. Each
       // call to consumeJustCreated atomically reads + clears the flag,
@@ -665,6 +712,15 @@ export class ESPHomePageDevice extends LitElement {
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
       this._kickKnownKeys();
+      // The loading gate detaches the editor subtree, so the section
+      // editor's unmount announcement never reaches this page — drop the
+      // captured ref and its dirty bit here instead.
+      this._activeSection = null;
+      this._sectionDirty = false;
+      // Discard leaves the buffer dirty; clear it or the prior device's
+      // YAML rides the reused element and Save writes it to this file.
+      this._yaml = "";
+      this._savedYaml = "";
       void this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
@@ -779,16 +835,38 @@ export class ESPHomePageDevice extends LitElement {
     }
   }
 
+  /** Bumped per load; a superseded loop self-cancels via ``abandoned``,
+   *  so an a → b → a switch can't commit the first load's stale reply. */
+  private _loadGen = 0;
+
   private async _loadYaml() {
+    const id = this.id;
+    const gen = ++this._loadGen;
+    this._yamlState = "loading";
+    let yaml: string | null;
     try {
-      const yaml = await this._api.getConfig(this.id);
-      this._yaml = yaml;
-      this._savedYaml = yaml;
-      this._maybeResolveLineFromUrl();
+      yaml = await loadConfigWithRecovery(this._api, id, {
+        // Unmount counts as abandoned too, or a slow load keeps fetching
+        // (and re-rendering) against a page that is already gone.
+        abandoned: () => !this.isConnected || this.id !== id || gen !== this._loadGen,
+        attempts: LOAD_YAML_ATTEMPTS,
+        timeoutMs: LOAD_YAML_TIMEOUT_MS,
+      });
     } catch (e) {
       console.error("Failed to load YAML:", e);
+      this._yamlState = isApiErrorCode(e, ErrorCode.NOT_FOUND) ? "missing" : "error";
+      return;
     }
+    if (yaml === null) return;
+    this._yaml = yaml;
+    this._savedYaml = yaml;
+    this._yamlState = "ready";
+    // Outside the catch: a resolver throw must not repaint a loaded
+    // config as a load failure.
+    this._maybeResolveLineFromUrl();
   }
+
+  private _retryLoadYaml = () => void this._loadYaml();
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.
@@ -1216,7 +1294,7 @@ export class ESPHomePageDevice extends LitElement {
     void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
-  static styles = [espHomeStyles, devicePageStyles];
+  static styles = [espHomeStyles, loadMessageStyles, devicePageStyles];
 
   protected render() {
     const deviceTitle =
@@ -1246,12 +1324,16 @@ export class ESPHomePageDevice extends LitElement {
         @yaml-draft=${this._onYamlDraft}
         @nav-collapse=${this._onNavCollapse}
       >
-        ${this._renderNavigator("drawer-nav")}
+        ${this._yamlState === "ready" ? this._renderNavigator("drawer-nav") : nothing}
       </div>
 
       <div class="page">
         <div
-          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
+          class=${classMap({
+            "layout-grid": true,
+            "nav-collapsed": this._navCollapsed,
+            "load-state": this._yamlState !== "ready",
+          })}
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
@@ -1274,75 +1356,11 @@ export class ESPHomePageDevice extends LitElement {
           @install-device=${this._saveThenInstall}
           @update-device=${this._saveThenUpdate}
         >
-          ${this._renderNavigator("desktop-nav")}
-          <esphome-device-editor
-            .yaml=${this._yaml}
-            .savedYaml=${this._savedYaml}
-            .layout=${this._layout}
-            ?navCollapsed=${this._navCollapsed}
-            .deviceTitle=${deviceTitle}
-            .board=${this._board}
-            .highlightRange=${this._highlightRange}
-            .scrollToHighlight=${this._scrollToHighlight}
-            .configuration=${this.id}
-            .selectedSection=${this._selectedSection}
-            .selectedFromLine=${this._selectedFromLine}
-            .focusFieldPath=${this._focusFieldPath}
-            .focusYamlPath=${this._focusYamlPath}
-            .backendErrors=${this._instanceBackendErrors(
-              this._backendErrors,
-              this._selectedSection,
-              this._selectedFromLine
-            )}
-            .justCreated=${this._justCreated}
-            @just-created-dismiss=${this._dismissJustCreated}
-            @request-install=${this._saveThenInstall}
-            @goto-line=${this._onEditorGoToLine}
-            @change-board=${this._onChangeBoard}
-            @open-logs=${this._onEditorOpenLogs}
-            @clean-build=${this._onEditorCleanBuild}
-            ?hasUnsavedEdits=${this._isDirty}
-            ?saving=${this._saving}
-            ?showModified=${this._device ? showPendingChanges(this._device) : false}
-            ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
-            .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
-            .availableVersion=${this._device?.current_version ?? ""}
-            .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
-            ?busy=${this._activeJobs.has(this.id)}
-          >
-            ${
-              showEdgeTab || this._selectedSection
-                ? html`<div slot="header-start" class="header-start-group">
-                    ${
-                      showEdgeTab
-                        ? html`<button
-                            type="button"
-                            class="ghost-icon-btn nav-toggle-btn"
-                            ${tourAnchor("nav-toggle")}
-                            @click=${this._onNavExpand}
-                            title=${this._localize("device.show_navigator")}
-                            aria-label=${this._localize("device.show_navigator")}
-                          >
-                            <wa-icon library="mdi" name="menu"></wa-icon>
-                          </button>`
-                        : nothing
-                    }
-                    ${
-                      this._selectedSection
-                        ? html`<button
-                            class="ghost-icon-btn back-btn"
-                            @click=${this._onBack}
-                            title=${backLabel}
-                            aria-label=${backLabel}
-                          >
-                            <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                          </button>`
-                        : nothing
-                    }
-                  </div>`
-                : nothing
-            }
-          </esphome-device-editor>
+          ${cache(
+            this._yamlState === "ready"
+              ? this._renderEditor(deviceTitle, showEdgeTab, backLabel)
+              : this._renderLoadState()
+          )}
         </div>
         <esphome-unsaved-changes-dialog
           @discard=${this._onUnsavedDiscard}
@@ -1538,6 +1556,102 @@ export class ESPHomePageDevice extends LitElement {
       .selectedFromLine=${this._selectedFromLine}
       .errorCounts=${this._navErrorCounts(this._backendErrors, this._heldUnknownInstance)}
     ></esphome-device-navigator>`;
+  }
+
+  private _renderEditor(deviceTitle: string, showEdgeTab: boolean, backLabel: string) {
+    return html` ${this._renderNavigator("desktop-nav")}
+      <esphome-device-editor
+        .yaml=${this._yaml}
+        .savedYaml=${this._savedYaml}
+        .layout=${this._layout}
+        ?navCollapsed=${this._navCollapsed}
+        .deviceTitle=${deviceTitle}
+        .board=${this._board}
+        .highlightRange=${this._highlightRange}
+        .scrollToHighlight=${this._scrollToHighlight}
+        .configuration=${this.id}
+        .selectedSection=${this._selectedSection}
+        .selectedFromLine=${this._selectedFromLine}
+        .focusFieldPath=${this._focusFieldPath}
+        .focusYamlPath=${this._focusYamlPath}
+        .backendErrors=${this._instanceBackendErrors(
+          this._backendErrors,
+          this._selectedSection,
+          this._selectedFromLine
+        )}
+        .justCreated=${this._justCreated}
+        @just-created-dismiss=${this._dismissJustCreated}
+        @request-install=${this._saveThenInstall}
+        @goto-line=${this._onEditorGoToLine}
+        @change-board=${this._onChangeBoard}
+        @open-logs=${this._onEditorOpenLogs}
+        @clean-build=${this._onEditorCleanBuild}
+        ?hasUnsavedEdits=${this._isDirty}
+        ?saving=${this._saving}
+        ?showModified=${this._device ? showPendingChanges(this._device) : false}
+        ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
+        .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
+        .availableVersion=${this._device?.current_version ?? ""}
+        .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
+        ?busy=${this._activeJobs.has(this.id)}
+      >
+        ${
+          showEdgeTab || this._selectedSection
+            ? html`<div slot="header-start" class="header-start-group">
+                ${
+                  showEdgeTab
+                    ? html`<button
+                        type="button"
+                        class="ghost-icon-btn nav-toggle-btn"
+                        ${tourAnchor("nav-toggle")}
+                        @click=${this._onNavExpand}
+                        title=${this._localize("device.show_navigator")}
+                        aria-label=${this._localize("device.show_navigator")}
+                      >
+                        <wa-icon library="mdi" name="menu"></wa-icon>
+                      </button>`
+                    : nothing
+                }
+                ${
+                  this._selectedSection
+                    ? html`<button
+                        class="ghost-icon-btn back-btn"
+                        @click=${this._onBack}
+                        title=${backLabel}
+                        aria-label=${backLabel}
+                      >
+                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                      </button>`
+                    : nothing
+                }
+              </div>`
+            : nothing
+        }
+      </esphome-device-editor>`;
+  }
+
+  /** The editor's stand-in until the config lands. A gone config is
+   *  terminal, so it offers a way out rather than a retry. */
+  private _renderLoadState() {
+    const loading = this._yamlState === "loading";
+    const missing = this._yamlState === "missing";
+    return renderAsyncState({
+      loading,
+      loadingMessage: this._localize("device.loading_config"),
+      loadingLead: html`<wa-spinner></wa-spinner>`,
+      error: loading
+        ? null
+        : this._localize(missing ? "device.load_not_found" : "device.load_failed"),
+      errorActions: () =>
+        html`<wa-button
+          size="small"
+          @click=${missing ? () => navigate("/") : this._retryLoadYaml}
+        >
+          ${this._localize(missing ? "device.back_to_dashboard" : "command.retry")}
+        </wa-button>`,
+      // The ready branch renders the editor instead of reaching here.
+      content: () => nothing,
+    });
   }
 
   /** Advance the YAML buffer. Any mutation while an error-jump
@@ -1842,9 +1956,8 @@ export class ESPHomePageDevice extends LitElement {
       rebased = null;
     }
     // The device switched mid-recompute: the continuation (and its
-    // toast) belongs to the previous device. ``_loadYaml`` doesn't
-    // clear ``_yaml`` before its fetch, so the buffer guard below
-    // can't catch this window.
+    // toast) belongs to the previous device. Bail before the buffer
+    // comparison below can route it to the superseded toast.
     if (detail.configuration !== this.id) return;
     // Land the re-base only if the pane didn't move again while it
     // was computed — stale coordinates no longer apply.
