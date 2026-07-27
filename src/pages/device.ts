@@ -36,6 +36,7 @@ import {
   activeJobsContext,
   apiContext,
   devicesContext,
+  apiConnectedContext,
   devicesLoadedContext,
   localizeContext,
 } from "../context/index.js";
@@ -56,7 +57,6 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { RECONNECTED_EVENT } from "../components/app-shell/connection-overlays.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
@@ -137,6 +137,11 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_platformReady`` uses this to tell "context still loading"
    *  apart from "context delivered, our id isn't here" — a length
    *  check would strand the gate on a zero-device dashboard. */
+  /** WS liveness; the false→true edge re-runs a load that gave up. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
+
   @consume({ context: devicesLoadedContext, subscribe: true })
   @state()
   private _devicesLoaded = false;
@@ -627,7 +632,6 @@ export class ESPHomePageDevice extends LitElement {
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener("keydown", this._onKeydown);
-    window.addEventListener(RECONNECTED_EVENT, this._onReconnected);
     this._mql.addEventListener("change", this._onMqlChange);
   }
 
@@ -637,7 +641,6 @@ export class ESPHomePageDevice extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
     window.removeEventListener("keydown", this._onKeydown);
-    window.removeEventListener(RECONNECTED_EVENT, this._onReconnected);
     this._mql.removeEventListener("change", this._onMqlChange);
     // Drop any in-flight unsaved-changes guard so its caller's
     // ``await`` doesn't dangle past unmount — resolve as "don't
@@ -674,6 +677,16 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   updated(changedProperties: Map<string, unknown>) {
+    // Socket is back: a load that gave up while it was down goes again
+    // without the user hunting for the Retry button. "missing" is a server
+    // answer, so it stays put.
+    if (
+      changedProperties.has("_apiConnected") &&
+      this._apiConnected &&
+      this._yamlState === "error"
+    ) {
+      this._retryLoadYaml();
+    }
     if (changedProperties.has("id") && this.id) {
       // Consume the wizard's "just-created" handoff once per id. Each
       // call to consumeJustCreated atomically reads + clears the flag,
@@ -814,7 +827,9 @@ export class ESPHomePageDevice extends LitElement {
     this._yamlState = "loading";
     try {
       const yaml = await loadConfigWithRecovery(this._api, id, {
-        abandoned: () => this.id !== id,
+        // Unmount counts as abandoned too, or a slow load keeps fetching
+        // (and re-rendering) against a page that is already gone.
+        abandoned: () => !this.isConnected || this.id !== id,
         attempts: LOAD_YAML_ATTEMPTS,
         timeoutMs: LOAD_YAML_TIMEOUT_MS,
       });
@@ -833,12 +848,6 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _retryLoadYaml = () => void this._loadYaml();
-
-  /** The socket is back; a load that gave up while it was down can go
-   *  again without the user hunting for the Retry button. */
-  private _onReconnected = () => {
-    if (this._yamlState === "error") this._retryLoadYaml();
-  };
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.
@@ -1327,21 +1336,9 @@ export class ESPHomePageDevice extends LitElement {
           @update-device=${this._saveThenUpdate}
         >
           ${cache(
-            renderAsyncState({
-              loading: this._yamlState === "loading",
-              loadingMessage: this._localize("device.loading_config"),
-              loadingLead: () => html`<wa-spinner></wa-spinner>`,
-              error:
-                this._yamlState === "ready"
-                  ? null
-                  : this._localize(
-                      this._yamlState === "missing"
-                        ? "device.load_not_found"
-                        : "device.load_failed"
-                    ),
-              errorActions: () => this._renderLoadFailure(),
-              content: () => this._renderEditor(deviceTitle, showEdgeTab, backLabel),
-            })
+            this._yamlState === "ready"
+              ? this._renderEditor(deviceTitle, showEdgeTab, backLabel)
+              : this._renderLoadState()
           )}
         </div>
         <esphome-unsaved-changes-dialog
@@ -1612,15 +1609,25 @@ export class ESPHomePageDevice extends LitElement {
       </esphome-device-editor>`;
   }
 
-  /** A gone config is terminal, so it offers a way out rather than a retry. */
-  private _renderLoadFailure() {
+  /** The editor's stand-in until the config lands. A gone config is
+   *  terminal, so it offers a way out rather than a retry. */
+  private _renderLoadState() {
     const missing = this._yamlState === "missing";
-    return html`<wa-button
-      size="small"
-      @click=${missing ? () => navigate("/") : this._retryLoadYaml}
-    >
-      ${this._localize(missing ? "device.back_to_dashboard" : "command.retry")}
-    </wa-button>`;
+    return renderAsyncState({
+      loading: this._yamlState === "loading",
+      loadingMessage: this._localize("device.loading_config"),
+      loadingLead: () => html`<wa-spinner></wa-spinner>`,
+      error: this._localize(missing ? "device.load_not_found" : "device.load_failed"),
+      errorActions: () =>
+        html`<wa-button
+          size="small"
+          @click=${missing ? () => navigate("/") : this._retryLoadYaml}
+        >
+          ${this._localize(missing ? "device.back_to_dashboard" : "command.retry")}
+        </wa-button>`,
+      // The ready branch renders the editor instead of reaching here.
+      content: () => nothing,
+    });
   }
 
   /** Advance the YAML buffer. Any mutation while an error-jump

@@ -21,6 +21,7 @@ import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/loca
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
@@ -83,11 +84,10 @@ import {
 } from "./app-shell/jobs.js";
 import {
   connectionOverlayStyles,
-  RECONNECTED_EVENT,
   renderReconnectPill,
   renderRouteLoadingBar,
 } from "./app-shell/connection-overlays.js";
-import { createRouter, prefetchLazyRoutes } from "./app-shell/router.js";
+import { createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
@@ -236,12 +236,12 @@ export class ESPHomeApp extends LitElement {
   @state() _rateLimitedUntil = 0;
   // Tracks the WS connection independently from auth — we don't flip _authState
   // on disconnect, that would unmount routed pages and lose unsaved YAML buffers.
-  @state() _apiConnected = false;
+  // Provided so a routed page can redo work that failed while it was down.
+  @provide({ context: apiConnectedContext }) @state() _apiConnected = false;
   @state() private _routeLoading = false;
   // Timer-gated so sub-second reconnect blips neither flash the pill nor
   // fire its role="status" announcement (a CSS delay would still announce).
   @state() private _showReconnectPill = false;
-  private _everConnected = false;
   private _reconnectPillTimer: ReturnType<typeof setTimeout> | null = null;
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -405,6 +405,14 @@ export class ESPHomeApp extends LitElement {
     });
   };
 
+  private _clearReconnectPill() {
+    if (this._reconnectPillTimer) {
+      clearTimeout(this._reconnectPillTimer);
+      this._reconnectPillTimer = null;
+    }
+    this._showReconnectPill = false;
+  }
+
   private _onSecretsSaved = () => {
     void loadOnboardingState(this);
   };
@@ -412,7 +420,6 @@ export class ESPHomeApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     void this._init();
-    prefetchLazyRoutes();
     if ("serial" in navigator) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
     }
@@ -422,10 +429,7 @@ export class ESPHomeApp extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._api.disconnect();
-    if (this._reconnectPillTimer) {
-      clearTimeout(this._reconnectPillTimer);
-      this._reconnectPillTimer = null;
-    }
+    this._clearReconnectPill();
     clearRecentJobs(this);
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
@@ -475,17 +479,8 @@ export class ESPHomeApp extends LitElement {
       this._desktopUpdateCapable = info.desktop_update_capable ?? false;
       this._isHaIngress = info.ha_ingress;
       this._isHaAddon = info.ha_addon;
-      // Tell parked pages the socket is usable again before flipping the
-      // flag, so a listener that re-reads state sees the fresh value.
-      const reconnected = this._everConnected;
-      this._everConnected = true;
       this._apiConnected = true;
-      if (reconnected) window.dispatchEvent(new Event(RECONNECTED_EVENT));
-      if (this._reconnectPillTimer) {
-        clearTimeout(this._reconnectPillTimer);
-        this._reconnectPillTimer = null;
-      }
-      this._showReconnectPill = false;
+      this._clearReconnectPill();
       void this._api.ready.then(() => this._afterAuthenticated());
     };
     this._api.onAuthRequired = () => {

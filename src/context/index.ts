@@ -12,6 +12,7 @@ export {
   desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
+  apiConnectedContext,
   devicesLoadedContext,
   experienceLevelContext,
   expertModeContext,

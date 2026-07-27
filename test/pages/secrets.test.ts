@@ -6,6 +6,7 @@ import toast from "sonner-js";
 import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
+import { flushMicrotasks } from "../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -14,6 +15,17 @@ import {
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+
+// The load cells below mount the page for real, which upgrades these
+// children; Web Awesome's form-associated base and CodeMirror both crash
+// under happy-dom, and the render-only cells only inspect tag names.
+vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("../../src/components/confirm-dialog.js", () => ({}));
+vi.mock("../../src/components/secrets/secrets-structured-editor.js", () => ({}));
+vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
+vi.mock("../../src/components/yaml-editor.js", () => ({}));
 
 // Capture the save-shortcut callback the page wires so the gating closure
 // can be exercised without mounting (and binding a real window listener).
@@ -37,7 +49,7 @@ vi.mock("../../src/util/save-shortcut-controller.js", () => ({
  */
 
 interface PageView {
-  _loaded: boolean;
+  _loadState: "loading" | "ready" | "error";
   _yaml: string;
   _savedYaml: string;
   _saving: boolean;
@@ -46,7 +58,6 @@ interface PageView {
   _readStoredLayout(): "form" | "yaml" | null;
   _seedLayoutFromBackend(): Promise<void>;
   _loadFromServer(): Promise<void>;
-  _loadFailed: boolean;
   _setLayout(layout: "form" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _confirmLeave(): Promise<boolean>;
@@ -62,7 +73,7 @@ interface PageView {
 
 function makePage(overrides: Partial<PageView> = {}): PageView {
   const page = new ESPHomePageSecrets() as unknown as PageView;
-  page._loaded = false;
+  page._loadState = "loading";
   page._yaml = "";
   page._savedYaml = "";
   page._saving = false;
@@ -72,7 +83,7 @@ function makePage(overrides: Partial<PageView> = {}): PageView {
 
 describe("esphome-page-secrets editor gating", () => {
   test("while loading: spinner is rendered, no editor, no save button", () => {
-    const tree = makePage({ _loaded: false }).render();
+    const tree = makePage({ _loadState: "loading" }).render();
     expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(1);
     expect(findTemplatesByAnchor(tree, "<esphome-yaml-editor")).toHaveLength(0);
     expect(findTemplatesByAnchor(tree, 'class="save-button"')).toHaveLength(0);
@@ -80,7 +91,7 @@ describe("esphome-page-secrets editor gating", () => {
 
   test("after load: editor is rendered with the loaded buffer, spinner gone", () => {
     const tree = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: hunter2\n",
       _savedYaml: "wifi_password: hunter2\n",
     }).render();
@@ -103,16 +114,16 @@ describe("esphome-page-secrets save-button disabled state", () => {
 
   test("disabled when buffer equals saved (no dirty state)", () => {
     const yaml = "wifi_password: hunter2\n";
-    expect(saveDisabled(makePage({ _loaded: true, _yaml: yaml, _savedYaml: yaml }))).toBe(
-      true
-    );
+    expect(
+      saveDisabled(makePage({ _loadState: "ready", _yaml: yaml, _savedYaml: yaml }))
+    ).toBe(true);
   });
 
   test("enabled when buffer differs from saved AND is non-empty", () => {
     expect(
       saveDisabled(
         makePage({
-          _loaded: true,
+          _loadState: "ready",
           _yaml: "wifi_password: new\n",
           _savedYaml: "wifi_password: old\n",
         })
@@ -126,7 +137,7 @@ describe("esphome-page-secrets save-button disabled state", () => {
     expect(
       saveDisabled(
         makePage({
-          _loaded: true,
+          _loadState: "ready",
           _yaml: "",
           _savedYaml: "wifi_password: hunter2\n",
         })
@@ -138,7 +149,7 @@ describe("esphome-page-secrets save-button disabled state", () => {
     expect(
       saveDisabled(
         makePage({
-          _loaded: true,
+          _loadState: "ready",
           _yaml: "   \n\n",
           _savedYaml: "wifi_password: hunter2\n",
         })
@@ -152,7 +163,7 @@ describe("esphome-page-secrets save-button disabled state", () => {
       resolveUpdate = r;
     });
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -179,7 +190,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   test("_save() clearing every secret confirms, then sends allow_wipe", async () => {
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "",
       _savedYaml: "wifi_password: hunter2\n",
     });
@@ -197,7 +208,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   test("_save() cancelled wipe writes nothing and keeps the saved buffer", async () => {
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "",
       _savedYaml: "wifi_password: hunter2\n",
     });
@@ -215,7 +226,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   test("_save() with secrets remaining does not confirm and omits allow_wipe", async () => {
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -232,7 +243,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   test("_save() editing an already-entry-less file does not confirm or send allow_wipe", async () => {
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "# new comment\n",
       _savedYaml: "# old comment\n",
     });
@@ -251,7 +262,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   test("_save() blanking an already-entry-less file sends allow_wipe without confirming", async () => {
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "",
       _savedYaml: "# only a comment\n",
     });
@@ -268,7 +279,7 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
   });
 
   test("disconnect settles an open wipe confirm as cancelled (no dangling promise)", () => {
-    const page = makePage({ _loaded: true });
+    const page = makePage({ _loadState: "ready" });
     const settle = vi.fn();
     page._settlePendingWipe = settle;
 
@@ -279,57 +290,87 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
 });
 
 describe("esphome-page-secrets initial load", () => {
-  test("seeds the header template only when the server says the file is missing", async () => {
-    const page = makePage();
-    page._api = {
+  // These drive the real mount path: the load aborts when the element is
+  // detached, so a bare constructor never reaches the server.
+  async function mountWithApi(getConfig: ReturnType<typeof vi.fn>): Promise<PageView> {
+    const page = new ESPHomePageSecrets();
+    (page as unknown as { _api: ESPHomeAPI })._api = {
       ready: Promise.resolve(),
-      getConfig: vi.fn().mockRejectedValue(new APIError("not_found", "missing")),
+      getConfig,
+      getPreferences: vi.fn().mockResolvedValue({}),
     } as unknown as ESPHomeAPI;
+    document.body.appendChild(page);
+    await flushMicrotasks(8);
+    return page as unknown as PageView;
+  }
 
-    await page._loadFromServer();
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("seeds the header template only when the server says the file is missing", async () => {
+    const page = await mountWithApi(
+      vi.fn().mockRejectedValue(new APIError("not_found", "missing"))
+    );
 
     expect(page._yaml).not.toBe("");
     expect(page._savedYaml).toBe(page._yaml);
-    expect(page._loaded).toBe(true);
+    expect(page._loadState).toBe("ready");
   });
 
   test("does not template over the real file on a non-not-found server error", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const page = makePage();
-    page._api = {
-      ready: Promise.resolve(),
-      getConfig: vi.fn().mockRejectedValue(new APIError("internal_error", "boom")),
-    } as unknown as ESPHomeAPI;
-
-    await page._loadFromServer();
+    const page = await mountWithApi(
+      vi.fn().mockRejectedValue(new APIError("internal_error", "boom"))
+    );
 
     // An editable blank buffer here would parse to zero entries, slipping
     // past the clear-all wipe confirm on the next save.
     expect(page._yaml).toBe("");
     expect(page._savedYaml).toBe("");
-    expect(page._loaded).toBe(false);
-    expect(page._loadFailed).toBe(true);
+    expect(page._loadState).toBe("error");
   });
 
   test("retries a transport failure instead of templating over the real file", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.useFakeTimers();
     try {
-      const page = makePage();
       const getConfig = vi
         .fn()
         .mockRejectedValueOnce(new Error("WebSocket connection closed"))
         .mockResolvedValueOnce("wifi_password: hunter2\n");
-      page._api = { ready: Promise.resolve(), getConfig } as unknown as ESPHomeAPI;
-
-      const loaded = page._loadFromServer();
+      const page = await mountWithApi(getConfig);
       await vi.advanceTimersByTimeAsync(2000);
-      await loaded;
+      await flushMicrotasks(8);
 
       // The real file wins; the blank template never reached the buffer.
       expect(getConfig).toHaveBeenCalledTimes(2);
       expect(page._yaml).toBe("wifi_password: hunter2\n");
       expect(page._savedYaml).toBe("wifi_password: hunter2\n");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("re-runs a failed load when the socket comes back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const getConfig = vi
+        .fn()
+        .mockRejectedValue(new Error("WebSocket connection closed"));
+      const page = await mountWithApi(getConfig);
+      await vi.advanceTimersByTimeAsync(1500 * 4);
+      await flushMicrotasks(8);
+      expect(page._loadState).toBe("error");
+
+      getConfig.mockResolvedValueOnce("wifi_password: hunter2\n");
+      (page as unknown as { _apiConnected: boolean })._apiConnected = true;
+      (page as unknown as { requestUpdate(): void }).requestUpdate();
+      await flushMicrotasks(8);
+
+      expect(page._loadState).toBe("ready");
     } finally {
       vi.useRealTimers();
     }
@@ -341,7 +382,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -362,7 +403,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_ssid: home\nxx:xxx\n",
       _savedYaml: "wifi_ssid: old\n",
     });
@@ -387,7 +428,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     vi.mocked(toast.error).mockClear();
     let resolveUpdate!: () => void;
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -422,7 +463,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -441,7 +482,7 @@ describe("esphome-page-secrets save toast ordering", () => {
 
   test("_save() fires secrets-saved on the timeout-as-success path", async () => {
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -462,7 +503,7 @@ describe("esphome-page-secrets save toast ordering", () => {
 
   test("_save() does not fire secrets-saved on a real failure", async () => {
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
@@ -487,7 +528,7 @@ describe("esphome-page-secrets Cmd/Ctrl+S save shortcut wiring", () => {
     // Reset first so the assertion proves THIS construction wired the
     // shortcut, not a stale callback captured by an earlier test.
     capturedRef.onSave = undefined;
-    const page = makePage({ _loaded: true, ...overrides });
+    const page = makePage({ _loadState: "ready", ...overrides });
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     page._api = { updateConfig } as unknown as ESPHomeAPI;
     // The page's field initializer constructed the (mocked) controller and
@@ -590,7 +631,7 @@ describe("esphome-page-secrets layout persistence", () => {
 
   test("the active editor binds the shared buffer across a layout switch", () => {
     const page = makePage({
-      _loaded: true,
+      _loadState: "ready",
       _layout: "form",
       _yaml: "wifi_ssid: home\n",
     });
@@ -622,14 +663,14 @@ describe("esphome-page-secrets layout persistence", () => {
 describe("esphome-page-secrets unsaved-changes leave guard", () => {
   function dirtyPage(): PageView {
     return makePage({
-      _loaded: true,
+      _loadState: "ready",
       _yaml: "wifi_ssid: new\n",
       _savedYaml: "wifi_ssid: old\n",
     });
   }
 
   test("a clean buffer leaves immediately without prompting", async () => {
-    const page = makePage({ _loaded: true, _yaml: "a: 1\n", _savedYaml: "a: 1\n" });
+    const page = makePage({ _loadState: "ready", _yaml: "a: 1\n", _savedYaml: "a: 1\n" });
     expect(await page._confirmLeave()).toBe(true);
   });
 

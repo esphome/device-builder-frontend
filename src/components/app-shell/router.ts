@@ -2,6 +2,7 @@ import { Router } from "@lit-labs/router";
 import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
+import { hasPushedHistoryEntry } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { sleep } from "../../util/sleep.js";
 
@@ -26,7 +27,8 @@ export interface RouterHooks {
 }
 
 const PENDING_FEEDBACK_DELAY_MS = 200;
-const RETRY_DELAYS_MS = [500, 1500];
+// One retry, since output.chunkLoadTimeout already bounds each attempt.
+const RETRY_DELAYS_MS = [500];
 
 // Slow loads in flight at once; the pending hook fires on the 0↔1 edges so
 // overlapping navigations can't hide each other's progress bar.
@@ -68,11 +70,8 @@ export async function lazyEnter(
           notifyError(hooks.localize()("layout.page_load_failed"));
           // navigate() pushed this URL before the router ran enter, and a
           // false return leaves the old page rendered; undo the push so the
-          // address bar doesn't describe a page that never mounted. A null
-          // state means a fresh load (deep link) with nothing to pop.
-          if (window.history.state !== null && typeof window.history.state === "object") {
-            window.history.back();
-          }
+          // address bar doesn't describe a page that never mounted.
+          if (hasPushedHistoryEntry()) window.history.back();
           return false;
         }
         await sleep(delay);
@@ -81,23 +80,6 @@ export async function lazyEnter(
   } finally {
     clearTimeout(pendingTimer);
     if (counted && --pendingLoads === 0) hooks.onPending(false);
-  }
-}
-
-/**
- * Warm the lazy route chunks once the browser is idle so a later Edit
- * click doesn't pay the chunk download on a degraded connection.
- * Failures are swallowed — the click path retries on its own.
- */
-export function prefetchLazyRoutes(): void {
-  const warm = () => {
-    import("../../pages/device.js").catch(() => {});
-    import("../../pages/secrets.js").catch(() => {});
-  };
-  if ("requestIdleCallback" in window) {
-    requestIdleCallback(warm, { timeout: 5000 });
-  } else {
-    setTimeout(warm, 2000);
   }
 }
 
@@ -112,12 +94,20 @@ export function createRouter(
     },
     {
       path: withBase("/secrets"),
-      enter: () => lazyEnter(() => import("../../pages/secrets.js"), hooks),
+      enter: () =>
+        lazyEnter(
+          () => import(/* webpackPrefetch: true */ "../../pages/secrets.js"),
+          hooks
+        ),
       render: () => html`<esphome-page-secrets></esphome-page-secrets>`,
     },
     {
       path: withBase("/device/:id"),
-      enter: () => lazyEnter(() => import("../../pages/device.js"), hooks),
+      enter: () =>
+        lazyEnter(
+          () => import(/* webpackPrefetch: true */ "../../pages/device.js"),
+          hooks
+        ),
       render: ({ id }) =>
         html`<esphome-page-device .id=${decodeIdParam(id)}></esphome-page-device>`,
     },

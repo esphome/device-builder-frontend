@@ -7,11 +7,7 @@ vi.mock("sonner-js", () => ({
 
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
-import {
-  lazyEnter,
-  prefetchLazyRoutes,
-  type RouterHooks,
-} from "../../../src/components/app-shell/router.js";
+import { lazyEnter, type RouterHooks } from "../../../src/components/app-shell/router.js";
 import { identityLocalize } from "../../_dom.js";
 
 /**
@@ -105,7 +101,7 @@ describe("lazyEnter", () => {
     const result = lazyEnter(importThunk, hooks);
 
     window.history.pushState({}, "", "/somewhere-else");
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(1000);
 
     await expect(result).resolves.toBe(false);
     // Bailed on the first failure instead of burning both retries.
@@ -159,9 +155,9 @@ describe("lazyEnter", () => {
     const importThunk = vi.fn().mockRejectedValue(new Error("chunk load failed"));
     const result = lazyEnter(importThunk, hooks);
 
-    await vi.advanceTimersByTimeAsync(500 + 1500);
+    await vi.advanceTimersByTimeAsync(500);
     await expect(result).resolves.toBe(false);
-    expect(importThunk).toHaveBeenCalledTimes(3);
+    expect(importThunk).toHaveBeenCalledTimes(2);
     expect(toast.error).toHaveBeenCalledWith("layout.page_load_failed", {
       richColors: true,
     });
@@ -170,18 +166,5 @@ describe("lazyEnter", () => {
     // navigate() had already pushed the URL; undo it so the address bar
     // doesn't describe a page that never mounted.
     expect(back).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("prefetchLazyRoutes", () => {
-  it("defers the warm-up to an idle callback", () => {
-    const requestIdleCallback = vi.fn();
-    vi.stubGlobal("requestIdleCallback", requestIdleCallback);
-    try {
-      prefetchLazyRoutes();
-      expect(requestIdleCallback).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 });

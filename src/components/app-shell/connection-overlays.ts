@@ -1,10 +1,6 @@
 import { css, html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 
-/** Fired on the window when the socket comes back after a drop, so pages
- *  parked on a failed load can retry without the user clicking. */
-export const RECONNECTED_EVENT = "esphome-reconnected";
-
 /**
  * Fixed-position connection feedback the app shell overlays on the authed
  * layout: the indeterminate route-chunk loading bar and the reconnecting

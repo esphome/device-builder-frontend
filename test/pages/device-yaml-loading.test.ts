@@ -11,7 +11,6 @@ vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
 import { APIError, type ESPHomeAPI } from "../../src/api/index.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
-import { RECONNECTED_EVENT } from "../../src/components/app-shell/connection-overlays.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import { flushMicrotasks, mount } from "../_dom.js";
 
@@ -194,7 +193,10 @@ describe("device page initial YAML loading gate", () => {
       expect(loadPanelIn(page)!.textContent).toContain("device.load_failed");
 
       getConfig.mockResolvedValueOnce("wifi:\n  ssid: x\n");
-      window.dispatchEvent(new Event(RECONNECTED_EVENT));
+      // The shell provides this through context; the false→true edge is
+      // the signal that the socket is usable again.
+      (page as unknown as { _apiConnected: boolean })._apiConnected = true;
+      page.requestUpdate();
       await flushMicrotasks(8);
       await page.updateComplete;
 

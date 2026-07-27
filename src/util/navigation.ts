@@ -41,8 +41,14 @@ export async function runLeaveGuard(): Promise<boolean> {
  * ``null`` means a fresh page load (deep link / refresh) so there's nothing
  * useful to pop and we fall back to ``navigate("/")`` to stay inside the SPA.
  */
+/** True when the current entry came from ``navigate()`` (which stamps
+ *  ``{}``) rather than a fresh page load, so there is something to pop. */
+export function hasPushedHistoryEntry(): boolean {
+  return window.history.state !== null && typeof window.history.state === "object";
+}
+
 export async function goBackOrHome(): Promise<void> {
-  if (window.history.state !== null && typeof window.history.state === "object") {
+  if (hasPushedHistoryEntry()) {
     // history.back() fires a raw popstate the router commits (unmounting the
     // page) before the device editor's popstate guard can veto it, so honour
     // the leave guard here — same gate navigate() applies. navigate("/") runs

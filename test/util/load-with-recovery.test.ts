@@ -1,16 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
-import {
-  LoadAbandonedError,
-  loadWithRecovery,
-} from "../../src/util/load-with-recovery.js";
+import type { ESPHomeAPI } from "../../src/api/index.js";
+import { loadConfigWithRecovery } from "../../src/util/load-with-recovery.js";
 
 /**
  * Pins the flaky-link fetch policy: transport faults retry, server
  * replies are final, and an outage costs no attempts.
  */
 
-describe("loadWithRecovery", () => {
+function makeApi(
+  getConfig: ReturnType<typeof vi.fn>,
+  ready: Promise<void> = Promise.resolve()
+): ESPHomeAPI {
+  return { ready, getConfig } as unknown as ESPHomeAPI;
+}
+
+describe("loadConfigWithRecovery", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -21,60 +26,60 @@ describe("loadWithRecovery", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns the value without retrying when the first attempt works", async () => {
-    const load = vi.fn().mockResolvedValue("yaml");
+  it("returns the config without retrying when the first attempt works", async () => {
+    const getConfig = vi.fn().mockResolvedValue("yaml");
     await expect(
-      loadWithRecovery({ ready: () => Promise.resolve(), load })
+      loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", { attempts: 4 })
     ).resolves.toBe("yaml");
-    expect(load).toHaveBeenCalledTimes(1);
+    expect(getConfig).toHaveBeenCalledTimes(1);
   });
 
   it("retries a transport fault after the backoff", async () => {
-    const load = vi
+    const getConfig = vi
       .fn()
       .mockRejectedValueOnce(new Error("WebSocket connection closed"))
       .mockResolvedValueOnce("yaml");
-    const result = loadWithRecovery({ ready: () => Promise.resolve(), load });
+    const result = loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", {
+      attempts: 4,
+    });
 
     await vi.advanceTimersByTimeAsync(1500);
     await expect(result).resolves.toBe("yaml");
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(getConfig).toHaveBeenCalledTimes(2);
   });
 
   it("rethrows an APIError immediately — the server already answered", async () => {
     const err = new APIError("not_found", "gone");
-    const load = vi.fn().mockRejectedValue(err);
-    await expect(loadWithRecovery({ ready: () => Promise.resolve(), load })).rejects.toBe(
-      err
-    );
-    expect(load).toHaveBeenCalledTimes(1);
+    const getConfig = vi.fn().mockRejectedValue(err);
+    await expect(
+      loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", { attempts: 4 })
+    ).rejects.toBe(err);
+    expect(getConfig).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces the transport fault once the attempt budget is spent", async () => {
-    const load = vi.fn().mockRejectedValue(new Error("timed out"));
+    const getConfig = vi.fn().mockRejectedValue(new Error("timed out"));
     // Attach the rejection handler before pumping timers, or the failure
     // lands unhandled mid-advance.
     const settled = expect(
-      loadWithRecovery({ ready: () => Promise.resolve(), load, attempts: 3 })
+      loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", { attempts: 3 })
     ).rejects.toThrow("timed out");
 
     await vi.advanceTimersByTimeAsync(1500 * 3);
     await settled;
-    expect(load).toHaveBeenCalledTimes(3);
+    expect(getConfig).toHaveBeenCalledTimes(3);
   });
 
   it("spends no attempts while the connection is down", async () => {
     let release!: () => void;
     const parked = new Promise<void>((resolve) => (release = resolve));
-    const load = vi.fn().mockResolvedValue("yaml");
-    const result = loadWithRecovery({
-      ready: () => parked,
-      load,
+    const getConfig = vi.fn().mockResolvedValue("yaml");
+    const result = loadConfigWithRecovery(makeApi(getConfig, parked), "kitchen.yaml", {
       attempts: 1,
     });
 
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(load).not.toHaveBeenCalled();
+    expect(getConfig).not.toHaveBeenCalled();
 
     release();
     await expect(result).resolves.toBe("yaml");
@@ -83,14 +88,11 @@ describe("loadWithRecovery", () => {
   it("drops a value that resolves after the caller moved on", async () => {
     let abandoned = false;
     let settle!: (v: string) => void;
-    const load = vi.fn(() => new Promise<string>((resolve) => (settle = resolve)));
-    const settled = expect(
-      loadWithRecovery({
-        ready: () => Promise.resolve(),
-        load,
-        abandoned: () => abandoned,
-      })
-    ).rejects.toBeInstanceOf(LoadAbandonedError);
+    const getConfig = vi.fn(() => new Promise<string>((resolve) => (settle = resolve)));
+    const result = loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", {
+      attempts: 4,
+      abandoned: () => abandoned,
+    });
 
     await vi.advanceTimersByTimeAsync(0);
     // The id moved on (or the page unmounted) mid-flight; the late reply
@@ -98,25 +100,23 @@ describe("loadWithRecovery", () => {
     abandoned = true;
     settle("stale yaml");
 
-    await settled;
+    await expect(result).resolves.toBeNull();
   });
 
-  it("abandons instead of retrying once the caller loses interest", async () => {
-    const load = vi.fn().mockRejectedValue(new Error("WebSocket closed"));
+  it("stops retrying once the caller loses interest", async () => {
+    const getConfig = vi.fn().mockRejectedValue(new Error("WebSocket closed"));
     let abandoned = false;
-    const settled = expect(
-      loadWithRecovery({
-        ready: () => Promise.resolve(),
-        load,
-        abandoned: () => abandoned,
-      })
-    ).rejects.toBeInstanceOf(LoadAbandonedError);
+    const result = loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", {
+      attempts: 4,
+      abandoned: () => abandoned,
+    });
 
     await vi.advanceTimersByTimeAsync(0);
     abandoned = true;
     await vi.advanceTimersByTimeAsync(1500);
 
-    await settled;
-    expect(load).toHaveBeenCalledTimes(1);
+    await expect(result).resolves.toBeNull();
+    // Bailed before spending the backoff, not after it.
+    expect(getConfig).toHaveBeenCalledTimes(1);
   });
 });

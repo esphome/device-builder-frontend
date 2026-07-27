@@ -6,7 +6,7 @@ import {
   mdiEyeOff,
   mdiFormTextbox,
 } from "@mdi/js";
-import { html, LitElement } from "lit";
+import { html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { apiErrorDetails, APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -14,7 +14,7 @@ import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
@@ -67,6 +67,11 @@ export class ESPHomePageSecrets extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
+  /** WS liveness; the false→true edge re-runs a load that gave up. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
+
   @state()
   private _yaml = "";
 
@@ -77,13 +82,11 @@ export class ESPHomePageSecrets extends LitElement {
   private _saving = false;
 
   @state()
-  private _loaded = false;
+  private _loadState: "loading" | "ready" | "error" = "loading";
 
-  @state()
-  private _loadFailed = false;
-
-  /** Stops the load retry loop once the page is gone. */
-  private _unmounted = false;
+  /** In-flight load, shared by the mount, the external-save reload, and
+   *  Retry so they can't run overlapping recovery loops. */
+  private _loadPromise: Promise<void> | null = null;
 
   // Mirrors the device editor's per-field reveal toggle. Default
   // hidden so values render as bullets the moment the page paints —
@@ -123,8 +126,6 @@ export class ESPHomePageSecrets extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    // A re-attached instance must not inherit the previous teardown's latch.
-    this._unmounted = false;
     const stored = this._readStoredLayout();
     if (stored) {
       this._layout = stored;
@@ -140,6 +141,18 @@ export class ESPHomePageSecrets extends LitElement {
       this._onExternalSecretsSaved as EventListener
     );
     await this._loadFromServer();
+  }
+
+  protected updated(changed: PropertyValues) {
+    // Socket is back: a load that gave up while it was down goes again
+    // without the user hunting for the Retry button.
+    if (
+      changed.has("_apiConnected") &&
+      this._apiConnected &&
+      this._loadState === "error"
+    ) {
+      void this._loadFromServer();
+    }
   }
 
   private _readStoredLayout(): SecretsLayout | null {
@@ -170,7 +183,6 @@ export class ESPHomePageSecrets extends LitElement {
   }
 
   disconnectedCallback() {
-    this._unmounted = true;
     setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
@@ -245,12 +257,19 @@ export class ESPHomePageSecrets extends LitElement {
    * clear-all wipe confirm and lets the next save replace a file that is
    * still intact on disk.
    */
-  private async _loadFromServer() {
-    this._loadFailed = false;
+  private _loadFromServer(): Promise<void> {
+    this._loadPromise ??= this._runLoad().finally(() => {
+      this._loadPromise = null;
+    });
+    return this._loadPromise;
+  }
+
+  private async _runLoad() {
+    if (this._loadState === "error") this._loadState = "loading";
     let yaml: string | null;
     try {
       yaml = await loadConfigWithRecovery(this._api, SECRETS_FILE, {
-        abandoned: () => this._unmounted,
+        abandoned: () => !this.isConnected,
         attempts: LOAD_ATTEMPTS,
       });
     } catch (err) {
@@ -259,7 +278,7 @@ export class ESPHomePageSecrets extends LitElement {
         yaml = this._localize("secrets.file_header");
       } else {
         console.error("Failed to load secrets.yaml:", err);
-        this._loadFailed = true;
+        this._loadState = "error";
         return;
       }
     }
@@ -267,7 +286,7 @@ export class ESPHomePageSecrets extends LitElement {
     if (yaml === null) return;
     this._yaml = yaml;
     this._savedYaml = yaml;
-    this._loaded = true;
+    this._loadState = "ready";
   }
 
   private _retryLoad = () => void this._loadFromServer();
@@ -337,10 +356,11 @@ export class ESPHomePageSecrets extends LitElement {
         </div>
         <div class="editor-card">
           ${renderAsyncState({
-            loading: !this._loaded && !this._loadFailed,
+            loading: this._loadState === "loading",
             loadingMessage: this._localize("secrets.loading"),
             loadingLead: () => html`<wa-spinner></wa-spinner>`,
-            error: this._loadFailed ? this._localize("secrets.load_failed") : null,
+            error:
+              this._loadState === "error" ? this._localize("secrets.load_failed") : null,
             errorActions: () =>
               html`<wa-button size="small" @click=${this._retryLoad}>
                 ${this._localize("command.retry")}
