@@ -11,6 +11,7 @@ vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
 import { APIError, type ESPHomeAPI } from "../../src/api/index.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
+import { RECONNECTED_EVENT } from "../../src/components/app-shell/connection-overlays.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import { flushMicrotasks, mount } from "../_dom.js";
 
@@ -176,6 +177,32 @@ describe("device page initial YAML loading gate", () => {
 
     expect(getConfig).toHaveBeenCalledTimes(1);
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("retries on its own when the socket comes back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const getConfig = vi
+        .fn()
+        .mockRejectedValue(new Error("WebSocket connection closed"));
+      const page = await mountPage(makeApi(getConfig));
+      await vi.advanceTimersByTimeAsync(1500 * 4);
+      await flushMicrotasks(8);
+      await page.updateComplete;
+      expect(loadPanelIn(page)!.textContent).toContain("device.load_failed");
+
+      getConfig.mockResolvedValueOnce("wifi:\n  ssid: x\n");
+      window.dispatchEvent(new Event(RECONNECTED_EVENT));
+      await flushMicrotasks(8);
+      await page.updateComplete;
+
+      // No click needed: the shell said the socket is usable again.
+      expect(editorIn(page)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("waits for api.ready before fetching the config", async () => {

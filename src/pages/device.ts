@@ -56,6 +56,7 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
+import { RECONNECTED_EVENT } from "../components/app-shell/connection-overlays.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
@@ -626,6 +627,7 @@ export class ESPHomePageDevice extends LitElement {
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener("keydown", this._onKeydown);
+    window.addEventListener(RECONNECTED_EVENT, this._onReconnected);
     this._mql.addEventListener("change", this._onMqlChange);
   }
 
@@ -635,6 +637,7 @@ export class ESPHomePageDevice extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
     window.removeEventListener("keydown", this._onKeydown);
+    window.removeEventListener(RECONNECTED_EVENT, this._onReconnected);
     this._mql.removeEventListener("change", this._onMqlChange);
     // Drop any in-flight unsaved-changes guard so its caller's
     // ``await`` doesn't dangle past unmount — resolve as "don't
@@ -830,6 +833,12 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _retryLoadYaml = () => void this._loadYaml();
+
+  /** The socket is back; a load that gave up while it was down can go
+   *  again without the user hunting for the Retry button. */
+  private _onReconnected = () => {
+    if (this._yamlState === "error") this._retryLoadYaml();
+  };
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.

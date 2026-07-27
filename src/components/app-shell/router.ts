@@ -49,6 +49,9 @@ export async function lazyEnter(
   const target = window.location.pathname;
   let counted = false;
   const pendingTimer = setTimeout(() => {
+    // An import can't be cancelled, so this fires even for a navigation the
+    // user has already walked away from; don't advertise progress for it.
+    if (window.location.pathname !== target) return;
     counted = true;
     if (++pendingLoads === 1) hooks.onPending(true);
   }, PENDING_FEEDBACK_DELAY_MS);
@@ -63,6 +66,13 @@ export async function lazyEnter(
         if (delay === undefined) {
           console.error("Failed to load route chunk:", err);
           notifyError(hooks.localize()("layout.page_load_failed"));
+          // navigate() pushed this URL before the router ran enter, and a
+          // false return leaves the old page rendered; undo the push so the
+          // address bar doesn't describe a page that never mounted. A null
+          // state means a fresh load (deep link) with nothing to pop.
+          if (window.history.state !== null && typeof window.history.state === "object") {
+            window.history.back();
+          }
           return false;
         }
         await sleep(delay);

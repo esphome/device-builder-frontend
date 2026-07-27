@@ -139,8 +139,22 @@ describe("lazyEnter", () => {
     expect(pendingCalls).toEqual([true, false]);
   });
 
+  it("does not show the bar for a navigation abandoned before the delay", async () => {
+    const { pendingCalls, hooks } = makeHooks();
+    const result = lazyEnter(() => new Promise<void>(() => {}), hooks);
+
+    window.history.pushState({}, "", "/");
+    await vi.advanceTimersByTimeAsync(400);
+
+    // The import can't be cancelled, but the feedback shouldn't advertise
+    // progress on a page the user already left.
+    expect(pendingCalls).toEqual([]);
+    void result;
+  });
+
   it("cancels the navigation with a toast once the retries are exhausted", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { pendingCalls, hooks } = makeHooks();
     const importThunk = vi.fn().mockRejectedValue(new Error("chunk load failed"));
     const result = lazyEnter(importThunk, hooks);
@@ -153,6 +167,9 @@ describe("lazyEnter", () => {
     });
     // The pending bar cleared even though the load never succeeded.
     expect(pendingCalls).toEqual([true, false]);
+    // navigate() had already pushed the URL; undo it so the address bar
+    // doesn't describe a page that never mounted.
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });
 

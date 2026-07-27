@@ -83,6 +83,7 @@ import {
 } from "./app-shell/jobs.js";
 import {
   connectionOverlayStyles,
+  RECONNECTED_EVENT,
   renderReconnectPill,
   renderRouteLoadingBar,
 } from "./app-shell/connection-overlays.js";
@@ -240,6 +241,7 @@ export class ESPHomeApp extends LitElement {
   // Timer-gated so sub-second reconnect blips neither flash the pill nor
   // fire its role="status" announcement (a CSS delay would still announce).
   @state() private _showReconnectPill = false;
+  private _everConnected = false;
   private _reconnectPillTimer: ReturnType<typeof setTimeout> | null = null;
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -473,7 +475,12 @@ export class ESPHomeApp extends LitElement {
       this._desktopUpdateCapable = info.desktop_update_capable ?? false;
       this._isHaIngress = info.ha_ingress;
       this._isHaAddon = info.ha_addon;
+      // Tell parked pages the socket is usable again before flipping the
+      // flag, so a listener that re-reads state sees the fresh value.
+      const reconnected = this._everConnected;
+      this._everConnected = true;
       this._apiConnected = true;
+      if (reconnected) window.dispatchEvent(new Event(RECONNECTED_EVENT));
       if (this._reconnectPillTimer) {
         clearTimeout(this._reconnectPillTimer);
         this._reconnectPillTimer = null;

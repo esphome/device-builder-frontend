@@ -9,7 +9,7 @@
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
-import { APIError } from "./api-error.js";
+import { APIError, CommandTimeoutError } from "./api-error.js";
 import type {
   AutomationAction,
   AutomationCatalogBody,
@@ -498,7 +498,7 @@ export class ESPHomeAPI {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this._pendingRequests.delete(messageId);
-        reject(new Error(`Command "${command}" timed out after ${timeout}ms`));
+        reject(new CommandTimeoutError(command, timeout));
       }, timeout);
 
       this._pendingRequests.set(messageId, {

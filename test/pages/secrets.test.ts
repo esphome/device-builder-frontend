@@ -46,6 +46,7 @@ interface PageView {
   _readStoredLayout(): "form" | "yaml" | null;
   _seedLayoutFromBackend(): Promise<void>;
   _loadFromServer(): Promise<void>;
+  _loadFailed: boolean;
   _setLayout(layout: "form" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _confirmLeave(): Promise<boolean>;
@@ -290,6 +291,24 @@ describe("esphome-page-secrets initial load", () => {
     expect(page._yaml).not.toBe("");
     expect(page._savedYaml).toBe(page._yaml);
     expect(page._loaded).toBe(true);
+  });
+
+  test("does not template over the real file on a non-not-found server error", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const page = makePage();
+    page._api = {
+      ready: Promise.resolve(),
+      getConfig: vi.fn().mockRejectedValue(new APIError("internal_error", "boom")),
+    } as unknown as ESPHomeAPI;
+
+    await page._loadFromServer();
+
+    // An editable blank buffer here would parse to zero entries, slipping
+    // past the clear-all wipe confirm on the next save.
+    expect(page._yaml).toBe("");
+    expect(page._savedYaml).toBe("");
+    expect(page._loaded).toBe(false);
+    expect(page._loadFailed).toBe(true);
   });
 
   test("retries a transport failure instead of templating over the real file", async () => {

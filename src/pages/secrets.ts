@@ -8,8 +8,9 @@ import {
 } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { apiErrorDetails } from "../api/api-error.js";
+import { apiErrorDetails, APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
@@ -50,6 +51,10 @@ registerMdiIcons({
 
 const SECRETS_FILE = "secrets.yaml";
 
+// Transport attempts before the load surfaces as an error the user can
+// retry; attempts are only spent while the socket is up.
+const LOAD_ATTEMPTS = 4;
+
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
 
@@ -73,6 +78,9 @@ export class ESPHomePageSecrets extends LitElement {
 
   @state()
   private _loaded = false;
+
+  @state()
+  private _loadFailed = false;
 
   /** Stops the load retry loop once the page is gone. */
   private _unmounted = false;
@@ -115,6 +123,8 @@ export class ESPHomePageSecrets extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    // A re-attached instance must not inherit the previous teardown's latch.
+    this._unmounted = false;
     const stored = this._readStoredLayout();
     if (stored) {
       this._layout = stored;
@@ -229,21 +239,29 @@ export class ESPHomePageSecrets extends LitElement {
   /**
    * Pull `secrets.yaml` from the server and reset both buffers.
    *
-   * Only a server reply (APIError, file missing) seeds the localized
-   * header template — a transport fault must not, or a reconnect-window
-   * mount would template over the real file and a save could wipe it.
-   * Transport faults retry once the connection is ready again.
+   * Only a NOT_FOUND reply seeds the localized header template. Any other
+   * failure leaves the buffers empty behind the error state: an editable
+   * blank buffer would parse to zero entries, which slips past the
+   * clear-all wipe confirm and lets the next save replace a file that is
+   * still intact on disk.
    */
   private async _loadFromServer() {
+    this._loadFailed = false;
     let yaml: string | null;
     try {
       yaml = await loadConfigWithRecovery(this._api, SECRETS_FILE, {
         abandoned: () => this._unmounted,
+        attempts: LOAD_ATTEMPTS,
       });
-    } catch {
-      // Only a server reply reaches here (transport faults retry), so
-      // this really is a missing file rather than an unreachable one.
-      yaml = this._localize("secrets.file_header");
+    } catch (err) {
+      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+        // First run: no secrets.yaml yet, so offer the header as a start.
+        yaml = this._localize("secrets.file_header");
+      } else {
+        console.error("Failed to load secrets.yaml:", err);
+        this._loadFailed = true;
+        return;
+      }
     }
     // Null means the page is gone; leave the buffers untouched.
     if (yaml === null) return;
@@ -251,6 +269,8 @@ export class ESPHomePageSecrets extends LitElement {
     this._savedYaml = yaml;
     this._loaded = true;
   }
+
+  private _retryLoad = () => void this._loadFromServer();
 
   /** Another component (typically the onboarding wizard) just
    *  wrote `secrets.yaml`. Reload from the server so the editor
@@ -317,10 +337,14 @@ export class ESPHomePageSecrets extends LitElement {
         </div>
         <div class="editor-card">
           ${renderAsyncState({
-            loading: !this._loaded,
+            loading: !this._loaded && !this._loadFailed,
             loadingMessage: this._localize("secrets.loading"),
             loadingLead: () => html`<wa-spinner></wa-spinner>`,
-            error: null,
+            error: this._loadFailed ? this._localize("secrets.load_failed") : null,
+            errorActions: () =>
+              html`<wa-button size="small" @click=${this._retryLoad}>
+                ${this._localize("command.retry")}
+              </wa-button>`,
             content: () => html`
               <button
                 type="button"

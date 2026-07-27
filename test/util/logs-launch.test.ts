@@ -1,4 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+import toast from "sonner-js";
+import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
@@ -96,7 +103,7 @@ describe("launchLogs", () => {
     try {
       vi.spyOn(console, "warn").mockImplementation(() => {});
       const host = makeHost(async () => {
-        throw new Error('Command "config/serial_ports" timed out after 2500ms');
+        throw new CommandTimeoutError("config/serial_ports", 2500);
       });
       const openPicker = vi.fn();
       await launchLogs(host, makeDevice(), openPicker);
@@ -107,6 +114,24 @@ describe("launchLogs", () => {
       expect(openPicker).not.toHaveBeenCalled();
       expect(host.logsDialog.open).toHaveBeenCalledTimes(1);
       expect(host.logsDialog.configuration).toBe("kitchen.yaml");
+      // A timeout isn't an answer: say the probe was skipped rather than
+      // let the serial option silently vanish for a user who has one.
+      expect(toast.info).toHaveBeenCalledWith(
+        "dashboard.logs_serial_probe_timeout",
+        expect.anything()
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("stays quiet when the server genuinely reports no serial ports", async () => {
+    vi.mocked(toast.info).mockClear();
+    const restore = withWebSerial(false);
+    try {
+      const host = makeHost(async () => []);
+      await launchLogs(host, makeDevice(), vi.fn());
+      expect(toast.info).not.toHaveBeenCalled();
     } finally {
       restore();
     }
