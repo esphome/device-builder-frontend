@@ -27,6 +27,11 @@ export function apiErrorDetails(err: unknown): string {
   return err instanceof APIError && err.details.trim() ? err.details.trim() : "";
 }
 
+/** True when *err* is an ``APIError`` carrying exactly *code*. */
+export function isApiErrorCode(err: unknown, code: string): err is APIError {
+  return err instanceof APIError && err.errorCode === code;
+}
+
 /**
  * A command that never got a reply within its timeout. Distinct from
  * ``APIError`` (the server answered) and from a bare transport ``Error``,

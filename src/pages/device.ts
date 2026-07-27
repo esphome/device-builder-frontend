@@ -2,9 +2,10 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { cache } from "lit/directives/cache.js";
+import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import { APIError, type ESPHomeAPI } from "../api/index.js";
+import { type ESPHomeAPI, isApiErrorCode } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
@@ -34,9 +35,9 @@ import type { HighlightRange } from "../components/yaml-editor.js";
 import type { ESPHomeYamlValidationDialog } from "../components/yaml-validation-dialog.js";
 import {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   devicesContext,
-  apiConnectedContext,
   devicesLoadedContext,
   localizeContext,
 } from "../context/index.js";
@@ -142,14 +143,14 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_platformReady`` uses this to tell "context still loading"
    *  apart from "context delivered, our id isn't here" — a length
    *  check would strand the gate on a zero-device dashboard. */
+  @consume({ context: devicesLoadedContext, subscribe: true })
+  @state()
+  private _devicesLoaded = false;
+
   /** WS liveness; the false→true edge re-runs a load that gave up. */
   @consume({ context: apiConnectedContext, subscribe: true })
   @state()
   private _apiConnected = false;
-
-  @consume({ context: devicesLoadedContext, subscribe: true })
-  @state()
-  private _devicesLoaded = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -852,10 +853,7 @@ export class ESPHomePageDevice extends LitElement {
       this._maybeResolveLineFromUrl();
     } catch (e) {
       console.error("Failed to load YAML:", e);
-      this._yamlState =
-        e instanceof APIError && e.errorCode === ErrorCode.NOT_FOUND
-          ? "missing"
-          : "error";
+      this._yamlState = isApiErrorCode(e, ErrorCode.NOT_FOUND) ? "missing" : "error";
     }
   }
 
@@ -1322,9 +1320,11 @@ export class ESPHomePageDevice extends LitElement {
 
       <div class="page">
         <div
-          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""} ${
-            this._yamlState === "ready" ? "" : "load-state"
-          }"
+          class=${classMap({
+            "layout-grid": true,
+            "nav-collapsed": this._navCollapsed,
+            "load-state": this._yamlState !== "ready",
+          })}
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
@@ -1624,12 +1624,15 @@ export class ESPHomePageDevice extends LitElement {
   /** The editor's stand-in until the config lands. A gone config is
    *  terminal, so it offers a way out rather than a retry. */
   private _renderLoadState() {
+    const loading = this._yamlState === "loading";
     const missing = this._yamlState === "missing";
     return renderAsyncState({
-      loading: this._yamlState === "loading",
+      loading,
       loadingMessage: this._localize("device.loading_config"),
-      loadingLead: () => html`<wa-spinner></wa-spinner>`,
-      error: this._localize(missing ? "device.load_not_found" : "device.load_failed"),
+      loadingLead: html`<wa-spinner></wa-spinner>`,
+      error: loading
+        ? null
+        : this._localize(missing ? "device.load_not_found" : "device.load_failed"),
       errorActions: () =>
         html`<wa-button
           size="small"

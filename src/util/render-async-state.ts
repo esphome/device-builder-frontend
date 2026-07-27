@@ -16,7 +16,7 @@ export interface RenderAsyncStateOptions {
   loadingMessage: string;
   /** Visual shown above the loading message, e.g. a spinner. Supplied by the
    *  consumer so this module needn't pull in a component dependency. */
-  loadingLead?: () => TemplateResult;
+  loadingLead?: TemplateResult;
   // Any falsy value (``""`` / ``null`` / ``undefined``) means "no error", so a
   // ``string | null`` field can be passed straight through without coercion.
   error: string | null | undefined;
@@ -28,7 +28,7 @@ export function renderAsyncState(
   opts: RenderAsyncStateOptions
 ): TemplateResult | typeof nothing {
   if (opts.loading) {
-    const lead = opts.loadingLead?.() ?? nothing;
+    const lead = opts.loadingLead ?? nothing;
     return html`<div class="message" role="status">${lead}${opts.loadingMessage}</div>`;
   }
   if (opts.error) {

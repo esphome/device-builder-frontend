@@ -8,7 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { apiErrorDetails, APIError } from "../api/api-error.js";
+import { apiErrorDetails, isApiErrorCode } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -84,13 +84,9 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _loadState: "loading" | "ready" | "error" = "loading";
 
-  /** In-flight load, shared by the mount, the external-save reload, and
-   *  Retry so they can't run overlapping recovery loops. */
-  private _loadPromise: Promise<void> | null = null;
-
-  /** Set when a caller joins an in-flight load whose request may predate
-   *  the content it wants (external save); triggers one fresh read. */
-  private _reloadQueued = false;
+  /** Bumped per load; a superseded loop self-cancels via ``abandoned``,
+   *  so a fresh read (external save) never settles on a stale reply. */
+  private _loadGen = 0;
 
   // Mirrors the device editor's per-field reveal toggle. Default
   // hidden so values render as bullets the moment the page paints —
@@ -264,31 +260,17 @@ export class ESPHomePageSecrets extends LitElement {
    * clear-all wipe confirm and lets the next save replace a file that is
    * still intact on disk.
    */
-  private _loadFromServer(): Promise<void> {
-    if (this._loadPromise) {
-      this._reloadQueued = true;
-      return this._loadPromise;
-    }
-    this._loadPromise = this._runLoad().finally(() => {
-      this._loadPromise = null;
-      if (this._reloadQueued) {
-        this._reloadQueued = false;
-        void this._loadFromServer();
-      }
-    });
-    return this._loadPromise;
-  }
-
-  private async _runLoad() {
+  private async _loadFromServer(): Promise<void> {
+    const gen = ++this._loadGen;
     if (this._loadState === "error") this._loadState = "loading";
     let yaml: string | null;
     try {
       yaml = await loadConfigWithRecovery(this._api, SECRETS_FILE, {
-        abandoned: () => !this.isConnected,
+        abandoned: () => !this.isConnected || gen !== this._loadGen,
         attempts: LOAD_ATTEMPTS,
       });
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+      if (isApiErrorCode(err, ErrorCode.NOT_FOUND)) {
         // First run: no secrets.yaml yet, so offer the header as a start.
         yaml = this._localize("secrets.file_header");
       } else {
@@ -304,7 +286,8 @@ export class ESPHomePageSecrets extends LitElement {
         return;
       }
     }
-    // Null means the page is gone; leave the buffers untouched.
+    // Null means the page is gone or a newer load took over; leave the
+    // buffers to it.
     if (yaml === null) return;
     this._yaml = yaml;
     this._savedYaml = yaml;
@@ -380,7 +363,7 @@ export class ESPHomePageSecrets extends LitElement {
           ${renderAsyncState({
             loading: this._loadState === "loading",
             loadingMessage: this._localize("secrets.loading"),
-            loadingLead: () => html`<wa-spinner></wa-spinner>`,
+            loadingLead: html`<wa-spinner></wa-spinner>`,
             error:
               this._loadState === "error" ? this._localize("secrets.load_failed") : null,
             errorActions: () =>

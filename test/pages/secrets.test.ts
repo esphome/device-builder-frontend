@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import toast from "sonner-js";
 
+import "../_mock-webawesome.js";
 import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
@@ -19,9 +20,8 @@ vi.mock("sonner-js", () => ({
 // The load cells below mount the page for real, which upgrades these
 // children; Web Awesome's form-associated base and CodeMirror both crash
 // under happy-dom, and the render-only cells only inspect tag names.
+// (_mock-webawesome covers icon/spinner; button isn't in the shared set.)
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("../../src/components/secrets/secrets-structured-editor.js", () => ({}));
 vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
@@ -304,10 +304,6 @@ describe("esphome-page-secrets initial load", () => {
     return page as unknown as PageView;
   }
 
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   test("seeds the header template only when the server says the file is missing", async () => {
     const page = await mountWithApi(
       vi.fn().mockRejectedValue(new APIError("not_found", "missing"))
@@ -372,7 +368,7 @@ describe("esphome-page-secrets initial load", () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  test("an external save landing mid-load queues one fresh read", async () => {
+  test("an external save landing mid-load supersedes it with a fresh read", async () => {
     let settleFirst!: (yaml: string) => void;
     const getConfig = vi
       .fn()
@@ -381,7 +377,8 @@ describe("esphome-page-secrets initial load", () => {
     const page = await mountWithApi(getConfig);
 
     // The wizard wrote secrets.yaml while the mount's read was in
-    // flight; that reply predates the write, so joining it isn't enough.
+    // flight; that reply predates the write, so a fresh read must win
+    // and the stale one must be dropped even though it settles later.
     void page._loadFromServer();
     settleFirst("wifi_password: stale\n");
     await flushMicrotasks(8);

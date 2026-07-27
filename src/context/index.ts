@@ -1,5 +1,6 @@
 export {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
@@ -12,7 +13,6 @@ export {
   desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
-  apiConnectedContext,
   devicesLoadedContext,
   experienceLevelContext,
   expertModeContext,

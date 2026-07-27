@@ -34,7 +34,7 @@ describe("renderAsyncState", () => {
       renderAsyncState({
         loading: true,
         loadingMessage: "checking",
-        loadingLead: () => html`<wa-spinner></wa-spinner>`,
+        loadingLead: html`<wa-spinner></wa-spinner>`,
         error: "",
         content,
       })

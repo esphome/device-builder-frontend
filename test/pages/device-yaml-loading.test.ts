@@ -60,7 +60,6 @@ const loadActionIn = (page: ESPHomePageDevice) =>
 describe("device page initial YAML loading gate", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    document.body.innerHTML = "";
   });
 
   it("shows the loading panel instead of an empty editor while getConfig is in flight", async () => {

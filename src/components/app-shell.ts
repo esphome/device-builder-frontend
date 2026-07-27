@@ -493,7 +493,7 @@ export class ESPHomeApp extends LitElement {
       this._apiConnected = false;
       this._reconnectPillTimer ??= setTimeout(() => {
         this._reconnectPillTimer = null;
-        if (!this._apiConnected) this._showReconnectPill = true;
+        this._showReconnectPill = true;
       }, RECONNECT_PILL_DELAY_MS);
     };
 

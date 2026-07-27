@@ -27,8 +27,9 @@ export interface RouterHooks {
 }
 
 const PENDING_FEEDBACK_DELAY_MS = 200;
-// One retry, since output.chunkLoadTimeout already bounds each attempt.
-const RETRY_DELAYS_MS = [500];
+// Two attempts total, since output.chunkLoadTimeout already bounds each.
+const CHUNK_LOAD_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 500;
 
 // Slow loads in flight at once; the pending hook fires on the 0↔1 edges so
 // overlapping navigations can't hide each other's progress bar.
@@ -58,14 +59,13 @@ export async function lazyEnter(
     if (++pendingLoads === 1) hooks.onPending(true);
   }, PENDING_FEEDBACK_DELAY_MS);
   try {
-    for (let attempt = 0; ; attempt++) {
+    for (let attempt = 1; ; attempt++) {
       try {
         await importThunk();
         return window.location.pathname === target;
       } catch (err) {
         if (window.location.pathname !== target) return false;
-        const delay = RETRY_DELAYS_MS[attempt];
-        if (delay === undefined) {
+        if (attempt >= CHUNK_LOAD_ATTEMPTS) {
           console.error("Failed to load route chunk:", err);
           notifyError(hooks.localize()("layout.page_load_failed"));
           // navigate() pushed this URL before the router ran enter, and a
@@ -76,7 +76,7 @@ export async function lazyEnter(
           if (hasPushedHistoryEntry()) popPushedEntrySilently();
           return false;
         }
-        await sleep(delay);
+        await sleep(RETRY_DELAY_MS);
       }
     }
   } finally {

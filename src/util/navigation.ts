@@ -33,14 +33,6 @@ export async function runLeaveGuard(): Promise<boolean> {
   }
 }
 
-/**
- * Leave the current page the way the header back arrow does. Prefer popping
- * the history stack so the previous URL — and therefore the dashboard's
- * filter / search state encoded in its query string — is restored verbatim.
- * ``history.state`` is set to ``{}`` by ``navigate()`` on every pushState;
- * ``null`` means a fresh page load (deep link / refresh) so there's nothing
- * useful to pop and we fall back to ``navigate("/")`` to stay inside the SPA.
- */
 /** True when the current entry came from ``navigate()`` (which stamps
  *  ``{}``) rather than a fresh page load, so there is something to pop. */
 export function hasPushedHistoryEntry(): boolean {
@@ -53,6 +45,14 @@ let popGuardSuppressed = false;
  *  guards — the user already answered them for the failed navigation. */
 export function popPushedEntrySilently(): void {
   popGuardSuppressed = true;
+  // The rollback's own popstate clears the arming even when no guarded
+  // page is mounted to consume it (dashboard), so it can't strand and
+  // skip a later real leave prompt. Page guards register on connect, so
+  // they run first and still consume it in time.
+  window.addEventListener("popstate", () => void consumePopGuardSuppression(), {
+    capture: true,
+    once: true,
+  });
   window.history.back();
 }
 
@@ -63,6 +63,14 @@ export function consumePopGuardSuppression(): boolean {
   return suppressed;
 }
 
+/**
+ * Leave the current page the way the header back arrow does. Prefer popping
+ * the history stack so the previous URL — and therefore the dashboard's
+ * filter / search state encoded in its query string — is restored verbatim.
+ * ``history.state`` is set to ``{}`` by ``navigate()`` on every pushState;
+ * ``null`` means a fresh page load (deep link / refresh) so there's nothing
+ * useful to pop and we fall back to ``navigate("/")`` to stay inside the SPA.
+ */
 export async function goBackOrHome(): Promise<void> {
   if (hasPushedHistoryEntry()) {
     // history.back() fires a raw popstate the router commits (unmounting the
