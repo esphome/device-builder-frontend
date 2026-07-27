@@ -352,6 +352,25 @@ describe("esphome-page-secrets initial load", () => {
     }
   });
 
+  test("an external save landing mid-load queues one fresh read", async () => {
+    let settleFirst!: (yaml: string) => void;
+    const getConfig = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<string>((r) => (settleFirst = r)))
+      .mockResolvedValueOnce("wifi_password: fresh\n");
+    const page = await mountWithApi(getConfig);
+
+    // The wizard wrote secrets.yaml while the mount's read was in
+    // flight; that reply predates the write, so joining it isn't enough.
+    void page._loadFromServer();
+    settleFirst("wifi_password: stale\n");
+    await flushMicrotasks(8);
+
+    expect(getConfig).toHaveBeenCalledTimes(2);
+    expect(page._yaml).toBe("wifi_password: fresh\n");
+    expect(page._savedYaml).toBe("wifi_password: fresh\n");
+  });
+
   test("re-runs a failed load when the socket comes back", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});

@@ -88,6 +88,10 @@ export class ESPHomePageSecrets extends LitElement {
    *  Retry so they can't run overlapping recovery loops. */
   private _loadPromise: Promise<void> | null = null;
 
+  /** Set when a caller joins an in-flight load whose request may predate
+   *  the content it wants (external save); triggers one fresh read. */
+  private _reloadQueued = false;
+
   // Mirrors the device editor's per-field reveal toggle. Default
   // hidden so values render as bullets the moment the page paints —
   // anyone glancing at the screen sees masks, not the raw secrets.
@@ -258,8 +262,16 @@ export class ESPHomePageSecrets extends LitElement {
    * still intact on disk.
    */
   private _loadFromServer(): Promise<void> {
-    this._loadPromise ??= this._runLoad().finally(() => {
+    if (this._loadPromise) {
+      this._reloadQueued = true;
+      return this._loadPromise;
+    }
+    this._loadPromise = this._runLoad().finally(() => {
       this._loadPromise = null;
+      if (this._reloadQueued) {
+        this._reloadQueued = false;
+        void this._loadFromServer();
+      }
     });
     return this._loadPromise;
   }

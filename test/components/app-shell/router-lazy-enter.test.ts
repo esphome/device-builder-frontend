@@ -12,8 +12,9 @@ import { identityLocalize } from "../../_dom.js";
 
 /**
  * Pins the lazy-route chunk loader: pending feedback only after the
- * delay, retries on a failed import, cancelled navigation + toast on
- * exhaustion, and idle-scheduled prefetch.
+ * delay, retries on a failed import, and cancelled navigation + toast
+ * on exhaustion. (Prefetch is a build-level webpackPrefetch hint with
+ * no runtime surface to test.)
  */
 
 function makeHooks(): { pendingCalls: boolean[]; hooks: RouterHooks } {
@@ -31,6 +32,9 @@ describe("lazyEnter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     window.history.pushState({}, "", "/device/kitchen.yaml");
+    // Module-factory mock, so restoreAllMocks never clears its history;
+    // without this the not.toHaveBeenCalled cells are order-dependent.
+    vi.mocked(toast.error).mockClear();
   });
 
   afterEach(() => {

@@ -15,6 +15,7 @@ export const connectionOverlayStyles = css`
     height: 3px;
     z-index: 10000;
     overflow: hidden;
+    pointer-events: none;
     /* White-on-translucent so it stays visible over the branded
        (primary-colored) header the bar always overlays. */
     background: rgba(255, 255, 255, 0.25);
