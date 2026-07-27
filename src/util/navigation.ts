@@ -30,11 +30,11 @@ export async function navigate(url: string): Promise<void> {
 /**
  * Run the active page-leave guard. Resolves ``true`` when it's safe to leave
  * (no guard, or the guard resolved "proceed"). Used by ``navigate`` and by
- * back-navigations that bypass it but still must honour the guard — the header
- * back arrow's ``history.back()``, whose raw popstate the router commits before
- * the device editor's own popstate guard can veto it. A guard that throws
- * resolves ``false``: navigating through unsaved state on a broken guard
- * would lose it silently, so staying put is the fail-safe.
+ * the header back arrow's ``history.back()``, which prompts before the pop
+ * rather than leaving it to the popstate interceptor's after-the-pop
+ * re-push. A guard that throws resolves ``false``: navigating through
+ * unsaved state on a broken guard would lose it silently, so staying put
+ * is the fail-safe.
  */
 export async function runLeaveGuard(): Promise<boolean> {
   if (!activeGuard) return true;
@@ -106,11 +106,44 @@ export interface PopLeaveGuardOptions {
   url: () => string;
 }
 
+let activeLeaveGuardController: PopLeaveGuardController | null = null;
+let interceptorInstalled = false;
+
+function claimPopstateDelivery(controller: PopLeaveGuardController): void {
+  activeLeaveGuardController = controller;
+}
+
+/** Release only while *controller* still holds delivery — a departing
+ *  page must not disarm a successor that already claimed it. */
+function releasePopstateDelivery(controller: PopLeaveGuardController): void {
+  if (activeLeaveGuardController === controller) activeLeaveGuardController = null;
+}
+
+/**
+ * Install the single popstate listener that delivers to the active
+ * ``PopLeaveGuardController``. Must run before the router is constructed:
+ * popstate targets ``window``, where listeners fire in registration order
+ * (the capture flag confers no priority), so registering ahead of the
+ * router's listener is the only way an interception can veto the
+ * router's route commit (#1520). Idempotent.
+ */
+export function installLeaveGuardInterceptor(): void {
+  if (interceptorInstalled) return;
+  interceptorInstalled = true;
+  window.addEventListener(
+    "popstate",
+    (e) => activeLeaveGuardController?.handlePopState(e),
+    { capture: true }
+  );
+}
+
 /**
  * Owns a page's popstate leave-guard: intercepts a dirty Back/Forward,
  * re-asserts the page URL, runs the confirm flow, and replays the pop on
  * proceed. Registers the confirm flow as the active leave guard for the
- * host's connected lifetime.
+ * host's connected lifetime; popstate delivery arrives through the
+ * module's single interceptor, which registers ahead of the router so
+ * ``stopImmediatePropagation`` genuinely blocks the route commit.
  */
 export class PopLeaveGuardController implements ReactiveController {
   /* The allow flag is flipped inside the wrapped guard BEFORE its caller
@@ -142,12 +175,12 @@ export class PopLeaveGuardController implements ReactiveController {
 
   hostConnected(): void {
     setLeaveGuard(this._guard);
-    window.addEventListener("popstate", this.handlePopState, { capture: true });
+    claimPopstateDelivery(this);
   }
 
   hostDisconnected(): void {
     clearLeaveGuard(this._guard);
-    window.removeEventListener("popstate", this.handlePopState, { capture: true });
+    releasePopstateDelivery(this);
     this._allowingLeave = false;
   }
 
@@ -186,10 +219,11 @@ export class PopLeaveGuardController implements ReactiveController {
  */
 export async function goBackOrHome(): Promise<void> {
   if (hasPushedHistoryEntry()) {
-    // history.back() fires a raw popstate the router commits (unmounting the
-    // page) before the device editor's popstate guard can veto it, so honour
-    // the leave guard here — same gate navigate() applies. navigate("/") runs
-    // the guard itself, so the fallback isn't double-prompted.
+    // Prompt before popping: the user answers while the URL still shows
+    // their page. The popstate interceptor would catch a raw back too,
+    // but only after the pop, via re-push; and the allow flag the guard
+    // sets lets this pop fall through it. navigate("/") runs the guard
+    // itself, so the fallback isn't double-prompted.
     if (!(await runLeaveGuard())) return;
     window.history.back();
     return;

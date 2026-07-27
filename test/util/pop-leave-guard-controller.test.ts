@@ -4,10 +4,15 @@ import type { ReactiveController } from "lit";
 import {
   PopLeaveGuardController,
   consumePopGuardSuppression,
+  installLeaveGuardInterceptor,
   popPushedEntrySilently,
   runLeaveGuard,
 } from "../../src/util/navigation.js";
 import { flushMicrotasks } from "../_dom.js";
+
+// Production installs this in createRouter, before the router's own
+// popstate listener registers; delivery to the controller runs through it.
+installLeaveGuardInterceptor();
 
 /**
  * Pins the centralized popstate leave-guard: suppression first, one-shot
@@ -170,5 +175,55 @@ describe("PopLeaveGuardController", () => {
     // Ownership check: only the active guard's owner may clear it.
     expect(second.confirm).toHaveBeenCalledTimes(1);
     expect(first.confirm).not.toHaveBeenCalled();
+
+    // The answered guard's own pop falls through; the next one shows
+    // popstate delivery follows the successor too.
+    window.dispatchEvent(popState());
+    window.dispatchEvent(popState());
+    expect(second.dirty).toHaveBeenCalledTimes(1);
+    expect(first.dirty).not.toHaveBeenCalled();
+  });
+
+  it("intercepts ahead of a router-style popstate listener", async () => {
+    let isDirty = true;
+    connect({ dirty: () => isDirty });
+    // Bubble listener registered after the interceptor, mirroring
+    // @lit-labs/router's registration at app-shell connect. popstate
+    // targets window, so registration order alone decides delivery.
+    const routerListener = vi.fn();
+    window.addEventListener("popstate", routerListener);
+    try {
+      window.dispatchEvent(popState());
+      // Dirty pop: the veto lands before the router can commit.
+      expect(routerListener).not.toHaveBeenCalled();
+      expect(pushState).toHaveBeenCalledWith({}, "", "/secrets");
+
+      await runLeaveGuard();
+      window.dispatchEvent(popState());
+      // An answered leave's own pop falls through to the router.
+      expect(routerListener).toHaveBeenCalledTimes(1);
+
+      popPushedEntrySilently();
+      window.dispatchEvent(popState());
+      // A suppressed rollback pop reaches the router too.
+      expect(routerListener).toHaveBeenCalledTimes(2);
+
+      isDirty = false;
+      window.dispatchEvent(popState());
+      // And so does a clean pop.
+      expect(routerListener).toHaveBeenCalledTimes(3);
+    } finally {
+      window.removeEventListener("popstate", routerListener);
+    }
+  });
+
+  it("installs the interceptor once", () => {
+    installLeaveGuardInterceptor();
+    installLeaveGuardInterceptor();
+    const { dirty } = connect();
+
+    window.dispatchEvent(popState());
+    // A duplicate listener would double-consult the dirty check.
+    expect(dirty).toHaveBeenCalledTimes(1);
   });
 });
