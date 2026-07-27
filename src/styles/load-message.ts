@@ -20,4 +20,8 @@ export const loadMessageStyles = css`
   .message wa-spinner {
     font-size: 32px;
   }
+
+  .message.error {
+    color: var(--wa-color-danger-text-normal);
+  }
 `;

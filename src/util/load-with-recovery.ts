@@ -23,7 +23,7 @@ export interface LoadConfigOptions {
  * server answered, so it is final and rethrown. Waiting on ``api.ready``
  * parks for the whole outage, so attempts are only spent while the socket
  * is up. Returns ``null`` once ``abandoned()`` goes true, including for a
- * reply that lands after the caller moved on.
+ * reply or failure that lands after the caller moved on.
  */
 export async function loadConfigWithRecovery(
   api: ESPHomeAPI,
@@ -38,8 +38,8 @@ export async function loadConfigWithRecovery(
       const yaml = await api.getConfig(configuration, opts.timeoutMs);
       return opts.abandoned?.() ? null : yaml;
     } catch (err) {
-      if (err instanceof APIError || attempt >= opts.attempts) throw err;
       if (opts.abandoned?.()) return null;
+      if (err instanceof APIError || attempt >= opts.attempts) throw err;
       console.warn(`Load failed (attempt ${attempt}); retrying:`, err);
       await sleep(RETRY_DELAY_MS);
     }

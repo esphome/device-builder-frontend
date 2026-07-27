@@ -103,6 +103,26 @@ describe("loadConfigWithRecovery", () => {
     await expect(result).resolves.toBeNull();
   });
 
+  it("drops a rejection that lands after the caller moved on", async () => {
+    let abandoned = false;
+    let fail!: (err: Error) => void;
+    const getConfig = vi.fn(
+      () => new Promise<string>((_resolve, reject) => (fail = reject))
+    );
+    const result = loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", {
+      attempts: 4,
+      abandoned: () => abandoned,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    // A reused element has moved to the next id; the old load's terminal
+    // failure must not paint an error state over it.
+    abandoned = true;
+    fail(new APIError("not_found", "gone"));
+
+    await expect(result).resolves.toBeNull();
+  });
+
   it("stops retrying once the caller loses interest", async () => {
     const getConfig = vi.fn().mockRejectedValue(new Error("WebSocket closed"));
     let abandoned = false;
