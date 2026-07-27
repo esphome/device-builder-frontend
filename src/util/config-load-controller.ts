@@ -47,6 +47,9 @@ export class ConfigLoadController implements ReactiveController {
 
   hostConnected(): void {
     this._active = true;
+    // Seed the edge detector so an error landing before the first host
+    // update can't misread an already-up socket as a reconnect.
+    this._prevConnected = this._opts.connected();
   }
 
   hostDisconnected(): void {

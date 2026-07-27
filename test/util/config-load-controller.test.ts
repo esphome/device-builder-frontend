@@ -143,6 +143,19 @@ describe("ConfigLoadController", () => {
     expect(controller.state).toBe("missing");
   });
 
+  it("does not treat the initial connected state as a reconnect edge", async () => {
+    const getConfig = vi.fn().mockRejectedValue(new Error("WebSocket closed"));
+    const { host, controller } = makeLoad({ getConfig });
+    await controller.start();
+    expect(controller.state).toBe("error");
+
+    host.update();
+    await flushMicrotasks(4);
+    // The socket was up the whole time — no edge, no extra retry.
+    expect(getConfig).toHaveBeenCalledTimes(1);
+    expect(controller.state).toBe("error");
+  });
+
   it("re-runs a failed load on the reconnect edge", async () => {
     let connected = true;
     const getConfig = vi.fn().mockRejectedValueOnce(new Error("WebSocket closed"));
