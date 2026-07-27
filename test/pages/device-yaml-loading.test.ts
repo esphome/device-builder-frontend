@@ -9,9 +9,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "./_mock-device-children.js";
 vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
-import type { ESPHomeAPI } from "../../src/api/index.js";
+import { APIError, type ESPHomeAPI } from "../../src/api/index.js";
+import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
-import { flushMicrotasks } from "../_dom.js";
+import { flushMicrotasks, mount } from "../_dom.js";
 
 interface Deferred {
   resolve(value: string): void;
@@ -38,12 +39,10 @@ function makeApi(getConfig: ReturnType<typeof vi.fn>): ESPHomeAPI {
 }
 
 async function mountPage(api: ESPHomeAPI): Promise<ESPHomePageDevice> {
-  const page = new ESPHomePageDevice();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (page as any)._api = api;
-  page.id = "kitchen.yaml";
-  document.body.appendChild(page);
-  await page.updateComplete;
+  const page = await mount(new ESPHomePageDevice(), {
+    _api: api,
+    id: "kitchen.yaml",
+  } as Partial<ESPHomePageDevice>);
   await flushMicrotasks(8);
   await page.updateComplete;
   return page;
@@ -102,6 +101,27 @@ describe("device page initial YAML loading gate", () => {
     expect(getConfig).toHaveBeenCalledTimes(2);
     expect(loadPanelIn(page)).toBeNull();
     expect(editorIn(page)).not.toBeNull();
+  });
+
+  it("offers a way back instead of a retry when the config is gone", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const getConfig = vi
+      .fn()
+      .mockRejectedValue(new APIError(ErrorCode.NOT_FOUND, "no such device"));
+    const page = await mountPage(makeApi(getConfig));
+
+    const panel = loadPanelIn(page);
+    expect(panel).not.toBeNull();
+    // A deleted config can't be retried into existence.
+    expect(panel!.textContent).toContain("device.load_not_found");
+    const button = panel!.querySelector("wa-button");
+    expect(button!.textContent).toContain("device.back_to_dashboard");
+
+    (button as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushMicrotasks(4);
+
+    expect(getConfig).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe("/");
   });
 
   it("waits for api.ready before fetching the config", async () => {

@@ -3,6 +3,7 @@ import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import { notifyError } from "../../util/notify.js";
+import { sleep } from "../../util/sleep.js";
 
 // Decode the :id path param, falling back to the raw value on URIError so a
 // malformed % sequence doesn't crash the whole router — the device page's
@@ -17,8 +18,8 @@ function decodeIdParam(id: string | undefined): string {
 }
 
 export interface RouterHooks {
-  /** Flips true when a lazy route chunk has been in flight long enough to
-   *  deserve visible feedback, false when the load settles either way. */
+  /** Flips true when the first slow chunk load crosses the feedback delay,
+   *  false when the last one settles either way. */
   onPending(pending: boolean): void;
   /** Read at failure time — the shell's localize loads async after mount. */
   localize(): LocalizeFunc;
@@ -27,44 +28,51 @@ export interface RouterHooks {
 const PENDING_FEEDBACK_DELAY_MS = 200;
 const RETRY_DELAYS_MS = [500, 1500];
 
+// Slow loads in flight at once; the pending hook fires on the 0↔1 edges so
+// overlapping navigations can't hide each other's progress bar.
+let pendingLoads = 0;
+
 /**
  * Await a lazy route chunk with pending feedback and retries.
  *
  * On exhaustion the navigation is cancelled with a toast so the click
  * never silently does nothing (rspack re-requests a failed chunk on the
- * next import() call, so a later click retries from scratch).
+ * next import() call, so a later click retries from scratch). A chunk
+ * that lands after the user has navigated elsewhere resolves false —
+ * @lit-labs/router has no in-flight guard, so returning true here would
+ * commit the stale route over the one the URL now shows.
  */
 export async function lazyEnter(
   importThunk: () => Promise<unknown>,
   hooks: RouterHooks
 ): Promise<boolean> {
-  let pendingShown = false;
+  const target = window.location.pathname;
+  let counted = false;
   const pendingTimer = setTimeout(() => {
-    pendingShown = true;
-    hooks.onPending(true);
+    counted = true;
+    if (++pendingLoads === 1) hooks.onPending(true);
   }, PENDING_FEEDBACK_DELAY_MS);
   try {
     for (let attempt = 0; ; attempt++) {
       try {
         await importThunk();
-        return true;
+        return window.location.pathname === target;
       } catch (err) {
+        if (window.location.pathname !== target) return false;
         const delay = RETRY_DELAYS_MS[attempt];
         if (delay === undefined) {
           console.error("Failed to load route chunk:", err);
           notifyError(hooks.localize()("layout.page_load_failed"));
           return false;
         }
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await sleep(delay);
       }
     }
   } finally {
     clearTimeout(pendingTimer);
-    if (pendingShown) hooks.onPending(false);
+    if (counted && --pendingLoads === 0) hooks.onPending(false);
   }
 }
-
-let prefetched = false;
 
 /**
  * Warm the lazy route chunks once the browser is idle so a later Edit
@@ -72,8 +80,6 @@ let prefetched = false;
  * Failures are swallowed — the click path retries on its own.
  */
 export function prefetchLazyRoutes(): void {
-  if (prefetched) return;
-  prefetched = true;
   const warm = () => {
     import("../../pages/device.js").catch(() => {});
     import("../../pages/secrets.js").catch(() => {});

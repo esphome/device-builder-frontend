@@ -1792,8 +1792,8 @@ export class ESPHomeAPI {
   }
 
   /** List available serial ports. */
-  async getSerialPorts(): Promise<SerialPort[]> {
-    return this.sendCommand<SerialPort[]>("config/serial_ports");
+  async getSerialPorts(timeout?: number): Promise<SerialPort[]> {
+    return this.sendCommand<SerialPort[]>("config/serial_ports", undefined, timeout);
   }
 
   /**

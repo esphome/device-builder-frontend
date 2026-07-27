@@ -1053,7 +1053,9 @@
     "discard_changes": "Discard",
     "save_and_leave": "Save",
     "loading_config": "Loading configuration…",
-    "load_failed": "The configuration could not be loaded. Check your connection and retry."
+    "load_failed": "The configuration could not be loaded. Check your connection and retry.",
+    "load_not_found": "This configuration no longer exists. It may have been deleted or renamed.",
+    "back_to_dashboard": "Back to devices"
   },
   "naming": {
     "hostname_disclosure": "Hostname: {hostname}",

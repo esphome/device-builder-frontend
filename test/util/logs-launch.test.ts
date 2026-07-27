@@ -91,22 +91,23 @@ describe("launchLogs", () => {
     }
   });
 
-  it("opens OTA logs after the probe timeout when the lookup hangs", async () => {
+  it("bounds the serial-port probe so a hung lookup still opens OTA logs", async () => {
     const restore = withWebSerial(false);
-    vi.useFakeTimers();
     try {
-      const host = makeHost(() => new Promise(() => {}));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const host = makeHost(async () => {
+        throw new Error('Command "config/serial_ports" timed out after 2500ms');
+      });
       const openPicker = vi.fn();
-      const launched = launchLogs(host, makeDevice(), openPicker);
+      await launchLogs(host, makeDevice(), openPicker);
 
-      await vi.advanceTimersByTimeAsync(2500);
-      await launched;
-
+      // The probe passes the short bound down to the command layer, so the
+      // wire timeout is what fires on a degraded link.
+      expect(host.api.getSerialPorts).toHaveBeenCalledWith(2500);
       expect(openPicker).not.toHaveBeenCalled();
       expect(host.logsDialog.open).toHaveBeenCalledTimes(1);
       expect(host.logsDialog.configuration).toBe("kitchen.yaml");
     } finally {
-      vi.useRealTimers();
       restore();
     }
   });

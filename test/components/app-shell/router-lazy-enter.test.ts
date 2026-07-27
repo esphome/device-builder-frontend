@@ -12,11 +12,12 @@ import {
   prefetchLazyRoutes,
   type RouterHooks,
 } from "../../../src/components/app-shell/router.js";
+import { identityLocalize } from "../../_dom.js";
 
 /**
  * Pins the lazy-route chunk loader: pending feedback only after the
  * delay, retries on a failed import, cancelled navigation + toast on
- * exhaustion, and idle-scheduled prefetch that never double-schedules.
+ * exhaustion, and idle-scheduled prefetch.
  */
 
 function makeHooks(): { pendingCalls: boolean[]; hooks: RouterHooks } {
@@ -25,7 +26,7 @@ function makeHooks(): { pendingCalls: boolean[]; hooks: RouterHooks } {
     pendingCalls,
     hooks: {
       onPending: (pending: boolean) => pendingCalls.push(pending),
-      localize: () => ((key: string) => key) as LocalizeFunc,
+      localize: () => identityLocalize as LocalizeFunc,
     },
   };
 }
@@ -33,22 +34,25 @@ function makeHooks(): { pendingCalls: boolean[]; hooks: RouterHooks } {
 describe("lazyEnter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    window.history.pushState({}, "", "/device/kitchen.yaml");
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    window.history.pushState({}, "", "/");
   });
 
-  it("resolves without pending feedback when the chunk is fast", async () => {
+  it("resolves without showing pending when the chunk is fast", async () => {
     const { pendingCalls, hooks } = makeHooks();
     const result = lazyEnter(() => Promise.resolve(), hooks);
     await expect(result).resolves.toBe(true);
     await vi.advanceTimersByTimeAsync(1000);
+    // Never crossed the delay, so it never joined the pending count.
     expect(pendingCalls).toEqual([]);
   });
 
-  it("shows pending feedback only after the delay and clears it on resolve", async () => {
+  it("shows pending only after the delay and clears it on resolve", async () => {
     const { pendingCalls, hooks } = makeHooks();
     let resolveImport!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -80,6 +84,61 @@ describe("lazyEnter", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("refuses to commit a chunk that lands after the user navigated away", async () => {
+    const { hooks } = makeHooks();
+    let resolveImport!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      resolveImport = resolve;
+    });
+    const result = lazyEnter(() => gate, hooks);
+
+    // User gave up on the slow route and went back to the dashboard.
+    window.history.pushState({}, "", "/");
+    resolveImport();
+
+    await expect(result).resolves.toBe(false);
+  });
+
+  it("abandons the retry loop when the location moves on mid-backoff", async () => {
+    const { hooks } = makeHooks();
+    const importThunk = vi.fn().mockRejectedValue(new Error("chunk load failed"));
+    const result = lazyEnter(importThunk, hooks);
+
+    window.history.pushState({}, "", "/somewhere-else");
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(result).resolves.toBe(false);
+    // Bailed on the first failure instead of burning both retries.
+    expect(importThunk).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps the bar up until the last overlapping load settles", async () => {
+    const { pendingCalls, hooks } = makeHooks();
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    const first = lazyEnter(
+      () => new Promise<void>((resolve) => (resolveFirst = resolve)),
+      hooks
+    );
+    const second = lazyEnter(
+      () => new Promise<void>((resolve) => (resolveSecond = resolve)),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(200);
+    // Both crossed the delay; the bar is shown once, not twice.
+    expect(pendingCalls).toEqual([true]);
+
+    resolveFirst();
+    await first;
+    expect(pendingCalls).toEqual([true]);
+
+    resolveSecond();
+    await second;
+    expect(pendingCalls).toEqual([true, false]);
+  });
+
   it("cancels the navigation with a toast once the retries are exhausted", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { pendingCalls, hooks } = makeHooks();
@@ -98,11 +157,10 @@ describe("lazyEnter", () => {
 });
 
 describe("prefetchLazyRoutes", () => {
-  it("schedules the warm-up once across repeated calls", () => {
+  it("defers the warm-up to an idle callback", () => {
     const requestIdleCallback = vi.fn();
     vi.stubGlobal("requestIdleCallback", requestIdleCallback);
     try {
-      prefetchLazyRoutes();
       prefetchLazyRoutes();
       expect(requestIdleCallback).toHaveBeenCalledTimes(1);
     } finally {

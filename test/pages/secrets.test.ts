@@ -45,6 +45,7 @@ interface PageView {
   _layout: "form" | "yaml";
   _readStoredLayout(): "form" | "yaml" | null;
   _seedLayoutFromBackend(): Promise<void>;
+  _loadFromServer(): Promise<void>;
   _setLayout(layout: "form" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _confirmLeave(): Promise<boolean>;
@@ -273,6 +274,46 @@ describe("esphome-page-secrets clear-all wipe confirm (#1568)", () => {
     page.disconnectedCallback();
 
     expect(settle).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("esphome-page-secrets initial load", () => {
+  test("seeds the header template only when the server says the file is missing", async () => {
+    const page = makePage();
+    page._api = {
+      ready: Promise.resolve(),
+      getConfig: vi.fn().mockRejectedValue(new APIError("not_found", "missing")),
+    } as unknown as ESPHomeAPI;
+
+    await page._loadFromServer();
+
+    expect(page._yaml).not.toBe("");
+    expect(page._savedYaml).toBe(page._yaml);
+    expect(page._loaded).toBe(true);
+  });
+
+  test("retries a transport failure instead of templating over the real file", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const page = makePage();
+      const getConfig = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("WebSocket connection closed"))
+        .mockResolvedValueOnce("wifi_password: hunter2\n");
+      page._api = { ready: Promise.resolve(), getConfig } as unknown as ESPHomeAPI;
+
+      const loaded = page._loadFromServer();
+      await vi.advanceTimersByTimeAsync(2000);
+      await loaded;
+
+      // The real file wins; the blank template never reached the buffer.
+      expect(getConfig).toHaveBeenCalledTimes(2);
+      expect(page._yaml).toBe("wifi_password: hunter2\n");
+      expect(page._savedYaml).toBe("wifi_password: hunter2\n");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

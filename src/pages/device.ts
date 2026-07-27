@@ -1,12 +1,14 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
+import { cache } from "lit/directives/cache.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import type { ESPHomeAPI } from "../api/index.js";
+import { APIError, type ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
@@ -322,9 +324,11 @@ export class ESPHomePageDevice extends LitElement {
 
   /** Initial-fetch gate for the current id: the editor and navigator
    *  render only once "ready", so a slow ``getConfig`` shows a spinner
-   *  instead of an empty editor, and a failed one shows a retry. */
+   *  instead of an empty editor. A transport failure offers a retry;
+   *  a NOT_FOUND config (deleted, renamed, stale bookmark) is terminal,
+   *  so it routes back to the dashboard instead. */
   @state()
-  private _yamlState: "loading" | "ready" | "error" = "loading";
+  private _yamlState: "loading" | "ready" | "error" | "missing" = "loading";
 
   @state()
   private _savedYaml = "";
@@ -673,7 +677,11 @@ export class ESPHomePageDevice extends LitElement {
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
       this._kickKnownKeys();
-      this._yamlState = "loading";
+      // The loading gate detaches the editor subtree, so the section
+      // editor's unmount announcement never reaches this page — drop the
+      // captured ref and its dirty bit here instead.
+      this._activeSection = null;
+      this._sectionDirty = false;
       void this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
@@ -790,6 +798,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private async _loadYaml() {
     const id = this.id;
+    this._yamlState = "loading";
     try {
       // Ready gates on (re)connect + auth, so a mount during a reconnect
       // window waits instead of throwing "WebSocket not connected".
@@ -802,14 +811,15 @@ export class ESPHomePageDevice extends LitElement {
       this._maybeResolveLineFromUrl();
     } catch (e) {
       console.error("Failed to load YAML:", e);
-      if (this.id === id) this._yamlState = "error";
+      if (this.id !== id) return;
+      this._yamlState =
+        e instanceof APIError && e.errorCode === ErrorCode.NOT_FOUND
+          ? "missing"
+          : "error";
     }
   }
 
-  private _retryLoadYaml = () => {
-    this._yamlState = "loading";
-    void this._loadYaml();
-  };
+  private _retryLoadYaml = () => void this._loadYaml();
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.
@@ -1295,79 +1305,11 @@ export class ESPHomePageDevice extends LitElement {
           @install-device=${this._saveThenInstall}
           @update-device=${this._saveThenUpdate}
         >
-          ${
+          ${cache(
             this._yamlState === "ready"
-              ? html` ${this._renderNavigator("desktop-nav")}
-                  <esphome-device-editor
-                    .yaml=${this._yaml}
-                    .savedYaml=${this._savedYaml}
-                    .layout=${this._layout}
-                    ?navCollapsed=${this._navCollapsed}
-                    .deviceTitle=${deviceTitle}
-                    .board=${this._board}
-                    .highlightRange=${this._highlightRange}
-                    .scrollToHighlight=${this._scrollToHighlight}
-                    .configuration=${this.id}
-                    .selectedSection=${this._selectedSection}
-                    .selectedFromLine=${this._selectedFromLine}
-                    .focusFieldPath=${this._focusFieldPath}
-                    .focusYamlPath=${this._focusYamlPath}
-                    .backendErrors=${this._instanceBackendErrors(
-                      this._backendErrors,
-                      this._selectedSection,
-                      this._selectedFromLine
-                    )}
-                    .justCreated=${this._justCreated}
-                    @just-created-dismiss=${this._dismissJustCreated}
-                    @request-install=${this._saveThenInstall}
-                    @goto-line=${this._onEditorGoToLine}
-                    @change-board=${this._onChangeBoard}
-                    @open-logs=${this._onEditorOpenLogs}
-                    @clean-build=${this._onEditorCleanBuild}
-                    ?hasUnsavedEdits=${this._isDirty}
-                    ?saving=${this._saving}
-                    ?showModified=${this._device ? showPendingChanges(this._device) : false}
-                    ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
-                    .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
-                    .availableVersion=${this._device?.current_version ?? ""}
-                    .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
-                    ?busy=${this._activeJobs.has(this.id)}
-                  >
-                    ${
-                      showEdgeTab || this._selectedSection
-                        ? html`<div slot="header-start" class="header-start-group">
-                            ${
-                              showEdgeTab
-                                ? html`<button
-                                    type="button"
-                                    class="ghost-icon-btn nav-toggle-btn"
-                                    ${tourAnchor("nav-toggle")}
-                                    @click=${this._onNavExpand}
-                                    title=${this._localize("device.show_navigator")}
-                                    aria-label=${this._localize("device.show_navigator")}
-                                  >
-                                    <wa-icon library="mdi" name="menu"></wa-icon>
-                                  </button>`
-                                : nothing
-                            }
-                            ${
-                              this._selectedSection
-                                ? html`<button
-                                    class="ghost-icon-btn back-btn"
-                                    @click=${this._onBack}
-                                    title=${backLabel}
-                                    aria-label=${backLabel}
-                                  >
-                                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                                  </button>`
-                                : nothing
-                            }
-                          </div>`
-                        : nothing
-                    }
-                  </esphome-device-editor>`
+              ? this._renderEditor(deviceTitle, showEdgeTab, backLabel)
               : this._renderYamlLoadState()
-          }
+          )}
         </div>
         <esphome-unsaved-changes-dialog
           @discard=${this._onUnsavedDiscard}
@@ -1565,21 +1507,98 @@ export class ESPHomePageDevice extends LitElement {
     ></esphome-device-navigator>`;
   }
 
+  private _renderEditor(deviceTitle: string, showEdgeTab: boolean, backLabel: string) {
+    return html` ${this._renderNavigator("desktop-nav")}
+      <esphome-device-editor
+        .yaml=${this._yaml}
+        .savedYaml=${this._savedYaml}
+        .layout=${this._layout}
+        ?navCollapsed=${this._navCollapsed}
+        .deviceTitle=${deviceTitle}
+        .board=${this._board}
+        .highlightRange=${this._highlightRange}
+        .scrollToHighlight=${this._scrollToHighlight}
+        .configuration=${this.id}
+        .selectedSection=${this._selectedSection}
+        .selectedFromLine=${this._selectedFromLine}
+        .focusFieldPath=${this._focusFieldPath}
+        .focusYamlPath=${this._focusYamlPath}
+        .backendErrors=${this._instanceBackendErrors(
+          this._backendErrors,
+          this._selectedSection,
+          this._selectedFromLine
+        )}
+        .justCreated=${this._justCreated}
+        @just-created-dismiss=${this._dismissJustCreated}
+        @request-install=${this._saveThenInstall}
+        @goto-line=${this._onEditorGoToLine}
+        @change-board=${this._onChangeBoard}
+        @open-logs=${this._onEditorOpenLogs}
+        @clean-build=${this._onEditorCleanBuild}
+        ?hasUnsavedEdits=${this._isDirty}
+        ?saving=${this._saving}
+        ?showModified=${this._device ? showPendingChanges(this._device) : false}
+        ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
+        .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
+        .availableVersion=${this._device?.current_version ?? ""}
+        .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
+        ?busy=${this._activeJobs.has(this.id)}
+      >
+        ${
+          showEdgeTab || this._selectedSection
+            ? html`<div slot="header-start" class="header-start-group">
+                ${
+                  showEdgeTab
+                    ? html`<button
+                        type="button"
+                        class="ghost-icon-btn nav-toggle-btn"
+                        ${tourAnchor("nav-toggle")}
+                        @click=${this._onNavExpand}
+                        title=${this._localize("device.show_navigator")}
+                        aria-label=${this._localize("device.show_navigator")}
+                      >
+                        <wa-icon library="mdi" name="menu"></wa-icon>
+                      </button>`
+                    : nothing
+                }
+                ${
+                  this._selectedSection
+                    ? html`<button
+                        class="ghost-icon-btn back-btn"
+                        @click=${this._onBack}
+                        title=${backLabel}
+                        aria-label=${backLabel}
+                      >
+                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                      </button>`
+                    : nothing
+                }
+              </div>`
+            : nothing
+        }
+      </esphome-device-editor>`;
+  }
+
   private _renderYamlLoadState() {
+    if (this._yamlState === "missing") {
+      return html`<div class="yaml-load-state">
+        <p role="alert">${this._localize("device.load_not_found")}</p>
+        <wa-button size="small" @click=${() => navigate("/")}>
+          ${this._localize("device.back_to_dashboard")}
+        </wa-button>
+      </div>`;
+    }
+    if (this._yamlState === "error") {
+      return html`<div class="yaml-load-state">
+        <p role="alert">${this._localize("device.load_failed")}</p>
+        <wa-button size="small" @click=${this._retryLoadYaml}>
+          ${this._localize("command.retry")}
+        </wa-button>
+      </div>`;
+    }
     return html`<div class="yaml-load-state">
-      ${
-        this._yamlState === "error"
-          ? html`
-              <p>${this._localize("device.load_failed")}</p>
-              <wa-button size="small" @click=${this._retryLoadYaml}>
-                ${this._localize("command.retry")}
-              </wa-button>
-            `
-          : html`
-              <wa-spinner></wa-spinner>
-              <p>${this._localize("device.loading_config")}</p>
-            `
-      }
+      <wa-spinner></wa-spinner>
+      <p role="status">${this._localize("device.loading_config")}</p>
     </div>`;
   }
 

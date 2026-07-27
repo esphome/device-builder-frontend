@@ -81,6 +81,11 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
+import {
+  connectionOverlayStyles,
+  renderReconnectPill,
+  renderRouteLoadingBar,
+} from "./app-shell/connection-overlays.js";
 import { createRouter, prefetchLazyRoutes } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
@@ -120,6 +125,10 @@ import "./update-all-dialog.js";
 import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
 export type AuthState = "connecting" | "needs-login" | "authing" | "authed";
+
+// A healthy reconnect lands well inside this, so the pill (and its
+// screen-reader announcement) never fires for a momentary blip.
+const RECONNECT_PILL_DELAY_MS = 800;
 
 @customElement("esphome-app")
 export class ESPHomeApp extends LitElement {
@@ -228,6 +237,10 @@ export class ESPHomeApp extends LitElement {
   // on disconnect, that would unmount routed pages and lose unsaved YAML buffers.
   @state() _apiConnected = false;
   @state() private _routeLoading = false;
+  // Timer-gated so sub-second reconnect blips neither flash the pill nor
+  // fire its role="status" announcement (a CSS delay would still announce).
+  @state() private _showReconnectPill = false;
+  private _reconnectPillTimer: ReturnType<typeof setTimeout> | null = null;
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
@@ -305,65 +318,8 @@ export class ESPHomeApp extends LitElement {
           transform: rotate(360deg);
         }
       }
-
-      .route-loading-bar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        z-index: 10000;
-        overflow: hidden;
-        /* White-on-translucent so it stays visible over the branded
-           (primary-colored) header the bar always overlays. */
-        background: rgba(255, 255, 255, 0.25);
-      }
-
-      .route-loading-bar::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        width: 40%;
-        background: #fff;
-        box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
-        animation: route-loading-slide 1.1s ease-in-out infinite;
-      }
-
-      @keyframes route-loading-slide {
-        from {
-          transform: translateX(-100%);
-        }
-        to {
-          transform: translateX(250%);
-        }
-      }
-
-      .reconnect-pill {
-        position: fixed;
-        bottom: var(--wa-space-l);
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10000;
-        padding: var(--wa-space-2xs) var(--wa-space-m);
-        border-radius: 999px;
-        background: var(--wa-color-warning-fill-loud, #b45309);
-        color: var(--wa-color-warning-on-loud, #fff);
-        font-size: var(--wa-font-size-s);
-        box-shadow: var(--wa-shadow-m);
-        /* Delay past the sub-second blips a healthy reconnect produces. */
-        animation: reconnect-fade-in 0.2s ease 0.8s both;
-        pointer-events: none;
-      }
-
-      @keyframes reconnect-fade-in {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
     `,
+    connectionOverlayStyles,
   ];
 
   private _portToastMs = new Map<SerialPort, number>();
@@ -464,6 +420,10 @@ export class ESPHomeApp extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._api.disconnect();
+    if (this._reconnectPillTimer) {
+      clearTimeout(this._reconnectPillTimer);
+      this._reconnectPillTimer = null;
+    }
     clearRecentJobs(this);
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
@@ -514,6 +474,11 @@ export class ESPHomeApp extends LitElement {
       this._isHaIngress = info.ha_ingress;
       this._isHaAddon = info.ha_addon;
       this._apiConnected = true;
+      if (this._reconnectPillTimer) {
+        clearTimeout(this._reconnectPillTimer);
+        this._reconnectPillTimer = null;
+      }
+      this._showReconnectPill = false;
       void this._api.ready.then(() => this._afterAuthenticated());
     };
     this._api.onAuthRequired = () => {
@@ -524,6 +489,10 @@ export class ESPHomeApp extends LitElement {
     this._api.onDisconnected = () => {
       console.warn("WebSocket disconnected, will auto-reconnect...");
       this._apiConnected = false;
+      this._reconnectPillTimer ??= setTimeout(() => {
+        this._reconnectPillTimer = null;
+        if (!this._apiConnected) this._showReconnectPill = true;
+      }, RECONNECT_PILL_DELAY_MS);
     };
 
     try {
@@ -595,18 +564,8 @@ export class ESPHomeApp extends LitElement {
     }
 
     return html`
-      ${
-        this._routeLoading
-          ? html`<div class="route-loading-bar" role="progressbar"></div>`
-          : nothing
-      }
-      ${
-        this._apiConnected
-          ? nothing
-          : html`<div class="reconnect-pill" role="status">
-              ${this._localize("layout.reconnecting")}
-            </div>`
-      }
+      ${this._routeLoading ? renderRouteLoadingBar() : nothing}
+      ${this._showReconnectPill ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

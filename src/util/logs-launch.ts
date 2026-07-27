@@ -41,17 +41,13 @@ export async function launchLogs(
     // Only pay the backend round-trip when WebSerial can't already provide a
     // serial path.
     try {
-      const ports = await Promise.race([
-        host.api.getSerialPorts(),
-        new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), SERIAL_PORT_PROBE_TIMEOUT_MS)
-        ),
-      ]);
-      hasServerPorts = (ports?.length ?? 0) > 0;
+      hasServerPorts =
+        (await host.api.getSerialPorts(SERIAL_PORT_PROBE_TIMEOUT_MS)).length > 0;
     } catch (err) {
       // Lockstep deployment means this command exists, so a rejection is a real
-      // WS/backend fault, not version drift; log it but still fall through to
-      // OTA logs so the user isn't left without any path.
+      // WS/backend fault or the bounded probe timing out on a degraded link;
+      // log it but still fall through to OTA logs so the user isn't left
+      // without any path.
       console.warn("getSerialPorts failed; falling back to OTA logs", err);
       hasServerPorts = false;
     }

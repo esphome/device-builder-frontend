@@ -8,7 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { apiErrorDetails } from "../api/api-error.js";
+import { apiErrorDetails, APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
@@ -26,6 +26,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
+import { sleep } from "../util/sleep.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { secretsStyles } from "./secrets.styles.js";
 
@@ -46,6 +47,10 @@ registerMdiIcons({
 });
 
 const SECRETS_FILE = "secrets.yaml";
+
+// Backoff between transport-fault reloads of secrets.yaml; keeps the
+// retry loop from spinning when the socket is up but requests time out.
+const RELOAD_RETRY_DELAY_MS = 2000;
 
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
@@ -70,6 +75,9 @@ export class ESPHomePageSecrets extends LitElement {
 
   @state()
   private _loaded = false;
+
+  /** Stops the load retry loop once the page is gone. */
+  private _unmounted = false;
 
   // Mirrors the device editor's per-field reveal toggle. Default
   // hidden so values render as bullets the moment the page paints —
@@ -154,6 +162,7 @@ export class ESPHomePageSecrets extends LitElement {
   }
 
   disconnectedCallback() {
+    this._unmounted = true;
     setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
@@ -219,18 +228,34 @@ export class ESPHomePageSecrets extends LitElement {
   private _onUnsavedSave = () => this._unsavedGuard.onSave();
   private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
-  /** Pull `secrets.yaml` from the server and reset both buffers.
-   *  On read error (file missing) seeds the editor with the
-   *  localized header so the user has a starting point. */
+  /**
+   * Pull `secrets.yaml` from the server and reset both buffers.
+   *
+   * Only a server reply (APIError, file missing) seeds the localized
+   * header template — a transport fault must not, or a reconnect-window
+   * mount would template over the real file and a save could wipe it.
+   * Transport faults retry once the connection is ready again.
+   */
   private async _loadFromServer() {
-    try {
-      const yaml = await this._api.getConfig(SECRETS_FILE);
-      this._yaml = yaml;
-      this._savedYaml = yaml;
-    } catch {
-      const yaml = this._localize("secrets.file_header");
-      this._yaml = yaml;
-      this._savedYaml = yaml;
+    for (;;) {
+      await this._api.ready;
+      try {
+        const yaml = await this._api.getConfig(SECRETS_FILE);
+        this._yaml = yaml;
+        this._savedYaml = yaml;
+        break;
+      } catch (err) {
+        if (err instanceof APIError) {
+          const yaml = this._localize("secrets.file_header");
+          this._yaml = yaml;
+          this._savedYaml = yaml;
+          break;
+        }
+        console.warn("Failed to load secrets.yaml; retrying:", err);
+        await sleep(RELOAD_RETRY_DELAY_MS);
+        // The page may have unmounted during the backoff.
+        if (this._unmounted) return;
+      }
     }
     this._loaded = true;
   }
