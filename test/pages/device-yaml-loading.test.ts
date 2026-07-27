@@ -1,0 +1,130 @@
+// @vitest-environment happy-dom
+/**
+ * Pins the initial-YAML loading gate: a slow getConfig shows the
+ * spinner panel instead of an empty editor, a failed one shows the
+ * retry panel, and Retry recovers into the mounted editor.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import "./_mock-device-children.js";
+vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
+
+import type { ESPHomeAPI } from "../../src/api/index.js";
+import { ESPHomePageDevice } from "../../src/pages/device.js";
+import { flushMicrotasks } from "../_dom.js";
+
+interface Deferred {
+  resolve(value: string): void;
+  reject(error: Error): void;
+  promise: Promise<string>;
+}
+
+function makeDeferred(): Deferred {
+  let resolve!: (value: string) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<string>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { resolve, reject, promise };
+}
+
+function makeApi(getConfig: ReturnType<typeof vi.fn>): ESPHomeAPI {
+  return {
+    ready: Promise.resolve(),
+    getConfig,
+    getPreferences: vi.fn().mockResolvedValue({ navigator_visible: true }),
+  } as unknown as ESPHomeAPI;
+}
+
+async function mountPage(api: ESPHomeAPI): Promise<ESPHomePageDevice> {
+  const page = new ESPHomePageDevice();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._api = api;
+  page.id = "kitchen.yaml";
+  document.body.appendChild(page);
+  await page.updateComplete;
+  await flushMicrotasks(8);
+  await page.updateComplete;
+  return page;
+}
+
+const editorIn = (page: ESPHomePageDevice) =>
+  page.shadowRoot!.querySelector("esphome-device-editor");
+const loadPanelIn = (page: ESPHomePageDevice) =>
+  page.shadowRoot!.querySelector(".yaml-load-state");
+
+describe("device page initial YAML loading gate", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  it("shows the loading panel instead of an empty editor while getConfig is in flight", async () => {
+    const deferred = makeDeferred();
+    const page = await mountPage(makeApi(vi.fn().mockReturnValue(deferred.promise)));
+
+    expect(editorIn(page)).toBeNull();
+    const panel = loadPanelIn(page);
+    expect(panel).not.toBeNull();
+    expect(panel!.querySelector("wa-spinner")).not.toBeNull();
+
+    deferred.resolve("wifi:\n  ssid: x\n");
+    await flushMicrotasks(8);
+    await page.updateComplete;
+
+    expect(loadPanelIn(page)).toBeNull();
+    const editor = editorIn(page);
+    expect(editor).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any).yaml).toBe("wifi:\n  ssid: x\n");
+  });
+
+  it("shows the retry panel when getConfig fails and recovers on Retry", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const getConfig = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("WebSocket connection closed"))
+      .mockResolvedValueOnce("wifi:\n  ssid: x\n");
+    const page = await mountPage(makeApi(getConfig));
+
+    expect(editorIn(page)).toBeNull();
+    const panel = loadPanelIn(page);
+    expect(panel).not.toBeNull();
+    const retry = panel!.querySelector("wa-button");
+    expect(retry).not.toBeNull();
+    expect(panel!.querySelector("wa-spinner")).toBeNull();
+
+    (retry as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushMicrotasks(8);
+    await page.updateComplete;
+
+    expect(getConfig).toHaveBeenCalledTimes(2);
+    expect(loadPanelIn(page)).toBeNull();
+    expect(editorIn(page)).not.toBeNull();
+  });
+
+  it("waits for api.ready before fetching the config", async () => {
+    let releaseReady!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      releaseReady = resolve;
+    });
+    const getConfig = vi.fn().mockResolvedValue("wifi:\n  ssid: x\n");
+    const api = {
+      ready,
+      getConfig,
+      getPreferences: vi.fn().mockResolvedValue({ navigator_visible: true }),
+    } as unknown as ESPHomeAPI;
+    const page = await mountPage(api);
+
+    expect(getConfig).not.toHaveBeenCalled();
+    expect(loadPanelIn(page)).not.toBeNull();
+
+    releaseReady();
+    await flushMicrotasks(8);
+    await page.updateComplete;
+
+    expect(getConfig).toHaveBeenCalledWith("kitchen.yaml");
+    expect(editorIn(page)).not.toBeNull();
+  });
+});

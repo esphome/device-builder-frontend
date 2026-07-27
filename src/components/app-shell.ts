@@ -1,5 +1,5 @@
 import { provide } from "@lit/context";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
@@ -81,7 +81,7 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
-import { createRouter } from "./app-shell/router.js";
+import { createRouter, prefetchLazyRoutes } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
@@ -227,6 +227,7 @@ export class ESPHomeApp extends LitElement {
   // Tracks the WS connection independently from auth — we don't flip _authState
   // on disconnect, that would unmount routed pages and lose unsaved YAML buffers.
   @state() _apiConnected = false;
+  @state() private _routeLoading = false;
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
@@ -241,7 +242,12 @@ export class ESPHomeApp extends LitElement {
   // mid-write can't revert the optimistic value. Counter for overlapping flips.
   _offloaderWritesInFlight = 0;
 
-  private _router = createRouter(this);
+  private _router = createRouter(this, {
+    onPending: (pending) => {
+      this._routeLoading = pending;
+    },
+    localize: () => this._localize,
+  });
 
   @query("esphome-settings-dialog") private _settingsDialog!: ESPHomeSettingsDialog;
   @query("esphome-firmware-jobs-dialog")
@@ -297,6 +303,64 @@ export class ESPHomeApp extends LitElement {
       @keyframes auth-spin {
         to {
           transform: rotate(360deg);
+        }
+      }
+
+      .route-loading-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        z-index: 10000;
+        overflow: hidden;
+        /* White-on-translucent so it stays visible over the branded
+           (primary-colored) header the bar always overlays. */
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      .route-loading-bar::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        background: #fff;
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+        animation: route-loading-slide 1.1s ease-in-out infinite;
+      }
+
+      @keyframes route-loading-slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+
+      .reconnect-pill {
+        position: fixed;
+        bottom: var(--wa-space-l);
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        padding: var(--wa-space-2xs) var(--wa-space-m);
+        border-radius: 999px;
+        background: var(--wa-color-warning-fill-loud, #b45309);
+        color: var(--wa-color-warning-on-loud, #fff);
+        font-size: var(--wa-font-size-s);
+        box-shadow: var(--wa-shadow-m);
+        /* Delay past the sub-second blips a healthy reconnect produces. */
+        animation: reconnect-fade-in 0.2s ease 0.8s both;
+        pointer-events: none;
+      }
+
+      @keyframes reconnect-fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
         }
       }
     `,
@@ -390,6 +454,7 @@ export class ESPHomeApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     void this._init();
+    prefetchLazyRoutes();
     if ("serial" in navigator) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
     }
@@ -530,6 +595,18 @@ export class ESPHomeApp extends LitElement {
     }
 
     return html`
+      ${
+        this._routeLoading
+          ? html`<div class="route-loading-bar" role="progressbar"></div>`
+          : nothing
+      }
+      ${
+        this._apiConnected
+          ? nothing
+          : html`<div class="reconnect-pill" role="status">
+              ${this._localize("layout.reconnecting")}
+            </div>`
+      }
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

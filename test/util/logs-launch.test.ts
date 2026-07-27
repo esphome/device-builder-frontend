@@ -90,6 +90,26 @@ describe("launchLogs", () => {
       restore();
     }
   });
+
+  it("opens OTA logs after the probe timeout when the lookup hangs", async () => {
+    const restore = withWebSerial(false);
+    vi.useFakeTimers();
+    try {
+      const host = makeHost(() => new Promise(() => {}));
+      const openPicker = vi.fn();
+      const launched = launchLogs(host, makeDevice(), openPicker);
+
+      await vi.advanceTimersByTimeAsync(2500);
+      await launched;
+
+      expect(openPicker).not.toHaveBeenCalled();
+      expect(host.logsDialog.open).toHaveBeenCalledTimes(1);
+      expect(host.logsDialog.configuration).toBe("kitchen.yaml");
+    } finally {
+      vi.useRealTimers();
+      restore();
+    }
+  });
 });
 
 describe("launchLogsWithMethod", () => {

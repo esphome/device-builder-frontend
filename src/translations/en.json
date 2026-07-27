@@ -1051,7 +1051,9 @@
     "unsaved_message": "You have unsaved changes in this device. If you leave without saving, they will be lost.",
     "leave_anyway": "Leave anyway",
     "discard_changes": "Discard",
-    "save_and_leave": "Save"
+    "save_and_leave": "Save",
+    "loading_config": "Loading configuration…",
+    "load_failed": "The configuration could not be loaded. Check your connection and retry."
   },
   "naming": {
     "hostname_disclosure": "Hostname: {hostname}",
@@ -1246,7 +1248,9 @@
     "close": "Close",
     "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})",
     "editor": "Editor",
-    "preview_badge": "Beta"
+    "preview_badge": "Beta",
+    "page_load_failed": "The page failed to load. Check your connection and try again.",
+    "reconnecting": "Connection lost. Reconnecting…"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",

@@ -30,6 +30,26 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(0, 5fr);
   }
 
+  .yaml-load-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wa-space-m);
+    background: var(--wa-color-surface-default);
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+  }
+
+  .yaml-load-state wa-spinner {
+    font-size: 28px;
+  }
+
+  .yaml-load-state p {
+    margin: 0;
+  }
+
   .layout-grid.nav-collapsed .desktop-nav {
     display: none;
   }

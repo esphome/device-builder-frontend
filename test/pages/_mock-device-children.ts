@@ -13,7 +13,9 @@ import { vi } from "vitest";
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("../../src/components/command-dialog.js", () => ({}));
 vi.mock("../../src/components/device/device-editor.js", () => ({}));
 vi.mock("../../src/components/device/device-navigator.js", () => ({}));

@@ -91,7 +91,9 @@ import {
   readUrlSections,
 } from "./device-url-state.js";
 
+import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/command-dialog.js";
 import "../components/device/board-reselect-dialog.js";
 import "../components/device/device-editor.js";
@@ -317,6 +319,12 @@ export class ESPHomePageDevice extends LitElement {
    */
   @state()
   private _yaml = "";
+
+  /** Initial-fetch gate for the current id: the editor and navigator
+   *  render only once "ready", so a slow ``getConfig`` shows a spinner
+   *  instead of an empty editor, and a failed one shows a retry. */
+  @state()
+  private _yamlState: "loading" | "ready" | "error" = "loading";
 
   @state()
   private _savedYaml = "";
@@ -665,6 +673,7 @@ export class ESPHomePageDevice extends LitElement {
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
       this._kickKnownKeys();
+      this._yamlState = "loading";
       void this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
@@ -780,15 +789,27 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private async _loadYaml() {
+    const id = this.id;
     try {
-      const yaml = await this._api.getConfig(this.id);
+      // Ready gates on (re)connect + auth, so a mount during a reconnect
+      // window waits instead of throwing "WebSocket not connected".
+      await this._api.ready;
+      const yaml = await this._api.getConfig(id);
+      if (this.id !== id) return;
       this._yaml = yaml;
       this._savedYaml = yaml;
+      this._yamlState = "ready";
       this._maybeResolveLineFromUrl();
     } catch (e) {
       console.error("Failed to load YAML:", e);
+      if (this.id === id) this._yamlState = "error";
     }
   }
+
+  private _retryLoadYaml = () => {
+    this._yamlState = "loading";
+    void this._loadYaml();
+  };
 
   /**
    * Consume the one-shot ``?line=`` intent once the YAML has loaded.
@@ -1246,7 +1267,7 @@ export class ESPHomePageDevice extends LitElement {
         @yaml-draft=${this._onYamlDraft}
         @nav-collapse=${this._onNavCollapse}
       >
-        ${this._renderNavigator("drawer-nav")}
+        ${this._yamlState === "ready" ? this._renderNavigator("drawer-nav") : nothing}
       </div>
 
       <div class="page">
@@ -1274,75 +1295,79 @@ export class ESPHomePageDevice extends LitElement {
           @install-device=${this._saveThenInstall}
           @update-device=${this._saveThenUpdate}
         >
-          ${this._renderNavigator("desktop-nav")}
-          <esphome-device-editor
-            .yaml=${this._yaml}
-            .savedYaml=${this._savedYaml}
-            .layout=${this._layout}
-            ?navCollapsed=${this._navCollapsed}
-            .deviceTitle=${deviceTitle}
-            .board=${this._board}
-            .highlightRange=${this._highlightRange}
-            .scrollToHighlight=${this._scrollToHighlight}
-            .configuration=${this.id}
-            .selectedSection=${this._selectedSection}
-            .selectedFromLine=${this._selectedFromLine}
-            .focusFieldPath=${this._focusFieldPath}
-            .focusYamlPath=${this._focusYamlPath}
-            .backendErrors=${this._instanceBackendErrors(
-              this._backendErrors,
-              this._selectedSection,
-              this._selectedFromLine
-            )}
-            .justCreated=${this._justCreated}
-            @just-created-dismiss=${this._dismissJustCreated}
-            @request-install=${this._saveThenInstall}
-            @goto-line=${this._onEditorGoToLine}
-            @change-board=${this._onChangeBoard}
-            @open-logs=${this._onEditorOpenLogs}
-            @clean-build=${this._onEditorCleanBuild}
-            ?hasUnsavedEdits=${this._isDirty}
-            ?saving=${this._saving}
-            ?showModified=${this._device ? showPendingChanges(this._device) : false}
-            ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
-            .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
-            .availableVersion=${this._device?.current_version ?? ""}
-            .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
-            ?busy=${this._activeJobs.has(this.id)}
-          >
-            ${
-              showEdgeTab || this._selectedSection
-                ? html`<div slot="header-start" class="header-start-group">
+          ${
+            this._yamlState === "ready"
+              ? html` ${this._renderNavigator("desktop-nav")}
+                  <esphome-device-editor
+                    .yaml=${this._yaml}
+                    .savedYaml=${this._savedYaml}
+                    .layout=${this._layout}
+                    ?navCollapsed=${this._navCollapsed}
+                    .deviceTitle=${deviceTitle}
+                    .board=${this._board}
+                    .highlightRange=${this._highlightRange}
+                    .scrollToHighlight=${this._scrollToHighlight}
+                    .configuration=${this.id}
+                    .selectedSection=${this._selectedSection}
+                    .selectedFromLine=${this._selectedFromLine}
+                    .focusFieldPath=${this._focusFieldPath}
+                    .focusYamlPath=${this._focusYamlPath}
+                    .backendErrors=${this._instanceBackendErrors(
+                      this._backendErrors,
+                      this._selectedSection,
+                      this._selectedFromLine
+                    )}
+                    .justCreated=${this._justCreated}
+                    @just-created-dismiss=${this._dismissJustCreated}
+                    @request-install=${this._saveThenInstall}
+                    @goto-line=${this._onEditorGoToLine}
+                    @change-board=${this._onChangeBoard}
+                    @open-logs=${this._onEditorOpenLogs}
+                    @clean-build=${this._onEditorCleanBuild}
+                    ?hasUnsavedEdits=${this._isDirty}
+                    ?saving=${this._saving}
+                    ?showModified=${this._device ? showPendingChanges(this._device) : false}
+                    ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
+                    .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
+                    .availableVersion=${this._device?.current_version ?? ""}
+                    .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
+                    ?busy=${this._activeJobs.has(this.id)}
+                  >
                     ${
-                      showEdgeTab
-                        ? html`<button
-                            type="button"
-                            class="ghost-icon-btn nav-toggle-btn"
-                            ${tourAnchor("nav-toggle")}
-                            @click=${this._onNavExpand}
-                            title=${this._localize("device.show_navigator")}
-                            aria-label=${this._localize("device.show_navigator")}
-                          >
-                            <wa-icon library="mdi" name="menu"></wa-icon>
-                          </button>`
+                      showEdgeTab || this._selectedSection
+                        ? html`<div slot="header-start" class="header-start-group">
+                            ${
+                              showEdgeTab
+                                ? html`<button
+                                    type="button"
+                                    class="ghost-icon-btn nav-toggle-btn"
+                                    ${tourAnchor("nav-toggle")}
+                                    @click=${this._onNavExpand}
+                                    title=${this._localize("device.show_navigator")}
+                                    aria-label=${this._localize("device.show_navigator")}
+                                  >
+                                    <wa-icon library="mdi" name="menu"></wa-icon>
+                                  </button>`
+                                : nothing
+                            }
+                            ${
+                              this._selectedSection
+                                ? html`<button
+                                    class="ghost-icon-btn back-btn"
+                                    @click=${this._onBack}
+                                    title=${backLabel}
+                                    aria-label=${backLabel}
+                                  >
+                                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                                  </button>`
+                                : nothing
+                            }
+                          </div>`
                         : nothing
                     }
-                    ${
-                      this._selectedSection
-                        ? html`<button
-                            class="ghost-icon-btn back-btn"
-                            @click=${this._onBack}
-                            title=${backLabel}
-                            aria-label=${backLabel}
-                          >
-                            <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                          </button>`
-                        : nothing
-                    }
-                  </div>`
-                : nothing
-            }
-          </esphome-device-editor>
+                  </esphome-device-editor>`
+              : this._renderYamlLoadState()
+          }
         </div>
         <esphome-unsaved-changes-dialog
           @discard=${this._onUnsavedDiscard}
@@ -1538,6 +1563,24 @@ export class ESPHomePageDevice extends LitElement {
       .selectedFromLine=${this._selectedFromLine}
       .errorCounts=${this._navErrorCounts(this._backendErrors, this._heldUnknownInstance)}
     ></esphome-device-navigator>`;
+  }
+
+  private _renderYamlLoadState() {
+    return html`<div class="yaml-load-state">
+      ${
+        this._yamlState === "error"
+          ? html`
+              <p>${this._localize("device.load_failed")}</p>
+              <wa-button size="small" @click=${this._retryLoadYaml}>
+                ${this._localize("command.retry")}
+              </wa-button>
+            `
+          : html`
+              <wa-spinner></wa-spinner>
+              <p>${this._localize("device.loading_config")}</p>
+            `
+      }
+    </div>`;
   }
 
   /** Advance the YAML buffer. Any mutation while an error-jump

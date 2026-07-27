@@ -19,6 +19,10 @@ export interface LogsLaunchHost {
   readonly localize: LocalizeFunc;
 }
 
+// Upper bound on the serial-port probe so a degraded link opens OTA logs
+// after a short beat instead of blocking silently on the 10s command timeout.
+const SERIAL_PORT_PROBE_TIMEOUT_MS = 2500;
+
 /**
  * Open live logs, offering the OTA-vs-serial picker when a serial path exists.
 
@@ -37,7 +41,13 @@ export async function launchLogs(
     // Only pay the backend round-trip when WebSerial can't already provide a
     // serial path.
     try {
-      hasServerPorts = (await host.api.getSerialPorts()).length > 0;
+      const ports = await Promise.race([
+        host.api.getSerialPorts(),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), SERIAL_PORT_PROBE_TIMEOUT_MS)
+        ),
+      ]);
+      hasServerPorts = (ports?.length ?? 0) > 0;
     } catch (err) {
       // Lockstep deployment means this command exists, so a rejection is a real
       // WS/backend fault, not version drift; log it but still fall through to
