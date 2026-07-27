@@ -1671,7 +1671,8 @@
     "empty": "No secrets yet. Add one below or switch to YAML.",
     "invalid_key": "Names may use letters, numbers, dots, dashes and underscores, and can't start with a number.",
     "duplicate_key": "A secret with this name already exists.",
-    "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
+    "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n",
+    "loading": "Loading secrets…"
   },
   "auth": {
     "connecting": "Connecting…",

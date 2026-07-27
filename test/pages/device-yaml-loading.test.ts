@@ -50,8 +50,12 @@ async function mountPage(api: ESPHomeAPI): Promise<ESPHomePageDevice> {
 
 const editorIn = (page: ESPHomePageDevice) =>
   page.shadowRoot!.querySelector("esphome-device-editor");
+// renderAsyncState's ladder: a .message block, plus a sibling action
+// button on the failure branches.
 const loadPanelIn = (page: ESPHomePageDevice) =>
-  page.shadowRoot!.querySelector(".yaml-load-state");
+  page.shadowRoot!.querySelector(".message");
+const loadActionIn = (page: ESPHomePageDevice) =>
+  page.shadowRoot!.querySelector(".message ~ wa-button");
 
 describe("device page initial YAML loading gate", () => {
   afterEach(() => {
@@ -94,7 +98,7 @@ describe("device page initial YAML loading gate", () => {
       const panel = loadPanelIn(page);
       expect(panel).not.toBeNull();
       expect(panel!.querySelector("wa-spinner")).not.toBeNull();
-      expect(panel!.querySelector("wa-button")).toBeNull();
+      expect(loadActionIn(page)).toBeNull();
 
       await vi.advanceTimersByTimeAsync(1500);
       await flushMicrotasks(8);
@@ -129,7 +133,7 @@ describe("device page initial YAML loading gate", () => {
 
       // Retry re-arms the whole recovery loop from scratch.
       getConfig.mockResolvedValueOnce("wifi:\n  ssid: x\n");
-      (panel!.querySelector("wa-button") as HTMLElement).dispatchEvent(
+      (loadActionIn(page) as HTMLElement).dispatchEvent(
         new MouseEvent("click", { bubbles: true })
       );
       await flushMicrotasks(8);
@@ -164,7 +168,7 @@ describe("device page initial YAML loading gate", () => {
     expect(panel).not.toBeNull();
     // A deleted config can't be retried into existence.
     expect(panel!.textContent).toContain("device.load_not_found");
-    const button = panel!.querySelector("wa-button");
+    const button = loadActionIn(page);
     expect(button!.textContent).toContain("device.back_to_dashboard");
 
     (button as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));

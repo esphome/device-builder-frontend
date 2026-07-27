@@ -182,12 +182,8 @@ export const secretsStyles = css`
     }
   }
 
-  .loading {
+  /* Placement only; the block itself comes from loadMessageStyles. */
+  .message {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: var(--wa-color-text-quiet);
   }
 `;

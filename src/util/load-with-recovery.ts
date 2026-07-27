@@ -1,4 +1,5 @@
 import { APIError } from "../api/api-error.js";
+import type { ESPHomeAPI } from "../api/index.js";
 import { sleep } from "./sleep.js";
 
 export interface LoadWithRecoveryOptions<T> {
@@ -36,12 +37,46 @@ export async function loadWithRecovery<T>(opts: LoadWithRecoveryOptions<T>): Pro
     await opts.ready();
     if (opts.abandoned?.()) throw new LoadAbandonedError();
     try {
-      return await opts.load();
+      const value = await opts.load();
+      // The caller may have moved on while this was in flight; a late
+      // result committed then would render another id's config.
+      if (opts.abandoned?.()) throw new LoadAbandonedError();
+      return value;
     } catch (err) {
+      if (err instanceof LoadAbandonedError) throw err;
       if (err instanceof APIError || attempt >= limit) throw err;
       console.warn(`Load failed (attempt ${attempt}); retrying:`, err);
       await sleep(opts.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
       if (opts.abandoned?.()) throw new LoadAbandonedError();
     }
+  }
+}
+
+/**
+ * Read a YAML config for a page the user is waiting on, surviving a flaky
+ * link. Returns ``null`` when the caller abandoned the load (page gone, id
+ * moved on); an ``APIError`` still throws so callers can tell a missing
+ * config from an unreachable one.
+ */
+export async function loadConfigWithRecovery(
+  api: ESPHomeAPI,
+  configuration: string,
+  opts: {
+    abandoned?: () => boolean;
+    attempts?: number;
+    /** Overrides the command default, which is short for a large config. */
+    timeoutMs?: number;
+  } = {}
+): Promise<string | null> {
+  try {
+    return await loadWithRecovery({
+      ready: () => api.ready,
+      load: () => api.getConfig(configuration, opts.timeoutMs),
+      abandoned: opts.abandoned,
+      attempts: opts.attempts,
+    });
+  } catch (err) {
+    if (err instanceof LoadAbandonedError) return null;
+    throw err;
   }
 }

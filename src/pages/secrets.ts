@@ -14,6 +14,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import {
@@ -22,9 +23,10 @@ import {
   type SecretsLayout,
 } from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
-import { LoadAbandonedError, loadWithRecovery } from "../util/load-with-recovery.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
@@ -233,20 +235,18 @@ export class ESPHomePageSecrets extends LitElement {
    * Transport faults retry once the connection is ready again.
    */
   private async _loadFromServer() {
-    let yaml: string;
+    let yaml: string | null;
     try {
-      yaml = await loadWithRecovery({
-        ready: () => this._api.ready,
-        load: () => this._api.getConfig(SECRETS_FILE),
+      yaml = await loadConfigWithRecovery(this._api, SECRETS_FILE, {
         abandoned: () => this._unmounted,
       });
-    } catch (err) {
-      // Abandoned means the page is gone; leave the buffers untouched.
-      if (err instanceof LoadAbandonedError) return;
+    } catch {
       // Only a server reply reaches here (transport faults retry), so
       // this really is a missing file rather than an unreachable one.
       yaml = this._localize("secrets.file_header");
     }
+    // Null means the page is gone; leave the buffers untouched.
+    if (yaml === null) return;
     this._yaml = yaml;
     this._savedYaml = yaml;
     this._loaded = true;
@@ -265,7 +265,7 @@ export class ESPHomePageSecrets extends LitElement {
     void this._loadFromServer();
   };
 
-  static styles = [espHomeStyles, secretsStyles];
+  static styles = [espHomeStyles, loadMessageStyles, secretsStyles];
 
   protected render() {
     const revealLabel = this._localize(
@@ -316,41 +316,43 @@ export class ESPHomePageSecrets extends LitElement {
           </button>
         </div>
         <div class="editor-card">
-          ${
-            this._loaded
-              ? html`
-                  <button
-                    type="button"
-                    class="save-button"
-                    ?disabled=${this._saving || this._yaml === this._savedYaml}
-                    @click=${this._save}
-                  >
-                    <wa-icon library="mdi" name="content-save"></wa-icon>
-                    ${
-                      this._saving
-                        ? this._localize("secrets.saving")
-                        : this._localize("secrets.save")
-                    }
-                  </button>
-                  <div class="editor-pane">
-                    ${
-                      this._layout === "form"
-                        ? html`<esphome-secrets-structured-editor
-                            .value=${this._yaml}
-                            .revealSensitive=${this._revealSensitive}
-                            @yaml-change=${this._onYamlChange}
-                          ></esphome-secrets-structured-editor>`
-                        : html`<esphome-yaml-editor
-                            .value=${this._yaml}
-                            .maskAllValues=${true}
-                            .revealSensitive=${this._revealSensitive}
-                            @yaml-change=${this._onYamlChange}
-                          ></esphome-yaml-editor>`
-                    }
-                  </div>
-                `
-              : html`<div class="loading"><wa-spinner></wa-spinner></div>`
-          }
+          ${renderAsyncState({
+            loading: !this._loaded,
+            loadingMessage: this._localize("secrets.loading"),
+            loadingLead: () => html`<wa-spinner></wa-spinner>`,
+            error: null,
+            content: () => html`
+              <button
+                type="button"
+                class="save-button"
+                ?disabled=${this._saving || this._yaml === this._savedYaml}
+                @click=${this._save}
+              >
+                <wa-icon library="mdi" name="content-save"></wa-icon>
+                ${
+                  this._saving
+                    ? this._localize("secrets.saving")
+                    : this._localize("secrets.save")
+                }
+              </button>
+              <div class="editor-pane">
+                ${
+                  this._layout === "form"
+                    ? html`<esphome-secrets-structured-editor
+                        .value=${this._yaml}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-secrets-structured-editor>`
+                    : html`<esphome-yaml-editor
+                        .value=${this._yaml}
+                        .maskAllValues=${true}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-yaml-editor>`
+                }
+              </div>
+            `,
+          })}
         </div>
       </div>
       <esphome-unsaved-changes-dialog

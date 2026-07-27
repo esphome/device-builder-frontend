@@ -39,6 +39,7 @@ import {
   devicesLoadedContext,
   localizeContext,
 } from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import {
   backendErrorCounts,
@@ -55,7 +56,8 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { LoadAbandonedError, loadWithRecovery } from "../util/load-with-recovery.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -808,22 +810,17 @@ export class ESPHomePageDevice extends LitElement {
     const id = this.id;
     this._yamlState = "loading";
     try {
-      const yaml = await loadWithRecovery({
-        // Ready parks on a dropped socket, so a reconnect window waits
-        // rather than throwing "WebSocket not connected".
-        ready: () => this._api.ready,
-        // A dropped socket rejects every in-flight request at once, so
-        // without the retry a blip mid-fetch reads as a hard failure.
-        load: () => this._api.getConfig(id, LOAD_YAML_TIMEOUT_MS),
+      const yaml = await loadConfigWithRecovery(this._api, id, {
         abandoned: () => this.id !== id,
         attempts: LOAD_YAML_ATTEMPTS,
+        timeoutMs: LOAD_YAML_TIMEOUT_MS,
       });
+      if (yaml === null) return;
       this._yaml = yaml;
       this._savedYaml = yaml;
       this._yamlState = "ready";
       this._maybeResolveLineFromUrl();
     } catch (e) {
-      if (e instanceof LoadAbandonedError) return;
       console.error("Failed to load YAML:", e);
       this._yamlState =
         e instanceof APIError && e.errorCode === ErrorCode.NOT_FOUND
@@ -1260,7 +1257,7 @@ export class ESPHomePageDevice extends LitElement {
     void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
-  static styles = [espHomeStyles, devicePageStyles];
+  static styles = [espHomeStyles, loadMessageStyles, devicePageStyles];
 
   protected render() {
     const deviceTitle =
@@ -1295,7 +1292,9 @@ export class ESPHomePageDevice extends LitElement {
 
       <div class="page">
         <div
-          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
+          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""} ${
+            this._yamlState === "ready" ? "" : "load-state"
+          }"
           @section-toggle=${this._onSectionToggle}
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
@@ -1319,9 +1318,21 @@ export class ESPHomePageDevice extends LitElement {
           @update-device=${this._saveThenUpdate}
         >
           ${cache(
-            this._yamlState === "ready"
-              ? this._renderEditor(deviceTitle, showEdgeTab, backLabel)
-              : this._renderYamlLoadState()
+            renderAsyncState({
+              loading: this._yamlState === "loading",
+              loadingMessage: this._localize("device.loading_config"),
+              loadingLead: () => html`<wa-spinner></wa-spinner>`,
+              error:
+                this._yamlState === "ready"
+                  ? null
+                  : this._localize(
+                      this._yamlState === "missing"
+                        ? "device.load_not_found"
+                        : "device.load_failed"
+                    ),
+              errorActions: () => this._renderLoadFailure(),
+              content: () => this._renderEditor(deviceTitle, showEdgeTab, backLabel),
+            })
           )}
         </div>
         <esphome-unsaved-changes-dialog
@@ -1592,27 +1603,15 @@ export class ESPHomePageDevice extends LitElement {
       </esphome-device-editor>`;
   }
 
-  private _renderYamlLoadState() {
-    if (this._yamlState === "missing") {
-      return html`<div class="yaml-load-state">
-        <p role="alert">${this._localize("device.load_not_found")}</p>
-        <wa-button size="small" @click=${() => navigate("/")}>
-          ${this._localize("device.back_to_dashboard")}
-        </wa-button>
-      </div>`;
-    }
-    if (this._yamlState === "error") {
-      return html`<div class="yaml-load-state">
-        <p role="alert">${this._localize("device.load_failed")}</p>
-        <wa-button size="small" @click=${this._retryLoadYaml}>
-          ${this._localize("command.retry")}
-        </wa-button>
-      </div>`;
-    }
-    return html`<div class="yaml-load-state">
-      <wa-spinner></wa-spinner>
-      <p role="status">${this._localize("device.loading_config")}</p>
-    </div>`;
+  /** A gone config is terminal, so it offers a way out rather than a retry. */
+  private _renderLoadFailure() {
+    const missing = this._yamlState === "missing";
+    return html`<wa-button
+      size="small"
+      @click=${missing ? () => navigate("/") : this._retryLoadYaml}
+    >
+      ${this._localize(missing ? "device.back_to_dashboard" : "command.retry")}
+    </wa-button>`;
   }
 
   /** Advance the YAML buffer. Any mutation while an error-jump

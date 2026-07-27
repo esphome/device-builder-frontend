@@ -80,6 +80,27 @@ describe("loadWithRecovery", () => {
     await expect(result).resolves.toBe("yaml");
   });
 
+  it("drops a value that resolves after the caller moved on", async () => {
+    let abandoned = false;
+    let settle!: (v: string) => void;
+    const load = vi.fn(() => new Promise<string>((resolve) => (settle = resolve)));
+    const settled = expect(
+      loadWithRecovery({
+        ready: () => Promise.resolve(),
+        load,
+        abandoned: () => abandoned,
+      })
+    ).rejects.toBeInstanceOf(LoadAbandonedError);
+
+    await vi.advanceTimersByTimeAsync(0);
+    // The id moved on (or the page unmounted) mid-flight; the late reply
+    // must not be committed over the newer load's state.
+    abandoned = true;
+    settle("stale yaml");
+
+    await settled;
+  });
+
   it("abandons instead of retrying once the caller loses interest", async () => {
     const load = vi.fn().mockRejectedValue(new Error("WebSocket closed"));
     let abandoned = false;

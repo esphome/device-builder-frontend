@@ -30,24 +30,15 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(0, 5fr);
   }
 
-  .yaml-load-state {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  /* Load ladder in place of the editor: the grid holds a message and an
+     optional action button instead of the nav + editor columns, so drop
+     the column split and the 1px gap's border colour. */
+  .layout-grid.load-state {
+    grid-template-columns: 1fr;
+    align-content: center;
+    justify-items: center;
     gap: var(--wa-space-m);
     background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-  }
-
-  .yaml-load-state wa-spinner {
-    font-size: 28px;
-  }
-
-  .yaml-load-state p {
-    margin: 0;
   }
 
   .layout-grid.nav-collapsed .desktop-nav {

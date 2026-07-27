@@ -25,7 +25,23 @@ describe("renderAsyncState", () => {
       renderAsyncState({ loading: true, loadingMessage: "checking", error: "", content })
     );
     expect(t.strings.join("")).toMatch(/^<div class="message" role="status">.*<\/div>$/);
-    expect(t.values).toEqual(["checking"]);
+    // No loadingLead supplied, so its slot renders nothing.
+    expect(t.values).toEqual([nothing, "checking"]);
+  });
+
+  it("renders the loading lead ahead of the message", () => {
+    const t = asTemplate(
+      renderAsyncState({
+        loading: true,
+        loadingMessage: "checking",
+        loadingLead: () => html`<wa-spinner></wa-spinner>`,
+        error: "",
+        content,
+      })
+    );
+    expect(t.values).toHaveLength(2);
+    expect(asTemplate(t.values[0]).strings.join("")).toContain("<wa-spinner>");
+    expect(t.values[1]).toBe("checking");
   });
 
   it("prefers the loading branch when both loading and error are set", () => {
@@ -38,7 +54,7 @@ describe("renderAsyncState", () => {
       })
     );
     expect(t.strings.join("")).toContain('role="status"');
-    expect(t.values).toEqual(["checking"]);
+    expect(t.values).toEqual([nothing, "checking"]);
   });
 
   it("renders an alert-role message on error", () => {
