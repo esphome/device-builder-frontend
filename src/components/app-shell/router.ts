@@ -58,6 +58,7 @@ export async function lazyEnter(
   const release = () => {
     if (!counted) return;
     counted = false;
+    window.removeEventListener("popstate", onNavigatedAway);
     if (--pendingLoads === 0) hooks.onPending(false);
   };
   // An import can't be cancelled, so a navigation away mid-load would
@@ -105,7 +106,8 @@ export async function lazyEnter(
     }
   } finally {
     clearTimeout(pendingTimer);
-    window.removeEventListener("popstate", onNavigatedAway);
+    // release() also detaches the listener; when never counted, none
+    // was attached.
     release();
   }
 }
