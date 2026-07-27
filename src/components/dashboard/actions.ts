@@ -3,7 +3,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { withBase } from "../../util/base-path.js";
+import { navigate } from "../../util/navigation.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -21,8 +21,7 @@ import {
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 export function editDevice(device: ConfiguredDevice) {
-  window.history.pushState({}, "", withBase(`/device/${device.configuration}`));
-  window.dispatchEvent(new PopStateEvent("popstate"));
+  void navigate(`/device/${device.configuration}`);
 }
 
 /**

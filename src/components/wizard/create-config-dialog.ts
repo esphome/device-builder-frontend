@@ -10,7 +10,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { withBase } from "../../util/base-path.js";
+import { navigate } from "../../util/navigation.js";
 import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
@@ -490,12 +490,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     markJustCreated(configuration);
     markPendingHighlight(configuration);
     this.close();
-    window.history.pushState(
-      {},
-      "",
-      withBase(`/device/${encodeURIComponent(configuration)}`)
-    );
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    void navigate(`/device/${encodeURIComponent(configuration)}`);
   }
 
   private async _onCreateEmptyConfig(
