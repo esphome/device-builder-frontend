@@ -2,7 +2,7 @@ import { Router } from "@lit-labs/router";
 import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
-import { hasPushedHistoryEntry } from "../../util/navigation.js";
+import { hasPushedHistoryEntry, popPushedEntrySilently } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { sleep } from "../../util/sleep.js";
 
@@ -70,8 +70,10 @@ export async function lazyEnter(
           notifyError(hooks.localize()("layout.page_load_failed"));
           // navigate() pushed this URL before the router ran enter, and a
           // false return leaves the old page rendered; undo the push so the
-          // address bar doesn't describe a page that never mounted.
-          if (hasPushedHistoryEntry()) window.history.back();
+          // address bar doesn't describe a page that never mounted. Silent,
+          // or the still-mounted page's popstate guard re-prompts over a
+          // leave the user already answered at navigate() time.
+          if (hasPushedHistoryEntry()) popPushedEntrySilently();
           return false;
         }
         await sleep(delay);

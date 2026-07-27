@@ -47,6 +47,22 @@ export function hasPushedHistoryEntry(): boolean {
   return window.history.state !== null && typeof window.history.state === "object";
 }
 
+let popGuardSuppressed = false;
+
+/** Pop a ``navigate()``-pushed entry without re-running page popstate
+ *  guards — the user already answered them for the failed navigation. */
+export function popPushedEntrySilently(): void {
+  popGuardSuppressed = true;
+  window.history.back();
+}
+
+/** One-shot check page popstate guards consume before intercepting. */
+export function consumePopGuardSuppression(): boolean {
+  const suppressed = popGuardSuppressed;
+  popGuardSuppressed = false;
+  return suppressed;
+}
+
 export async function goBackOrHome(): Promise<void> {
   if (hasPushedHistoryEntry()) {
     // history.back() fires a raw popstate the router commits (unmounting the

@@ -352,6 +352,26 @@ describe("esphome-page-secrets initial load", () => {
     }
   });
 
+  test("a failed background reload keeps the rendered editor and toasts", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce("wifi_password: hunter2\n")
+      .mockRejectedValueOnce(new APIError("internal_error", "boom"));
+    const page = await mountWithApi(getConfig);
+    expect(page._loadState).toBe("ready");
+    vi.mocked(toast.error).mockClear();
+
+    await page._loadFromServer();
+    await flushMicrotasks(8);
+
+    // The content is still in memory; demoting to the error panel would
+    // hide it behind an unnecessary Retry.
+    expect(page._loadState).toBe("ready");
+    expect(page._yaml).toBe("wifi_password: hunter2\n");
+    expect(toast.error).toHaveBeenCalled();
+  });
+
   test("an external save landing mid-load queues one fresh read", async () => {
     let settleFirst!: (yaml: string) => void;
     const getConfig = vi

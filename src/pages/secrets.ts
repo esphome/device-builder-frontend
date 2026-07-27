@@ -23,7 +23,7 @@ import {
   secretsLayoutToPref,
   type SecretsLayout,
 } from "../util/editor-layout.js";
-import { setLeaveGuard } from "../util/navigation.js";
+import { consumePopGuardSuppression, setLeaveGuard } from "../util/navigation.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -233,6 +233,9 @@ export class ESPHomePageSecrets extends LitElement {
   // bypassing ``navigate``; re-assert our URL and run the guard, then replay
   // the back once the user has decided.
   private _onPopState = (e: PopStateEvent) => {
+    // A failed route chunk rolling back its own push is a return to
+    // this page, not a leave.
+    if (consumePopGuardSuppression()) return;
     if (this._allowingLeave) {
       this._allowingLeave = false;
       return;
@@ -290,7 +293,14 @@ export class ESPHomePageSecrets extends LitElement {
         yaml = this._localize("secrets.file_header");
       } else {
         console.error("Failed to load secrets.yaml:", err);
-        this._loadState = "error";
+        // A reload over a rendered buffer keeps the content on screen
+        // and surfaces the staleness; only a load with nothing behind
+        // it gets the error panel.
+        if (this._loadState === "ready") {
+          notifyError(this._localize("secrets.reload_failed"));
+        } else {
+          this._loadState = "error";
+        }
         return;
       }
     }

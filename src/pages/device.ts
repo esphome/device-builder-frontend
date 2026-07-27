@@ -59,7 +59,12 @@ import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { renderAsyncState } from "../util/render-async-state.js";
-import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
+import {
+  consumePopGuardSuppression,
+  goBackOrHome,
+  navigate,
+  setLeaveGuard,
+} from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isTypingTarget } from "../util/typing-target.js";
@@ -601,6 +606,9 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _onPopState = (e: PopStateEvent) => {
+    // A failed route chunk rolling back its own push is a return to
+    // this page, not a leave.
+    if (consumePopGuardSuppression()) return;
     if (this._allowingLeave) {
       this._allowingLeave = false;
       return;
@@ -708,6 +716,10 @@ export class ESPHomePageDevice extends LitElement {
       // captured ref and its dirty bit here instead.
       this._activeSection = null;
       this._sectionDirty = false;
+      // Discard leaves the buffer dirty; clear it or the prior device's
+      // YAML rides the reused element and Save writes it to this file.
+      this._yaml = "";
+      this._savedYaml = "";
       void this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board

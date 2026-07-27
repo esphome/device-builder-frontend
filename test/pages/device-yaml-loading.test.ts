@@ -83,6 +83,27 @@ describe("device page initial YAML loading gate", () => {
     expect((editor as any).yaml).toBe("wifi:\n  ssid: x\n");
   });
 
+  it("clears the prior device's buffer on an id change", async () => {
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce("esphome:\n  name: kitchen\n")
+      .mockImplementationOnce(() => new Promise<string>(() => {}));
+    const page = await mountPage(makeApi(getConfig));
+    const view = page as unknown as { _yaml: string; _savedYaml: string };
+    expect(view._yaml).toBe("esphome:\n  name: kitchen\n");
+
+    // Discard leaves the buffer dirty; the element is then reused for
+    // the next device, whose load hangs.
+    view._yaml = "esphome:\n  name: kitchen-edited\n";
+    page.id = "porch.yaml";
+    await page.updateComplete;
+
+    // The prior device's dirty YAML must not survive where Save could
+    // write it into porch.yaml.
+    expect(view._yaml).toBe("");
+    expect(view._savedYaml).toBe("");
+  });
+
   it("keeps the spinner and retries when the socket drops mid-fetch", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.useFakeTimers();

@@ -8,6 +8,7 @@ vi.mock("sonner-js", () => ({
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { lazyEnter, type RouterHooks } from "../../../src/components/app-shell/router.js";
+import { consumePopGuardSuppression } from "../../../src/util/navigation.js";
 import { identityLocalize } from "../../_dom.js";
 
 /**
@@ -35,6 +36,8 @@ describe("lazyEnter", () => {
     // Module-factory mock, so restoreAllMocks never clears its history;
     // without this the not.toHaveBeenCalled cells are order-dependent.
     vi.mocked(toast.error).mockClear();
+    // Module state in navigation.ts; drain any leftover arming.
+    consumePopGuardSuppression();
   });
 
   afterEach(() => {
@@ -170,5 +173,21 @@ describe("lazyEnter", () => {
     // navigate() had already pushed the URL; undo it so the address bar
     // doesn't describe a page that never mounted.
     expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses the popstate guard for its own rollback", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { hooks } = makeHooks();
+    const result = lazyEnter(
+      vi.fn().mockRejectedValue(new Error("chunk load failed")),
+      hooks
+    );
+
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(result).resolves.toBe(false);
+    // The still-mounted page's guard consumes this and lets the rollback
+    // popstate through instead of re-prompting a leave already answered.
+    expect(consumePopGuardSuppression()).toBe(true);
   });
 });
