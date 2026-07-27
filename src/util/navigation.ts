@@ -11,7 +11,7 @@ export function setLeaveGuard(guard: LeaveGuard | null): void {
 
 /** Clear only while *guard* is still the active one — a departing page
  *  must not disarm a successor that already registered. */
-export function clearLeaveGuard(guard: LeaveGuard): void {
+function clearLeaveGuard(guard: LeaveGuard): void {
   if (activeGuard === guard) activeGuard = null;
 }
 
