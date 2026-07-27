@@ -1,3 +1,4 @@
+import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { withBase } from "./base-path.js";
 
 export type LeaveGuard = () => Promise<boolean>;
@@ -85,6 +86,87 @@ export function consumePopGuardSuppression(): boolean {
   const suppressed = popGuardSuppressed;
   popGuardSuppressed = false;
   return suppressed;
+}
+
+export interface PopLeaveGuardOptions {
+  /** The page's confirm-dialog flow; also registered as the active leave
+   *  guard for ``navigate()`` / ``goBackOrHome()``. */
+  confirmLeave: () => Promise<boolean>;
+  /** Read at popstate time, after the suppression and allow checks; may
+   *  have side effects (the device page kicks its section flush here). */
+  isDirty: () => boolean;
+  /** Un-based path re-asserted while the prompt is open. */
+  url: () => string;
+}
+
+/**
+ * Owns a page's popstate leave-guard: intercepts a dirty Back/Forward,
+ * re-asserts the page URL, runs the confirm flow, and replays the pop on
+ * proceed. Registers the confirm flow as the active leave guard for the
+ * host's connected lifetime.
+ */
+export class PopLeaveGuardController implements ReactiveController {
+  /* The allow flag is flipped inside the wrapped guard BEFORE its caller
+   * resumes, so the callers' own popstates fall through instead of being
+   * re-intercepted while the buffer is still dirty (Discard doesn't
+   * revert it):
+   *
+   *   - ``navigate()`` on ``canLeave=true`` does ``pushState +
+   *     dispatchEvent(popstate)`` synchronously after the guard resolves.
+   *   - The intercepted-pop replay below calls ``history.back()``.
+   *
+   * Microtasks run to completion, so no popstate task can interleave
+   * between the confirm resolving and the flag write. */
+  private _allowingLeave = false;
+
+  private readonly _guard: LeaveGuard;
+
+  constructor(
+    host: ReactiveControllerHost,
+    private readonly _opts: PopLeaveGuardOptions
+  ) {
+    this._guard = async () => {
+      const ok = await this._opts.confirmLeave();
+      if (ok) this._allowingLeave = true;
+      return ok;
+    };
+    host.addController(this);
+  }
+
+  hostConnected(): void {
+    setLeaveGuard(this._guard);
+    window.addEventListener("popstate", this.handlePopState, { capture: true });
+  }
+
+  hostDisconnected(): void {
+    setLeaveGuard(null);
+    window.removeEventListener("popstate", this.handlePopState, { capture: true });
+    this._allowingLeave = false;
+  }
+
+  readonly handlePopState = (e: PopStateEvent) => {
+    // A failed route chunk rolling back its own push is a return to the
+    // page, not a leave.
+    if (consumePopGuardSuppression()) return;
+    if (this._allowingLeave) {
+      this._allowingLeave = false;
+      return;
+    }
+    // Only now: the dirty check may side-effect (section-flush kick).
+    if (!this._opts.isDirty()) return;
+    e.stopImmediatePropagation();
+    // Synchronous by contract: the popped entry is re-pushed in the same
+    // task. Plain ``{}`` state — a navigate() stamp here would let the
+    // router's rollback treat a guard re-push as a fresh push.
+    window.history.pushState({}, "", withBase(this._opts.url()));
+    this._guard()
+      .then((canLeave) => {
+        if (canLeave) window.history.back();
+      })
+      // The entry was already re-pushed, so staying put is the fail-safe
+      // on an unexpected guard failure.
+      .catch((err) => console.error("Leave confirmation failed:", err));
+  };
 }
 
 /**
