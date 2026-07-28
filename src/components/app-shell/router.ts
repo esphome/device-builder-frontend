@@ -3,6 +3,7 @@ import { html, type ReactiveControllerHost } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import {
+  installLeaveGuardInterceptor,
   isFreshNavigatePush,
   isSameDocumentPush,
   popPushedEntrySilently,
@@ -140,6 +141,8 @@ export function createRouter(
   host: ReactiveControllerHost & HTMLElement,
   hooks: RouterHooks
 ): Router {
+  // Ordering is load-bearing; see installLeaveGuardInterceptor's doc.
+  installLeaveGuardInterceptor();
   return new Router(host, [
     {
       path: withBase("/"),

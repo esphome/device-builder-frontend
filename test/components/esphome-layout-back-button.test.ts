@@ -38,11 +38,11 @@ describe("esphome-layout dashboard-route detection", () => {
   });
 });
 
-// The header back arrow pops history via history.back(), whose raw popstate the
-// router commits before the device editor's popstate guard can veto it. _goHome
-// therefore runs the active leave guard up front (like navigate() does) and
-// only pops when it resolves "proceed". Pin that gate so a dirty editor can't
-// be navigated away from without the prompt.
+// The header back arrow pops history via history.back(). _goHome runs the
+// active leave guard up front (like navigate() does) and only pops when it
+// resolves "proceed", so the prompt shows while the URL still names the
+// page instead of through the interceptor's after-the-pop re-push. Pin that
+// gate so a dirty editor can't be navigated away from without the prompt.
 describe("esphome-layout back arrow leave guard", () => {
   afterEach(() => {
     setLeaveGuard(null);

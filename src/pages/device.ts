@@ -632,11 +632,7 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = false;
       return;
     }
-    /* Otherwise leave the editor via the header back arrow's guarded
-       path. A raw history.back() here loses the dirty buffer: the
-       router's popstate listener commits the leave before this page's
-       ``_onPopState`` can veto it, so the unsaved-changes prompt must
-       run before the navigation, not after. */
+    // Otherwise leave via goBackOrHome(), which prompts before the pop.
     e.preventDefault();
     void goBackOrHome();
   };
