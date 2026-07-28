@@ -79,7 +79,7 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
-import { buildFormRenderPlan } from "./config-entry-form-plan.js";
+import { buildFormRenderPlan, unitMembersByKey } from "./config-entry-form-plan.js";
 import {
   fieldRendererStyles,
   formatConstraintKeys,
@@ -710,7 +710,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (this.entries.length === 0) return;
     const key = fieldKeyAttr(this.focusFieldPath);
     if (key === this._focusRevealKey) return;
-    if (!pathIsAdvanced(this.entries, this.focusFieldPath, this.values)) return;
+    const unitFor = unitMembersByKey(this.entries, this.requiredGroups);
+    if (!pathIsAdvanced(this.entries, this.focusFieldPath, this.values, unitFor)) {
+      return;
+    }
     this._focusRevealKey = key;
     this._emitAdvancedToggle(true);
   }

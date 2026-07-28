@@ -638,6 +638,36 @@ describe("config-entry-form advanced-section", () => {
     expect(count).toBe(1);
   });
 
+  it("does not ask for an empty member of a cluster another member fills", () => {
+    // The whole cluster paints inline off the sibling's value, so the
+    // empty member is already on screen.
+    const clu = (key: string) =>
+      makeConfigEntry({
+        key,
+        type: ConfigEntryType.STRING,
+        label: key,
+        advanced: true,
+        group: "grp",
+      });
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, clu("a"), clu("b")];
+    form.values = { a: "set" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["b"];
+    let count = 0;
+    form.addEventListener("advanced-toggle", () => count++);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(0);
+    // A wholly-empty all-advanced cluster is gated — the reveal fires.
+    form.values = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+  });
+
   it("keeps the focus-reveal shot after a skipped value-bearing target", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];

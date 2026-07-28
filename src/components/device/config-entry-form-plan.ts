@@ -49,6 +49,31 @@ export function buildFormRenderPlan(
 }
 
 /**
+ * Resolver from a top-level entry key to its render unit's members (exclusive
+ * group or constraint cluster), undefined for plain entries. Feeds
+ * ``pathIsAdvanced`` so reveal decisions match unit placement.
+ */
+export function unitMembersByKey(
+  entries: ConfigEntry[],
+  requiredGroups: RequiredGroup[]
+): (key: string) => ConfigEntry[] | undefined {
+  const byKey = new Map<string, ConfigEntry[]>();
+  const { clusters } = buildConstraintClusters(entries, requiredGroups);
+  for (const cluster of clusters) {
+    for (const member of cluster.members) byKey.set(member.key, cluster.members);
+  }
+  const groups = new Map<string, ConfigEntry[]>();
+  for (const entry of entries) {
+    if (!entry.exclusive_group) continue;
+    const members = groups.get(entry.exclusive_group) ?? [];
+    members.push(entry);
+    groups.set(entry.exclusive_group, members);
+    byKey.set(entry.key, members);
+  }
+  return (key) => byKey.get(key);
+}
+
+/**
  * Whether the plan paints anything the user can act on: an unlocked plain
  * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
  *

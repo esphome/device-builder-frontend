@@ -67,6 +67,25 @@ describe("device-section-config — advanced reveal on caret-follow", () => {
     expect(inner._showAdvanced).toBe(true);
   });
 
+  it("does not reveal for an empty member of a cluster another member fills", () => {
+    const clu = (key: string) =>
+      ({
+        key,
+        type: ConfigEntryType.STRING,
+        label: key,
+        advanced: true,
+        group: "grp",
+      }) as ConfigEntry;
+    const inner = makeHost(["b"]);
+    inner._config = { entries: [clu("a"), clu("b")] };
+    inner._values = { a: "set" };
+    inner._revealAdvancedForFocus(focusChanged());
+    expect(inner._showAdvanced).toBe(false);
+    inner._values = {};
+    inner._revealAdvancedForFocus(focusChanged());
+    expect(inner._showAdvanced).toBe(true);
+  });
+
   it("ignores updates where neither focusFieldPath nor _config changed", () => {
     const inner = makeHost(["hide_timestamp"]);
     inner._revealAdvancedForFocus(new Map()); // e.g. an unrelated re-render

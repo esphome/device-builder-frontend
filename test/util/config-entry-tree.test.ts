@@ -115,6 +115,33 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced([pins], ["pins", "0", "id"], {})).toBe(true);
   });
 
+  it("gates a unit only when every member is advanced and none is valued", () => {
+    const a = entry("a", true);
+    const b = entry("b", true);
+    const unitFor = (key: string) => (key === "a" || key === "b" ? [a, b] : undefined);
+    expect(pathIsAdvanced([a, b], ["b"], {}, unitFor)).toBe(true);
+    // A valued sibling paints the whole unit inline.
+    expect(pathIsAdvanced([a, b], ["b"], { a: "set" }, unitFor)).toBe(false);
+    // A mixed unit never lands in the advanced bucket.
+    const plain = entry("a", false);
+    const mixedFor = (key: string) =>
+      key === "a" || key === "b" ? [plain, b] : undefined;
+    expect(pathIsAdvanced([plain, b], ["b"], {}, mixedFor)).toBe(false);
+    // Keys the resolver doesn't know keep per-entry gating.
+    expect(pathIsAdvanced([a, b, entry("c", true)], ["c"], {}, unitFor)).toBe(true);
+  });
+
+  it("consults the unit resolver for the top-level segment only", () => {
+    const wrap = nested("wrap", false, [entry("a", true)]);
+    const unitFor = (key: string) =>
+      key === "a" ? [entry("a", true), entry("z", true)] : undefined;
+    // "a" at depth 1 is a plain advanced leaf; its own scope decides.
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], { wrap: { a: "set" } }, unitFor)).toBe(
+      false
+    );
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], {}, unitFor)).toBe(true);
+  });
+
   it("still short-circuits on a hidden flag under a pin's mode group", () => {
     // The wiring exception suppresses advanced marks, not the hidden
     // walk — a hidden flag never renders, so don't reveal for it.
