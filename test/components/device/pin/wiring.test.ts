@@ -253,6 +253,22 @@ describe("pin wiring preset cards", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 
+  it("skips the guardrail when the reference resolves to an uncatalogued GPIO", () => {
+    // The lookup must return null, not fall back to some board pin —
+    // against a board that could banner if it did.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "${my_pin}", mode: {} },
+        { yaml: "substitutions:\n  my_pin: GPIO99\n" },
+        inputOnlyBoard()
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-banner")).toHaveLength(0);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
+  });
+
   it("keeps the raw disclosure for an expander channel with a substitution number", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
@@ -361,6 +377,16 @@ describe("pin wiring preset cards", () => {
 
   it("opening the wiring summary does not rewrite a short-form pin", () => {
     const ctx = openCtx("GPIO2", { nestedOpenSections: new Set<string>() });
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    (disclosureToggle(result)["@click"] as () => void)();
+
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("opening the wiring summary does not rewrite a scalar reference pin", () => {
+    const ctx = openCtx("${my_pin}", { nestedOpenSections: new Set<string>() });
     const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
 
     (disclosureToggle(result)["@click"] as () => void)();
