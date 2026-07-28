@@ -242,11 +242,12 @@ describe("pin wiring preset cards", () => {
 
   it("renders enabled cards without the guardrail for an unresolvable reference", () => {
     // Same posture as a literal the catalog doesn't list: no board pin,
-    // no input-only vouching, cards stay usable.
+    // no input-only vouching, cards stay usable. The board carries an
+    // input-only pin so the no-banner assertion isn't vacuous.
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
-      openCtx({ number: "${from_package}", mode: {} })
+      openCtx({ number: "${from_package}", mode: {} }, {}, inputOnlyBoard())
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-banner")).toHaveLength(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
