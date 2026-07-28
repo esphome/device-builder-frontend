@@ -4,10 +4,11 @@
  * validation-error map.
  */
 
+import { hasMaterialValue } from "../components/device/config-entry-render-filter.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
-import { isIndexSegment } from "./nested-values.js";
+import { asRecord, isIndexSegment, isPlainObject } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
 /** A pick-one group/cluster with any visible board-locked member is the
@@ -44,17 +45,27 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
 /**
  * Whether the entry at *path* — or any NESTED ancestor along it — is
  * `advanced`. Used to reveal a section's hidden advanced fields when the
- * caret or a backend error lands on one. List-index segments are skipped:
- * the schema nests an item's fields directly under the list entry, with
- * no index level. Returns false if the path doesn't resolve.
+ * caret or a backend error lands on one. List-index segments descend the
+ * value scope only: the schema nests an item's fields directly under the
+ * list entry, with no index level. When *values* is given, an advanced
+ * entry whose scope carries a material value doesn't gate — it renders
+ * without the toggle. Returns false if the path doesn't resolve.
  */
-export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean {
+export function pathIsAdvanced(
+  entries: ConfigEntry[],
+  path: string[],
+  values?: Record<string, unknown>
+): boolean {
   let level = entries;
+  let scope: unknown = values;
   let advanced = false;
   let prevWasPin = false;
   let inPinWiring = false;
   for (const key of path) {
-    if (isIndexSegment(key)) continue;
+    if (isIndexSegment(key)) {
+      scope = Array.isArray(scope) ? scope[Number(key)] : undefined;
+      continue;
+    }
     const entry = level.find((e) => e.key === key);
     if (!entry) return false;
     // A hidden entry never renders, so opening the advanced section
@@ -65,9 +76,16 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
     // anything; keep walking so the hidden check above still covers the
     // rest of the path.
     if (prevWasPin && PIN_WIRING_KEYS.has(entry.key)) inPinWiring = true;
-    if (entry.advanced && !inPinWiring) advanced = true;
+    if (
+      entry.advanced &&
+      !inPinWiring &&
+      (values === undefined || !hasMaterialValue(entry, asRecord(scope)))
+    ) {
+      advanced = true;
+    }
     prevWasPin = entry.type === ConfigEntryType.PIN;
     level = entry.config_entries ?? [];
+    scope = isPlainObject(scope) ? scope[key] : undefined;
   }
   return advanced;
 }

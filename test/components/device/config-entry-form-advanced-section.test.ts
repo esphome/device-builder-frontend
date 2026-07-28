@@ -638,6 +638,43 @@ describe("config-entry-form advanced-section", () => {
     expect(count).toBe(1);
   });
 
+  it("does not ask for a focus target that already renders inline", () => {
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, ADVANCED];
+    form.values = { reboot_timeout: "5min" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["reboot_timeout"];
+    let emitted = false;
+    form.addEventListener("advanced-toggle", () => {
+      emitted = true;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(emitted).toBe(false);
+  });
+
+  it("keeps the focus-reveal shot after a skipped value-bearing target", () => {
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, ADVANCED];
+    form.values = { reboot_timeout: "5min" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["reboot_timeout"];
+    let count = 0;
+    form.addEventListener("advanced-toggle", () => count++);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(0);
+    // Value cleared in YAML: the same target is hidden again, so it reveals.
+    form.values = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];

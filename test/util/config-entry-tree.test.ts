@@ -81,6 +81,44 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced([advancedPin], ["pin", "mode", "input"])).toBe(true);
   });
 
+  it("is false for an advanced leaf that already carries a value", () => {
+    expect(pathIsAdvanced(entries, ["hide_timestamp"], { hide_timestamp: "5s" })).toBe(
+      false
+    );
+  });
+
+  it("stays true when only an unrelated key carries a value", () => {
+    expect(pathIsAdvanced(entries, ["hide_timestamp"], { name: "x" })).toBe(true);
+  });
+
+  it("ungates a plain leaf once its advanced ancestor has a value", () => {
+    expect(
+      pathIsAdvanced(entries, ["calibrate", "method"], { calibrate: { method: "gauss" } })
+    ).toBe(false);
+    expect(pathIsAdvanced(entries, ["calibrate", "method"], {})).toBe(true);
+  });
+
+  it("keeps gating an empty advanced leaf beside a valued sibling", () => {
+    expect(
+      pathIsAdvanced(entries, ["filters", "multiply"], { filters: { offset: 1 } })
+    ).toBe(true);
+  });
+
+  it("descends the value scope through list-index segments", () => {
+    const pins = {
+      key: "pins",
+      type: ConfigEntryType.NESTED,
+      label: "pins",
+      advanced: true,
+      multi_value: true,
+      config_entries: [entry("id", true)],
+    } as ConfigEntry;
+    expect(pathIsAdvanced([pins], ["pins", "0", "id"], { pins: [{ id: "x" }] })).toBe(
+      false
+    );
+    expect(pathIsAdvanced([pins], ["pins", "0", "id"], {})).toBe(true);
+  });
+
   it("still short-circuits on a hidden flag under a pin's mode group", () => {
     // The wiring exception suppresses advanced marks, not the hidden
     // walk — a hidden flag never renders, so don't reveal for it.

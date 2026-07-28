@@ -145,6 +145,13 @@ describe("device-section-config — backend field errors", () => {
     expect(inner._showAdvanced).toBe(true);
   });
 
+  it("does not reveal when the errored advanced field already has a value", () => {
+    const inner = makeHost(instanceErrors({ pin: "pin broken" }));
+    inner._values = { pin: "GPIO4" };
+    inner._revealAdvancedForErrors(backendErrorsChanged());
+    expect(inner._showAdvanced).toBe(false);
+  });
+
   it("does not reveal advanced settings for a plain-field error", () => {
     const inner = makeHost(instanceErrors({ update_interval: "x" }));
     inner._revealAdvancedForErrors(backendErrorsChanged());
