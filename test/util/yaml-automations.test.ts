@@ -1,11 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { _clearRenamedKeys, recordRenamedKeys } from "../../src/util/renamed-keys.js";
 import { parseYamlAutomations } from "../../src/util/yaml-automations.js";
 import { _clearYamlSectionsMemo } from "../../src/util/yaml-sections-core.js";
 
 // `parseYamlAutomations` leans on `parseYamlTopLevelSections`, which memoises on
 // the yaml string. Distinct fixtures key distinctly, but clear the memo between
 // tests anyway so no case can be satisfied by a prior parse.
-afterEach(() => _clearYamlSectionsMemo());
+afterEach(() => {
+  _clearYamlSectionsMemo();
+  _clearRenamedKeys();
+});
+
+/** Hydrate the alias registry the way the api catalog payload does. */
+const seedApiRenamedKeys = () =>
+  recordRenamedKeys("api", { services: "actions", service: "action" });
 
 /** The stable `key`s the parser emits, in document order — the identifier the
  *  page matches against a backend `ParsedAutomation.location`. */
@@ -177,6 +185,7 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
   });
 
   it("falls back to the legacy `service:` key for an api action name", () => {
+    seedApiRenamedKeys();
     const yaml = [
       "api:",
       "  actions:",
@@ -186,6 +195,39 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
       "",
     ].join("\n");
     expect(keys(yaml)).toContain("automation:api_action:legacy_call");
+  });
+
+  it("enumerates a legacy `services:` block like `actions:`", () => {
+    seedApiRenamedKeys();
+    const yaml = [
+      "api:",
+      "  services:",
+      "    - service: start_va",
+      "      then:",
+      "        - logger.log: go",
+      "    - service: stop_va",
+      "      then:",
+      "        - logger.log: halt",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual([
+      "automation:api_action:start_va",
+      "automation:api_action:stop_va",
+    ]);
+  });
+
+  it("re-parses after alias hydration instead of serving the pre-hydration memo", () => {
+    const yaml = [
+      "api:",
+      "  services:",
+      "    - service: start_va",
+      "      then:",
+      "        - logger.log: go",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual([]);
+    seedApiRenamedKeys();
+    expect(keys(yaml)).toEqual(["automation:api_action:start_va"]);
   });
 });
 

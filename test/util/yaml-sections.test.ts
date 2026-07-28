@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { _clearRenamedKeys, recordRenamedKeys } from "../../src/util/renamed-keys.js";
 import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import {
   _clearYamlSectionsMemo,
@@ -823,6 +824,7 @@ describe("parseYamlAutomations", () => {
   });
 
   it("accepts the legacy service: discriminator on api.actions:", () => {
+    recordRenamedKeys("api", { services: "actions", service: "action" });
     const yaml = `api:
   actions:
     - service: legacy_name
@@ -832,6 +834,7 @@ describe("parseYamlAutomations", () => {
     const items = parseYamlAutomations(yaml).filter((s) =>
       s.key.startsWith("automation:api_action:")
     );
+    _clearRenamedKeys();
     expect(items.map((s) => s.key)).toEqual(["automation:api_action:legacy_name"]);
   });
 

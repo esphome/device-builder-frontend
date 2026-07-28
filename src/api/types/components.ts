@@ -125,6 +125,11 @@ export interface ComponentCatalogEntry {
    *  `spi`), so the card can chip its type alongside its recommendation
    *  status. Null/absent on regular entries. */
   underlying_category?: ComponentCategory | null;
+  /** Legacy key spellings esphome still accepts, old to new (api:
+   *  services to actions, item service to action). Absent when the
+   *  component has none. Consumers record it into the renamed-keys
+   *  registry and resolve accepted spellings from there. */
+  renamed_keys?: Record<string, string>;
   /** Cross-field cardinality constraints over the top-level `config_entries`
    *  (from ESPHome's `cv.has_*_one_key` validators). Nested-scope constraints
    *  live on the owning `nested` entry's `required_groups`. */

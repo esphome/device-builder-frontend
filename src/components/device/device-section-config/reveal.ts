@@ -3,6 +3,7 @@
  * and the api manage-list caret flash.
  */
 import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
+import { legacyKeysFor } from "../../../util/renamed-keys.js";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { scrollFlashRow } from "../field-highlight.js";
@@ -41,13 +42,15 @@ export function revealAdvancedForFocus(
   if (host.focusFieldPath?.length) autoRevealAdvanced(host, [host.focusFieldPath]);
 }
 
-/** ``api.actions`` / ``services`` are hidden from the form — the
- *  manage-list below it owns them, so a caret on those keys lands
- *  there instead of on a field that no longer renders. */
+/** ``api.actions`` (any catalog-recorded spelling) is hidden from the
+ *  form — the manage-list below it owns it, so a caret on those keys
+ *  lands there instead of on a field that no longer renders. */
 export function maybeFlashApiActionsList(host: ESPHomeDeviceSectionConfig): void {
   if (host.sectionKey !== "api") return;
   const head = host.focusFieldPath?.[0];
-  if (head !== "actions" && head !== "services") return;
+  if (head !== "actions" && !legacyKeysFor("api", "actions").includes(head as string)) {
+    return;
+  }
   const key = JSON.stringify(host.focusFieldPath);
   if (key === host._apiListFlashKey) return;
   const list = host.shadowRoot?.querySelector<HTMLElement>(

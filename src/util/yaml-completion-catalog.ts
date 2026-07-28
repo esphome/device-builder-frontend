@@ -16,6 +16,7 @@ import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import { fetchAllComponents } from "./fetch-all-components.js";
+import { recordRenamedKeys } from "./renamed-keys.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import {
   blankLineContext,
@@ -139,6 +140,7 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
     const byCategory = new Map<string, ComponentCatalogEntry[]>();
     for (const c of components) {
       byId.set(c.id, c);
+      recordRenamedKeys(c.id, c.renamed_keys);
       const list = byCategory.get(c.category) ?? [];
       list.push(c);
       byCategory.set(c.category, list);

@@ -8,6 +8,14 @@ import {
 } from "../../src/util/component-name-cache.js";
 import { ComponentNameResolverController } from "../../src/util/component-name-resolver-controller.js";
 
+// The cache's fetch wrapper records renamed_keys before resolving, so
+// results land one microtask later than the raw api call.
+const drainFetch = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 const entry = (id: string, name: string): ComponentCatalogEntry =>
   ({
     id,
@@ -73,8 +81,7 @@ describe("ComponentNameResolverController", () => {
 
     expect(ctl.resolve("i2c")).toBe("i2c"); // not yet fetched
     ctl.kickoff(["i2c"]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await drainFetch();
     expect(ctl.resolve("i2c")).toBe("I²C Bus");
   });
 
@@ -103,8 +110,7 @@ describe("ComponentNameResolverController", () => {
     // a fresh entry landing shouldn't surface as a host update yet.
     connect();
     ctl.kickoff(["wifi"]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await drainFetch();
     expect(requestUpdate).toHaveBeenCalled();
 
     disconnect();
@@ -143,8 +149,7 @@ describe("ComponentNameResolverController", () => {
     connect();
 
     ctl.kickoff(["spi"]);
-    await Promise.resolve();
-    await Promise.resolve();
+    await drainFetch();
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
 
     ctl.kickoff(["spi"]);

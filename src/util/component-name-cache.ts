@@ -1,6 +1,7 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { BatchedCache } from "./batched-cache.js";
+import { recordRenamedKeys } from "./renamed-keys.js";
 
 /** Session-scoped cache of component catalog entries, keyed by
  *  ``componentId|platform|boardId``. The backend catalog is
@@ -19,8 +20,13 @@ interface _ComponentContext {
 const _cache = new BatchedCache<ComponentCatalogEntry, _ComponentContext>({
   name: "component-name-cache",
   bucketKey: ({ platform, boardId }) => `${platform ?? ""}|${boardId ?? ""}`,
-  fetch: (api, ids, { platform, boardId }) =>
-    api.getComponentBodies(ids, platform, boardId),
+  fetch: async (api, ids, { platform, boardId }) => {
+    const bodies = await api.getComponentBodies(ids, platform, boardId);
+    for (const [id, body] of Object.entries(bodies)) {
+      recordRenamedKeys(id, body?.renamed_keys);
+    }
+    return bodies;
+  },
 });
 
 export function getCachedComponent(

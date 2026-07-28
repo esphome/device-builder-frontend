@@ -5,6 +5,7 @@
  * unaffected; import from there or from here directly.
  */
 
+import { legacyKeysFor, renamedKeysGeneration } from "./renamed-keys.js";
 import {
   endsBlockAtIndent,
   isBlankOrCommentLine,
@@ -65,14 +66,25 @@ const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
  * instance and must not mutate it.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
-  if (_automationsKey === yaml && _automationsValue) return _automationsValue;
+  // Alias hydration invalidates too: a parse cached before the
+  // renamed-keys registry filled must not be served after it.
+  const generation = renamedKeysGeneration();
+  if (
+    _automationsKey === yaml &&
+    _automationsGeneration === generation &&
+    _automationsValue
+  ) {
+    return _automationsValue;
+  }
   const result = _parseYamlAutomations(yaml);
   _automationsKey = yaml;
+  _automationsGeneration = generation;
   _automationsValue = result;
   return result;
 }
 
 let _automationsKey: string | undefined;
+let _automationsGeneration: number | undefined;
 let _automationsValue: YamlSection[] | undefined;
 
 function _parseYamlAutomations(yaml: string): YamlSection[] {
@@ -250,26 +262,30 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   // ``api.actions:`` list items — Home Assistant-callable actions
   // nested under the top-level ``api:`` block. Same callable shape
   // as ``script:`` (named entry, no trigger key) but one level
-  // deeper in the YAML tree. Each item's ``action:`` (or legacy
-  // ``service:``) value is the stable discriminator.
+  // deeper in the YAML tree. Each item's ``action:`` value is the
+  // stable discriminator. Both the block key and the discriminator
+  // have catalog-recorded legacy spellings (services / service),
+  // still valid esphome config.
   const apiBlock = _findTopLevelBlock(lines, "api");
   if (apiBlock) {
-    const actionsBlock = _findChildBlock(
-      lines,
-      apiBlock.fromLine,
-      apiBlock.toLine,
-      "actions"
-    );
+    let actionsBlock: { fromLine: number; toLine: number } | null = null;
+    for (const blockKey of ["actions", ...legacyKeysFor("api", "actions")]) {
+      actionsBlock = _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, blockKey);
+      if (actionsBlock) break;
+    }
     if (actionsBlock) {
+      const itemKeys = ["action", ...legacyKeysFor("api", "action")];
       const items = _enumerateListItems(
         lines,
         actionsBlock.fromLine,
         actionsBlock.toLine
       );
       for (const item of items) {
-        const actionName =
-          _readKeyOnLine(lines, item.fromLine, "action") ??
-          _readKeyOnLine(lines, item.fromLine, "service");
+        let actionName: string | null = null;
+        for (const itemKey of itemKeys) {
+          actionName = _readKeyOnLine(lines, item.fromLine, itemKey);
+          if (actionName) break;
+        }
         if (!actionName) continue;
         automations.push({
           key: `automation:api_action:${actionName}`,

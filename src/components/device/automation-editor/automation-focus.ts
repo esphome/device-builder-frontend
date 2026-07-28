@@ -19,6 +19,7 @@ import type {
   AutomationTree,
   ConditionNode,
 } from "../../../api/types/automations.js";
+import { legacyKeysFor } from "../../../util/renamed-keys.js";
 import type { YamlPathSegment } from "../../../util/yaml-ast.js";
 
 export type { YamlPathSegment };
@@ -53,12 +54,20 @@ export function automationRelativePath(
 ): YamlPathSegment[] | null {
   const anchor = location && handlerAnchor(location);
   if (!anchor) return null;
-  let at = path.indexOf(anchor.keys[0]);
-  while (at >= 0 && !anchor.keys.every((k, i) => path[at + i] === k)) {
-    at = path.indexOf(anchor.keys[0], at + 1);
+  let at = -1;
+  let matched: string[] | null = null;
+  for (const keys of anchor.keyPaths) {
+    at = path.indexOf(keys[0]);
+    while (at >= 0 && !keys.every((k, i) => path[at + i] === k)) {
+      at = path.indexOf(keys[0], at + 1);
+    }
+    if (at >= 0) {
+      matched = keys;
+      break;
+    }
   }
-  if (at < 0) return null;
-  const rest = path.slice(at + anchor.keys.length);
+  if (at < 0 || !matched) return null;
+  const rest = path.slice(at + matched.length);
   if (anchor.index === undefined) return rest;
   if (anchor.index === "any") {
     return typeof rest[0] === "number" ? rest.slice(1) : null;
@@ -155,19 +164,27 @@ export function createFocusResolver(): typeof resolveFocus {
  */
 function handlerAnchor(
   location: AutomationLocation
-): { keys: string[]; index?: number | "any" } | null {
+): { keyPaths: string[][]; index?: number | "any" } | null {
   switch (location.kind) {
     case "device_on":
     case "component_on":
-      return { keys: [location.trigger], index: location.index };
+      return { keyPaths: [[location.trigger]], index: location.index };
     case "component_action":
-      return { keys: [location.field] };
+      return { keyPaths: [[location.field]] };
     case "interval":
-      return { keys: ["interval"], index: location.index };
+      return { keyPaths: [["interval"]], index: location.index };
     case "script":
-      return { keys: ["script"], index: "any" };
+      return { keyPaths: [["script"]], index: "any" };
     case "api_action":
-      return { keys: ["api", "actions"], index: "any" };
+      // The cursor path carries whichever block spelling the user's
+      // YAML uses, so every catalog-recorded legacy alias anchors too.
+      return {
+        keyPaths: [
+          ["api", "actions"],
+          ...legacyKeysFor("api", "actions").map((key) => ["api", key]),
+        ],
+        index: "any",
+      };
     default:
       // light_effect mounts a different editor.
       return null;
