@@ -28,7 +28,7 @@ describe("pathIsAdvanced", () => {
   ];
 
   it("is true for an advanced leaf", () => {
-    expect(pathIsAdvanced(entries, ["hide_timestamp"])).toBe(true);
+    expect(pathIsAdvanced(entries, ["hide_timestamp"], {})).toBe(true);
   });
 
   it("is false for a hidden entry — revealing advanced can't show it", () => {
@@ -39,25 +39,25 @@ describe("pathIsAdvanced", () => {
       advanced: true,
       hidden: true,
     } as ConfigEntry;
-    expect(pathIsAdvanced([...entries, hidden], ["actions"])).toBe(false);
-    expect(pathIsAdvanced([...entries, hidden], ["actions", "then"])).toBe(false);
+    expect(pathIsAdvanced([...entries, hidden], ["actions"], {})).toBe(false);
+    expect(pathIsAdvanced([...entries, hidden], ["actions", "then"], {})).toBe(false);
   });
 
   it("is false for a plain leaf", () => {
-    expect(pathIsAdvanced(entries, ["name"])).toBe(false);
+    expect(pathIsAdvanced(entries, ["name"], {})).toBe(false);
   });
 
   it("is true when an advanced ancestor gates a plain leaf", () => {
-    expect(pathIsAdvanced(entries, ["calibrate", "method"])).toBe(true);
+    expect(pathIsAdvanced(entries, ["calibrate", "method"], {})).toBe(true);
   });
 
   it("is true for an advanced leaf under a plain ancestor", () => {
-    expect(pathIsAdvanced(entries, ["filters", "multiply"])).toBe(true);
+    expect(pathIsAdvanced(entries, ["filters", "multiply"], {})).toBe(true);
   });
 
   it("is false when the path doesn't resolve", () => {
-    expect(pathIsAdvanced(entries, ["bogus"])).toBe(false);
-    expect(pathIsAdvanced(entries, [])).toBe(false);
+    expect(pathIsAdvanced(entries, ["bogus"], {})).toBe(false);
+    expect(pathIsAdvanced(entries, [], {})).toBe(false);
   });
 
   it("ignores the catalog-advanced marks under a pin's wiring fields", () => {
@@ -73,12 +73,12 @@ describe("pathIsAdvanced", () => {
         entry("inverted", true),
       ],
     } as ConfigEntry;
-    expect(pathIsAdvanced([pin], ["pin", "mode", "input"])).toBe(false);
-    expect(pathIsAdvanced([pin], ["pin", "mode"])).toBe(false);
-    expect(pathIsAdvanced([pin], ["pin", "inverted"])).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "mode", "input"], {})).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "mode"], {})).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "inverted"], {})).toBe(false);
     // An advanced pin entry itself still gates its wiring fields.
     const advancedPin = { ...pin, advanced: true } as ConfigEntry;
-    expect(pathIsAdvanced([advancedPin], ["pin", "mode", "input"])).toBe(true);
+    expect(pathIsAdvanced([advancedPin], ["pin", "mode", "input"], {})).toBe(true);
   });
 
   it("is false for an advanced leaf that already carries a value", () => {
@@ -106,12 +106,8 @@ describe("pathIsAdvanced", () => {
 
   it("descends the value scope through list-index segments", () => {
     const pins = {
-      key: "pins",
-      type: ConfigEntryType.NESTED,
-      label: "pins",
-      advanced: true,
+      ...nested("pins", true, [entry("id", true)]),
       multi_value: true,
-      config_entries: [entry("id", true)],
     } as ConfigEntry;
     expect(pathIsAdvanced([pins], ["pins", "0", "id"], { pins: [{ id: "x" }] })).toBe(
       false
@@ -134,7 +130,7 @@ describe("pathIsAdvanced", () => {
         ]),
       ],
     } as ConfigEntry;
-    expect(pathIsAdvanced([pin], ["pin", "mode", "secret"])).toBe(false);
-    expect(pathIsAdvanced([pin], ["pin", "mode", "input"])).toBe(true);
+    expect(pathIsAdvanced([pin], ["pin", "mode", "secret"], {})).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "mode", "input"], {})).toBe(true);
   });
 });
