@@ -12,8 +12,8 @@ import { setLeaveGuard } from "../../src/util/navigation.js";
  * Pin the Escape-to-leave path against esphome/device-builder#2259: with a
  * dirty buffer, Escape must run the unsaved-changes guard BEFORE popping
  * history. The old raw ``history.back()`` lost the buffer to the router's
- * popstate listener, which unmounts the page before the device page's own
- * popstate guard can veto.
+ * popstate listener in the pre-interceptor era; prompting first also shows
+ * the dialog while the URL still names the page.
  */
 
 interface EscapeView {
