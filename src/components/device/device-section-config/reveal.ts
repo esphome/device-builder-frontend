@@ -4,7 +4,7 @@
  */
 import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
-import { unitMembersByKey } from "../config-entry-form-plan.js";
+import { unitAdvancedGate } from "../config-entry-form-plan.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { scrollFlashRow } from "../field-highlight.js";
 
@@ -73,8 +73,12 @@ function autoRevealAdvanced(
   if (host._showAdvanced || !host._config) return;
   if (host._autoRevealedSections.has(host.sectionKey)) return;
   const entries = resolveSectionEntries(host.sectionKey, host._config.entries);
-  const unitFor = unitMembersByKey(entries, host._config.required_groups ?? []);
-  if (!paths.some((path) => pathIsAdvanced(entries, path, host._values, unitFor))) {
+  const unitGate = unitAdvancedGate(
+    entries,
+    host._config.required_groups ?? [],
+    host._values
+  );
+  if (!paths.some((path) => pathIsAdvanced(entries, path, host._values, unitGate))) {
     return;
   }
   host._autoRevealedSections.add(host.sectionKey);

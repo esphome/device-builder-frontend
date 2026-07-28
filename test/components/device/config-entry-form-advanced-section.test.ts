@@ -668,6 +668,34 @@ describe("config-entry-form advanced-section", () => {
     expect(count).toBe(1);
   });
 
+  it("does not ask for an exclusive-group member its sibling's value inlines", () => {
+    const ex = (key: string) =>
+      makeConfigEntry({
+        key,
+        type: ConfigEntryType.STRING,
+        label: key,
+        advanced: true,
+        exclusive_group: "g",
+      });
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, ex("first"), ex("second")];
+    form.values = { second: "set" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["first"];
+    let count = 0;
+    form.addEventListener("advanced-toggle", () => count++);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(0);
+    // A wholly-empty all-advanced group is gated — the reveal fires.
+    form.values = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+  });
+
   it("keeps the focus-reveal shot after a skipped value-bearing target", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];

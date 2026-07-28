@@ -115,31 +115,26 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced([pins], ["pins", "0", "id"], {})).toBe(true);
   });
 
-  it("gates a unit only when every member is advanced and none is valued", () => {
+  it("lets the unit gate override per-entry gating at the top level", () => {
     const a = entry("a", true);
-    const b = entry("b", true);
-    const unitFor = (key: string) => (key === "a" || key === "b" ? [a, b] : undefined);
-    expect(pathIsAdvanced([a, b], ["b"], {}, unitFor)).toBe(true);
-    // A valued sibling paints the whole unit inline.
-    expect(pathIsAdvanced([a, b], ["b"], { a: "set" }, unitFor)).toBe(false);
-    // A mixed unit never lands in the advanced bucket.
-    const plain = entry("a", false);
-    const mixedFor = (key: string) =>
-      key === "a" || key === "b" ? [plain, b] : undefined;
-    expect(pathIsAdvanced([plain, b], ["b"], {}, mixedFor)).toBe(false);
-    // Keys the resolver doesn't know keep per-entry gating.
-    expect(pathIsAdvanced([a, b, entry("c", true)], ["c"], {}, unitFor)).toBe(true);
+    const gate = (verdict: boolean | undefined) => (key: string) =>
+      key === "a" ? verdict : undefined;
+    // Gate false: the unit paints inline even though the entry alone gates.
+    expect(pathIsAdvanced([a], ["a"], {}, gate(false))).toBe(false);
+    // Gate true: the unit is gated even though the entry alone is valued.
+    expect(pathIsAdvanced([a], ["a"], { a: "x" }, gate(true))).toBe(true);
+    // No verdict: per-entry gating applies.
+    expect(pathIsAdvanced([a], ["a"], {}, gate(undefined))).toBe(true);
   });
 
-  it("consults the unit resolver for the top-level segment only", () => {
+  it("consults the unit gate for the top-level segment only", () => {
     const wrap = nested("wrap", false, [entry("a", true)]);
-    const unitFor = (key: string) =>
-      key === "a" ? [entry("a", true), entry("z", true)] : undefined;
+    const gate = (key: string) => (key === "a" ? true : undefined);
     // "a" at depth 1 is a plain advanced leaf; its own scope decides.
-    expect(pathIsAdvanced([wrap], ["wrap", "a"], { wrap: { a: "set" } }, unitFor)).toBe(
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], { wrap: { a: "set" } }, gate)).toBe(
       false
     );
-    expect(pathIsAdvanced([wrap], ["wrap", "a"], {}, unitFor)).toBe(true);
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], {}, gate)).toBe(true);
   });
 
   it("still short-circuits on a hidden flag under a pin's mode group", () => {
