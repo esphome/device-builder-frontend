@@ -18,7 +18,6 @@ import {
 } from "../../../api/types/config-entries.js";
 import { isPlainObject } from "../../../util/nested-values.js";
 import { isExpanderPinValue } from "../../../util/pin/gpio.js";
-import { isSubstitutionString } from "../../../util/substitutions.js";
 import {
   applyPresetToPin,
   modeFlagsOf,
@@ -116,18 +115,14 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // And only when a card pick can't lose data — a ``${var}`` mode or
   // inverted, or a readable flag outside the guided set (``analog``),
   // must fall through to the raw disclosure (a pick would clobber the
-  // reference / delete the flag), and a ``${var}`` number (either form)
-  // leaves the actual GPIO unknown, so the input-only guardrail could
-  // not vouch for the cards.
-  const numberValue = isLongForm
-    ? (rawValue as Record<string, unknown>).number
-    : rawValue;
+  // reference / delete the flag). A ``${var}`` number is fine: a pick
+  // never writes the number, and the caller resolves it against the
+  // file's substitutions to feed the board guardrail.
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
     !isExpanderPinValue(rawValue) &&
-    wiringValuesPresetSafe(modeValue, invertedValue) &&
-    !isSubstitutionString(numberValue)
+    wiringValuesPresetSafe(modeValue, invertedValue)
       ? presetsForPinMode(entry.pin_mode)
       : [];
   const usePresets = presets.length > 0;

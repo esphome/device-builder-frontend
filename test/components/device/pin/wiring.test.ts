@@ -217,23 +217,48 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
-  it("keeps the raw disclosure when the pin number is a substitution", () => {
-    // The GPIO is unknown, so the input-only guardrail can't vouch for
-    // the cards; the raw disclosure edits the reference safely.
+  it("renders the preset cards when the pin number is a substitution", () => {
+    // A pick never writes the number, so the reference is safe under
+    // the cards; the text input above keeps editing it.
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
       openCtx({ number: "${my_pin}", mode: {} })
     );
-    expect(cards(result)).toHaveLength(0);
+    expect(new Set(cards(result).map((c) => c["data-preset"]))).toEqual(
+      new Set(["ground_switch", "vcc_switch", "driven_signal", "custom"])
+    );
 
-    // Same rule for the scalar form.
+    // Same for the scalar form.
     const scalar = renderPinField(
       wiringPinEntry(PinMode.INPUT),
       ["pin"],
       openCtx("${my_pin}")
     );
-    expect(cards(scalar)).toHaveLength(0);
+    expect(new Set(cards(scalar).map((c) => c["data-preset"]))).toEqual(
+      new Set(["ground_switch", "vcc_switch", "driven_signal", "custom"])
+    );
+  });
+
+  it("renders enabled cards without the guardrail for an unresolvable reference", () => {
+    // Same posture as a literal the catalog doesn't list: no board pin,
+    // no input-only vouching, cards stay usable.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "${from_package}", mode: {} })
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-banner")).toHaveLength(0);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
+  });
+
+  it("keeps the raw disclosure for an expander channel with a substitution number", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ pca9554: "hub", number: "${ch}", mode: {} })
+    );
+    expect(cards(result)).toHaveLength(0);
   });
 
   it("marks the platform-default card active on an untouched pin", () => {
@@ -264,6 +289,19 @@ describe("pin wiring preset cards", () => {
 
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], {
       number: "GPIO2",
+      mode: { input: true, pullup: true },
+      inverted: true,
+    });
+  });
+
+  it("preserves the substitution reference on a preset pick", () => {
+    const ctx = openCtx("${my_pin}");
+    const result = renderPinField(wiringPinEntry(PinMode.INPUT), ["pin"], ctx);
+
+    (cardById(result, "ground_switch")!["@click"] as () => void)();
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], {
+      number: "${my_pin}",
       mode: { input: true, pullup: true },
       inverted: true,
     });
@@ -495,6 +533,21 @@ describe("pin wiring input-only guardrail", () => {
     expect(findTemplatesByAnchor(result, "pin-wiring-banner").length).toBeGreaterThan(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
     expect(cardById(result, "vcc_switch")?.["aria-disabled"]).toBe("true");
+    expect(cardById(result, "driven_signal")?.["aria-disabled"]).toBe("false");
+  });
+
+  it("banners when a substitution resolves to an input-only pin", () => {
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "${my_pin}" },
+        { yaml: "substitutions:\n  my_pin: GPIO34\n" },
+        inputOnlyBoard()
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-banner").length).toBeGreaterThan(0);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
     expect(cardById(result, "driven_signal")?.["aria-disabled"]).toBe("false");
   });
 
