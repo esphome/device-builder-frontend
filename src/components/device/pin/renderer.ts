@@ -535,8 +535,9 @@ function renderSubstitutionPin(
   // yields its channel token (compared against the board's token
   // designations), never a board GPIO its channel number could alias. A
   // plain pin's alias spelling ("SDA") resolves through the board table.
-  // An unresolvable reference guards nothing (the wiring is unknowable,
-  // and the presets gate already withholds cards).
+  // An unresolvable reference guards nothing and yields no board pin —
+  // the cards render without the input-only guardrail, same as a
+  // literal the catalog doesn't list.
   const pins = ctx.board?.pins ?? [];
   const resolvedNumber = resolveSubstitutions(number, ctx.substitutions);
   const resolved =
@@ -551,6 +552,9 @@ function renderSubstitutionPin(
       : designationMatches(boardPins.tokens, resolved) ||
         (entry.suggestions ?? []).some((s) => s === resolved));
   const guarded = boardPreset && !fieldDisabled;
+  // A long-form expander value resolves to a channel token, never a GPIO.
+  const boardPin =
+    typeof resolved === "number" ? (pins.find((p) => p.gpio === resolved) ?? null) : null;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
@@ -574,7 +578,7 @@ function renderSubstitutionPin(
         path,
         ctx,
         rawValue,
-        boardPin: null,
+        boardPin,
         guarded,
       })}
     </div>
