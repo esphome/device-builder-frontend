@@ -57,6 +57,16 @@ describe("device-section-config — advanced reveal on caret-follow", () => {
     expect(inner._showAdvanced).toBe(false);
   });
 
+  it("keeps the once-per-section shot after a skipped value-bearing reveal", () => {
+    const inner = makeHost(["hide_timestamp"]);
+    inner._values = { hide_timestamp: "5s" };
+    inner._revealAdvancedForFocus(focusChanged());
+    expect(inner._showAdvanced).toBe(false);
+    inner._values = {};
+    inner._revealAdvancedForFocus(focusChanged());
+    expect(inner._showAdvanced).toBe(true);
+  });
+
   it("ignores updates where neither focusFieldPath nor _config changed", () => {
     const inner = makeHost(["hide_timestamp"]);
     inner._revealAdvancedForFocus(new Map()); // e.g. an unrelated re-render
