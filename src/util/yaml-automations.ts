@@ -7,11 +7,13 @@
 
 import { joinActionFieldPath } from "./action-field-path.js";
 import {
+  BLOCK_SCALAR_RE,
   endsBlockAtIndent,
   isAutomationKey,
   isBlankOrCommentLine,
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
+import { _blockScalarBodyEnd } from "./yaml-section-list.js";
 import {
   instanceComponentId,
   lineIndent,
@@ -377,12 +379,25 @@ function _actionFieldPath(
         if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return null;
       }
       const segments: Array<string | number> = stack.map((frame) => frame.seg);
-      // A container key the bare-key regex couldn't name drops its
-      // frame while its dashes still count; an index-first path can't
-      // route, so fall back to no row rather than an unroutable one.
-      if (typeof segments[0] === "number") return null;
+      // A container key the bare-key regex couldn't name (quoted,
+      // hyphenated) drops its frame while its dashes still count; an
+      // index without a preceding key can't route, so fall back to no
+      // row rather than a wrong one.
+      const orphanIndex = segments.some(
+        (seg, idx) => typeof seg === "number" && typeof segments[idx - 1] !== "string"
+      );
+      if (orphanIndex) return null;
       segments.push(field);
       return segments;
+    }
+    // A block scalar's body is opaque text: a ``*_action``-looking line
+    // inside it is not a field, and its content must not misframe the
+    // walk — refuse a target inside it, skip past it otherwise.
+    if (BLOCK_SCALAR_RE.test(rest)) {
+      const end = _blockScalarBodyEnd(lines, j + 1, indent);
+      if (targetIdx < end) return null;
+      j = end - 1;
+      continue;
     }
     const blockKey = rest.match(_BARE_MAPPING_KEY_RE);
     if (blockKey) stack.push({ indent, seg: blockKey[1] });

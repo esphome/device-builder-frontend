@@ -1543,6 +1543,34 @@ describe("nested component_action sections (#1543)", () => {
     expect(componentActionItems(yaml)).toEqual([]);
   });
 
+  it("drops an orphaned index when a mid-path container key is unnameable", () => {
+    const yaml = `sprinkler:
+  - id: lawn
+    valves:
+      - "zones":
+          - run_duration_number:
+              set_action:
+                - logger.log: changed
+`;
+    expect(componentActionItems(yaml)).toEqual([]);
+  });
+
+  it("ignores *_action-shaped text inside a block scalar", () => {
+    const yaml = `sprinkler:
+  - id: lawn
+    main_switch: Lawn
+    notes: |
+      set_action:
+        - not a real field
+    repeat_number:
+      set_action:
+        - logger.log: real
+`;
+    expect(componentActionItems(yaml).map((s) => s.actionField)).toEqual([
+      "repeat_number.set_action",
+    ]);
+  });
+
   it("uses an index-free path when the list is written as one mapping", () => {
     const yaml = `sprinkler:
   - id: lawn
