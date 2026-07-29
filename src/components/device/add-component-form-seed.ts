@@ -12,6 +12,7 @@ import {
   collectExistingIds,
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
+import { suggestEntityName } from "../../util/default-entity-name.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
@@ -155,12 +156,13 @@ export function seedDefaults(
  * Build the initial form `_values` for the current component:
  *  1. Seed required entries' default values (recursively).
  *  2. Auto-generate a unique `id` for the top-level id field.
- *  3. Seed pin entries from the board manifest.
- *  4. Restore the values the user typed before a "+ Add <dep>" detour
+ *  3. Suggest an entity name for platform components.
+ *  4. Seed pin entries from the board manifest.
+ *  5. Restore the values the user typed before a "+ Add <dep>" detour
  *     (over the seeded defaults, under the prefills below).
- *  5. If we were just brought back from a "+ Add <domain>" detour,
+ *  6. If we were just brought back from a "+ Add <domain>" detour,
  *     prefill the field that points at that domain with the new id.
- *  6. Overlay constraint-derived prefill fields last.
+ *  7. Overlay constraint-derived prefill fields last.
  */
 export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   const {
@@ -194,6 +196,14 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
       collectExistingIds(yaml)
     );
     if (seeded !== null) next = { ...next, id: seeded };
+  }
+
+  const nameEntry = entries.find(
+    (e) => e.key === "name" && e.type === ConfigEntryType.STRING
+  );
+  if (nameEntry && next["name"] === undefined) {
+    const seededName = suggestEntityName(component.id, component.name, yaml);
+    if (seededName !== null) next = { ...next, name: seededName };
   }
 
   // Seed pin entries from the board's manifest when the board has
