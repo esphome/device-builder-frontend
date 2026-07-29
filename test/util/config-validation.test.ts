@@ -1044,7 +1044,7 @@ describe("validateValueAt", () => {
       options: [
         { label: "A", value: "a" },
         { label: "B", value: "b" },
-      ] as ConfigValueOption[],
+      ],
     });
     const errors = validateValueAt([mode], ["mode"], "c");
     expect(errors.get("mode")?.code).toBe("validation.invalid_option");

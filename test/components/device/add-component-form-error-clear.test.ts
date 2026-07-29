@@ -5,7 +5,7 @@ import "../../_mock-webawesome.js";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
-import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 /**
  * Pins that editing a field clears its per-item error keys too (#1348):

@@ -9,15 +9,11 @@ import {
   isApiEncryptionKeyField,
   isValidApiEncryptionKey,
 } from "./api-encryption-key.js";
+import { entryAtPath } from "./config-entry-tree.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { parseIntInput } from "./int-input.js";
-import {
-  asMappingList,
-  asRecord,
-  isIndexSegment,
-  isPrimitiveOrNullish,
-} from "./nested-values.js";
+import { asMappingList, asRecord, isPrimitiveOrNullish } from "./nested-values.js";
 import { isSecretRef } from "./secret-ref.js";
 import { isSubstitutionString, looksLikeSubstitution } from "./substitutions.js";
 import { parseYamlBoolean, YamlRawValue } from "./yaml-serialize.js";
@@ -386,12 +382,14 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
  * Live validation for one just-edited path: the entry's typed checks
  * (range, type, options) without the required-empty nag.
  *
- * Resolves the `ConfigEntry` by walking `path` (index segments skip a
- * level, matching the renderers' item paths); an unresolvable path or a
- * clean value yields an empty map. A scalar `multi_value` array is
- * checked per item, keyed `"<path>.<idx>"` like submit-time validation.
- * Required-empty stays a submit-only signal so untouched-then-cleared
- * fields don't nag mid-form.
+ * Deliberately edit-scoped: only the changed path is checked, so a
+ * wrong seeded default stays quiet until submit — the same fresh-signal
+ * rule that keeps untouched required fields nag-free. Assumes the
+ * edited path was rendered (visibility gates are not re-evaluated) and
+ * covers `validateEntry`'s per-value checks only, not the traversal's
+ * section-scoped post-checks. An unresolvable path or an empty value
+ * yields an empty map; a scalar `multi_value` array is checked per
+ * item, keyed `"<path>.<idx>"` like submit-time validation.
  */
 export function validateValueAt(
   entries: ConfigEntry[],
@@ -399,33 +397,18 @@ export function validateValueAt(
   value: unknown
 ): Map<string, ValidationError> {
   const errors = new Map<string, ValidationError>();
-  let level = entries;
-  let entry: ConfigEntry | undefined;
-  for (const key of path) {
-    if (isIndexSegment(key)) continue;
-    entry = level.find((e) => e.key === key);
-    if (!entry) return errors;
-    level = entry.config_entries ?? [];
-  }
+  const entry = entryAtPath(entries, path);
   if (!entry) return errors;
   const pathKey = path.join(".");
   if (entry.multi_value && Array.isArray(value)) {
-    if (value.every(isPrimitiveOrNullish)) {
-      value.forEach((item, idx) => {
-        if (!isValuePresent(item)) return;
-        const err = validateEntry(entry!, item);
-        if (err && err.code !== "validation.required") {
-          const fullPath = `${pathKey}.${idx}`;
-          errors.set(fullPath, { ...err, key: fullPath });
-        }
-      });
-    }
+    _validateScalarItems(entry, value, pathKey, errors);
     return errors;
   }
+  // Emptiness is a submit-only concern (required is the only check
+  // that fires on an empty value).
+  if (!isValuePresent(value)) return errors;
   const err = validateEntry(entry, value);
-  if (err && err.code !== "validation.required") {
-    errors.set(pathKey, { ...err, key: pathKey });
-  }
+  if (err) errors.set(pathKey, { ...err, key: pathKey });
   return errors;
 }
 
@@ -456,6 +439,31 @@ export function validateEntries(
  * look them up by `path.join(".")` (matching how
  * `device-section-config.ts` reads them in `_errorAt`).
  */
+/**
+ * Per-item checks for a scalar `multi_value` list, keyed `"<pathKey>.<idx>"`.
+ *
+ * A list-of-dicts the schema bundle couldn't type as nested renders
+ * YAML-only (the renderer's whole-field bail); per-item scalar checks
+ * would flag rows the form never shows. ESPHome's own validate_yaml
+ * owns those, same as MAP values.
+ */
+function _validateScalarItems(
+  entry: ConfigEntry,
+  items: unknown[],
+  pathKey: string,
+  errors: Map<string, ValidationError>
+): void {
+  if (!items.every(isPrimitiveOrNullish)) return;
+  items.forEach((item, idx) => {
+    if (!isValuePresent(item)) return;
+    const err = validateEntry(entry, item);
+    if (err) {
+      const fullPath = `${pathKey}.${idx}`;
+      errors.set(fullPath, { ...err, key: fullPath });
+    }
+  });
+}
+
 function _validateEntriesRecursive(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
@@ -600,20 +608,7 @@ function _validateEntriesRecursive(
         }
         continue;
       }
-      // A list-of-dicts the schema bundle couldn't type as nested renders
-      // YAML-only (the renderer's whole-field bail); per-item scalar
-      // checks would flag rows the form never shows. ESPHome's own
-      // validate_yaml owns those, same as MAP values.
-      if (raw.every(isPrimitiveOrNullish)) {
-        raw.forEach((item, idx) => {
-          if (!isValuePresent(item)) return;
-          const err = validateEntry(entry, item);
-          if (err) {
-            const fullPath = [...pathPrefix, entry.key, String(idx)].join(".");
-            errors.set(fullPath, { ...err, key: fullPath });
-          }
-        });
-      }
+      _validateScalarItems(entry, raw, [...pathPrefix, entry.key].join("."), errors);
       continue;
     }
 

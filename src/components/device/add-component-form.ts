@@ -7,7 +7,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../api/types/config-entries.js";
+import {} from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
@@ -35,6 +35,7 @@ import {
 } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
+import { entryAtPath } from "../../util/config-entry-tree.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
@@ -424,16 +425,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    * required`` is more useful than ``Auth: This field is required``.
    */
   private _labelForErrorKey(errKey: string): string {
-    const segments = errKey.split(".");
-    let entries: ConfigEntry[] | null = this._entries;
-    let entry: ConfigEntry | undefined;
-    for (const seg of segments) {
-      if (!entries) break;
-      entry = entries.find((e) => e.key === seg);
-      if (!entry) break;
-      entries =
-        entry.type === ConfigEntryType.NESTED ? (entry.config_entries ?? []) : null;
-    }
+    const entry = entryAtPath(this._entries, errKey.split("."));
     return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
 
@@ -473,13 +465,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     // user input is a fresh signal that supersedes the previous bail;
     // the next submit attempt re-evaluates from scratch.
     const cleared = clearPathErrors(this._errors, path.join("."));
-    if (cleared) this._errors = cleared;
     // A wrong *typed* value flags immediately (range/type/options via
     // validateValueAt); required-empty stays a submit-only signal, so
     // untouched fields keep the no-nag behavior.
     const live = validateValueAt(this._entries, path, value);
-    if (live.size) {
-      const next = new Map(cleared ?? this._errors);
+    if (cleared || live.size) {
+      const next = cleared ?? new Map(this._errors);
       for (const [key, err] of live) next.set(key, err);
       this._errors = next;
     }

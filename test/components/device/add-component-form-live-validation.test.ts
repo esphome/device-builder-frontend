@@ -6,7 +6,7 @@ import "../../_mock-webawesome.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
-import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 /**
  * Pins #1528: a wrong *typed* value flags as soon as it lands in the

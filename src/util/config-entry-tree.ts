@@ -52,6 +52,27 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
  * cluster, which paints atomically) replaces the per-entry rule. Returns
  * false if the path doesn't resolve.
  */
+/**
+ * The `ConfigEntry` a config-entry path resolves to, or `undefined`.
+ *
+ * Index segments skip a level (a list item shares its field's entry),
+ * the same rule `pathIsAdvanced` walks with.
+ */
+export function entryAtPath(
+  entries: ConfigEntry[],
+  path: string[]
+): ConfigEntry | undefined {
+  let level = entries;
+  let entry: ConfigEntry | undefined;
+  for (const key of path) {
+    if (isIndexSegment(key)) continue;
+    entry = level.find((e) => e.key === key);
+    if (!entry) return undefined;
+    level = entry.config_entries ?? [];
+  }
+  return entry;
+}
+
 export function pathIsAdvanced(
   entries: ConfigEntry[],
   path: string[],
