@@ -1,13 +1,12 @@
 /**
  * Line → indexed-path walk over a section's body: `findFieldLine`'s
- * inverse, in its own module only for `yaml-sections-core`'s file-size
- * cap. Frames follow the fallback parser's rules, not `findFieldLine`'s
- * descent: the child column comes from `listItemChildIndent` on the
- * section's own line (a flat host falls back to `indent + 2` rather
- * than reading the first child), block scalars and flow collections
- * aren't modelled, and only bare `key:` lines open frames — a quoted or
- * hyphenated container drops its frame, which consumers detect as an
- * index with no named parent.
+ * inverse. Frames follow the fallback parser's rules, not
+ * `findFieldLine`'s descent: the child column comes from
+ * `listItemChildIndent` on the section's own line (a flat host falls
+ * back to `indent + 2` rather than reading the first child), block
+ * scalars and flow collections aren't modelled, and only bare `key:`
+ * lines open frames — a quoted or hyphenated container drops its frame,
+ * which consumers detect as an index with no named parent.
  */
 
 import {
@@ -35,13 +34,8 @@ export interface IndexedPathFrame {
 export interface IndexedPathVisit {
   /** 0-based index of the visited line. */
   lineIdx: number;
-  /** The line's own key — bare (`pin:`), valued (`number: 33`), or
-   *  dash-inline (`- name: x`) — or null for a keyless line. */
-  key: string | null;
-  /** True when the line's bare key opens a frame (value-less `key:`). */
-  isBare: boolean;
-  /** Content column of the line's key (dash-adjusted for inline keys). */
-  keyIndent: number;
+  /** Line content from the key column (dash-stripped, comment kept). */
+  rest: string;
   /** Live enclosing-frame stack, outermost first, NOT including the
    *  line's own key. Mutated in place as the walk advances — copy what
    *  must outlive the callback. */
@@ -79,7 +73,8 @@ export function walkIndexedPaths(
   for (let j = walkStart; j <= last; j++) {
     const line = lines[j];
     if (isBlankOrCommentLine(line)) continue;
-    let indent = lineIndent(line);
+    const rawIndent = lineIndent(line);
+    let indent = rawIndent;
     let rest = line.slice(indent);
     const dash = line.match(LIST_ITEM_START_RE);
     while (stack.length) {
@@ -104,16 +99,9 @@ export function walkIndexedPaths(
       // An inline first key sits at the item's content column.
       indent = contentCol;
     }
-    if (lineIndent(line) >= childIndent) {
-      const bare = rest.match(BARE_MAPPING_KEY_RE);
-      const pair = bare ? null : stripComment(rest).match(RE_PAIR_LINE);
-      const stop = visit({
-        lineIdx: j,
-        key: bare?.[1] ?? pair?.[1] ?? null,
-        isBare: bare !== null,
-        keyIndent: indent,
-        frames: stack,
-      });
+    const bare = rest.match(BARE_MAPPING_KEY_RE);
+    if (rawIndent >= childIndent) {
+      const stop = visit({ lineIdx: j, rest, frames: stack });
       if (stop === false) return;
     }
     // A block scalar's body is opaque text: a key-shaped line inside it
@@ -122,8 +110,7 @@ export function walkIndexedPaths(
       j = _blockScalarBodyEnd(lines, j + 1, indent) - 1;
       continue;
     }
-    const blockKey = rest.match(BARE_MAPPING_KEY_RE);
-    if (blockKey) stack.push({ indent, seg: blockKey[1] });
+    if (bare) stack.push({ indent, seg: bare[1] });
   }
 }
 
@@ -142,8 +129,9 @@ export function indexedPathAtLine(
   let path: Array<string | number> | null = null;
   walkIndexedPaths(lines, section, (v) => {
     if (v.lineIdx < line - 1) return;
-    if (v.lineIdx === line - 1 && v.key !== null) {
-      path = [...v.frames.map((f) => f.seg), v.key];
+    if (v.lineIdx === line - 1) {
+      const key = stripComment(v.rest).match(RE_PAIR_LINE)?.[1];
+      if (key !== undefined) path = [...v.frames.map((f) => f.seg), key];
     }
     return false;
   });

@@ -63,10 +63,9 @@ export const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s*-\\s+(${KEY_PATTERN}):\\
 
 /**
  * A bare mapping-key line (``temperature:``) — key, no value, optional
- * comment. This is the frame-opening key shape structural walkers push:
- * a valued ``key: value`` line has no children, and a quoted or
- * hyphenated key deliberately doesn't match (its frame drops, which the
- * indexed-path consumers detect as an unencodable path).
+ * comment. The frame-opening key shape structural walkers push: a
+ * valued ``key: value`` line has no children, and a quoted or
+ * hyphenated key deliberately doesn't match.
  */
 export const BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
 

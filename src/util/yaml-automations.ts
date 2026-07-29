@@ -199,12 +199,10 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   // inside a trigger or action body (``on_*`` / another ``*_action`` /
   // ``then``-family ancestor) is edited within that automation's tree
   // and excluded.
-  const actionMatches: Array<{
-    idx: number;
-    indent: number;
-    field: string;
-    host: YamlSection;
-  }> = [];
+  const actionMatchesByHost = new Map<
+    YamlSection,
+    Map<number, { indent: number; field: string }>
+  >();
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(_COMPONENT_ACTION_FIELD_RE);
     if (!match) continue;
@@ -213,30 +211,26 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
     if (match[2].startsWith("on_")) continue;
     const host = smallestContainingSection(sections, i + 1);
     if (!host) continue;
-    actionMatches.push({ idx: i, indent: match[1].length, field: match[2], host });
+    let byLine = actionMatchesByHost.get(host);
+    if (!byLine) actionMatchesByHost.set(host, (byLine = new Map()));
+    byLine.set(i, { indent: match[1].length, field: match[2] });
   }
-  // One walk per host: sections are disjoint and ascending, so consecutive
-  // grouping keeps the matches' global line order in the emitted rows.
-  for (let m = 0; m < actionMatches.length; ) {
-    const host = actionMatches[m].host;
-    const group: typeof actionMatches = [];
-    for (; m < actionMatches.length && actionMatches[m].host === host; m++) {
-      group.push(actionMatches[m]);
-    }
+  // One walk per host. Hosts arrive in first-match order and the walker
+  // visits ascending, so — sections being disjoint — the emitted rows
+  // keep the match lines' global order.
+  for (const [host, byLine] of actionMatchesByHost) {
     let componentId: string | null | undefined;
-    let g = 0;
+    let remaining = byLine.size;
     walkIndexedPaths(lines, host, (v) => {
-      // A match the walker refused to visit (block-scalar body, line
+      // A match the walker never visits (block-scalar body, line
       // shallower than the host's child column) emits nothing.
-      while (g < group.length && group[g].idx < v.lineIdx) g++;
-      if (g >= group.length) return false;
-      if (v.lineIdx !== group[g].idx) return;
-      const { idx, indent, field } = group[g];
-      g++;
+      const match = byLine.get(v.lineIdx);
+      if (!match) return;
+      const stop = --remaining === 0 ? false : undefined;
       // A field inside an automation body is edited within that
       // automation's tree, not addressed on the instance.
       for (const frame of v.frames) {
-        if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return;
+        if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return stop;
       }
       const segments: Array<string | number> = v.frames.map((frame) => frame.seg);
       // Refuse paths the dotted encoding can't carry: an index whose
@@ -249,23 +243,23 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
           (typeof seg === "number" && typeof segments[i - 1] !== "string") ||
           (typeof seg === "string" && seg.includes("."))
       );
-      if (unencodable) return;
+      if (unencodable) return stop;
       componentId ??= instanceComponentId(sections, host);
       if (!componentId) return false;
-      segments.push(field);
+      segments.push(match.field);
       const dotted = joinActionFieldPath(segments);
       const labelHead = host.name || componentId;
       automations.push({
         key: `automation:component_action:${componentId}:${dotted}`,
         displayLabel: `${labelHead} → ${dotted}`,
-        fromLine: idx + 1,
-        toLine: _findBlockEnd(lines, idx, indent),
+        fromLine: v.lineIdx + 1,
+        toLine: _findBlockEnd(lines, v.lineIdx, match.indent),
         id: componentId,
         name: host.name,
         parentKey: host.parentKey ?? host.key,
         actionField: dotted,
       });
-      return;
+      return stop;
     });
   }
 
