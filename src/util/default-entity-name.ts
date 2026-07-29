@@ -1,3 +1,4 @@
+import { parseCatalogId } from "./config-entry-yaml-scan.js";
 import { isPlatformComponentId } from "./featured-id.js";
 import { collectInstanceScalars } from "./yaml-sections-core.js";
 
@@ -33,12 +34,15 @@ function nameKey(name: string): string {
 export function suggestEntityName(
   componentId: string,
   componentTitle: string,
-  existingNames: ReadonlySet<string>
+  yaml: string
 ): string | null {
   if (!isPlatformComponentId(componentId)) return null;
   const title = componentTitle.trim();
   if (!title) return null;
 
+  // Names collide per platform (unlike globally-unique ids), so the
+  // pool is scoped to the component's own top-level section.
+  const existingNames = collectExistingNames(yaml, parseCatalogId(componentId).domain);
   const taken = new Set<string>();
   for (const name of existingNames) {
     const key = nameKey(name);

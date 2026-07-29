@@ -403,7 +403,7 @@ export function collectInstanceScalars(
   let inSection = section === undefined;
   for (const line of yaml.split("\n")) {
     if (!/^\s/.test(line)) {
-      const top = line.match(/^([A-Za-z0-9_]+):/);
+      const top = line.match(TOP_LEVEL_KEY_RE);
       if (section !== undefined && top) inSection = top[1] === section;
       continue;
     }

@@ -12,10 +12,7 @@ import {
   collectExistingIds,
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
-import {
-  collectExistingNames,
-  suggestEntityName,
-} from "../../util/default-entity-name.js";
+import { suggestEntityName } from "../../util/default-entity-name.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
@@ -205,13 +202,7 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     (e) => e.key === "name" && e.type === ConfigEntryType.STRING
   );
   if (nameEntry && next["name"] === undefined) {
-    // Names collide per platform (unlike globally-unique ids), so the
-    // pool is scoped to the component's own top-level section.
-    const seededName = suggestEntityName(
-      component.id,
-      component.name,
-      collectExistingNames(yaml, component.id.split(".", 1)[0])
-    );
+    const seededName = suggestEntityName(component.id, component.name, yaml);
     if (seededName !== null) next = { ...next, name: seededName };
   }
 
