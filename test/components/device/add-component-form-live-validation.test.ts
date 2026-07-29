@@ -67,13 +67,25 @@ describe("esphome-add-component-form live validation", () => {
     expect(form._errors.size).toBe(0);
   });
 
-  it("clears the flag once the value is corrected", () => {
+  it("clears the flag the instant the value is corrected", () => {
     const form = makeForm();
     form._onValueChange(changeEvent(["can_id"], 4434343434343434));
     vi.advanceTimersByTime(250);
     form._onValueChange(changeEvent(["can_id"], 42));
-    vi.advanceTimersByTime(250);
+    // No pause needed — correction is synchronous.
     expect(form._errors.has("can_id")).toBe(false);
+  });
+
+  it("keeps a shown error steady while the value is still wrong", () => {
+    const form = makeForm();
+    form._onValueChange(changeEvent(["can_id"], 4434343434343434));
+    vi.advanceTimersByTime(250);
+    // Another wrong keystroke must not blink the error away.
+    form._onValueChange(changeEvent(["can_id"], -1));
+    expect(form._errors.get("can_id")?.code).toBe("validation.max");
+    vi.advanceTimersByTime(250);
+    // The message swaps to the settled value's failure at the pause.
+    expect(form._errors.get("can_id")?.code).toBe("validation.min");
   });
 
   it("does not nag a required field emptied mid-form", () => {

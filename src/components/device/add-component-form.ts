@@ -472,26 +472,33 @@ export class ESPHomeAddComponentForm extends LitElement {
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
-    // Clear any error on the path the user just edited — including
-    // per-item keys under it, or the offending row's error sticks until
-    // the next submit. Same for the hidden-validation block message: any
-    // user input is a fresh signal that supersedes the previous bail;
-    // the next submit attempt re-evaluates from scratch.
-    const cleared = clearPathErrors(this._errors, path.join("."));
-    if (cleared) this._errors = cleared;
     // A wrong *typed* value flags once typing pauses (range/type/options
     // via validateValueAt); the renderers emit partial text per
-    // keystroke ("0x", "1e"), so an immediate check would flash errors
-    // mid-entry. Required-empty stays a submit-only signal, so untouched
-    // fields keep the no-nag behavior.
+    // keystroke ("0x", "1e"), so appearing immediately would flash
+    // errors mid-entry. The error state is one-directional while
+    // typing: a now-valid value clears instantly (correction feels
+    // immediate), a still-wrong value keeps the shown error steady —
+    // clearing and re-adding per keystroke made it blink — and the
+    // message refreshes in one swap at the pause. Required-empty stays
+    // a submit-only signal, so untouched fields keep the no-nag
+    // behavior.
     clearTimeout(this._liveValidateTimer);
-    this._liveValidateTimer = setTimeout(() => {
-      const live = validateValueAt(this._entries, path, getIn(this._values, path));
-      if (!live.size) return;
-      const next = new Map(this._errors);
-      for (const [key, err] of live) next.set(key, err);
-      this._errors = next;
-    }, ESPHomeAddComponentForm.LIVE_VALIDATE_DEBOUNCE_MS);
+    if (validateValueAt(this._entries, path, value).size === 0) {
+      const cleared = clearPathErrors(this._errors, path.join("."));
+      if (cleared) this._errors = cleared;
+    } else {
+      this._liveValidateTimer = setTimeout(() => {
+        const live = validateValueAt(this._entries, path, getIn(this._values, path));
+        const cleared = clearPathErrors(this._errors, path.join("."));
+        if (!cleared && !live.size) return;
+        const next = cleared ?? new Map(this._errors);
+        for (const [key, err] of live) next.set(key, err);
+        this._errors = next;
+      }, ESPHomeAddComponentForm.LIVE_VALIDATE_DEBOUNCE_MS);
+    }
+    // The hidden-validation block message: any user input is a fresh
+    // signal that supersedes the previous bail; the next submit attempt
+    // re-evaluates from scratch.
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 
