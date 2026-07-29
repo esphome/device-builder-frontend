@@ -254,12 +254,11 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   // ``service:``) value is the stable discriminator.
   const apiBlock = _findTopLevelBlock(lines, "api");
   if (apiBlock) {
-    const actionsBlock = _findChildBlock(
-      lines,
-      apiBlock.fromLine,
-      apiBlock.toLine,
-      "actions"
-    );
+    // The block key has a legacy spelling alongside the item-level one
+    // below; both match the backend's BLOCK_KEYS / ITEM_KEYS constants.
+    const actionsBlock =
+      _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, "actions") ??
+      _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, "services");
     if (actionsBlock) {
       const items = _enumerateListItems(
         lines,

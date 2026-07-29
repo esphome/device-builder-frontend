@@ -53,12 +53,18 @@ export function automationRelativePath(
 ): YamlPathSegment[] | null {
   const anchor = location && handlerAnchor(location);
   if (!anchor) return null;
-  let at = path.indexOf(anchor.keys[0]);
-  while (at >= 0 && !anchor.keys.every((k, i) => path[at + i] === k)) {
-    at = path.indexOf(anchor.keys[0], at + 1);
+  let rest: YamlPathSegment[] | null = null;
+  for (const keys of anchor.keyPaths) {
+    let at = path.indexOf(keys[0]);
+    while (at >= 0 && !keys.every((k, i) => path[at + i] === k)) {
+      at = path.indexOf(keys[0], at + 1);
+    }
+    if (at >= 0) {
+      rest = path.slice(at + keys.length);
+      break;
+    }
   }
-  if (at < 0) return null;
-  const rest = path.slice(at + anchor.keys.length);
+  if (rest === null) return null;
   if (anchor.index === undefined) return rest;
   if (anchor.index === "any") {
     return typeof rest[0] === "number" ? rest.slice(1) : null;
@@ -155,19 +161,27 @@ export function createFocusResolver(): typeof resolveFocus {
  */
 function handlerAnchor(
   location: AutomationLocation
-): { keys: string[]; index?: number | "any" } | null {
+): { keyPaths: string[][]; index?: number | "any" } | null {
   switch (location.kind) {
     case "device_on":
     case "component_on":
-      return { keys: [location.trigger], index: location.index };
+      return { keyPaths: [[location.trigger]], index: location.index };
     case "component_action":
-      return { keys: [location.field] };
+      return { keyPaths: [[location.field]] };
     case "interval":
-      return { keys: ["interval"], index: location.index };
+      return { keyPaths: [["interval"]], index: location.index };
     case "script":
-      return { keys: ["script"], index: "any" };
+      return { keyPaths: [["script"]], index: "any" };
     case "api_action":
-      return { keys: ["api", "actions"], index: "any" };
+      // Both block spellings: the caret must follow into a legacy
+      // services block before the first canonicalizing write.
+      return {
+        keyPaths: [
+          ["api", "actions"],
+          ["api", "services"],
+        ],
+        index: "any",
+      };
     default:
       // light_effect mounts a different editor.
       return null;
