@@ -193,6 +193,9 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (changedProperties.has("component") || !this._initialized) {
       if (this.component) {
         this._initialized = true;
+        // A pending live check belongs to the previous component's
+        // entries; validating across the retarget could mis-flag.
+        clearTimeout(this._liveValidateTimer);
         this._initValues();
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow

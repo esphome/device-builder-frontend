@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
@@ -22,6 +22,16 @@ const changeEvent = (path: string[], value: unknown) =>
   new CustomEvent("value-change", { detail: { path, value } });
 
 describe("esphome-add-component-form error clearing", () => {
+  // The clear is synchronous; fake timers keep the debounced live check
+  // from outliving the case.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("clears per-item keys under the edited field path", () => {
     const form = new ESPHomeAddComponentForm() as unknown as ErrorClearView;
     form.component = {
