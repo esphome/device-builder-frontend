@@ -54,8 +54,19 @@ describe("device-board-info legacy-spelling banner", () => {
     const seen = vi.fn();
     el.addEventListener("request-canonicalize", seen);
     el.shadowRoot!.querySelector(".legacy-spelling-banner")!
-      .querySelector<HTMLButtonElement>("button")!
+      .querySelector<HTMLButtonElement>(".cta")!
       .click();
     expect(seen).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides after dismiss until remount", async () => {
+    const el = await mount(
+      "esphome:\n  on_boot:\n    then:\n      - homeassistant.service:\n          action: light.on\n"
+    );
+    el.shadowRoot!.querySelector(".legacy-spelling-banner")!
+      .querySelector<HTMLButtonElement>(".notice-close")!
+      .click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".legacy-spelling-banner")).toBeNull();
   });
 });

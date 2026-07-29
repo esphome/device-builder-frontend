@@ -1,7 +1,7 @@
 /** Unit tests for `hasLegacyAutomationSpellings`. */
 import { describe, expect, it } from "vitest";
 
-import { hasLegacyAutomationSpellings } from "../../src/util/yaml-automations.js";
+import { hasLegacyAutomationSpellings } from "../../src/util/yaml-automations-legacy.js";
 
 describe("hasLegacyAutomationSpellings", () => {
   it("flags a legacy api services block", () => {
@@ -56,6 +56,46 @@ describe("hasLegacyAutomationSpellings", () => {
     expect(
       hasLegacyAutomationSpellings(
         "script:\n  - id: s\n    then:\n      - homeassistant.action:\n          action: notify\n          data:\n            service: decoy\n"
+      )
+    ).toBe(false);
+  });
+
+  it("ignores a flow-nested payload decoy", () => {
+    expect(
+      hasLegacyAutomationSpellings(
+        "esphome:\n  on_boot:\n    then:\n      - homeassistant.action: {action: notify, data: {service: decoy}}\n"
+      )
+    ).toBe(false);
+  });
+
+  it("flags a flow legacy field beside a nested canonical decoy", () => {
+    expect(
+      hasLegacyAutomationSpellings(
+        "esphome:\n  on_boot:\n    then:\n      - homeassistant.action: {data: {action: decoy}, service: light.on}\n"
+      )
+    ).toBe(true);
+  });
+
+  it("reads past comment lines in the node body", () => {
+    expect(
+      hasLegacyAutomationSpellings(
+        "esphome:\n  on_boot:\n    then:\n      - homeassistant.action:\n        # call the light service\n          service: light.on\n"
+      )
+    ).toBe(true);
+  });
+
+  it("ignores a collision the canonicalizer would skip", () => {
+    expect(
+      hasLegacyAutomationSpellings(
+        "esphome:\n  on_boot:\n    then:\n      - homeassistant.action:\n          action: a\n          service: b\n"
+      )
+    ).toBe(false);
+  });
+
+  it("ignores anchors inside block scalars", () => {
+    expect(
+      hasLegacyAutomationSpellings(
+        "esphome:\n  on_boot:\n    then:\n      - lambda: |-\n          homeassistant.service: not_yaml\n"
       )
     ).toBe(false);
   });

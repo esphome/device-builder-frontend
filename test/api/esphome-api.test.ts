@@ -2028,6 +2028,23 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     });
   });
 
+  it("sends ``editor/canonicalize_spellings`` with the draft content", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.canonicalizeSpellings("api:\n  services: []\n");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("editor/canonicalize_spellings");
+    expect(sent.args).toEqual({ content: "api:\n  services: []\n" });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { yaml_diff: null },
+    });
+    await expect(pending).resolves.toEqual({ yaml_diff: null });
+  });
+
   it("propagates backend INVALID_ARGS as an APIError so the editor can surface a typed parse error", async () => {
     // Unknown action / condition ids inside an existing YAML are
     // a parse failure the editor must show as "this automation

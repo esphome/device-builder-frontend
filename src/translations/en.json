@@ -1022,6 +1022,8 @@
     "legacy_spelling_migrate": "Migrate",
     "legacy_spelling_applied": "Spellings migrated in the draft. Save to apply.",
     "legacy_spelling_failed": "Could not migrate the legacy spellings.",
+    "legacy_spelling_none": "Nothing to migrate.",
+    "legacy_spelling_dismiss": "Dismiss",
     "entry_render_error_title": "Could not render this field",
     "show_yaml_editor": "Show YAML editor",
     "save_error": "Failed to save",

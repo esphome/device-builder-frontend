@@ -103,10 +103,30 @@ export const deviceBoardInfoStyles = css`
     margin-top: var(--wa-space-m);
   }
 
+  /* ─── Legacy-spelling migrate nudge ─── */
+
+  .legacy-spelling-banner {
+    margin-top: var(--wa-space-m);
+    margin-bottom: 0;
+  }
+
+  .notice-close {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--wa-color-text-quiet);
+    border-radius: var(--wa-border-radius-s);
+  }
+
+  .notice-close:hover {
+    color: var(--wa-color-text-normal);
+  }
+
   /* ─── Just-created welcome banner ─── */
 
-  .welcome-banner,
-  .legacy-spelling-banner {
+  .welcome-banner {
     margin-top: var(--wa-space-m);
   }
 

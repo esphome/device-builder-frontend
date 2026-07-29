@@ -24,7 +24,8 @@ import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { hasLegacyAutomationSpellings } from "../../util/yaml-automations.js";
+import { hasLegacyAutomationSpellings } from "../../util/yaml-automations-legacy.js";
+import { noticeBannerStyles } from "./notice-banner.styles.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
@@ -75,6 +76,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   /** Board id `_alternateBoards` was fetched for; guards a stale response. */
   private _alternatesForBoardId: string | null = null;
+
+  /** Session-scoped dismissal of the legacy-spelling nudge. */
+  @state()
+  private _legacyBannerDismissed = false;
 
   @property()
   yaml = "";
@@ -251,7 +256,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     fireEvent(this, "change-board", e.detail);
   };
 
-  static styles = [espHomeStyles, deviceBoardInfoStyles];
+  static styles = [espHomeStyles, deviceBoardInfoStyles, noticeBannerStyles];
 
   protected render() {
     const board = this.board;
@@ -303,7 +308,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
             `
           : nothing
       }
-      ${hasLegacyAutomationSpellings(this.yaml) ? this._renderLegacySpellingBanner() : nothing}
+      ${
+        !this._legacyBannerDismissed && hasLegacyAutomationSpellings(this.yaml)
+          ? this._renderLegacySpellingBanner()
+          : nothing
+      }
       ${
         this.selectedSection
           ? this._renderSelectedSection()
@@ -509,27 +518,35 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   /** Nudge shown while the buffer holds legacy renamed-key spellings
    *  (api ``services:``, ``homeassistant.service``); the CTA asks the
-   *  page to run ``automations/canonicalize`` against the draft. */
+   *  page to run ``editor/canonicalize_spellings`` against the draft. */
   private _renderLegacySpellingBanner() {
     return html`
-      <wa-callout class="legacy-spelling-banner" variant="neutral" role="note">
-        <wa-icon slot="icon" library="mdi" name="update"></wa-icon>
-        <p class="welcome-banner-text">
-          ${this._localize("device.legacy_spelling_notice")}
-        </p>
+      <div class="notice legacy-spelling-banner" role="note">
+        <wa-icon library="mdi" name="update"></wa-icon>
+        <div class="body">
+          <p>${this._localize("device.legacy_spelling_notice")}</p>
+          <button type="button" class="cta" @click=${this._onCanonicalize}>
+            ${this._localize("device.legacy_spelling_migrate")}
+          </button>
+        </div>
         <button
           type="button"
-          class="action-item welcome-banner-install"
-          @click=${this._onCanonicalize}
+          class="notice-close"
+          aria-label=${this._localize("device.legacy_spelling_dismiss")}
+          @click=${this._onDismissLegacyBanner}
         >
-          ${this._localize("device.legacy_spelling_migrate")}
+          <wa-icon library="mdi" name="close"></wa-icon>
         </button>
-      </wa-callout>
+      </div>
     `;
   }
 
   private _onCanonicalize() {
     fireEvent(this, "request-canonicalize");
+  }
+
+  private _onDismissLegacyBanner() {
+    this._legacyBannerDismissed = true;
   }
 
   private _onWelcomeInstall() {

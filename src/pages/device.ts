@@ -1917,14 +1917,31 @@ export class ESPHomePageDevice extends LitElement {
 
   /** Legacy-spelling banner CTA: canonicalize the draft in one splice. */
   private async _onCanonicalize() {
+    // The splice is whole-file and line-coordinate based, so both the
+    // device and the buffer must be exactly what the request was
+    // computed against (the router reuses this element; typing or a
+    // section draft advances `_yaml` mid-flight).
+    const configuration = this.id;
+    const basis = this._yaml;
     try {
-      const { yaml_diff } = await this._api.canonicalizeSpellings(this._yaml);
-      if (!yaml_diff) return;
-      const newYaml = applyYamlDiff(this._yaml, yaml_diff);
+      const { yaml_diff } = await this._api.canonicalizeSpellings(basis);
+      if (configuration !== this.id) return;
+      if (basis !== this._yaml) {
+        notifyInfo(this._localize("device.draft_superseded"), {
+          description: this._localize("device.draft_superseded_detail"),
+        });
+        return;
+      }
+      if (!yaml_diff) {
+        notifyInfo(this._localize("device.legacy_spelling_none"));
+        return;
+      }
+      const newYaml = applyYamlDiff(basis, yaml_diff);
       this._setYaml(newYaml);
       this._repinSelection(newYaml);
       notifySuccess(this._localize("device.legacy_spelling_applied"));
     } catch (err) {
+      if (configuration !== this.id) return;
       notifyError(this._localize("device.legacy_spelling_failed"), {
         description: err instanceof Error ? err.message : String(err),
       });

@@ -396,7 +396,7 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
 /** Top-level key block (``script:`` / ``interval:``) with its
  *  inclusive 1-indexed line range, or ``null`` when the key is
  *  absent. */
-function _findTopLevelBlock(
+export function _findTopLevelBlock(
   lines: string[],
   key: string
 ): { fromLine: number; toLine: number } | null {
@@ -411,7 +411,7 @@ function _findTopLevelBlock(
 /** Find a nested key directly under a parent block (e.g.
  *  ``actions:`` inside ``api:``). Returns the matched key's
  *  inclusive 1-indexed line range. */
-function _findChildBlock(
+export function _findChildBlock(
   lines: string[],
   parentFromLine: number,
   parentToLine: number,
@@ -442,7 +442,7 @@ function _findChildBlock(
  *  block. Nested list markers (the ``- logger.log`` inside a
  *  ``then:`` clause) are deeper and skipped by pinning to the
  *  block's first-row dash indent. */
-function _enumerateListItems(
+export function _enumerateListItems(
   lines: string[],
   blockFromLine: number,
   blockToLine: number
@@ -529,7 +529,11 @@ function _dashIndent(line: string): number {
 
 /** Read a leading ``key: value`` line inside a list item — used to
  *  pull the script's ``id:`` for the stable section key. */
-function _readKeyOnLine(lines: string[], fromLine: number, key: string): string | null {
+export function _readKeyOnLine(
+  lines: string[],
+  fromLine: number,
+  key: string
+): string | null {
   const target = lines[fromLine - 1];
   // ``<key>: value`` with the value's quotes peeled — shared between the
   // dash-line form (``- id: my_alarm``) and the indented sibling form.
@@ -554,77 +558,4 @@ function _readKeyOnLine(lines: string[], fromLine: number, key: string): string 
     if (kv) return kv[1];
   }
   return null;
-}
-
-/** Anchor for a homeassistant action node, under either registered id. */
-const _HA_NODE_RE = /^(\s*(?:-\s+)?)homeassistant\.(service|action):(.*)$/;
-
-/**
- * Whether the buffer contains any legacy renamed-key spelling: the api
- * ``services:`` block key, a ``- service:`` item discriminator, a
- * ``homeassistant.service`` node id, or a legacy ``service:`` field in
- * a homeassistant action body. Mirrors the backend canonicalizer's
- * anchors so the nudge and the rewrite can't disagree. Single-entry
- * memo, same shape as ``parseYamlAutomations``.
- */
-export function hasLegacyAutomationSpellings(yaml: string): boolean {
-  if (_legacyKey === yaml && _legacyValue !== undefined) return _legacyValue;
-  const result = _hasLegacyAutomationSpellings(yaml);
-  _legacyKey = yaml;
-  _legacyValue = result;
-  return result;
-}
-
-let _legacyKey: string | undefined;
-let _legacyValue: boolean | undefined;
-
-function _hasLegacyAutomationSpellings(yaml: string): boolean {
-  const lines = yaml.split("\n");
-  const apiBlock = _findTopLevelBlock(lines, "api");
-  if (apiBlock) {
-    if (
-      _findChildBlock(
-        lines,
-        apiBlock.fromLine,
-        apiBlock.toLine,
-        API_ACTIONS_BLOCK_KEYS[1]
-      )
-    ) {
-      return true;
-    }
-    const actions = _findChildBlock(
-      lines,
-      apiBlock.fromLine,
-      apiBlock.toLine,
-      API_ACTIONS_BLOCK_KEYS[0]
-    );
-    if (actions) {
-      for (const item of _enumerateListItems(lines, actions.fromLine, actions.toLine)) {
-        if (_readKeyOnLine(lines, item.fromLine, "service")) return true;
-      }
-    }
-  }
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(_HA_NODE_RE);
-    if (!match) continue;
-    if (match[2] === "service") return true;
-    const rest = match[3];
-    if (rest.includes("{")) {
-      if (/[{,]\s*service\s*:/.test(rest)) return true;
-      continue;
-    }
-    // The first body line sets the child indent; only a ``service:``
-    // key at exactly that column is the renamed field.
-    const contentCol = match[1].length;
-    let childIndent: number | null = null;
-    for (let j = i + 1; j < lines.length; j++) {
-      const body = lines[j];
-      if (body.trim() === "") continue;
-      const leading = lineIndent(body);
-      if (leading <= contentCol) break;
-      childIndent ??= leading;
-      if (leading === childIndent && /^ *service\s*:/.test(body)) return true;
-    }
-  }
-  return false;
 }
