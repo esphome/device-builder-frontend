@@ -94,23 +94,28 @@ describe("esphome-add-component-form live validation", () => {
     expect(form._errors.get("can_id")?.code).toBe("validation.max");
   });
 
-  it("labels a per-item error key through index segments", () => {
+  it("labels an error key with an index mid-path from its leaf entry", () => {
+    // The old walker stopped at the list container; resolving through
+    // the index segment reaches the leaf's own label.
     const form = makeForm() as unknown as {
       component: unknown;
       _labelForErrorKey(key: string): string;
     };
     form.component = {
-      id: "remote_receiver",
-      name: "Remote Receiver",
+      id: "servo",
+      name: "Servo",
       config_entries: [
         makeConfigEntry({
-          key: "codes",
-          label: "Codes",
-          type: ConfigEntryType.INTEGER,
+          key: "servos",
+          label: "Servos",
+          type: ConfigEntryType.NESTED,
           multi_value: true,
+          config_entries: [
+            makeConfigEntry({ key: "pin", label: "Pin", type: ConfigEntryType.INTEGER }),
+          ],
         }),
       ],
     };
-    expect(form._labelForErrorKey("codes.0")).toBe("Codes");
+    expect(form._labelForErrorKey("servos.0.pin")).toBe("Pin");
   });
 });
