@@ -54,12 +54,14 @@
  * decides whether to clear the field, surface a validation
  * error, etc.
  *
- * Backed by `BigInt`, not `Number`, so 64-bit values like a
- * DS18B20 ROM (`0xbe030c9794184728`) and the catalog's full
- * `cv.hex_uint64_t` range (up to `2^64 - 1`) survive the
- * round-trip. `Number.parseInt(s, 16)` rounded to the nearest
- * representable double for any hex over 2^53, silently mutating
- * the user's value on save (#944).
+ * Hex input never round-trips through a numeric type at all —
+ * pure string slicing — so 64-bit values like a DS18B20 ROM
+ * (`0xbe030c9794184728`) survive verbatim. Decimal input is
+ * `BigInt`-backed, not `Number`-backed, so the catalog's full
+ * `cv.hex_uint64_t` range (up to `2^64 - 1`) survives too;
+ * `Number.parseInt(s, 16)` rounded to the nearest representable
+ * double for any hex over 2^53, silently mutating the user's
+ * value on save (#944).
  *
  * **Bare hex without `0x` is intentionally rejected.** The i2c
  * address `76` would otherwise be ambiguous — could be the user
@@ -108,9 +110,10 @@ export function parseHexInt(raw: string): string | null {
  * Walk a values dict and rewrite every hex-typed entry's value to
  * its canonical lowercase ``"0x..."`` string form. Numeric (number
  * or bigint) values stringify through ``formatHexInt``; string
- * values (including uppercase, leading-zero, and decimal-typed-as-
- * string shapes) round-trip through ``parseHexInt``; already-
- * canonical strings short-circuit without allocating a copy.
+ * values (uppercase — including uppercase leading-zero — and
+ * decimal-typed-as-string shapes) round-trip through
+ * ``parseHexInt``; already-canonical strings, leading zeros
+ * included, short-circuit without allocating a copy.
  *
  * Why: the form's values dict carries heterogeneous types
  * (``parseYamlSectionValues`` hands hex literals back as raw
