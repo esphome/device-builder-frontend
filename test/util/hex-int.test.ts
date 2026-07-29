@@ -282,9 +282,9 @@ describe("normalizeHexValues", () => {
     expect(normalizeHexValues({ network_key: key }, entries)).toEqual({
       network_key: key,
     });
-    expect(
-      normalizeHexValues({ network_key: key.toUpperCase().replace("0X", "0x") }, entries)
-    ).toEqual({ network_key: key });
+    expect(normalizeHexValues({ network_key: key.toUpperCase() }, entries)).toEqual({
+      network_key: key,
+    });
   });
 
   it("rewrites bigint hex values to canonical 0x-strings", () => {
