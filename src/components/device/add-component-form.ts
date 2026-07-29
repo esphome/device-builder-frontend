@@ -114,6 +114,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     return { ...this._values };
   }
 
+  /** Keyboard-submit entry: same guarded path as the Add button. */
+  requestSubmit(): void {
+    if (this.submitting) return;
+    this._onSubmit();
+  }
+
   @state()
   private _errors: Map<string, ValidationError> = new Map();
 

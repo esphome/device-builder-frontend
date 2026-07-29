@@ -273,6 +273,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         ?open=${this._dialog.open}
         ?busy=${this._submitting}
         .label=${title}
+        .confirmOnEnter=${isForm ? this._onEnterSubmit : undefined}
         @request-close=${this._dialog.onRequestClose}
         @add-component=${this._onComponentSelected}
         @add-bundle=${this._onBundleSelected}
@@ -744,6 +745,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     e.stopPropagation();
     return this._submitComponent(e.detail.fields);
   }
+
+  // Armed only in the form view; the catalog has no selection for Enter
+  // to act on.
+  private _onEnterSubmit = () => {
+    this._form?.requestSubmit();
+  };
 
   /**
    * Add the selected component with ``fields`` and run the post-add
