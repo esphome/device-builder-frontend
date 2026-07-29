@@ -38,6 +38,7 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
+import { renamedKeysGeneration } from "../../util/renamed-keys.js";
 import { type NavigatorBuckets, deriveNavigatorBuckets } from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
@@ -103,7 +104,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   protected readonly _reveal = new NavigatorRevealController(this, () => ({
     selectedLine: this._selectedLine,
-    buckets: this._deriveBuckets(this.yaml),
+    buckets: this._deriveBuckets(this.yaml, renamedKeysGeneration()),
     openSections: this.openSections,
     filtering: this._query.trim().length > 0,
   }));
@@ -287,7 +288,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected render() {
-    const buckets = this._deriveBuckets(this.yaml);
+    const buckets = this._deriveBuckets(this.yaml, renamedKeysGeneration());
     const { core, components, automations } = buckets;
 
     interface NavSection {

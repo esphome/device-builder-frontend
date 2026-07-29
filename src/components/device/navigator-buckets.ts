@@ -17,9 +17,10 @@ export interface NavigatorBuckets {
 /**
  * Parse + categorize + filter + sort the YAML into the three navigator
  * buckets. Two parser passes and three list traversals collapse into a
- * single result; the navigator memoises it on the YAML source.
+ * single result; the navigator memoises it on the YAML source plus the
+ * renamed-keys generation, so a pre-hydration parse isn't pinned.
  */
-export function deriveNavigatorBuckets(yaml: string): NavigatorBuckets {
+export function deriveNavigatorBuckets(yaml: string, _generation = 0): NavigatorBuckets {
   const {
     core,
     components,

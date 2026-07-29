@@ -426,7 +426,10 @@ function _findChildBlock(
     }
   }
   if (childIndent === null) return null;
-  const pattern = new RegExp(`^\\s{${childIndent}}${childKey}\\s*:`);
+  // childKey can be catalog-supplied (renamed-keys registry) — escape
+  // so a stray metachar can't throw out of the keystroke-time parser.
+  const escapedKey = childKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^\\s{${childIndent}}${escapedKey}\\s*:`);
   for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
     if (!pattern.test(lines[i])) continue;
     return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, childIndent) };
