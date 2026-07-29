@@ -10,6 +10,7 @@ import {
   validateDeviceName,
   validateEntries,
   validateEntry,
+  validateValueAt,
 } from "../../src/util/config-validation.js";
 import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
@@ -978,4 +979,74 @@ it("never flags a lambda value on a typed templatable field", () => {
     )
   ).toBeNull();
   expect(validateEntry(makeEntry({ type: ConfigEntryType.INTEGER }), lambda)).toBeNull();
+});
+
+describe("validateValueAt", () => {
+  const canId = makeEntry({
+    key: "can_id",
+    type: ConfigEntryType.INTEGER,
+    required: true,
+    range: [0, 536870911],
+  });
+
+  it("flags an out-of-range typed value on a flat path", () => {
+    const errors = validateValueAt([canId], ["can_id"], 4434343434343434);
+    expect(errors.get("can_id")?.code).toBe("validation.max");
+  });
+
+  it("stays quiet for an in-range value and for an emptied required field", () => {
+    expect(validateValueAt([canId], ["can_id"], 42).size).toBe(0);
+    // Required-empty is a submit-only signal.
+    expect(validateValueAt([canId], ["can_id"], "").size).toBe(0);
+  });
+
+  it("resolves a nested path through a group", () => {
+    const group = makeEntry({
+      key: "advanced",
+      type: ConfigEntryType.NESTED,
+      config_entries: [canId],
+    });
+    const errors = validateValueAt([group], ["advanced", "can_id"], -1);
+    expect(errors.get("advanced.can_id")?.code).toBe("validation.min");
+  });
+
+  it("skips index segments when resolving the entry", () => {
+    const codes = makeEntry({
+      key: "codes",
+      type: ConfigEntryType.INTEGER,
+      multi_value: true,
+      range: [0, 10],
+    });
+    const errors = validateValueAt([codes], ["codes", "1"], 99);
+    expect(errors.get("codes.1")?.code).toBe("validation.max");
+  });
+
+  it("keys a scalar multi_value array per offending item", () => {
+    const codes = makeEntry({
+      key: "codes",
+      type: ConfigEntryType.INTEGER,
+      multi_value: true,
+      range: [0, 10],
+    });
+    const errors = validateValueAt([codes], ["codes"], [3, 99, ""]);
+    expect([...errors.keys()]).toEqual(["codes.1"]);
+    expect(errors.get("codes.1")?.code).toBe("validation.max");
+  });
+
+  it("returns nothing for an unknown path", () => {
+    expect(validateValueAt([canId], ["nope"], 5).size).toBe(0);
+  });
+
+  it("flags a value outside the options list", () => {
+    const mode = makeEntry({
+      key: "mode",
+      type: ConfigEntryType.STRING,
+      options: [
+        { label: "A", value: "a" },
+        { label: "B", value: "b" },
+      ] as ConfigValueOption[],
+    });
+    const errors = validateValueAt([mode], ["mode"], "c");
+    expect(errors.get("mode")?.code).toBe("validation.invalid_option");
+  });
 });

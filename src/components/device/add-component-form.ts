@@ -17,6 +17,7 @@ import { ComponentNameResolverController } from "../../util/component-name-resol
 import {
   clearPathErrors,
   validateEntries,
+  validateValueAt,
   type ValidationError,
 } from "../../util/config-validation.js";
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
@@ -473,6 +474,15 @@ export class ESPHomeAddComponentForm extends LitElement {
     // the next submit attempt re-evaluates from scratch.
     const cleared = clearPathErrors(this._errors, path.join("."));
     if (cleared) this._errors = cleared;
+    // A wrong *typed* value flags immediately (range/type/options via
+    // validateValueAt); required-empty stays a submit-only signal, so
+    // untouched fields keep the no-nag behavior.
+    const live = validateValueAt(this._entries, path, value);
+    if (live.size) {
+      const next = new Map(cleared ?? this._errors);
+      for (const [key, err] of live) next.set(key, err);
+      this._errors = next;
+    }
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 

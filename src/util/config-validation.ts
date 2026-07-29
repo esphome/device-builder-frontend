@@ -12,7 +12,12 @@ import {
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { parseIntInput } from "./int-input.js";
-import { asMappingList, asRecord, isPrimitiveOrNullish } from "./nested-values.js";
+import {
+  asMappingList,
+  asRecord,
+  isIndexSegment,
+  isPrimitiveOrNullish,
+} from "./nested-values.js";
 import { isSecretRef } from "./secret-ref.js";
 import { isSubstitutionString, looksLikeSubstitution } from "./substitutions.js";
 import { parseYamlBoolean, YamlRawValue } from "./yaml-serialize.js";
@@ -375,6 +380,53 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   }
 
   return null;
+}
+
+/**
+ * Live validation for one just-edited path: the entry's typed checks
+ * (range, type, options) without the required-empty nag.
+ *
+ * Resolves the `ConfigEntry` by walking `path` (index segments skip a
+ * level, matching the renderers' item paths); an unresolvable path or a
+ * clean value yields an empty map. A scalar `multi_value` array is
+ * checked per item, keyed `"<path>.<idx>"` like submit-time validation.
+ * Required-empty stays a submit-only signal so untouched-then-cleared
+ * fields don't nag mid-form.
+ */
+export function validateValueAt(
+  entries: ConfigEntry[],
+  path: string[],
+  value: unknown
+): Map<string, ValidationError> {
+  const errors = new Map<string, ValidationError>();
+  let level = entries;
+  let entry: ConfigEntry | undefined;
+  for (const key of path) {
+    if (isIndexSegment(key)) continue;
+    entry = level.find((e) => e.key === key);
+    if (!entry) return errors;
+    level = entry.config_entries ?? [];
+  }
+  if (!entry) return errors;
+  const pathKey = path.join(".");
+  if (entry.multi_value && Array.isArray(value)) {
+    if (value.every(isPrimitiveOrNullish)) {
+      value.forEach((item, idx) => {
+        if (!isValuePresent(item)) return;
+        const err = validateEntry(entry!, item);
+        if (err && err.code !== "validation.required") {
+          const fullPath = `${pathKey}.${idx}`;
+          errors.set(fullPath, { ...err, key: fullPath });
+        }
+      });
+    }
+    return errors;
+  }
+  const err = validateEntry(entry, value);
+  if (err && err.code !== "validation.required") {
+    errors.set(pathKey, { ...err, key: pathKey });
+  }
+  return errors;
 }
 
 export function validateEntries(

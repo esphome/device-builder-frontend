@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import "../../_mock-webawesome.js";
 
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 
 /**
  * Pins that editing a field clears its per-item error keys too (#1348):
@@ -11,6 +13,7 @@ import { ESPHomeAddComponentForm } from "../../../src/components/device/add-comp
  * must not survive as a stale red ring.
  */
 interface ErrorClearView {
+  component: unknown;
   _errors: Map<string, { key: string; code: string }>;
   _onValueChange(e: CustomEvent): void;
 }
@@ -21,6 +24,18 @@ const changeEvent = (path: string[], value: unknown) =>
 describe("esphome-add-component-form error clearing", () => {
   it("clears per-item keys under the edited field path", () => {
     const form = new ESPHomeAddComponentForm() as unknown as ErrorClearView;
+    form.component = {
+      id: "remote_receiver",
+      name: "Remote Receiver",
+      config_entries: [
+        makeConfigEntry({
+          key: "codes",
+          type: ConfigEntryType.INTEGER,
+          multi_value: true,
+        }),
+        makeConfigEntry({ key: "other", type: ConfigEntryType.STRING, required: true }),
+      ],
+    };
     form._errors = new Map([
       ["codes.0", { key: "codes.0", code: "validation.not_a_number" }],
       ["codes.1", { key: "codes.1", code: "validation.max" }],
