@@ -8,8 +8,10 @@
  *
  * The rewrite is pure and draft-only: clicking the CTA emits
  * `apply-section-values` so the host splices the replacement into the unsaved
- * YAML buffer — no dialog, no backend call. Adding an option is a single
- * registry entry + its copy.
+ * YAML buffer — no dialog, no backend call. A bespoke migration (ethernet) is
+ * a full `DeprecatedOption` plus its copy; a plain `cv.rename_key` field is a
+ * one-liner with shared copy, e.g.
+ * `"sensor.sgp4x": [renamedOption("voc", "voc_index", "2026.8.0")]`.
  */
 import { consume } from "@lit/context";
 import { mdiUpdate } from "@mdi/js";
@@ -19,7 +21,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { isEntryVisible } from "../../util/config-validation.js";
+import { isEntryVisible, isValuePresent } from "../../util/config-validation.js";
 import { notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -38,9 +40,36 @@ export interface DeprecatedOption {
   key: string;
   /** `device.<copyPrefix>_*` localization keys for this option's copy. */
   copyPrefix: string;
+  /** ICU params for the copy keys (shared templated copy). */
+  copyParams?: Record<string, string | number>;
   /** Derives the replacement `setIn` changes (`value: undefined` removes the
    *  key); `null` when the current value isn't migratable (nudge hidden). */
   migrate: (value: unknown) => { path: string[]; value: unknown }[] | null;
+}
+
+/**
+ * Plain `cv.rename_key` field: move the value verbatim (nested mappings and
+ * raw blocks included), overwriting any value already under *newKey* — the
+ * same old-spelling-wins collision policy as the clk migration below.
+ * Shared templated copy.
+ */
+export function renamedOption(
+  oldKey: string,
+  newKey: string,
+  removedIn: string
+): DeprecatedOption {
+  return {
+    key: oldKey,
+    copyPrefix: "renamed_option",
+    copyParams: { old: oldKey, new: newKey, version: removedIn },
+    migrate: (value) =>
+      isValuePresent(value)
+        ? [
+            { path: [newKey], value },
+            { path: [oldKey], value: undefined },
+          ]
+        : null,
+  };
 }
 
 /** Deprecated flat `clk_mode: GPIO<n>_(IN|OUT)` encodes the RMII clock pin
@@ -136,9 +165,11 @@ export class ESPHomeDeprecationNotice extends LitElement {
         <div class="notice" role="note">
           <wa-icon library="mdi" name="update"></wa-icon>
           <div class="body">
-            <p>${this._localize(`device.${option.copyPrefix}_notice`)}</p>
+            <p>
+              ${this._localize(`device.${option.copyPrefix}_notice`, option.copyParams)}
+            </p>
             <button type="button" class="cta" @click=${() => this._onMigrate(changes)}>
-              ${this._localize(`device.${option.copyPrefix}_migrate`)}
+              ${this._localize(`device.${option.copyPrefix}_migrate`, option.copyParams)}
             </button>
           </div>
         </div>
