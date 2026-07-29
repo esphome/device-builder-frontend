@@ -114,14 +114,21 @@ export class ESPHomeAddComponentForm extends LitElement {
     return { ...this._values };
   }
 
+  /** Keyboard-submit entry: same guarded path as the Add button. */
+  requestSubmit(): void {
+    if (this.submitting) return;
+    this._onSubmit();
+  }
+
   @state()
   private _errors: Map<string, ValidationError> = new Map();
 
-  /** Surface text for the rare path where ``_onSubmit`` would return
-   * silently (validation errors on entries hidden from the rendered
-   * form, or a defensive missing-deps fallback). The dialog's
-   * ``submitError`` is reserved for API failures — this is the
-   * pre-API "the form refused to submit and here's why" lane. */
+  /** Surface text where ``_onSubmit`` blocks without visible field
+   * errors (hidden-entry validation, missing deps) — routine via
+   * ``requestSubmit`` (Enter), which bypasses the Add button's
+   * disabled gate. The dialog's ``submitError`` is reserved for API
+   * failures — this is the pre-API "the form refused to submit and
+   * here's why" lane. */
   @state()
   private _localBlockMessage = "";
 
@@ -500,15 +507,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
-    // Block submit when a declared dependency isn't satisfied. The
-    // button should already be disabled in that case, but defend here
-    // too in case the YAML changed under us between renders.
+    // Block submit when a declared dependency isn't satisfied. The Add
+    // button is disabled in that case, but Enter (requestSubmit) still
+    // lands here.
     const missingDeps = this._missingDeps(presentComponents);
     if (missingDeps.length > 0) {
-      // Should be unreachable — the button-disabled predicate uses the
-      // same check. If we get here, the YAML changed under us between
-      // renders. Surface a visible message that names the missing
-      // domain(s) so the user can act, instead of returning silently.
+      // Surface a visible message that names the missing domain(s) so
+      // the user can act, instead of returning silently.
       this._localBlockMessage = `${this._localize("device.missing_dependencies_title", {
         name: this.component.name,
       })} (${missingDeps.join(", ")})`;
