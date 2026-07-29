@@ -136,6 +136,51 @@ describe("config-migration-notice", () => {
     expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
   });
 
+  it("keeps a live nudge when a re-check fails", async () => {
+    let call = 0;
+    const api = makeApi(() => {
+      call += 1;
+      return call === 1
+        ? Promise.resolve({ yaml_diff: DIFF })
+        : Promise.reject(new Error("ws down"));
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const [el] = await mount(LEGACY, api);
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
+    el.yaml = CANONICAL;
+    await el.updateComplete;
+    await vi.runAllTimersAsync();
+    await el.updateComplete;
+    // A transient failure must not clear a nudge the buffer hasn't
+    // been proven clean of.
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("re-arms when the buffer moves during the load-time round-trip", async () => {
+    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let call = 0;
+    const api = makeApi(() => {
+      call += 1;
+      if (call === 1) {
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve({ yaml_diff: DIFF });
+    });
+    const [el] = await mount(LEGACY, api);
+    el.yaml = `${LEGACY}# edited\n`;
+    await el.updateComplete;
+    resolveFirst({ yaml_diff: DIFF });
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    await el.updateComplete;
+    expect(api.migrateConfig).toHaveBeenCalledTimes(2);
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
+  });
+
   it("dismiss cancels a pending re-check", async () => {
     const [el, api] = await mount(LEGACY);
     el.yaml = CANONICAL;

@@ -106,7 +106,17 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
     if (!api) return;
     try {
       const { yaml_diff } = await api.migrateConfig(yaml);
-      if (configuration !== this.configuration || yaml !== this.yaml) return;
+      if (configuration !== this.configuration) return;
+      if (yaml !== this.yaml) {
+        // Only the buffer moved on — re-arm instead of dropping, so a
+        // keystroke inside the round-trip can't lose the load's one
+        // detection shot.
+        if (!this._dismissed) {
+          clearTimeout(this._recheckTimer);
+          this._recheckTimer = setTimeout(() => void this._detect(), RECHECK_DEBOUNCE_MS);
+        }
+        return;
+      }
       this._needed = yaml_diff !== null;
     } catch (err) {
       // Keep the current verdict: hidden at load (the next load
