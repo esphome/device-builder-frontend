@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectExistingIds,
   generateDefaultComponentId,
+  generateNestedItemId,
 } from "../../src/util/default-component-id.js";
 
 describe("generateDefaultComponentId", () => {
@@ -88,6 +89,22 @@ describe("generateDefaultComponentId", () => {
     expect(generateDefaultComponentId("Switch.GPIO", true, new Set())).toBe(
       "switch_gpio_1"
     );
+  });
+});
+
+describe("generateNestedItemId", () => {
+  it("suffixes the list key", () => {
+    expect(generateNestedItemId("microphone", new Set())).toBe("microphone_1");
+    expect(generateNestedItemId("devices", new Set())).toBe("devices_1");
+  });
+
+  it("increments past taken ids", () => {
+    const existing = new Set(["microphone_1", "microphone_2", "my_mic"]);
+    expect(generateNestedItemId("microphone", existing)).toBe("microphone_3");
+  });
+
+  it("slugs a key that isn't already id-shaped", () => {
+    expect(generateNestedItemId("On-Off", new Set())).toBe("on_off_1");
   });
 });
 

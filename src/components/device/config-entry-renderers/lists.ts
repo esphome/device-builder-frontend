@@ -2,6 +2,10 @@ import { html, nothing } from "lit";
 import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
+import {
+  collectExistingIds,
+  generateNestedItemId,
+} from "../../../util/default-component-id.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -44,6 +48,28 @@ function arrayItemHandlers(
   };
   const addItem = () => ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
   return { addItem, removeAt };
+}
+
+// New nested-list rows whose schema requires a declaring id start with a
+// unique one prefilled (#2452) — the user shouldn't have to invent it.
+// Uniqueness spans the document plus current rows: in the add dialog the
+// form values aren't in the YAML yet, and in the section editor a
+// just-added sibling may not have flushed through the draft debounce.
+function makeNewNestedItem(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx
+): Record<string, unknown> {
+  const idChild = (entry.config_entries ?? []).find(
+    (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
+  );
+  if (!idChild) return {};
+  const existing = collectExistingIds(ctx.yaml);
+  for (const item of asMappingList(ctx.getAt(path))) {
+    const value = item[idChild.key];
+    if (typeof value === "string" && value) existing.add(value);
+  }
+  return { [idChild.key]: generateNestedItemId(entry.key, existing) };
 }
 
 export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
@@ -358,7 +384,9 @@ export function renderNestedListField(
 
   const items = asMappingList(raw);
   const disabled = effectiveDisabled(entry, ctx);
-  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => ({}));
+  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () =>
+    makeNewNestedItem(entry, path, ctx)
+  );
   const itemTitle = labelFor(entry, ctx);
   const childrenSchema = entry.config_entries ?? [];
 

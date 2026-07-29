@@ -110,7 +110,7 @@ describe("renderNestedListField", () => {
     expect(json).toContain("device.multi_value_empty");
   });
 
-  it("addItem appends a fresh empty object at the field's path", () => {
+  it("addItem seeds a unique id when the row schema requires one (#2452)", () => {
     const entry = makeListEntry();
     const { ctx, emitChange } = makeCtx({
       devices: [{ id: "kitchen" }],
@@ -120,7 +120,58 @@ describe("renderNestedListField", () => {
     // Last handler in render order is the add button (rendered after
     // the items + their per-item remove buttons).
     handlers[handlers.length - 1]();
-    expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "kitchen" }, {}]);
+    expect(emitChange).toHaveBeenCalledWith(
+      ["devices"],
+      [{ id: "kitchen" }, { id: "devices_1" }]
+    );
+  });
+
+  it("seeded id increments past document ids and unflushed sibling rows", () => {
+    const entry = makeListEntry();
+    const renderEntry = vi.fn(() => "<rendered>");
+    const emitChange = vi.fn();
+    const filterRenderable = vi.fn((entries: ConfigEntry[]) => entries);
+    const ctx = makeRenderCtx(
+      { devices: [{ id: "devices_2" }] },
+      {
+        board: null,
+        overrides: {
+          emitChange,
+          renderEntry,
+          filterRenderable,
+          yaml: "esphome:\n  devices:\n    - id: devices_1\n",
+        },
+      }
+    );
+    const tpl = renderNestedListField(entry, ["devices"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(
+      ["devices"],
+      [{ id: "devices_2" }, { id: "devices_3" }]
+    );
+  });
+
+  it("addItem appends a bare {} when no child requires a declaring id", () => {
+    const entry = makeConfigEntry({
+      key: "devices",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
+        makeConfigEntry({
+          key: "uart_id",
+          type: ConfigEntryType.ID,
+          required: true,
+          references_component: "uart",
+        }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx({ devices: [] });
+    const tpl = renderNestedListField(entry, ["devices"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    // The optional id stays unseeded; the required reference is a picker,
+    // not a declaration.
+    expect(emitChange).toHaveBeenCalledWith(["devices"], [{}]);
   });
 
   it("removeAt drops the item at idx and emits the new array", () => {

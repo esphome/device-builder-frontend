@@ -36,9 +36,33 @@ export function generateDefaultComponentId(
   const isSingleton = !multiConf && !isPlatformComponentId(componentId);
   if (isSingleton) return null;
 
-  // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
-  // board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
-  const slug = componentId.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+  return uniquifyId(slugifyId(componentId), existing);
+}
+
+/**
+ * Auto-generate an `id:` value for a new nested-list row whose schema
+ * requires one (e.g. `voice_assistant.microphone` items): the list key
+ * plus a numeric suffix, unique against *existing*.
+ */
+export function generateNestedItemId(
+  listKey: string,
+  existing: ReadonlySet<string>
+): string {
+  return uniquifyId(slugifyId(listKey), existing);
+}
+
+/** Scan the YAML for every `id:` line and return the set of values. */
+export function collectExistingIds(yaml: string): Set<string> {
+  return collectInstanceScalars(yaml, "id");
+}
+
+// Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
+// board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
+function slugifyId(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+}
+
+function uniquifyId(slug: string, existing: ReadonlySet<string>): string {
   let n = 1;
   let candidate = `${slug}_${n}`;
   while (existing.has(candidate)) {
@@ -46,9 +70,4 @@ export function generateDefaultComponentId(
     candidate = `${slug}_${n}`;
   }
   return candidate;
-}
-
-/** Scan the YAML for every `id:` line and return the set of values. */
-export function collectExistingIds(yaml: string): Set<string> {
-  return collectInstanceScalars(yaml, "id");
 }
