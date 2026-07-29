@@ -192,6 +192,7 @@ const AREAS_YAML = [
 describe("indexedPathAtLine", () => {
   it("inverts a top-level and a nested field line", () => {
     const section = sectionAt(LIST_YAML, 2);
+    expect(indexedPathAtLine(LIST_YAML, section, 2)).toEqual(["platform"]);
     expect(indexedPathAtLine(LIST_YAML, section, 3)).toEqual(["name"]);
     expect(indexedPathAtLine(LIST_YAML, section, 5)).toEqual(["pin"]);
     expect(indexedPathAtLine(LIST_YAML, section, 6)).toEqual(["pin", "number"]);
@@ -207,9 +208,14 @@ describe("indexedPathAtLine", () => {
   });
 
   it("inverts a same-indent compact block-sequence line", () => {
-    const yaml = ["wifi:", "  group:", "    items:", "    - ssid: a", "    - ssid: b", ""].join(
-      "\n"
-    );
+    const yaml = [
+      "wifi:",
+      "  group:",
+      "    items:",
+      "    - ssid: a",
+      "    - ssid: b",
+      "",
+    ].join("\n");
     const section = sectionAt(yaml, 1);
     expect(indexedPathAtLine(yaml, section, 4)).toEqual(["group", "items", 0, "ssid"]);
     expect(indexedPathAtLine(yaml, section, 5)).toEqual(["group", "items", 1, "ssid"]);
@@ -250,7 +256,11 @@ describe("indexedPathAtLine", () => {
       const section = sectionAt(yaml, fromLine);
       const lineCount = yaml.split("\n").length;
       let inverted = 0;
-      for (let line = section.fromLine + 1; line <= Math.min(section.toLine, lineCount); line++) {
+      for (
+        let line = section.fromLine;
+        line <= Math.min(section.toLine, lineCount);
+        line++
+      ) {
         const path = indexedPathAtLine(yaml, section, line);
         if (path === null) continue;
         expect(findFieldLine(yaml, section, path.map(String))).toBe(line);

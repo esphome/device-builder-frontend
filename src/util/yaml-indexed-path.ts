@@ -126,6 +126,15 @@ export function indexedPathAtLine(
   line: number
 ): Array<string | number> | null {
   const lines = yaml.split("\n");
+  // The walk starts past the section's own line; a list-item header's
+  // inline key (``- platform: gpio``) still inverts.
+  if (line === section.fromLine) {
+    const hostLine = lines[line - 1] ?? "";
+    if (!LIST_ITEM_START_RE.test(hostLine)) return null;
+    const rest = hostLine.slice(listItemChildIndent(hostLine));
+    const key = stripComment(rest).match(RE_PAIR_LINE)?.[1];
+    return key === undefined ? null : [key];
+  }
   let path: Array<string | number> | null = null;
   walkIndexedPaths(lines, section, (v) => {
     if (v.lineIdx < line - 1) return;
