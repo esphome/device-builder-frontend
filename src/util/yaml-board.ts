@@ -1,11 +1,8 @@
 import type { SlimBoard } from "../api/types/boards.js";
 import { chipNameToVariant } from "./chip-variant.js";
 import { canonicalComponentKey, TARGET_PLATFORM_KEYS } from "./component-presence.js";
-import {
-  lineIndent,
-  parseYamlTopLevelSections,
-  readInstanceScalar,
-} from "./yaml-sections-core.js";
+import { readInstanceScalar } from "./yaml-instance-scalars.js";
+import { lineIndent, parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 export interface YamlPlatformBoard {
   /** Canonical platform key (`rp2` folded to `rp2040`). */

@@ -1,5 +1,5 @@
 import { isPlatformComponentId } from "./featured-id.js";
-import { collectInstanceScalars } from "./yaml-sections-core.js";
+import { collectInstanceScalars } from "./yaml-instance-scalars.js";
 
 /**
  * Auto-generate a default `id:` value for a component being added

@@ -1,6 +1,6 @@
 import { parseCatalogId } from "./config-entry-yaml-scan.js";
 import { isPlatformComponentId } from "./featured-id.js";
-import { collectInstanceScalars } from "./yaml-sections-core.js";
+import { collectInstanceScalars } from "./yaml-instance-scalars.js";
 
 /**
  * Collision key mirroring esphome's str_sanitize(str_snake_case(name)),
