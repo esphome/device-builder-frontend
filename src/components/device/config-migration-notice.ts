@@ -107,7 +107,10 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       if (configuration !== this.configuration || yaml !== this.yaml) return;
       this._needed = yaml_diff !== null;
     } catch (err) {
-      // Failed detection leaves the nudge hidden; the next load retries.
+      // Keep the current verdict: hidden at load (the next load
+      // retries), still shown during a re-check — a transient WS
+      // failure must not clear a nudge the buffer hasn't been
+      // proven clean of.
       console.warn("config-migration-notice: detection failed", err);
     }
   }
