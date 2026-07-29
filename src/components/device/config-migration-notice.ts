@@ -57,6 +57,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       this._detectedFor = this.configuration;
       this._dismissed = false;
       this._needed = false;
+      clearTimeout(this._recheckTimer);
       void this._detect();
     } else if (changed.has("yaml") && this._needed && !this._dismissed) {
       // Re-check only while the nudge is live so a completed migration
@@ -94,6 +95,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       dismissLabel: this._localize("device.config_migration_dismiss"),
       onDismiss: () => {
         this._dismissed = true;
+        clearTimeout(this._recheckTimer);
       },
     });
   }

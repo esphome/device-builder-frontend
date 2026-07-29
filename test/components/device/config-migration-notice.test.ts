@@ -136,6 +136,16 @@ describe("config-migration-notice", () => {
     expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
   });
 
+  it("dismiss cancels a pending re-check", async () => {
+    const [el, api] = await mount(LEGACY);
+    el.yaml = CANONICAL;
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".notice-close")?.click();
+    await el.updateComplete;
+    await vi.runAllTimersAsync();
+    expect(api.migrateConfig).toHaveBeenCalledTimes(1);
+  });
+
   it("re-detects and un-dismisses on a configuration switch", async () => {
     const [el] = await mount(CANONICAL);
     el.configuration = "other.yaml";
