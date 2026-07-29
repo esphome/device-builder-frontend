@@ -560,7 +560,14 @@ export class ESPHomeAdoptDialog extends LitElement {
       this.close();
       // The import succeeded but the device's remote package didn't
       // resolve; the backend kept the file for an in-editor repair.
-      if (warning) notifyWarning(warning);
+      // Long duration: the adopt-with-rename path opens the follow-job
+      // dialog right away, and this toast is the only repair signal.
+      if (warning) {
+        notifyWarning(this._localize("dashboard.adopt_package_warning"), {
+          description: warning,
+          duration: 8000,
+        });
+      }
       const detail: AdoptedDetail = {
         name: factoryName,
         configuration,

@@ -125,9 +125,10 @@ describe("adopt-then-rename (#2412)", () => {
 
     await priv._submit();
 
-    expect(notifyWarning).toHaveBeenCalledWith(
-      "Imported, but the remote package didn't resolve"
-    );
+    expect(notifyWarning).toHaveBeenCalledWith("dashboard.adopt_package_warning", {
+      description: "Imported, but the remote package didn't resolve",
+      duration: 8000,
+    });
     expect(adopted).toHaveBeenCalledTimes(1);
     expect(priv._error).toBeNull();
   });
