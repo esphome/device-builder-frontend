@@ -190,10 +190,13 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   // Component action-list config fields (``open_action:`` …). These are
   // ``type: trigger`` config fields whose value is a bare action list —
   // editable as trigger-less automations, parallel to the inline ``on_*``
-  // pass above. Matched by the ``*_action`` suffix and gated to a direct
-  // child of a component instance, so an ``on_*`` key (different suffix)
-  // and a ``*_action`` nested inside another action body (deeper indent,
-  // edited within that automation's tree) are both excluded.
+  // pass above. Matched by the ``*_action`` suffix at any depth inside a
+  // component instance; the field is addressed on the instance by its
+  // dotted path (list items as indices — ``valves.0.run_duration_number.
+  // set_action``), the backend's ``component_action`` encoding. A key
+  // inside a trigger or action body (``on_*`` / another ``*_action`` /
+  // ``then``-family ancestor) is edited within that automation's tree
+  // and excluded.
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(_COMPONENT_ACTION_FIELD_RE);
     if (!match) continue;
@@ -204,20 +207,22 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
     if (field.startsWith("on_")) continue;
     const fromLine = i + 1;
     const host = smallestContainingSection(sections, fromLine);
-    const scope = host && _resolveHandlerScope(lines, sections, host, i, indent, false);
-    if (!host || !scope) continue;
-    const componentId = scope.componentId;
+    if (!host) continue;
+    const segments = _actionFieldPath(lines, host, i, indent, field);
+    if (!segments) continue;
+    const componentId = instanceComponentId(sections, host);
     if (!componentId) continue;
+    const dotted = segments.join(".");
     const labelHead = host.name || componentId;
     automations.push({
-      key: `automation:component_action:${componentId}:${field}`,
-      displayLabel: `${labelHead} → ${field}`,
+      key: `automation:component_action:${componentId}:${dotted}`,
+      displayLabel: `${labelHead} → ${dotted}`,
       fromLine,
       toLine: _findBlockEnd(lines, i, indent),
       id: componentId,
       name: host.name,
       parentKey: host.parentKey ?? host.key,
-      actionField: field,
+      actionField: dotted,
     });
   }
 
@@ -303,6 +308,89 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   }
 
   return automations;
+}
+
+/** Ancestor keys that place a ``*_action`` line inside an automation
+ *  body rather than the instance's config tree. */
+const _AUTOMATION_BODY_KEYS = new Set(["then", "else", "actions"]);
+
+const _BLOCK_KEY_RE = /^([A-Za-z0-9_.]+):\s*(?:#.*)?$/;
+const _VALUED_KEY_RE = /^[A-Za-z0-9_.]+:\s+\S/;
+
+/**
+ * Concrete path segments from *host*'s body to the ``*_action`` key at
+ * *targetIdx*, list items as 0-based indices — the backend's
+ * ``component_action`` addressing. ``null`` when the field sits inside
+ * a trigger or automation body (edited within that automation's tree)
+ * or the structure doesn't resolve.
+ */
+function _actionFieldPath(
+  lines: string[],
+  host: YamlSection,
+  targetIdx: number,
+  targetIndent: number,
+  field: string
+): Array<string | number> | null {
+  const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
+  if (targetIndent < childIndent) return null;
+  if (targetIndent === childIndent) return [field];
+  // Walk the instance body accumulating the enclosing frames: block
+  // mapping keys by indent, list items as counted dash indices.
+  const stack: Array<{ indent: number; seg: string | number }> = [];
+  for (let j = host.fromLine; j <= targetIdx; j++) {
+    const line = lines[j];
+    if (isBlankOrCommentLine(line)) continue;
+    let indent = lineIndent(line);
+    let rest = line.slice(indent);
+    const dash = line.match(/^(\s*)-(\s+|$)/);
+    if (dash) {
+      while (stack.length) {
+        const top = stack[stack.length - 1];
+        if (
+          top.indent < indent ||
+          (top.indent === indent && typeof top.seg === "number")
+        ) {
+          break;
+        }
+        stack.pop();
+      }
+      const top = stack[stack.length - 1];
+      if (top && top.indent === indent && typeof top.seg === "number") {
+        top.seg += 1;
+      } else {
+        stack.push({ indent, seg: 0 });
+      }
+      rest = line.slice(dash[0].length);
+      if (!rest.trim()) continue;
+      // An inline first key sits at the item's content column.
+      indent = dash[0].length;
+    } else {
+      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    }
+    if (j === targetIdx) {
+      for (const frame of stack) {
+        if (typeof frame.seg !== "string") continue;
+        if (
+          frame.seg.startsWith("on_") ||
+          frame.seg.endsWith("_action") ||
+          _AUTOMATION_BODY_KEYS.has(frame.seg)
+        ) {
+          return null;
+        }
+      }
+      return [...stack.map((frame) => frame.seg), field];
+    }
+    const blockKey = rest.match(_BLOCK_KEY_RE);
+    if (blockKey) {
+      stack.push({ indent, seg: blockKey[1] });
+    } else if (!_VALUED_KEY_RE.test(rest) && indent < targetIndent && !dash) {
+      // A non-key, non-item construct shallower than the target (flow
+      // collection, block scalar) hides the structure — refuse rather
+      // than emit a wrong path.
+      return null;
+    }
+  }
+  return null;
 }
 
 /** Resolve a handler at ``indent`` to its target instance: the host for a

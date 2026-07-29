@@ -1452,3 +1452,93 @@ describe("resolveCurrentSectionLine", () => {
     expect(resolveCurrentSectionLine(yaml, "wifi", 3)).toBeUndefined();
   });
 });
+
+describe("nested component_action sections (#1543)", () => {
+  const sprinklerYaml = `sprinkler:
+  - id: lawn
+    main_switch: Lawn Sprinklers
+    repeat_number:
+      id: lawn_repeat
+      set_action:
+        - logger.log: repeat changed
+    valves:
+      - valve_switch: Front Yard
+        run_duration_number:
+          id: front_duration
+          set_action:
+            - logger.log: front changed
+      - valve_switch: Back Yard
+        run_duration_number:
+          set_action:
+            - logger.log: back changed
+`;
+
+  it("emits nested action fields with concrete dotted paths, in line order", () => {
+    const items = parseYamlAutomations(sprinklerYaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    expect(items.map((s) => s.actionField)).toEqual([
+      "repeat_number.set_action",
+      "valves.0.run_duration_number.set_action",
+      "valves.1.run_duration_number.set_action",
+    ]);
+    for (const item of items) {
+      expect(item.id).toBe("lawn");
+      expect(item.key).toBe(`automation:component_action:lawn:${item.actionField}`);
+    }
+  });
+
+  it("routes a caret inside a nested action body to its automation row", () => {
+    const line =
+      sprinklerYaml.split("\n").findIndex((l) => l.includes("back changed")) + 1;
+    const hit = sectionAtLine(sprinklerYaml, line);
+    expect(hit?.key).toBe(
+      "automation:component_action:lawn:valves.1.run_duration_number.set_action"
+    );
+  });
+
+  it("uses an index-free path when the list is written as one mapping", () => {
+    const yaml = `sprinkler:
+  - id: lawn
+    valves:
+      valve_switch: Only Zone
+      run_duration_number:
+        set_action:
+          - logger.log: changed
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    expect(items.map((s) => s.actionField)).toEqual([
+      "valves.run_duration_number.set_action",
+    ]);
+  });
+
+  it("still excludes *_action keys inside trigger and automation bodies", () => {
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: btn
+    on_press:
+      - if:
+          condition:
+            lambda: "return true;"
+          then:
+            - light.turn_on: some_action_ref
+      - script.execute: run_action
+    filters:
+      - delayed_on: 10ms
+cover:
+  - platform: feedback
+    id: gate
+    open_action:
+      - if:
+          then:
+            - switch.turn_on: relay
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    // Only the real top-level field; nothing from inside bodies.
+    expect(items.map((s) => s.actionField)).toEqual(["open_action"]);
+  });
+});
