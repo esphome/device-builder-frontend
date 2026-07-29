@@ -263,3 +263,43 @@ describe("parseYamlAutomations — empty / no-automation input", () => {
     expect(parseYamlAutomations("")).toEqual([]);
   });
 });
+
+describe("parseYamlAutomations — many-instance sweep", () => {
+  it("emits every nested action leaf across a large multi-instance config", () => {
+    const instance = (n: number) => [
+      `  - id: lawn_${n}`,
+      `    main_switch: Lawn ${n}`,
+      "    repeat_number:",
+      `      id: repeat_${n}`,
+      "      set_action:",
+      "        - logger.log: repeat changed",
+      "    valves:",
+      "      - valve_switch: Front",
+      "        run_duration_number:",
+      `          id: front_${n}`,
+      "          set_action:",
+      "            - logger.log: front changed",
+      "      - valve_switch: Back",
+      "        run_duration_number:",
+      `          id: back_${n}`,
+      "          set_action:",
+      "            - logger.log: back changed",
+    ];
+    const yaml = [
+      "sprinkler:",
+      ...Array.from({ length: 25 }, (_, n) => instance(n)).flat(),
+      "",
+    ].join("\n");
+    const rows = parseYamlAutomations(yaml);
+    expect(rows).toHaveLength(75);
+    expect(rows[0].key).toBe(
+      "automation:component_action:lawn_0:repeat_number.set_action"
+    );
+    expect(rows[1].key).toBe(
+      "automation:component_action:lawn_0:valves.0.run_duration_number.set_action"
+    );
+    expect(rows[74].key).toBe(
+      "automation:component_action:lawn_24:valves.1.run_duration_number.set_action"
+    );
+  });
+});

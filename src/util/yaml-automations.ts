@@ -8,14 +8,13 @@
 import { joinActionFieldPath } from "./action-field-path.js";
 import {
   BARE_MAPPING_KEY_RE,
-  BLOCK_SCALAR_RE,
   endsBlockAtIndent,
   isAutomationKey,
   isBlankOrCommentLine,
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
-import { _blockScalarBodyEnd } from "./yaml-section-list.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
+import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import {
   instanceComponentId,
   lineIndent,
@@ -200,32 +199,73 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   // inside a trigger or action body (``on_*`` / another ``*_action`` /
   // ``then``-family ancestor) is edited within that automation's tree
   // and excluded.
+  const actionMatches: Array<{
+    idx: number;
+    indent: number;
+    field: string;
+    host: YamlSection;
+  }> = [];
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(_COMPONENT_ACTION_FIELD_RE);
     if (!match) continue;
-    const indent = match[1].length;
-    const field = match[2];
     // An ``on_*`` key is a trigger, already emitted by the loop above;
     // skip it here so an ``on_…_action`` name can't be counted twice.
-    if (field.startsWith("on_")) continue;
-    const fromLine = i + 1;
-    const host = smallestContainingSection(sections, fromLine);
+    if (match[2].startsWith("on_")) continue;
+    const host = smallestContainingSection(sections, i + 1);
     if (!host) continue;
-    const segments = _actionFieldPath(lines, host, i, indent, field);
-    if (!segments) continue;
-    const componentId = instanceComponentId(sections, host);
-    if (!componentId) continue;
-    const dotted = joinActionFieldPath(segments);
-    const labelHead = host.name || componentId;
-    automations.push({
-      key: `automation:component_action:${componentId}:${dotted}`,
-      displayLabel: `${labelHead} → ${dotted}`,
-      fromLine,
-      toLine: _findBlockEnd(lines, i, indent),
-      id: componentId,
-      name: host.name,
-      parentKey: host.parentKey ?? host.key,
-      actionField: dotted,
+    actionMatches.push({ idx: i, indent: match[1].length, field: match[2], host });
+  }
+  // One walk per host: sections are disjoint and ascending, so consecutive
+  // grouping keeps the matches' global line order in the emitted rows.
+  for (let m = 0; m < actionMatches.length; ) {
+    const host = actionMatches[m].host;
+    const group: typeof actionMatches = [];
+    for (; m < actionMatches.length && actionMatches[m].host === host; m++) {
+      group.push(actionMatches[m]);
+    }
+    let componentId: string | null | undefined;
+    let g = 0;
+    walkIndexedPaths(lines, host, (v) => {
+      // A match the walker refused to visit (block-scalar body, line
+      // shallower than the host's child column) emits nothing.
+      while (g < group.length && group[g].idx < v.lineIdx) g++;
+      if (g >= group.length) return false;
+      if (v.lineIdx !== group[g].idx) return;
+      const { idx, indent, field } = group[g];
+      g++;
+      // A field inside an automation body is edited within that
+      // automation's tree, not addressed on the instance.
+      for (const frame of v.frames) {
+        if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return;
+      }
+      const segments: Array<string | number> = v.frames.map((frame) => frame.seg);
+      // Refuse paths the dotted encoding can't carry: an index whose
+      // container key the bare-key regex couldn't name (quoted,
+      // hyphenated — the frame dropped while its dashes still count),
+      // or a segment containing a dot, which the lossless-join
+      // invariant of ``action-field-path.ts`` forbids.
+      const unencodable = segments.some(
+        (seg, i) =>
+          (typeof seg === "number" && typeof segments[i - 1] !== "string") ||
+          (typeof seg === "string" && seg.includes("."))
+      );
+      if (unencodable) return;
+      componentId ??= instanceComponentId(sections, host);
+      if (!componentId) return false;
+      segments.push(field);
+      const dotted = joinActionFieldPath(segments);
+      const labelHead = host.name || componentId;
+      automations.push({
+        key: `automation:component_action:${componentId}:${dotted}`,
+        displayLabel: `${labelHead} → ${dotted}`,
+        fromLine: idx + 1,
+        toLine: _findBlockEnd(lines, idx, indent),
+        id: componentId,
+        name: host.name,
+        parentKey: host.parentKey ?? host.key,
+        actionField: dotted,
+      });
+      return;
     });
   }
 
@@ -311,112 +351,6 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   }
 
   return automations;
-}
-
-/** A dash item's leader — the match length is the item's content column. */
-const _DASH_LEADER_RE = /^\s*-(\s+|$)/;
-
-/**
- * Concrete path segments from *host*'s body to the ``*_action`` key at
- * *targetIdx*, list items as 0-based indices — the backend's
- * ``component_action`` addressing. ``null`` when the field sits inside
- * an automation body (an ``isAutomationKey`` ancestor — edited within
- * that automation's tree) or the structure doesn't resolve. Best-effort
- * like the rest of this fallback: block scalars and flow collections
- * aren't modelled, so a key-shaped line inside one can misframe until
- * backend parse corrects it.
- */
-function _actionFieldPath(
-  lines: string[],
-  host: YamlSection,
-  targetIdx: number,
-  targetIndent: number,
-  field: string
-): Array<string | number> | null {
-  const hostLine = lines[host.fromLine - 1] ?? "";
-  const childIndent = listItemChildIndent(hostLine);
-  if (targetIndent < childIndent) return null;
-  // Walk the instance body accumulating the enclosing frames: block
-  // mapping keys by indent, list items as counted dash indices.
-  const stack: Array<{ indent: number; seg: string | number }> = [];
-  // A bare inline first key on the instance dash line (``- valves:``)
-  // opens a block the loop below never sees — seed its frame.
-  const hostDash = hostLine.match(_DASH_LEADER_RE);
-  const hostInlineKey = hostDash
-    ? hostLine.slice(hostDash[0].length).match(BARE_MAPPING_KEY_RE)
-    : null;
-  if (hostInlineKey) stack.push({ indent: childIndent, seg: hostInlineKey[1] });
-  // A block scalar opened inline on the dash line hides its body from
-  // the loop's opener check — refuse a target inside it, start past it.
-  let walkStart = host.fromLine;
-  if (
-    hostDash &&
-    !hostInlineKey &&
-    BLOCK_SCALAR_RE.test(hostLine.slice(hostDash[0].length))
-  ) {
-    const end = _blockScalarBodyEnd(lines, host.fromLine, childIndent);
-    if (targetIdx < end) return null;
-    walkStart = end;
-  }
-  for (let j = walkStart; j <= targetIdx; j++) {
-    const line = lines[j];
-    if (isBlankOrCommentLine(line)) continue;
-    let indent = lineIndent(line);
-    let rest = line.slice(indent);
-    const dash = line.match(_DASH_LEADER_RE);
-    while (stack.length) {
-      const top = stack[stack.length - 1];
-      if (top.indent < indent) break;
-      // A dash keeps its same-indent frames: the sibling index it
-      // increments, and — in the zero-indent sequence style — the
-      // parent key whose column the dashes share.
-      if (dash && top.indent === indent) break;
-      stack.pop();
-    }
-    if (dash) {
-      const top = stack[stack.length - 1];
-      if (top && top.indent === indent && typeof top.seg === "number") {
-        top.seg += 1;
-      } else {
-        stack.push({ indent, seg: 0 });
-      }
-      rest = line.slice(dash[0].length);
-      if (!rest.trim()) continue;
-      // An inline first key sits at the item's content column.
-      indent = dash[0].length;
-    }
-    if (j === targetIdx) {
-      for (const frame of stack) {
-        if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return null;
-      }
-      const segments: Array<string | number> = stack.map((frame) => frame.seg);
-      // Refuse paths the dotted encoding can't carry: an index whose
-      // container key the bare-key regex couldn't name (quoted,
-      // hyphenated — the frame dropped while its dashes still count),
-      // or a segment containing a dot, which the lossless-join
-      // invariant of ``action-field-path.ts`` forbids.
-      const unencodable = segments.some(
-        (seg, idx) =>
-          (typeof seg === "number" && typeof segments[idx - 1] !== "string") ||
-          (typeof seg === "string" && seg.includes("."))
-      );
-      if (unencodable) return null;
-      segments.push(field);
-      return segments;
-    }
-    // A block scalar's body is opaque text: a ``*_action``-looking line
-    // inside it is not a field, and its content must not misframe the
-    // walk — refuse a target inside it, skip past it otherwise.
-    if (BLOCK_SCALAR_RE.test(rest)) {
-      const end = _blockScalarBodyEnd(lines, j + 1, indent);
-      if (targetIdx < end) return null;
-      j = end - 1;
-      continue;
-    }
-    const blockKey = rest.match(BARE_MAPPING_KEY_RE);
-    if (blockKey) stack.push({ indent, seg: blockKey[1] });
-  }
-  return null;
 }
 
 /** Resolve a handler at ``indent`` to its target instance: the host for a
