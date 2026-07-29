@@ -184,10 +184,10 @@ describe("loadAndHydrateAvailable", () => {
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
       getAutomationBodies: vi.fn(
-        async (refs: { type: string; id: string }[]) =>
+        async (refs: { type: string; id: string }[]): Promise<Record<string, unknown>> =>
           Object.fromEntries(
             refs.map((ref) => [`${ref.type}/${ref.id}`, bodies[`${ref.type}/${ref.id}`]])
-          ) as Record<string, never>
+          )
       ),
     } as unknown as ESPHomeAPI;
 

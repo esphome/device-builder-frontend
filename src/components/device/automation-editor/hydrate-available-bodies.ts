@@ -16,6 +16,7 @@ import {
   type HydrationResult,
 } from "../../../util/automation-body-hydration.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
 /** Which catalog lists to hydrate bodies for. A consumer that renders
  *  only some of them (the trigger-less editors never show triggers)
@@ -61,15 +62,6 @@ export async function hydrateAvailableBodies(
   }
   return result;
 }
-
-/** Legacy registry aliases kept for reading existing configs — never
- *  offered for new nodes; the migrate nudge (backend
- *  ``editor/migrate_config`` rules) respells them. Enforced by the
- *  action/condition catalog picker only (the trigger picker filters
- *  its own list). */
-export const LEGACY_AUTOMATION_IDS: ReadonlySet<string> = new Set([
-  "homeassistant.service",
-]);
 
 // Derived so a new alias can't reach the field override without also
 // leaving the picker.
