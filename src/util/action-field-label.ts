@@ -1,5 +1,7 @@
 import type { LocalizeFunc } from "../common/localize.js";
 
+import { actionFieldLeaf } from "./action-field-path.js";
+
 /**
  * Friendly label for a component action-list field key
  * (``open_action`` → "Open action").
@@ -15,8 +17,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 export function actionFieldLabel(field: string, localize: LocalizeFunc): string {
   // A nested field is a dotted path (``valves.0.run_duration_number.
   // set_action``); the leaf segment names the action list.
-  const segments = field.split(".");
-  const leaf = segments[segments.length - 1] || field;
+  const leaf = actionFieldLeaf(field);
   const base = leaf.endsWith("_action") ? leaf.slice(0, -"_action".length) : leaf;
   // ``|| "action"`` keeps ``words`` non-empty (a bare ``_action`` key the
   // parser can't actually produce, or an empty field), so the

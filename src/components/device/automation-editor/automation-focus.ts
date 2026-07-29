@@ -12,6 +12,7 @@
  * tail degrades to the deepest resolved node.
  */
 import memoizeOne from "memoize-one";
+import { splitActionFieldPath } from "../../../util/action-field-path.js";
 
 import type {
   ActionNode,
@@ -170,13 +171,8 @@ function handlerAnchor(
     case "component_action":
       // ``field`` is a dotted path for a nested action list
       // (``valves.0.run_duration_number.set_action``); the caret must
-      // follow the whole chain to the leaf, with decimal segments as
-      // the numeric indices the cursor path carries.
-      return {
-        keyPaths: [
-          location.field.split(".").map((seg) => (/^\d+$/.test(seg) ? Number(seg) : seg)),
-        ],
-      };
+      // follow the whole chain to the leaf.
+      return { keyPaths: [splitActionFieldPath(location.field)] };
     case "interval":
       return { keyPaths: [["interval"]], index: location.index };
     case "script":

@@ -1,4 +1,5 @@
 import { consume } from "@lit/context";
+import { joinActionFieldPath } from "../../util/action-field-path.js";
 import {
   mdiAlertCircleOutline,
   mdiDelete,
@@ -546,8 +547,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   /**
    * Route an in-form "Edit actions" click (from a ``TRIGGER`` config
    * field like cover ``open_action``) to the automation editor. The
-   * form emits the field's full path (segments are schema keys and
-   * list indices, never containing dots); resolve this instance's
+   * form emits the field's full path; resolve this instance's
    * component id and build the dotted ``component_action`` section key
    * the backend addresses nested fields with.
    */
@@ -558,7 +558,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     const sectionKey = sectionKeyFromLocation({
       kind: "component_action",
       component_id: componentId,
-      field: e.detail.path.join("."),
+      field: joinActionFieldPath(e.detail.path),
     });
     fireEvent(this, "section-select", { sectionKey });
   };
