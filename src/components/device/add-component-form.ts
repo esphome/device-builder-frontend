@@ -29,6 +29,9 @@ import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
+import { assessBusHostability, exclusiveBusTarget } from "../../util/bus-availability.js";
+import { yamlHasMergedSources } from "../../util/config-entry-yaml-scan.js";
+import { loadCatalog } from "../../util/yaml-completion-catalog.js";
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
@@ -93,18 +96,6 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property({ attribute: false })
   restoredValues: Record<string, unknown> | null = null;
 
-  /** Deps whose block exists in the YAML but has no bus instance this
-   *  component can attach to (every uart's rx already claimed); folded
-   *  into the missing-deps banner and submit gate so the user detours
-   *  to a new bus instead of shipping a validation error. */
-  @property({ attribute: false })
-  busBlockedDeps: string[] | null = null;
-
-  /** The sole existing bus this component can attach to; seeded into the
-   *  matching reference field so the attachment is explicit. */
-  @property({ attribute: false })
-  busReference: { domain: string; id: string } | null = null;
-
   /** Per-field dropdown narrowing the requester imposes via a list
    *  `bus_constraints` value (CN105 -> baud_rate [2400, 9600]); the
    *  matching entry's `options` are limited to these, defaulting first. */
@@ -163,6 +154,20 @@ export class ESPHomeAddComponentForm extends LitElement {
    *  overwrite a newer one. */
   private _providesSeq = 0;
 
+  /** Bus dep present in the YAML but with no bus this component can attach
+   *  to; folded into the missing-deps banner and submit gate so the user
+   *  detours to a new bus. Resolved async like `_providedDeps`. */
+  @state()
+  private _busBlockedDep: string | null = null;
+
+  /** Reference key forced visible when several buses qualify, so the user
+   *  picks one instead of esphome failing on the ambiguity. */
+  @state()
+  private _busPickerKey: string | null = null;
+
+  /** Guards `_resolveBusHostability` against out-of-order resolutions. */
+  private _busAssessSeq = 0;
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this._liveValidateTimer);
@@ -189,10 +194,17 @@ export class ESPHomeAddComponentForm extends LitElement {
   // Memoized so the shared form's `.entries` identity is render-stable.
   private _overlayRequired = memoizeOne(overlayRequired);
   private _overlayOptions = memoizeOne(overlayOptions);
+  private _mergedExtraRequired = memoizeOne(
+    (extra: string[] | null, busKey: string | null): string[] | null =>
+      busKey ? [...(extra ?? []), busKey] : extra
+  );
 
   private get _entries(): ConfigEntry[] {
     return this._overlayOptions(
-      this._overlayRequired(this.component.config_entries, this.extraRequired),
+      this._overlayRequired(
+        this.component.config_entries,
+        this._mergedExtraRequired(this.extraRequired, this._busPickerKey)
+      ),
       this.optionOverrides
     );
   }
@@ -221,6 +233,10 @@ export class ESPHomeAddComponentForm extends LitElement {
         // detour the form gets reused for) would leak into the next
         // component's form.
         this._localBlockMessage = "";
+        // A stale bus verdict must not gate the next component while its
+        // own assessment is in flight.
+        this._busBlockedDep = null;
+        this._busPickerKey = null;
         this._depResolver.kickoff(this.component.dependencies ?? []);
       }
     }
@@ -232,33 +248,21 @@ export class ESPHomeAddComponentForm extends LitElement {
       changedProperties.has("board")
     ) {
       void this._resolveProvidedDeps();
-    }
-    // The bus assessment resolves async in the dialog, so the reference can
-    // arrive after `_initValues` seeded; apply it into a still-empty field.
-    if (changedProperties.has("busReference") && this._initialized && this.busReference) {
-      const path = findReferencePath(
-        this._entries,
-        this.busReference.domain,
-        [],
-        this._values
-      );
-      if (path) this._values = setIn(this._values, path, this.busReference.id);
+      void this._resolveBusHostability();
     }
   }
 
   /** Net-missing deps driving the banner and submit gate: the literal-name
    *  scan minus those a present component provides (`_providedDeps`), plus
-   *  deps present but with no attachable bus (`busBlockedDeps`). */
+   *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
     const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
       present
     ).filter((d) => !this._providedDeps.has(d));
-    for (const dep of this.busBlockedDeps ?? []) {
-      if (!missing.includes(dep)) missing.push(dep);
-    }
-    return missing;
+    const blocked = this._busBlockedDep;
+    return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -298,6 +302,70 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
+   * Refresh the bus verdict for the current `(component, yaml)`: no
+   * attachable bus flags the dep missing, a sole compatible bus seeds the
+   * reference field, several force the picker. Anything uncertain — a
+   * catalog failure, a configured bus provider (a `usb_uart:` channel the
+   * bus scan can't model), a `packages:` merge hiding consumers — resolves
+   * to no gating.
+   */
+  private async _resolveBusHostability(): Promise<void> {
+    const seq = ++this._busAssessSeq;
+    const api = this._api;
+    const target = this.component ? exclusiveBusTarget(this.component) : null;
+    let blocked: string | null = null;
+    let picker: string | null = null;
+    let reference: string | null = null;
+    if (api && target && !yamlHasMergedSources(this.yaml)) {
+      try {
+        const catalog = await loadCatalog(api);
+        const { busCount, compatibleIds } = assessBusHostability(
+          this.yaml,
+          target.domain,
+          target.constraints,
+          (id) => catalog.byId.get(id)?.bus_constraints
+        );
+        if (busCount > 0 && compatibleIds.length === 0) {
+          const present = parseTopLevelComponents(this.yaml);
+          const satisfied = await depsSatisfiedByProvides(api, [target.domain], present, {
+            platform: this.board?.esphome.platform ?? null,
+            boardId: this.board?.id ?? null,
+          });
+          if (!satisfied.has(target.domain)) blocked = target.domain;
+        } else if (compatibleIds.length === 1) {
+          reference = compatibleIds[0];
+        } else if (compatibleIds.length > 1) {
+          // `overlayRequired` matches top-level keys only; a nested
+          // reference (none exists today) just skips the forcing.
+          const path = findReferencePath(
+            this.component.config_entries,
+            target.domain,
+            []
+          );
+          if (path?.length === 1) picker = path[0];
+        }
+      } catch (err) {
+        console.warn("[add-component-form] bus availability lookup failed", err);
+      }
+    }
+    if (seq !== this._busAssessSeq) return;
+    if (this._busBlockedDep !== blocked) this._busBlockedDep = blocked;
+    if (this._busPickerKey !== picker) this._busPickerKey = picker;
+    if (reference !== null && target) {
+      // Seed the sole compatible bus into a still-empty reference field so
+      // the attachment is explicit; a detour-created bus or a value the
+      // user typed already fills the field and wins.
+      const path = findReferencePath(
+        this.component.config_entries,
+        target.domain,
+        [],
+        this._values
+      );
+      if (path) this._values = setIn(this._values, path, reference);
+    }
+  }
+
+  /**
    * Seed `_values` for the current component. The seeding pipeline
    * itself is a pure function of the host's inputs — see
    * `add-component-form-seed.ts`.
@@ -311,7 +379,6 @@ export class ESPHomeAddComponentForm extends LitElement {
       prefillReference: this.prefillReference,
       prefillFields: this.prefillFields,
       restoredValues: this.restoredValues,
-      busReference: this.busReference,
       localize: this._localize,
     });
   }
@@ -416,8 +483,8 @@ export class ESPHomeAddComponentForm extends LitElement {
    * ``willUpdate``).
    */
   private _renderMissingDeps(missing: string[]) {
-    const blocked = new Set(this.busBlockedDeps ?? []);
-    const allBlocked = blocked.size > 0 && missing.every((d) => blocked.has(d));
+    const blocked = this._busBlockedDep;
+    const allBlocked = blocked !== null && missing.length === 1 && missing[0] === blocked;
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>

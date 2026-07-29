@@ -30,10 +30,6 @@ export interface SeedContext {
    *  isn't lost. Overlaid before `prefillReference` so the just-added dep's id
    *  still wins for the reference field. */
   restoredValues: Record<string, unknown> | null;
-  /** The sole existing bus the component can attach to, seeded into its
-   *  matching reference field so the attachment is explicit. Yields to a
-   *  restored/typed value and to `prefillReference` (a detour-created bus). */
-  busReference: { domain: string; id: string } | null;
   localize: LocalizeFunc;
 }
 
@@ -175,7 +171,6 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     prefillReference,
     prefillFields,
     restoredValues,
-    busReference,
     localize,
   } = ctx;
 
@@ -215,16 +210,6 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // still wins for the reference field.
   if (restoredValues) {
     next = { ...next, ...restoredValues };
-  }
-
-  // Before `prefillReference` and only into a still-empty field (the
-  // `next` snapshot covers seeded and restored values), so a
-  // detour-created bus and a restored user pick both win over it.
-  if (busReference) {
-    const targetPath = findReferencePath(entries, busReference.domain, [], next);
-    if (targetPath) {
-      next = setIn(next, targetPath, busReference.id);
-    }
   }
 
   if (prefillReference) {

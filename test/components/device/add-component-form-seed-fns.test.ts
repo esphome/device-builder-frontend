@@ -345,7 +345,6 @@ describe("buildInitialValues", () => {
       prefillReference: null,
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     // _1 is taken in the YAML, so the generator skips to _2.
@@ -371,7 +370,6 @@ describe("buildInitialValues", () => {
       prefillReference: null,
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     expect(values.id).toBe("preset_id");
@@ -396,7 +394,6 @@ describe("buildInitialValues", () => {
       prefillReference: null,
       prefillFields: { baud_rate: "2400" },
       restoredValues: null,
-      busReference: null,
       localize,
     });
     expect(values.baud_rate).toBe("2400");
@@ -414,7 +411,6 @@ describe("buildInitialValues", () => {
       prefillReference: { domain: "i2c", id: "bus_a" },
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     expect(values.i2c_id).toBe("bus_a");
@@ -435,7 +431,6 @@ describe("buildInitialValues", () => {
       prefillReference: { domain: "i2c", id: "bus_a" },
       prefillFields: null,
       restoredValues: { cs_pin: "GPIO5", i2c_id: "stale" },
-      busReference: null,
       localize,
     });
     // The pin the user picked before the "+ Add i2c" detour is preserved.
@@ -472,7 +467,6 @@ describe("buildInitialValues", () => {
       prefillReference: { domain: "output", id: "output_warm" },
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     expect(values.blue).toBe("output_blue");
@@ -506,58 +500,9 @@ describe("buildInitialValues", () => {
       prefillReference: { domain: "output", id: "output_a" },
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     expect(values.blue).toBe("output_a");
-  });
-
-  it("seeds a busReference into the matching empty reference field", () => {
-    const component = makeComponent({
-      config_entries: [makeConfigEntry({ key: "uart_id", references_component: "uart" })],
-    });
-    const values = buildInitialValues({
-      entries: component.config_entries,
-      component,
-      board: null,
-      yaml: "",
-      prefillReference: null,
-      prefillFields: null,
-      restoredValues: null,
-      busReference: { domain: "uart", id: "uart_2" },
-      localize,
-    });
-    expect(values.uart_id).toBe("uart_2");
-  });
-
-  it("lets a restored user pick and a detour prefill both win over busReference", () => {
-    const component = makeComponent({
-      config_entries: [makeConfigEntry({ key: "uart_id", references_component: "uart" })],
-    });
-    const restored = buildInitialValues({
-      entries: component.config_entries,
-      component,
-      board: null,
-      yaml: "",
-      prefillReference: null,
-      prefillFields: null,
-      restoredValues: { uart_id: "user_pick" },
-      busReference: { domain: "uart", id: "uart_2" },
-      localize,
-    });
-    expect(restored.uart_id).toBe("user_pick");
-    const detoured = buildInitialValues({
-      entries: component.config_entries,
-      component,
-      board: null,
-      yaml: "",
-      prefillReference: { domain: "uart", id: "uart_new" },
-      prefillFields: null,
-      restoredValues: null,
-      busReference: { domain: "uart", id: "uart_2" },
-      localize,
-    });
-    expect(detoured.uart_id).toBe("uart_new");
   });
 
   it("seeds pin entries from the board manifest between id-gen and prefill", () => {
@@ -580,7 +525,6 @@ describe("buildInitialValues", () => {
       prefillReference: null,
       prefillFields: null,
       restoredValues: null,
-      busReference: null,
       localize,
     });
     // Board's i2c_scl/i2c_sda feature tags win over the symbolic

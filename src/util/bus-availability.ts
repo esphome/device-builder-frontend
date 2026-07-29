@@ -20,13 +20,9 @@
  * error, not to second-guess configs it can't parse.
  */
 import { hasSubstitutionReference } from "./substitutions.js";
-import { parseTopLevelComponents } from "./yaml-serialize.js";
-import {
-  findFieldLine,
-  parseYamlTopLevelSections,
-  readInstanceScalar,
-  type YamlSection,
-} from "./yaml-sections-core.js";
+import { parseYamlSectionValues } from "./yaml-section-reader.js";
+import { parseYamlTopLevelSections, type YamlSection } from "./yaml-sections-core.js";
+import { sectionKeyOf } from "./yaml-sections.js";
 
 /** One catalog entry's `bus_constraints[bus]` dict. */
 export type BusConstraintValues = Record<string, unknown>;
@@ -52,10 +48,21 @@ const BUS_SEMANTICS: Record<string, BusSemantics> = {
   },
 };
 
-/** Bus domains with exclusive-claim semantics worth assessing. */
-export const EXCLUSIVE_BUS_DOMAINS: ReadonlySet<string> = new Set(
-  Object.keys(BUS_SEMANTICS)
-);
+/**
+ * The first dependency of *entry* on an exclusive-claim bus domain the
+ * entry also constrains, with those constraints; null when none.
+ */
+export function exclusiveBusTarget(entry: {
+  dependencies?: string[];
+  bus_constraints?: Record<string, BusConstraintValues>;
+}): { domain: string; constraints: BusConstraintValues } | null {
+  for (const dep of entry.dependencies ?? []) {
+    if (!BUS_SEMANTICS[dep]) continue;
+    const constraints = entry.bus_constraints?.[dep];
+    if (constraints) return { domain: dep, constraints };
+  }
+  return null;
+}
 
 export interface BusHostability {
   /** Buses of the domain in the YAML. */
@@ -67,11 +74,8 @@ export interface BusHostability {
 
 interface BusState {
   id: string | null;
-  /** Pin field -> present on the bus block. */
-  pins: Record<string, boolean>;
-  /** Effective setting values; `null` = unknown (absent with no default,
-   *  or a substitution) and matches anything. */
-  settings: Record<string, string | null>;
+  /** The bus block's parsed top-level keys. */
+  values: Record<string, unknown>;
   /** Pin fields an existing consumer already claims. */
   claimed: Set<string>;
 }
@@ -89,29 +93,26 @@ export function assessBusHostability(
 ): BusHostability {
   const semantics = BUS_SEMANTICS[busDomain];
   const sections = parseYamlTopLevelSections(yaml);
-  const lines = yaml.split("\n");
-  const buses: BusState[] = [];
-  const consumers: YamlSection[] = [];
-  for (const section of sections) {
-    if ((section.parentKey ?? section.key) === busDomain) {
-      buses.push(_readBus(yaml, lines, section, semantics));
-    } else {
-      consumers.push(section);
-    }
-  }
+  const isBus = (s: YamlSection) => (s.parentKey ?? s.key) === busDomain;
+  const buses: BusState[] = sections.filter(isBus).map((s) => ({
+    id: s.id ?? null,
+    values: parseYamlSectionValues(yaml, s.key, s.fromLine),
+    claimed: new Set<string>(),
+  }));
   if (buses.length === 0) return { busCount: 0, compatibleIds: [] };
 
   // The native-class gate excludes the host platform from pin
   // exclusivity, and settings mismatches there are esphome's to flag.
-  if (parseTopLevelComponents(yaml).has("host")) {
+  if (sections.some((s) => (s.parentKey ?? s.key) === "host")) {
     return { busCount: buses.length, compatibleIds: buses.map((b) => b.id) };
   }
 
   const refKey = `${busDomain}_id`;
-  for (const section of consumers) {
-    const constraints = _busConstraintsOf(section, busDomain, constraintsFor);
+  for (const section of sections) {
+    if (isBus(section)) continue;
+    const constraints = constraintsFor(sectionKeyOf(section))?.[busDomain];
     if (!constraints) continue;
-    const bus = _attachedBus(yaml, lines, section, refKey, buses);
+    const bus = _attachedBus(yaml, section, refKey, buses);
     if (!bus) continue;
     for (const [flag, pin] of Object.entries(semantics.claims)) {
       if (constraints[flag] === true) bus.claimed.add(pin);
@@ -124,52 +125,17 @@ export function assessBusHostability(
   return { busCount: buses.length, compatibleIds };
 }
 
-function _readBus(
-  yaml: string,
-  lines: string[],
-  section: YamlSection,
-  semantics: BusSemantics
-): BusState {
-  const settings: Record<string, string | null> = {};
-  for (const [key, dflt] of Object.entries(semantics.settings)) {
-    const raw = _readField(yaml, lines, section, key) ?? dflt;
-    settings[key] = raw !== null && hasSubstitutionReference(raw) ? null : raw;
-  }
-  const pins: Record<string, boolean> = {};
-  for (const pin of Object.values(semantics.claims)) {
-    pins[pin] = findFieldLine(yaml, section, [pin]) !== null;
-  }
-  return {
-    id: section.id ?? _readField(yaml, lines, section, "id"),
-    pins,
-    settings,
-    claimed: new Set(),
-  };
-}
-
-/** The section's own catalog `bus_constraints[busDomain]`, else undefined. */
-function _busConstraintsOf(
-  section: YamlSection,
-  busDomain: string,
-  constraintsFor: BusConstraintsLookup
-): BusConstraintValues | undefined {
-  const domain = section.parentKey ?? section.key;
-  const catalogId = section.platform ? `${domain}.${section.platform}` : domain;
-  return constraintsFor(catalogId)?.[busDomain];
-}
-
 /** The bus *section* attaches to: its `<bus>_id`, else the sole bus.
  *  With several buses and no reference the config is already invalid —
  *  the consumer claims nothing. */
 function _attachedBus(
   yaml: string,
-  lines: string[],
   section: YamlSection,
   refKey: string,
   buses: BusState[]
 ): BusState | null {
-  const ref = _readField(yaml, lines, section, refKey);
-  if (ref !== null) return buses.find((b) => b.id === ref) ?? null;
+  const ref = parseYamlSectionValues(yaml, section.key, section.fromLine)[refKey];
+  if (ref !== undefined) return buses.find((b) => b.id === String(ref)) ?? null;
   return buses.length === 1 ? buses[0] : null;
 }
 
@@ -179,34 +145,33 @@ function _canHost(
   semantics: BusSemantics
 ): boolean {
   for (const [flag, pin] of Object.entries(semantics.claims)) {
-    if (candidate[flag] === true && (bus.claimed.has(pin) || !bus.pins[pin])) {
+    if (candidate[flag] === true && (bus.claimed.has(pin) || !(pin in bus.values))) {
       return false;
     }
   }
-  for (const key of Object.keys(semantics.settings)) {
+  for (const [key, dflt] of Object.entries(semantics.settings)) {
     const wanted = candidate[key];
     if (wanted === undefined || wanted === null) continue;
-    const actual = bus.settings[key];
+    const actual = _busSetting(bus, key, dflt);
     if (actual === null) continue;
-    // A list constraint is a choice set (first = default).
-    const choices = Array.isArray(wanted) ? wanted : [wanted];
-    if (!choices.some((choice) => _settingEquals(actual, choice))) return false;
+    // A list constraint is a choice set (first = default); non-scalar
+    // constraint values match anything.
+    const choices = (Array.isArray(wanted) ? wanted : [wanted]).filter(
+      (c): c is string | number => typeof c === "string" || typeof c === "number"
+    );
+    if (choices.length === 0) continue;
+    if (!choices.some((c) => actual.toUpperCase() === String(c).toUpperCase())) {
+      return false;
+    }
   }
   return true;
 }
 
-function _settingEquals(actual: string, wanted: unknown): boolean {
-  if (typeof wanted !== "string" && typeof wanted !== "number") return true;
-  return actual.toUpperCase() === String(wanted).toUpperCase();
-}
-
-function _readField(
-  yaml: string,
-  lines: string[],
-  section: YamlSection,
-  key: string
-): string | null {
-  const lineNo = findFieldLine(yaml, section, [key]);
-  if (lineNo === null) return null;
-  return readInstanceScalar(lines[lineNo - 1], key);
+/** Effective setting value; `null` = unknown (absent with no default,
+ *  or a substitution) and matches anything. */
+function _busSetting(bus: BusState, key: string, dflt: string | null): string | null {
+  const raw = bus.values[key];
+  if (raw === undefined || raw === null) return dflt;
+  const text = String(raw);
+  return hasSubstitutionReference(text) ? null : text;
 }

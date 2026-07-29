@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   assessBusHostability,
-  EXCLUSIVE_BUS_DOMAINS,
+  exclusiveBusTarget,
   type BusConstraintsLookup,
 } from "../../src/util/bus-availability.js";
 import { _clearYamlSectionsMemo } from "../../src/util/yaml-sections-core.js";
@@ -139,8 +139,20 @@ describe("assessBusHostability", () => {
   });
 });
 
-describe("EXCLUSIVE_BUS_DOMAINS", () => {
-  it("covers exactly uart today", () => {
-    expect([...EXCLUSIVE_BUS_DOMAINS]).toEqual(["uart"]);
+describe("exclusiveBusTarget", () => {
+  it("targets a uart dependency the entry also constrains", () => {
+    const entry = { dependencies: ["uart"], bus_constraints: { uart: RX_9600 } };
+    expect(exclusiveBusTarget(entry)).toEqual({ domain: "uart", constraints: RX_9600 });
+  });
+
+  it("ignores non-exclusive buses and unconstrained deps", () => {
+    expect(
+      exclusiveBusTarget({
+        dependencies: ["i2c"],
+        bus_constraints: { i2c: { max_frequency: 15000 } },
+      })
+    ).toBeNull();
+    expect(exclusiveBusTarget({ dependencies: ["uart"] })).toBeNull();
+    expect(exclusiveBusTarget({})).toBeNull();
   });
 });
