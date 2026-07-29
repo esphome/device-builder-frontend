@@ -26,6 +26,8 @@ export function actionFieldLabel(field: string, localize: LocalizeFunc): string 
   const containers: string[] = [];
   for (const seg of segments.slice(0, -1)) {
     if (typeof seg === "number") {
+      // A field path always starts with a schema key, so an index has a
+      // container to fold into; an index-first path can't occur.
       containers[containers.length - 1] =
         `${containers[containers.length - 1]} #${seg + 1}`;
     } else {
