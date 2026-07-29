@@ -142,8 +142,10 @@ export async function loadAndHydrateAvailable(
     // Fresh array refs so identity-based ``hasChanged`` consumers
     // re-render with the hydrated entries. The list entries keep their
     // object identity; the legacy override above remaps two actions'
-    // ``config_entries`` before any consumer renders, so no cache ever
-    // holds a pre-override object.
+    // ``config_entries`` before the refreshed refs reach state, so no
+    // cache ever holds a pre-override object. (A form mounted off the
+    // ``onPaint`` object mid-hydration can transiently see the legacy
+    // field; the refreshed refs force the corrective re-render.)
     const refreshed: AvailableAutomations = {
       ...available,
       triggers: [...available.triggers],

@@ -63,13 +63,19 @@ export function collectUnsatisfiedConstraints(
     );
   };
   const anyVisible = (keys: string[]): boolean => keys.some(keyVisible);
+  // For the zero-present kinds, name only the keys the user can see — a
+  // hidden alias shouldn't be prompted for. The all/none kinds exist to
+  // name the *missing* member, visible or not, so they keep every key.
+  const namedKeys = (kind: string, keys: string[]): string[] =>
+    kind === "all_or_none" || kind === "none_or_all" ? keys : keys.filter(keyVisible);
   for (const group of requiredGroups) {
     if (group.keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(group.keys)) continue;
     if (evaluateGroup(group.kind, group.keys, values)) continue;
-    // Name only the keys the user can see — a hidden alias shouldn't be
-    // prompted for.
-    messages.push({ kind: group.kind, keys: formatKeys(group.keys.filter(keyVisible)) });
+    messages.push({
+      kind: group.kind,
+      keys: formatKeys(namedKeys(group.kind, group.keys)),
+    });
   }
   // buildConstraintClusters folds every *non-exclusive* inclusive group into
   // a cluster (whose members land in clusteredKeys), so this loop only fires
@@ -86,7 +92,10 @@ export function collectUnsatisfiedConstraints(
     if (keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(keys)) continue;
     if (evaluateGroup("all_or_none", keys, values)) continue;
-    messages.push({ kind: "all_or_none", keys: formatKeys(keys) });
+    messages.push({
+      kind: "all_or_none",
+      keys: formatKeys(namedKeys("all_or_none", keys)),
+    });
   }
   return messages;
 }
