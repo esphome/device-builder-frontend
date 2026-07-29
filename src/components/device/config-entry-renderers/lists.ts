@@ -52,24 +52,32 @@ function arrayItemHandlers(
 
 // New nested-list rows whose schema requires a declaring id start with a
 // unique one prefilled (#2452) — the user shouldn't have to invent it.
-// Uniqueness spans the document plus current rows: in the add dialog the
-// form values aren't in the YAML yet, and in the section editor a
-// just-added sibling may not have flushed through the draft debounce.
-function makeNewNestedItem(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx
-): Record<string, unknown> {
+// Uniqueness spans the document plus the whole form-values tree: in the
+// add dialog the form values aren't in the YAML yet, in the section
+// editor a just-added row may not have flushed through the draft
+// debounce, and a same-key sibling list under a *different* parent row
+// (esp32_ble_server's ``services[].characteristics[]``) isn't visible
+// through this list's own rows at all.
+function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, unknown> {
   const idChild = (entry.config_entries ?? []).find(
     (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
   );
   if (!idChild) return {};
   const existing = collectExistingIds(ctx.yaml);
-  for (const item of asMappingList(ctx.getAt(path))) {
-    const value = item[idChild.key];
-    if (typeof value === "string" && value) existing.add(value);
-  }
+  collectValuesAtKey(ctx.getAt([]), idChild.key, existing);
   return { [idChild.key]: generateNestedItemId(entry.key, existing) };
+}
+
+// Walk the form-values tree and collect every string at *key*.
+function collectValuesAtKey(node: unknown, key: string, out: Set<string>): void {
+  if (Array.isArray(node)) {
+    for (const item of node) collectValuesAtKey(item, key, out);
+  } else if (node && typeof node === "object" && !(node instanceof YamlRawValue)) {
+    for (const [k, v] of Object.entries(node)) {
+      if (k === key && typeof v === "string" && v) out.add(v);
+      collectValuesAtKey(v, key, out);
+    }
+  }
 }
 
 export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
@@ -385,7 +393,7 @@ export function renderNestedListField(
   const items = asMappingList(raw);
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () =>
-    makeNewNestedItem(entry, path, ctx)
+    makeNewNestedItem(entry, ctx)
   );
   const itemTitle = labelFor(entry, ctx);
   const childrenSchema = entry.config_entries ?? [];

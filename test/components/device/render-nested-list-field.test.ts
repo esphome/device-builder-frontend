@@ -151,6 +151,32 @@ describe("renderNestedListField", () => {
     );
   });
 
+  it("seeded id sees a same-key sibling list under a different parent row", () => {
+    // esp32_ble_server: every services[] row has its own characteristics[]
+    // list; an id minted in one must not collide with an unflushed id in
+    // the other.
+    const entry = makeConfigEntry({
+      key: "characteristics",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx({
+      services: [
+        { characteristics: [{ id: "characteristics_1" }] },
+        { characteristics: [] },
+      ],
+    });
+    const tpl = renderNestedListField(entry, ["services", "1", "characteristics"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(
+      ["services", "1", "characteristics"],
+      [{ id: "characteristics_2" }]
+    );
+  });
+
   it("addItem appends a bare {} when no child requires a declaring id", () => {
     const entry = makeConfigEntry({
       key: "devices",
