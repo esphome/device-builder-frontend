@@ -1784,18 +1784,15 @@ export class ESPHomeAPI {
     });
   }
 
-  /** Respell every legacy renamed-key spelling to canonical (api
-   *  ``services:`` block and items, homeassistant node id and body
-   *  field) in one splice. ``yaml_diff`` is ``null`` when nothing was
-   *  legacy. Optional ``yaml`` override as for ``upsertAutomation``. */
-  async canonicalizeAutomations(
-    configuration: string,
-    yaml?: string
-  ): Promise<{ yaml_diff: YamlDiff | null }> {
-    return this.sendCommand<{ yaml_diff: YamlDiff | null }>("automations/canonicalize", {
-      configuration,
-      ...(yaml !== undefined ? { yaml } : {}),
-    });
+  /** Respell every legacy renamed-key spelling in ``content`` to
+   *  canonical (api ``services:`` block and items, registry-action node
+   *  ids and body fields) in one splice. ``yaml_diff`` is ``null`` when
+   *  nothing was legacy. */
+  async canonicalizeSpellings(content: string): Promise<{ yaml_diff: YamlDiff | null }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff | null }>(
+      "editor/canonicalize_spellings",
+      { content }
+    );
   }
 
   // ─── Config Commands ──────────────────────────────────────

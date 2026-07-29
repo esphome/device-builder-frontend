@@ -1918,7 +1918,7 @@ export class ESPHomePageDevice extends LitElement {
   /** Legacy-spelling banner CTA: canonicalize the draft in one splice. */
   private async _onCanonicalize() {
     try {
-      const { yaml_diff } = await this._api.canonicalizeAutomations(this.id, this._yaml);
+      const { yaml_diff } = await this._api.canonicalizeSpellings(this._yaml);
       if (!yaml_diff) return;
       const newYaml = applyYamlDiff(this._yaml, yaml_diff);
       this._setYaml(newYaml);
