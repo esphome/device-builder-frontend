@@ -75,6 +75,21 @@ describe("configNeedsMigration", () => {
       "ethernet:\n  type: LAN8720\n  clk_mode: !secret clk\n",
       false,
     ],
+    [
+      "ethernet clk_mode outside the closed mode table",
+      "ethernet:\n  type: LAN8720\n  clk_mode: GPIO5_OUT\n",
+      false,
+    ],
+    [
+      "ethernet clk_mode with a comment and quotes",
+      'ethernet:\n  clk_mode: "GPIO0_IN"  # rmii clock\n',
+      true,
+    ],
+    [
+      "block scalar with an indent indicator",
+      "esphome:\n  on_boot:\n    then:\n      - lambda: |2-\n          homeassistant.service: not_yaml\n",
+      false,
+    ],
     ["ethernet already on clk", "ethernet:\n  clk:\n    pin: GPIO0\n", false],
     ["empty buffer", "", false],
     ["unrelated config", "logger:\n  level: DEBUG\n", false],

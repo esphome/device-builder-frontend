@@ -15,9 +15,10 @@ import { lineIndent } from "./yaml-sections-core.js";
 /** Anchor for a homeassistant action node, under either registered id. */
 const _HA_NODE_RE = /^(\s*(?:-\s+)?)homeassistant\.(service|action):(.*)$/;
 
-/** The decodable ethernet clock mode the migration converts. */
-const _CLK_MODE_RE = /^\s*clk_mode\s*:\s*(\S+)\s*$/;
-const _CLK_MODE_VALUE_RE = /^GPIO\d+_(IN|OUT)$/;
+/** The decodable ethernet clock mode the migration converts — upstream's
+ *  closed mode table; anything else keeps failing validation loudly. */
+const _CLK_MODE_RE = /^\s*clk_mode\s*:\s*(.+?)\s*$/;
+const _CLK_MODES = new Set(["GPIO0_IN", "GPIO0_OUT", "GPIO16_OUT", "GPIO17_OUT"]);
 
 /** Whether the buffer contains anything `editor/migrate_config` would
  *  rewrite. Single-entry memo, same shape as `parseYamlAutomations`. */
@@ -62,7 +63,15 @@ function _hasEthernetClkMode(lines: string[]): boolean {
     if (!inEthernet) continue;
     const match = line.match(_CLK_MODE_RE);
     if (match) {
-      return _CLK_MODE_VALUE_RE.test(match[1].toUpperCase().replace(/ /g, "_"));
+      let value = match[1].replace(/\s#.*$/, "").trim();
+      if (
+        value.length >= 2 &&
+        value[0] === value[value.length - 1] &&
+        "\"'".includes(value[0])
+      ) {
+        value = value.slice(1, -1);
+      }
+      return _CLK_MODES.has(value.trim().toUpperCase().replace(/ /g, "_"));
     }
   }
   return false;
