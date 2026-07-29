@@ -5,10 +5,13 @@
  * multi_value a non-list value stands for a one-item list whose items may
  * themselves be bare scalars. Run once at section load so the stored
  * form state always holds the canonical mapping/list shape - the
- * renderers, dotted-path reads, and edits all address that shape, and a
- * scalar left in place would render as an empty list and be clobbered by
- * the first edit. The YAML keeps its shorthand until the section is next
- * written (canonicalize-on-edit, same policy as legacy key respelling).
+ * renderers, dotted-path reads, and edits all address that shape. A
+ * scalar left in place at a multi_value entry would render as an empty
+ * list and be clobbered by the first edit; at a single nested entry it
+ * would fall to the read-only value-set-in-YAML notice instead of
+ * populating the group. The YAML keeps its shorthand until the section
+ * is next written (canonicalize-on-edit, same policy as legacy key
+ * respelling).
  */
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";

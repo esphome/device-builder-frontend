@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { normalizeMaybeValues } from "../../src/util/maybe-values.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 const microphoneEntry = (overrides: Record<string, unknown> = {}) =>
   makeConfigEntry({
@@ -86,16 +87,16 @@ describe("normalizeMaybeValues", () => {
     expect(normalizeMaybeValues(values, [entry])).toBe(values);
   });
 
-  it("passes non-plain objects (parser wrappers) through untouched", () => {
-    class RawBlock {}
-    const raw = new RawBlock();
-    const values = { microphone: raw };
+  it("passes YamlRawValue through untouched", () => {
+    // The renderers' raw-block bail-outs are literal instanceof checks;
+    // wrapping the instance would stop them firing and clobber the
+    // user's preserved YAML on the next save.
+    const values = { microphone: new YamlRawValue(["    - dotted.key: 1"]) };
     expect(normalizeMaybeValues(values, [microphoneEntry()])).toBe(values);
   });
 
-  it("passes a parser wrapper inside a list through untouched", () => {
-    class RawBlock {}
-    const values = { microphone: [new RawBlock()] };
+  it("passes a YamlRawValue inside a list through untouched", () => {
+    const values = { microphone: [new YamlRawValue(["    - dotted.key: 1"])] };
     expect(normalizeMaybeValues(values, [microphoneEntry()])).toBe(values);
   });
 
