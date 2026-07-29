@@ -23,6 +23,8 @@ import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+// Value import registers the custom element.
+import "./config-migration-notice.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
@@ -300,6 +302,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
             `
           : nothing
       }
+      <esphome-config-migration-notice
+        .configuration=${this.configuration}
+        .yaml=${this.yaml}
+      ></esphome-config-migration-notice>
       ${
         this.selectedSection
           ? this._renderSelectedSection()

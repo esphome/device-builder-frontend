@@ -1,6 +1,6 @@
 /**
  * Shared styles for the inline notice banners shown above a section's form
- * (`<esphome-security-notice>`, `<esphome-deprecation-notice>`): the warning
+ * the warning
  * `.notice` box, its `.body` column, and the `.cta` button.
  */
 import { css } from "lit";
@@ -61,5 +61,26 @@ export const noticeBannerStyles = css`
   .cta:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+`;
+
+export const noticeCloseStyles = css`
+  .notice-close {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--wa-color-text-quiet);
+    border-radius: var(--wa-border-radius-s);
+  }
+
+  .notice-close:hover {
+    color: var(--wa-color-text-normal);
+  }
+
+  .notice-close wa-icon {
+    font-size: 18px;
+    display: block;
   }
 `;

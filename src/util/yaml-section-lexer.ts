@@ -95,7 +95,7 @@ export const LIST_ITEM_START_RE = /^\s*-(\s|$)/;
  * templatable fields emit that shape, so the tag has to count as a
  * block-scalar header too.
  */
-export const BLOCK_SCALAR_RE = /^[^"']*:\s*(?:!\S+\s+)?[|>][-+]?\s*(?:#.*)?$/;
+export const BLOCK_SCALAR_RE = /^[^"']*:\s*(?:!\S+\s+)?[|>][0-9+-]*\s*(?:#.*)?$/;
 
 /**
  * Match the part AFTER the colon on a `key: |-` line (the `raw` value

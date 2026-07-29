@@ -1784,6 +1784,16 @@ export class ESPHomeAPI {
     });
   }
 
+  /** Apply every known migration to ``content`` in one splice: renamed
+   *  api and homeassistant spellings plus the ethernet ``clk_mode``
+   *  conversion. ``yaml_diff`` is ``null`` when nothing needed
+   *  migrating. */
+  async migrateConfig(content: string): Promise<{ yaml_diff: YamlDiff | null }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff | null }>("editor/migrate_config", {
+      content,
+    });
+  }
+
   // ─── Config Commands ──────────────────────────────────────
 
   /** Get ESPHome and server version. */

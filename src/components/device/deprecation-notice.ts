@@ -1,17 +1,13 @@
 /**
  * Inline deprecation nudge shown above a section's form when the config uses a
- * deprecated option with a losslessly derivable replacement. One config-driven
- * component covers every option in `DEPRECATED_OPTIONS`:
+ * deprecated option with a losslessly derivable replacement, driven by the
+ * `DEPRECATED_OPTIONS` registry. The rewrite is pure and draft-only: clicking
+ * the CTA emits `apply-section-values` so the host splices the replacement
+ * into the unsaved YAML buffer — no dialog, no backend call.
  *
- * - `ethernet` — flat `clk_mode: GPIO<n>_(IN|OUT)` → nested `clk: {pin, mode}`
- *   (removed upstream in ESPHome 2026.9.0).
- *
- * The rewrite is pure and draft-only: clicking the CTA emits
- * `apply-section-values` so the host splices the replacement into the unsaved
- * YAML buffer — no dialog, no backend call. A bespoke migration (ethernet) is
- * a full `DeprecatedOption` plus its copy; a plain `cv.rename_key` field is a
- * one-liner with shared copy, e.g.
- * `"sensor.sgp4x": [renamedOption("voc", "voc_index", "2026.8.0")]`.
+ * The registry is empty today: whole-file migrations live in the backend's
+ * `editor/migrate_config` rules behind the config-migration nudge, which is
+ * where new ones land.
  */
 import { consume } from "@lit/context";
 import { mdiUpdate } from "@mdi/js";
@@ -49,9 +45,8 @@ export interface DeprecatedOption {
 
 /**
  * Plain `cv.rename_key` field: move the value verbatim (nested mappings and
- * raw blocks included), overwriting any value already under *newKey* — the
- * same old-spelling-wins collision policy as the clk migration below.
- * Shared templated copy.
+ * raw blocks included), overwriting any value already under *newKey* —
+ * the old spelling wins. Shared templated copy.
  */
 export function renamedOption(
   oldKey: string,
@@ -72,35 +67,8 @@ export function renamedOption(
   };
 }
 
-/** Deprecated flat `clk_mode: GPIO<n>_(IN|OUT)` encodes the RMII clock pin
- *  and direction in the mode string. */
-const CLK_MODE_RE = /^GPIO(\d+)_(IN|OUT)$/;
-
-/** `clk_mode` → nested `clk` with the pin in the picker's `GPIO<n>` form.
- *  Replaces any existing `clk` wholesale, mirroring upstream's precedence. */
-const migrateClkMode: DeprecatedOption["migrate"] = (value) => {
-  if (typeof value !== "string") return null;
-  // The upstream enum is case-insensitive with spaces as underscores.
-  const match = CLK_MODE_RE.exec(value.trim().toUpperCase().replace(/ /g, "_"));
-  if (!match) return null;
-  return [
-    {
-      path: ["clk"],
-      value: {
-        pin: `GPIO${match[1]}`,
-        mode: match[2] === "IN" ? "CLK_EXT_IN" : "CLK_OUT",
-      },
-    },
-    { path: ["clk_mode"], value: undefined },
-  ];
-};
-
 /** Registry keyed by the editor `sectionKey`. */
-export const DEPRECATED_OPTIONS: Record<string, DeprecatedOption[]> = {
-  ethernet: [
-    { key: "clk_mode", copyPrefix: "ethernet_clk_mode", migrate: migrateClkMode },
-  ],
-};
+export const DEPRECATED_OPTIONS: Record<string, DeprecatedOption[]> = {};
 
 /** Whether this section has deprecated options to watch for. Own-property check
  *  so a top-level YAML key like `__proto__` can't resolve to an inherited
@@ -120,8 +88,8 @@ export class ESPHomeDeprecationNotice extends LitElement {
   /** The section's draft values (the host's `_values`). */
   @property({ attribute: false }) values: Record<string, unknown> = {};
 
-  /** The section's schema entries, to honor `depends_on` gates (e.g. ethernet
-   *  `clk_mode` applies only to RMII PHY types, never SPI). */
+  /** The section's schema entries, to honor `depends_on` gates on a
+   *  deprecated key that only applies to some of the section's types. */
   @property({ attribute: false }) entries: ConfigEntry[] = [];
 
   /** Registry entries whose deprecated key is present with a migratable value. */
