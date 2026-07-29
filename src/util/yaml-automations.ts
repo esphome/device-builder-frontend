@@ -393,31 +393,6 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
   return lines.length;
 }
 
-/** Legacy api spellings the migrate command would rewrite: a ``services:``
- *  block key, or a ``- service:`` discriminator without a canonical
- *  sibling (the collision the migration skips). */
-export function hasLegacyApiSpellings(lines: string[]): boolean {
-  const apiBlock = _findTopLevelBlock(lines, "api");
-  if (!apiBlock) return false;
-  if (
-    _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, API_ACTIONS_BLOCK_KEYS[1])
-  ) {
-    return true;
-  }
-  const actions = _findChildBlock(
-    lines,
-    apiBlock.fromLine,
-    apiBlock.toLine,
-    API_ACTIONS_BLOCK_KEYS[0]
-  );
-  if (!actions) return false;
-  return _enumerateListItems(lines, actions.fromLine, actions.toLine).some(
-    (item) =>
-      Boolean(_readKeyOnLine(lines, item.fromLine, "service")) &&
-      !_readKeyOnLine(lines, item.fromLine, "action")
-  );
-}
-
 /** Top-level key block (``script:`` / ``interval:``) with its
  *  inclusive 1-indexed line range, or ``null`` when the key is
  *  absent. */
