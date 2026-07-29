@@ -185,16 +185,25 @@ describe("create-config-dialog create de-dupe + retry", () => {
       warning: "Created, but the remote package didn't validate",
     });
     const el = await mount({ createDevice });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
+    const closeSpy = vi.spyOn(el, "close");
 
     emitCreate(el, "proxy");
     await flush();
 
+    expect(createDevice).toHaveBeenCalledTimes(1);
+    expect((el as unknown as { _createError: string })._createError).toBe("");
     expect(toast.warning).toHaveBeenCalledWith(
-      "dashboard.create_package_warning",
+      "Created, but its remote package needs a repair in the editor",
       expect.objectContaining({
         description: "Created, but the remote package didn't validate",
         duration: 8000,
       })
+    );
+    // The toast is the repair signal on the editor page; it must fire
+    // after the dialog has closed, not under the still-open wizard.
+    expect(closeSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(toast.warning).mock.invocationCallOrder[0]
     );
   });
 
