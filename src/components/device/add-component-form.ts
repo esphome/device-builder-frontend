@@ -318,8 +318,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     let picker: string | null = null;
     let reference: string | null = null;
     if (api && target && !yamlHasExternalIdSources(this.yaml)) {
-      try {
-        const catalog = await loadCatalog(api);
+      // `loadCatalog` resolves to an empty index on failure rather than
+      // rejecting; an empty index records no claims, so bail with no
+      // verdict instead of affirmatively seeding a bus it has no
+      // evidence for.
+      const catalog = await loadCatalog(api);
+      if (seq !== this._busAssessSeq) return;
+      if (catalog.byId.size > 0) {
         const { busCount, compatibleIds } = assessBusHostability(
           this.yaml,
           target.domain,
@@ -332,12 +337,25 @@ export class ESPHomeAddComponentForm extends LitElement {
         const usable =
           busCount > 1 ? compatibleIds.filter((id) => id !== null) : compatibleIds;
         if (busCount > 0 && usable.length === 0) {
-          const present = parseTopLevelComponents(this.yaml);
-          const satisfied = await depsSatisfiedByProvides(api, [target.domain], present, {
-            platform: this.board?.esphome.platform ?? null,
-            boardId: this.board?.id ?? null,
-          });
-          if (!satisfied.has(target.domain)) blocked = target.domain;
+          // The local verdict stands on parsed evidence; the provider
+          // escape (a `usb_uart:` channel the bus scan can't model) only
+          // clears it, and a failed provider lookup doesn't discard it.
+          blocked = target.domain;
+          try {
+            const present = parseTopLevelComponents(this.yaml);
+            const satisfied = await depsSatisfiedByProvides(
+              api,
+              [target.domain],
+              present,
+              {
+                platform: this.board?.esphome.platform ?? null,
+                boardId: this.board?.id ?? null,
+              }
+            );
+            if (satisfied.has(target.domain)) blocked = null;
+          } catch (err) {
+            console.warn("[add-component-form] bus provider lookup failed", err);
+          }
         } else if (usable.length === 1) {
           reference = usable[0];
         } else if (usable.length > 1) {
@@ -350,8 +368,6 @@ export class ESPHomeAddComponentForm extends LitElement {
           );
           if (path?.length === 1) picker = path[0];
         }
-      } catch (err) {
-        console.warn("[add-component-form] bus availability lookup failed", err);
       }
     }
     if (seq !== this._busAssessSeq) return;
@@ -488,21 +504,30 @@ export class ESPHomeAddComponentForm extends LitElement {
    * back to the raw id until the cache lookup lands (kicked off in
    * ``willUpdate``).
    */
-  private _renderMissingDeps(missing: string[]) {
+  /** True when the only outstanding dep is the bus-blocked one, so the
+   *  banner and the Enter-key submit bail speak of an unavailable bus
+   *  rather than a missing component. */
+  private _allDepsBusBlocked(missing: string[]): boolean {
     const blocked = this._busBlockedDep;
-    const allBlocked = blocked !== null && missing.length === 1 && missing[0] === blocked;
+    return blocked !== null && missing.length === 1 && missing[0] === blocked;
+  }
+
+  private _depsBlockTitle(missing: string[]): string {
+    return this._localize(
+      this._allDepsBusBlocked(missing)
+        ? "device.bus_dependency_in_use_title"
+        : "device.missing_dependencies_title",
+      { name: this.component.name }
+    );
+  }
+
+  private _renderMissingDeps(missing: string[]) {
+    const allBlocked = this._allDepsBusBlocked(missing);
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
-          <div class="deps-warning-title">
-            ${this._localize(
-              allBlocked
-                ? "device.bus_dependency_in_use_title"
-                : "device.missing_dependencies_title",
-              { name: this.component.name }
-            )}
-          </div>
+          <div class="deps-warning-title">${this._depsBlockTitle(missing)}</div>
           <div>
             ${
               allBlocked
@@ -668,9 +693,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (missingDeps.length > 0) {
       // Surface a visible message that names the missing domain(s) so
       // the user can act, instead of returning silently.
-      this._localBlockMessage = `${this._localize("device.missing_dependencies_title", {
-        name: this.component.name,
-      })} (${missingDeps.join(", ")})`;
+      this._localBlockMessage = `${this._depsBlockTitle(missingDeps)} (${missingDeps.join(", ")})`;
       return;
     }
 

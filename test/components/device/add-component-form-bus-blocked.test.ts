@@ -70,11 +70,14 @@ const CLAIMED_BUS =
   "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    tx_pin: 43\n    id: uart_1\n" +
   "sensor:\n  - platform: a02yyuw\n    name: Level\n    uart_id: uart_1\n";
 
-async function mountForm(yaml: string): Promise<ESPHomeAddComponentForm> {
+async function mountForm(
+  yaml: string,
+  api: ESPHomeAPI = makeApi()
+): Promise<ESPHomeAddComponentForm> {
   const el = new ESPHomeAddComponentForm();
   el.component = a01nyub;
   el.yaml = yaml;
-  Object.assign(el as unknown as Record<string, unknown>, { _api: makeApi() });
+  Object.assign(el as unknown as Record<string, unknown>, { _api: api });
   document.body.appendChild(el);
   await el.updateComplete;
   await flushMicrotasks(10);
@@ -150,6 +153,18 @@ describe("add-component-form bus hostability", () => {
   it("fails open entirely when the YAML pulls in external sources", async () => {
     const el = await mountForm("packages:\n  base: !include common.yaml\n" + CLAIMED_BUS);
     expect(banner(el)).toBeNull();
+  });
+
+  it("issues no verdict when the catalog index is unavailable", async () => {
+    const down = {
+      getComponents: vi.fn(async () => {
+        throw new Error("backend down");
+      }),
+      getComponentBodies: vi.fn(async () => ({})),
+    } as unknown as ESPHomeAPI;
+    const el = await mountForm(CLAIMED_BUS, down);
+    expect(banner(el)).toBeNull();
+    expect(el.currentValues.uart_id).toBeUndefined();
   });
 
   it("detours instead of shipping an ambiguous reference to an un-idded bus", async () => {
