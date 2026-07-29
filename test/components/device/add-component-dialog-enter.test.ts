@@ -62,11 +62,14 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
     expect(requestSubmitCalls).toHaveLength(1);
   });
 
-  it("Enter in the catalog view does nothing", async () => {
+  it("Enter in the catalog view is not even claimed", async () => {
     const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
     await baseDialogSettled(el);
-    pressEnter();
+    // An unclaimed (no preventDefault) Enter proves the listener is
+    // detached, not merely bound to an undefined callback.
+    const event = pressEnter();
+    expect(event.defaultPrevented).toBe(false);
     expect(requestSubmitCalls).toHaveLength(0);
   });
 
@@ -95,14 +98,15 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
     expect(requestSubmitCalls).toHaveLength(0);
   });
 
-  it("stops firing after leaving the form view via back", async () => {
+  it("detaches the listener after leaving the form view via back", async () => {
     const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
     await enterFormView(el);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._selected = null;
     await baseDialogSettled(el);
-    pressEnter();
+    const event = pressEnter();
+    expect(event.defaultPrevented).toBe(false);
     expect(requestSubmitCalls).toHaveLength(0);
   });
 });
