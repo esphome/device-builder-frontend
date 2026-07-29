@@ -64,6 +64,9 @@ describe("parseHexInt", () => {
     );
     // The uppercase-prefix arm keeps padding too, casing lowered.
     expect(parseHexInt("0X0AB")).toBe("0x0ab");
+    // Decimal is the diverging branch: leading zeros carry no hex
+    // width, so the BigInt route emits the minimal form.
+    expect(parseHexInt("0118")).toBe("0x76");
   });
 
   it("keeps zero at its typed width, decimal zero minimal", () => {
