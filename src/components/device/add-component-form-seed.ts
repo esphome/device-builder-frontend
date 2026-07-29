@@ -206,7 +206,9 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // falls back to ESP32 GPIO22/21. Pins the YAML already wires stay
   // unseeded (a second uart would otherwise re-suggest the first
   // bus's pins, #1555); no exclude range — the new component isn't
-  // in the YAML yet.
+  // in the YAML yet. The scan's known imprecision is inherited: a
+  // token like "esp32-p4" registers GPIO4 as used (over-suppresses a
+  // default), and a substitution-wired pin is invisible to it.
   next = seedBoardPinDefaults(component.id, entries, board, next, findUsedPins(yaml));
 
   // Restore what the user typed before a "+ Add <dep>" detour, over the freshly

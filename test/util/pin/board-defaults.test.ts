@@ -300,6 +300,28 @@ describe("seedBoardPinDefaults", () => {
     expect(result).toEqual({ rx_pin: 18, tx_pin: 17 });
   });
 
+  it("never seeds one GPIO for two roles in the same pass", () => {
+    // A pin tagged with both roles must not resolve for both entries —
+    // that would recreate the duplicate-pin error on submit. First
+    // entry wins by loop order; the second falls through or stays
+    // unset.
+    const board = makeBoard([
+      makePin({ gpio: 8, features: ["i2c_sda", "i2c_scl"] }),
+      makePin({ gpio: 9, features: ["i2c_scl"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "i2c",
+      [
+        makeEntry({ key: "sda", default_value: "SDA" }),
+        makeEntry({ key: "scl", default_value: "SCL" }),
+      ],
+      board,
+      {},
+      NO_USED_PINS
+    );
+    expect(result).toEqual({ sda: 8, scl: 9 });
+  });
+
   it("falls through to the next free tagged pin (second i2c bus)", () => {
     // wesp32 shape: i2c_sda / i2c_scl tagged on several pins. A second
     // bus skips the pair the first bus wired and suggests the next
