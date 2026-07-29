@@ -48,3 +48,11 @@ export function hasMaterialValue(
   }
   return value !== undefined;
 }
+
+/** The gate rule: an advanced entry hides behind the toggle unless valued. */
+export function advancedGated(
+  entry: ConfigEntry,
+  values: Record<string, unknown>
+): boolean {
+  return !!entry.advanced && !hasMaterialValue(entry, values);
+}

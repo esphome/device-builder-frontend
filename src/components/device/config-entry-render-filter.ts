@@ -25,10 +25,8 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
-import { hasMaterialValue } from "../../util/material-value.js";
+import { advancedGated } from "../../util/material-value.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
-
-export { hasMaterialValue };
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -171,7 +169,7 @@ export function filterRenderable(
     ) {
       continue;
     }
-    if (entry.advanced && !opts.showAdvanced && !hasMaterialValue(entry, values)) {
+    if (!opts.showAdvanced && advancedGated(entry, values)) {
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {

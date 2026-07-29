@@ -5,7 +5,7 @@
 
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
-import { hasMaterialValue } from "./material-value.js";
+import { advancedGated } from "./material-value.js";
 import { asRecord, getIn, isIndexSegment } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
@@ -82,9 +82,8 @@ export function pathIsAdvanced(
       if (unitGated) advanced = true;
     } else if (
       !advanced &&
-      entry.advanced &&
       !inPinWiring &&
-      !hasMaterialValue(entry, asRecord(getIn(values, path.slice(0, i))))
+      advancedGated(entry, asRecord(getIn(values, path.slice(0, i))))
     ) {
       advanced = true;
     }
