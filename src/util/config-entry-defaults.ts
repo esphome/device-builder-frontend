@@ -36,6 +36,7 @@ export function makeConfigEntry(overrides: Partial<ConfigEntry> = {}): ConfigEnt
     unit_options: null,
     help_link: null,
     multi_value: false,
+    maybe_key: null,
     hidden: false,
     advanced: false,
     translation_key: null,
