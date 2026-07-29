@@ -1571,6 +1571,32 @@ describe("nested component_action sections (#1543)", () => {
     ]);
   });
 
+  it("ignores a block scalar opened inline on the instance dash line", () => {
+    const yaml = `sprinkler:
+  - notes: |
+      set_action:
+        - not a real field
+    id: lawn
+    repeat_number:
+      set_action:
+        - logger.log: real
+`;
+    expect(componentActionItems(yaml).map((s) => s.actionField)).toEqual([
+      "repeat_number.set_action",
+    ]);
+  });
+
+  it("refuses a container key containing a dot", () => {
+    // ``a.b:`` would make the dotted field encoding lossy.
+    const yaml = `sprinkler:
+  - id: lawn
+    weird.container:
+      set_action:
+        - logger.log: changed
+`;
+    expect(componentActionItems(yaml)).toEqual([]);
+  });
+
   it("uses an index-free path when the list is written as one mapping", () => {
     const yaml = `sprinkler:
   - id: lawn

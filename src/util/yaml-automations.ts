@@ -347,7 +347,19 @@ function _actionFieldPath(
     ? hostLine.slice(hostDash[0].length).match(_BARE_MAPPING_KEY_RE)
     : null;
   if (hostInlineKey) stack.push({ indent: childIndent, seg: hostInlineKey[1] });
-  for (let j = host.fromLine; j <= targetIdx; j++) {
+  // A block scalar opened inline on the dash line hides its body from
+  // the loop's opener check — refuse a target inside it, start past it.
+  let walkStart = host.fromLine;
+  if (
+    hostDash &&
+    !hostInlineKey &&
+    BLOCK_SCALAR_RE.test(hostLine.slice(hostDash[0].length))
+  ) {
+    const end = _blockScalarBodyEnd(lines, host.fromLine, childIndent);
+    if (targetIdx < end) return null;
+    walkStart = end;
+  }
+  for (let j = walkStart; j <= targetIdx; j++) {
     const line = lines[j];
     if (isBlankOrCommentLine(line)) continue;
     let indent = lineIndent(line);
@@ -379,14 +391,17 @@ function _actionFieldPath(
         if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return null;
       }
       const segments: Array<string | number> = stack.map((frame) => frame.seg);
-      // A container key the bare-key regex couldn't name (quoted,
-      // hyphenated) drops its frame while its dashes still count; an
-      // index without a preceding key can't route, so fall back to no
-      // row rather than a wrong one.
-      const orphanIndex = segments.some(
-        (seg, idx) => typeof seg === "number" && typeof segments[idx - 1] !== "string"
+      // Refuse paths the dotted encoding can't carry: an index whose
+      // container key the bare-key regex couldn't name (quoted,
+      // hyphenated — the frame dropped while its dashes still count),
+      // or a segment containing a dot, which the lossless-join
+      // invariant of ``action-field-path.ts`` forbids.
+      const unencodable = segments.some(
+        (seg, idx) =>
+          (typeof seg === "number" && typeof segments[idx - 1] !== "string") ||
+          (typeof seg === "string" && seg.includes("."))
       );
-      if (orphanIndex) return null;
+      if (unencodable) return null;
       segments.push(field);
       return segments;
     }
