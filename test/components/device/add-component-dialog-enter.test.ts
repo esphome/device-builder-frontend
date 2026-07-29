@@ -5,7 +5,7 @@
  * base-dialog's confirmOnEnter (issue esphome/device-builder#2400): armed
  * only while the form view is showing, routed through the form's
  * requestSubmit(), and inert in the catalog view (no selection for Enter
- * to act on) and while closed.
+ * to act on), while closed, on OS key-repeat, and during an in-flight add.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,8 +24,8 @@ vi.mock("../../../src/components/device/component-catalog.js", () => {
 });
 
 // Stub the form so the dialog's _form query resolves to an element whose
-// requestSubmit() calls we can count; the real form's guard has its own test
-// (add-component-form-request-submit.test.ts).
+// requestSubmit() calls we can count; the real form's behaviour has its own
+// suite (add-component-form-request-submit.test.ts).
 const requestSubmitCalls: HTMLElement[] = [];
 vi.mock("../../../src/components/device/add-component-form.js", () => {
   class StubForm extends HTMLElement {
@@ -40,7 +40,7 @@ vi.mock("../../../src/components/device/add-component-form.js", () => {
 });
 
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
-import { mount } from "../../_dom.js";
+import { baseDialogSettled, mount } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
 
 beforeEach(() => {
@@ -50,7 +50,7 @@ beforeEach(() => {
 async function enterFormView(el: ESPHomeAddComponentDialog): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._selected = { name: "Restart Button", category: "button" };
-  await el.updateComplete;
+  await baseDialogSettled(el);
 }
 
 describe("add-component-dialog Enter-to-submit (#2400)", () => {
@@ -65,7 +65,7 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
   it("Enter in the catalog view does nothing", async () => {
     const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
-    await el.updateComplete;
+    await baseDialogSettled(el);
     pressEnter();
     expect(requestSubmitCalls).toHaveLength(0);
   });
@@ -77,13 +77,21 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
     expect(requestSubmitCalls).toHaveLength(0);
   });
 
-  it("drops a key-repeat Enter while a submit is in flight", async () => {
+  it("drops an OS key-repeat Enter (held key across a view swap)", async () => {
+    const el = await mount(new ESPHomeAddComponentDialog());
+    el.open();
+    await enterFormView(el);
+    pressEnter({ repeat: true });
+    expect(requestSubmitCalls).toHaveLength(0);
+  });
+
+  it("drops Enter while a submit is in flight", async () => {
     const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
     await enterFormView(el);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._submitting = true;
-    pressEnter({ repeat: true });
+    pressEnter();
     expect(requestSubmitCalls).toHaveLength(0);
   });
 
@@ -93,7 +101,7 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
     await enterFormView(el);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._selected = null;
-    await el.updateComplete;
+    await baseDialogSettled(el);
     pressEnter();
     expect(requestSubmitCalls).toHaveLength(0);
   });

@@ -3,36 +3,74 @@
  *
  * requestSubmit() (the dialog's Enter path, #2400) runs the same submit
  * path as the Add button but self-guards on an in-flight submit — the
- * button's ?disabled only protects the click path.
+ * button's ?disabled only protects the click path. Unlike the button,
+ * Enter reaches _onSubmit even when the form is incomplete, so the
+ * validation branches surface the block instead of silently ignoring
+ * the key.
  */
 import { describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
+import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { identityLocalize } from "../../_dom.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
-function makeForm(): {
+function makeForm(component?: ComponentCatalogEntry): {
   form: ESPHomeAddComponentForm;
-  onSubmit: ReturnType<typeof vi.fn>;
+  submits: Record<string, unknown>[];
 } {
   const form = new ESPHomeAddComponentForm();
-  const onSubmit = vi.fn();
+  const submits: Record<string, unknown>[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (form as any)._onSubmit = onSubmit;
-  return { form, onSubmit };
+  const internals = form as any;
+  internals.component =
+    component ??
+    ({
+      id: "button.restart",
+      config_entries: [makeConfigEntry({ key: "name", type: ConfigEntryType.STRING })],
+    } as unknown as ComponentCatalogEntry);
+  internals.yaml = "";
+  internals._localize = identityLocalize;
+  form.addEventListener("form-submit", (e) => {
+    submits.push((e as CustomEvent<{ fields: Record<string, unknown> }>).detail.fields);
+  });
+  return { form, submits };
 }
 
-describe("add-component-form requestSubmit guard (#2400)", () => {
-  it("runs the submit path when idle", () => {
-    const { form, onSubmit } = makeForm();
+describe("add-component-form requestSubmit (#2400)", () => {
+  it("fires form-submit with the coerced fields on a complete form", () => {
+    const { form, submits } = makeForm();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._values = { name: "Enter Test" };
     form.requestSubmit();
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(submits).toEqual([{ name: "Enter Test" }]);
+  });
+
+  it("blocks an incomplete form and surfaces the errors instead", () => {
+    const required = {
+      id: "button.restart",
+      config_entries: [
+        makeConfigEntry({ key: "name", type: ConfigEntryType.STRING, required: true }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(required);
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((form as any)._errors as Map<string, unknown>).size).toBeGreaterThan(0);
   });
 
   it("ignores a request while a submit is in flight", () => {
-    const { form, onSubmit } = makeForm();
+    const { form, submits } = makeForm();
+    const onSubmit = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._onSubmit = onSubmit;
     form.submitting = true;
     form.requestSubmit();
     expect(onSubmit).not.toHaveBeenCalled();
+    expect(submits).toHaveLength(0);
   });
 });

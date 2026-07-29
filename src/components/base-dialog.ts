@@ -175,13 +175,14 @@ export class ESPHomeBaseDialog extends LitElement {
    *  :class:`EnterController` already skips Enter on
    *  buttons/links/textareas/selects and mid-IME composition. The callback
    *  must self-guard against repeat/invalid — a held Enter can re-fire until
-   *  ``open`` flips false.
+   *  ``open`` flips false; the keydown is passed so guards can check
+   *  ``e.repeat``.
    *
    *  Don't set this on a dialog that opens a *nested* dialog while it stays
    *  open: the listener is window-level and the controllers claim Enter in
    *  open order, not z-order, so a stacked inner dialog wouldn't reliably win
    *  the Enter (see :class:`EnterController`). */
-  @property({ attribute: false }) confirmOnEnter?: () => void;
+  @property({ attribute: false }) confirmOnEnter?: (e: KeyboardEvent) => void;
 
   /** Whether a consumer has slotted footer content. Gates the
    *  forwarding ``<slot name="footer">`` — see ``willUpdate``. */
@@ -190,7 +191,7 @@ export class ESPHomeBaseDialog extends LitElement {
   // Reads the live ``confirmOnEnter`` at fire time, so a fresh arrow each
   // render is fine; toggled from ``willUpdate`` and torn down by the
   // controller's ``hostDisconnected``.
-  private _enter = new EnterController(this, () => this.confirmOnEnter?.());
+  private _enter = new EnterController(this, (e) => this.confirmOnEnter?.(e));
 
   // wa-dialog turns its footer chrome (border-top + padding) on by
   // testing for a direct ``[slot="footer"]`` child element, not for

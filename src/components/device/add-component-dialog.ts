@@ -747,10 +747,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   // Armed only in the form view; the catalog has no selection for Enter
-  // to act on. The form's own submitting guard lags a render behind
-  // `_submitting`, so a key-repeat Enter is dropped here first.
-  private _onEnterSubmit = () => {
-    if (this._submitting) return;
+  // to act on. `e.repeat` guards the bundle-advance / detour-return
+  // boundary, where a fresh form mounts with `_submitting` already
+  // cleared while Enter is still held; `_submitting` guards the
+  // in-flight window before the form sees the updated prop.
+  private _onEnterSubmit = (e: KeyboardEvent) => {
+    if (e.repeat || this._submitting) return;
     this._form?.requestSubmit();
   };
 
