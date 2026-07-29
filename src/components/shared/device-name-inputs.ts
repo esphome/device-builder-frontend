@@ -87,6 +87,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   @state()
   private _hostnameEdited = false;
 
+  // Derivation fallback when the friendly name slugs to nothing (adopt's
+  // factory broadcast); empty for the create/clone flows.
+  private _hostnameFallback = "";
+
   @state()
   private _open = false;
 
@@ -190,9 +194,16 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     return this.hostname.length > 0 && !this.validity.err;
   }
 
-  reset(prefillFriendly = "") {
+  reset(prefillFriendly = "", prefillHostname = "") {
     this._friendly = prefillFriendly;
-    this._hostname = slugifyHostname(prefillFriendly);
+    // A seeded hostname (adopt's factory broadcast) is the initial
+    // value only — derivation stays live, so a friendly-name edit
+    // recalcs it like the create/rename flows, and a direct hostname
+    // edit latches as usual. The seed doubles as the derivation
+    // fallback: a cleared friendly name returns to it instead of
+    // stranding an empty hostname behind a disabled submit.
+    this._hostname = prefillHostname || slugifyHostname(prefillFriendly);
+    this._hostnameFallback = prefillHostname;
     this._hostnameEdited = false;
     this._open = false;
   }
@@ -267,7 +278,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
                 // stranding an empty field behind a required-hostname error.
                 this._hostname = this._hostnameEdited
                   ? value
-                  : slugifyHostname(this._friendly);
+                  : slugifyHostname(this._friendly) || this._hostnameFallback;
                 // Typing here is an explicit override; keep the panel open
                 // once the edit clears the error that force-opened it, or
                 // the field unmounts mid-keystroke.
@@ -303,7 +314,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   private _onFriendlyInput = (e: Event) => {
     this._friendly = (e.target as HTMLInputElement).value;
     if (!this._hostnameEdited) {
-      this._hostname = slugifyHostname(this._friendly);
+      this._hostname = slugifyHostname(this._friendly) || this._hostnameFallback;
     }
     this._autoOpenOnWarning();
     this._notify();

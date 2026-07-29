@@ -23,6 +23,8 @@ import type { ArchivedDevice } from "../api/types/system.js";
 import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
+  adoptFollowUp,
+  type AdoptedDetail,
   deleteLabel,
   executeClone,
   executeFriendlyName,
@@ -928,9 +930,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._tryConsumePendingScroll();
   }
 
-  _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
-    this._highlightFreshDevice(`${e.detail.name}.yaml`);
-  };
+  _onAdopted = (e: CustomEvent<AdoptedDetail>) => void adoptFollowUp(this, e.detail);
 
   /** Post-clone reveal (#2246): the search that matched the source would
    *  hide the fresh clone, so clear it (no refocus — attention belongs on

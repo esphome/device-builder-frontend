@@ -1,10 +1,12 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import type { AdoptedDetail } from "./dashboard/actions-ui.js";
+import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 import {
   dialogActionButtonStyles,
   dialogActionsRowStyles,
@@ -12,19 +14,18 @@ import {
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { fireEvent } from "../util/fire-event.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
-import { renderInlineError } from "../util/render-error.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
 import "./base-dialog.js";
+import "./shared/device-name-inputs.js";
 
 @customElement("esphome-adopt-dialog")
 export class ESPHomeAdoptDialog extends LitElement {
@@ -36,9 +37,15 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state()
   private _api?: ESPHomeAPI;
 
+  // Hostnames already in use (configured devices + other discovered
+  // broadcasts); an edited name colliding here would only fail at the
+  // rename step, after the import already landed.
+  @property({ attribute: false }) takenHostnames: ReadonlySet<string> = new Set();
+
+  @query("esphome-device-name-inputs")
+  private _nameInputs?: ESPHomeDeviceNameInputs;
+
   @state() private _device: AdoptableDevice | null = null;
-  @state() private _name = "";
-  @state() private _friendlyName = "";
   // Default on — the legacy dashboard added an encryption key to
   // every adopted device unconditionally and the lack of a way to
   // opt out was the actual annoyance. Keep the secure-by-default
@@ -182,6 +189,19 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
+      /* The shared name pair carries no outer margins (its hosts own
+         the rhythm); without this the hostname row sits flush on the
+         encryption checkbox. */
+      .name-pair {
+        margin-bottom: var(--wa-space-m);
+      }
+
+      .name-hint {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        margin-top: var(--wa-space-2xs);
+      }
+
       /* Adoption's commit affordance is success-green rather than the
          standard primary tint (dialogActionButtonStyles); per that
          module's guidance, divergent colour intents stay local. This
@@ -221,14 +241,6 @@ export class ESPHomeAdoptDialog extends LitElement {
 
   open(device: AdoptableDevice) {
     this._device = device;
-    /* Default to the discovered hostname verbatim — including the
-       MAC-suffix factory firmware appends. The backend writes the
-       new YAML with ``name_add_mac_suffix: False`` so whatever the
-       user picks sticks; users who want a cleaner name can edit the
-       suffix off, but defaulting to a stripped form silently dropped
-       the disambiguator on devices like ``apollo-plt-1-983300``. */
-    this._name = device.name;
-    this._friendlyName = device.friendly_name || "";
     this._encryption = true;
     this._busy = false;
     this._error = null;
@@ -236,6 +248,23 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._password = "";
     this._hasWifiSecrets = undefined;
     this._dialog.open = true;
+    /* Seed the shared name pair. The hostname seeds to the
+       discovered broadcast verbatim — including the MAC-suffix
+       factory firmware appends — and holds until the user types: a
+       friendly-name edit re-derives it like the create/rename
+       flows. The import always lands under the broadcast name (the
+       only hostname the running device answers to); a changed
+       hostname is applied afterwards via the rename flow, which
+       flashes the device before the old name is dropped. Seed
+       synchronously when the pair is already mounted (a re-open
+       would otherwise render one frame of the previous device's
+       state) and again after the open render mounts it fresh. */
+    const seed = () => this._nameInputs?.reset(device.friendly_name || "", device.name);
+    seed();
+    void this.updateComplete.then(() => {
+      seed();
+      this.requestUpdate();
+    });
     // A Wi-Fi device whose install has no shared wifi_ssid/wifi_password
     // would import a config referencing an undefined !secret and fail to
     // validate (esphome/device-builder#1742). Probe the shared secrets so
@@ -277,6 +306,34 @@ export class ESPHomeAdoptDialog extends LitElement {
     );
   }
 
+  // The name pair's validity is the shared component's: charset,
+  // esphome's 31-char hostname cap, edge hyphens, and the taken set.
+  // The unedited factory default is exempt from the taken check — its
+  // own importable row is in the set, and the broadcast name is
+  // compile-time valid. Memoized per (set, device): the child re-fires
+  // ``device-name-changed`` whenever its ``takenHostnames`` reference
+  // changes, so a fresh Set per render would loop the update cycle.
+  private _takenCache?: {
+    src: ReadonlySet<string>;
+    factory: string;
+    out: ReadonlySet<string>;
+  };
+
+  private get _takenMinusFactory(): ReadonlySet<string> {
+    const device = this._device;
+    if (!device || !this.takenHostnames.has(device.name)) return this.takenHostnames;
+    if (
+      this._takenCache?.src === this.takenHostnames &&
+      this._takenCache.factory === device.name
+    ) {
+      return this._takenCache.out;
+    }
+    const out = new Set(this.takenHostnames);
+    out.delete(device.name);
+    this._takenCache = { src: this.takenHostnames, factory: device.name, out };
+    return out;
+  }
+
   close = () => {
     /* Arrow function so ``@click=${this.close}`` from the cancel
        button keeps ``this`` bound to the dialog. With a plain method,
@@ -296,10 +353,13 @@ export class ESPHomeAdoptDialog extends LitElement {
        user had to click Take Control twice for the dialog to
        actually appear. */
     const device = this._device;
-    const nameTrimmed = this._name.trim();
-    const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
+    const hostname = this._nameInputs?.hostname ?? "";
+    const renamed = !!device && hostname.length > 0 && hostname !== device.name;
     const canSubmit =
-      !!device && !!nameTrimmed && !nameErr && !this._busy && !this._wifiBlocking;
+      !!device &&
+      (this._nameInputs?.canSubmit ?? false) &&
+      !this._busy &&
+      !this._wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -320,40 +380,21 @@ export class ESPHomeAdoptDialog extends LitElement {
 
                 ${this._renderSource(device.package_import_url)}
 
-                <div class="field">
-                  <label for="adopt-name">
-                    ${this._localize("dashboard.adopt_field_name")}
-                  </label>
-                  <input
-                    id="adopt-name"
-                    type="text"
-                    class=${nameErr ? "invalid" : ""}
-                    .value=${this._name}
-                    ?disabled=${this._busy}
-                    @input=${(e: Event) => {
-                      this._name = (e.target as HTMLInputElement).value;
-                    }}
-                  />
-                  ${renderInlineError(
-                    nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
-                  )}
+                <div class="name-pair">
+                  <esphome-device-name-inputs
+                    autofocus
+                    .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
+                    .takenHostnames=${this._takenMinusFactory}
+                    @device-name-changed=${() => this.requestUpdate()}
+                  ></esphome-device-name-inputs>
+                  ${
+                    renamed
+                      ? html`<div class="name-hint" role="status">
+                          ${this._localize("dashboard.adopt_rename_hint")}
+                        </div>`
+                      : nothing
+                  }
                 </div>
-
-                <div class="field">
-                  <label for="adopt-friendly-name">
-                    ${this._localize("dashboard.adopt_field_friendly_name")}
-                  </label>
-                  <input
-                    id="adopt-friendly-name"
-                    type="text"
-                    .value=${this._friendlyName}
-                    ?disabled=${this._busy}
-                    @input=${(e: Event) => {
-                      this._friendlyName = (e.target as HTMLInputElement).value;
-                    }}
-                  />
-                </div>
-
                 ${
                   this._collectWifi
                     ? html`
@@ -458,10 +499,13 @@ export class ESPHomeAdoptDialog extends LitElement {
 
   private _submit = async () => {
     if (this._busy) return; // Enter bypasses the disabled button; guard re-entry
-    if (!this._device || !this._api) return;
-    const name = this._name.trim();
-    const friendlyName = this._friendlyName.trim();
-    if (!name || validateDeviceName(name)) return;
+    if (!this._device || !this._api || !this._nameInputs) return;
+    // Enter bypasses the disabled button; re-run the shared pair's full
+    // gate (charset, 31-char cap, edge hyphens, taken set) so nothing
+    // can slip through to a post-close rename failure.
+    if (!this._nameInputs.canSubmit) return;
+    const name = this._nameInputs.hostname;
+    const friendlyName = this._nameInputs.friendlyName;
     // Enter bypasses the disabled button; re-check the Wi-Fi gate so a
     // held Enter can't import before the secret store (or with bad creds).
     if (this._wifiBlocking) return;
@@ -485,26 +529,41 @@ export class ESPHomeAdoptDialog extends LitElement {
       // when False keeps the call site clean and avoids relying on
       // the upstream ``import_config`` branch's ``if encryption:``
       // truthiness check accepting the literal string "false".
+      // Always import under the factory broadcast name — the only
+      // hostname the running device answers to. An edited name is
+      // applied by the rename flow the dashboard starts off the
+      // ``adopted`` event: its OTA tail flashes the device at the
+      // factory identity before the old name is dropped, and a
+      // failed rename keeps the device adopted under the factory
+      // name instead of stranding a hostname nothing broadcasts.
+      // The factory name is assumed valid unvalidated: esphome
+      // enforces the same hostname charset on ``name:`` at compile
+      // time, so a genuine factory image can't broadcast a
+      // non-conforming name.
+      const factoryName = this._device.name;
       const args: Parameters<ESPHomeAPI["importDevice"]>[0] = {
-        name,
+        name: factoryName,
         project_name: this._device.project_name,
         package_import_url: this._device.package_import_url,
       };
       if (friendlyName) args.friendly_name = friendlyName;
       if (this._encryption) args.encryption = "true";
-      await this._api.importDevice(args);
-      // Configuration filenames are ``<name>.yaml``; mirror the same
-      // derivation the dashboard's ``_onAdopted`` handler uses so
-      // both the welcome-banner flag (consumed on first device-editor
-      // mount) and the highlight signal key off the same string.
-      // Pre-rename flag survives a rename only if the user opens
-      // the editor first — if they rename before opening, the rename
-      // flow drops the flag (see ``clearJustCreated`` call in
-      // ``_executeRename``); they've already engaged with the device
-      // so the welcome banner would just be noise.
-      markJustCreated(`${name}.yaml`);
+      // The response carries the authoritative YAML path the backend
+      // wrote; it feeds the welcome-banner flag, the highlight, and
+      // the rename's ``configuration`` argument. The rename flow
+      // drops the just-created flag (``clearJustCreated`` in
+      // ``performRename``), so an adopt-with-rename skips the welcome
+      // banner — the follow-job dialog already has the user engaged.
+      const { configuration } = await this._api.importDevice(args);
+      markJustCreated(configuration);
       this.close();
-      fireEvent(this, "adopted", { name, friendlyName });
+      const detail: AdoptedDetail = {
+        name: factoryName,
+        configuration,
+        friendlyName,
+        renameTo: name !== factoryName ? name : null,
+      };
+      fireEvent(this, "adopted", detail);
     } catch (err) {
       this._error = formatApiError(err, this._localize, "dashboard.adopt_error_generic");
     } finally {

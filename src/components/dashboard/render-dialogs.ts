@@ -169,7 +169,13 @@ export function executeConfirm(
       void host._archiveDevice(pending.device);
       return;
     case "rename-config-only":
-      void performRename(host, pending.device, pending.newName, true);
+      void performRename(
+        host,
+        pending.device.configuration,
+        pending.device.name,
+        pending.newName,
+        true
+      );
       return;
     case "clear-queued-update":
       void clearQueuedUpdate(pending.device, host._api, host._localize);
@@ -229,7 +235,10 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
         host._labelDialogEditing = null;
       }}
     ></esphome-label-dialog>
-    <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
+    <esphome-adopt-dialog
+      .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
+      @adopted=${host._onAdopted}
+    ></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
