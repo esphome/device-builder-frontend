@@ -953,3 +953,16 @@ describe("clearPathErrors", () => {
     expect(clearPathErrors(errs(), "other")).toBeNull();
   });
 });
+
+it("never flags a lambda value on a typed templatable field", () => {
+  // A !lambda resolves at runtime; the typed branches would stringify
+  // it to "[object Object]" and reject a valid value.
+  const lambda = { _lambda: "return 153;" };
+  expect(
+    validateEntry(
+      makeEntry({ type: ConfigEntryType.FLOAT_WITH_UNIT, range: [153, 500] }),
+      lambda
+    )
+  ).toBeNull();
+  expect(validateEntry(makeEntry({ type: ConfigEntryType.INTEGER }), lambda)).toBeNull();
+});

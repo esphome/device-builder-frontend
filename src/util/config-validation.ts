@@ -1,3 +1,4 @@
+import { isLambdaValue } from "../api/types/automations.js";
 import type {
   ConfigEntry,
   ConfigPrimitive,
@@ -256,6 +257,11 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   // here; skip all validation (range, options, not-a-number) for the literal
   // or a mid-edit partial (#1391).
   if (isSubstitutionString(raw)) return null;
+
+  // A !lambda on a templatable field resolves at runtime the same way;
+  // the typed branches would stringify it to "[object Object]" and flag
+  // a valid value as not-a-number.
+  if (isLambdaValue(raw)) return null;
 
   if (entry.type === ConfigEntryType.INTEGER && entry.display_format === "hex") {
     // BigInt-route the hex-typed integer check so cv.hex_uint64_t
