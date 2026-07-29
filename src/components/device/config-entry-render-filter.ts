@@ -25,10 +25,8 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
-import { advancedGated, hasMaterialValue } from "../../util/material-value.js";
+import { advancedGated } from "../../util/material-value.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
-
-export { hasMaterialValue };
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is

@@ -1,7 +1,7 @@
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
+import { hasMaterialValue } from "../../util/material-value.js";
 import {
   filterRenderable,
-  hasMaterialValue,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
 import {

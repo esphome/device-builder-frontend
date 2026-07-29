@@ -44,6 +44,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fetchAllComponents } from "../../util/fetch-all-components.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   fetchPinRegistryModes,
@@ -57,7 +58,6 @@ import { isSubstitutionString, parseSubstitutions } from "../../util/substitutio
 import {
   _isStructuralType,
   filterRenderable,
-  hasMaterialValue,
   renderFilterOptions,
 } from "./config-entry-render-filter.js";
 import {
