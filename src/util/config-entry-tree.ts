@@ -1,12 +1,10 @@
 /**
  * Recursive walkers over a `ConfigEntry[]` tree: reveal advanced fields
- * under the caret and locate the first entry referenced by a
- * validation-error map.
+ * under the caret.
  */
 
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
-import type { ValidationError } from "./config-validation.js";
 import { hasMaterialValue } from "./material-value.js";
 import { asRecord, getIn, isIndexSegment } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
@@ -94,36 +92,4 @@ export function pathIsAdvanced(
     level = entry.config_entries ?? [];
   }
   return advanced;
-}
-
-/**
- * Walk the entries in render order and return the first error target.
- * `path` is the dotted path of the failing leaf field;
- * `hasAdvancedAncestor` is true when the leaf itself or any
- * NESTED entry along the way is `advanced`.
- */
-export function findFirstErrorTarget(
-  entries: ConfigEntry[],
-  errors: Map<string, ValidationError>,
-  pathPrefix: string[] = [],
-  ancestorAdvanced = false
-): { path: string[]; hasAdvancedAncestor: boolean } | null {
-  for (const entry of entries) {
-    const path = [...pathPrefix, entry.key];
-    const advancedHere = ancestorAdvanced || entry.advanced;
-    if (entry.type === ConfigEntryType.NESTED) {
-      const found = findFirstErrorTarget(
-        entry.config_entries ?? [],
-        errors,
-        path,
-        advancedHere
-      );
-      if (found) return found;
-      continue;
-    }
-    if (errors.has(path.join("."))) {
-      return { path, hasAdvancedAncestor: advancedHere };
-    }
-  }
-  return null;
 }
