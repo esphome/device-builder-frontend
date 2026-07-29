@@ -5,6 +5,7 @@
  * unaffected; import from there or from here directly.
  */
 
+import { escapeRegExp } from "./escape-regexp.js";
 import { acceptedKeysFor, renamedKeysGeneration } from "./renamed-keys.js";
 import {
   endsBlockAtIndent,
@@ -428,8 +429,7 @@ function _findChildBlock(
   if (childIndent === null) return null;
   // childKey can be catalog-supplied (renamed-keys registry) — escape
   // so a stray metachar can't throw out of the keystroke-time parser.
-  const escapedKey = childKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^\\s{${childIndent}}${escapedKey}\\s*:`);
+  const pattern = new RegExp(`^\\s{${childIndent}}${escapeRegExp(childKey)}\\s*:`);
   for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
     if (!pattern.test(lines[i])) continue;
     return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, childIndent) };

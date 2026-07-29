@@ -9,6 +9,7 @@
  * splits into the picker instead of blanking out. `ns` / `nanoseconds`
  * have no canonical picker unit and fall through to the raw-text editor.
  */
+import { escapeRegExp } from "./escape-regexp.js";
 
 /** Canonical units the time-period / delay pickers offer, least to
  *  most coarse. */
@@ -36,9 +37,7 @@ const TIME_PERIOD_UNIT_ALIASES: Record<string, TimePeriodUnit> = {
 
 // The trailing `$` forces a full match, so the alternation captures the
 // whole suffix (`seconds`, not just `s`) regardless of key order.
-const _UNIT_PATTERN = Object.keys(TIME_PERIOD_UNIT_ALIASES)
-  .map((u) => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-  .join("|");
+const _UNIT_PATTERN = Object.keys(TIME_PERIOD_UNIT_ALIASES).map(escapeRegExp).join("|");
 
 // Optional whitespace between number and unit, matching ESPHome's regex.
 const TIME_PERIOD_PARSE_RE = new RegExp(`^(\\d+(?:\\.\\d+)?)\\s*(${_UNIT_PATTERN})?$`);
