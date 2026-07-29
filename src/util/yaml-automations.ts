@@ -7,6 +7,7 @@
 
 import { joinActionFieldPath } from "./action-field-path.js";
 import {
+  BARE_MAPPING_KEY_RE,
   BLOCK_SCALAR_RE,
   endsBlockAtIndent,
   isAutomationKey,
@@ -41,8 +42,6 @@ const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
 export const API_ACTIONS_BLOCK_KEYS = ["actions", "services"] as const;
 /** An inline ``on_*:`` trigger handler: group 1 the indent, group 2 the key. */
 const _ON_HANDLER_RE = /^(\s+)(on_[a-zA-Z_]+):/;
-/** A bare mapping-key line (``temperature:``) — key, no value, optional comment. */
-const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
 /** A dash line with inline content — the match length is the item's
  *  content column. */
 const _DASH_CONTENT_RE = /^\s*-\s+(?=\S)/;
@@ -344,7 +343,7 @@ function _actionFieldPath(
   // opens a block the loop below never sees — seed its frame.
   const hostDash = hostLine.match(_DASH_LEADER_RE);
   const hostInlineKey = hostDash
-    ? hostLine.slice(hostDash[0].length).match(_BARE_MAPPING_KEY_RE)
+    ? hostLine.slice(hostDash[0].length).match(BARE_MAPPING_KEY_RE)
     : null;
   if (hostInlineKey) stack.push({ indent: childIndent, seg: hostInlineKey[1] });
   // A block scalar opened inline on the dash line hides its body from
@@ -414,7 +413,7 @@ function _actionFieldPath(
       j = end - 1;
       continue;
     }
-    const blockKey = rest.match(_BARE_MAPPING_KEY_RE);
+    const blockKey = rest.match(BARE_MAPPING_KEY_RE);
     if (blockKey) stack.push({ indent, seg: blockKey[1] });
   }
   return null;
@@ -468,7 +467,7 @@ function _subEntity(
     if (ind < childIndent) return null; // left the instance's children
     if (ind === childIndent) {
       // Must be a bare mapping key (``temperature:``), not a sibling scalar.
-      const header = lines[j].match(_BARE_MAPPING_KEY_RE);
+      const header = lines[j].match(BARE_MAPPING_KEY_RE);
       if (!header) return null;
       headerIdx = j;
       key = header[1];
