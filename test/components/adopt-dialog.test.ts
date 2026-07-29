@@ -152,6 +152,31 @@ describe("adopt-then-rename (#2412)", () => {
     expect(adopted.mock.calls[0][0].detail.renameTo).toBe("kitchen-sensor");
   });
 
+  it("returns the hostname to the factory broadcast when the friendly name is cleared", async () => {
+    const { priv, importDevice } = await makeDialog([]);
+    const adopted = vi.fn();
+    (priv as EventTarget).addEventListener("adopted", adopted);
+    await openSettled(priv, ethernetDevice());
+    const inputs = await deviceNameInputsOf(priv);
+    const friendly = inputs.shadowRoot!.querySelector<HTMLInputElement>(
+      "#device-friendly-name"
+    )!;
+    friendly.value = "";
+    friendly.dispatchEvent(new Event("input"));
+    await inputs.updateComplete;
+    await priv.updateComplete;
+
+    await priv._submit();
+
+    // The seed doubles as the derivation fallback — an empty friendly
+    // name must not strand an empty hostname behind a disabled submit.
+    expect(importDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "foo-1234" })
+    );
+    expect(adopted).toHaveBeenCalledTimes(1);
+    expect(adopted.mock.calls[0][0].detail.renameTo).toBe(null);
+  });
+
   it("refuses to submit an edited name that is already taken", async () => {
     const { priv, importDevice } = await makeDialog([]);
     priv.takenHostnames = new Set(["foo-1234", "kitchen"]);

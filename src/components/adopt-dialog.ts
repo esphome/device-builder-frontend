@@ -248,17 +248,21 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._password = "";
     this._hasWifiSecrets = undefined;
     this._dialog.open = true;
-    /* Seed the shared name pair after the open render mounts it.
-       The hostname seeds to the discovered broadcast verbatim —
-       including the MAC-suffix factory firmware appends — and holds
-       until the user types: a friendly-name edit re-derives it like
-       the create/rename flows. The import always lands under the
-       broadcast name (the only hostname the running device answers
-       to); a changed hostname is applied afterwards via the rename
-       flow, which flashes the device before the old name is
-       dropped. */
+    /* Seed the shared name pair. The hostname seeds to the
+       discovered broadcast verbatim — including the MAC-suffix
+       factory firmware appends — and holds until the user types: a
+       friendly-name edit re-derives it like the create/rename
+       flows. The import always lands under the broadcast name (the
+       only hostname the running device answers to); a changed
+       hostname is applied afterwards via the rename flow, which
+       flashes the device before the old name is dropped. Seed
+       synchronously when the pair is already mounted (a re-open
+       would otherwise render one frame of the previous device's
+       state) and again after the open render mounts it fresh. */
+    const seed = () => this._nameInputs?.reset(device.friendly_name || "", device.name);
+    seed();
     void this.updateComplete.then(() => {
-      this._nameInputs?.reset(device.friendly_name || "", device.name);
+      seed();
       this.requestUpdate();
     });
     // A Wi-Fi device whose install has no shared wifi_ssid/wifi_password
@@ -385,7 +389,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                   ></esphome-device-name-inputs>
                   ${
                     renamed
-                      ? html`<div class="name-hint">
+                      ? html`<div class="name-hint" role="status">
                           ${this._localize("dashboard.adopt_rename_hint")}
                         </div>`
                       : nothing
