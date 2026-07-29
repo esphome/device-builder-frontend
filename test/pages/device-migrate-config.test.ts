@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the legacy-spelling migrate CTA: the whole-file splice applies
+ * Pins the config-migration CTA: the whole-file splice applies
  * only when the device and buffer still match what the request was
  * computed against, and every outcome acknowledges the click.
  */
@@ -22,7 +22,7 @@ const internals = (page: ESPHomePageDevice) => page as any;
 
 function makePage(canonicalize: ReturnType<typeof vi.fn>): ESPHomePageDevice {
   const page = new ESPHomePageDevice();
-  internals(page)._api = { canonicalizeSpellings: canonicalize } as unknown as ESPHomeAPI;
+  internals(page)._api = { migrateConfig: canonicalize } as unknown as ESPHomeAPI;
   page.id = "kitchen.yaml";
   internals(page)._yaml = LEGACY;
   internals(page)._savedYaml = LEGACY;
@@ -30,7 +30,7 @@ function makePage(canonicalize: ReturnType<typeof vi.fn>): ESPHomePageDevice {
   return page;
 }
 
-describe("device page — canonicalize CTA", () => {
+describe("device page — migrate CTA", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -38,7 +38,7 @@ describe("device page — canonicalize CTA", () => {
   it("applies the splice and announces success", async () => {
     const canonicalize = vi.fn().mockResolvedValue({ yaml_diff: DIFF });
     const page = makePage(canonicalize);
-    await internals(page)._onCanonicalize();
+    await internals(page)._onMigrateConfig();
     expect(canonicalize).toHaveBeenCalledWith(LEGACY);
     expect(internals(page)._yaml).toBe(CANONICAL);
     expect(toast.success).toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("device page — canonicalize CTA", () => {
     let resolve!: (v: unknown) => void;
     const canonicalize = vi.fn().mockReturnValue(new Promise((r) => (resolve = r)));
     const page = makePage(canonicalize);
-    const pending = internals(page)._onCanonicalize();
+    const pending = internals(page)._onMigrateConfig();
     internals(page)._yaml = LEGACY + "# typed mid-flight\n";
     resolve({ yaml_diff: DIFF });
     await pending;
@@ -60,7 +60,7 @@ describe("device page — canonicalize CTA", () => {
     let resolve!: (v: unknown) => void;
     const canonicalize = vi.fn().mockReturnValue(new Promise((r) => (resolve = r)));
     const page = makePage(canonicalize);
-    const pending = internals(page)._onCanonicalize();
+    const pending = internals(page)._onMigrateConfig();
     page.id = "other.yaml";
     resolve({ yaml_diff: DIFF });
     await pending;
@@ -72,7 +72,7 @@ describe("device page — canonicalize CTA", () => {
   it("acknowledges a null diff instead of a dead-end click", async () => {
     const canonicalize = vi.fn().mockResolvedValue({ yaml_diff: null });
     const page = makePage(canonicalize);
-    await internals(page)._onCanonicalize();
+    await internals(page)._onMigrateConfig();
     expect(internals(page)._yaml).toBe(LEGACY);
     expect(toast.info).toHaveBeenCalled();
   });

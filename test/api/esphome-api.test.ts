@@ -2028,14 +2028,14 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     });
   });
 
-  it("sends ``editor/canonicalize_spellings`` with the draft content", async () => {
+  it("sends ``editor/migrate_config`` with the draft content", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
 
-    const pending = api.canonicalizeSpellings("api:\n  services: []\n");
+    const pending = api.migrateConfig("api:\n  services: []\n");
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
 
-    expect(sent.command).toBe("editor/canonicalize_spellings");
+    expect(sent.command).toBe("editor/migrate_config");
     expect(sent.args).toEqual({ content: "api:\n  services: []\n" });
 
     ws.receive({

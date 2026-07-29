@@ -1,9 +1,11 @@
 /**
- * Shared plumbing for the inline notice banners shown above a section's form
- * (`<esphome-security-notice>`, `<esphome-deprecation-notice>`): the
- * `apply-section-values` event they use to point the host's draft values at
- * new content. Styles live in `notice-banner.styles.ts`.
+ * Shared plumbing for the inline notice banners: the banner template, and
+ * the `apply-section-values` event the section-form notices use to point
+ * the host's draft values at new content. Styles live in
+ * `notice-banner.styles.ts`.
  */
+
+import { html, nothing, type TemplateResult } from "lit";
 
 /** Detail for the `apply-section-values` event: each change's draft path and
  *  the value to write there (`undefined` removes the key). */
@@ -24,4 +26,38 @@ export function dispatchApplySectionValues(
       composed: true,
     })
   );
+}
+
+/** Shared notice-banner template: icon, body text, CTA, optional dismiss. */
+export function renderNoticeBanner(opts: {
+  icon: string;
+  text: unknown;
+  ctaLabel: unknown;
+  onCta: () => void;
+  dismissLabel?: string;
+  onDismiss?: () => void;
+}): TemplateResult {
+  return html`
+    <div class="notice" role="note">
+      <wa-icon library="mdi" name=${opts.icon}></wa-icon>
+      <div class="body">
+        <p>${opts.text}</p>
+        <button type="button" class="cta" @click=${opts.onCta}>${opts.ctaLabel}</button>
+      </div>
+      ${
+        opts.onDismiss
+          ? html`
+              <button
+                type="button"
+                class="notice-close"
+                aria-label=${opts.dismissLabel ?? ""}
+                @click=${opts.onDismiss}
+              >
+                <wa-icon library="mdi" name="close"></wa-icon>
+              </button>
+            `
+          : nothing
+      }
+    </div>
+  `;
 }

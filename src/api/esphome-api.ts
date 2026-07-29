@@ -1784,15 +1784,14 @@ export class ESPHomeAPI {
     });
   }
 
-  /** Respell every legacy renamed-key spelling in ``content`` to
-   *  canonical (api ``services:`` block and items, registry-action node
-   *  ids and body fields) in one splice. ``yaml_diff`` is ``null`` when
-   *  nothing was legacy. */
-  async canonicalizeSpellings(content: string): Promise<{ yaml_diff: YamlDiff | null }> {
-    return this.sendCommand<{ yaml_diff: YamlDiff | null }>(
-      "editor/canonicalize_spellings",
-      { content }
-    );
+  /** Apply every known migration to ``content`` in one splice: renamed
+   *  api and homeassistant spellings plus the ethernet ``clk_mode``
+   *  conversion. ``yaml_diff`` is ``null`` when nothing needed
+   *  migrating. */
+  async migrateConfig(content: string): Promise<{ yaml_diff: YamlDiff | null }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff | null }>("editor/migrate_config", {
+      content,
+    });
   }
 
   // ─── Config Commands ──────────────────────────────────────

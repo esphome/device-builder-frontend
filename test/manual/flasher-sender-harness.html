@@ -22,15 +22,47 @@
     <meta charset="utf-8" />
     <title>ESPHome Web flasher — sender harness</title>
     <style>
-      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
-      h1 { font-size: 1.2rem; }
-      label, input, button { display: block; margin: 0.75rem 0; }
-      input[type="file"] { }
-      button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
-      #log { background: #111; color: #ddd; padding: 0.75rem; border-radius: 6px;
-             white-space: pre-wrap; font-family: ui-monospace, monospace; min-height: 8rem; }
-      .row { display: flex; gap: 0.5rem; align-items: center; }
-      code { background: #eee; padding: 1px 4px; border-radius: 3px; }
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 {
+        font-size: 1.2rem;
+      }
+      label,
+      input,
+      button {
+        display: block;
+        margin: 0.75rem 0;
+      }
+      input[type="file"] {
+      }
+      button {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      #log {
+        background: #111;
+        color: #ddd;
+        padding: 0.75rem;
+        border-radius: 6px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, monospace;
+        min-height: 8rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      code {
+        background: #eee;
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
     </style>
   </head>
   <body>
@@ -38,8 +70,8 @@
     <p>
       Simulates the dashboard hand-off (mirrors <code>usb-flasher.ts</code>). Serve this
       over http, pick a factory <code>.bin</code>, and click Flash. It opens the receiver,
-      waits for <code>ready</code>, then posts the firmware. Complete the flash in the popup
-      (<em>Connect &amp; install</em> → pick the serial port).
+      waits for <code>ready</code>, then posts the firmware. Complete the flash in the
+      popup (<em>Connect &amp; install</em> → pick the serial port).
     </p>
 
     <label>
@@ -64,7 +96,10 @@
 
       const $ = (id) => document.getElementById(id);
       const logEl = $("log");
-      const log = (m) => { logEl.textContent += "\n" + m; logEl.scrollTop = logEl.scrollHeight; };
+      const log = (m) => {
+        logEl.textContent += "\n" + m;
+        logEl.scrollTop = logEl.scrollHeight;
+      };
 
       let fileBytes = null;
       $("file").addEventListener("change", async (e) => {
@@ -78,7 +113,8 @@
         if (!fileBytes) return;
         const base = $("url").value.trim().replace(/#.*$/, "");
         const origin = new URL(base).origin;
-        const nonce = crypto.getRandomValues(new Uint8Array(16))
+        const nonce = crypto
+          .getRandomValues(new Uint8Array(16))
           .reduce((s, b) => s + b.toString(16).padStart(2, "0"), "");
 
         // Open the receiver with the nonce + our origin, exactly like the dashboard.
@@ -86,7 +122,10 @@
           `${base}#nonce=${encodeURIComponent(nonce)}&origin=${encodeURIComponent(location.origin)}`,
           "_blank"
         );
-        if (!win) { log("Pop-up blocked — allow pop-ups for this page."); return; }
+        if (!win) {
+          log("Pop-up blocked — allow pop-ups for this page.");
+          return;
+        }
         log(`Opened ${base} (nonce ${nonce.slice(0, 8)}…). Waiting for ready…`);
 
         let bytes = fileBytes;
@@ -98,10 +137,17 @@
             handedOff = true;
             log(`Receiver ready (v${d.version}). Sending firmware…`);
             win.postMessage(
-              { type: MSG_FIRMWARE, version: PROTOCOL_VERSION, nonce,
-                name: "harness.factory.bin", deviceName: "Test device",
-                erase: true, parts: [{ address: 0, data: bytes }] },
-              origin, [bytes]
+              {
+                type: MSG_FIRMWARE,
+                version: PROTOCOL_VERSION,
+                nonce,
+                name: "harness.factory.bin",
+                deviceName: "Test device",
+                erase: true,
+                parts: [{ address: 0, data: bytes }],
+              },
+              origin,
+              [bytes]
             );
             bytes = null; // transferred
           } else if (d.type === MSG_PROGRESS) {

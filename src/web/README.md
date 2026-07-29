@@ -40,15 +40,15 @@ hardware classes behave differently:
 
 ## Where things live
 
-| Path | What |
-|---|---|
-| `entrypoint.ts` / `esphome-web-app.ts` | App shell |
-| `dashboard/` | Connect cards (ESP + Pico) and per-device action cards |
-| `install/` | Flash dialogs and the install flow controller |
-| `logs/` | Serial log viewer dialog |
-| `improv/` | Wi-Fi provisioning dialog |
-| `flash-receiver/` | Receives images from a Device Builder over the local network |
-| `util/` | Web-only helpers (port disconnect watcher, firmware fetch, Pico filter) |
+| Path                                   | What                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                               |
+| `dashboard/`                           | Connect cards (ESP + Pico) and per-device action cards                  |
+| `install/`                             | Flash dialogs and the install flow controller                           |
+| `logs/`                                | Serial log viewer dialog                                                |
+| `improv/`                              | Wi-Fi provisioning dialog                                               |
+| `flash-receiver/`                      | Receives images from a Device Builder over the local network            |
+| `util/`                                | Web-only helpers (port disconnect watcher, firmware fetch, Pico filter) |
 
 New copy goes in `src/translations/en.json` under the `web.*`
 namespace. Tests live in `test/web/` and run with the main suite

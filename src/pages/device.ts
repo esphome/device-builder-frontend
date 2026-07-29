@@ -22,6 +22,7 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
 import { applyRemoval } from "../components/device/apply-removal.js";
 import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
+import type { YamlDiff } from "../api/types/automations.js";
 import type {
   SectionEditor,
   YamlDraftDetail,
@@ -1492,7 +1493,7 @@ export class ESPHomePageDevice extends LitElement {
         .justCreated=${this._justCreated}
         @just-created-dismiss=${this._dismissJustCreated}
         @request-install=${this._saveThenInstall}
-        @request-canonicalize=${this._onCanonicalize}
+        @request-migrate-config=${this._onMigrateConfig}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -1915,37 +1916,40 @@ export class ESPHomePageDevice extends LitElement {
     this._retryPendingFieldLine();
   }
 
-  /** Legacy-spelling banner CTA: canonicalize the draft in one splice. */
-  private async _onCanonicalize() {
+  /** Migrate-nudge CTA: bring the draft up to date in one splice. */
+  private async _onMigrateConfig() {
     // The splice is whole-file and line-coordinate based, so both the
     // device and the buffer must be exactly what the request was
     // computed against (the router reuses this element; typing or a
     // section draft advances `_yaml` mid-flight).
     const configuration = this.id;
     const basis = this._yaml;
+    let yaml_diff: YamlDiff | null;
     try {
-      const { yaml_diff } = await this._api.canonicalizeSpellings(basis);
-      if (configuration !== this.id) return;
-      if (basis !== this._yaml) {
-        notifyInfo(this._localize("device.draft_superseded"), {
-          description: this._localize("device.draft_superseded_detail"),
-        });
-        return;
-      }
-      if (!yaml_diff) {
-        notifyInfo(this._localize("device.legacy_spelling_none"));
-        return;
-      }
-      const newYaml = applyYamlDiff(basis, yaml_diff);
-      this._setYaml(newYaml);
-      this._repinSelection(newYaml);
-      notifySuccess(this._localize("device.legacy_spelling_applied"));
+      ({ yaml_diff } = await this._api.migrateConfig(basis));
     } catch (err) {
-      if (configuration !== this.id) return;
-      notifyError(this._localize("device.legacy_spelling_failed"), {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      if (configuration === this.id) {
+        notifyError(this._localize("device.config_migration_failed"), {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
     }
+    if (configuration !== this.id) return;
+    if (basis !== this._yaml) {
+      notifyInfo(this._localize("device.draft_superseded"), {
+        description: this._localize("device.draft_superseded_detail"),
+      });
+      return;
+    }
+    if (!yaml_diff) {
+      notifyInfo(this._localize("device.config_migration_none"));
+      return;
+    }
+    const newYaml = applyYamlDiff(basis, yaml_diff);
+    this._setYaml(newYaml);
+    this._repinSelection(newYaml);
+    notifySuccess(this._localize("device.config_migration_applied"));
   }
 
   private _onSectionSelect(

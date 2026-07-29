@@ -393,10 +393,35 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
   return lines.length;
 }
 
+/** Legacy api spellings the migrate command would rewrite: a ``services:``
+ *  block key, or a ``- service:`` discriminator without a canonical
+ *  sibling (the collision the migration skips). */
+export function hasLegacyApiSpellings(lines: string[]): boolean {
+  const apiBlock = _findTopLevelBlock(lines, "api");
+  if (!apiBlock) return false;
+  if (
+    _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, API_ACTIONS_BLOCK_KEYS[1])
+  ) {
+    return true;
+  }
+  const actions = _findChildBlock(
+    lines,
+    apiBlock.fromLine,
+    apiBlock.toLine,
+    API_ACTIONS_BLOCK_KEYS[0]
+  );
+  if (!actions) return false;
+  return _enumerateListItems(lines, actions.fromLine, actions.toLine).some(
+    (item) =>
+      Boolean(_readKeyOnLine(lines, item.fromLine, "service")) &&
+      !_readKeyOnLine(lines, item.fromLine, "action")
+  );
+}
+
 /** Top-level key block (``script:`` / ``interval:``) with its
  *  inclusive 1-indexed line range, or ``null`` when the key is
  *  absent. */
-export function _findTopLevelBlock(
+function _findTopLevelBlock(
   lines: string[],
   key: string
 ): { fromLine: number; toLine: number } | null {
@@ -411,7 +436,7 @@ export function _findTopLevelBlock(
 /** Find a nested key directly under a parent block (e.g.
  *  ``actions:`` inside ``api:``). Returns the matched key's
  *  inclusive 1-indexed line range. */
-export function _findChildBlock(
+function _findChildBlock(
   lines: string[],
   parentFromLine: number,
   parentToLine: number,
@@ -442,7 +467,7 @@ export function _findChildBlock(
  *  block. Nested list markers (the ``- logger.log`` inside a
  *  ``then:`` clause) are deeper and skipped by pinning to the
  *  block's first-row dash indent. */
-export function _enumerateListItems(
+function _enumerateListItems(
   lines: string[],
   blockFromLine: number,
   blockToLine: number
@@ -529,11 +554,7 @@ function _dashIndent(line: string): number {
 
 /** Read a leading ``key: value`` line inside a list item — used to
  *  pull the script's ``id:`` for the stable section key. */
-export function _readKeyOnLine(
-  lines: string[],
-  fromLine: number,
-  key: string
-): string | null {
+function _readKeyOnLine(lines: string[], fromLine: number, key: string): string | null {
   const target = lines[fromLine - 1];
   // ``<key>: value`` with the value's quotes peeled — shared between the
   // dash-line form (``- id: my_alarm``) and the indented sibling form.
