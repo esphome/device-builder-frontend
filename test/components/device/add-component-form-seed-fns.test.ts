@@ -532,4 +532,91 @@ describe("buildInitialValues", () => {
     expect(values.scl).toBe(9);
     expect(values.sda).toBe(8);
   });
+
+  const nameSeedComponent = (over: Partial<ComponentCatalogEntry> = {}) =>
+    makeComponent({
+      id: "sensor.a02yyuw",
+      name: "A02YYUW Waterproof Ultrasonic Sensor",
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
+        makeConfigEntry({ key: "name", type: ConfigEntryType.STRING }),
+      ],
+      ...over,
+    });
+
+  const seedWith = (
+    component: ComponentCatalogEntry,
+    over: Partial<Parameters<typeof buildInitialValues>[0]> = {}
+  ) =>
+    buildInitialValues({
+      entries: component.config_entries,
+      component,
+      board: null,
+      yaml: "",
+      prefillReference: null,
+      prefillFields: null,
+      restoredValues: null,
+      localize,
+      ...over,
+    });
+
+  it("seeds the entity name from the catalog title for a platform component", () => {
+    const values = seedWith(nameSeedComponent());
+    expect(values.id).toBe("sensor_a02yyuw_1");
+    expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor");
+  });
+
+  it("suffixes the seeded name against a name already in the YAML, case-insensitively", () => {
+    const yaml =
+      "sensor:\n  - platform: a02yyuw\n    name: a02yyuw waterproof ultrasonic sensor\n";
+    const values = seedWith(nameSeedComponent(), { yaml });
+    expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor 2");
+  });
+
+  it("does not seed a name for an undotted component with a name entry", () => {
+    // Undotted name-carriers (esphome, esp32_ble, sprinkler, ...) use the
+    // key for something other than an entity name.
+    const values = seedWith(
+      nameSeedComponent({ id: "sprinkler", name: "Sprinkler Controller" })
+    );
+    expect(values.name).toBeUndefined();
+  });
+
+  it("does not seed a name when the schema has no top-level name entry", () => {
+    const values = seedWith(
+      nameSeedComponent({
+        config_entries: [makeConfigEntry({ key: "id", type: ConfigEntryType.ID })],
+      })
+    );
+    expect(values.name).toBeUndefined();
+  });
+
+  it("does not overwrite a name seeded from a default_value", () => {
+    const values = seedWith(
+      nameSeedComponent({
+        config_entries: [
+          makeConfigEntry({
+            key: "name",
+            type: ConfigEntryType.STRING,
+            required: true,
+            default_value: "Preset Name",
+          }),
+        ],
+      })
+    );
+    expect(values.name).toBe("Preset Name");
+  });
+
+  it("lets restoredValues override the seeded name", () => {
+    // A deliberately cleared name survives the detour round-trip.
+    const values = seedWith(nameSeedComponent(), { restoredValues: { name: "" } });
+    expect(values.name).toBe("");
+  });
+
+  it("lets prefillFields win over the seeded name", () => {
+    const values = seedWith(nameSeedComponent(), {
+      prefillFields: { name: "Constraint Name" },
+    });
+    expect(values.name).toBe("Constraint Name");
+  });
 });
