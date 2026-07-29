@@ -556,11 +556,11 @@ export class ESPHomeAdoptDialog extends LitElement {
       // ``performRename``), so an adopt-with-rename skips the welcome
       // banner — the follow-job dialog already has the user engaged.
       const { configuration, warning } = await this._api.importDevice(args);
+      markJustCreated(configuration);
+      this.close();
       // The import succeeded but the device's remote package didn't
       // resolve; the backend kept the file for an in-editor repair.
       if (warning) notifyWarning(warning);
-      markJustCreated(configuration);
-      this.close();
       const detail: AdoptedDetail = {
         name: factoryName,
         configuration,
