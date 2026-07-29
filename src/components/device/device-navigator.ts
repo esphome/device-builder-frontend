@@ -38,7 +38,7 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
-import { renamedKeysGeneration } from "../../util/renamed-keys.js";
+import { renamedKeysGeneration, subscribeRenamedKeys } from "../../util/renamed-keys.js";
 import { type NavigatorBuckets, deriveNavigatorBuckets } from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
@@ -92,6 +92,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   private readonly _caches = new CacheTickController(this, [
     subscribeComponentCache,
     subscribeAutomationCatalogCache,
+    subscribeRenamedKeys,
   ]);
 
   // Resolves automation rows' pretty trigger names; shared with the

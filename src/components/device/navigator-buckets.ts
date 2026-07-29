@@ -20,7 +20,10 @@ export interface NavigatorBuckets {
  * single result; the navigator memoises it on the YAML source plus the
  * renamed-keys generation, so a pre-hydration parse isn't pinned.
  */
-export function deriveNavigatorBuckets(yaml: string, _generation = 0): NavigatorBuckets {
+export function deriveNavigatorBuckets(
+  yaml: string,
+  _generation: number
+): NavigatorBuckets {
   const {
     core,
     components,

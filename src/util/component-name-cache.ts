@@ -1,7 +1,7 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { BatchedCache } from "./batched-cache.js";
-import { recordRenamedKeys } from "./renamed-keys.js";
+import { recordRenamedKeysBatch } from "./renamed-keys.js";
 
 /** Session-scoped cache of component catalog entries, keyed by
  *  ``componentId|platform|boardId``. The backend catalog is
@@ -23,14 +23,20 @@ const _cache = new BatchedCache<ComponentCatalogEntry, _ComponentContext>({
   fetch: (api, ids, { platform, boardId }) => {
     const bodies = api.getComponentBodies(ids, platform, boardId);
     // Side-tap so recording doesn't delay consumers by a microtask;
-    // late hydration is what the registry's generation counter covers.
+    // late hydration is what the registry's subscribe/generation covers.
+    // The onRejected arm absorbs transport failures only, so a recording
+    // bug reaches the trailing catch and logs instead of vanishing.
     void bodies
-      .then((result) => {
-        for (const [id, body] of Object.entries(result)) {
-          recordRenamedKeys(id, body?.renamed_keys);
-        }
-      })
-      .catch(() => {});
+      .then(
+        (result) =>
+          recordRenamedKeysBatch(
+            Object.entries(result).map(([id, body]) => [id, body?.renamed_keys] as const)
+          ),
+        () => {}
+      )
+      .catch((err) =>
+        console.warn("[component-name-cache] renamed-keys hydration failed:", err)
+      );
     return bodies;
   },
 });

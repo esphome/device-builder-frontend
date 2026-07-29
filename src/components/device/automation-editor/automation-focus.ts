@@ -19,7 +19,7 @@ import type {
   AutomationTree,
   ConditionNode,
 } from "../../../api/types/automations.js";
-import { acceptedKeysFor } from "../../../util/renamed-keys.js";
+import { acceptedKeysFor, renamedKeysGeneration } from "../../../util/renamed-keys.js";
 import type { YamlPathSegment } from "../../../util/yaml-ast.js";
 
 export type { YamlPathSegment };
@@ -154,10 +154,22 @@ function resolveFocus(
 }
 
 /** Memoized cursor-path → focus resolver, one per editor instance —
- *  keyed on (value, location, path) so it self-heals once the async
- *  hydrate lands the tree. */
+ *  keyed on (value, location, path) plus, for the api_action anchor
+ *  that reads the registry, the renamed-keys generation — so it
+ *  self-heals once the async hydrate lands the tree or the aliases
+ *  arrive. */
 export function createFocusResolver(): typeof resolveFocus {
-  return memoizeOne(resolveFocus);
+  const memo = memoizeOne(
+    (_generation: number, ...args: Parameters<typeof resolveFocus>) =>
+      resolveFocus(...args)
+  );
+  return (value, location, path) =>
+    memo(
+      location?.kind === "api_action" ? renamedKeysGeneration() : 0,
+      value,
+      location,
+      path
+    );
 }
 
 /**

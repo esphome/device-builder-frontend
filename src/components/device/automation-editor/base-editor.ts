@@ -21,6 +21,8 @@ import { formatApiError } from "../../../util/format-api-error.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { subscribeRenamedKeys } from "../../../util/renamed-keys.js";
+import { CacheTickController } from "../cache-tick-controller.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
@@ -83,6 +85,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   @state() protected _error = "";
 
   protected _resolveFocus = createFocusResolver();
+
+  // Re-render when alias hydration lands so a caret focus resolved
+  // pre-hydration doesn't wait for the next unrelated render.
+  protected readonly _renamedKeysTick = new CacheTickController(this, [
+    subscribeRenamedKeys,
+  ]);
 
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  section so its empty tree can't overwrite the real YAML. */
