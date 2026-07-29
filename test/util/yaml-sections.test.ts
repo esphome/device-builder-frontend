@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { _clearRenamedKeys, recordRenamedKeys } from "../../src/util/renamed-keys.js";
 import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import {
@@ -21,6 +21,8 @@ beforeEach(() => {
   // values across unrelated cases.
   _clearYamlSectionsMemo();
 });
+
+afterEach(() => _clearRenamedKeys());
 
 describe("parseYamlTopLevelSections", () => {
   it("returns empty for empty input", () => {
@@ -834,7 +836,6 @@ describe("parseYamlAutomations", () => {
     const items = parseYamlAutomations(yaml).filter((s) =>
       s.key.startsWith("automation:api_action:")
     );
-    _clearRenamedKeys();
     expect(items.map((s) => s.key)).toEqual(["automation:api_action:legacy_name"]);
   });
 

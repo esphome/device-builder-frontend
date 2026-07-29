@@ -20,11 +20,17 @@ interface _ComponentContext {
 const _cache = new BatchedCache<ComponentCatalogEntry, _ComponentContext>({
   name: "component-name-cache",
   bucketKey: ({ platform, boardId }) => `${platform ?? ""}|${boardId ?? ""}`,
-  fetch: async (api, ids, { platform, boardId }) => {
-    const bodies = await api.getComponentBodies(ids, platform, boardId);
-    for (const [id, body] of Object.entries(bodies)) {
-      recordRenamedKeys(id, body?.renamed_keys);
-    }
+  fetch: (api, ids, { platform, boardId }) => {
+    const bodies = api.getComponentBodies(ids, platform, boardId);
+    // Side-tap so recording doesn't delay consumers by a microtask;
+    // late hydration is what the registry's generation counter covers.
+    void bodies
+      .then((result) => {
+        for (const [id, body] of Object.entries(result)) {
+          recordRenamedKeys(id, body?.renamed_keys);
+        }
+      })
+      .catch(() => {});
     return bodies;
   },
 });

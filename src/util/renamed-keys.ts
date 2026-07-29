@@ -7,6 +7,7 @@
  */
 
 const _byComponent = new Map<string, Record<string, string>>();
+const _accepted = new Map<string, string[]>();
 let _generation = 0;
 
 /** Record a component's renamed_keys map; no-op when absent or unchanged. */
@@ -26,16 +27,31 @@ export function recordRenamedKeys(
     return;
   }
   _byComponent.set(componentId, { ...renamed });
+  for (const cacheKey of _accepted.keys()) {
+    if (cacheKey.startsWith(`${componentId}|`)) _accepted.delete(cacheKey);
+  }
   _generation++;
 }
 
-/** Legacy spellings that map to canonicalKey for componentId. */
-export function legacyKeysFor(componentId: string, canonicalKey: string): string[] {
-  const renamed = _byComponent.get(componentId);
-  if (!renamed) return [];
-  return Object.entries(renamed)
-    .filter(([, target]) => target === canonicalKey)
-    .map(([old]) => old);
+/** Every accepted spelling of canonicalKey for componentId, canonical
+ *  first. Returns a cached array, stable until the next record. */
+export function acceptedKeysFor(
+  componentId: string,
+  canonicalKey: string
+): readonly string[] {
+  const cacheKey = `${componentId}|${canonicalKey}`;
+  let accepted = _accepted.get(cacheKey);
+  if (!accepted) {
+    accepted = [canonicalKey];
+    const renamed = _byComponent.get(componentId);
+    if (renamed) {
+      for (const [old, target] of Object.entries(renamed)) {
+        if (target === canonicalKey) accepted.push(old);
+      }
+    }
+    _accepted.set(cacheKey, accepted);
+  }
+  return accepted;
 }
 
 /** Bumps on every registry change — fold into memo keys of consumers
@@ -47,5 +63,6 @@ export function renamedKeysGeneration(): number {
 /** Test helper: drop every recorded map. */
 export function _clearRenamedKeys(): void {
   _byComponent.clear();
+  _accepted.clear();
   _generation++;
 }

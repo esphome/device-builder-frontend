@@ -19,7 +19,7 @@ import type {
   AutomationTree,
   ConditionNode,
 } from "../../../api/types/automations.js";
-import { legacyKeysFor } from "../../../util/renamed-keys.js";
+import { acceptedKeysFor } from "../../../util/renamed-keys.js";
 import type { YamlPathSegment } from "../../../util/yaml-ast.js";
 
 export type { YamlPathSegment };
@@ -54,25 +54,32 @@ export function automationRelativePath(
 ): YamlPathSegment[] | null {
   const anchor = location && handlerAnchor(location);
   if (!anchor) return null;
-  let at = -1;
-  let matched: string[] | null = null;
+  let rest: YamlPathSegment[] | null = null;
   for (const keys of anchor.keyPaths) {
-    at = path.indexOf(keys[0]);
-    while (at >= 0 && !keys.every((k, i) => path[at + i] === k)) {
-      at = path.indexOf(keys[0], at + 1);
-    }
+    const at = _indexOfSubpath(path, keys);
     if (at >= 0) {
-      matched = keys;
+      rest = path.slice(at + keys.length);
       break;
     }
   }
-  if (at < 0 || !matched) return null;
-  const rest = path.slice(at + matched.length);
+  if (rest === null) return null;
   if (anchor.index === undefined) return rest;
   if (anchor.index === "any") {
     return typeof rest[0] === "number" ? rest.slice(1) : null;
   }
   return rest[0] === anchor.index ? rest.slice(1) : null;
+}
+
+/** Index of the first run of *keys* inside *path*, -1 when absent. */
+function _indexOfSubpath(
+  path: readonly YamlPathSegment[],
+  keys: readonly string[]
+): number {
+  let at = path.indexOf(keys[0]);
+  while (at >= 0 && !keys.every((k, i) => path[at + i] === k)) {
+    at = path.indexOf(keys[0], at + 1);
+  }
+  return at;
 }
 
 /**
@@ -179,10 +186,7 @@ function handlerAnchor(
       // The cursor path carries whichever block spelling the user's
       // YAML uses, so every catalog-recorded legacy alias anchors too.
       return {
-        keyPaths: [
-          ["api", "actions"],
-          ...legacyKeysFor("api", "actions").map((key) => ["api", key]),
-        ],
+        keyPaths: acceptedKeysFor("api", "actions").map((key) => ["api", key]),
         index: "any",
       };
     default:

@@ -3,7 +3,7 @@
  * and the api manage-list caret flash.
  */
 import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
-import { legacyKeysFor } from "../../../util/renamed-keys.js";
+import { acceptedKeysFor } from "../../../util/renamed-keys.js";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { scrollFlashRow } from "../field-highlight.js";
@@ -48,9 +48,7 @@ export function revealAdvancedForFocus(
 export function maybeFlashApiActionsList(host: ESPHomeDeviceSectionConfig): void {
   if (host.sectionKey !== "api") return;
   const head = host.focusFieldPath?.[0];
-  if (head !== "actions" && !legacyKeysFor("api", "actions").includes(head as string)) {
-    return;
-  }
+  if (!head || !acceptedKeysFor("api", "actions").includes(head)) return;
   const key = JSON.stringify(host.focusFieldPath);
   if (key === host._apiListFlashKey) return;
   const list = host.shadowRoot?.querySelector<HTMLElement>(

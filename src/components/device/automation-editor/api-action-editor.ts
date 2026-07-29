@@ -28,6 +28,7 @@ import { customElement } from "lit/decorators.js";
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
+import { acceptedKeysFor } from "../../../util/renamed-keys.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { scrollFlashRow } from "../field-highlight.js";
@@ -172,12 +173,13 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
   }
 
   /** The action name lives in a bespoke input, outside any form — flash
-   *  its field when the cursor targets ``action:`` (or legacy
-   *  ``service:``). */
+   *  its field when the cursor targets ``action:`` under any accepted
+   *  spelling. */
   private _maybeFlashName(): void {
     const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     const head = entryFieldFocus(focus)?.[0];
-    if (head !== "action" && head !== "service") return;
+    if (typeof head !== "string" || !acceptedKeysFor("api", "action").includes(head))
+      return;
     const key = focusKey(focus);
     if (key === this._nameFlashKey) return;
     const field = this.shadowRoot

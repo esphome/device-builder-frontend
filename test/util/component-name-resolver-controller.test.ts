@@ -8,15 +8,6 @@ import {
 } from "../../src/util/component-name-cache.js";
 import { ComponentNameResolverController } from "../../src/util/component-name-resolver-controller.js";
 
-// The cache's async fetch wrapper interposes await hops between the
-// mock api resolving and results landing (wrapper resume, cache await,
-// distribution); drain them all.
-const drainFetch = async (): Promise<void> => {
-  for (let i = 0; i < 3; i++) {
-    await Promise.resolve();
-  }
-};
-
 const entry = (id: string, name: string): ComponentCatalogEntry =>
   ({
     id,
@@ -82,7 +73,8 @@ describe("ComponentNameResolverController", () => {
 
     expect(ctl.resolve("i2c")).toBe("i2c"); // not yet fetched
     ctl.kickoff(["i2c"]);
-    await drainFetch();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(ctl.resolve("i2c")).toBe("I²C Bus");
   });
 
@@ -111,7 +103,8 @@ describe("ComponentNameResolverController", () => {
     // a fresh entry landing shouldn't surface as a host update yet.
     connect();
     ctl.kickoff(["wifi"]);
-    await drainFetch();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(requestUpdate).toHaveBeenCalled();
 
     disconnect();
@@ -150,7 +143,8 @@ describe("ComponentNameResolverController", () => {
     connect();
 
     ctl.kickoff(["spi"]);
-    await drainFetch();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
 
     ctl.kickoff(["spi"]);
