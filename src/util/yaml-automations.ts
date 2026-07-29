@@ -377,6 +377,10 @@ function _actionFieldPath(
         if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return null;
       }
       const segments: Array<string | number> = stack.map((frame) => frame.seg);
+      // A container key the bare-key regex couldn't name drops its
+      // frame while its dashes still count; an index-first path can't
+      // route, so fall back to no row rather than an unroutable one.
+      if (typeof segments[0] === "number") return null;
       segments.push(field);
       return segments;
     }

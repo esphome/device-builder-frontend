@@ -1529,6 +1529,20 @@ describe("nested component_action sections (#1543)", () => {
     ]);
   });
 
+  it("drops a field whose container key the walk cannot name", () => {
+    // A quoted container key isn't a bare mapping key, so its frame is
+    // missing; an index-first path can't route — no row beats a broken
+    // one.
+    const yaml = `sprinkler:
+  - id: lawn
+    "valves":
+      - run_duration_number:
+          set_action:
+            - logger.log: changed
+`;
+    expect(componentActionItems(yaml)).toEqual([]);
+  });
+
   it("uses an index-free path when the list is written as one mapping", () => {
     const yaml = `sprinkler:
   - id: lawn
