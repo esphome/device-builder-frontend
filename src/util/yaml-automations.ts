@@ -555,3 +555,76 @@ function _readKeyOnLine(lines: string[], fromLine: number, key: string): string 
   }
   return null;
 }
+
+/** Anchor for a homeassistant action node, under either registered id. */
+const _HA_NODE_RE = /^(\s*(?:-\s+)?)homeassistant\.(service|action):(.*)$/;
+
+/**
+ * Whether the buffer contains any legacy renamed-key spelling: the api
+ * ``services:`` block key, a ``- service:`` item discriminator, a
+ * ``homeassistant.service`` node id, or a legacy ``service:`` field in
+ * a homeassistant action body. Mirrors the backend canonicalizer's
+ * anchors so the nudge and the rewrite can't disagree. Single-entry
+ * memo, same shape as ``parseYamlAutomations``.
+ */
+export function hasLegacyAutomationSpellings(yaml: string): boolean {
+  if (_legacyKey === yaml && _legacyValue !== undefined) return _legacyValue;
+  const result = _hasLegacyAutomationSpellings(yaml);
+  _legacyKey = yaml;
+  _legacyValue = result;
+  return result;
+}
+
+let _legacyKey: string | undefined;
+let _legacyValue: boolean | undefined;
+
+function _hasLegacyAutomationSpellings(yaml: string): boolean {
+  const lines = yaml.split("\n");
+  const apiBlock = _findTopLevelBlock(lines, "api");
+  if (apiBlock) {
+    if (
+      _findChildBlock(
+        lines,
+        apiBlock.fromLine,
+        apiBlock.toLine,
+        API_ACTIONS_BLOCK_KEYS[1]
+      )
+    ) {
+      return true;
+    }
+    const actions = _findChildBlock(
+      lines,
+      apiBlock.fromLine,
+      apiBlock.toLine,
+      API_ACTIONS_BLOCK_KEYS[0]
+    );
+    if (actions) {
+      for (const item of _enumerateListItems(lines, actions.fromLine, actions.toLine)) {
+        if (_readKeyOnLine(lines, item.fromLine, "service")) return true;
+      }
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(_HA_NODE_RE);
+    if (!match) continue;
+    if (match[2] === "service") return true;
+    const rest = match[3];
+    if (rest.includes("{")) {
+      if (/[{,]\s*service\s*:/.test(rest)) return true;
+      continue;
+    }
+    // The first body line sets the child indent; only a ``service:``
+    // key at exactly that column is the renamed field.
+    const contentCol = match[1].length;
+    let childIndent: number | null = null;
+    for (let j = i + 1; j < lines.length; j++) {
+      const body = lines[j];
+      if (body.trim() === "") continue;
+      const leading = lineIndent(body);
+      if (leading <= contentCol) break;
+      childIndent ??= leading;
+      if (leading === childIndent && /^ *service\s*:/.test(body)) return true;
+    }
+  }
+  return false;
+}

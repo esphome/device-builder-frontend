@@ -5,6 +5,7 @@ import {
   mdiOpenInNew,
   mdiPartyPopper,
   mdiPlusCircleOutline,
+  mdiUpdate,
   mdiUsb,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
@@ -23,6 +24,7 @@ import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { hasLegacyAutomationSpellings } from "../../util/yaml-automations.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
@@ -47,6 +49,7 @@ registerMdiIcons({
   close: mdiClose,
   "party-popper": mdiPartyPopper,
   "plus-circle-outline": mdiPlusCircleOutline,
+  update: mdiUpdate,
   usb: mdiUsb,
 });
 
@@ -300,6 +303,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
             `
           : nothing
       }
+      ${hasLegacyAutomationSpellings(this.yaml) ? this._renderLegacySpellingBanner() : nothing}
       ${
         this.selectedSection
           ? this._renderSelectedSection()
@@ -501,6 +505,31 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   private _onDismissWelcome() {
     fireEvent(this, "just-created-dismiss");
+  }
+
+  /** Nudge shown while the buffer holds legacy renamed-key spellings
+   *  (api ``services:``, ``homeassistant.service``); the CTA asks the
+   *  page to run ``automations/canonicalize`` against the draft. */
+  private _renderLegacySpellingBanner() {
+    return html`
+      <wa-callout class="legacy-spelling-banner" variant="neutral" role="note">
+        <wa-icon slot="icon" library="mdi" name="update"></wa-icon>
+        <p class="welcome-banner-text">
+          ${this._localize("device.legacy_spelling_notice")}
+        </p>
+        <button
+          type="button"
+          class="action-item welcome-banner-install"
+          @click=${this._onCanonicalize}
+        >
+          ${this._localize("device.legacy_spelling_migrate")}
+        </button>
+      </wa-callout>
+    `;
+  }
+
+  private _onCanonicalize() {
+    fireEvent(this, "request-canonicalize");
   }
 
   private _onWelcomeInstall() {

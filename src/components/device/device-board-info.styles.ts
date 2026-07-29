@@ -105,7 +105,8 @@ export const deviceBoardInfoStyles = css`
 
   /* ─── Just-created welcome banner ─── */
 
-  .welcome-banner {
+  .welcome-banner,
+  .legacy-spelling-banner {
     margin-top: var(--wa-space-m);
   }
 

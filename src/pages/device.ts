@@ -21,6 +21,7 @@ import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
 import { applyRemoval } from "../components/device/apply-removal.js";
+import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import type {
   SectionEditor,
   YamlDraftDetail,
@@ -1491,6 +1492,7 @@ export class ESPHomePageDevice extends LitElement {
         .justCreated=${this._justCreated}
         @just-created-dismiss=${this._dismissJustCreated}
         @request-install=${this._saveThenInstall}
+        @request-canonicalize=${this._onCanonicalize}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -1911,6 +1913,22 @@ export class ESPHomePageDevice extends LitElement {
     // to the same line.
     this._repinSelection(e.detail.yaml);
     this._retryPendingFieldLine();
+  }
+
+  /** Legacy-spelling banner CTA: canonicalize the draft in one splice. */
+  private async _onCanonicalize() {
+    try {
+      const { yaml_diff } = await this._api.canonicalizeAutomations(this.id, this._yaml);
+      if (!yaml_diff) return;
+      const newYaml = applyYamlDiff(this._yaml, yaml_diff);
+      this._setYaml(newYaml);
+      this._repinSelection(newYaml);
+      notifySuccess(this._localize("device.legacy_spelling_applied"));
+    } catch (err) {
+      notifyError(this._localize("device.legacy_spelling_failed"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private _onSectionSelect(
