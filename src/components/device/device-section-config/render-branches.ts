@@ -4,10 +4,8 @@
  */
 import { html, nothing, type TemplateResult } from "lit";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
-// The value imports (isSecuritySection / isDeprecationSection) already execute
-// the modules, registering the notice elements — no separate side-effect
-// imports needed.
-import { isDeprecationSection } from "../deprecation-notice.js";
+// The value import (isSecuritySection) already executes the module,
+// registering the notice element — no separate side-effect import needed.
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { isSecuritySection } from "../security-notice.js";
 import type { SectionConfigResponse } from "./loading.js";
@@ -80,16 +78,6 @@ export function renderStructuredFormBranch(
             .fromLine=${host._resolvedFromLine}
             @apply-section-values=${host._onApplySectionValues}
           ></esphome-security-notice>`
-        : nothing
-    }
-    ${
-      isDeprecationSection(host.sectionKey)
-        ? html`<esphome-deprecation-notice
-            .sectionKey=${host.sectionKey}
-            .values=${host._values}
-            .entries=${renderEntries}
-            @apply-section-values=${host._onApplySectionValues}
-          ></esphome-deprecation-notice>`
         : nothing
     }
     <esphome-config-entry-form
