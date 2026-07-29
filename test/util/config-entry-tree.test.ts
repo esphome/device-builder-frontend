@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ConfigEntry } from "../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
-import { pathIsAdvanced } from "../../src/util/config-entry-tree.js";
+import { entryAtPath, pathIsAdvanced } from "../../src/util/config-entry-tree.js";
 
 function entry(key: string, advanced: boolean): ConfigEntry {
   return { key, type: ConfigEntryType.STRING, label: key, advanced } as ConfigEntry;
@@ -154,5 +154,41 @@ describe("pathIsAdvanced", () => {
     } as ConfigEntry;
     expect(pathIsAdvanced([pin], ["pin", "mode", "secret"], {})).toBe(false);
     expect(pathIsAdvanced([pin], ["pin", "mode", "input"], {})).toBe(true);
+  });
+});
+
+describe("entryAtPath", () => {
+  const pin = {
+    key: "pin",
+    type: ConfigEntryType.INTEGER,
+  } as ConfigEntry;
+  const servos = {
+    key: "servos",
+    type: ConfigEntryType.NESTED,
+    multi_value: true,
+    config_entries: [pin],
+  } as ConfigEntry;
+
+  it("resolves through nested groups and index segments", () => {
+    expect(entryAtPath([servos], ["servos"])).toBe(servos);
+    expect(entryAtPath([servos], ["servos", "0", "pin"])).toBe(pin);
+  });
+
+  it("descends config_entries regardless of entry type", () => {
+    // A PIN-style entry carries sub-entries without being NESTED; the
+    // walk reaches them the same way the renderers' paths do.
+    const number = { key: "number", type: ConfigEntryType.INTEGER } as ConfigEntry;
+    const gpio = {
+      key: "gpio",
+      type: ConfigEntryType.PIN,
+      config_entries: [number],
+    } as ConfigEntry;
+    expect(entryAtPath([gpio], ["gpio", "number"])).toBe(number);
+  });
+
+  it("returns undefined for unresolved and empty paths", () => {
+    expect(entryAtPath([servos], [])).toBeUndefined();
+    expect(entryAtPath([servos], ["nope"])).toBeUndefined();
+    expect(entryAtPath([servos], ["0"])).toBeUndefined();
   });
 });

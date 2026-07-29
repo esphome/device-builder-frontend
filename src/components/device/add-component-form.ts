@@ -7,22 +7,23 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
+import { entryAtPath } from "../../util/config-entry-tree.js";
 import {
   clearPathErrors,
   validateEntries,
+  validateValueAt,
   type ValidationError,
 } from "../../util/config-validation.js";
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { setIn } from "../../util/nested-values.js";
+import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   parseTopLevelComponents,
@@ -135,6 +136,12 @@ export class ESPHomeAddComponentForm extends LitElement {
   @state()
   private _showYaml = false;
 
+  /** Debounce for the live typed-value check: the renderers emit
+   *  partial text per keystroke, so validation waits for a pause. */
+  private static readonly LIVE_VALIDATE_DEBOUNCE_MS = 200;
+
+  private _liveValidateTimer: ReturnType<typeof setTimeout> | undefined;
+
   /** Missing deps a present component already provides; resolved async,
    *  subtracted from the banner. See `depsSatisfiedByProvides`. */
   @state()
@@ -143,6 +150,11 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** Bumps per resolution so a superseded `(component, yaml)` result can't
    *  overwrite a newer one. */
   private _providesSeq = 0;
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    clearTimeout(this._liveValidateTimer);
+  }
 
   /** Resolves dep ids (``i2c``) to their catalog name (``I²C Bus``)
    * for the missing-deps banner. Owns the cache subscription so a
@@ -188,6 +200,9 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (changedProperties.has("component") || !this._initialized) {
       if (this.component) {
         this._initialized = true;
+        // A pending live check belongs to the previous component's
+        // entries; validating across the retarget could mis-flag.
+        clearTimeout(this._liveValidateTimer);
         this._initValues();
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow
@@ -430,16 +445,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    * required`` is more useful than ``Auth: This field is required``.
    */
   private _labelForErrorKey(errKey: string): string {
-    const segments = errKey.split(".");
-    let entries: ConfigEntry[] | null = this._entries;
-    let entry: ConfigEntry | undefined;
-    for (const seg of segments) {
-      if (!entries) break;
-      entry = entries.find((e) => e.key === seg);
-      if (!entry) break;
-      entries =
-        entry.type === ConfigEntryType.NESTED ? (entry.config_entries ?? []) : null;
-    }
+    const entry = entryAtPath(this._entries, errKey.split("."));
     return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
 
@@ -473,13 +479,45 @@ export class ESPHomeAddComponentForm extends LitElement {
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
-    // Clear any error on the path the user just edited — including
-    // per-item keys under it, or the offending row's error sticks until
-    // the next submit. Same for the hidden-validation block message: any
-    // user input is a fresh signal that supersedes the previous bail;
-    // the next submit attempt re-evaluates from scratch.
-    const cleared = clearPathErrors(this._errors, path.join("."));
-    if (cleared) this._errors = cleared;
+    // A wrong *typed* value flags once typing pauses (range/type/options
+    // via validateValueAt); the renderers emit partial text per
+    // keystroke ("0x", "1e"), so appearing immediately would flash
+    // errors mid-entry. While typing, the display only ever improves in
+    // place: cleared and corrected keys drop instantly, a key already
+    // painted stays painted with its message kept current (clearing and
+    // re-adding per keystroke made it blink; deferring the clear left
+    // stale messages when a later edit cancelled the timer), and a
+    // newly wrong key appears only at the pause. Required-empty stays a
+    // submit-only signal, so untouched fields keep the no-nag behavior.
+    clearTimeout(this._liveValidateTimer);
+    const pathKey = path.join(".");
+    const live = validateValueAt(this._entries, path, value);
+    const shown = this._errors;
+    const cleared = clearPathErrors(shown, pathKey);
+    if (live.size === 0) {
+      if (cleared) this._errors = cleared;
+    } else {
+      const next = cleared ?? new Map(shown);
+      let changed = cleared !== null;
+      for (const [key, err] of live) {
+        if (shown.has(key)) {
+          next.set(key, err);
+          changed = true;
+        }
+      }
+      if (changed) this._errors = next;
+      this._liveValidateTimer = setTimeout(() => {
+        const settled = validateValueAt(this._entries, path, getIn(this._values, path));
+        const swept = clearPathErrors(this._errors, pathKey);
+        if (!swept && !settled.size) return;
+        const merged = swept ?? new Map(this._errors);
+        for (const [key, err] of settled) merged.set(key, err);
+        this._errors = merged;
+      }, ESPHomeAddComponentForm.LIVE_VALIDATE_DEBOUNCE_MS);
+    }
+    // The hidden-validation block message: any user input is a fresh
+    // signal that supersedes the previous bail; the next submit attempt
+    // re-evaluates from scratch.
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 
@@ -501,6 +539,9 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onSubmit() {
+    // Submit computes the full error map itself; a pending live check
+    // would only re-add a subset of it.
+    clearTimeout(this._liveValidateTimer);
     // Reset the local block message at the top of every submit
     // attempt so a stale notice from a previous click can't render
     // alongside a fresh result. Both bail paths below set their

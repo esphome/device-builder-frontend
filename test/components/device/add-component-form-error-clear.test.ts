@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 /**
  * Pins that editing a field clears its per-item error keys too (#1348):
@@ -11,6 +13,7 @@ import { ESPHomeAddComponentForm } from "../../../src/components/device/add-comp
  * must not survive as a stale red ring.
  */
 interface ErrorClearView {
+  component: unknown;
   _errors: Map<string, { key: string; code: string }>;
   _onValueChange(e: CustomEvent): void;
 }
@@ -19,8 +22,30 @@ const changeEvent = (path: string[], value: unknown) =>
   new CustomEvent("value-change", { detail: { path, value } });
 
 describe("esphome-add-component-form error clearing", () => {
+  // The clear is synchronous; fake timers keep the debounced live check
+  // from outliving the case.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("clears per-item keys under the edited field path", () => {
     const form = new ESPHomeAddComponentForm() as unknown as ErrorClearView;
+    form.component = {
+      id: "remote_receiver",
+      name: "Remote Receiver",
+      config_entries: [
+        makeConfigEntry({
+          key: "codes",
+          type: ConfigEntryType.INTEGER,
+          multi_value: true,
+        }),
+        makeConfigEntry({ key: "other", type: ConfigEntryType.STRING, required: true }),
+      ],
+    };
     form._errors = new Map([
       ["codes.0", { key: "codes.0", code: "validation.not_a_number" }],
       ["codes.1", { key: "codes.1", code: "validation.max" }],

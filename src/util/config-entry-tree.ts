@@ -41,6 +41,27 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
 }
 
 /**
+ * The `ConfigEntry` a config-entry path resolves to, or `undefined`.
+ *
+ * Index segments skip a level (a list item shares its field's entry),
+ * the same rule `pathIsAdvanced` walks with.
+ */
+export function entryAtPath(
+  entries: ConfigEntry[],
+  path: string[]
+): ConfigEntry | undefined {
+  let level = entries;
+  let entry: ConfigEntry | undefined;
+  for (const key of path) {
+    if (isIndexSegment(key)) continue;
+    entry = level.find((e) => e.key === key);
+    if (!entry) return undefined;
+    level = entry.config_entries ?? [];
+  }
+  return entry;
+}
+
+/**
  * Whether the entry at *path* — or any NESTED ancestor along it — is
  * advanced-gated given the current *values*: an advanced entry whose scope
  * carries a material value doesn't gate, since it renders without the
