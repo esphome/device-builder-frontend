@@ -32,6 +32,13 @@ describe("actionFieldLabel", () => {
     expect(actionFieldLabel("sequence", localize)).toBe("Sequence action");
   });
 
+  it("labels a dotted nested field from its leaf segment", () => {
+    expect(actionFieldLabel("valves.0.run_duration_number.set_action", localize)).toBe(
+      "Set action"
+    );
+    expect(actionFieldLabel("repeat_number.set_action", localize)).toBe("Set action");
+  });
+
   it("falls back without throwing on an empty field", () => {
     // Not reachable from the call sites (the parser only passes matched
     // `*_action` keys), but the util must not crash if reused.

@@ -546,17 +546,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   /**
    * Route an in-form "Edit actions" click (from a ``TRIGGER`` config
    * field like cover ``open_action``) to the automation editor. The
-   * form knows only the field key; resolve this instance's component id
-   * and build the ``component_action`` section key here.
+   * form emits the field's full path (segments are schema keys and
+   * list indices, never containing dots); resolve this instance's
+   * component id and build the dotted ``component_action`` section key
+   * the backend addresses nested fields with.
    */
-  _onEditActionField = (e: CustomEvent<{ field: string }>) => {
+  _onEditActionField = (e: CustomEvent<{ path: string[] }>) => {
     e.stopPropagation();
     const componentId = this._resolveComponentId();
     if (componentId === null) return;
     const sectionKey = sectionKeyFromLocation({
       kind: "component_action",
       component_id: componentId,
-      field: e.detail.field,
+      field: e.detail.path.join("."),
     });
     fireEvent(this, "section-select", { sectionKey });
   };
