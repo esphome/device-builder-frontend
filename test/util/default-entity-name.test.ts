@@ -77,31 +77,44 @@ describe("suggestEntityName", () => {
 
 describe("collectExistingNames", () => {
   it("returns an empty set for empty input", () => {
-    expect(collectExistingNames("")).toEqual(new Set());
+    expect(collectExistingNames("", "switch")).toEqual(new Set());
   });
 
   it("picks up multi-word names on indented and list-item lines, peeling quotes", () => {
     const yaml = [
+      "sensor:",
+      '  - name: "Porch Distance"',
+      "  - platform: dht",
+      "",
+      "    temperature:",
+      "      name: Living Room Temp  # inline note",
+      "",
+    ].join("\n");
+    expect(collectExistingNames(yaml, "sensor")).toEqual(
+      new Set(["Porch Distance", "Living Room Temp"])
+    );
+  });
+
+  it("scopes collection to the domain's top-level section", () => {
+    // Names collide per platform in esphome, so a switch named like a
+    // sensor must not force a suffix on the sensor seed.
+    const yaml = [
+      "esphome:",
+      "  name: my-device",
       "switch:",
       "  - platform: gpio",
       '    name: "Living Room Light"',
       "sensor:",
       "  - platform: dht",
-      "    temperature:",
-      "      name: Living Room Temp  # inline note",
+      "    name: Distance",
       "",
     ].join("\n");
-    expect(collectExistingNames(yaml)).toEqual(
-      new Set(["Living Room Light", "Living Room Temp"])
-    );
+    expect(collectExistingNames(yaml, "sensor")).toEqual(new Set(["Distance"]));
+    expect(collectExistingNames(yaml, "switch")).toEqual(new Set(["Living Room Light"]));
+    expect(collectExistingNames(yaml, "light")).toEqual(new Set());
   });
 
   it("ignores a column-0 name key", () => {
-    expect(collectExistingNames("name: Not A Component\n")).toEqual(new Set());
-  });
-
-  it("includes the esphome device name (accepted over-collection)", () => {
-    const yaml = "esphome:\n  name: my-device\n";
-    expect(collectExistingNames(yaml)).toEqual(new Set(["my-device"]));
+    expect(collectExistingNames("name: Not A Component\n", "name")).toEqual(new Set());
   });
 });

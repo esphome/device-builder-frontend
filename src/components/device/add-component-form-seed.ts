@@ -205,10 +205,12 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     (e) => e.key === "name" && e.type === ConfigEntryType.STRING
   );
   if (nameEntry && next["name"] === undefined) {
+    // Names collide per platform (unlike globally-unique ids), so the
+    // pool is scoped to the component's own top-level section.
     const seededName = suggestEntityName(
       component.id,
       component.name,
-      collectExistingNames(yaml)
+      collectExistingNames(yaml, component.id.split(".", 1)[0])
     );
     if (seededName !== null) next = { ...next, name: seededName };
   }

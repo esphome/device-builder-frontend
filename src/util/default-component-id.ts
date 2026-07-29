@@ -1,5 +1,5 @@
-import { isFeaturedId } from "./featured-id.js";
-import { readInstanceScalar } from "./yaml-sections-core.js";
+import { isPlatformComponentId } from "./featured-id.js";
+import { collectInstanceScalars } from "./yaml-sections-core.js";
 
 /**
  * Auto-generate a default `id:` value for a component being added
@@ -30,12 +30,10 @@ export function generateDefaultComponentId(
   multiConf: boolean,
   existing: ReadonlySet<string>
 ): string | null {
-  // A featured id (`featured.<board>.<local>`) carries dots but wraps one
-  // underlying component, so judge singleton-ness by `multiConf` alone —
-  // the dotted form would otherwise always read as a platform entry and a
+  // A featured wrap judges singleton-ness by `multiConf` alone — the dotted
+  // form would otherwise always read as a platform entry and a
   // single-instance wrap (ethernet, wifi) would wrongly get an id.
-  const looksPlatform = isFeaturedId(componentId) ? false : componentId.includes(".");
-  const isSingleton = !multiConf && !looksPlatform;
+  const isSingleton = !multiConf && !isPlatformComponentId(componentId);
   if (isSingleton) return null;
 
   // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
@@ -50,20 +48,7 @@ export function generateDefaultComponentId(
   return candidate;
 }
 
-/**
- * Scan the YAML for every `id:` line and return the set of values.
- * Best-effort line scan via the shared `readInstanceScalar`, deliberately
- * simple (we only need a uniqueness check, not a full parse).
- */
+/** Scan the YAML for every `id:` line and return the set of values. */
 export function collectExistingIds(yaml: string): Set<string> {
-  const ids = new Set<string>();
-  if (!yaml) return ids;
-  for (const line of yaml.split("\n")) {
-    // A real component id is always indented under a block; `readInstanceScalar`
-    // leaves indent-gating to callers, so skip a column-0 `id:`.
-    if (!/^\s/.test(line)) continue;
-    const id = readInstanceScalar(line, "id");
-    if (id !== null) ids.add(id);
-  }
-  return ids;
+  return collectInstanceScalars(yaml, "id");
 }

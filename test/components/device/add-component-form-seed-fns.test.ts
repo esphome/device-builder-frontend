@@ -566,11 +566,20 @@ describe("buildInitialValues", () => {
     expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor");
   });
 
-  it("suffixes the seeded name against a name already in the YAML, case-insensitively", () => {
+  it("suffixes the seeded name against a same-platform name in the YAML, case-insensitively", () => {
     const yaml =
       "sensor:\n  - platform: a02yyuw\n    name: a02yyuw waterproof ultrasonic sensor\n";
     const values = seedWith(nameSeedComponent(), { yaml });
     expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor 2");
+  });
+
+  it("does not suffix against a same-named entity on another platform", () => {
+    // esphome's duplicate check is per platform; a switch may share a
+    // sensor's name.
+    const yaml =
+      "switch:\n  - platform: template\n    name: A02YYUW Waterproof Ultrasonic Sensor\n";
+    const values = seedWith(nameSeedComponent(), { yaml });
+    expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor");
   });
 
   it("does not seed a name for an undotted component with a name entry", () => {

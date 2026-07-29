@@ -386,6 +386,35 @@ export function readInstanceScalar(line: string, key: string): string | null {
 }
 
 /**
+ * Every value of an indented '<key>: value' line in *yaml*, as a set.
+ * Best-effort line scan via readInstanceScalar, deliberately simple
+ * (callers need a uniqueness pool, not a full parse). A real component
+ * field is always indented under a block, so column-0 lines are never
+ * collected. With *section* set, only lines under that top-level key
+ * are collected; blank and comment lines don't end a section.
+ */
+export function collectInstanceScalars(
+  yaml: string,
+  key: string,
+  section?: string
+): Set<string> {
+  const values = new Set<string>();
+  if (!yaml) return values;
+  let inSection = section === undefined;
+  for (const line of yaml.split("\n")) {
+    if (!/^\s/.test(line)) {
+      const top = line.match(/^([A-Za-z0-9_]+):/);
+      if (section !== undefined && top) inSection = top[1] === section;
+      continue;
+    }
+    if (!inSection) continue;
+    const value = readInstanceScalar(line, key);
+    if (value !== null) values.add(value);
+  }
+  return values;
+}
+
+/**
  * 1-indexed YAML line of the instance-relative field *relPath* within
  * *section*, or ``null`` so callers fall back to the whole-section range.
  * Descends both mapping keys (``["pin","number"]`` → the nested

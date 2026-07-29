@@ -1,5 +1,5 @@
-import { isFeaturedId } from "./featured-id.js";
-import { readInstanceScalar } from "./yaml-sections-core.js";
+import { isPlatformComponentId } from "./featured-id.js";
+import { collectInstanceScalars } from "./yaml-sections-core.js";
 
 /**
  * Collision key mirroring esphome's str_sanitize(str_snake_case(name)),
@@ -35,8 +35,7 @@ export function suggestEntityName(
   componentTitle: string,
   existingNames: ReadonlySet<string>
 ): string | null {
-  const looksPlatform = isFeaturedId(componentId) ? false : componentId.includes(".");
-  if (!looksPlatform) return null;
+  if (!isPlatformComponentId(componentId)) return null;
   const title = componentTitle.trim();
   if (!title) return null;
 
@@ -56,19 +55,15 @@ export function suggestEntityName(
 }
 
 /**
- * Scan the YAML for every 'name:' line and return the set of values.
- * Deliberately over-collects (the device name under 'esphome:',
- * automation names, every platform's entities); esphome scopes the
- * duplicate check per platform, so the only cost of a false hit is an
- * unneeded numeric suffix, never a missed collision.
+ * Scan the YAML for every 'name:' line under the *domain* top-level
+ * section, matching the scope of esphome's per-platform duplicate
+ * check. Still over-collects within the section (nested sub-entity
+ * names, sub-device duplicates esphome would allow); the cost of a
+ * false hit is an unneeded numeric suffix. The scan is line-based: a
+ * name behind a block scalar or inside a packages/!include file is
+ * invisible and can still collide; the user can still edit the seeded
+ * value before submitting.
  */
-export function collectExistingNames(yaml: string): Set<string> {
-  const names = new Set<string>();
-  if (!yaml) return names;
-  for (const line of yaml.split("\n")) {
-    if (!/^\s/.test(line)) continue;
-    const name = readInstanceScalar(line, "name");
-    if (name !== null) names.add(name);
-  }
-  return names;
+export function collectExistingNames(yaml: string, domain: string): Set<string> {
+  return collectInstanceScalars(yaml, "name", domain);
 }
