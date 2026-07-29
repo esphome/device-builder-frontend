@@ -62,6 +62,8 @@ describe("parseHexInt", () => {
     expect(parseHexInt("0x00112233445566778899aabbccddeeff")).toBe(
       "0x00112233445566778899aabbccddeeff"
     );
+    // The uppercase-prefix arm keeps padding too, casing lowered.
+    expect(parseHexInt("0X0AB")).toBe("0x0ab");
   });
 
   it("keeps zero at its typed width, decimal zero minimal", () => {

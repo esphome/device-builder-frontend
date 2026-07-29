@@ -20,12 +20,13 @@
  * - **Form input → emit**: `parseHexInt("0x76" | "0X76" | "118")`
  *   → canonical `"0x..."` string. Both hex (with explicit `0x`
  *   prefix) and decimal input are accepted; the user can type
- *   whichever is most natural for the value at hand. Parsing is
- *   `BigInt`-backed, so 64-bit values like a DS18B20 ROM
- *   (`0xbe030c9794184728`, range up to `2^64 - 1` per the catalog)
- *   round-trip without IEEE-754 precision loss (#944). Empty
- *   string → `null` (so optional entries get stripped from the
- *   payload by the form's coerce pass).
+ *   whichever is most natural for the value at hand. Hex input
+ *   is pure string slicing (width kept, casing lowered) and
+ *   decimal is `BigInt`-backed, so 64-bit values like a DS18B20
+ *   ROM (`0xbe030c9794184728`, range up to `2^64 - 1` per the
+ *   catalog) round-trip without IEEE-754 precision loss (#944).
+ *   Empty string → `null` (so optional entries get stripped from
+ *   the payload by the form's coerce pass).
  *
  * Round-trip preservation: when the YAML had `address: 0x76`, the
  * form shows `0x76` and the user can save without forcing the
