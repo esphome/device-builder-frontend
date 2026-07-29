@@ -232,4 +232,25 @@ describe("catalog-picker-dialog tab strip", () => {
       "device.automation_pick_tab_building_blocks",
     ]);
   });
+
+  it("never offers legacy registry aliases", async () => {
+    const dialog = await mountDialog({
+      items: [
+        action({
+          id: "homeassistant.action",
+          name: "HA Action",
+          domain: "homeassistant",
+        }),
+        action({
+          id: "homeassistant.service",
+          name: "HA Service",
+          domain: "homeassistant",
+        }),
+      ],
+      tab: "by-type",
+    });
+    const text = dialog.shadowRoot!.textContent ?? "";
+    expect(text).toContain("HA Action");
+    expect(text).not.toContain("HA Service");
+  });
 });

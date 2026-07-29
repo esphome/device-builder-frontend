@@ -62,6 +62,25 @@ export async function hydrateAvailableBodies(
   return result;
 }
 
+/** Legacy registry aliases kept for reading existing configs — never
+ *  offered for new nodes; the migrate nudge respells them. */
+export const LEGACY_AUTOMATION_IDS: ReadonlySet<string> = new Set([
+  "homeassistant.service",
+]);
+
+const _HA_ACTION_IDS = new Set(["homeassistant.action", "homeassistant.service"]);
+
+/** Hide the legacy ``service`` field so a new node can only author the
+ *  canonical ``action``; a value already in the YAML still renders. */
+function overrideLegacyActionEntries(available: AvailableAutomations): void {
+  for (const action of available.actions) {
+    if (!_HA_ACTION_IDS.has(action.id)) continue;
+    action.config_entries = action.config_entries.map((entry) =>
+      entry.key === "service" ? { ...entry, hidden: true } : entry
+    );
+  }
+}
+
 /** Discriminated outcome of :func:`loadAndHydrateAvailable`. */
 export type LoadAndHydrateOutcome =
   | { status: "ok"; available: AvailableAutomations; hydration: HydrationResult }
@@ -116,6 +135,7 @@ export async function loadAndHydrateAvailable(
       options?.lists
     );
     if (options?.isStale?.()) return { status: "stale" };
+    overrideLegacyActionEntries(available);
     // Fresh array refs so identity-based ``hasChanged`` consumers
     // re-render with the hydrated entries (entries' object identity
     // is preserved so per-entry caches stay valid).

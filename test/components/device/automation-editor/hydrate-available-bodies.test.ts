@@ -157,6 +157,48 @@ describe("loadAndHydrateAvailable", () => {
       devices: [],
     }) as unknown as AvailableAutomations;
 
+  it("hides the legacy service field on the homeassistant actions", async () => {
+    const entryOf = (key: string) => ({ key, type: "string", label: key });
+    const slim = {
+      ...emptySlim(),
+      actions: [
+        {
+          id: "homeassistant.action",
+          name: "Action",
+          domain: "homeassistant",
+          config_entries: [entryOf("action"), entryOf("service"), entryOf("data")],
+        },
+        {
+          id: "homeassistant.service",
+          name: "Service",
+          domain: "homeassistant",
+          config_entries: [entryOf("action"), entryOf("service")],
+        },
+        {
+          id: "logger.log",
+          name: "Log",
+          domain: "logger",
+          config_entries: [entryOf("format")],
+        },
+      ],
+    } as unknown as AvailableAutomations;
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+    if (outcome.status !== "ok") throw new Error(outcome.status);
+    const byId = new Map(outcome.available.actions.map((a) => [a.id, a]));
+    for (const id of ["homeassistant.action", "homeassistant.service"]) {
+      const entries = byId.get(id)!.config_entries;
+      expect(entries.find((e) => e.key === "service")?.hidden).toBe(true);
+      expect(entries.find((e) => e.key === "action")?.hidden).toBeUndefined();
+    }
+    expect(
+      byId.get("logger.log")!.config_entries.find((e) => e.key === "format")?.hidden
+    ).toBeUndefined();
+  });
+
   it("issues exactly one getAvailableAutomations call per invocation", async () => {
     const slim = emptySlim();
     const getAvailableAutomations = vi.fn().mockResolvedValue(slim);
