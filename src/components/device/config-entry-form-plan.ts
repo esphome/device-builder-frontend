@@ -1,6 +1,7 @@
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import {
   filterRenderable,
+  hasMaterialValue,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
 import {
@@ -48,6 +49,39 @@ export function buildFormRenderPlan(
   return { ordered, clusters, memberKeys, clusterByFirstKey, visible };
 }
 
+/** Every member advanced — an atomic unit can't straddle the boundary. */
+export function unitAllAdvanced(members: ConfigEntry[]): boolean {
+  return members.length > 0 && members.every((m) => !!m.advanced);
+}
+
+/** Any member valued — one value paints the whole unit inline. */
+export function unitHasMaterialValue(
+  members: ConfigEntry[],
+  values: Record<string, unknown>
+): boolean {
+  return members.some((m) => hasMaterialValue(m, values));
+}
+
+/**
+ * Per-key gate: whether the render unit (exclusive group / constraint
+ * cluster) containing *key* is advanced-gated — every member advanced and
+ * none valued — or undefined for keys outside any unit. Feeds
+ * ``pathIsAdvanced`` so the caret-follow reveal can't drift from the
+ * form's unit placement.
+ */
+export function unitAdvancedGate(
+  entries: ConfigEntry[],
+  requiredGroups: RequiredGroup[],
+  values: Record<string, unknown>
+): (key: string) => boolean | undefined {
+  const memberFor = unitMembersByKey(entries, requiredGroups);
+  return (key) => {
+    const members = memberFor(key);
+    if (!members) return undefined;
+    return unitAllAdvanced(members) && !unitHasMaterialValue(members, values);
+  };
+}
+
 /**
  * Whether the plan paints anything the user can act on: an unlocked plain
  * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
@@ -81,4 +115,25 @@ export function planNeedsUserInput(
         Array.isArray(item) && anyActionable(item) && !choicePinned(item, isVisible)
     )
   );
+}
+
+function unitMembersByKey(
+  entries: ConfigEntry[],
+  requiredGroups: RequiredGroup[]
+): (key: string) => ConfigEntry[] | undefined {
+  const byKey = new Map<string, ConfigEntry[]>();
+  const { clusters } = buildConstraintClusters(entries, requiredGroups);
+  for (const cluster of clusters) {
+    for (const member of cluster.members) byKey.set(member.key, cluster.members);
+  }
+  const groups = new Map<string, ConfigEntry[]>();
+  for (const entry of entries) {
+    if (!entry.exclusive_group) continue;
+    // Every member shares one array, so earlier keys see later joiners.
+    const members = groups.get(entry.exclusive_group) ?? [];
+    members.push(entry);
+    groups.set(entry.exclusive_group, members);
+    byKey.set(entry.key, members);
+  }
+  return (key) => byKey.get(key);
 }

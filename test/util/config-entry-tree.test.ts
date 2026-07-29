@@ -115,6 +115,28 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced([pins], ["pins", "0", "id"], {})).toBe(true);
   });
 
+  it("lets the unit gate override per-entry gating at the top level", () => {
+    const a = entry("a", true);
+    const gate = (verdict: boolean | undefined) => (key: string) =>
+      key === "a" ? verdict : undefined;
+    // Gate false: the unit paints inline even though the entry alone gates.
+    expect(pathIsAdvanced([a], ["a"], {}, gate(false))).toBe(false);
+    // Gate true: the unit is gated even though the entry alone is valued.
+    expect(pathIsAdvanced([a], ["a"], { a: "x" }, gate(true))).toBe(true);
+    // No verdict: per-entry gating applies.
+    expect(pathIsAdvanced([a], ["a"], {}, gate(undefined))).toBe(true);
+  });
+
+  it("consults the unit gate for the top-level segment only", () => {
+    const wrap = nested("wrap", false, [entry("a", true)]);
+    const gate = (key: string) => (key === "a" ? true : undefined);
+    // "a" at depth 1 is a plain advanced leaf; its own scope decides.
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], { wrap: { a: "set" } }, gate)).toBe(
+      false
+    );
+    expect(pathIsAdvanced([wrap], ["wrap", "a"], {}, gate)).toBe(true);
+  });
+
   it("still short-circuits on a hidden flag under a pin's mode group", () => {
     // The wiring exception suppresses advanced marks, not the hidden
     // walk — a hidden flag never renders, so don't reveal for it.

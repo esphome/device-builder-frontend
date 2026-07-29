@@ -79,7 +79,12 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
-import { buildFormRenderPlan } from "./config-entry-form-plan.js";
+import {
+  buildFormRenderPlan,
+  unitAdvancedGate,
+  unitAllAdvanced,
+  unitHasMaterialValue,
+} from "./config-entry-form-plan.js";
 import {
   fieldRendererStyles,
   formatConstraintKeys,
@@ -482,11 +487,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     let gatedAdvanced = advanced;
     if (this.gateAdvanced) {
       const unitPrefilled = (item: ConfigEntry | ConfigEntry[]): boolean => {
-        if (Array.isArray(item))
-          return item.some((e) => hasMaterialValue(e, this.values));
+        if (Array.isArray(item)) return unitHasMaterialValue(item, this.values);
         if (plan.memberKeys.has(item.key)) {
           const cluster = plan.clusterByFirstKey.get(item.key);
-          return !!cluster?.members.some((m) => hasMaterialValue(m, this.values));
+          return !!cluster && unitHasMaterialValue(cluster.members, this.values);
         }
         return hasMaterialValue(item, this.values);
       };
@@ -566,11 +570,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _advancedUnitClassifier(plan: ReturnType<typeof buildFormRenderPlan>) {
     const clusterAllAdvanced = new Map<string, boolean>();
     for (const cluster of plan.clusters) {
-      const all = cluster.members.every((m) => m.advanced);
+      const all = unitAllAdvanced(cluster.members);
       for (const m of cluster.members) clusterAllAdvanced.set(m.key, all);
     }
     return (item: ConfigEntry | ConfigEntry[]): boolean => {
-      if (Array.isArray(item)) return item.length > 0 && item.every((e) => e.advanced);
+      if (Array.isArray(item)) return unitAllAdvanced(item);
       if (plan.memberKeys.has(item.key)) return clusterAllAdvanced.get(item.key) ?? false;
       return !!item.advanced;
     };
@@ -710,7 +714,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (this.entries.length === 0) return;
     const key = fieldKeyAttr(this.focusFieldPath);
     if (key === this._focusRevealKey) return;
-    if (!pathIsAdvanced(this.entries, this.focusFieldPath, this.values)) return;
+    const unitGate = unitAdvancedGate(this.entries, this.requiredGroups, this.values);
+    if (!pathIsAdvanced(this.entries, this.focusFieldPath, this.values, unitGate)) {
+      return;
+    }
     this._focusRevealKey = key;
     this._emitAdvancedToggle(true);
   }

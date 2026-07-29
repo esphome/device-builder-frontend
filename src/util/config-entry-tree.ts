@@ -49,12 +49,16 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
  * toggle. Used to reveal a section's hidden advanced fields when the caret
  * or a backend error lands on one. List-index segments descend the value
  * scope only: the schema nests an item's fields directly under the list
- * entry, with no index level. Returns false if the path doesn't resolve.
+ * entry, with no index level. When *unitGate* answers for the top-level
+ * key, its verdict on the whole render unit (exclusive group / constraint
+ * cluster, which paints atomically) replaces the per-entry rule. Returns
+ * false if the path doesn't resolve.
  */
 export function pathIsAdvanced(
   entries: ConfigEntry[],
   path: string[],
-  values: Record<string, unknown>
+  values: Record<string, unknown>,
+  unitGate?: (key: string) => boolean | undefined
 ): boolean {
   let level = entries;
   let advanced = false;
@@ -73,7 +77,12 @@ export function pathIsAdvanced(
     // anything; keep walking so the hidden check above still covers the
     // rest of the path.
     if (prevWasPin && PIN_WIRING_KEYS.has(entry.key)) inPinWiring = true;
-    if (
+    // Units only form at a form's top level, so the gate applies to the
+    // first segment alone.
+    const unitGated = i === 0 ? unitGate?.(key) : undefined;
+    if (unitGated !== undefined) {
+      if (unitGated) advanced = true;
+    } else if (
       !advanced &&
       entry.advanced &&
       !inPinWiring &&
