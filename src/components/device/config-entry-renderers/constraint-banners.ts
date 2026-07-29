@@ -47,27 +47,29 @@ export function collectUnsatisfiedConstraints(
   // hidden / depends_on / platform, or simply not a rendered entry), matching
   // the cluster box — otherwise the prompt nags about fields the user can't set.
   const byKey = new Map(entries.map((e) => [e.key, e]));
-  const anyVisible = (keys: string[]): boolean =>
-    keys.some((k) => {
-      const entry = byKey.get(k);
-      return (
-        entry !== undefined &&
-        (getIn(values, [k]) !== undefined ||
-          isEntryVisible(
-            entry,
-            values,
-            presentComponents,
-            targetPlatform,
-            undefined,
-            entries
-          ))
-      );
-    });
+  const keyVisible = (k: string): boolean => {
+    const entry = byKey.get(k);
+    return (
+      entry !== undefined &&
+      (getIn(values, [k]) !== undefined ||
+        isEntryVisible(
+          entry,
+          values,
+          presentComponents,
+          targetPlatform,
+          undefined,
+          entries
+        ))
+    );
+  };
+  const anyVisible = (keys: string[]): boolean => keys.some(keyVisible);
   for (const group of requiredGroups) {
     if (group.keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(group.keys)) continue;
     if (evaluateGroup(group.kind, group.keys, values)) continue;
-    messages.push({ kind: group.kind, keys: formatKeys(group.keys) });
+    // Name only the keys the user can see — a hidden alias shouldn't be
+    // prompted for.
+    messages.push({ kind: group.kind, keys: formatKeys(group.keys.filter(keyVisible)) });
   }
   // buildConstraintClusters folds every *non-exclusive* inclusive group into
   // a cluster (whose members land in clusteredKeys), so this loop only fires

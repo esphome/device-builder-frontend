@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import toast from "sonner-js";
+import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationAction,
@@ -148,6 +149,10 @@ describe("hydrateAvailableBodies", () => {
 });
 
 describe("loadAndHydrateAvailable", () => {
+  afterEach(() => {
+    _clearAutomationBodyCache();
+  });
+
   const emptySlim = (): AvailableAutomations =>
     ({
       triggers: [],

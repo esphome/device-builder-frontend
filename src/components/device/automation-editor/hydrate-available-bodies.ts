@@ -63,7 +63,10 @@ export async function hydrateAvailableBodies(
 }
 
 /** Legacy registry aliases kept for reading existing configs — never
- *  offered for new nodes; the migrate nudge respells them. */
+ *  offered for new nodes; the migrate nudge respells them. Enforced by
+ *  the action/condition catalog picker only (the trigger picker filters
+ *  its own list); the migration-side twin of these ids lives in
+ *  ``src/util/config-migrations.ts``. */
 export const LEGACY_AUTOMATION_IDS: ReadonlySet<string> = new Set([
   "homeassistant.service",
 ]);

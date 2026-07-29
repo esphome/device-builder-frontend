@@ -100,4 +100,16 @@ describe("collectUnsatisfiedConstraints", () => {
       { kind: "all_or_none", keys: "cert,key" },
     ]);
   });
+
+  it("names only visible keys when a group member is hidden and empty", () => {
+    const entries = [
+      { key: "action", type: "string", label: "Action" },
+      { key: "service", type: "string", label: "Service", hidden: true },
+    ] as unknown as ConfigEntry[];
+    const groups = [
+      { kind: "exactly_one", keys: ["service", "action"] },
+    ] as RequiredGroup[];
+    const messages = collect({ entries, requiredGroups: groups });
+    expect(messages).toEqual([{ kind: "exactly_one", keys: "action" }]);
+  });
 });
