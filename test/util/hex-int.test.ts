@@ -53,23 +53,31 @@ describe("parseHexInt", () => {
     expect(parseHexInt("18446744073709551615")).toBe("0xffffffffffffffff");
   });
 
-  it("strips leading zeros from hex input", () => {
-    // ``BigInt("0x076").toString(16)`` is ``"76"``; the canonical
-    // form is unique so the form's display, the values dict, and
-    // on-disk YAML all agree on a single shape.
-    expect(parseHexInt("0x076")).toBe("0x76");
-    expect(parseHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
+  it("preserves the nibble width of hex input", () => {
+    // A leading-zero wide key (openthread's 128-bit network_key /
+    // pskc / ext_pan_id) must stay pasteable into Thread
+    // commissioning tooling that expects the full 32-nibble form.
+    expect(parseHexInt("0x076")).toBe("0x076");
+    expect(parseHexInt("0x00be030c9794184728")).toBe("0x00be030c9794184728");
+    expect(parseHexInt("0x00112233445566778899aabbccddeeff")).toBe(
+      "0x00112233445566778899aabbccddeeff"
+    );
+    // The uppercase-prefix arm keeps padding too, casing lowered.
+    expect(parseHexInt("0X0AB")).toBe("0x0ab");
+    // Decimal is the diverging branch: leading zeros carry no hex
+    // width, so the BigInt route emits the minimal form.
+    expect(parseHexInt("0118")).toBe("0x76");
   });
 
-  it("canonicalises zero to 0x0 regardless of input shape", () => {
+  it("keeps zero at its typed width, decimal zero minimal", () => {
     // Pin the zero corner of CANONICAL_HEX_RE so a future tweak to
-    // the regex can't desynchronise the slow path's BigInt(0) output
-    // from the canonical-form gate ``formatHexInt`` /
-    // ``normalizeHexValues`` use to skip rewriting.
+    // the regex can't desynchronise the slow path's output from the
+    // canonical-form gate ``formatHexInt`` / ``normalizeHexValues``
+    // use to skip rewriting.
     expect(parseHexInt("0")).toBe("0x0");
     expect(parseHexInt("0x0")).toBe("0x0");
-    expect(parseHexInt("0x00")).toBe("0x0");
-    expect(parseHexInt("0x000")).toBe("0x0");
+    expect(parseHexInt("0x00")).toBe("0x00");
+    expect(parseHexInt("0x000")).toBe("0x000");
   });
 
   it("trims surrounding whitespace", () => {
@@ -141,21 +149,21 @@ describe("formatHexInt", () => {
     expect(formatHexInt("0xffffffffffffffff")).toBe("0xffffffffffffffff");
   });
 
-  it("canonicalises non-canonical hex strings (leading zeros)", () => {
-    // ``"0x076"`` matches the input regex but not the canonical-form
-    // gate, so the slow path strips the leading zero. Both formatters
-    // must agree on the output for a single value.
-    expect(formatHexInt("0x076")).toBe("0x76");
-    expect(formatHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
+  it("keeps leading-zero hex strings at their input width", () => {
+    // Leading zeros are canonical now; both formatters must agree on
+    // the width-preserved output for a single value so the
+    // ``normalizeHexValues`` fast-path skip stays consistent with a
+    // subsequent re-format.
+    expect(formatHexInt("0x076")).toBe("0x076");
+    expect(formatHexInt("0x00be030c9794184728")).toBe("0x00be030c9794184728");
+    expect(formatHexInt("0x00112233445566778899aabbccddeeff")).toBe(
+      "0x00112233445566778899aabbccddeeff"
+    );
   });
 
   it("agrees with parseHexInt at the zero edge", () => {
-    // ``formatHexInt`` must not return ``"0x00"`` for a string that
-    // ``parseHexInt`` canonicalises to ``"0x0"``; otherwise the
-    // ``normalizeHexValues`` fast-path skip would diverge from a
-    // subsequent re-format.
     expect(formatHexInt("0x0")).toBe("0x0");
-    expect(formatHexInt("0x00")).toBe("0x0");
+    expect(formatHexInt("0x00")).toBe("0x00");
     expect(formatHexInt(0)).toBe("0x0");
   });
 
@@ -258,14 +266,27 @@ describe("normalizeHexValues", () => {
     });
   });
 
-  it("strips leading zeros from non-canonical hex strings", () => {
-    // Without canonicalisation here the fast path returns the
-    // string verbatim while a later edit re-renders the value
-    // through ``parseHexInt`` and the leading zero disappears; the
-    // values dict and on-disk YAML would silently disagree.
+  it("keeps leading-zero hex strings full width, identity-equal", () => {
+    // Leading zeros are canonical: the fast path skips the rewrite
+    // and every later re-render agrees, so a wide key with a zero
+    // leading nibble never shortens on an unrelated save.
     const entries = [entry("address", { display_format: "hex" })];
-    expect(normalizeHexValues({ address: "0x076" }, entries)).toEqual({
-      address: "0x76",
+    const values = { address: "0x076" };
+    expect(normalizeHexValues(values, entries)).toBe(values);
+  });
+
+  it("round-trips a leading-zero 128-bit Thread credential at full width", () => {
+    // The #2390 shape: openthread's network_key parses as a hex
+    // integer; an unrelated save must re-serialize the untouched
+    // credential at the full 32-nibble width commissioning tooling
+    // expects, including from the uppercase YAML spelling.
+    const entries = [entry("network_key", { display_format: "hex" })];
+    const key = "0x00112233445566778899aabbccddeeff";
+    expect(normalizeHexValues({ network_key: key }, entries)).toEqual({
+      network_key: key,
+    });
+    expect(normalizeHexValues({ network_key: key.toUpperCase() }, entries)).toEqual({
+      network_key: key,
     });
   });
 

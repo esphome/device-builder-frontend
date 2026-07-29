@@ -274,6 +274,19 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "0x76")).toBeNull();
   });
 
+  it("range-checks the padded canonical hex form by value, not width", () => {
+    // Leading zeros are canonical since the width-preserving
+    // round-trip; the BigInt comparison must keep ignoring them.
+    const entry = makeEntry({
+      type: ConfigEntryType.INTEGER,
+      display_format: "hex",
+      range: [0x08, 0x77],
+    });
+    expect(validateEntry(entry, "0x0076")).toBeNull();
+    expect(validateEntry(entry, "0x0007")?.code).toBe("validation.min");
+    expect(validateEntry(entry, "0x0078")?.code).toBe("validation.max");
+  });
+
   it("accepts floats on FLOAT fields", () => {
     const entry = makeEntry({ type: ConfigEntryType.FLOAT });
     expect(validateEntry(entry, 3.5)).toBeNull();

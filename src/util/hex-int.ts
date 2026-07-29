@@ -11,20 +11,22 @@
  *
  * - **YAML → form display**: any integer (`118`, `0x76`, `"0x76"`)
  *   resolves to a canonical hex string. We render it as
- *   `formatHexInt(value)` → `"0x76"` (lowercase, no padding —
- *   `value.toString(16)`-style; ESPHome's own `cv.hex_int`
- *   formatter uses uppercase, but the dashboard standardised on
- *   lowercase for user-facing display since that's what HA docs
- *   and most i2c datasheets use).
+ *   `formatHexInt(value)` → `"0x76"` (lowercase, keeping the
+ *   input's nibble width — a leading-zero wide key like a 128-bit
+ *   `0x0abc...` Thread credential stays full width; ESPHome's own
+ *   `cv.hex_int` formatter uses uppercase, but the dashboard
+ *   standardised on lowercase for user-facing display since that's
+ *   what HA docs and most i2c datasheets use).
  * - **Form input → emit**: `parseHexInt("0x76" | "0X76" | "118")`
  *   → canonical `"0x..."` string. Both hex (with explicit `0x`
  *   prefix) and decimal input are accepted; the user can type
- *   whichever is most natural for the value at hand. Parsing is
- *   `BigInt`-backed, so 64-bit values like a DS18B20 ROM
- *   (`0xbe030c9794184728`, range up to `2^64 - 1` per the catalog)
- *   round-trip without IEEE-754 precision loss (#944). Empty
- *   string → `null` (so optional entries get stripped from the
- *   payload by the form's coerce pass).
+ *   whichever is most natural for the value at hand. Hex input
+ *   is pure string slicing (width kept, casing lowered) and
+ *   decimal is `BigInt`-backed, so 64-bit values like a DS18B20
+ *   ROM (`0xbe030c9794184728`, range up to `2^64 - 1` per the
+ *   catalog) round-trip without IEEE-754 precision loss (#944).
+ *   Empty string → `null` (so optional entries get stripped from
+ *   the payload by the form's coerce pass).
  *
  * Round-trip preservation: when the YAML had `address: 0x76`, the
  * form shows `0x76` and the user can save without forcing the
@@ -43,8 +45,9 @@
  * hex string.
  *
  * Accepts:
- *  - hex with `0x` / `0X` prefix (`"0x76"`, `"0X1A"`);
- *  - non-negative decimal (`"118"`);
+ *  - hex with `0x` / `0X` prefix (`"0x76"`, `"0X1A"`) — the
+ *    digit count is preserved, so `"0X0AB"` → `"0x0ab"`;
+ *  - non-negative decimal (`"118"`) — minimum-width hex out;
  *  - leading/trailing whitespace around either form.
  *
  * Returns `null` for empty input, negative numbers, or any value
@@ -52,12 +55,14 @@
  * decides whether to clear the field, surface a validation
  * error, etc.
  *
- * Backed by `BigInt`, not `Number`, so 64-bit values like a
- * DS18B20 ROM (`0xbe030c9794184728`) and the catalog's full
- * `cv.hex_uint64_t` range (up to `2^64 - 1`) survive the
- * round-trip. `Number.parseInt(s, 16)` rounded to the nearest
- * representable double for any hex over 2^53, silently mutating
- * the user's value on save (#944).
+ * Hex input never round-trips through a numeric type at all —
+ * pure string slicing — so 64-bit values like a DS18B20 ROM
+ * (`0xbe030c9794184728`) survive verbatim. Decimal input is
+ * `BigInt`-backed, not `Number`-backed, so the catalog's full
+ * `cv.hex_uint64_t` range (up to `2^64 - 1`) survives too;
+ * `Number.parseInt(s, 16)` rounded to the nearest representable
+ * double for any hex over 2^53, silently mutating the user's
+ * value on save (#944).
  *
  * **Bare hex without `0x` is intentionally rejected.** The i2c
  * address `76` would otherwise be ambiguous — could be the user
@@ -79,18 +84,26 @@
 // unprefixed hex letters — falls through to ``return null``.
 const ACCEPTED_INPUT_RE = /^(?:0[xX][0-9a-fA-F]+|\d+)$/;
 
-// What ``parseHexInt`` / ``formatHexInt`` emit — minimum-width
-// lowercase ``"0x..."``. Tighter than the input regex on purpose:
-// ``"0x076"`` is rejected here so the canonical-form fast path in
-// ``formatHexInt`` / ``normalizeHexValues`` agrees bit-for-bit
-// with what the BigInt slow path would produce (which strips the
-// leading zero). Without this tightening the two paths return
-// different strings for the same input.
-const CANONICAL_HEX_RE = /^0x(?:[1-9a-f][0-9a-f]*|0)$/;
+// What ``parseHexInt`` / ``formatHexInt`` emit — lowercase
+// ``"0x..."`` at whatever nibble width the input carried. Leading
+// zeros are canonical: a hex-prefixed input keeps its digit count
+// through the parse (only the casing normalises), so the fast path
+// here agrees bit-for-bit with the slow path's output. Width
+// preservation is load-bearing for wide keys — openthread's 128-bit
+// ``network_key`` / ``pskc`` / ``ext_pan_id`` must stay pasteable
+// into Thread commissioning tooling that expects the full 32-nibble
+// form, so a leading-zero key must not shorten on an unrelated save.
+const CANONICAL_HEX_RE = /^0x[0-9a-f]+$/;
 
 export function parseHexInt(raw: string): string | null {
   const trimmed = raw.trim();
   if (!ACCEPTED_INPUT_RE.test(trimmed)) return null;
+  // Hex-prefixed input keeps its nibble width (see CANONICAL_HEX_RE);
+  // only decimal input takes the BigInt route, whose minimum-width
+  // hex is the only width there is.
+  if (trimmed[0] === "0" && (trimmed[1] === "x" || trimmed[1] === "X")) {
+    return "0x" + trimmed.slice(2).toLowerCase();
+  }
   return "0x" + BigInt(trimmed).toString(16);
 }
 
@@ -98,9 +111,10 @@ export function parseHexInt(raw: string): string | null {
  * Walk a values dict and rewrite every hex-typed entry's value to
  * its canonical lowercase ``"0x..."`` string form. Numeric (number
  * or bigint) values stringify through ``formatHexInt``; string
- * values (including uppercase, leading-zero, and decimal-typed-as-
- * string shapes) round-trip through ``parseHexInt``; already-
- * canonical strings short-circuit without allocating a copy.
+ * values (uppercase — including uppercase leading-zero — and
+ * decimal-typed-as-string shapes) round-trip through
+ * ``parseHexInt``; already-canonical strings, leading zeros
+ * included, short-circuit without allocating a copy.
  *
  * Why: the form's values dict carries heterogeneous types
  * (``parseYamlSectionValues`` hands hex literals back as raw
@@ -197,14 +211,15 @@ export function normalizeHexValues(
 /**
  * Format an arbitrary form value as a hex literal for display.
  *
- * Returns `"0x" + value.toString(16)` — the minimum-width
- * lowercase form. `0` → `"0x0"`, `0x76` → `"0x76"`,
- * `0xff00` → `"0xff00"`. Intentionally not zero-padded: i2c
- * addresses and register addresses are read at whatever width
- * the underlying integer needs, and forcing a fixed
- * width (e.g. always `0x00`-style for 8-bit) would mismatch
- * larger hex types (`hex_uint16_t`, `hex_uint32_t`) sharing
- * this formatter.
+ * Numbers and bigints return `"0x" + value.toString(16)` — the
+ * minimum-width lowercase form (`0` → `"0x0"`, `0xff00` →
+ * `"0xff00"`); there is no width to preserve. Strings keep their
+ * nibble width through `parseHexInt`, so a leading-zero wide key
+ * survives re-render. Numeric values are intentionally not
+ * zero-padded to a fixed width: i2c and register addresses are
+ * read at whatever width the underlying integer needs, and a
+ * fixed 8-bit pad would mismatch the larger hex types
+ * (`hex_uint16_t`, `hex_uint32_t`) sharing this formatter.
  *
  * Lowercase to match the `0x76` form Home Assistant docs and
  * most i2c datasheets use. ESPHome's own `cv.hex_int` formatter
