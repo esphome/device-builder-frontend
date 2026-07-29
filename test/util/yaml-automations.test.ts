@@ -113,6 +113,39 @@ describe("parseYamlAutomations — component triggers", () => {
     expect(action?.actionField).toBe("open_action");
   });
 
+  it("keeps trigger rows before action rows, each in global line order", () => {
+    const yaml = [
+      "cover:",
+      "  - platform: template",
+      "    id: front_cover",
+      "    on_open:",
+      "      then:",
+      "        - logger.log: front open",
+      "    open_action:",
+      "      - switch.turn_on: relay_a",
+      "    close_action:",
+      "      - switch.turn_off: relay_a",
+      "  - platform: template",
+      "    id: back_cover",
+      "    on_open:",
+      "      then:",
+      "        - logger.log: back open",
+      "    open_action:",
+      "      - switch.turn_on: relay_b",
+      "    stop_action:",
+      "      - switch.turn_off: relay_b",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual([
+      "automation:component_on:front_cover:on_open",
+      "automation:component_on:back_cover:on_open",
+      "automation:component_action:front_cover:open_action",
+      "automation:component_action:front_cover:close_action",
+      "automation:component_action:back_cover:open_action",
+      "automation:component_action:back_cover:stop_action",
+    ]);
+  });
+
   it("does not double-count an on_*_action key as both trigger and action", () => {
     const yaml = [
       "cover:",
