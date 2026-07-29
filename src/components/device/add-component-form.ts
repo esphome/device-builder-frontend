@@ -13,6 +13,7 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
+import { entryAtPath } from "../../util/config-entry-tree.js";
 import {
   clearPathErrors,
   validateEntries,
@@ -34,7 +35,6 @@ import {
 } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
-import { entryAtPath } from "../../util/config-entry-tree.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
@@ -135,11 +135,6 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   private _liveValidateTimer: ReturnType<typeof setTimeout> | undefined;
 
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    clearTimeout(this._liveValidateTimer);
-  }
-
   /** Missing deps a present component already provides; resolved async,
    *  subtracted from the banner. See `depsSatisfiedByProvides`. */
   @state()
@@ -148,6 +143,11 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** Bumps per resolution so a superseded `(component, yaml)` result can't
    *  overwrite a newer one. */
   private _providesSeq = 0;
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    clearTimeout(this._liveValidateTimer);
+  }
 
   /** Resolves dep ids (``i2c``) to their catalog name (``I²C Bus``)
    * for the missing-deps banner. Owns the cache subscription so a
@@ -513,6 +513,9 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onSubmit() {
+    // Submit computes the full error map itself; a pending live check
+    // would only re-add a subset of it.
+    clearTimeout(this._liveValidateTimer);
     // Reset the local block message at the top of every submit
     // attempt so a stale notice from a previous click can't render
     // alongside a fresh result. Both bail paths below set their
