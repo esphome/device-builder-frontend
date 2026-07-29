@@ -12,6 +12,7 @@
  * tail degrades to the deepest resolved node.
  */
 import memoizeOne from "memoize-one";
+import { splitActionFieldPath } from "../../../util/action-field-path.js";
 
 import type {
   ActionNode,
@@ -162,13 +163,16 @@ export function createFocusResolver(): typeof resolveFocus {
  */
 function handlerAnchor(
   location: AutomationLocation
-): { keyPaths: string[][]; index?: number | "any" } | null {
+): { keyPaths: YamlPathSegment[][]; index?: number | "any" } | null {
   switch (location.kind) {
     case "device_on":
     case "component_on":
       return { keyPaths: [[location.trigger]], index: location.index };
     case "component_action":
-      return { keyPaths: [[location.field]] };
+      // ``field`` is a dotted path for a nested action list
+      // (``valves.0.run_duration_number.set_action``); the caret must
+      // follow the whole chain to the leaf.
+      return { keyPaths: [splitActionFieldPath(location.field)] };
     case "interval":
       return { keyPaths: [["interval"]], index: location.index };
     case "script":

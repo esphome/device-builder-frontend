@@ -97,6 +97,28 @@ describe("automationRelativePath", () => {
     ).toEqual([0, "logger.log"]);
   });
 
+  it("slices a nested component_action on its whole field chain", () => {
+    expect(
+      automationRelativePath(
+        [
+          "sprinkler",
+          0,
+          "valves",
+          0,
+          "run_duration_number",
+          "set_action",
+          1,
+          "switch.turn_on",
+        ],
+        {
+          kind: "component_action",
+          component_id: "lawn",
+          field: "valves.0.run_duration_number.set_action",
+        }
+      )
+    ).toEqual([1, "switch.turn_on"]);
+  });
+
   it("slices interval by index", () => {
     expect(
       automationRelativePath(["interval", 2, "then", 0], { kind: "interval", index: 2 })

@@ -1000,16 +1000,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.TRIGGER:
         // A component action-list config field (cover ``open_action`` …):
         // a bare action list edited in the automation editor, not inline.
-        // The form knows only the field key, so emit ``edit-action-field``
-        // and let the section host resolve the component instance and
-        // route to the automation editor.
+        // The form emits ``edit-action-field`` with the full path (a
+        // nested field's segments include list indices) and the section
+        // host resolves the component instance and routes to the
+        // automation editor.
         return html`<div class="field" data-field-key=${fieldKeyAttr(path)}>
           ${labelFor(entry, ctx)}
           <button
             type="button"
             class="edit-actions-button"
             ?disabled=${ctx.disabled}
-            @click=${() => this._emitEditActionField(entry.key)}
+            @click=${() => this._emitEditActionField(path)}
           >
             ${ctx.localize("device.automation_action_field_edit")}
           </button>
@@ -1138,11 +1139,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /** A TRIGGER (action-list) field's "Edit actions" was clicked. The
    *  host resolves the component instance and routes to the automation
-   *  editor — the form only knows the field key. */
-  private _emitEditActionField(field: string) {
+   *  editor — the form only knows the field's path. */
+  private _emitEditActionField(path: string[]) {
     this.dispatchEvent(
-      new CustomEvent<{ field: string }>("edit-action-field", {
-        detail: { field },
+      new CustomEvent<{ path: string[] }>("edit-action-field", {
+        detail: { path },
         bubbles: true,
         composed: true,
       })

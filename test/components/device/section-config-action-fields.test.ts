@@ -69,9 +69,27 @@ describe("device-section-config — component action fields", () => {
     });
 
     inner._onEditActionField(
-      new CustomEvent("edit-action-field", { detail: { field: "open_action" } })
+      new CustomEvent("edit-action-field", { detail: { path: ["open_action"] } })
     );
 
     expect(selected).toBe("automation:component_action:my_gate:open_action");
+  });
+
+  it("joins a nested field path into the dotted section key", () => {
+    const { c, inner } = makeHost();
+    let selected: string | undefined;
+    c.addEventListener("section-select", (e) => {
+      selected = (e as CustomEvent<{ sectionKey: string }>).detail.sectionKey;
+    });
+
+    inner._onEditActionField(
+      new CustomEvent("edit-action-field", {
+        detail: { path: ["valves", "0", "run_duration_number", "set_action"] },
+      })
+    );
+
+    expect(selected).toBe(
+      "automation:component_action:my_gate:valves.0.run_duration_number.set_action"
+    );
   });
 });

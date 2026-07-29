@@ -32,6 +32,19 @@ describe("actionFieldLabel", () => {
     expect(actionFieldLabel("sequence", localize)).toBe("Sequence action");
   });
 
+  it("prefixes a dotted nested field with its container chain", () => {
+    expect(actionFieldLabel("valves.0.run_duration_number.set_action", localize)).toBe(
+      "Valves #1 → Run duration number → Set action"
+    );
+    expect(actionFieldLabel("repeat_number.set_action", localize)).toBe(
+      "Repeat number → Set action"
+    );
+    // Sibling leaves stay distinct — the sprinkler collision case.
+    expect(actionFieldLabel("multiplier_number.set_action", localize)).toBe(
+      "Multiplier number → Set action"
+    );
+  });
+
   it("falls back without throwing on an empty field", () => {
     // Not reachable from the call sites (the parser only passes matched
     // `*_action` keys), but the util must not crash if reused.

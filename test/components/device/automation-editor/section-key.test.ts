@@ -85,6 +85,19 @@ describe("locationFromSectionKey", () => {
     expect(locationFromSectionKey("automation:nope")).toBeNull();
   });
 
+  it("round-trips a dotted nested component_action field", () => {
+    const location = {
+      kind: "component_action" as const,
+      component_id: "lawn",
+      field: "valves.0.run_duration_number.set_action",
+    };
+    const key = sectionKeyFromLocation(location);
+    expect(key).toBe(
+      "automation:component_action:lawn:valves.0.run_duration_number.set_action"
+    );
+    expect(locationFromSectionKey(key)).toEqual(location);
+  });
+
   it("rejects malformed keys", () => {
     expect(locationFromSectionKey("automation:device_on:")).toBeNull();
     expect(locationFromSectionKey("automation:component_on:my_button")).toBeNull();
