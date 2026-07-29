@@ -137,8 +137,10 @@ export async function loadAndHydrateAvailable(
     if (options?.isStale?.()) return { status: "stale" };
     overrideLegacyActionEntries(available);
     // Fresh array refs so identity-based ``hasChanged`` consumers
-    // re-render with the hydrated entries (entries' object identity
-    // is preserved so per-entry caches stay valid).
+    // re-render with the hydrated entries. The list entries keep their
+    // object identity; the legacy override above remaps two actions'
+    // ``config_entries`` before any consumer renders, so no cache ever
+    // holds a pre-override object.
     const refreshed: AvailableAutomations = {
       ...available,
       triggers: [...available.triggers],
