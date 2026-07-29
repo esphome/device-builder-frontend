@@ -1030,7 +1030,7 @@
     "missing_dependencies_title": "{name} requires other components",
     "missing_dependencies_body": "Configure these first, then come back to add this one:",
     "missing_dependencies_add": "Add {domain}",
-    "bus_dependency_in_use_body": "The existing bus is already in use by another component and can't be shared; add a new one for this component:",
+    "bus_dependency_in_use_body": "No existing bus can host this component; each is already in use by another component or configured incompatibly. Add a new one for it:",
     "id_reference_empty": "No {domain} configured yet",
     "id_reference_auto_configured": "Auto (uses the configured {domain})",
     "id_reference_add": "Add {domain}",
