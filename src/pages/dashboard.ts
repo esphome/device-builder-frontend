@@ -27,6 +27,7 @@ import {
   executeClone,
   executeFriendlyName,
   executeRename,
+  performRename,
   scheduleScrollIntoView,
   toggleIgnore,
 } from "../components/dashboard/actions-ui.js";
@@ -928,8 +929,22 @@ export class ESPHomePageDashboard extends LitElement {
     this._tryConsumePendingScroll();
   }
 
-  _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
+  _onAdopted = (
+    e: CustomEvent<{ name: string; friendlyName: string; renameTo: string | null }>
+  ) => {
+    // ``name`` is the factory broadcast the import landed under; the
+    // rename flow re-keys the card when the OTA tail succeeds, and a
+    // failed rename leaves the device adopted under the factory name.
     this._highlightFreshDevice(`${e.detail.name}.yaml`);
+    if (e.detail.renameTo) {
+      void performRename(
+        this,
+        `${e.detail.name}.yaml`,
+        e.detail.name,
+        e.detail.renameTo,
+        false
+      );
+    }
   };
 
   /** Post-clone reveal (#2246): the search that matched the source would

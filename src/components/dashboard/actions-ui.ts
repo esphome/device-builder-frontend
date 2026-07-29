@@ -94,24 +94,25 @@ export async function executeRename(
     host._openConfirm({ kind: "rename-config-only", device, newName });
     return;
   }
-  await performRename(host, device, newName, false);
+  await performRename(host, device.configuration, device.name, newName, false);
 }
 
 /** Call ``devices/rename`` and surface the result (job-follow, success, or error). */
 export async function performRename(
   host: ESPHomePageDashboard,
-  device: ConfiguredDevice,
+  configuration: string,
+  currentName: string,
   newName: string,
   configOnly: boolean
 ): Promise<void> {
   let response: RenameDeviceResponse;
   try {
-    response = await host._api.renameDevice(device.configuration, newName, configOnly);
+    response = await host._api.renameDevice(configuration, newName, configOnly);
   } catch (err) {
     const reason = getErrorMessage(err);
     notifyError(
       host._localize("dashboard.action_rename_failed", {
-        name: device.name,
+        name: currentName,
         reason,
       })
     );

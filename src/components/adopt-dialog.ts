@@ -222,10 +222,11 @@ export class ESPHomeAdoptDialog extends LitElement {
   open(device: AdoptableDevice) {
     this._device = device;
     /* Default to the discovered hostname verbatim — including the
-       MAC-suffix factory firmware appends. The backend writes the
-       new YAML with ``name_add_mac_suffix: False`` so whatever the
-       user picks sticks; users who want a cleaner name can edit the
-       suffix off, but defaulting to a stripped form silently dropped
+       MAC-suffix factory firmware appends. The import always lands
+       under this broadcast name (the only hostname the running
+       device answers to); an edited name is applied afterwards via
+       the rename flow, which flashes the device before the old name
+       is dropped. Defaulting to a stripped form silently dropped
        the disambiguator on devices like ``apollo-plt-1-983300``. */
     this._name = device.name;
     this._friendlyName = device.friendly_name || "";
@@ -485,8 +486,16 @@ export class ESPHomeAdoptDialog extends LitElement {
       // when False keeps the call site clean and avoids relying on
       // the upstream ``import_config`` branch's ``if encryption:``
       // truthiness check accepting the literal string "false".
+      // Always import under the factory broadcast name — the only
+      // hostname the running device answers to. An edited name is
+      // applied by the rename flow the dashboard starts off the
+      // ``adopted`` event: its OTA tail flashes the device at the
+      // factory identity before the old name is dropped, and a
+      // failed rename keeps the device adopted under the factory
+      // name instead of stranding a hostname nothing broadcasts.
+      const factoryName = this._device.name;
       const args: Parameters<ESPHomeAPI["importDevice"]>[0] = {
-        name,
+        name: factoryName,
         project_name: this._device.project_name,
         package_import_url: this._device.package_import_url,
       };
@@ -497,14 +506,16 @@ export class ESPHomeAdoptDialog extends LitElement {
       // derivation the dashboard's ``_onAdopted`` handler uses so
       // both the welcome-banner flag (consumed on first device-editor
       // mount) and the highlight signal key off the same string.
-      // Pre-rename flag survives a rename only if the user opens
-      // the editor first — if they rename before opening, the rename
-      // flow drops the flag (see ``clearJustCreated`` call in
-      // ``_executeRename``); they've already engaged with the device
-      // so the welcome banner would just be noise.
-      markJustCreated(`${name}.yaml`);
+      // The rename flow drops the flag (``clearJustCreated`` in
+      // ``performRename``), so an adopt-with-rename skips the welcome
+      // banner — the follow-job dialog already has the user engaged.
+      markJustCreated(`${factoryName}.yaml`);
       this.close();
-      fireEvent(this, "adopted", { name, friendlyName });
+      fireEvent(this, "adopted", {
+        name: factoryName,
+        friendlyName,
+        renameTo: name !== factoryName ? name : null,
+      });
     } catch (err) {
       this._error = formatApiError(err, this._localize, "dashboard.adopt_error_generic");
     } finally {

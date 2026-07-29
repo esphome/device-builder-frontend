@@ -58,6 +58,48 @@ describe("adopt-dialog re-entry guard", () => {
   });
 });
 
+describe("adopt-then-rename (#2412)", () => {
+  it("imports under the factory name and requests a rename for an edited name", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    const adopted = vi.fn();
+    (priv as EventTarget).addEventListener("adopted", adopted);
+    priv.open(ethernetDevice());
+    priv._name = "kitchen";
+
+    await priv._submit();
+
+    // The running device only answers to its factory broadcast name;
+    // the edited name rides the adopted event for the rename flow.
+    expect(importDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "foo-1234" })
+    );
+    expect(adopted).toHaveBeenCalledTimes(1);
+    expect(adopted.mock.calls[0][0].detail).toEqual({
+      name: "foo-1234",
+      friendlyName: "Foo",
+      renameTo: "kitchen",
+    });
+  });
+
+  it("requests no rename when the name is unedited", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    const adopted = vi.fn();
+    (priv as EventTarget).addEventListener("adopted", adopted);
+    priv.open(ethernetDevice());
+
+    await priv._submit();
+
+    expect(importDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "foo-1234" })
+    );
+    expect(adopted.mock.calls[0][0].detail).toEqual({
+      name: "foo-1234",
+      friendlyName: "Foo",
+      renameTo: null,
+    });
+  });
+});
+
 describe("adopt-dialog wifi step (#1742)", () => {
   beforeEach(() => {
     _resetSecretKeysCache();

@@ -169,7 +169,13 @@ export function executeConfirm(
       void host._archiveDevice(pending.device);
       return;
     case "rename-config-only":
-      void performRename(host, pending.device, pending.newName, true);
+      void performRename(
+        host,
+        pending.device.configuration,
+        pending.device.name,
+        pending.newName,
+        true
+      );
       return;
     case "clear-queued-update":
       void clearQueuedUpdate(pending.device, host._api, host._localize);
