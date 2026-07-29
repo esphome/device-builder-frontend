@@ -1,4 +1,5 @@
 import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
+import { escapeRegExp } from "./escape-regexp.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
@@ -151,7 +152,7 @@ export function findAddedSection(
   if (newId) {
     const lines = yaml.split("\n");
     // The id is form input — escape it so the match is literal.
-    const escapedId = newId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedId = escapeRegExp(newId);
     const idRe = new RegExp(`^\\s*(?:-\\s+)?id:\\s*["']?${escapedId}["']?\\s*$`);
     for (const s of candidates) {
       for (let i = s.fromLine - 1; i < s.toLine && i < lines.length; i++) {
