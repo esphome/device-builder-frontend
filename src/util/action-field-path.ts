@@ -12,7 +12,7 @@ import type { YamlPathSegment } from "./yaml-ast.js";
  */
 
 /** Dotted `field` string for a config-entry path. */
-export function joinActionFieldPath(path: string[]): string {
+export function joinActionFieldPath(path: Array<string | number>): string {
   return path.join(".");
 }
 

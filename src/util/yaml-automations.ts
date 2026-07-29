@@ -5,8 +5,10 @@
  * unaffected; import from there or from here directly.
  */
 
+import { joinActionFieldPath } from "./action-field-path.js";
 import {
   endsBlockAtIndent,
+  isAutomationKey,
   isBlankOrCommentLine,
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
@@ -212,7 +214,7 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
     if (!segments) continue;
     const componentId = instanceComponentId(sections, host);
     if (!componentId) continue;
-    const dotted = segments.join(".");
+    const dotted = joinActionFieldPath(segments);
     const labelHead = host.name || componentId;
     automations.push({
       key: `automation:component_action:${componentId}:${dotted}`,
@@ -310,19 +312,18 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** Ancestor keys that place a ``*_action`` line inside an automation
- *  body rather than the instance's config tree. */
-const _AUTOMATION_BODY_KEYS = new Set(["then", "else", "actions"]);
-
-const _BLOCK_KEY_RE = /^([A-Za-z0-9_.]+):\s*(?:#.*)?$/;
-const _VALUED_KEY_RE = /^[A-Za-z0-9_.]+:\s+\S/;
+/** A dash item's leader — the match length is the item's content column. */
+const _DASH_LEADER_RE = /^\s*-(\s+|$)/;
 
 /**
  * Concrete path segments from *host*'s body to the ``*_action`` key at
  * *targetIdx*, list items as 0-based indices — the backend's
  * ``component_action`` addressing. ``null`` when the field sits inside
- * a trigger or automation body (edited within that automation's tree)
- * or the structure doesn't resolve.
+ * an automation body (an ``isAutomationKey`` ancestor — edited within
+ * that automation's tree) or the structure doesn't resolve. Best-effort
+ * like the rest of this fallback: block scalars and flow collections
+ * aren't modelled, so a key-shaped line inside one can misframe until
+ * backend parse corrects it.
  */
 function _actionFieldPath(
   lines: string[],
@@ -333,7 +334,6 @@ function _actionFieldPath(
 ): Array<string | number> | null {
   const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
   if (targetIndent < childIndent) return null;
-  if (targetIndent === childIndent) return [field];
   // Walk the instance body accumulating the enclosing frames: block
   // mapping keys by indent, list items as counted dash indices.
   const stack: Array<{ indent: number; seg: string | number }> = [];
@@ -342,18 +342,14 @@ function _actionFieldPath(
     if (isBlankOrCommentLine(line)) continue;
     let indent = lineIndent(line);
     let rest = line.slice(indent);
-    const dash = line.match(/^(\s*)-(\s+|$)/);
+    const dash = line.match(_DASH_LEADER_RE);
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      if (top.indent < indent) break;
+      if (dash && top.indent === indent && typeof top.seg === "number") break;
+      stack.pop();
+    }
     if (dash) {
-      while (stack.length) {
-        const top = stack[stack.length - 1];
-        if (
-          top.indent < indent ||
-          (top.indent === indent && typeof top.seg === "number")
-        ) {
-          break;
-        }
-        stack.pop();
-      }
       const top = stack[stack.length - 1];
       if (top && top.indent === indent && typeof top.seg === "number") {
         top.seg += 1;
@@ -364,46 +360,30 @@ function _actionFieldPath(
       if (!rest.trim()) continue;
       // An inline first key sits at the item's content column.
       indent = dash[0].length;
-    } else {
-      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
     }
     if (j === targetIdx) {
       for (const frame of stack) {
-        if (typeof frame.seg !== "string") continue;
-        if (
-          frame.seg.startsWith("on_") ||
-          frame.seg.endsWith("_action") ||
-          _AUTOMATION_BODY_KEYS.has(frame.seg)
-        ) {
-          return null;
-        }
+        if (typeof frame.seg === "string" && isAutomationKey(frame.seg)) return null;
       }
-      return [...stack.map((frame) => frame.seg), field];
+      const segments: Array<string | number> = stack.map((frame) => frame.seg);
+      segments.push(field);
+      return segments;
     }
-    const blockKey = rest.match(_BLOCK_KEY_RE);
-    if (blockKey) {
-      stack.push({ indent, seg: blockKey[1] });
-    } else if (!_VALUED_KEY_RE.test(rest) && indent < targetIndent && !dash) {
-      // A non-key, non-item construct shallower than the target (flow
-      // collection, block scalar) hides the structure — refuse rather
-      // than emit a wrong path.
-      return null;
-    }
+    const blockKey = rest.match(_BARE_MAPPING_KEY_RE);
+    if (blockKey) stack.push({ indent, seg: blockKey[1] });
   }
   return null;
 }
 
 /** Resolve a handler at ``indent`` to its target instance: the host for a
- *  direct child, or (when ``allowSubEntity``) the host's ided sub-entity for a
- *  deeper handler. ``null`` when no addressable target. The ``*_action`` field
- *  pass passes ``false`` — those fields are direct-child-only. */
+ *  direct child, or the host's ided sub-entity for a deeper handler.
+ *  ``null`` when no addressable target. */
 function _resolveHandlerScope(
   lines: string[],
   sections: YamlSection[],
   host: YamlSection,
   handlerIdx: number,
-  indent: number,
-  allowSubEntity = true
+  indent: number
 ): { componentId: string; displayName?: string; parentComponentId?: string } | null {
   const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
   if (indent === childIndent) {
@@ -412,7 +392,7 @@ function _resolveHandlerScope(
       displayName: host.name ?? undefined,
     };
   }
-  if (allowSubEntity && indent > childIndent) {
+  if (indent > childIndent) {
     const sub = _subEntity(lines, handlerIdx, childIndent);
     if (sub) {
       const parentComponentId = instanceComponentId(sections, host);

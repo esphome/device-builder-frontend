@@ -21,6 +21,11 @@ beforeEach(() => {
   _clearYamlSectionsMemo();
 });
 
+const componentActionItems = (yaml: string) =>
+  parseYamlAutomations(yaml).filter((s) =>
+    s.key.startsWith("automation:component_action:")
+  );
+
 describe("parseYamlTopLevelSections", () => {
   it("returns empty for empty input", () => {
     expect(parseYamlTopLevelSections("")).toEqual([]);
@@ -1161,9 +1166,7 @@ describe("parseYamlAutomations", () => {
     stop_action:
       - switch.turn_on: relay_stop
 `;
-    const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const items = componentActionItems(yaml);
     expect(items.map((s) => s.key)).toEqual([
       "automation:component_action:my_gate:open_action",
       "automation:component_action:my_gate:close_action",
@@ -1179,9 +1182,7 @@ describe("parseYamlAutomations", () => {
     open_action:
       - switch.turn_on: relay_open
 `;
-    const [item] = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const [item] = componentActionItems(yaml);
     expect(item.key).toBe("automation:component_action:cover_0:open_action");
   });
 
@@ -1203,9 +1204,7 @@ binary_sensor:
             - some_action:
                 - logger.log: nested
 `;
-    const actionRows = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const actionRows = componentActionItems(yaml);
     expect(actionRows).toEqual([]);
   });
 
@@ -1474,9 +1473,7 @@ describe("nested component_action sections (#1543)", () => {
 `;
 
   it("emits nested action fields with concrete dotted paths, in line order", () => {
-    const items = parseYamlAutomations(sprinklerYaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const items = componentActionItems(sprinklerYaml);
     expect(items.map((s) => s.actionField)).toEqual([
       "repeat_number.set_action",
       "valves.0.run_duration_number.set_action",
@@ -1506,9 +1503,7 @@ describe("nested component_action sections (#1543)", () => {
         set_action:
           - logger.log: changed
 `;
-    const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const items = componentActionItems(yaml);
     expect(items.map((s) => s.actionField)).toEqual([
       "valves.run_duration_number.set_action",
     ]);
@@ -1535,9 +1530,7 @@ cover:
           then:
             - switch.turn_on: relay
 `;
-    const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:component_action:")
-    );
+    const items = componentActionItems(yaml);
     // Only the real top-level field; nothing from inside bodies.
     expect(items.map((s) => s.actionField)).toEqual(["open_action"]);
   });

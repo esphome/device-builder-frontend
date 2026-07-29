@@ -26,6 +26,7 @@
  * caller doesn't need a fallback for "the parse failed".
  */
 import { syntaxTree } from "@codemirror/language";
+import { isAutomationKey } from "./yaml-section-lexer.js";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 
@@ -126,15 +127,7 @@ export function isUnderThenItem(state: EditorState, pos: number): boolean {
  *  ``close_action``, lock ``unlock_action``, …). Covers every
  *  list-of-actions body in the ESPHome schema; broader than the
  *  legacy ``then``-only carve-out. */
-const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
-
-/** True for pair keys whose value is a list of actions: ``then`` /
- *  ``else`` / ``on_*`` / ``*_action``. The indent-based completion
- *  fallback uses this when the Lezer parse mis-nests an empty trailing
- *  ``- `` and ``isUnderAutomationItem`` can't see the enclosing key. */
-export function isAutomationKey(key: string): boolean {
-  return RE_AUTOMATION_KEY.test(key);
-}
+export { isAutomationKey } from "./yaml-section-lexer.js";
 
 /**
  * True when *pos* is inside a list ``Item`` whose enclosing Pair
