@@ -289,9 +289,12 @@ export interface YamlSearchHit {
   total_matches?: number;
 }
 
-/** Response from devices/create. */
+/** Response from devices/create. `warning` is set when the config was
+ * kept despite a validation failure confined to remote package
+ * resolution (a package board whose upstream moved). */
 export interface WizardResponse {
   configuration: string;
+  warning?: string;
 }
 
 /** Response from `POST /api/devices/import_bundle`.

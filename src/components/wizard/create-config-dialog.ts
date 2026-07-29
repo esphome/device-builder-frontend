@@ -572,7 +572,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._resetCreateErrors();
     this._submitting = true;
     try {
-      const { configuration } = await this._api.createDevice(args);
+      const { configuration, warning } = await this._api.createDevice(args);
       // A supplied SSID is persisted to secrets.yaml by the backend; refresh
       // the shared secret-keys cache so the new device's editor doesn't show
       // the just-written `!secret wifi_*` refs as missing until a reload.
@@ -582,6 +582,14 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       }
       this._created = true; // keep the collision check frozen through the close
       this.navigateToCreated(configuration);
+      // A package board whose upstream failed to load still creates; the
+      // toast is the repair signal once the dialog has closed.
+      if (warning) {
+        notifyWarning(this._localize("dashboard.create_package_warning"), {
+          description: warning,
+          duration: 8000,
+        });
+      }
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
