@@ -145,7 +145,10 @@ function _canHost(
   semantics: BusSemantics
 ): boolean {
   for (const [flag, pin] of Object.entries(semantics.claims)) {
-    if (candidate[flag] === true && (bus.claimed.has(pin) || !(pin in bus.values))) {
+    if (
+      candidate[flag] === true &&
+      (bus.claimed.has(pin) || !Object.prototype.hasOwnProperty.call(bus.values, pin))
+    ) {
       return false;
     }
   }
