@@ -35,6 +35,7 @@ function makeApi(getConfig: ReturnType<typeof vi.fn>): ESPHomeAPI {
     ready: Promise.resolve(),
     getConfig,
     getPreferences: vi.fn().mockResolvedValue({ navigator_visible: true }),
+    getLegacySpellings: vi.fn().mockResolvedValue({}),
   } as unknown as ESPHomeAPI;
 }
 
@@ -266,6 +267,7 @@ describe("device page initial YAML loading gate", () => {
       ready,
       getConfig,
       getPreferences: vi.fn().mockResolvedValue({ navigator_visible: true }),
+      getLegacySpellings: vi.fn().mockResolvedValue({}),
     } as unknown as ESPHomeAPI;
     const page = await mountPage(api);
 

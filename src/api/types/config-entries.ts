@@ -251,6 +251,11 @@ export interface ConfigEntry {
    * unrooted control with no surrounding context).
    */
   hidden: boolean;
+  /** Set on a legacy-spelled entry: the canonical sibling key esphome
+   *  rewrites this one to (the api `services` entry carries
+   *  `"actions"`). Both spellings exist as siblings at the same level.
+   *  Absent on canonical entries. */
+  renamed_to?: string;
   /** Optional URL pointing to documentation specific to this field. */
   help_link: string | null;
   /** i18n override key. */

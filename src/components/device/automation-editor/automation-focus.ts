@@ -19,7 +19,7 @@ import type {
   AutomationTree,
   ConditionNode,
 } from "../../../api/types/automations.js";
-import { acceptedKeysFor, renamedKeysGeneration } from "../../../util/renamed-keys.js";
+import { acceptedKeysFor } from "../../../util/legacy-spellings.js";
 import type { YamlPathSegment } from "../../../util/yaml-ast.js";
 
 export type { YamlPathSegment };
@@ -154,22 +154,10 @@ function resolveFocus(
 }
 
 /** Memoized cursor-path → focus resolver, one per editor instance —
- *  keyed on (value, location, path) plus, for the api_action anchor
- *  that reads the registry, the renamed-keys generation — so it
- *  self-heals once the async hydrate lands the tree or the aliases
- *  arrive. */
+ *  keyed on (value, location, path) so it self-heals once the async
+ *  hydrate lands the tree. */
 export function createFocusResolver(): typeof resolveFocus {
-  const memo = memoizeOne(
-    (_generation: number, ...args: Parameters<typeof resolveFocus>) =>
-      resolveFocus(...args)
-  );
-  return (value, location, path) =>
-    memo(
-      location?.kind === "api_action" ? renamedKeysGeneration() : 0,
-      value,
-      location,
-      path
-    );
+  return memoizeOne(resolveFocus);
 }
 
 /**
@@ -198,7 +186,7 @@ function handlerAnchor(
       // The cursor path carries whichever block spelling the user's
       // YAML uses, so every catalog-recorded legacy alias anchors too.
       return {
-        keyPaths: acceptedKeysFor("api", "actions").map((key) => ["api", key]),
+        keyPaths: acceptedKeysFor("api", ["actions"]).map((key) => ["api", key]),
         index: "any",
       };
     default:

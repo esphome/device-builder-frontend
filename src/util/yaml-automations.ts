@@ -6,7 +6,7 @@
  */
 
 import { escapeRegExp } from "./escape-regexp.js";
-import { acceptedKeysFor, renamedKeysGeneration } from "./renamed-keys.js";
+import { acceptedKeysFor } from "./legacy-spellings.js";
 import {
   endsBlockAtIndent,
   isBlankOrCommentLine,
@@ -67,24 +67,14 @@ const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
  * instance and must not mutate it.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
-  // Alias hydration invalidates too.
-  const generation = renamedKeysGeneration();
-  if (
-    _automationsKey === yaml &&
-    _automationsGeneration === generation &&
-    _automationsValue
-  ) {
-    return _automationsValue;
-  }
+  if (_automationsKey === yaml && _automationsValue) return _automationsValue;
   const result = _parseYamlAutomations(yaml);
   _automationsKey = yaml;
-  _automationsGeneration = generation;
   _automationsValue = result;
   return result;
 }
 
 let _automationsKey: string | undefined;
-let _automationsGeneration: number | undefined;
 let _automationsValue: YamlSection[] | undefined;
 
 function _parseYamlAutomations(yaml: string): YamlSection[] {
@@ -269,12 +259,12 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   const apiBlock = _findTopLevelBlock(lines, "api");
   if (apiBlock) {
     let actionsBlock: { fromLine: number; toLine: number } | null = null;
-    for (const blockKey of acceptedKeysFor("api", "actions")) {
+    for (const blockKey of acceptedKeysFor("api", ["actions"])) {
       actionsBlock = _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, blockKey);
       if (actionsBlock) break;
     }
     if (actionsBlock) {
-      const itemKeys = acceptedKeysFor("api", "action");
+      const itemKeys = acceptedKeysFor("api", ["actions", "action"]);
       const items = _enumerateListItems(
         lines,
         actionsBlock.fromLine,
@@ -427,7 +417,7 @@ function _findChildBlock(
     }
   }
   if (childIndent === null) return null;
-  // childKey can be catalog-supplied (renamed-keys registry) — escape
+  // childKey can be catalog-supplied (legacy-spellings store) — escape
   // so a stray metachar can't throw out of the keystroke-time parser.
   const pattern = new RegExp(`^\\s{${childIndent}}${escapeRegExp(childKey)}\\s*:`);
   for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {

@@ -58,6 +58,7 @@ import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { ConfigLoadController } from "../util/config-load-controller.js";
+import { loadLegacySpellings } from "../util/legacy-spellings.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -352,6 +353,7 @@ export class ESPHomePageDevice extends LitElement {
     // Outside the failure path: a resolver throw must not repaint a
     // loaded config as a load failure.
     onReady: () => this._maybeResolveLineFromUrl(),
+    prefetch: () => loadLegacySpellings(this._api),
     onApiError: (err) => (err.errorCode === ErrorCode.NOT_FOUND ? "missing" : undefined),
   });
 

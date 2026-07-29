@@ -32,6 +32,7 @@ import type {
 import type {
   ComponentCatalogEntry,
   IntegrationDoc,
+  LegacySpellingRow,
   PagedComponentsResponse,
 } from "./types/components.js";
 import type { DesktopUpdateCheck, DesktopUpdateStarted } from "./types/desktop.js";
@@ -1469,6 +1470,13 @@ export class ESPHomeAPI {
         ...(platform ? { platform } : {}),
         ...(boardId ? { board_id: boardId } : {}),
       }
+    );
+  }
+
+  /** Every legacy-spelled catalog position, keyed by component. */
+  async getLegacySpellings(): Promise<Record<string, LegacySpellingRow[]>> {
+    return this.sendCommand<Record<string, LegacySpellingRow[]>>(
+      "components/get_legacy_spellings"
     );
   }
 

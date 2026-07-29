@@ -18,6 +18,10 @@ export interface ConfigLoadOptions {
   commit: (yaml: string) => void;
   /** Runs after a successful load, outside the failure path. */
   onReady?: () => void;
+  /** Awaited alongside the config fetch so its data is in place before
+   *  the gate opens. Must never reject (degrade internally instead) —
+   *  the error/retry ladder belongs to the config fetch alone. */
+  prefetch?: () => Promise<unknown>;
   /** Terminal server reply: ``{seed}`` commits substitute content as
    *  success, ``"missing"`` parks terminally, undefined errors. */
   onApiError?: (err: APIError) => { seed: string } | "missing" | undefined;
@@ -84,16 +88,19 @@ export class ConfigLoadController implements ReactiveController {
     if (!background || this.state !== "ready") this._setState("loading");
     let yaml: string | null;
     try {
-      yaml = await loadConfigWithRecovery(this._opts.api(), configuration, {
-        // Unmount and a changed target count as abandoned too, or a slow
-        // load keeps fetching against a page that has moved on.
-        abandoned: () =>
-          !this._active ||
-          this._opts.configuration() !== configuration ||
-          gen !== this._gen,
-        attempts: this._opts.attempts,
-        timeoutMs: this._opts.timeoutMs,
-      });
+      [yaml] = await Promise.all([
+        loadConfigWithRecovery(this._opts.api(), configuration, {
+          // Unmount and a changed target count as abandoned too, or a slow
+          // load keeps fetching against a page that has moved on.
+          abandoned: () =>
+            !this._active ||
+            this._opts.configuration() !== configuration ||
+            gen !== this._gen,
+          attempts: this._opts.attempts,
+          timeoutMs: this._opts.timeoutMs,
+        }),
+        this._opts.prefetch?.(),
+      ]);
     } catch (err) {
       const handled = err instanceof APIError ? this._opts.onApiError?.(err) : undefined;
       if (handled === "missing") {

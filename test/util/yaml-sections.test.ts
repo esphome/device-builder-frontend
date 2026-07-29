@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { _clearRenamedKeys, recordRenamedKeys } from "../../src/util/renamed-keys.js";
+import {
+  _clearLegacySpellings,
+  seedLegacySpellings,
+} from "../../src/util/legacy-spellings.js";
 import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import {
   _clearYamlSectionsMemo,
@@ -22,7 +25,7 @@ beforeEach(() => {
   _clearYamlSectionsMemo();
 });
 
-afterEach(() => _clearRenamedKeys());
+afterEach(() => _clearLegacySpellings());
 
 describe("parseYamlTopLevelSections", () => {
   it("returns empty for empty input", () => {
@@ -826,7 +829,12 @@ describe("parseYamlAutomations", () => {
   });
 
   it("accepts the legacy service: discriminator on api.actions:", () => {
-    recordRenamedKeys("api", { services: "actions", service: "action" });
+    seedLegacySpellings({
+      api: [
+        { path: ["actions"], spellings: ["actions", "services"] },
+        { path: ["actions", "action"], spellings: ["action", "service"] },
+      ],
+    });
     const yaml = `api:
   actions:
     - service: legacy_name

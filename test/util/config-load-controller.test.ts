@@ -40,6 +40,7 @@ function makeLoad(overrides: {
   onApiError?: (err: APIError) => { seed: string } | "missing" | undefined;
   onRefreshFailed?: () => void;
   onReady?: () => void;
+  prefetch?: () => Promise<unknown>;
 }) {
   const host = new FakeHost();
   const commit = vi.fn();
@@ -52,6 +53,7 @@ function makeLoad(overrides: {
     onReady: overrides.onReady,
     onApiError: overrides.onApiError,
     onRefreshFailed: overrides.onRefreshFailed,
+    prefetch: overrides.prefetch,
   });
   host.connect();
   return { host, controller, commit };
@@ -64,6 +66,25 @@ describe("ConfigLoadController", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("awaits the prefetch alongside the config before opening the gate", async () => {
+    let prefetchDone = false;
+    const orderings: string[] = [];
+    const { controller } = makeLoad({
+      getConfig: vi.fn().mockResolvedValue("esphome:"),
+      prefetch: () =>
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            prefetchDone = true;
+            resolve();
+          }, 0)
+        ),
+      onReady: () => orderings.push(prefetchDone ? "prefetch-first" : "gate-first"),
+    });
+    await controller.start();
+    expect(controller.state).toBe("ready");
+    expect(orderings).toEqual(["prefetch-first"]);
   });
 
   it("commits a loaded config and flips to ready, then onReady", async () => {
