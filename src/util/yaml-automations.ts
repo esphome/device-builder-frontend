@@ -28,10 +28,20 @@ import {
  * would surface a spurious row here until backend parse corrects it.
  */
 const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
+/**
+ * Accepted spellings of the api action-list block key, canonical
+ * first — matches the backend's BLOCK_KEYS constant. Consume this
+ * everywhere the pair is needed so a new site can't forget the
+ * legacy spelling.
+ */
+export const API_ACTIONS_BLOCK_KEYS = ["actions", "services"] as const;
 /** An inline ``on_*:`` trigger handler: group 1 the indent, group 2 the key. */
 const _ON_HANDLER_RE = /^(\s+)(on_[a-zA-Z_]+):/;
 /** A bare mapping-key line (``temperature:``) — key, no value, optional comment. */
 const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
+/** A dash line with inline content — the match length is the item's
+ *  content column. */
+const _DASH_CONTENT_RE = /^\s*-\s+(?=\S)/;
 
 /**
  * Synchronous fallback parser for automation sections. The navigator
@@ -257,8 +267,18 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
     // The block key has a legacy spelling alongside the item-level one
     // below; both match the backend's BLOCK_KEYS / ITEM_KEYS constants.
     const actionsBlock =
-      _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, "actions") ??
-      _findChildBlock(lines, apiBlock.fromLine, apiBlock.toLine, "services");
+      _findChildBlock(
+        lines,
+        apiBlock.fromLine,
+        apiBlock.toLine,
+        API_ACTIONS_BLOCK_KEYS[0]
+      ) ??
+      _findChildBlock(
+        lines,
+        apiBlock.fromLine,
+        apiBlock.toLine,
+        API_ACTIONS_BLOCK_KEYS[1]
+      );
     if (actionsBlock) {
       const items = _enumerateListItems(
         lines,
@@ -517,11 +537,19 @@ function _readKeyOnLine(lines: string[], fromLine: number, key: string): string 
   const m = target.match(new RegExp(`^\\s*-\\s*${value}`));
   if (m) return m[1];
   const dashIndent = _dashIndent(target);
+  // Siblings of the item's own mapping all sit at one column: the
+  // dash line's content column, or the first body line's for a bare
+  // dash. Pinning to it keeps a same-named key nested deeper in the
+  // body (a homeassistant.action call, a then block) from winning.
+  let childIndent = target.match(_DASH_CONTENT_RE)?.[0].length ?? null;
   const siblingRe = new RegExp(`^\\s+${value}`);
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    if (lineIndent(line) <= dashIndent) break;
+    const indent = lineIndent(line);
+    if (indent <= dashIndent) break;
+    childIndent ??= indent;
+    if (indent !== childIndent) continue;
     const kv = line.match(siblingRe);
     if (kv) return kv[1];
   }

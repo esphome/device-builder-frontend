@@ -7,6 +7,7 @@ import { resolveSectionEntries } from "../../../util/section-entry-overrides.js"
 import { unitAdvancedGate } from "../config-entry-form-plan.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { scrollFlashRow } from "../field-highlight.js";
+import { API_ACTIONS_BLOCK_KEYS } from "../../../util/yaml-automations.js";
 
 /**
  * When a backend error lands on an advanced field that's currently
@@ -48,7 +49,7 @@ export function revealAdvancedForFocus(
 export function maybeFlashApiActionsList(host: ESPHomeDeviceSectionConfig): void {
   if (host.sectionKey !== "api") return;
   const head = host.focusFieldPath?.[0];
-  if (head !== "actions" && head !== "services") return;
+  if (!API_ACTIONS_BLOCK_KEYS.some((key) => key === head)) return;
   const key = JSON.stringify(host.focusFieldPath);
   if (key === host._apiListFlashKey) return;
   const list = host.shadowRoot?.querySelector<HTMLElement>(

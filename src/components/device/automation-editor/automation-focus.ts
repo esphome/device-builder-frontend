@@ -20,6 +20,7 @@ import type {
   ConditionNode,
 } from "../../../api/types/automations.js";
 import type { YamlPathSegment } from "../../../util/yaml-ast.js";
+import { API_ACTIONS_BLOCK_KEYS } from "../../../util/yaml-automations.js";
 
 export type { YamlPathSegment };
 
@@ -176,10 +177,7 @@ function handlerAnchor(
       // Both block spellings: the caret must follow into a legacy
       // services block before the first canonicalizing write.
       return {
-        keyPaths: [
-          ["api", "actions"],
-          ["api", "services"],
-        ],
+        keyPaths: API_ACTIONS_BLOCK_KEYS.map((key) => ["api", key]),
         index: "any",
       };
     default:

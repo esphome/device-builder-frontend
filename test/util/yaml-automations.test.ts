@@ -194,6 +194,19 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
     ]);
   });
 
+  it("names a legacy item by its own key, not a nested homeassistant.action", () => {
+    const yaml = [
+      "api:",
+      "  services:",
+      "    - service: start_va",
+      "      then:",
+      "        - homeassistant.action:",
+      "            action: script.turn_on",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual(["automation:api_action:start_va"]);
+  });
+
   it("falls back to the legacy `service:` key for an api action name", () => {
     const yaml = [
       "api:",

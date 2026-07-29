@@ -152,6 +152,16 @@ describe("automationRelativePath", () => {
     expect(automationRelativePath(["api", "actions"], loc)).toBeNull();
   });
 
+  it("slices an api action under the legacy services anchor", () => {
+    const loc = { kind: "api_action", action_name: "ring" } as const;
+    expect(
+      automationRelativePath(["api", "services", 1, "then", 0, "logger.log"], loc)
+    ).toEqual(["then", 0, "logger.log"]);
+    // The bare block key matches the anchor with an empty tail; the
+    // index policy then rejects it, not the match loop.
+    expect(automationRelativePath(["api", "services"], loc)).toBeNull();
+  });
+
   it("scans past a lone first-key occurrence to the full anchor sequence", () => {
     // A param key equal to the anchor's first key must not block a later
     // full-sequence match.
