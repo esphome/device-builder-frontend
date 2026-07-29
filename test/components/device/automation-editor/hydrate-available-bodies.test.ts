@@ -167,32 +167,37 @@ describe("loadAndHydrateAvailable", () => {
     const slim = {
       ...emptySlim(),
       actions: [
-        {
-          id: "homeassistant.action",
-          name: "Action",
-          domain: "homeassistant",
-          config_entries: [entryOf("action"), entryOf("service"), entryOf("data")],
-        },
-        {
-          id: "homeassistant.service",
-          name: "Service",
-          domain: "homeassistant",
-          config_entries: [entryOf("action"), entryOf("service")],
-        },
-        {
-          id: "logger.log",
-          name: "Log",
-          domain: "logger",
-          config_entries: [entryOf("format")],
-        },
+        { id: "homeassistant.action", name: "Action", domain: "homeassistant" },
+        { id: "homeassistant.service", name: "Service", domain: "homeassistant" },
+        { id: "logger.log", name: "Log", domain: "logger" },
       ],
     } as unknown as AvailableAutomations;
+    const bodies: Record<string, unknown> = {
+      "actions/homeassistant.action": {
+        config_entries: [entryOf("action"), entryOf("service"), entryOf("data")],
+      },
+      "actions/homeassistant.service": {
+        config_entries: [entryOf("action"), entryOf("service")],
+      },
+      "actions/logger.log": { config_entries: [entryOf("format")] },
+    };
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+      getAutomationBodies: vi.fn(
+        async (refs: { type: string; id: string }[]) =>
+          Object.fromEntries(
+            refs.map((ref) => [`${ref.type}/${ref.id}`, bodies[`${ref.type}/${ref.id}`]])
+          ) as Record<string, never>
+      ),
     } as unknown as ESPHomeAPI;
 
     const outcome = await loadAndHydrateAvailable(api, "device.yaml");
     if (outcome.status !== "ok") throw new Error(outcome.status);
+    // Clean hydration — the override must apply to hydrated bodies, not
+    // to fixtures surviving a failed fetch.
+    expect(outcome.hydration).toEqual(
+      expect.objectContaining({ missingBody: 0, missingField: 0, rejected: 0 })
+    );
     const byId = new Map(outcome.available.actions.map((a) => [a.id, a]));
     for (const id of ["homeassistant.action", "homeassistant.service"]) {
       const entries = byId.get(id)!.config_entries;
