@@ -51,6 +51,8 @@ function makeEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
   return makeConfigEntry({ type: ConfigEntryType.PIN, label: "", ...overrides });
 }
 
+const NO_USED_PINS = new Map<number | string, string>();
+
 describe("seedBoardPinDefaults", () => {
   // Original ESP32-C3 i2c repro shape: GPIO8 tagged i2c_sda, GPIO9
   // tagged i2c_scl. The bus's catalog entry has scl/sda PIN entries
@@ -71,9 +73,13 @@ describe("seedBoardPinDefaults", () => {
   ];
 
   it("seeds matching pins from board manifest features", () => {
-    const result = seedBoardPinDefaults("i2c", i2cEntries, makeBoard(c3Pins), {
-      id: "i2c_1",
-    });
+    const result = seedBoardPinDefaults(
+      "i2c",
+      i2cEntries,
+      makeBoard(c3Pins),
+      { id: "i2c_1" },
+      NO_USED_PINS
+    );
     // GPIO8 is tagged i2c_sda → sda entry gets 8.
     // GPIO9 is tagged i2c_scl → scl entry gets 9.
     expect(result).toEqual({ id: "i2c_1", scl: 9, sda: 8 });
@@ -85,23 +91,32 @@ describe("seedBoardPinDefaults", () => {
       i2cEntries,
       makeBoard(c3Pins),
       // User typed scl manually before clicking Add.
-      { id: "i2c_1", scl: 5 }
+      { id: "i2c_1", scl: 5 },
+      NO_USED_PINS
     );
     // sda still seeded; scl untouched.
     expect(result).toEqual({ id: "i2c_1", scl: 5, sda: 8 });
   });
 
   it("returns input unchanged when board is null", () => {
-    const result = seedBoardPinDefaults("i2c", i2cEntries, null, {
-      id: "i2c_1",
-    });
+    const result = seedBoardPinDefaults(
+      "i2c",
+      i2cEntries,
+      null,
+      { id: "i2c_1" },
+      NO_USED_PINS
+    );
     expect(result).toEqual({ id: "i2c_1" });
   });
 
   it("returns input unchanged when board has no pins", () => {
-    const result = seedBoardPinDefaults("i2c", i2cEntries, makeBoard([]), {
-      id: "i2c_1",
-    });
+    const result = seedBoardPinDefaults(
+      "i2c",
+      i2cEntries,
+      makeBoard([]),
+      { id: "i2c_1" },
+      NO_USED_PINS
+    );
     expect(result).toEqual({ id: "i2c_1" });
   });
 
@@ -111,9 +126,13 @@ describe("seedBoardPinDefaults", () => {
       makePin({ gpio: 0, features: ["adc"] }),
       makePin({ gpio: 1, features: ["adc"] }),
     ]);
-    const result = seedBoardPinDefaults("i2c", i2cEntries, board, {
-      id: "i2c_1",
-    });
+    const result = seedBoardPinDefaults(
+      "i2c",
+      i2cEntries,
+      board,
+      { id: "i2c_1" },
+      NO_USED_PINS
+    );
     // No seeding — user picks pins manually via the form.
     expect(result).toEqual({ id: "i2c_1" });
   });
@@ -127,7 +146,8 @@ describe("seedBoardPinDefaults", () => {
       "audio_adc.es7210",
       [makeEntry({ key: "din", default_value: "GPIO4" })],
       makeBoard([makePin({ gpio: 4, features: ["adc"] })]),
-      {}
+      {},
+      NO_USED_PINS
     );
     expect(result).toEqual({});
   });
@@ -144,7 +164,8 @@ describe("seedBoardPinDefaults", () => {
       "featured.athom-smart-plug-v3.relay",
       [makeEntry({ key: "pin", default_value: "GPIO12" })],
       makeBoard([makePin({ gpio: 8, features: ["i2c_sda"] })]),
-      { pin: "GPIO12" } // catalog preset already in values
+      { pin: "GPIO12" }, // catalog preset already in values
+      NO_USED_PINS
     );
     // No change — preset stays put.
     expect(result).toEqual({ pin: "GPIO12" });
@@ -164,7 +185,8 @@ describe("seedBoardPinDefaults", () => {
         }),
       ],
       board,
-      {}
+      {},
+      NO_USED_PINS
     );
     expect(result).toEqual({});
   });
@@ -185,7 +207,8 @@ describe("seedBoardPinDefaults", () => {
         makeEntry({ key: "tx_pin", default_value: "GPIO1" }),
       ],
       board,
-      {}
+      {},
+      NO_USED_PINS
     );
     expect(result).toEqual({ rx_pin: 20, tx_pin: 21 });
   });
@@ -204,9 +227,103 @@ describe("seedBoardPinDefaults", () => {
         makeEntry({ key: "tx_gpio", default_value: "GPIO1" }), // _gpio suffix
       ],
       board,
-      {}
+      {},
+      NO_USED_PINS
     );
     expect(result).toEqual({ rx: 20, tx_gpio: 21 });
+  });
+
+  it("leaves the field unset when every tagged pin is occupied (issue #1555)", () => {
+    // Second uart on a board with one uart_rx/uart_tx pair: the first
+    // bus already wires 20/21, and no other tagged pin exists, so
+    // seeding them again would just manufacture a "used in multiple
+    // places" error on submit.
+    const board = makeBoard([
+      makePin({ gpio: 20, features: ["uart_rx"] }),
+      makePin({ gpio: 21, features: ["uart_tx"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "uart",
+      [
+        makeEntry({ key: "rx_pin", default_value: "GPIO3" }),
+        makeEntry({ key: "tx_pin", default_value: "GPIO1" }),
+      ],
+      board,
+      {},
+      new Map([
+        [20, "uart"],
+        [21, "uart"],
+      ])
+    );
+    // Left for the user to wire — no value at all, not a warned one.
+    expect(result).toEqual({});
+  });
+
+  it("seeds the free pin when only one of the pair is occupied", () => {
+    const board = makeBoard([
+      makePin({ gpio: 20, features: ["uart_rx"] }),
+      makePin({ gpio: 21, features: ["uart_tx"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "uart",
+      [
+        makeEntry({ key: "rx_pin", default_value: "GPIO3" }),
+        makeEntry({ key: "tx_pin", default_value: "GPIO1" }),
+      ],
+      board,
+      {},
+      new Map([[20, "switch"]])
+    );
+    expect(result).toEqual({ tx_pin: 21 });
+  });
+
+  it("suggests the next workable uart pair when the board tags two", () => {
+    const board = makeBoard([
+      makePin({ gpio: 44, features: ["uart_rx"] }),
+      makePin({ gpio: 43, features: ["uart_tx"] }),
+      makePin({ gpio: 18, features: ["uart_rx"] }),
+      makePin({ gpio: 17, features: ["uart_tx"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "uart",
+      [
+        makeEntry({ key: "rx_pin", default_value: "GPIO3" }),
+        makeEntry({ key: "tx_pin", default_value: "GPIO1" }),
+      ],
+      board,
+      {},
+      new Map([
+        [44, "uart"],
+        [43, "uart"],
+      ])
+    );
+    expect(result).toEqual({ rx_pin: 18, tx_pin: 17 });
+  });
+
+  it("falls through to the next free tagged pin (second i2c bus)", () => {
+    // wesp32 shape: i2c_sda / i2c_scl tagged on several pins. A second
+    // bus skips the pair the first bus wired and suggests the next
+    // workable pair by manifest order.
+    const board = makeBoard([
+      makePin({ gpio: 21, features: ["pwm", "i2c_sda"] }),
+      makePin({ gpio: 22, features: ["pwm", "i2c_scl"] }),
+      makePin({ gpio: 15, features: ["touch", "i2c_sda"] }),
+      makePin({ gpio: 4, features: ["adc", "i2c_scl"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "i2c",
+      [
+        makeEntry({ key: "sda", default_value: "SDA" }),
+        makeEntry({ key: "scl", default_value: "SCL" }),
+      ],
+      board,
+      {},
+      new Map([
+        [21, "i2c"],
+        [22, "i2c"],
+      ])
+    );
+    expect(result).toEqual({ sda: 15, scl: 4 });
   });
 
   it("uses the FIRST matching pin when multiple are tagged", () => {
@@ -222,7 +339,8 @@ describe("seedBoardPinDefaults", () => {
       "i2c",
       [makeEntry({ key: "sda", default_value: "SDA" })],
       board,
-      {}
+      {},
+      NO_USED_PINS
     );
     expect(result).toEqual({ sda: 8 });
   });

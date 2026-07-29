@@ -38,7 +38,8 @@ export function seedBoardPinDefaults(
   componentId: string,
   configEntries: ConfigEntry[],
   board: BoardCatalogEntry | null,
-  values: Record<string, unknown>
+  values: Record<string, unknown>,
+  usedPins: ReadonlyMap<number | string, string>
 ): Record<string, unknown> {
   if (!board?.pins?.length) return values;
   // Platform-qualified ids (``audio_adc.es7210``) → skip. Bus-like
@@ -55,7 +56,13 @@ export function seedBoardPinDefaults(
     // ``_pin_feature_from_name`` (device-builder#1012 / #1165).
     const role = entry.key.toLowerCase().replace(/_(pin|gpio)$/, "");
     const featureTag = `${componentId}_${role}`;
-    const matchingPin = board.pins.find((p) => p.features.includes(featureTag));
+    // First tagged pin the YAML doesn't wire yet: a second bus falls
+    // through to the next tagged pin (a wesp32 tags i2c_sda on three),
+    // and a board with every tagged pin taken leaves the field for the
+    // user instead of re-suggesting the first bus's pins (#1555).
+    const matchingPin = board.pins.find(
+      (p) => p.features.includes(featureTag) && !usedPins.has(p.gpio)
+    );
     if (!matchingPin) continue;
     next = { ...next, [entry.key]: matchingPin.gpio };
   }
