@@ -7,7 +7,6 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import {} from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
@@ -23,7 +22,7 @@ import {
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { setIn } from "../../util/nested-values.js";
+import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   parseTopLevelComponents,
@@ -129,6 +128,17 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   @state()
   private _showYaml = false;
+
+  /** Debounce for the live typed-value check: the renderers emit
+   *  partial text per keystroke, so validation waits for a pause. */
+  private static readonly LIVE_VALIDATE_DEBOUNCE_MS = 200;
+
+  private _liveValidateTimer: ReturnType<typeof setTimeout> | undefined;
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    clearTimeout(this._liveValidateTimer);
+  }
 
   /** Missing deps a present component already provides; resolved async,
    *  subtracted from the banner. See `depsSatisfiedByProvides`. */
@@ -465,15 +475,20 @@ export class ESPHomeAddComponentForm extends LitElement {
     // user input is a fresh signal that supersedes the previous bail;
     // the next submit attempt re-evaluates from scratch.
     const cleared = clearPathErrors(this._errors, path.join("."));
-    // A wrong *typed* value flags immediately (range/type/options via
-    // validateValueAt); required-empty stays a submit-only signal, so
-    // untouched fields keep the no-nag behavior.
-    const live = validateValueAt(this._entries, path, value);
-    if (cleared || live.size) {
-      const next = cleared ?? new Map(this._errors);
+    if (cleared) this._errors = cleared;
+    // A wrong *typed* value flags once typing pauses (range/type/options
+    // via validateValueAt); the renderers emit partial text per
+    // keystroke ("0x", "1e"), so an immediate check would flash errors
+    // mid-entry. Required-empty stays a submit-only signal, so untouched
+    // fields keep the no-nag behavior.
+    clearTimeout(this._liveValidateTimer);
+    this._liveValidateTimer = setTimeout(() => {
+      const live = validateValueAt(this._entries, path, getIn(this._values, path));
+      if (!live.size) return;
+      const next = new Map(this._errors);
       for (const [key, err] of live) next.set(key, err);
       this._errors = next;
-    }
+    }, ESPHomeAddComponentForm.LIVE_VALIDATE_DEBOUNCE_MS);
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 

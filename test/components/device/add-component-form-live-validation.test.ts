@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
@@ -40,22 +40,46 @@ function makeForm(): LiveValidationView {
 }
 
 describe("esphome-add-component-form live validation", () => {
-  it("flags an out-of-range typed value before any submit", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("flags an out-of-range typed value once typing pauses, before any submit", () => {
     const form = makeForm();
     form._onValueChange(changeEvent(["can_id"], 4434343434343434));
+    // Nothing mid-typing — the renderers emit partial text per keystroke.
+    expect(form._errors.size).toBe(0);
+    vi.advanceTimersByTime(250);
     expect(form._errors.get("can_id")?.code).toBe("validation.max");
+  });
+
+  it("never flashes an error for a partial value overwritten within the pause", () => {
+    const form = makeForm();
+    // A hex field's keystroke sequence: "0x" (unparseable) then the
+    // complete value — only the settled value is ever validated.
+    form._onValueChange(changeEvent(["can_id"], "0x"));
+    form._onValueChange(changeEvent(["can_id"], 42));
+    vi.advanceTimersByTime(250);
+    expect(form._errors.size).toBe(0);
   });
 
   it("clears the flag once the value is corrected", () => {
     const form = makeForm();
     form._onValueChange(changeEvent(["can_id"], 4434343434343434));
+    vi.advanceTimersByTime(250);
     form._onValueChange(changeEvent(["can_id"], 42));
+    vi.advanceTimersByTime(250);
     expect(form._errors.has("can_id")).toBe(false);
   });
 
   it("does not nag a required field emptied mid-form", () => {
     const form = makeForm();
     form._onValueChange(changeEvent(["can_id"], ""));
+    vi.advanceTimersByTime(250);
     expect(form._errors.size).toBe(0);
   });
 
@@ -65,7 +89,28 @@ describe("esphome-add-component-form live validation", () => {
       ["bit_rate", { key: "bit_rate", code: "validation.required" }],
     ]);
     form._onValueChange(changeEvent(["can_id"], 4434343434343434));
+    vi.advanceTimersByTime(250);
     expect(form._errors.get("bit_rate")?.code).toBe("validation.required");
     expect(form._errors.get("can_id")?.code).toBe("validation.max");
+  });
+
+  it("labels a per-item error key through index segments", () => {
+    const form = makeForm() as unknown as {
+      component: unknown;
+      _labelForErrorKey(key: string): string;
+    };
+    form.component = {
+      id: "remote_receiver",
+      name: "Remote Receiver",
+      config_entries: [
+        makeConfigEntry({
+          key: "codes",
+          label: "Codes",
+          type: ConfigEntryType.INTEGER,
+          multi_value: true,
+        }),
+      ],
+    };
+    expect(form._labelForErrorKey("codes.0")).toBe("Codes");
   });
 });

@@ -434,12 +434,6 @@ export function validateEntries(
 }
 
 /**
- * Recurse through `entries`, validating each leaf and descending into
- * NESTED entries. Errors are keyed by the dotted path so callers can
- * look them up by `path.join(".")` (matching how
- * `device-section-config.ts` reads them in `_errorAt`).
- */
-/**
  * Per-item checks for a scalar `multi_value` list, keyed `"<pathKey>.<idx>"`.
  *
  * A list-of-dicts the schema bundle couldn't type as nested renders
@@ -464,6 +458,12 @@ function _validateScalarItems(
   });
 }
 
+/**
+ * Recurse through `entries`, validating each leaf and descending into
+ * NESTED entries. Errors are keyed by the dotted path so callers can
+ * look them up by `path.join(".")` (matching how
+ * `device-section-config.ts` reads them in `_errorAt`).
+ */
 function _validateEntriesRecursive(
   entries: ConfigEntry[],
   values: Record<string, unknown>,

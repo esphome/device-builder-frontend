@@ -41,18 +41,6 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
 }
 
 /**
- * Whether the entry at *path* — or any NESTED ancestor along it — is
- * advanced-gated given the current *values*: an advanced entry whose scope
- * carries a material value doesn't gate, since it renders without the
- * toggle. Used to reveal a section's hidden advanced fields when the caret
- * or a backend error lands on one. List-index segments descend the value
- * scope only: the schema nests an item's fields directly under the list
- * entry, with no index level. When *unitGate* answers for the top-level
- * key, its verdict on the whole render unit (exclusive group / constraint
- * cluster, which paints atomically) replaces the per-entry rule. Returns
- * false if the path doesn't resolve.
- */
-/**
  * The `ConfigEntry` a config-entry path resolves to, or `undefined`.
  *
  * Index segments skip a level (a list item shares its field's entry),
@@ -73,6 +61,18 @@ export function entryAtPath(
   return entry;
 }
 
+/**
+ * Whether the entry at *path* — or any NESTED ancestor along it — is
+ * advanced-gated given the current *values*: an advanced entry whose scope
+ * carries a material value doesn't gate, since it renders without the
+ * toggle. Used to reveal a section's hidden advanced fields when the caret
+ * or a backend error lands on one. List-index segments descend the value
+ * scope only: the schema nests an item's fields directly under the list
+ * entry, with no index level. When *unitGate* answers for the top-level
+ * key, its verdict on the whole render unit (exclusive group / constraint
+ * cluster, which paints atomically) replaces the per-entry rule. Returns
+ * false if the path doesn't resolve.
+ */
 export function pathIsAdvanced(
   entries: ConfigEntry[],
   path: string[],
