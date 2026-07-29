@@ -1,10 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins that the host applies a deprecation notice's migration into the unsaved
- * draft: `applySectionValues` writes the nested `clk`, drops `clk_mode`
- * (`value: undefined` removes the key on serialization), and flushes one
- * `yaml-draft`.
+ * Pins the host's `applySectionValues`: writes a nested replacement value,
+ * drops a key via `value: undefined`, and flushes one `yaml-draft`.
  */
 import { describe, expect, it, vi } from "vitest";
 
