@@ -20,6 +20,7 @@
     "adopt_description": "Taking control of {name} creates a local ESPHome configuration. From now on you manage updates from the dashboard — vendor-provided firmware updates won't apply automatically.",
     "adopt_source_label": "Configuration source",
     "adopt_field_name": "Device name (hostname)",
+    "adopt_rename_hint": "Changing the hostname will build and install new firmware over the network.",
     "adopt_field_friendly_name": "Friendly name (optional)",
     "adopt_encryption_title": "Enable API encryption",
     "adopt_encryption_hint": "Generates a fresh key for the Native API. Recommended; required for Home Assistant integration.",

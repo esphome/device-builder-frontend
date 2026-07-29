@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -35,6 +35,11 @@ export class ESPHomeAdoptDialog extends LitElement {
   @consume({ context: apiContext })
   @state()
   private _api?: ESPHomeAPI;
+
+  // Hostnames already in use (configured devices + other discovered
+  // broadcasts); an edited name colliding here would only fail at the
+  // rename step, after the import already landed.
+  @property({ attribute: false }) takenHostnames: ReadonlySet<string> = new Set();
 
   @state() private _device: AdoptableDevice | null = null;
   @state() private _name = "";
@@ -182,6 +187,12 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
+      .name-hint {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        margin-top: var(--wa-space-2xs);
+      }
+
       /* Adoption's commit affordance is success-green rather than the
          standard primary tint (dialogActionButtonStyles); per that
          module's guidance, divergent colour intents stay local. This
@@ -299,8 +310,17 @@ export class ESPHomeAdoptDialog extends LitElement {
     const device = this._device;
     const nameTrimmed = this._name.trim();
     const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
+    const renamed = !!device && !!nameTrimmed && nameTrimmed !== device.name;
+    // The unedited factory default is exempt — its own importable row
+    // is in the taken set.
+    const nameTaken = renamed && this.takenHostnames.has(nameTrimmed);
     const canSubmit =
-      !!device && !!nameTrimmed && !nameErr && !this._busy && !this._wifiBlocking;
+      !!device &&
+      !!nameTrimmed &&
+      !nameErr &&
+      !nameTaken &&
+      !this._busy &&
+      !this._wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -328,7 +348,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                   <input
                     id="adopt-name"
                     type="text"
-                    class=${nameErr ? "invalid" : ""}
+                    class=${nameErr || nameTaken ? "invalid" : ""}
                     .value=${this._name}
                     ?disabled=${this._busy}
                     @input=${(e: Event) => {
@@ -336,8 +356,21 @@ export class ESPHomeAdoptDialog extends LitElement {
                     }}
                   />
                   ${renderInlineError(
-                    nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
+                    nameErr
+                      ? this._localize(nameErr.code, nameErr.params)
+                      : nameTaken
+                        ? this._localize("naming.hostname_taken", {
+                            hostname: nameTrimmed,
+                          })
+                        : undefined
                   )}
+                  ${
+                    renamed && !nameErr && !nameTaken
+                      ? html`<div class="name-hint">
+                          ${this._localize("dashboard.adopt_rename_hint")}
+                        </div>`
+                      : nothing
+                  }
                 </div>
 
                 <div class="field">
@@ -463,6 +496,9 @@ export class ESPHomeAdoptDialog extends LitElement {
     const name = this._name.trim();
     const friendlyName = this._friendlyName.trim();
     if (!name || validateDeviceName(name)) return;
+    // Enter bypasses the disabled button; re-check the taken gate so a
+    // collision can't slip through to a post-close rename failure.
+    if (name !== this._device.name && this.takenHostnames.has(name)) return;
     // Enter bypasses the disabled button; re-check the Wi-Fi gate so a
     // held Enter can't import before the secret store (or with bad creds).
     if (this._wifiBlocking) return;
@@ -493,6 +529,10 @@ export class ESPHomeAdoptDialog extends LitElement {
       // factory identity before the old name is dropped, and a
       // failed rename keeps the device adopted under the factory
       // name instead of stranding a hostname nothing broadcasts.
+      // The factory name is assumed valid unvalidated: esphome
+      // enforces the same hostname charset on ``name:`` at compile
+      // time, so a genuine factory image can't broadcast a
+      // non-conforming name.
       const factoryName = this._device.name;
       const args: Parameters<ESPHomeAPI["importDevice"]>[0] = {
         name: factoryName,
@@ -501,18 +541,18 @@ export class ESPHomeAdoptDialog extends LitElement {
       };
       if (friendlyName) args.friendly_name = friendlyName;
       if (this._encryption) args.encryption = "true";
-      await this._api.importDevice(args);
-      // Configuration filenames are ``<name>.yaml``; mirror the same
-      // derivation the dashboard's ``_onAdopted`` handler uses so
-      // both the welcome-banner flag (consumed on first device-editor
-      // mount) and the highlight signal key off the same string.
-      // The rename flow drops the flag (``clearJustCreated`` in
+      // The response carries the authoritative YAML path the backend
+      // wrote; it feeds the welcome-banner flag, the highlight, and
+      // the rename's ``configuration`` argument. The rename flow
+      // drops the just-created flag (``clearJustCreated`` in
       // ``performRename``), so an adopt-with-rename skips the welcome
       // banner — the follow-job dialog already has the user engaged.
-      markJustCreated(`${factoryName}.yaml`);
+      const { configuration } = await this._api.importDevice(args);
+      markJustCreated(configuration);
       this.close();
       fireEvent(this, "adopted", {
         name: factoryName,
+        configuration,
         friendlyName,
         renameTo: name !== factoryName ? name : null,
       });

@@ -4,6 +4,7 @@ import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import {
+  adoptFollowUp,
   executeClone,
   executeRename,
   openLogsWithMethod,
@@ -168,6 +169,56 @@ describe("openLogsWithMethod web-serial", () => {
     expect(logsDialog.openPassive).toHaveBeenCalledTimes(1);
     expect(logsDialog.open).not.toHaveBeenCalled();
     expect(toastInfo).not.toHaveBeenCalled();
+  });
+});
+
+describe("adoptFollowUp", () => {
+  function makeAdoptHost(renameDevice: ESPHomeAPI["renameDevice"]) {
+    const highlight = vi.fn();
+    const followJob = vi.fn();
+    const host = makeDashboardHost({
+      _api: { renameDevice } as unknown as ESPHomeAPI,
+      _localize: localize,
+      _highlightFreshDevice: highlight,
+      _commandDialog: { followJob },
+      _devices: [],
+    });
+    return { host, highlight, followJob };
+  }
+
+  it("starts an OTA rename against the imported configuration for an edited name", async () => {
+    const renameDevice = vi.fn(async () => ({
+      configuration: "kitchen.yaml",
+      job: { job_id: "j1", job_type: "compile" },
+      tail_job: { job_id: "j2", job_type: "rename" },
+    })) as unknown as ESPHomeAPI["renameDevice"];
+    const { host, highlight, followJob } = makeAdoptHost(renameDevice);
+
+    await adoptFollowUp(host, {
+      name: "foo-1234",
+      configuration: "foo-1234.yaml",
+      friendlyName: "Foo",
+      renameTo: "kitchen",
+    });
+
+    expect(highlight).toHaveBeenCalledWith("foo-1234.yaml");
+    expect(renameDevice).toHaveBeenCalledWith("foo-1234.yaml", "kitchen", false);
+    expect(followJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts no rename when the name was unedited", async () => {
+    const renameDevice = vi.fn() as unknown as ESPHomeAPI["renameDevice"];
+    const { host, highlight } = makeAdoptHost(renameDevice);
+
+    await adoptFollowUp(host, {
+      name: "foo-1234",
+      configuration: "foo-1234.yaml",
+      friendlyName: "Foo",
+      renameTo: null,
+    });
+
+    expect(highlight).toHaveBeenCalledWith("foo-1234.yaml");
+    expect(renameDevice).not.toHaveBeenCalled();
   });
 });
 

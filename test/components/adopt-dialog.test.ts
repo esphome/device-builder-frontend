@@ -76,6 +76,7 @@ describe("adopt-then-rename (#2412)", () => {
     expect(adopted).toHaveBeenCalledTimes(1);
     expect(adopted.mock.calls[0][0].detail).toEqual({
       name: "foo-1234",
+      configuration: "foo-1234.yaml",
       friendlyName: "Foo",
       renameTo: "kitchen",
     });
@@ -94,9 +95,32 @@ describe("adopt-then-rename (#2412)", () => {
     );
     expect(adopted.mock.calls[0][0].detail).toEqual({
       name: "foo-1234",
+      configuration: "foo-1234.yaml",
       friendlyName: "Foo",
       renameTo: null,
     });
+  });
+
+  it("refuses to submit an edited name that is already taken", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    priv.open(ethernetDevice());
+    priv.takenHostnames = new Set(["foo-1234", "kitchen"]);
+    priv._name = "kitchen";
+
+    await priv._submit();
+
+    expect(importDevice).not.toHaveBeenCalled();
+  });
+
+  it("exempts the unedited factory name from the taken set", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    priv.open(ethernetDevice());
+    // The device's own importable row puts its broadcast name in the set.
+    priv.takenHostnames = new Set(["foo-1234"]);
+
+    await priv._submit();
+
+    expect(importDevice).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -97,6 +97,26 @@ export async function executeRename(
   await performRename(host, device.configuration, device.name, newName, false);
 }
 
+/** Post-adopt follow-up: highlight the fresh card, then start the rename for an edited name. */
+export async function adoptFollowUp(
+  host: ESPHomePageDashboard,
+  detail: {
+    name: string;
+    configuration: string;
+    friendlyName: string;
+    renameTo: string | null;
+  }
+): Promise<void> {
+  // ``configuration`` is the backend-reported YAML the import landed
+  // under (the factory broadcast name); the rename flow re-keys the
+  // card when the OTA tail succeeds, and a failed rename leaves the
+  // device adopted under the factory name.
+  host._highlightFreshDevice(detail.configuration);
+  if (detail.renameTo) {
+    await performRename(host, detail.configuration, detail.name, detail.renameTo, false);
+  }
+}
+
 /** Call ``devices/rename`` and surface the result (job-follow, success, or error). */
 export async function performRename(
   host: ESPHomePageDashboard,

@@ -235,7 +235,10 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
         host._labelDialogEditing = null;
       }}
     ></esphome-label-dialog>
-    <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
+    <esphome-adopt-dialog
+      .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
+      @adopted=${host._onAdopted}
+    ></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
