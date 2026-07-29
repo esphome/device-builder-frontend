@@ -710,10 +710,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (this.entries.length === 0) return;
     const key = fieldKeyAttr(this.focusFieldPath);
     if (key === this._focusRevealKey) return;
+    if (!pathIsAdvanced(this.entries, this.focusFieldPath, this.values)) return;
     this._focusRevealKey = key;
-    if (pathIsAdvanced(this.entries, this.focusFieldPath)) {
-      this._emitAdvancedToggle(true);
-    }
+    this._emitAdvancedToggle(true);
   }
 
   /**

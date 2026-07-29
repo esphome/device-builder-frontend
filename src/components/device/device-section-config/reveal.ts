@@ -75,7 +75,7 @@ function autoRevealAdvanced(
   if (host._showAdvanced || !host._config) return;
   if (host._autoRevealedSections.has(host.sectionKey)) return;
   const entries = resolveSectionEntries(host.sectionKey, host._config.entries);
-  if (!paths.some((path) => pathIsAdvanced(entries, path))) return;
+  if (!paths.some((path) => pathIsAdvanced(entries, path, host._values))) return;
   host._autoRevealedSections.add(host.sectionKey);
   host._setShowAdvanced(true);
 }
