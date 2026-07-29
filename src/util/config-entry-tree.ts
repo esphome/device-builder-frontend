@@ -4,10 +4,10 @@
  * validation-error map.
  */
 
-import { hasMaterialValue } from "../components/device/config-entry-render-filter.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
+import { hasMaterialValue } from "./material-value.js";
 import { asRecord, getIn, isIndexSegment } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
