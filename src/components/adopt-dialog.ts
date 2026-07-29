@@ -250,12 +250,13 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._dialog.open = true;
     /* Seed the shared name pair after the open render mounts it.
        The hostname seeds to the discovered broadcast verbatim —
-       including the MAC-suffix factory firmware appends — and
-       latched, so friendly-name edits don't silently become a
-       rename. The import always lands under this broadcast name
-       (the only hostname the running device answers to); an edited
-       hostname is applied afterwards via the rename flow, which
-       flashes the device before the old name is dropped. */
+       including the MAC-suffix factory firmware appends — and holds
+       until the user types: a friendly-name edit re-derives it like
+       the create/rename flows. The import always lands under the
+       broadcast name (the only hostname the running device answers
+       to); a changed hostname is applied afterwards via the rename
+       flow, which flashes the device before the old name is
+       dropped. */
     void this.updateComplete.then(() => {
       this._nameInputs?.reset(device.friendly_name || "", device.name);
       this.requestUpdate();

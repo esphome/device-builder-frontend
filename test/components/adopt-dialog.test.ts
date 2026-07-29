@@ -127,7 +127,7 @@ describe("adopt-then-rename (#2412)", () => {
     });
   });
 
-  it("keeps the factory hostname when only the friendly name is edited", async () => {
+  it("re-derives the hostname from a friendly-name edit", async () => {
     const { priv, importDevice } = await makeDialog([]);
     const adopted = vi.fn();
     (priv as EventTarget).addEventListener("adopted", adopted);
@@ -143,12 +143,13 @@ describe("adopt-then-rename (#2412)", () => {
 
     await priv._submit();
 
-    // The seeded broadcast hostname is latched — a friendly-name edit
-    // must not silently turn adoption into a rename.
+    // Same idiom as create/rename: the seeded broadcast hostname holds
+    // only until the user types, then derivation takes over and the
+    // recalced name rides the rename flow.
     expect(importDevice).toHaveBeenCalledWith(
       expect.objectContaining({ name: "foo-1234", friendly_name: "Kitchen Sensor" })
     );
-    expect(adopted.mock.calls[0][0].detail.renameTo).toBe(null);
+    expect(adopted.mock.calls[0][0].detail.renameTo).toBe("kitchen-sensor");
   });
 
   it("refuses to submit an edited name that is already taken", async () => {

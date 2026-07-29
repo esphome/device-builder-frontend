@@ -192,11 +192,12 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   reset(prefillFriendly = "", prefillHostname = "") {
     this._friendly = prefillFriendly;
+    // A seeded hostname (adopt's factory broadcast) is the initial
+    // value only — derivation stays live, so a friendly-name edit
+    // recalcs it like the create/rename flows, and a direct hostname
+    // edit latches as usual.
     this._hostname = prefillHostname || slugifyHostname(prefillFriendly);
-    // A seeded hostname is an existing identity (adopt's factory
-    // broadcast), not a derived slug — latch it so friendly-name
-    // edits don't silently turn into a rename.
-    this._hostnameEdited = prefillHostname.length > 0;
+    this._hostnameEdited = false;
     this._open = false;
   }
 
