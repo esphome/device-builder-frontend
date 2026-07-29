@@ -63,6 +63,46 @@ describe("add-component-form requestSubmit (#2400)", () => {
     expect(((form as any)._errors as Map<string, unknown>).size).toBeGreaterThan(0);
   });
 
+  it("blocks on a missing dependency with a visible message", () => {
+    const needsBus = {
+      id: "sensor.ags10",
+      name: "AGS10",
+      dependencies: ["i2c"],
+      config_entries: [makeConfigEntry({ key: "name", type: ConfigEntryType.STRING })],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(needsBus);
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message = (form as any)._localBlockMessage as string;
+    expect(message).toContain("device.missing_dependencies_title");
+    expect(message).toContain("i2c");
+  });
+
+  it("blocks on a hidden-entry validation error with the dedicated message", () => {
+    // The failing entry is advanced + optional, so required-only mode
+    // never renders it; the error must surface as the block message
+    // instead of bailing silently.
+    const hiddenBad = {
+      id: "sensor.example",
+      config_entries: [
+        makeConfigEntry({
+          key: "frequency",
+          type: ConfigEntryType.INTEGER,
+          advanced: true,
+        }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(hiddenBad);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._values = { frequency: "not-a-number" };
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message = (form as any)._localBlockMessage as string;
+    expect(message).toContain("device.add_component_hidden_validation_error");
+  });
+
   it("ignores a request while a submit is in flight", () => {
     const { form, submits } = makeForm();
     const onSubmit = vi.fn();
