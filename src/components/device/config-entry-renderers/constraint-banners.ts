@@ -63,10 +63,11 @@ export function collectUnsatisfiedConstraints(
     );
   };
   const anyVisible = (keys: string[]): boolean => keys.some(keyVisible);
-  // For the zero-present kinds, name only the keys the user can see — a
-  // hidden alias shouldn't be prompted for. The all/none kinds exist to
-  // name the *missing* member, visible or not, so they keep every key.
-  const namedKeys = (kind: string, keys: string[]): string[] =>
+  // The all/none kinds exist to name the *missing* member, visible or
+  // not, so they keep every key; the rest prompt the user to set (or
+  // unset) something, so they name only keys the user can see — a
+  // hidden alias shouldn't be prompted for.
+  const namedKeys = (kind: ConstraintKind, keys: string[]): string[] =>
     kind === "all_or_none" || kind === "none_or_all" ? keys : keys.filter(keyVisible);
   for (const group of requiredGroups) {
     if (group.keys.some((k) => clusteredKeys.has(k))) continue;
@@ -94,6 +95,8 @@ export function collectUnsatisfiedConstraints(
     if (evaluateGroup("all_or_none", keys, values)) continue;
     messages.push({
       kind: "all_or_none",
+      // No-op for this loop's fixed kind; routed through so the naming
+      // rule lives in one place.
       keys: formatKeys(namedKeys("all_or_none", keys)),
     });
   }

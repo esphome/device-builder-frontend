@@ -63,15 +63,17 @@ export async function hydrateAvailableBodies(
 }
 
 /** Legacy registry aliases kept for reading existing configs — never
- *  offered for new nodes; the migrate nudge respells them. Enforced by
- *  the action/condition catalog picker only (the trigger picker filters
- *  its own list); the migration-side twin of these ids lives in
- *  ``src/util/config-migrations.ts``. */
+ *  offered for new nodes; the migrate nudge (backend
+ *  ``editor/migrate_config`` rules) respells them. Enforced by the
+ *  action/condition catalog picker only (the trigger picker filters
+ *  its own list). */
 export const LEGACY_AUTOMATION_IDS: ReadonlySet<string> = new Set([
   "homeassistant.service",
 ]);
 
-const _HA_ACTION_IDS = new Set(["homeassistant.action", "homeassistant.service"]);
+// Derived so a new alias can't reach the field override without also
+// leaving the picker.
+const _HA_ACTION_IDS = new Set(["homeassistant.action", ...LEGACY_AUTOMATION_IDS]);
 
 /** Hide the legacy ``service`` field so a new node can only author the
  *  canonical ``action``; a value already in the YAML still renders. */
