@@ -52,6 +52,7 @@ import {
 } from "../../util/pin/registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
+import { advancedGated } from "../../util/material-value.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
 import {
@@ -554,7 +555,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** True when a pre-filled advanced field forces the section open — it can't be
    *  collapsed while a value is set, matching the legacy material-value rule. */
   private _advancedForceOpen(): boolean {
-    return this.entries.some((e) => e.advanced && hasMaterialValue(e, this.values));
+    return this.entries.some((e) => e.advanced && !advancedGated(e, this.values));
   }
 
   /** The force-open kernel: a pre-filled advanced field opens the section, but

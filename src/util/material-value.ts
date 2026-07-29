@@ -22,6 +22,14 @@ import { YamlRawValue } from "./yaml-serialize.js";
  * any descendant leaf is set; an advanced group with at least one
  * filled child needs to render so the child is reachable.
  */
+/** The gate rule: an advanced entry hides behind the toggle unless valued. */
+export function advancedGated(
+  entry: ConfigEntry,
+  values: Record<string, unknown>
+): boolean {
+  return !!entry.advanced && !hasMaterialValue(entry, values);
+}
+
 export function hasMaterialValue(
   entry: ConfigEntry,
   values: Record<string, unknown>
