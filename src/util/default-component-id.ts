@@ -1,3 +1,4 @@
+import { normalizeEspHomeId } from "./esphome-id.js";
 import { isPlatformComponentId } from "./featured-id.js";
 import { collectInstanceScalars } from "./yaml-instance-scalars.js";
 
@@ -58,8 +59,9 @@ export function collectExistingIds(yaml: string): Set<string> {
 
 // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
 // board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
+// Generated ids are lowercased by convention before the shared reshape.
 function slugifyId(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+  return normalizeEspHomeId(raw.toLowerCase());
 }
 
 function uniquifyId(slug: string, existing: ReadonlySet<string>): string {
