@@ -50,14 +50,12 @@ function arrayItemHandlers(
   return { addItem, removeAt };
 }
 
-// New nested-list rows whose schema requires a declaring id start with a
-// unique one prefilled (#2452) — the user shouldn't have to invent it.
-// Uniqueness spans the document plus the whole form-values tree: in the
-// add dialog the form values aren't in the YAML yet, in the section
-// editor a just-added row may not have flushed through the draft
-// debounce, and a same-key sibling list under a *different* parent row
-// (esp32_ble_server's ``services[].characteristics[]``) isn't visible
-// through this list's own rows at all.
+// A new row whose schema requires a declaring id arrives with a unique one
+// prefilled (#2452). Uniqueness spans the document *and* the whole
+// form-values tree: the add dialog's values aren't in the YAML yet, a
+// just-added row may not have flushed through the draft debounce, and a
+// same-key sibling list under another parent row (esp32_ble_server's
+// ``services[].characteristics[]``) is invisible from this list's rows.
 function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, unknown> {
   const idChild = (entry.config_entries ?? []).find(
     (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
@@ -68,15 +66,13 @@ function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, u
   return { [idChild.key]: generateNestedItemId(entry.key, existing) };
 }
 
-// Walk the form-values tree and collect every string at *key*.
+// Walk the form-values tree and collect every string at *key*. Arrays fall
+// through the same branch — their numeric keys can't match a field name.
 function collectValuesAtKey(node: unknown, key: string, out: Set<string>): void {
-  if (Array.isArray(node)) {
-    for (const item of node) collectValuesAtKey(item, key, out);
-  } else if (node && typeof node === "object" && !(node instanceof YamlRawValue)) {
-    for (const [k, v] of Object.entries(node)) {
-      if (k === key && typeof v === "string" && v) out.add(v);
-      collectValuesAtKey(v, key, out);
-    }
+  if (!node || typeof node !== "object" || node instanceof YamlRawValue) return;
+  for (const [k, v] of Object.entries(node)) {
+    if (k === key && typeof v === "string" && v) out.add(v);
+    collectValuesAtKey(v, key, out);
   }
 }
 

@@ -37,7 +37,7 @@ export function generateDefaultComponentId(
   const isSingleton = !multiConf && !isPlatformComponentId(componentId);
   if (isSingleton) return null;
 
-  return uniquifyId(slugifyId(componentId), existing);
+  return generateUniqueId(componentId, existing);
 }
 
 /**
@@ -49,7 +49,7 @@ export function generateNestedItemId(
   listKey: string,
   existing: ReadonlySet<string>
 ): string {
-  return uniquifyId(slugifyId(listKey), existing);
+  return generateUniqueId(listKey, existing);
 }
 
 /** Scan the YAML for every `id:` line and return the set of values. */
@@ -57,22 +57,14 @@ export function collectExistingIds(yaml: string): Set<string> {
   return collectInstanceScalars(yaml, "id");
 }
 
-// Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
-// board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
-// Generated ids are lowercased by convention before the shared reshape, and
-// a digit-leading slug gets an underscore prefix — unlike user-typed input,
-// a generated id has no mid-typing UX to preserve.
-function slugifyId(raw: string): string {
+// Slug *raw* into a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*), then walk a
+// numeric suffix until it clears *existing*. Unlike user-typed input, a
+// generated id has no mid-typing UX to preserve, so a digit-leading slug
+// takes an underscore prefix rather than being left invalid.
+function generateUniqueId(raw: string, existing: ReadonlySet<string>): string {
   const slug = normalizeEspHomeId(raw.toLowerCase());
-  return /^[a-z_]/.test(slug) ? slug : `_${slug}`;
-}
-
-function uniquifyId(slug: string, existing: ReadonlySet<string>): string {
+  const base = /^[a-z_]/.test(slug) ? slug : `_${slug}`;
   let n = 1;
-  let candidate = `${slug}_${n}`;
-  while (existing.has(candidate)) {
-    n++;
-    candidate = `${slug}_${n}`;
-  }
-  return candidate;
+  while (existing.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
 }

@@ -65,13 +65,16 @@ function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unkno
   return out;
 }
 
-function makeCtx(values: Record<string, unknown>): CtxStub {
+function makeCtx(
+  values: Record<string, unknown>,
+  extraOverrides: Partial<RenderCtx> = {}
+): CtxStub {
   const renderEntry = vi.fn(() => "<rendered>");
   const emitChange = vi.fn();
   const filterRenderable = vi.fn((entries: ConfigEntry[]) => entries);
   const ctx = makeRenderCtx(values, {
     board: null,
-    overrides: { emitChange, renderEntry, filterRenderable },
+    overrides: { emitChange, renderEntry, filterRenderable, ...extraOverrides },
   });
   return { ctx, renderEntry, emitChange, filterRenderable };
 }
@@ -128,20 +131,9 @@ describe("renderNestedListField", () => {
 
   it("seeded id increments past document ids and unflushed sibling rows", () => {
     const entry = makeListEntry();
-    const renderEntry = vi.fn(() => "<rendered>");
-    const emitChange = vi.fn();
-    const filterRenderable = vi.fn((entries: ConfigEntry[]) => entries);
-    const ctx = makeRenderCtx(
+    const { ctx, emitChange } = makeCtx(
       { devices: [{ id: "devices_2" }] },
-      {
-        board: null,
-        overrides: {
-          emitChange,
-          renderEntry,
-          filterRenderable,
-          yaml: "esphome:\n  devices:\n    - id: devices_1\n",
-        },
-      }
+      { yaml: "esphome:\n  devices:\n    - id: devices_1\n" }
     );
     const tpl = renderNestedListField(entry, ["devices"], ctx);
     collectHandlers(tpl.values).pop()!();
