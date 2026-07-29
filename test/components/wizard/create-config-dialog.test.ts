@@ -164,6 +164,7 @@ function emitNextStep(el: ESPHomeCreateConfigDialog, step: string): void {
 // cases.
 afterEach(() => {
   _clearBoardBodyCache();
+  vi.mocked(toast.warning).mockClear();
 });
 
 describe("create-config-dialog create de-dupe + retry", () => {
@@ -176,6 +177,25 @@ describe("create-config-dialog create de-dupe + retry", () => {
     emitCreate(el, "kitchen");
 
     expect(createDevice).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the backend's package warning and still completes the create", async () => {
+    const createDevice = vi.fn().mockResolvedValue({
+      configuration: "proxy.yaml",
+      warning: "Created, but the remote package didn't validate",
+    });
+    const el = await mount({ createDevice });
+
+    emitCreate(el, "proxy");
+    await flush();
+
+    expect(toast.warning).toHaveBeenCalledWith(
+      "dashboard.create_package_warning",
+      expect.objectContaining({
+        description: "Created, but the remote package didn't validate",
+        duration: 8000,
+      })
+    );
   });
 
   it("allows a retry after a failed create (no permanent lockout)", async () => {
