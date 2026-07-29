@@ -14,12 +14,12 @@ import {
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
 import { _blockScalarBodyEnd } from "./yaml-section-list.js";
+import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import {
   instanceComponentId,
   lineIndent,
   listItemChildIndent,
   parseYamlTopLevelSections,
-  readInstanceScalar,
   smallestContainingSection,
   type YamlSection,
 } from "./yaml-sections-core.js";

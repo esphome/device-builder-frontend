@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { readInstanceScalar } from "../../src/util/yaml-instance-scalars.js";
 import {
   _clearYamlSectionsMemo,
   findFieldLine,
   parseYamlTopLevelSections,
-  readInstanceScalar,
   type YamlSection,
 } from "../../src/util/yaml-sections-core.js";
 
