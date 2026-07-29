@@ -19,6 +19,7 @@ import { EnterController } from "../util/enter-controller.js";
 import { fireEvent } from "../util/fire-event.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
+import { notifyWarning } from "../util/notify.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
@@ -554,7 +555,10 @@ export class ESPHomeAdoptDialog extends LitElement {
       // drops the just-created flag (``clearJustCreated`` in
       // ``performRename``), so an adopt-with-rename skips the welcome
       // banner — the follow-job dialog already has the user engaged.
-      const { configuration } = await this._api.importDevice(args);
+      const { configuration, warning } = await this._api.importDevice(args);
+      // The import succeeded but the device's remote package didn't
+      // resolve; the backend kept the file for an in-editor repair.
+      if (warning) notifyWarning(warning);
       markJustCreated(configuration);
       this.close();
       const detail: AdoptedDetail = {

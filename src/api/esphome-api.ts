@@ -1084,14 +1084,16 @@ export class ESPHomeAPI {
     });
   }
 
-  /** Import/adopt a discovered device. */
+  /** Import/adopt a discovered device. `warning` is set when the YAML
+   *  was kept despite a validation failure confined to remote package
+   *  resolution (a stale factory-broadcast URL). */
   async importDevice(args: {
     name: string;
     project_name?: string;
     package_import_url?: string;
     friendly_name?: string;
     encryption?: string;
-  }): Promise<{ configuration: string }> {
+  }): Promise<{ configuration: string; warning?: string }> {
     return this.sendCommand("devices/import", args);
   }
 

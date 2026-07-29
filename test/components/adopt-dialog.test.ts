@@ -8,6 +8,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../../src/util/notify.js", () => ({
+  notifyWarning: vi.fn(),
+}));
+
 import "../_mock-webawesome.js";
 
 import type { AdoptableDevice } from "../../src/api/types/devices.js";
@@ -105,6 +109,27 @@ describe("adopt-then-rename (#2412)", () => {
       friendlyName: "Foo",
       renameTo: "kitchen",
     });
+  });
+
+  it("surfaces the backend's package-resolution warning and still adopts", async () => {
+    const { notifyWarning } = await import("../../src/util/notify.js");
+    vi.mocked(notifyWarning).mockClear();
+    const { priv, importDevice } = await makeDialog([]);
+    importDevice.mockResolvedValue({
+      configuration: "foo-1234.yaml",
+      warning: "Imported, but the remote package didn't resolve",
+    });
+    const adopted = vi.fn();
+    (priv as EventTarget).addEventListener("adopted", adopted);
+    await openSettled(priv, ethernetDevice());
+
+    await priv._submit();
+
+    expect(notifyWarning).toHaveBeenCalledWith(
+      "Imported, but the remote package didn't resolve"
+    );
+    expect(adopted).toHaveBeenCalledTimes(1);
+    expect(priv._error).toBeNull();
   });
 
   it("requests no rename when the name is unedited", async () => {
