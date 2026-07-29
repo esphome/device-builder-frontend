@@ -16,6 +16,7 @@ import {
   type HydrationResult,
 } from "../../../util/automation-body-hydration.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
 /** Which catalog lists to hydrate bodies for. A consumer that renders
  *  only some of them (the trigger-less editors never show triggers)
@@ -60,6 +61,21 @@ export async function hydrateAvailableBodies(
     }
   }
   return result;
+}
+
+// Derived so a new alias can't reach the field override without also
+// leaving the picker.
+const _HA_ACTION_IDS = new Set(["homeassistant.action", ...LEGACY_AUTOMATION_IDS]);
+
+/** Hide the legacy ``service`` field so a new node can only author the
+ *  canonical ``action``; a value already in the YAML still renders. */
+function overrideLegacyActionEntries(available: AvailableAutomations): void {
+  for (const action of available.actions) {
+    if (!_HA_ACTION_IDS.has(action.id)) continue;
+    action.config_entries = action.config_entries.map((entry) =>
+      entry.key === "service" ? { ...entry, hidden: true } : entry
+    );
+  }
 }
 
 /** Discriminated outcome of :func:`loadAndHydrateAvailable`. */
@@ -116,9 +132,14 @@ export async function loadAndHydrateAvailable(
       options?.lists
     );
     if (options?.isStale?.()) return { status: "stale" };
+    overrideLegacyActionEntries(available);
     // Fresh array refs so identity-based ``hasChanged`` consumers
-    // re-render with the hydrated entries (entries' object identity
-    // is preserved so per-entry caches stay valid).
+    // re-render with the hydrated entries. The list entries keep their
+    // object identity; the legacy override above remaps two actions'
+    // ``config_entries`` before the refreshed refs reach state, so no
+    // cache ever holds a pre-override object. (A form mounted off the
+    // ``onPaint`` object mid-hydration can transiently see the legacy
+    // field; the refreshed refs force the corrective re-render.)
     const refreshed: AvailableAutomations = {
       ...available,
       triggers: [...available.triggers],

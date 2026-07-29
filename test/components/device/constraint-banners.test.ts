@@ -100,4 +100,28 @@ describe("collectUnsatisfiedConstraints", () => {
       { kind: "all_or_none", keys: "cert,key" },
     ]);
   });
+
+  it("names only visible keys when a group member is hidden and empty", () => {
+    const entries = [
+      { key: "action", type: "string", label: "Action" },
+      { key: "service", type: "string", label: "Service", hidden: true },
+    ] as unknown as ConfigEntry[];
+    const groups = [
+      { kind: "exactly_one", keys: ["service", "action"] },
+    ] as RequiredGroup[];
+    const messages = collect({ entries, requiredGroups: groups });
+    expect(messages).toEqual([{ kind: "exactly_one", keys: "action" }]);
+  });
+
+  it("keeps every key in an all-or-none prompt, hidden members included", () => {
+    const entries = [
+      { key: "cert", type: "string", label: "Cert" },
+      { key: "key", type: "string", label: "Key", hidden: true },
+    ] as unknown as ConfigEntry[];
+    const groups = [
+      { kind: "all_or_none", keys: ["cert", "key"] },
+    ] as unknown as RequiredGroup[];
+    const messages = collect({ entries, requiredGroups: groups, values: { cert: "x" } });
+    expect(messages).toEqual([{ kind: "all_or_none", keys: "cert,key" }]);
+  });
 });

@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import toast from "sonner-js";
+import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationAction,
@@ -148,6 +149,10 @@ describe("hydrateAvailableBodies", () => {
 });
 
 describe("loadAndHydrateAvailable", () => {
+  afterEach(() => {
+    _clearAutomationBodyCache();
+  });
+
   const emptySlim = (): AvailableAutomations =>
     ({
       triggers: [],
@@ -156,6 +161,53 @@ describe("loadAndHydrateAvailable", () => {
       scripts: [],
       devices: [],
     }) as unknown as AvailableAutomations;
+
+  it("hides the legacy service field on the homeassistant actions", async () => {
+    const entryOf = (key: string) => ({ key, type: "string", label: key });
+    const slim = {
+      ...emptySlim(),
+      actions: [
+        { id: "homeassistant.action", name: "Action", domain: "homeassistant" },
+        { id: "homeassistant.service", name: "Service", domain: "homeassistant" },
+        { id: "logger.log", name: "Log", domain: "logger" },
+      ],
+    } as unknown as AvailableAutomations;
+    const bodies: Record<string, unknown> = {
+      "actions/homeassistant.action": {
+        config_entries: [entryOf("action"), entryOf("service"), entryOf("data")],
+      },
+      "actions/homeassistant.service": {
+        config_entries: [entryOf("action"), entryOf("service")],
+      },
+      "actions/logger.log": { config_entries: [entryOf("format")] },
+    };
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+      getAutomationBodies: vi.fn(
+        async (refs: { type: string; id: string }[]): Promise<Record<string, unknown>> =>
+          Object.fromEntries(
+            refs.map((ref) => [`${ref.type}/${ref.id}`, bodies[`${ref.type}/${ref.id}`]])
+          )
+      ),
+    } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+    if (outcome.status !== "ok") throw new Error(outcome.status);
+    // Clean hydration — the override must apply to hydrated bodies, not
+    // to fixtures surviving a failed fetch.
+    expect(outcome.hydration).toEqual(
+      expect.objectContaining({ missingBody: 0, missingField: 0, rejected: 0 })
+    );
+    const byId = new Map(outcome.available.actions.map((a) => [a.id, a]));
+    for (const id of ["homeassistant.action", "homeassistant.service"]) {
+      const entries = byId.get(id)!.config_entries;
+      expect(entries.find((e) => e.key === "service")?.hidden).toBe(true);
+      expect(entries.find((e) => e.key === "action")?.hidden).toBeUndefined();
+    }
+    expect(
+      byId.get("logger.log")!.config_entries.find((e) => e.key === "format")?.hidden
+    ).toBeUndefined();
+  });
 
   it("issues exactly one getAvailableAutomations call per invocation", async () => {
     const slim = emptySlim();

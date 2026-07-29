@@ -33,6 +33,7 @@
  * (conditions don't have a target — they're tested against the
  * whole device state).
  */
+import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 import { consume } from "@lit/context";
 import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
@@ -363,7 +364,9 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   }
 
   private _renderActiveTab() {
-    const filtered = this._applyQuery(this.items);
+    const filtered = this._applyQuery(
+      this.items.filter((item) => !LEGACY_AUTOMATION_IDS.has(item.id))
+    );
     switch (this._activeTab) {
       case "by-target":
         return this._renderByTarget(filtered);

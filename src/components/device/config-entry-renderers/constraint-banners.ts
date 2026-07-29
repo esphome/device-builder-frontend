@@ -47,27 +47,36 @@ export function collectUnsatisfiedConstraints(
   // hidden / depends_on / platform, or simply not a rendered entry), matching
   // the cluster box — otherwise the prompt nags about fields the user can't set.
   const byKey = new Map(entries.map((e) => [e.key, e]));
-  const anyVisible = (keys: string[]): boolean =>
-    keys.some((k) => {
-      const entry = byKey.get(k);
-      return (
-        entry !== undefined &&
-        (getIn(values, [k]) !== undefined ||
-          isEntryVisible(
-            entry,
-            values,
-            presentComponents,
-            targetPlatform,
-            undefined,
-            entries
-          ))
-      );
-    });
+  const keyVisible = (k: string): boolean => {
+    const entry = byKey.get(k);
+    return (
+      entry !== undefined &&
+      (getIn(values, [k]) !== undefined ||
+        isEntryVisible(
+          entry,
+          values,
+          presentComponents,
+          targetPlatform,
+          undefined,
+          entries
+        ))
+    );
+  };
+  const anyVisible = (keys: string[]): boolean => keys.some(keyVisible);
+  // The all/none kinds exist to name the *missing* member, visible or
+  // not, so they keep every key; the rest prompt the user to set (or
+  // unset) something, so they name only keys the user can see — a
+  // hidden alias shouldn't be prompted for.
+  const namedKeys = (kind: ConstraintKind, keys: string[]): string[] =>
+    kind === "all_or_none" || kind === "none_or_all" ? keys : keys.filter(keyVisible);
   for (const group of requiredGroups) {
     if (group.keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(group.keys)) continue;
     if (evaluateGroup(group.kind, group.keys, values)) continue;
-    messages.push({ kind: group.kind, keys: formatKeys(group.keys) });
+    messages.push({
+      kind: group.kind,
+      keys: formatKeys(namedKeys(group.kind, group.keys)),
+    });
   }
   // buildConstraintClusters folds every *non-exclusive* inclusive group into
   // a cluster (whose members land in clusteredKeys), so this loop only fires
@@ -84,7 +93,12 @@ export function collectUnsatisfiedConstraints(
     if (keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(keys)) continue;
     if (evaluateGroup("all_or_none", keys, values)) continue;
-    messages.push({ kind: "all_or_none", keys: formatKeys(keys) });
+    messages.push({
+      kind: "all_or_none",
+      // No-op for this loop's fixed kind; routed through so the naming
+      // rule lives in one place.
+      keys: formatKeys(namedKeys("all_or_none", keys)),
+    });
   }
   return messages;
 }
