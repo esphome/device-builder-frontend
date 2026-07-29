@@ -57,19 +57,23 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       this._detectedFor = this.configuration;
       this._dismissed = false;
       this._needed = false;
-      clearTimeout(this._recheckTimer);
+      this._cancelRecheck();
       void this._detect();
-    } else if (changed.has("yaml") && this._needed && !this._dismissed) {
-      // Re-check only while the nudge is live so a completed migration
-      // clears it; anything typed later waits for the next load.
-      clearTimeout(this._recheckTimer);
-      this._recheckTimer = setTimeout(() => void this._detect(), RECHECK_DEBOUNCE_MS);
+    } else if (
+      changed.has("yaml") &&
+      (this._needed || this._recheckTimer !== undefined) &&
+      !this._dismissed
+    ) {
+      // Re-check only while the nudge is live (or a load-path re-arm is
+      // pending — typing defers it) so a completed migration clears it;
+      // anything typed later waits for the next load.
+      this._armRecheck();
     }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    clearTimeout(this._recheckTimer);
+    this._cancelRecheck();
   }
 
   static styles = [
@@ -95,9 +99,22 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       dismissLabel: this._localize("device.config_migration_dismiss"),
       onDismiss: () => {
         this._dismissed = true;
-        clearTimeout(this._recheckTimer);
+        this._cancelRecheck();
       },
     });
+  }
+
+  private _armRecheck(): void {
+    clearTimeout(this._recheckTimer);
+    this._recheckTimer = setTimeout(() => {
+      this._recheckTimer = undefined;
+      void this._detect();
+    }, RECHECK_DEBOUNCE_MS);
+  }
+
+  private _cancelRecheck(): void {
+    clearTimeout(this._recheckTimer);
+    this._recheckTimer = undefined;
   }
 
   /** Dry-run migrate on the draft; a stale resolve (buffer or config moved on) is discarded. */
@@ -111,10 +128,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
         // Only the buffer moved on — re-arm instead of dropping, so a
         // keystroke inside the round-trip can't lose the load's one
         // detection shot.
-        if (!this._dismissed) {
-          clearTimeout(this._recheckTimer);
-          this._recheckTimer = setTimeout(() => void this._detect(), RECHECK_DEBOUNCE_MS);
-        }
+        if (!this._dismissed && this.isConnected) this._armRecheck();
         return;
       }
       this._needed = yaml_diff !== null;

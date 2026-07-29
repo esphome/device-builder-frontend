@@ -181,6 +181,53 @@ describe("config-migration-notice", () => {
     expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
   });
 
+  it("typing defers a pending load-path re-arm instead of firing per debounce", async () => {
+    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let call = 0;
+    const api = makeApi(() => {
+      call += 1;
+      if (call === 1) {
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve({ yaml_diff: DIFF });
+    });
+    const [el] = await mount(LEGACY, api);
+    el.yaml = `${LEGACY}# one\n`;
+    await el.updateComplete;
+    resolveFirst({ yaml_diff: DIFF });
+    await Promise.resolve();
+    // Keystrokes inside the debounce window keep deferring the re-arm.
+    await vi.advanceTimersByTimeAsync(400);
+    el.yaml = `${LEGACY}# two\n`;
+    await el.updateComplete;
+    await vi.advanceTimersByTimeAsync(400);
+    expect(api.migrateConfig).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(400);
+    await el.updateComplete;
+    expect(api.migrateConfig).toHaveBeenCalledTimes(2);
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
+  });
+
+  it("a resolve after disconnect arms nothing", async () => {
+    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    const api = makeApi(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+    );
+    const [el] = await mount(LEGACY, api);
+    el.yaml = `${LEGACY}# edited\n`;
+    await el.updateComplete;
+    el.remove();
+    resolveFirst({ yaml_diff: DIFF });
+    await Promise.resolve();
+    await vi.runAllTimersAsync();
+    expect(api.migrateConfig).toHaveBeenCalledTimes(1);
+  });
+
   it("dismiss cancels a pending re-check", async () => {
     const [el, api] = await mount(LEGACY);
     el.yaml = CANONICAL;
