@@ -36,7 +36,7 @@ import {
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
-import { buildInitialValues } from "./add-component-form-seed.js";
+import { buildInitialValues, findReferencePath } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
@@ -92,6 +92,18 @@ export class ESPHomeAddComponentForm extends LitElement {
    *  they already filled (an SPI device's `cs_pin`) survives the round-trip. */
   @property({ attribute: false })
   restoredValues: Record<string, unknown> | null = null;
+
+  /** Deps whose block exists in the YAML but has no bus instance this
+   *  component can attach to (every uart's rx already claimed); folded
+   *  into the missing-deps banner and submit gate so the user detours
+   *  to a new bus instead of shipping a validation error. */
+  @property({ attribute: false })
+  busBlockedDeps: string[] | null = null;
+
+  /** The sole existing bus this component can attach to; seeded into the
+   *  matching reference field so the attachment is explicit. */
+  @property({ attribute: false })
+  busReference: { domain: string; id: string } | null = null;
 
   /** Per-field dropdown narrowing the requester imposes via a list
    *  `bus_constraints` value (CN105 -> baud_rate [2400, 9600]); the
@@ -221,16 +233,32 @@ export class ESPHomeAddComponentForm extends LitElement {
     ) {
       void this._resolveProvidedDeps();
     }
+    // The bus assessment resolves async in the dialog, so the reference can
+    // arrive after `_initValues` seeded; apply it into a still-empty field.
+    if (changedProperties.has("busReference") && this._initialized && this.busReference) {
+      const path = findReferencePath(
+        this._entries,
+        this.busReference.domain,
+        [],
+        this._values
+      );
+      if (path) this._values = setIn(this._values, path, this.busReference.id);
+    }
   }
 
   /** Net-missing deps driving the banner and submit gate: the literal-name
-   *  scan minus those a present component provides (`_providedDeps`). */
+   *  scan minus those a present component provides (`_providedDeps`), plus
+   *  deps present but with no attachable bus (`busBlockedDeps`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
-    return findMissingDependencies(
+    const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
       present
     ).filter((d) => !this._providedDeps.has(d));
+    for (const dep of this.busBlockedDeps ?? []) {
+      if (!missing.includes(dep)) missing.push(dep);
+    }
+    return missing;
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -283,6 +311,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       prefillReference: this.prefillReference,
       prefillFields: this.prefillFields,
       restoredValues: this.restoredValues,
+      busReference: this.busReference,
       localize: this._localize,
     });
   }
@@ -387,6 +416,8 @@ export class ESPHomeAddComponentForm extends LitElement {
    * ``willUpdate``).
    */
   private _renderMissingDeps(missing: string[]) {
+    const blocked = new Set(this.busBlockedDeps ?? []);
+    const allBlocked = blocked.size > 0 && missing.every((d) => blocked.has(d));
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
@@ -396,7 +427,13 @@ export class ESPHomeAddComponentForm extends LitElement {
               name: this.component.name,
             })}
           </div>
-          <div>${this._localize("device.missing_dependencies_body")}</div>
+          <div>
+            ${
+              allBlocked
+                ? this._localize("device.bus_dependency_in_use_body")
+                : this._localize("device.missing_dependencies_body")
+            }
+          </div>
           <div class="deps-warning-actions">
             ${missing.map(
               (d) =>

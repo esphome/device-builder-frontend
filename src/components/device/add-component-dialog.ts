@@ -19,9 +19,18 @@ import { fireSectionEvent } from "./section-editor.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  assessBusHostability,
+  EXCLUSIVE_BUS_DOMAINS,
+  type BusHostability,
+} from "../../util/bus-availability.js";
+import { loadCatalog } from "../../util/yaml-completion-catalog.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
-import { findMissingDependencies } from "./add-component-deps.js";
+import {
+  depsSatisfiedByProvides,
+  findMissingDependencies,
+} from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   matchesDepDomain,
@@ -181,6 +190,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
    *  resolve time discards its result. */
   private _selectionSeq = 0;
 
+  /** Which existing buses of `domain` can host `_selected`; null while no
+   *  bus-constrained component is selected (or the lookup failed). */
+  @state()
+  private _busHostability: { domain: string; hostability: BusHostability } | null = null;
+
+  /** Guards `_assessBusHostability` against out-of-order resolutions. */
+  private _busAssessSeq = 0;
+
   // Full-screen on mobile (overrides base-dialog's centered default): the
   // catalog is a wide, content-heavy view that needs the whole viewport on a
   // phone rather than being boxed into a centered column.
@@ -240,6 +257,85 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // Bumping here couples bundle/detour teardown to the selection
     // token so an in-flight hydrate can't resurrect cleared state.
     this._selectionSeq++;
+  }
+
+  override willUpdate(changedProperties: Map<string, unknown>) {
+    super.willUpdate(changedProperties);
+    if (changedProperties.has("_selected") || changedProperties.has("yaml")) {
+      void this._assessBusHostability();
+    }
+  }
+
+  /**
+   * Refresh `_busHostability` for the current `(selected, yaml)`. Only a
+   * component declaring `bus_constraints` on an exclusive-claim bus domain
+   * gets an assessment; anything uncertain (catalog lookup failure, a present
+   * bus *provider* whose channels the bus scan can't model) resolves to
+   * null — fail open, today's behavior.
+   */
+  private async _assessBusHostability(): Promise<void> {
+    const seq = ++this._busAssessSeq;
+    const entry = this._selected;
+    const domain = (entry?.dependencies ?? []).find(
+      (dep) => EXCLUSIVE_BUS_DOMAINS.has(dep) && entry?.bus_constraints?.[dep]
+    );
+    if (!entry || !domain) {
+      this._busHostability = null;
+      return;
+    }
+    let result: { domain: string; hostability: BusHostability } | null = null;
+    try {
+      const catalog = await loadCatalog(this._api);
+      const hostability = assessBusHostability(
+        this.yaml,
+        domain,
+        entry.bus_constraints![domain],
+        (id) => catalog.byId.get(id)?.bus_constraints
+      );
+      result = { domain, hostability };
+      if (hostability.busCount > 0 && hostability.compatibleIds.length === 0) {
+        // Exclusivity only covers native buses; a configured provider
+        // (a `usb_uart:` channel) may still host the component.
+        const present = parseTopLevelComponents(this.yaml);
+        const satisfied = await depsSatisfiedByProvides(this._api, [domain], present, {
+          platform: this.platform || null,
+          boardId: this.board?.id ?? null,
+        });
+        if (satisfied.has(domain)) result = null;
+      }
+    } catch (err) {
+      console.warn("[add-component-dialog] bus availability lookup failed", err);
+    }
+    if (seq === this._busAssessSeq) this._busHostability = result;
+  }
+
+  /** `[domain]` when a bus exists but none can host the selection. */
+  private get _busBlockedDeps(): string[] | null {
+    const a = this._busHostability;
+    return a && a.hostability.busCount > 0 && a.hostability.compatibleIds.length === 0
+      ? [a.domain]
+      : null;
+  }
+
+  /** The sole compatible bus, when it is referenceable by id. */
+  private get _busReference(): { domain: string; id: string } | null {
+    const a = this._busHostability;
+    if (!a || a.hostability.compatibleIds.length !== 1) return null;
+    const id = a.hostability.compatibleIds[0];
+    return id ? { domain: a.domain, id } : null;
+  }
+
+  /** Force the bus reference visible when several buses qualify, so the
+   *  user picks one instead of esphome failing on the ambiguity. */
+  private get _busExtraRequired(): string[] {
+    const a = this._busHostability;
+    return a && a.hostability.compatibleIds.length > 1 ? [`${a.domain}_id`] : [];
+  }
+
+  /** Detour-forced bus fields plus the bus picker, as one form overlay. */
+  private get _mergedExtraRequired(): string[] | null {
+    const merged = [...(this._depPrefill?.required ?? []), ...this._busExtraRequired];
+    return merged.length > 0 ? merged : null;
   }
 
   protected render() {
@@ -344,8 +440,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._restoredValuesForMount}
-                .extraRequired=${this._depPrefill?.required ?? null}
+                .extraRequired=${this._mergedExtraRequired}
                 .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
+                .busBlockedDeps=${this._busBlockedDeps}
+                .busReference=${this._busReference}
                 .submitting=${this._submitting}
                 .submitError=${this._submitError}
               ></esphome-add-component-form>`
@@ -499,6 +597,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // can't predict; show the form. (Detour/restore set `_selected` directly
     // and bypass this handler, so this is null today — a forward guard.)
     if (this._prefillReference !== null || this._depPrefill !== null) return null;
+    // The bus hostability assessment is async; a component constrained on
+    // an exclusive-claim bus always gets the form so its verdict can gate
+    // the add.
+    if (
+      (entry.dependencies ?? []).some(
+        (dep) => EXCLUSIVE_BUS_DOMAINS.has(dep) && entry.bus_constraints?.[dep]
+      )
+    ) {
+      return null;
+    }
     const present = parseTopLevelComponents(this.yaml);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
@@ -514,6 +622,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       prefillReference: null,
       prefillFields: null,
       restoredValues: null,
+      busReference: null,
       localize: this._localize,
     });
     if (
