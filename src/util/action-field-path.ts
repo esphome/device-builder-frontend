@@ -1,4 +1,5 @@
 import { isIndexSegment } from "./nested-values.js";
+import type { YamlPathSegment } from "./yaml-ast.js";
 
 /**
  * The one owner of the dotted `component_action` field encoding.
@@ -16,12 +17,6 @@ export function joinActionFieldPath(path: string[]): string {
 }
 
 /** Path segments of a dotted field, indices as the numbers cursor paths carry. */
-export function splitActionFieldPath(field: string): (string | number)[] {
+export function splitActionFieldPath(field: string): YamlPathSegment[] {
   return field.split(".").map((seg) => (isIndexSegment(seg) ? Number(seg) : seg));
-}
-
-/** The leaf key naming the action list (`…set_action` → `set_action`). */
-export function actionFieldLeaf(field: string): string {
-  const segments = field.split(".");
-  return segments[segments.length - 1];
 }

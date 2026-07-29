@@ -220,8 +220,10 @@ export function locationFromSectionKey(key: string): AutomationLocation | null {
     }
     case "component_action":
       // `automation:component_action:<component_id>:<field>` — exactly 4
-      // colon-free tokens (id is `[a-z0-9_]`, field is `*_action`); no
-      // index part, so reject any trailing segments rather than ignore them.
+      // colon-free tokens (id is `[a-z0-9_]`, field is a dotted path of
+      // schema keys and list indices, e.g.
+      // `valves.0.run_duration_number.set_action`); no index part, so
+      // reject any trailing segments rather than ignore them.
       return parts.length === 4 && parts[2] && parts[3]
         ? { kind: "component_action", component_id: parts[2], field: parts[3] }
         : null;
