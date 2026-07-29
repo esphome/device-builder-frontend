@@ -12,8 +12,8 @@ const HEX_INT_RE = /^0x[0-9a-f]+$/i;
 export function parseIntInput(raw: unknown): bigint | null {
   const v = String(raw ?? "").trim();
   // The regexes admit only ``BigInt``-parseable literals, so call it directly
-  // (mirrors ``parseHexInt``) — a future regex change that breaks that
-  // invariant should throw loudly, not be swallowed into a silent null.
+  // — a future regex change that breaks that invariant should throw loudly,
+  // not be swallowed into a silent null.
   if (!DECIMAL_INT_RE.test(v) && !HEX_INT_RE.test(v)) return null;
   return BigInt(v);
 }
