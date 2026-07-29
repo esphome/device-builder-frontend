@@ -76,16 +76,27 @@ describe("esphome-add-component-form live validation", () => {
     expect(form._errors.has("can_id")).toBe(false);
   });
 
-  it("keeps a shown error steady while the value is still wrong", () => {
+  it("keeps a shown error painted while the value is still wrong", () => {
     const form = makeForm();
     form._onValueChange(changeEvent(["can_id"], 4434343434343434));
     vi.advanceTimersByTime(250);
-    // Another wrong keystroke must not blink the error away.
+    // Another wrong keystroke must not blink the error away — the
+    // painted key refreshes in place, immediately.
     form._onValueChange(changeEvent(["can_id"], -1));
-    expect(form._errors.get("can_id")?.code).toBe("validation.max");
-    vi.advanceTimersByTime(250);
-    // The message swaps to the settled value's failure at the pause.
     expect(form._errors.get("can_id")?.code).toBe("validation.min");
+    vi.advanceTimersByTime(250);
+    expect(form._errors.get("can_id")?.code).toBe("validation.min");
+  });
+
+  it("never strands a stale message when a later edit cancels the timer", () => {
+    // A submit-set required error, an invalid replacement, then an edit
+    // elsewhere inside the pause: the field must not keep saying
+    // "required" while visibly holding text.
+    const form = makeForm();
+    form._errors = new Map([["can_id", { key: "can_id", code: "validation.required" }]]);
+    form._onValueChange(changeEvent(["can_id"], 4434343434343434));
+    form._onValueChange(changeEvent(["bit_rate"], "125kbps"));
+    expect(form._errors.get("can_id")?.code).toBe("validation.max");
   });
 
   it("does not nag a required field emptied mid-form", () => {

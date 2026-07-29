@@ -475,25 +475,37 @@ export class ESPHomeAddComponentForm extends LitElement {
     // A wrong *typed* value flags once typing pauses (range/type/options
     // via validateValueAt); the renderers emit partial text per
     // keystroke ("0x", "1e"), so appearing immediately would flash
-    // errors mid-entry. The error state is one-directional while
-    // typing: a now-valid value clears instantly (correction feels
-    // immediate), a still-wrong value keeps the shown error steady —
-    // clearing and re-adding per keystroke made it blink — and the
-    // message refreshes in one swap at the pause. Required-empty stays
-    // a submit-only signal, so untouched fields keep the no-nag
-    // behavior.
+    // errors mid-entry. While typing, the display only ever improves in
+    // place: cleared and corrected keys drop instantly, a key already
+    // painted stays painted with its message kept current (clearing and
+    // re-adding per keystroke made it blink; deferring the clear left
+    // stale messages when a later edit cancelled the timer), and a
+    // newly wrong key appears only at the pause. Required-empty stays a
+    // submit-only signal, so untouched fields keep the no-nag behavior.
     clearTimeout(this._liveValidateTimer);
-    if (validateValueAt(this._entries, path, value).size === 0) {
-      const cleared = clearPathErrors(this._errors, path.join("."));
+    const pathKey = path.join(".");
+    const live = validateValueAt(this._entries, path, value);
+    const shown = this._errors;
+    const cleared = clearPathErrors(shown, pathKey);
+    if (live.size === 0) {
       if (cleared) this._errors = cleared;
     } else {
+      const next = cleared ?? new Map(shown);
+      let changed = cleared !== null;
+      for (const [key, err] of live) {
+        if (shown.has(key)) {
+          next.set(key, err);
+          changed = true;
+        }
+      }
+      if (changed) this._errors = next;
       this._liveValidateTimer = setTimeout(() => {
-        const live = validateValueAt(this._entries, path, getIn(this._values, path));
-        const cleared = clearPathErrors(this._errors, path.join("."));
-        if (!cleared && !live.size) return;
-        const next = cleared ?? new Map(this._errors);
-        for (const [key, err] of live) next.set(key, err);
-        this._errors = next;
+        const settled = validateValueAt(this._entries, path, getIn(this._values, path));
+        const swept = clearPathErrors(this._errors, pathKey);
+        if (!swept && !settled.size) return;
+        const merged = swept ?? new Map(this._errors);
+        for (const [key, err] of settled) merged.set(key, err);
+        this._errors = merged;
       }, ESPHomeAddComponentForm.LIVE_VALIDATE_DEBOUNCE_MS);
     }
     // The hidden-validation block message: any user input is a fresh
