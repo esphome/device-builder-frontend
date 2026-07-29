@@ -131,6 +131,31 @@ describe("assessBusHostability", () => {
     });
   });
 
+  it("treats an anchor-merged bus block as unknown, not pinless", () => {
+    const yaml =
+      ".uart_base: &uart_base\n  baud_rate: 9600\n  rx_pin: 44\n" +
+      "uart:\n  - <<: *uart_base\n    id: uart_1\n";
+    expect(assessBusHostability(yaml, "uart", RX_9600, lookup).compatibleIds).toEqual([
+      "uart_1",
+    ]);
+  });
+
+  it("treats a flow-mapping bus item as unknown, not pinless", () => {
+    const yaml = "uart:\n  - { baud_rate: 115200, rx_pin: 44, id: uart_1 }\n";
+    expect(assessBusHostability(yaml, "uart", RX_9600, lookup).busCount).toBe(1);
+    expect(
+      assessBusHostability(yaml, "uart", RX_9600, lookup).compatibleIds
+    ).toHaveLength(1);
+  });
+
+  it("fails open for a domain without registered semantics", () => {
+    const yaml = "i2c:\n  - sda: 8\n    scl: 9\n    id: bus_a\n";
+    expect(assessBusHostability(yaml, "i2c", { max_frequency: 15000 }, lookup)).toEqual({
+      busCount: 1,
+      compatibleIds: ["bus_a"],
+    });
+  });
+
   it("skips pin exclusivity on the host platform", () => {
     const yaml = "host:\n" + ONE_BUS + RX_CONSUMER;
     expect(assessBusHostability(yaml, "uart", RX_9600, lookup).compatibleIds).toEqual([

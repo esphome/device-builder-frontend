@@ -30,7 +30,7 @@ import {
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import { assessBusHostability, exclusiveBusTarget } from "../../util/bus-availability.js";
-import { yamlHasMergedSources } from "../../util/config-entry-yaml-scan.js";
+import { yamlHasExternalIdSources } from "../../util/config-entry-yaml-scan.js";
 import { loadCatalog } from "../../util/yaml-completion-catalog.js";
 import {
   depsSatisfiedByProvides,
@@ -227,16 +227,17 @@ export class ESPHomeAddComponentForm extends LitElement {
         // A pending live check belongs to the previous component's
         // entries; validating across the retarget could mis-flag.
         clearTimeout(this._liveValidateTimer);
+        // A stale bus verdict must not gate the next component while its
+        // own assessment is in flight, and the previous picker key must
+        // not shape the seed pass below.
+        this._busBlockedDep = null;
+        this._busPickerKey = null;
         this._initValues();
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow
         // detour the form gets reused for) would leak into the next
         // component's form.
         this._localBlockMessage = "";
-        // A stale bus verdict must not gate the next component while its
-        // own assessment is in flight.
-        this._busBlockedDep = null;
-        this._busPickerKey = null;
         this._depResolver.kickoff(this.component.dependencies ?? []);
       }
     }
@@ -306,7 +307,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    * attachable bus flags the dep missing, a sole compatible bus seeds the
    * reference field, several force the picker. Anything uncertain — a
    * catalog failure, a configured bus provider (a `usb_uart:` channel the
-   * bus scan can't model), a `packages:` merge hiding consumers — resolves
+   * bus scan can't model), an include or anchor merge hiding ids — resolves
    * to no gating.
    */
   private async _resolveBusHostability(): Promise<void> {
@@ -316,7 +317,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     let blocked: string | null = null;
     let picker: string | null = null;
     let reference: string | null = null;
-    if (api && target && !yamlHasMergedSources(this.yaml)) {
+    if (api && target && !yamlHasExternalIdSources(this.yaml)) {
       try {
         const catalog = await loadCatalog(api);
         const { busCount, compatibleIds } = assessBusHostability(
@@ -325,16 +326,21 @@ export class ESPHomeAddComponentForm extends LitElement {
           target.constraints,
           (id) => catalog.byId.get(id)?.bus_constraints
         );
-        if (busCount > 0 && compatibleIds.length === 0) {
+        // On a multi-bus config an un-idded compatible bus is unusable —
+        // without an explicit reference esphome fails on the ambiguity —
+        // so it falls through to the detour rather than shipping one.
+        const usable =
+          busCount > 1 ? compatibleIds.filter((id) => id !== null) : compatibleIds;
+        if (busCount > 0 && usable.length === 0) {
           const present = parseTopLevelComponents(this.yaml);
           const satisfied = await depsSatisfiedByProvides(api, [target.domain], present, {
             platform: this.board?.esphome.platform ?? null,
             boardId: this.board?.id ?? null,
           });
           if (!satisfied.has(target.domain)) blocked = target.domain;
-        } else if (compatibleIds.length === 1) {
-          reference = compatibleIds[0];
-        } else if (compatibleIds.length > 1) {
+        } else if (usable.length === 1) {
+          reference = usable[0];
+        } else if (usable.length > 1) {
           // `overlayRequired` matches top-level keys only; a nested
           // reference (none exists today) just skips the forcing.
           const path = findReferencePath(
@@ -490,9 +496,12 @@ export class ESPHomeAddComponentForm extends LitElement {
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
           <div class="deps-warning-title">
-            ${this._localize("device.missing_dependencies_title", {
-              name: this.component.name,
-            })}
+            ${this._localize(
+              allBlocked
+                ? "device.bus_dependency_in_use_title"
+                : "device.missing_dependencies_title",
+              { name: this.component.name }
+            )}
           </div>
           <div>
             ${

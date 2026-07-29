@@ -76,6 +76,10 @@ interface BusState {
   id: string | null;
   /** The bus block's parsed top-level keys. */
   values: Record<string, unknown>;
+  /** False when the block's keys arrive from somewhere the line scan
+   *  can't see (an anchor merge, an include, a flow mapping) — its pins
+   *  and settings are then unknown, not absent. */
+  readable: boolean;
   /** Pin fields an existing consumer already claims. */
   claimed: Set<string>;
 }
@@ -93,13 +97,22 @@ export function assessBusHostability(
 ): BusHostability {
   const semantics = BUS_SEMANTICS[busDomain];
   const sections = parseYamlTopLevelSections(yaml);
+  const lines = yaml.split("\n");
   const isBus = (s: YamlSection) => (s.parentKey ?? s.key) === busDomain;
-  const buses: BusState[] = sections.filter(isBus).map((s) => ({
-    id: s.id ?? null,
-    values: parseYamlSectionValues(yaml, s.key, s.fromLine),
-    claimed: new Set<string>(),
-  }));
+  const buses: BusState[] = sections.filter(isBus).map((s) => {
+    const values = parseYamlSectionValues(yaml, s.key, s.fromLine);
+    return {
+      id: s.id ?? null,
+      values,
+      readable: Object.keys(values).length > 0 && !_hasHiddenKeys(lines, s),
+      claimed: new Set<string>(),
+    };
+  });
   if (buses.length === 0) return { busCount: 0, compatibleIds: [] };
+  // Fail open for a domain without registered semantics.
+  if (!semantics) {
+    return { busCount: buses.length, compatibleIds: buses.map((b) => b.id) };
+  }
 
   // The native-class gate excludes the host platform from pin
   // exclusivity, and settings mismatches there are esphome's to flag.
@@ -145,13 +158,14 @@ function _canHost(
   semantics: BusSemantics
 ): boolean {
   for (const [flag, pin] of Object.entries(semantics.claims)) {
-    if (
-      candidate[flag] === true &&
-      (bus.claimed.has(pin) || !Object.prototype.hasOwnProperty.call(bus.values, pin))
-    ) {
+    if (candidate[flag] !== true) continue;
+    if (bus.claimed.has(pin)) return false;
+    // Pin presence is knowable only on a block the line scan fully read.
+    if (bus.readable && !Object.prototype.hasOwnProperty.call(bus.values, pin)) {
       return false;
     }
   }
+  if (!bus.readable) return true;
   for (const [key, dflt] of Object.entries(semantics.settings)) {
     const wanted = candidate[key];
     if (wanted === undefined || wanted === null) continue;
@@ -168,6 +182,18 @@ function _canHost(
     }
   }
   return true;
+}
+
+/** True when the block pulls keys from a source the line scan can't see:
+ *  an anchor merge (`<<:` at any position, including the dash line) or an
+ *  include tag. Flow-mapping items parse to zero keys and are caught by
+ *  the empty-values half of the `readable` rule instead. */
+function _hasHiddenKeys(lines: string[], section: YamlSection): boolean {
+  for (let i = section.fromLine - 1; i < section.toLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(?:-\s+)?<<\s*:/.test(line) || line.includes("!include")) return true;
+  }
+  return false;
 }
 
 /** Effective setting value; `null` = unknown (absent with no default,

@@ -137,4 +137,28 @@ describe("add-component-form bus hostability", () => {
     const el = await mountForm("usb_uart:\n  id: hub\n" + CLAIMED_BUS);
     expect(banner(el)).toBeNull();
   });
+
+  it("treats an anchor-merged unclaimed bus as hostable, not pinless", async () => {
+    const el = await mountForm(
+      ".base: &base\n  rx_pin: 44\n" +
+        "uart:\n  - <<: *base\n    baud_rate: 9600\n    id: uart_1\n"
+    );
+    expect(banner(el)).toBeNull();
+    expect(el.currentValues.uart_id).toBe("uart_1");
+  });
+
+  it("fails open entirely when the YAML pulls in external sources", async () => {
+    const el = await mountForm("packages:\n  base: !include common.yaml\n" + CLAIMED_BUS);
+    expect(banner(el)).toBeNull();
+  });
+
+  it("detours instead of shipping an ambiguous reference to an un-idded bus", async () => {
+    const el = await mountForm(
+      "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    id: uart_1\n" +
+        "  - baud_rate: 9600\n    rx_pin: 6\n" +
+        "sensor:\n  - platform: a02yyuw\n    name: Level\n    uart_id: uart_1\n"
+    );
+    expect(banner(el)).not.toBeNull();
+    expect(el.currentValues.uart_id).toBeUndefined();
+  });
 });
