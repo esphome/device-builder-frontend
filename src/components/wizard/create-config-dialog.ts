@@ -577,19 +577,19 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       // the shared secret-keys cache so the new device's editor doesn't show
       // the just-written `!secret wifi_*` refs as missing until a reload.
       if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
+      if (options.fullSetup && options.board) {
+        await this._applyFullSetup(configuration, options.board);
+      }
+      this._created = true; // keep the collision check frozen through the close
+      this.navigateToCreated(configuration);
       // A package board whose upstream failed to load still creates; the
-      // toast is the repair signal once this dialog closes.
+      // toast is the repair signal once the dialog has closed.
       if (warning) {
         notifyWarning(this._localize("dashboard.create_package_warning"), {
           description: warning,
           duration: 8000,
         });
       }
-      if (options.fullSetup && options.board) {
-        await this._applyFullSetup(configuration, options.board);
-      }
-      this._created = true; // keep the collision check frozen through the close
-      this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
