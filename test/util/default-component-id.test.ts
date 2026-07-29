@@ -106,6 +106,10 @@ describe("generateNestedItemId", () => {
   it("slugs a key that isn't already id-shaped", () => {
     expect(generateNestedItemId("On-Off", new Set())).toBe("on_off_1");
   });
+
+  it("prefixes an underscore when the key starts with a digit", () => {
+    expect(generateNestedItemId("1wire", new Set())).toBe("_1wire_1");
+  });
 });
 
 describe("collectExistingIds", () => {

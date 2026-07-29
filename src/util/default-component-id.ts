@@ -59,9 +59,12 @@ export function collectExistingIds(yaml: string): Set<string> {
 
 // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
 // board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
-// Generated ids are lowercased by convention before the shared reshape.
+// Generated ids are lowercased by convention before the shared reshape, and
+// a digit-leading slug gets an underscore prefix — unlike user-typed input,
+// a generated id has no mid-typing UX to preserve.
 function slugifyId(raw: string): string {
-  return normalizeEspHomeId(raw.toLowerCase());
+  const slug = normalizeEspHomeId(raw.toLowerCase());
+  return /^[a-z_]/.test(slug) ? slug : `_${slug}`;
 }
 
 function uniquifyId(slug: string, existing: ReadonlySet<string>): string {
