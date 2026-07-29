@@ -332,11 +332,19 @@ function _actionFieldPath(
   targetIndent: number,
   field: string
 ): Array<string | number> | null {
-  const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
+  const hostLine = lines[host.fromLine - 1] ?? "";
+  const childIndent = listItemChildIndent(hostLine);
   if (targetIndent < childIndent) return null;
   // Walk the instance body accumulating the enclosing frames: block
   // mapping keys by indent, list items as counted dash indices.
   const stack: Array<{ indent: number; seg: string | number }> = [];
+  // A bare inline first key on the instance dash line (``- valves:``)
+  // opens a block the loop below never sees — seed its frame.
+  const hostDash = hostLine.match(_DASH_LEADER_RE);
+  const hostInlineKey = hostDash
+    ? hostLine.slice(hostDash[0].length).match(_BARE_MAPPING_KEY_RE)
+    : null;
+  if (hostInlineKey) stack.push({ indent: childIndent, seg: hostInlineKey[1] });
   for (let j = host.fromLine; j <= targetIdx; j++) {
     const line = lines[j];
     if (isBlankOrCommentLine(line)) continue;
@@ -346,7 +354,10 @@ function _actionFieldPath(
     while (stack.length) {
       const top = stack[stack.length - 1];
       if (top.indent < indent) break;
-      if (dash && top.indent === indent && typeof top.seg === "number") break;
+      // A dash keeps its same-indent frames: the sibling index it
+      // increments, and — in the zero-indent sequence style — the
+      // parent key whose column the dashes share.
+      if (dash && top.indent === indent) break;
       stack.pop();
     }
     if (dash) {

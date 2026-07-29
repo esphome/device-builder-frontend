@@ -339,6 +339,15 @@ export const isChildListItemLine = (line: string, parentIndent: string): boolean
   return tail === "-" || tail.startsWith("- ");
 };
 
+const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
+
+/** True for pair keys whose value is a list of actions: ``then`` /
+ *  ``else`` / ``on_*`` / ``*_action``. The one definition every walker
+ *  shares, so "what encloses an automation body" can't drift. */
+export function isAutomationKey(key: string): boolean {
+  return RE_AUTOMATION_KEY.test(key);
+}
+
 /**
  * The one rule for "where does a block end". True when *line* terminates a
  * block whose opener key sits at *openerIndent* columns. Blank and
@@ -351,15 +360,6 @@ export const isChildListItemLine = (line: string, parentIndent: string): boolean
  * sequence and comment cases are handled in one place instead of being
  * relearned (and mis-learned) per call site.
  */
-const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
-
-/** True for pair keys whose value is a list of actions: ``then`` /
- *  ``else`` / ``on_*`` / ``*_action``. The one definition every walker
- *  shares, so "what encloses an automation body" can't drift. */
-export function isAutomationKey(key: string): boolean {
-  return RE_AUTOMATION_KEY.test(key);
-}
-
 export const endsBlockAtIndent = (line: string, openerIndent: number): boolean => {
   if (isBlankOrCommentLine(line)) return false;
   const lineIndent = _leadingIndent(line).length;

@@ -1494,6 +1494,41 @@ describe("nested component_action sections (#1543)", () => {
     );
   });
 
+  it("keeps the parent key for a zero-indent sequence", () => {
+    // The dashes share ``valves:``'s own column — a common style the
+    // repo's block-boundary rule already treats as the key's body.
+    const yaml = `sprinkler:
+  - id: lawn
+    valves:
+    - valve_switch: Front Yard
+      run_duration_number:
+        set_action:
+          - logger.log: front changed
+    - valve_switch: Back Yard
+      run_duration_number:
+        set_action:
+          - logger.log: back changed
+`;
+    expect(componentActionItems(yaml).map((s) => s.actionField)).toEqual([
+      "valves.0.run_duration_number.set_action",
+      "valves.1.run_duration_number.set_action",
+    ]);
+  });
+
+  it("seeds a bare inline first key on the instance dash line", () => {
+    const yaml = `sprinkler:
+  - valves:
+      - valve_switch: Front Yard
+        run_duration_number:
+          set_action:
+            - logger.log: changed
+    id: lawn
+`;
+    expect(componentActionItems(yaml).map((s) => s.actionField)).toEqual([
+      "valves.0.run_duration_number.set_action",
+    ]);
+  });
+
   it("uses an index-free path when the list is written as one mapping", () => {
     const yaml = `sprinkler:
   - id: lawn
@@ -1528,7 +1563,9 @@ cover:
     open_action:
       - if:
           then:
-            - switch.turn_on: relay
+            - cover.control:
+                stop_action:
+                  - switch.turn_on: relay
 `;
     const items = componentActionItems(yaml);
     // Only the real top-level field; nothing from inside bodies.
