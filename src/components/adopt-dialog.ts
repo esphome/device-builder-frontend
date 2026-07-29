@@ -189,6 +189,13 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
+      /* The shared name pair carries no outer margins (its hosts own
+         the rhythm); without this the hostname row sits flush on the
+         encryption checkbox. */
+      .name-pair {
+        margin-bottom: var(--wa-space-m);
+      }
+
       .name-hint {
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
@@ -368,19 +375,21 @@ export class ESPHomeAdoptDialog extends LitElement {
 
                 ${this._renderSource(device.package_import_url)}
 
-                <esphome-device-name-inputs
-                  autofocus
-                  .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
-                  .takenHostnames=${this._takenMinusFactory}
-                  @device-name-changed=${() => this.requestUpdate()}
-                ></esphome-device-name-inputs>
-                ${
-                  renamed
-                    ? html`<div class="name-hint">
-                        ${this._localize("dashboard.adopt_rename_hint")}
-                      </div>`
-                    : nothing
-                }
+                <div class="name-pair">
+                  <esphome-device-name-inputs
+                    autofocus
+                    .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
+                    .takenHostnames=${this._takenMinusFactory}
+                    @device-name-changed=${() => this.requestUpdate()}
+                  ></esphome-device-name-inputs>
+                  ${
+                    renamed
+                      ? html`<div class="name-hint">
+                          ${this._localize("dashboard.adopt_rename_hint")}
+                        </div>`
+                      : nothing
+                  }
+                </div>
                 ${
                   this._collectWifi
                     ? html`
