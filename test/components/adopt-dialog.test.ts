@@ -93,6 +93,7 @@ describe("adopt-then-rename (#2412)", () => {
     expect(importDevice).toHaveBeenCalledWith(
       expect.objectContaining({ name: "foo-1234" })
     );
+    expect(adopted).toHaveBeenCalledTimes(1);
     expect(adopted.mock.calls[0][0].detail).toEqual({
       name: "foo-1234",
       configuration: "foo-1234.yaml",
@@ -106,6 +107,26 @@ describe("adopt-then-rename (#2412)", () => {
     priv.open(ethernetDevice());
     priv.takenHostnames = new Set(["foo-1234", "kitchen"]);
     priv._name = "kitchen";
+
+    await priv._submit();
+
+    expect(importDevice).not.toHaveBeenCalled();
+  });
+
+  it("refuses an edited name past the 31-char hostname cap", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    priv.open(ethernetDevice());
+    priv._name = "a".repeat(32); // passes the shared 63-char check
+
+    await priv._submit();
+
+    expect(importDevice).not.toHaveBeenCalled();
+  });
+
+  it("refuses an edited name with an edge hyphen", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    priv.open(ethernetDevice());
+    priv._name = "-kitchen"; // charset-valid, backend refuses it
 
     await priv._submit();
 

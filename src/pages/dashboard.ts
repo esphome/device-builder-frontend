@@ -24,6 +24,7 @@ import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   adoptFollowUp,
+  type AdoptedDetail,
   deleteLabel,
   executeClone,
   executeFriendlyName,
@@ -929,14 +930,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._tryConsumePendingScroll();
   }
 
-  _onAdopted = (
-    e: CustomEvent<{
-      name: string;
-      configuration: string;
-      friendlyName: string;
-      renameTo: string | null;
-    }>
-  ) => void adoptFollowUp(this, e.detail);
+  _onAdopted = (e: CustomEvent<AdoptedDetail>) => void adoptFollowUp(this, e.detail);
 
   /** Post-clone reveal (#2246): the search that matched the source would
    *  hide the fresh clone, so clear it (no refocus — attention belongs on

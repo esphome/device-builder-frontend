@@ -5,6 +5,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import type { AdoptedDetail } from "./dashboard/actions-ui.js";
 import {
   dialogActionButtonStyles,
   dialogActionsRowStyles,
@@ -12,6 +13,7 @@ import {
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import type { ValidationError } from "../util/config-validation.js";
 import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
@@ -21,6 +23,7 @@ import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
+import { HOSTNAME_MAX_LEN } from "../util/slugify-hostname.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
@@ -289,6 +292,37 @@ export class ESPHomeAdoptDialog extends LitElement {
     );
   }
 
+  private _nameError(nameTrimmed: string): ValidationError | null {
+    const base = validateDeviceName(nameTrimmed);
+    if (base) return base;
+    // The unedited factory default is exempt from the edited-name
+    // rules: its own importable row is in the taken set, and the
+    // broadcast name is compile-time valid.
+    if (!this._device || nameTrimmed === this._device.name) return null;
+    // An edited name becomes a ``devices/rename`` target after the
+    // dialog closes, so apply the rename backend's stricter rules up
+    // front — a late failure would leave the device adopted under
+    // the factory name with only a transient toast.
+    if (nameTrimmed.length > HOSTNAME_MAX_LEN) {
+      return {
+        key: "name",
+        code: "validation.max_length",
+        params: { max: HOSTNAME_MAX_LEN },
+      };
+    }
+    if (nameTrimmed.startsWith("-") || nameTrimmed.endsWith("-")) {
+      return { key: "name", code: "naming.hostname_edge_hyphen" };
+    }
+    if (this.takenHostnames.has(nameTrimmed)) {
+      return {
+        key: "name",
+        code: "naming.hostname_taken",
+        params: { hostname: nameTrimmed },
+      };
+    }
+    return null;
+  }
+
   close = () => {
     /* Arrow function so ``@click=${this.close}`` from the cancel
        button keeps ``this`` bound to the dialog. With a plain method,
@@ -309,18 +343,10 @@ export class ESPHomeAdoptDialog extends LitElement {
        actually appear. */
     const device = this._device;
     const nameTrimmed = this._name.trim();
-    const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
+    const nameErr = nameTrimmed ? this._nameError(nameTrimmed) : null;
     const renamed = !!device && !!nameTrimmed && nameTrimmed !== device.name;
-    // The unedited factory default is exempt — its own importable row
-    // is in the taken set.
-    const nameTaken = renamed && this.takenHostnames.has(nameTrimmed);
     const canSubmit =
-      !!device &&
-      !!nameTrimmed &&
-      !nameErr &&
-      !nameTaken &&
-      !this._busy &&
-      !this._wifiBlocking;
+      !!device && !!nameTrimmed && !nameErr && !this._busy && !this._wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -348,7 +374,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                   <input
                     id="adopt-name"
                     type="text"
-                    class=${nameErr || nameTaken ? "invalid" : ""}
+                    class=${nameErr ? "invalid" : ""}
                     .value=${this._name}
                     ?disabled=${this._busy}
                     @input=${(e: Event) => {
@@ -356,16 +382,10 @@ export class ESPHomeAdoptDialog extends LitElement {
                     }}
                   />
                   ${renderInlineError(
-                    nameErr
-                      ? this._localize(nameErr.code, nameErr.params)
-                      : nameTaken
-                        ? this._localize("naming.hostname_taken", {
-                            hostname: nameTrimmed,
-                          })
-                        : undefined
+                    nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
                   )}
                   ${
-                    renamed && !nameErr && !nameTaken
+                    renamed && !nameErr
                       ? html`<div class="name-hint">
                           ${this._localize("dashboard.adopt_rename_hint")}
                         </div>`
@@ -495,10 +515,9 @@ export class ESPHomeAdoptDialog extends LitElement {
     if (!this._device || !this._api) return;
     const name = this._name.trim();
     const friendlyName = this._friendlyName.trim();
-    if (!name || validateDeviceName(name)) return;
-    // Enter bypasses the disabled button; re-check the taken gate so a
-    // collision can't slip through to a post-close rename failure.
-    if (name !== this._device.name && this.takenHostnames.has(name)) return;
+    // Enter bypasses the disabled button; re-run the full name gate so
+    // nothing can slip through to a post-close rename failure.
+    if (!name || this._nameError(name)) return;
     // Enter bypasses the disabled button; re-check the Wi-Fi gate so a
     // held Enter can't import before the secret store (or with bad creds).
     if (this._wifiBlocking) return;
@@ -550,12 +569,13 @@ export class ESPHomeAdoptDialog extends LitElement {
       const { configuration } = await this._api.importDevice(args);
       markJustCreated(configuration);
       this.close();
-      fireEvent(this, "adopted", {
+      const detail: AdoptedDetail = {
         name: factoryName,
         configuration,
         friendlyName,
         renameTo: name !== factoryName ? name : null,
-      });
+      };
+      fireEvent(this, "adopted", detail);
     } catch (err) {
       this._error = formatApiError(err, this._localize, "dashboard.adopt_error_generic");
     } finally {
