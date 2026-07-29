@@ -77,6 +77,16 @@ describe("add-component-dialog Enter-to-submit (#2400)", () => {
     expect(requestSubmitCalls).toHaveLength(0);
   });
 
+  it("drops a key-repeat Enter while a submit is in flight", async () => {
+    const el = await mount(new ESPHomeAddComponentDialog());
+    el.open();
+    await enterFormView(el);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._submitting = true;
+    pressEnter({ repeat: true });
+    expect(requestSubmitCalls).toHaveLength(0);
+  });
+
   it("stops firing after leaving the form view via back", async () => {
     const el = await mount(new ESPHomeAddComponentDialog());
     el.open();

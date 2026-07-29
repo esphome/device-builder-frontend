@@ -747,8 +747,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   // Armed only in the form view; the catalog has no selection for Enter
-  // to act on.
+  // to act on. The form's own submitting guard lags a render behind
+  // `_submitting`, so a key-repeat Enter is dropped here first.
   private _onEnterSubmit = () => {
+    if (this._submitting) return;
     this._form?.requestSubmit();
   };
 
