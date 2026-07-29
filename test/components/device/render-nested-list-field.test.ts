@@ -27,6 +27,7 @@ import type { RenderCtx } from "../../../src/components/device/config-entry-rend
 import { renderNestedListField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
+import { normalizeMaybeValues } from "../../../src/util/maybe-values.js";
 import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeListEntry(): ConfigEntry {
@@ -208,5 +209,29 @@ describe("renderNestedListField", () => {
     // No Add / Remove translation keys — those buttons aren't rendered.
     expect(json).not.toContain("device.multi_value_add");
     expect(json).not.toContain("device.multi_value_remove");
+  });
+
+  it("renders a load-normalized maybe_simple_value scalar as a populated row (#2397)", () => {
+    // The end-to-end shape for ``voice_assistant: {microphone: mic_id}``:
+    // normalizeMaybeValues expands the scalar at section load, and the
+    // renderer sees the canonical one-item list — not the empty hint.
+    const entry = makeConfigEntry({
+      key: "microphone",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      maybe_key: "microphone",
+      config_entries: [
+        makeConfigEntry({ key: "microphone", type: ConfigEntryType.ID }),
+        makeConfigEntry({ key: "gain_factor", type: ConfigEntryType.INTEGER }),
+      ],
+    });
+    const values = normalizeMaybeValues({ microphone: "onju_microphone" }, [entry]);
+    const { ctx, renderEntry } = makeCtx(values);
+    const tpl = renderNestedListField(entry, ["microphone"], ctx);
+    const paths = renderEntry.mock.calls.map((c) => c[1] as string[]);
+    expect(paths).toContainEqual(["microphone", "0", "microphone"]);
+    expect(ctx.getAt(["microphone", "0", "microphone"])).toBe("onju_microphone");
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(json).not.toContain("device.multi_value_empty");
   });
 });

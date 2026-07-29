@@ -132,6 +132,14 @@ export interface ConfigEntry {
   unit_options: string[] | null;
   /** When True the field accepts a list of values. */
   multi_value: boolean;
+  /**
+   * For NESTED entries validated by esphome's `maybe_simple_value`: the
+   * child key a bare scalar value expands into
+   * (`microphone: mic_id` == `microphone: {microphone: mic_id}`).
+   * With `multi_value` each list item may also be a bare scalar. Null
+   * (or absent) = no scalar shorthand.
+   */
+  maybe_key?: string | null;
   /** When True accepts either a literal value OR a !lambda block. */
   templatable: boolean;
   /**

@@ -1,6 +1,7 @@
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
+import { normalizeMaybeValues } from "../../../util/maybe-values.js";
 import { loadCatalog } from "../../../util/yaml-completion-catalog.js";
 import { platformDomains } from "../../../util/yaml-completion-items.js";
 import { parseYamlSectionValues } from "../../../util/yaml-section-reader.js";
@@ -94,7 +95,14 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     // save preserves the user's hex notation even when they only edited
     // an unrelated field. Without this, i2c addresses round-trip from
     // 0x76 to 118 on the next save.
-    host._values = normalizeHexValues(parsedValues, host._config.entries);
+    // Expand maybe_simple_value shorthands (a bare `microphone: mic_id`)
+    // into the canonical mapping/list shape the renderers and dotted-path
+    // edits address; left as a scalar it renders as an empty list and the
+    // first edit clobbers it (#2397).
+    host._values = normalizeMaybeValues(
+      normalizeHexValues(parsedValues, host._config.entries),
+      host._config.entries
+    );
     host._resolvedFromLine = resolvedFromLine;
     host._presentComponents = parseTopLevelComponents(yaml);
   } catch (e) {
