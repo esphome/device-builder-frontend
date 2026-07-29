@@ -8,12 +8,13 @@ import {
 } from "../../src/util/component-name-cache.js";
 import { ComponentNameResolverController } from "../../src/util/component-name-resolver-controller.js";
 
-// The cache's fetch wrapper records renamed_keys before resolving, so
-// results land one microtask later than the raw api call.
+// The cache's async fetch wrapper interposes await hops between the
+// mock api resolving and results landing (wrapper resume, cache await,
+// distribution); drain them all.
 const drainFetch = async (): Promise<void> => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 3; i++) {
+    await Promise.resolve();
+  }
 };
 
 const entry = (id: string, name: string): ComponentCatalogEntry =>
