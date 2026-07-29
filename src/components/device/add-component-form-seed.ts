@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
 import {
   findReferenceCandidates,
+  findUsedPins,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
@@ -212,8 +213,13 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // ESP32-C3 (and other variants without an SCL/SDA alias) are
   // either invalid or wrong-numbered: i2c on C3 emits an
   // "Invalid pin number: 22" squiggle because the bus block
-  // falls back to ESP32 GPIO22/21.
-  next = seedBoardPinDefaults(component.id, entries, board, next);
+  // falls back to ESP32 GPIO22/21. Pins the YAML already wires stay
+  // unseeded (a second uart would otherwise re-suggest the first
+  // bus's pins, #1555); no exclude range — the new component isn't
+  // in the YAML yet. The scan's known imprecision is inherited: a
+  // token like "esp32-p4" registers GPIO4 as used (over-suppresses a
+  // default), and a substitution-wired pin is invisible to it.
+  next = seedBoardPinDefaults(component.id, entries, board, next, findUsedPins(yaml));
 
   // Restore what the user typed before a "+ Add <dep>" detour, over the freshly
   // seeded defaults, but before `prefillReference` so the just-added dep's id
