@@ -241,11 +241,13 @@ export class ESPHomeLogsDialog extends LitElement {
       else this._quietSerial.disarm();
     }
     // A Web Serial session reads USB, not the dashboard WS; the
-    // connection banner and its scroll re-pin are ota-only.
-    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
+    // connection banner and the resume are ota-only.
+    if (changedProperties.has("_connectionLost") && this._session.kind === "ota") {
       // The banner toggling resizes the log area on both edges;
       // re-pin the scroll so the tail stays visible.
       this._resetAnsiLogScroll();
+    }
+    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
       if (this._apiConnected) resumeAfterReconnect(this);
     }
   }
