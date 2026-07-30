@@ -13,6 +13,7 @@ import {
   formEncodedLength,
   takeLinesUnderBudget,
 } from "./crash-report-budget.js";
+import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -246,8 +247,8 @@ export interface CrashReport {
 const PLATFORM_INTEGRATIONS = [
   "esp32",
   "esp8266",
-  "rp2",
-  "rp2040",
+  RP2_CANONICAL_KEY,
+  RP2_ALIAS_KEY,
   "bk72xx",
   "rtl87xx",
   "ln882x",
