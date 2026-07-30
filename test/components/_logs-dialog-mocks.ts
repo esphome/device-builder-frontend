@@ -6,7 +6,7 @@ import { vi } from "vitest";
 import "../_mock-webawesome.js";
 
 /** Captures dashboard error toasts for assertion. */
-export const toastError = vi.fn();
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 
 vi.mock("sonner-js", () => ({
   default: {
@@ -15,3 +15,5 @@ vi.mock("sonner-js", () => ({
     info: vi.fn(),
   },
 }));
+
+export { toastError };
