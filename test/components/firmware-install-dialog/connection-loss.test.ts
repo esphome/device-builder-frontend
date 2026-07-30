@@ -11,6 +11,7 @@ import {
 import {
   cardState,
   cardStatusMessage,
+  connectionLost,
 } from "../../../src/components/firmware-install-dialog/renderers.js";
 import { fakeLogBuffer } from "../../_fake-host.js";
 import { identityLocalize } from "../../_dom.js";
@@ -158,31 +159,32 @@ describe("waitForRunningJob connection loss", () => {
   });
 });
 
-describe("reconnecting banner overlay", () => {
-  it("overrides the card only during the follow-backed steps", () => {
+describe("reconnecting banner predicate", () => {
+  it("flags only the follow-backed steps, and never overrides the card helpers", () => {
     const base = { _localize: identityLocalize, _statusMessage: "Compiling…" };
     const compiling = {
       ...base,
-      _apiConnected: false,
+      _connectionLost: true,
       _step: "compiling",
     } as unknown as ESPHomeFirmwareInstallDialog;
-    expect(cardState(compiling)).toBe("error");
-    expect(cardStatusMessage(compiling)).toBe("layout.reconnecting");
+    expect(connectionLost(compiling)).toBe(true);
+    // The card helpers keep their own values; the terminal owns the
+    // override presentation.
+    expect(cardState(compiling)).toBe("running");
+    expect(cardStatusMessage(compiling)).toBe("Compiling…");
 
     const flashing = {
       ...base,
-      _apiConnected: false,
+      _connectionLost: true,
       _step: "flashing",
     } as unknown as ESPHomeFirmwareInstallDialog;
-    expect(cardState(flashing)).toBe("running");
-    expect(cardStatusMessage(flashing)).toBe("Compiling…");
+    expect(connectionLost(flashing)).toBe(false);
 
     const connected = {
       ...base,
-      _apiConnected: true,
+      _connectionLost: false,
       _step: "compiling",
     } as unknown as ESPHomeFirmwareInstallDialog;
-    expect(cardState(connected)).toBe("running");
-    expect(cardStatusMessage(connected)).toBe("Compiling…");
+    expect(connectionLost(connected)).toBe(false);
   });
 });

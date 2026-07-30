@@ -19,7 +19,7 @@ import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   activeJobsContext,
-  apiConnectedContext,
+  apiConnectionLostContext,
   apiContext,
   buildOffloadPairingsContext,
   darkModeContext,
@@ -50,6 +50,7 @@ import {
   cardState,
   cardStatusDetail,
   cardStatusMessage,
+  connectionLost,
   renderFooter,
   renderOffloadHintSlot,
   renderResetSuggestion,
@@ -99,10 +100,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
-  /** WS liveness; drives the transient reconnecting banner over a build. */
-  @consume({ context: apiConnectedContext, subscribe: true })
+  /** The gated (debounced, ready-cleared) indicator the banner rides. */
+  @consume({ context: apiConnectionLostContext, subscribe: true })
   @state()
-  _apiConnected = true;
+  _connectionLost = false;
 
   // Live job snapshot — the compile job's progress gauge is the second
   // compile-start signal beside the log scanner (covers raw ninja builds).
@@ -488,6 +489,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           .state=${cardState(this)}
           .statusMessage=${cardStatusMessage(this)}
           .statusDetail=${cardStatusDetail(this)}
+          .connectionLost=${connectionLost(this)}
+          .connectionLostMessage=${this._localize("layout.reconnecting")}
           .progress=${this._step === "flashing" ? this._flashPercent : null}
         >
           ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}

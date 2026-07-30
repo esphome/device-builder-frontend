@@ -123,29 +123,30 @@ describe("command-dialog follow connection loss", () => {
 });
 
 describe("command-dialog reconnecting banner overlay", () => {
-  it("overrides the terminal only while a run is active", async () => {
+  it("flags the terminal only while a run is active", async () => {
     const el = new ESPHomeCommandDialog();
     (el as any)._api = { firmwareFollowJob: () => "s1", ready: Promise.resolve() };
     document.body.appendChild(el);
     (el as any)._open = true;
     (el as any)._state = "running";
-    (el as any)._apiConnected = false;
+    (el as any)._connectionLost = true;
     await el.updateComplete;
     const terminal = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-    expect(terminal.state).toBe("error");
-    expect(terminal.statusMessage).toBe("layout.reconnecting");
-    // The stream is paused, so the pulsing dot pauses with it.
-    expect(terminal.hasAttribute("streaming")).toBe(false);
+    expect(terminal.connectionLost).toBe(true);
+    expect(terminal.connectionLostMessage).toBe("layout.reconnecting");
+    // The terminal pauses the pulsing dot itself while flagged.
+    expect(terminal.shadowRoot!.querySelector(".streaming-dot")).toBeNull();
 
-    (el as any)._apiConnected = true;
+    (el as any)._connectionLost = false;
     await el.updateComplete;
-    expect(terminal.state).toBe("running");
+    expect(terminal.connectionLost).toBe(false);
 
+    // A terminal state keeps its own message; no flag past the run.
     (el as any)._state = "error";
     (el as any)._statusMessage = "command.install_failed";
-    (el as any)._apiConnected = false;
+    (el as any)._connectionLost = true;
     await el.updateComplete;
-    expect(terminal.state).toBe("error");
+    expect(terminal.connectionLost).toBe(false);
     expect(terminal.statusMessage).toBe("command.install_failed");
   });
 });

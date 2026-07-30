@@ -23,6 +23,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
   apiConnectedContext,
+  apiConnectionLostContext,
   apiContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
@@ -106,10 +107,15 @@ export class ESPHomeCommandDialog extends LitElement {
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
-  /** WS liveness; drives the transient reconnecting banner over a run. */
+  /** WS liveness; gates Stop, which must not wait out the debounce. */
   @consume({ context: apiConnectedContext, subscribe: true })
   @state()
   _apiConnected = true;
+
+  /** The gated (debounced, ready-cleared) indicator the banner rides. */
+  @consume({ context: apiConnectionLostContext, subscribe: true })
+  @state()
+  _connectionLost = false;
 
   // Live firmware-job snapshot keyed by job_id. Drives the queued overlay so
   // we tell the user the dialog is waiting in line instead of sitting empty.
@@ -501,7 +507,7 @@ export class ESPHomeCommandDialog extends LitElement {
   protected render() {
     // Reconnecting banner only over an active run; terminal states
     // keep their own message.
-    const wsDown = !this._apiConnected && this._state === "running";
+    const wsDown = this._connectionLost && this._state === "running";
     return html`
       <esphome-base-dialog
         ?open=${this._open}
@@ -512,11 +518,11 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._log.lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && !showRunTimer(this) && !wsDown}
-          .state=${wsDown ? "error" : this._state}
-          .statusMessage=${
-            wsDown ? this._localize("layout.reconnecting") : this._statusMessage
-          }
+          ?streaming=${this._state === "running" && !showRunTimer(this)}
+          .state=${this._state}
+          .statusMessage=${this._statusMessage}
+          .connectionLost=${wsDown}
+          .connectionLostMessage=${this._localize("layout.reconnecting")}
         >
           ${renderRemoteBuilderSubLine(this)} ${renderQueuedOverlay(this)}
           ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}

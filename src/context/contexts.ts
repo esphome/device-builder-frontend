@@ -68,6 +68,15 @@ export const apiConnectedContext = createContext<boolean>(
   Symbol("esphome-api-connected")
 );
 
+/** The gated connection-lost indicator: true only once an outage
+ *  crossed the reconnect-pill delay, false again only once the
+ *  reconnect's auth landed. One debounce for the pill and every
+ *  dialog banner; blips never show, and nothing clears before the
+ *  ready-gated replays can start. */
+export const apiConnectionLostContext = createContext<boolean>(
+  Symbol("esphome-api-connection-lost")
+);
+
 /** Context for whether the frontend is running inside HA ingress. */
 export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 
