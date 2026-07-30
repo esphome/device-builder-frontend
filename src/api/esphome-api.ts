@@ -288,7 +288,17 @@ export class ESPHomeAPI {
       const wsUrl = `${protocol}//${window.location.host}${BASE_PATH}ws`;
 
       // Listeners ignore events from a socket a reconnect replaced.
-      const ws = new WebSocket(wsUrl);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        // A synchronous constructor throw (CSP, malformed host) fires
+        // no close event; route it through the normal close path so
+        // the failure is logged and the backoff loop keeps going.
+        console.error("[WS] Failed to open a socket", err);
+        this._onClose();
+        return;
+      }
       this._ws = ws;
 
       ws.addEventListener("message", (event) => {
@@ -369,6 +379,14 @@ export class ESPHomeAPI {
 
   private readonly _onWindowOnline = (): void => {
     if (this._intentionalDisconnect || this._connected) return;
+    // An attempt stalled in CONNECTING was made against the interface
+    // that just came back; abandon it rather than waiting out its
+    // connect timeout. Before clearing the retry timer, since the
+    // forced close re-arms one.
+    const stalled = this._ws;
+    if (stalled && stalled.readyState === WebSocket.CONNECTING) {
+      this._forceClose(stalled);
+    }
     this._reconnectDelay = 1000;
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
@@ -428,9 +446,10 @@ export class ESPHomeAPI {
         console.debug("[WS] Heartbeat got no reply; closing socket", err);
         if (this._ws === ws) this._forceClose(ws);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         // A throw from the disconnect fan-out must not become an
-        // unhandled rejection.
+        // unhandled rejection, but it must not vanish either.
+        console.error("[WS] Heartbeat close path threw", err);
       })
       .finally(() => {
         this._heartbeatInFlight = false;
@@ -614,10 +633,16 @@ export class ESPHomeAPI {
     }
     this._pendingRequests.clear();
 
-    // Notify stream handlers
+    // Notify stream handlers. Each callback is isolated so one
+    // consumer throwing can't abort the fan-out or the reconnect
+    // scheduling below.
     for (const [, stream] of this._streamHandlers) {
-      if (stream.onConnectionLost) stream.onConnectionLost();
-      else stream.onError?.("WebSocket connection closed");
+      try {
+        if (stream.onConnectionLost) stream.onConnectionLost();
+        else stream.onError?.("WebSocket connection closed");
+      } catch (err) {
+        console.error("[WS] Stream close handler threw", err);
+      }
     }
     this._streamHandlers.clear();
 
@@ -625,7 +650,11 @@ export class ESPHomeAPI {
     this._eventSubscriptions.clear();
 
     if (wasConnected) {
-      this.onDisconnected?.();
+      try {
+        this.onDisconnected?.();
+      } catch (err) {
+        console.error("[WS] onDisconnected handler threw", err);
+      }
     }
 
     // Auto-reconnect unless intentionally disconnected. While the
@@ -704,6 +733,7 @@ export class ESPHomeAPI {
     callbacks: StreamCallbacks<TResult>
   ): string {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      console.debug(`[WS] Stream send refused (not connected): ${command}`);
       if (callbacks.onConnectionLost) callbacks.onConnectionLost();
       else callbacks.onError?.("WebSocket not connected");
       return "";

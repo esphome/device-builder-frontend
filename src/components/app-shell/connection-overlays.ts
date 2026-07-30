@@ -85,13 +85,12 @@ export function renderRouteLoadingBar(): TemplateResult {
 function showPillOnAttach(el?: Element): void {
   if (!(el instanceof HTMLElement)) return;
   queueMicrotask(() => {
-    if (!el.isConnected) return;
     try {
       if (!el.matches(":popover-open")) el.showPopover();
     } catch {
-      // No popover support: degrade to the plain fixed pill (visible
-      // everywhere except under a modal's top layer) rather than
-      // staying display:none forever.
+      // No popover support or a detached element: degrade to the plain
+      // fixed pill (visible everywhere except under a modal's top
+      // layer) rather than staying display:none forever.
       el.removeAttribute("popover");
     }
   });

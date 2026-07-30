@@ -84,7 +84,10 @@ export class ESPHomeProcessTerminal extends LitElement {
     if (this.state !== "success" && this.state !== "error") return nothing;
     const isSuccess = this.state === "success";
     return html`
-      <div class="status-banner status-banner--${isSuccess ? "success" : "error"}">
+      <div
+        class="status-banner status-banner--${isSuccess ? "success" : "error"}"
+        role="status"
+      >
         <wa-icon
           library="mdi"
           name=${isSuccess ? "check-circle" : "alert-circle"}

@@ -2609,6 +2609,20 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
+  it("online abandons a connect attempt stalled in CONNECTING", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    ws.close();
+    await vi.advanceTimersByTimeAsync(1000);
+    // The retry fired and its handshake is stalling.
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const stalled = MockWebSocket.latest();
+    expect(stalled.readyState).toBe(MockWebSocket.CONNECTING);
+    fireWindowEvent("online");
+    expect(stalled.readyState).toBe(MockWebSocket.CLOSED);
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
   it("holds retries at the backoff ceiling while the browser reports offline", async () => {
     vi.stubGlobal("navigator", { onLine: false });
     const api = makeApi();
