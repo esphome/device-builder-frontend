@@ -152,6 +152,10 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
   return catalogPromise;
 }
 
+export function _clearCatalogCache(): void {
+  catalogPromise = null;
+}
+
 /**
  * Map a YAML parent block (``esphome``, ``binary_sensor`` plus a
  * ``platform: gpio`` sibling, …) to the schema-bundle filename and

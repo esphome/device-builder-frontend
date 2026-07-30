@@ -33,10 +33,11 @@ import {
   depsSatisfiedByProvides,
   findMissingDependencies,
 } from "./add-component-deps.js";
+import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
-import { buildInitialValues } from "./add-component-form-seed.js";
+import { buildInitialValues, findReferencePath } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
@@ -151,6 +152,20 @@ export class ESPHomeAddComponentForm extends LitElement {
    *  overwrite a newer one. */
   private _providesSeq = 0;
 
+  /** Bus dep present in the YAML but with no bus this component can attach
+   *  to; folded into the missing-deps banner and submit gate so the user
+   *  detours to a new bus. Resolved async like `_providedDeps`. */
+  @state()
+  private _busBlockedDep: string | null = null;
+
+  /** Reference key forced visible when several buses qualify, so the user
+   *  picks one instead of esphome failing on the ambiguity. */
+  @state()
+  private _busPickerKey: string | null = null;
+
+  /** Guards `_resolveBusHostability` against out-of-order resolutions. */
+  private _busAssessSeq = 0;
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this._liveValidateTimer);
@@ -177,10 +192,17 @@ export class ESPHomeAddComponentForm extends LitElement {
   // Memoized so the shared form's `.entries` identity is render-stable.
   private _overlayRequired = memoizeOne(overlayRequired);
   private _overlayOptions = memoizeOne(overlayOptions);
+  private _mergedExtraRequired = memoizeOne(
+    (extra: string[] | null, busKey: string | null): string[] | null =>
+      busKey ? [...(extra ?? []), busKey] : extra
+  );
 
   private get _entries(): ConfigEntry[] {
     return this._overlayOptions(
-      this._overlayRequired(this.component.config_entries, this.extraRequired),
+      this._overlayRequired(
+        this.component.config_entries,
+        this._mergedExtraRequired(this.extraRequired, this._busPickerKey)
+      ),
       this.optionOverrides
     );
   }
@@ -203,6 +225,11 @@ export class ESPHomeAddComponentForm extends LitElement {
         // A pending live check belongs to the previous component's
         // entries; validating across the retarget could mis-flag.
         clearTimeout(this._liveValidateTimer);
+        // A stale bus verdict must not gate the next component while its
+        // own assessment is in flight, and the previous picker key must
+        // not shape the seed pass below.
+        this._busBlockedDep = null;
+        this._busPickerKey = null;
         this._initValues();
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow
@@ -220,17 +247,21 @@ export class ESPHomeAddComponentForm extends LitElement {
       changedProperties.has("board")
     ) {
       void this._resolveProvidedDeps();
+      void this._resolveBusHostability();
     }
   }
 
   /** Net-missing deps driving the banner and submit gate: the literal-name
-   *  scan minus those a present component provides (`_providedDeps`). */
+   *  scan minus those a present component provides (`_providedDeps`), plus
+   *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
-    return findMissingDependencies(
+    const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
       present
     ).filter((d) => !this._providedDeps.has(d));
+    const blocked = this._busBlockedDep;
+    return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -266,6 +297,32 @@ export class ESPHomeAddComponentForm extends LitElement {
       // failure is observable rather than silently re-showing the original
       // false banner — mirrors config-entry-form's provider fetch.
       console.warn("[add-component-form] provides lookup failed", err);
+    }
+  }
+
+  /** Refresh the bus verdict for the current `(component, yaml)`; the
+   *  decision logic lives in `add-component-form-bus.ts`. */
+  private async _resolveBusHostability(): Promise<void> {
+    const seq = ++this._busAssessSeq;
+    const api = this._api;
+    const verdict =
+      api && this.component
+        ? await resolveBusVerdict(api, this.component, this.yaml, this.board)
+        : NO_BUS_VERDICT;
+    if (seq !== this._busAssessSeq) return;
+    if (this._busBlockedDep !== verdict.blocked) this._busBlockedDep = verdict.blocked;
+    if (this._busPickerKey !== verdict.picker) this._busPickerKey = verdict.picker;
+    if (verdict.reference) {
+      // Seed the sole compatible bus into a still-empty reference field so
+      // the attachment is explicit; a detour-created bus or a value the
+      // user typed already fills the field and wins.
+      const path = findReferencePath(
+        this.component.config_entries,
+        verdict.reference.domain,
+        [],
+        this._values
+      );
+      if (path) this._values = setIn(this._values, path, verdict.reference.id);
     }
   }
 
@@ -386,17 +443,37 @@ export class ESPHomeAddComponentForm extends LitElement {
    * back to the raw id until the cache lookup lands (kicked off in
    * ``willUpdate``).
    */
+  /** True when the only outstanding dep is the bus-blocked one, so the
+   *  banner and the Enter-key submit bail speak of an unavailable bus
+   *  rather than a missing component. */
+  private _allDepsBusBlocked(missing: string[]): boolean {
+    const blocked = this._busBlockedDep;
+    return blocked !== null && missing.length === 1 && missing[0] === blocked;
+  }
+
+  private _depsBlockTitle(missing: string[]): string {
+    return this._localize(
+      this._allDepsBusBlocked(missing)
+        ? "device.bus_dependency_in_use_title"
+        : "device.missing_dependencies_title",
+      { name: this.component.name }
+    );
+  }
+
   private _renderMissingDeps(missing: string[]) {
+    const allBlocked = this._allDepsBusBlocked(missing);
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
-          <div class="deps-warning-title">
-            ${this._localize("device.missing_dependencies_title", {
-              name: this.component.name,
-            })}
+          <div class="deps-warning-title">${this._depsBlockTitle(missing)}</div>
+          <div>
+            ${
+              allBlocked
+                ? this._localize("device.bus_dependency_in_use_body")
+                : this._localize("device.missing_dependencies_body")
+            }
           </div>
-          <div>${this._localize("device.missing_dependencies_body")}</div>
           <div class="deps-warning-actions">
             ${missing.map(
               (d) =>
@@ -555,9 +632,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (missingDeps.length > 0) {
       // Surface a visible message that names the missing domain(s) so
       // the user can act, instead of returning silently.
-      this._localBlockMessage = `${this._localize("device.missing_dependencies_title", {
-        name: this.component.name,
-      })} (${missingDeps.join(", ")})`;
+      this._localBlockMessage = `${this._depsBlockTitle(missingDeps)} (${missingDeps.join(", ")})`;
       return;
     }
 

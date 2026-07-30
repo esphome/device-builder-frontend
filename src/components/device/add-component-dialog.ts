@@ -10,6 +10,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { exclusiveBusTarget } from "../../util/bus-availability.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
@@ -499,6 +500,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // can't predict; show the form. (Detour/restore set `_selected` directly
     // and bypass this handler, so this is null today — a forward guard.)
     if (this._prefillReference !== null || this._depPrefill !== null) return null;
+    // The form owns the async bus-hostability verdict; a component
+    // constrained on an exclusive-claim bus always gets the form so the
+    // verdict can gate the add.
+    if (exclusiveBusTarget(entry)) return null;
     const present = parseTopLevelComponents(this.yaml);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
