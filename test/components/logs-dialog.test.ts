@@ -3,34 +3,21 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-
-const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
-vi.mock("sonner-js", () => ({
-  default: {
-    error: (...args: unknown[]) => toastError(...args),
-    success: vi.fn(),
-    info: vi.fn(),
-  },
-}));
+import {
+  call,
+  makeLogsDialog,
+  paused,
+  session,
+  streaming,
+  toastError,
+} from "./_logs-dialog-env.js";
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { startOtaStream } from "../../src/components/logs-dialog/session.js";
-import {
-  hasSerialPort,
-  isStreaming,
-  type LogsSession,
-} from "../../src/components/logs-session.js";
+import { hasSerialPort } from "../../src/components/logs-session.js";
 
-// Read the dialog's private session/getters without sprinkling casts inline.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._session;
-const streaming = (el: ESPHomeLogsDialog): boolean => isStreaming(session(el));
-const paused = (el: ESPHomeLogsDialog): boolean => (el as any)._serialPaused;
-const call = (el: ESPHomeLogsDialog, method: string) => (el as any)[method]();
-
 interface DeferredStop {
   promise: Promise<void>;
   resolve: () => void;
@@ -51,12 +38,11 @@ describe("logs-dialog states-toggle restart", () => {
   let stopStream: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    el = new ESPHomeLogsDialog();
     stop = deferred();
     let n = 0;
     logs = vi.fn(() => `stream-${++n}`);
     stopStream = vi.fn(() => stop.promise);
-    (el as any)._api = { logs, stopStream };
+    el = makeLogsDialog({ logs, stopStream }, { mount: false });
   });
 
   it("does not respawn a stream when the dialog is closed mid-restart", async () => {
@@ -97,16 +83,17 @@ describe("logs-dialog states-toggle restart", () => {
 
 describe("logs-dialog OTA stale-callback guard", () => {
   it("ignores onResult from a torn-down stream so it can't stop its replacement", () => {
-    const el = new ESPHomeLogsDialog();
     const handlers: { onResult: () => void }[] = [];
     let n = 0;
-    (el as any)._api = {
-      logs: (_c: string, _p: string, cb: { onResult: () => void }) => {
-        handlers.push(cb);
-        return `stream-${++n}`;
+    const el = makeLogsDialog(
+      {
+        logs: (_c: string, _p: string, cb: { onResult: () => void }) => {
+          handlers.push(cb);
+          return `stream-${++n}`;
+        },
       },
-      stopStream: () => Promise.resolve(),
-    };
+      { mount: false }
+    );
 
     el.open("OTA"); // stream-1
     call(el, "_onStop"); // stop stream-1
@@ -122,12 +109,7 @@ describe("logs-dialog OTA stale-callback guard", () => {
 });
 
 describe("logs-dialog header source chip", () => {
-  function mount(): ESPHomeLogsDialog {
-    const el = new ESPHomeLogsDialog();
-    (el as any)._api = { logs: () => "s1", stopStream: () => Promise.resolve() };
-    document.body.appendChild(el);
-    return el;
-  }
+  const mount = (): ESPHomeLogsDialog => makeLogsDialog();
 
   function chipText(el: ESPHomeLogsDialog): string {
     return el.shadowRoot!.querySelector(".source-chip")?.textContent?.trim() ?? "";
@@ -157,12 +139,7 @@ describe("logs-dialog header source chip", () => {
 });
 
 describe("logs-dialog States toggle gate (#539)", () => {
-  function mount(): ESPHomeLogsDialog {
-    const el = new ESPHomeLogsDialog();
-    (el as any)._api = { logs: () => "s1", stopStream: () => Promise.resolve() };
-    document.body.appendChild(el);
-    return el;
-  }
+  const mount = (): ESPHomeLogsDialog => makeLogsDialog();
 
   // The States toggle is the only toolbar control with aria-pressed.
   const hasStatesToggle = (el: ESPHomeLogsDialog): boolean =>
@@ -198,9 +175,11 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   beforeEach(() => {
     toastError.mockClear();
-    el = new ESPHomeLogsDialog();
     logs = vi.fn(() => "stream-1");
-    (el as any)._api = { logs, stopStream: vi.fn(() => Promise.resolve()) };
+    el = makeLogsDialog(
+      { logs, stopStream: vi.fn(() => Promise.resolve()) },
+      { mount: false }
+    );
     port = {
       close: vi.fn(() => Promise.resolve()),
       setSignals: vi.fn(() => Promise.resolve()),

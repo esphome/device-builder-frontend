@@ -6,19 +6,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("sonner-js", () => ({
-  default: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
-}));
+import { call, makeLogsDialog, session } from "./_logs-dialog-env.js";
 
-import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 import { switchToOtaLogs } from "../../src/components/logs-dialog/session.js";
-import { OTA_PORT, type LogsSession } from "../../src/components/logs-session.js";
+import { OTA_PORT } from "../../src/components/logs-session.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._session;
-const call = (el: ESPHomeLogsDialog, method: string) => (el as any)[method]();
 const banner = (el: ESPHomeLogsDialog): Element | null =>
   el.shadowRoot!.querySelector(".reset-suggestion");
 
@@ -30,11 +24,9 @@ describe("logs-dialog quiet-serial banner", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    el = new ESPHomeLogsDialog();
     logs = vi.fn(() => "stream-1");
-    (el as any)._api = { logs, stopStream: vi.fn(() => Promise.resolve()) };
+    el = makeLogsDialog({ logs, stopStream: vi.fn(() => Promise.resolve()) });
     cancel = vi.fn();
-    document.body.appendChild(el);
   });
 
   afterEach(() => {
@@ -157,9 +149,11 @@ describe("switchToOtaLogs", () => {
   const port = { close: vi.fn(), setSignals: vi.fn() } as unknown as SerialPort;
 
   beforeEach(() => {
-    el = new ESPHomeLogsDialog();
     logs = vi.fn(() => "stream-1");
-    (el as any)._api = { logs, stopStream: vi.fn(() => Promise.resolve()) };
+    el = makeLogsDialog(
+      { logs, stopStream: vi.fn(() => Promise.resolve()) },
+      { mount: false }
+    );
     (el as any)._open = true;
   });
 
