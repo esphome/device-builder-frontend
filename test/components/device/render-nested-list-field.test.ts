@@ -65,13 +65,16 @@ function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unkno
   return out;
 }
 
-function makeCtx(values: Record<string, unknown>): CtxStub {
+function makeCtx(
+  values: Record<string, unknown>,
+  extraOverrides: Partial<RenderCtx> = {}
+): CtxStub {
   const renderEntry = vi.fn(() => "<rendered>");
   const emitChange = vi.fn();
   const filterRenderable = vi.fn((entries: ConfigEntry[]) => entries);
   const ctx = makeRenderCtx(values, {
     board: null,
-    overrides: { emitChange, renderEntry, filterRenderable },
+    overrides: { emitChange, renderEntry, filterRenderable, ...extraOverrides },
   });
   return { ctx, renderEntry, emitChange, filterRenderable };
 }
@@ -110,7 +113,7 @@ describe("renderNestedListField", () => {
     expect(json).toContain("device.multi_value_empty");
   });
 
-  it("addItem appends a fresh empty object at the field's path", () => {
+  it("addItem seeds a unique id when the row schema requires one (#2452)", () => {
     const entry = makeListEntry();
     const { ctx, emitChange } = makeCtx({
       devices: [{ id: "kitchen" }],
@@ -120,7 +123,96 @@ describe("renderNestedListField", () => {
     // Last handler in render order is the add button (rendered after
     // the items + their per-item remove buttons).
     handlers[handlers.length - 1]();
-    expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "kitchen" }, {}]);
+    expect(emitChange).toHaveBeenCalledWith(
+      ["devices"],
+      [{ id: "kitchen" }, { id: "devices_1" }]
+    );
+  });
+
+  it("seeded id increments past document ids and unflushed sibling rows", () => {
+    const entry = makeListEntry();
+    const { ctx, emitChange } = makeCtx(
+      { devices: [{ id: "devices_2" }] },
+      { yaml: "esphome:\n  devices:\n    - id: devices_1\n" }
+    );
+    const tpl = renderNestedListField(entry, ["devices"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(
+      ["devices"],
+      [{ id: "devices_2" }, { id: "devices_3" }]
+    );
+  });
+
+  it("seeded id sees a same-key sibling list under a different parent row", () => {
+    // esp32_ble_server: every services[] row has its own characteristics[]
+    // list; an id minted in one must not collide with an unflushed id in
+    // the other.
+    const entry = makeConfigEntry({
+      key: "characteristics",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx({
+      services: [
+        { characteristics: [{ id: "characteristics_1" }] },
+        { characteristics: [] },
+      ],
+    });
+    const tpl = renderNestedListField(entry, ["services", "1", "characteristics"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(
+      ["services", "1", "characteristics"],
+      [{ id: "characteristics_2" }]
+    );
+  });
+
+  it("seeded id clears ids declared under another key", () => {
+    // tca9548a declares through ``channels[].bus_id`` and usb_uart through
+    // ``channels[].id``, so both mint from base ``channels`` — the pool has
+    // to span every id-naming key or the two collide.
+    const entry = makeConfigEntry({
+      key: "channels",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx(
+      { channels: [] },
+      {
+        yaml: "tca9548a:\n  - id: mux\n    channels:\n      - bus_id: channels_1\n",
+      }
+    );
+    const tpl = renderNestedListField(entry, ["channels"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(["channels"], [{ id: "channels_2" }]);
+  });
+
+  it("addItem appends a bare {} when no child requires a declaring id", () => {
+    const entry = makeConfigEntry({
+      key: "devices",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
+        makeConfigEntry({
+          key: "uart_id",
+          type: ConfigEntryType.ID,
+          required: true,
+          references_component: "uart",
+        }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx({ devices: [] });
+    const tpl = renderNestedListField(entry, ["devices"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    // The optional id stays unseeded; the required reference is a picker,
+    // not a declaration.
+    expect(emitChange).toHaveBeenCalledWith(["devices"], [{}]);
   });
 
   it("removeAt drops the item at idx and emits the new array", () => {
