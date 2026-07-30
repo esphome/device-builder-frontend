@@ -155,11 +155,6 @@ export class ESPHomeLogsDialog extends LitElement {
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
 
-  // Set when the OTA stream was stopped by a lost WS connection rather
-  // than by the user; the reconnect edge in willUpdate resumes it. A
-  // manual Stop/Start clears it so a user-stopped stream stays stopped.
-  _stoppedByConnectionLoss = false;
-
   // Watchdog for a Web Serial session that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
   // willUpdate; fed displayed lines via _noteSerialActivity. When it goes

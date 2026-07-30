@@ -584,6 +584,31 @@ describe("ESPHomeAPI — streaming commands", () => {
     expect(onError).toHaveBeenCalledWith("WebSocket connection closed");
   });
 
+  it("prefers onConnectionLost over onError when the socket drops", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const onError = vi.fn();
+    const onConnectionLost = vi.fn();
+    api.sendStreamCommand(
+      "devices/logs",
+      { configuration: "foo.yaml" },
+      { onError, onConnectionLost }
+    );
+    ws.close();
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("prefers onConnectionLost over onError on a refused send", () => {
+    const api = new ESPHomeAPI();
+    const onError = vi.fn();
+    const onConnectionLost = vi.fn();
+    const id = api.sendStreamCommand("x", {}, { onError, onConnectionLost });
+    expect(id).toBe("");
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("stopStream sends devices/stop_stream with the stream id", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
@@ -2452,6 +2477,7 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     uninstallMockWebSocket();
   });
 
@@ -2498,7 +2524,7 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
   });
 
   it("keeps the socket open when the ping is rejected by the auth gate", async () => {
-    // An error frame is still a reply — the link is alive; only
+    // An error frame is still a reply; the link is alive, and only
     // silence may force-close the socket.
     const api = new ESPHomeAPI();
     const ws = await connect(api);
@@ -2540,5 +2566,19 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     api.disconnect();
     fireWindowEvent("online");
     expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("suspends reconnect attempts while the browser reports offline", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    fireWindowEvent("offline");
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    // No doomed retries while offline; the online event restarts the loop.
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(MockWebSocket.instances).toHaveLength(1);
+    vi.stubGlobal("navigator", { onLine: true });
+    fireWindowEvent("online");
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 });

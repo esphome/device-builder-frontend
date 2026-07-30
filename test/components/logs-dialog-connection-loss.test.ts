@@ -13,7 +13,11 @@ import type { LogsSession } from "../../src/components/logs-session.js";
 const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._session;
 const call = (el: ESPHomeLogsDialog, method: string) => (el as any)[method]();
 
-type StreamCallbacks = { onOutput: (l: string) => void; onError: (e: string) => void };
+type StreamCallbacks = {
+  onOutput: (l: string) => void;
+  onError: (e: string) => void;
+  onConnectionLost: () => void;
+};
 
 describe("logs-dialog OTA connection loss", () => {
   let el: ESPHomeLogsDialog;
@@ -37,11 +41,14 @@ describe("logs-dialog OTA connection loss", () => {
     document.body.appendChild(el);
   });
 
-  it("flags a connection-loss stop instead of appending the error", () => {
+  it("marks the session interrupted on connection loss without appending a line", () => {
     el.open("OTA");
-    handlers[0].onError("WebSocket connection closed");
-    expect(session(el)).toMatchObject({ kind: "ota", streamId: null });
-    expect((el as any)._stoppedByConnectionLoss).toBe(true);
+    handlers[0].onConnectionLost();
+    expect(session(el)).toMatchObject({
+      kind: "ota",
+      streamId: null,
+      interrupted: true,
+    });
     expect((el as any)._log.lines).toEqual([]);
   });
 
@@ -49,20 +56,31 @@ describe("logs-dialog OTA connection loss", () => {
     el.open("OTA");
     handlers[0].onError("configuration not found");
     expect(session(el)).toMatchObject({ kind: "ota", streamId: null });
-    expect((el as any)._stoppedByConnectionLoss).toBe(false);
+    expect(session(el)).not.toHaveProperty("interrupted", true);
     expect((el as any)._log.lines).toEqual(["configuration not found"]);
   });
 
-  it("stays stopped and flagged when the send is refused outright", () => {
-    // sendStreamCommand returns "" (and fires onError synchronously)
-    // when the socket is already known dead.
+  it("ignores a stale stream's late connection-loss signal", () => {
+    el.open("OTA"); // stream-1
+    call(el, "_onStop");
+    call(el, "_onStart"); // stream-2
+    handlers[0].onConnectionLost(); // stale
+    expect(session(el)).toMatchObject({ kind: "ota", streamId: "stream-2" });
+  });
+
+  it("stays stopped and interrupted when the send is refused outright", () => {
+    // sendStreamCommand fires onConnectionLost synchronously and
+    // returns "" when the socket is already known dead.
     logs.mockImplementation((_c: string, _p: string, cb: StreamCallbacks) => {
-      cb.onError("WebSocket not connected");
+      cb.onConnectionLost();
       return "";
     });
     el.open("OTA");
-    expect(session(el)).toMatchObject({ kind: "ota", streamId: null });
-    expect((el as any)._stoppedByConnectionLoss).toBe(true);
+    expect(session(el)).toMatchObject({
+      kind: "ota",
+      streamId: null,
+      interrupted: true,
+    });
   });
 
   it("resumes the stream on the reconnect edge with a reconnected line", async () => {
@@ -70,23 +88,21 @@ describe("logs-dialog OTA connection loss", () => {
     await el.updateComplete;
     (el as any)._apiConnected = false;
     await el.updateComplete;
-    handlers[0].onError("WebSocket connection closed");
+    handlers[0].onConnectionLost();
 
     (el as any)._apiConnected = true;
     await el.updateComplete;
     await vi.waitFor(() => expect(logs).toHaveBeenCalledTimes(2));
     expect((el as any)._log.lines).toEqual(["dashboard.logs_reconnected"]);
     expect(session(el)).toMatchObject({ kind: "ota", streamId: "stream-2" });
-    expect((el as any)._stoppedByConnectionLoss).toBe(false);
   });
 
-  it("does not resume a stream the user stopped", async () => {
+  it("does not resume a stream the user stopped before the drop", async () => {
     el.open("OTA");
     await el.updateComplete;
+    call(el, "_onStop");
     (el as any)._apiConnected = false;
     await el.updateComplete;
-    handlers[0].onError("WebSocket connection closed");
-    call(el, "_onStop");
 
     (el as any)._apiConnected = true;
     await el.updateComplete;

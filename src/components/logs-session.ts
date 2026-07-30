@@ -27,7 +27,15 @@
  */
 export type LogsSession =
   | { readonly kind: "idle" }
-  | { readonly kind: "ota"; readonly port: string; readonly streamId: string | null }
+  | {
+      readonly kind: "ota";
+      readonly port: string;
+      readonly streamId: string | null;
+      /** Stopped by a lost dashboard connection (not the user); the
+       *  reconnect edge resumes it. Any other transition rebuilds the
+       *  session without it, so a user stop never auto-resumes. */
+      readonly interrupted?: boolean;
+    }
   | { readonly kind: "reconnecting"; readonly paused: boolean }
   | {
       readonly kind: "serial";

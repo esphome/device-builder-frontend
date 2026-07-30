@@ -1,4 +1,5 @@
 import { css, html, type TemplateResult } from "lit";
+import { ref } from "lit/directives/ref.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 
 /**
@@ -77,14 +78,29 @@ export function renderRouteLoadingBar(): TemplateResult {
   return html`<div class="route-loading-bar" aria-hidden="true"></div>`;
 }
 
+// Module-level so the ref callback keeps one identity across renders;
+// an inline arrow would re-fire on every host render. The microtask
+// defers past the commit: ref fires before Lit inserts the fragment,
+// and showPopover() throws on a disconnected element.
+function showPillOnAttach(el?: Element): void {
+  if (!(el instanceof HTMLElement) || typeof el.showPopover !== "function") return;
+  queueMicrotask(() => {
+    if (el.isConnected && !el.matches(":popover-open")) el.showPopover();
+  });
+}
+
 /**
- * A manual popover, not a plain fixed div: wa-dialog opens with the
- * native showModal(), whose top layer paints above any z-index, so a
- * fixed pill is invisible while a modal is open. The caller must
- * showPopover() after render (removal from the DOM auto-hides it).
+ * A manual popover, not a plain fixed div: modal dialogs sit in the
+ * browser top layer above any z-index. Shows itself on attach; DOM
+ * removal hides it.
  */
 export function renderReconnectPill(localize: LocalizeFunc): TemplateResult {
-  return html`<div class="reconnect-pill" popover="manual" role="status">
+  return html`<div
+    class="reconnect-pill"
+    popover="manual"
+    role="status"
+    ${ref(showPillOnAttach)}
+  >
     ${localize("layout.reconnecting")}
   </div>`;
 }

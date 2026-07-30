@@ -650,12 +650,6 @@ export class ESPHomeApp extends LitElement {
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
       this._onboardingWizard?.open();
     }
-    if (changed.has("_showReconnectPill") && this._showReconnectPill) {
-      // Promote the pill into the top layer so it paints above open
-      // modals; hiding is implicit when the render drops the element.
-      const pill = this.renderRoot.querySelector<HTMLElement>(".reconnect-pill");
-      if (pill && !pill.matches(":popover-open")) pill.showPopover();
-    }
   }
 }
 
