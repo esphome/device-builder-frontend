@@ -30,17 +30,17 @@ describe("wizard step-board platform chips", () => {
     expect(nrf52?.variant).toBe("");
   });
 
-  it("splits the rp2040 platform into separate RP2040 and RP2350 chips", () => {
-    // ESPHome's `rp2040` platform key covers both the original RP2040
+  it("splits the rp2 platform into separate RP2040 and RP2350 chips", () => {
+    // ESPHome's `rp2` platform key covers both the original RP2040
     // and the newer RP2350 (Raspberry Pi Pico 2). Each gets its own
     // filter chip (mirroring the per-variant ESP32 chips); both keep
-    // platform `rp2040` and are told apart by `mcu`, which the backend
+    // platform `rp2` and are told apart by `mcu`, which the backend
     // filters on.
     const rp2040 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2040");
     const rp2350 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2350");
-    expect(rp2040?.platform).toBe("rp2040");
+    expect(rp2040?.platform).toBe("rp2");
     expect(rp2040?.mcu).toBe("rp2040");
-    expect(rp2350?.platform).toBe("rp2040");
+    expect(rp2350?.platform).toBe("rp2");
     expect(rp2350?.mcu).toBe("rp2350");
   });
 
@@ -155,7 +155,7 @@ describe("wizard step-board platform chips", () => {
     const accepted = new Set([
       "esp32",
       "esp8266",
-      "rp2040",
+      "rp2",
       "bk72xx",
       "rtl87xx",
       "ln882x",

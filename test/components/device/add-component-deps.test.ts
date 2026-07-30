@@ -155,17 +155,17 @@ describe("depsSatisfiedByProvides", () => {
     expect([...satisfied]).toEqual(["uart"]);
   });
 
-  it("matches a rp2040 provider against a rp2 block and canonicalizes the platform", async () => {
-    const getComponents = vi.fn().mockResolvedValue(providersResponse(["rp2040"]));
+  it("matches a rp2 provider against a legacy rp2040 block and canonicalizes the platform", async () => {
+    const getComponents = vi.fn().mockResolvedValue(providersResponse(["rp2"]));
     const satisfied = await depsSatisfiedByProvides(
       stubApi(getComponents),
       ["pico_w"],
-      new Set(["rp2", "logger"]),
-      { platform: "rp2", boardId: null }
+      new Set(["rp2040", "logger"]),
+      { platform: "rp2040", boardId: null }
     );
     expect([...satisfied]).toEqual(["pico_w"]);
     // The provides index is keyed on the catalog's canonical platform key.
-    expect(getComponents.mock.calls[0][0]).toMatchObject({ platform: "rp2040" });
+    expect(getComponents.mock.calls[0][0]).toMatchObject({ platform: "rp2" });
   });
 
   it("short-circuits an empty missing list without an API call", async () => {

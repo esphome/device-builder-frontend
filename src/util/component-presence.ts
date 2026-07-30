@@ -1,7 +1,7 @@
 // Canonical and accepted-alias spellings of the RP2 platform key
 // (esphome#17145 rename); a canonical-key flip starts by swapping these.
-export const RP2_CANONICAL_KEY = "rp2040";
-export const RP2_ALIAS_KEY = "rp2";
+export const RP2_CANONICAL_KEY = "rp2";
+export const RP2_ALIAS_KEY = "rp2040";
 
 /** ESPHome target-platform section keys that carry board config (no `host`). */
 export const TARGET_PLATFORM_KEYS: ReadonlySet<string> = new Set([
