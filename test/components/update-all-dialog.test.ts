@@ -95,7 +95,7 @@ describe("update-all-dialog", () => {
     saveDashboardFilters({
       labels: [],
       areas: [],
-      platforms: ["rp2040"],
+      platforms: ["rp2"],
       states: [DeviceState.OFFLINE],
       updates: ["modified"],
     });

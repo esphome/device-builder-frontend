@@ -69,7 +69,7 @@ export interface RenderFilterOptions {
   presentComponents?: ReadonlySet<string>;
   /**
    * The device's target platform (``esp32`` / ``esp8266`` /
-   * ``rp2040`` / ...). Forwarded to ``isEntryVisible`` which
+   * ``rp2`` / ...). Forwarded to ``isEntryVisible`` which
    * applies the actual platform gate against
    * ``ConfigEntry.supported_platforms``. Keeping the predicate
    * inside ``isEntryVisible`` (rather than re-implementing it
@@ -112,7 +112,7 @@ export interface RenderFilterSource {
 
 /**
  * Layer the board's implied ``esphome`` fields under *rootValues* when the form
- * renders its platform section (``esp32`` / ``esp8266`` / ``rp2040``).
+ * renders its platform section (``esp32`` / ``esp8266`` / ``rp2``).
  *
  * A board fixes its ``variant`` (``esp32-poe-iso`` → ``esp32``) even when the
  * user never writes ``variant:`` in YAML, so a field gated on it — esp32

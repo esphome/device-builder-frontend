@@ -64,7 +64,7 @@ describe("iconForDomain", () => {
       "esp32",
       "esp8266",
       "rp2040",
-      // esphome#17145 renames the rp2040 platform key to rp2
+      // the deprecated rp2040 spelling of the rp2 platform (esphome#17145)
       "rp2",
       "bk72xx",
       "rtl87xx",

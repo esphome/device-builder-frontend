@@ -26,10 +26,10 @@ describe("readPlatformBoard", () => {
     });
   });
 
-  it("folds the rp2 alias onto rp2040", () => {
-    const yaml = "rp2:\n  board: rpipicow\n";
+  it("folds the legacy rp2040 spelling onto rp2", () => {
+    const yaml = "rp2040:\n  board: rpipicow\n";
     expect(readPlatformBoard(yaml)).toEqual({
-      platform: "rp2040",
+      platform: "rp2",
       board: "rpipicow",
       variant: null,
     });

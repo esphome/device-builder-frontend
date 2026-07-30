@@ -89,6 +89,7 @@ describe("resolveLogDocLink — actionable", () => {
   it.each([
     ["esp32.crash", "[12:31:55][E][esp32.crash:221]"],
     ["esp8266", "[09:28:39.132][E][esp8266:171]"],
+    ["rp2.crash", "[12:31:55][E][rp2.crash:103]"],
     ["rp2040.crash", "[12:31:55][E][rp2040.crash:103]"],
   ])("maps the %s crash banner to the troubleshooting guide", (_tag, prefix) => {
     const line = `${prefix}: *** CRASH DETECTED ON PREVIOUS BOOT ***`;

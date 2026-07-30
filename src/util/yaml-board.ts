@@ -5,7 +5,7 @@ import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { lineIndent, parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 export interface YamlPlatformBoard {
-  /** Canonical platform key (`rp2` folded to `rp2040`). */
+  /** Canonical platform key (legacy `rp2040` folded to `rp2`). */
   platform: string;
   board: string | null;
   variant: string | null;

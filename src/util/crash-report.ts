@@ -1,3 +1,4 @@
+import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
   ADDRESS_RE,
@@ -71,6 +72,9 @@ const CRASH_RELATED_RE = new RegExp(
 // prefix match (variants like ESP32S3 report as ESP32).
 const ISSUE_PLATFORMS: Record<string, string> = {
   ESP8266: "ESP8266",
+  // Both RP2 spellings: 2026.7+ firmware reports the renamed platform,
+  // older builds the legacy one; the bug form's dropdown value is RP2040.
+  RP2: "RP2040",
   RP2040: "RP2040",
   BK72XX: "BK72XX",
   RTL87XX: "RTL87XX",
@@ -243,7 +247,8 @@ export interface CrashReport {
 const PLATFORM_INTEGRATIONS = [
   "esp32",
   "esp8266",
-  "rp2040",
+  RP2_CANONICAL_KEY,
+  RP2_ALIAS_KEY,
   "bk72xx",
   "rtl87xx",
   "ln882x",

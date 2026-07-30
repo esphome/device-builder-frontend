@@ -30,24 +30,24 @@ describe("wizard step-board platform chips", () => {
     expect(nrf52?.variant).toBe("");
   });
 
-  it("splits the rp2040 platform into separate RP2040 and RP2350 chips", () => {
-    // ESPHome's `rp2040` platform key covers both the original RP2040
+  it("splits the rp2 platform into separate RP2040 and RP2350 chips", () => {
+    // ESPHome's `rp2` platform key covers both the original RP2040
     // and the newer RP2350 (Raspberry Pi Pico 2). Each gets its own
     // filter chip (mirroring the per-variant ESP32 chips); both keep
-    // platform `rp2040` and are told apart by `mcu`, which the backend
+    // platform `rp2` and are told apart by `mcu`, which the backend
     // filters on.
     const rp2040 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2040");
     const rp2350 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2350");
-    expect(rp2040?.platform).toBe("rp2040");
+    expect(rp2040?.platform).toBe("rp2");
     expect(rp2040?.mcu).toBe("rp2040");
-    expect(rp2350?.platform).toBe("rp2040");
+    expect(rp2350?.platform).toBe("rp2");
     expect(rp2350?.mcu).toBe("rp2350");
   });
 
   it("splits the libretiny platforms into per-chip filters, kept adjacent", () => {
     // The libretiny platforms bundle genuinely different silicon, so each
     // is split into per-chip filters (BK7231/BK7238/BK7251, RTL8710B/
-    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2040 splits.
+    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2 splits.
     // They stay contiguous so the user scanning the chip row sees them as
     // one family; pin both the mapping and the ordering.
     const bk72xx = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === "bk72xx");
@@ -124,7 +124,7 @@ describe("wizard step-board platform chips", () => {
     });
 
     it("maps the rp2040 / rp2350 chip series to their split filter labels", () => {
-      // The two rp2040-platform chips are distinguished by `mcu`, so the
+      // The two rp2-platform chips are distinguished by `mcu`, so the
       // chip-series name must resolve to its own label.
       expect(chipNameToFilterLabel("RP2040")).toBe("RP2040");
       expect(chipNameToFilterLabel("RP2350")).toBe("RP2350");
@@ -155,7 +155,7 @@ describe("wizard step-board platform chips", () => {
     const accepted = new Set([
       "esp32",
       "esp8266",
-      "rp2040",
+      "rp2",
       "bk72xx",
       "rtl87xx",
       "ln882x",

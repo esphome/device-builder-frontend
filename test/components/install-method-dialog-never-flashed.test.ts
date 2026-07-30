@@ -72,7 +72,7 @@ describe("install-method-dialog never-flashed ordering", () => {
   });
 
   it("promotes server-serial when the platform has no Web Serial row", async () => {
-    const d = await mount({ neverFlashed: true, platform: "rp2040" });
+    const d = await mount({ neverFlashed: true, platform: "rp2" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("serial-port");
     expect(order[order.length - 1]).toBe("wifi");

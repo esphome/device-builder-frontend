@@ -132,7 +132,7 @@ const DOMAIN_ICON: Record<string, readonly [string, string]> = {
   esp32: ["cpu-32-bit", mdiCpu32Bit],
   esp8266: ["cpu-32-bit", mdiCpu32Bit],
   [RP2_CANONICAL_KEY]: ["cpu-32-bit", mdiCpu32Bit],
-  // esphome#17145 renames the rp2040 platform key to rp2
+  // the deprecated rp2040 spelling of the rp2 platform (esphome#17145)
   [RP2_ALIAS_KEY]: ["cpu-32-bit", mdiCpu32Bit],
   bk72xx: ["cpu-32-bit", mdiCpu32Bit],
   rtl87xx: ["cpu-32-bit", mdiCpu32Bit],

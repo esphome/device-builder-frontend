@@ -18,6 +18,7 @@ describe("isEsptoolPlatform", () => {
 
   it("rejects non-ESP and unknown platforms (fail-closed)", () => {
     for (const p of [
+      "rp2",
       "rp2040",
       "rp2350",
       "nrf52",
