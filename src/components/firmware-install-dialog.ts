@@ -19,6 +19,7 @@ import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   activeJobsContext,
+  apiConnectedContext,
   apiContext,
   buildOffloadPairingsContext,
   darkModeContext,
@@ -97,6 +98,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode =
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
+
+  /** WS liveness; drives the transient reconnecting banner over a build. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  _apiConnected = true;
 
   // Live job snapshot — the compile job's progress gauge is the second
   // compile-start signal beside the log scanner (covers raw ninja builds).
