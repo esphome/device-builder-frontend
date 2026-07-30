@@ -3,22 +3,17 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import { append, makeLogsDialog } from "./_logs-dialog-env.js";
 
-import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 import { CRASH_BANNER_LINE as CRASH_LINE } from "../_crash-lines.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const append = (el: ESPHomeLogsDialog, lines: string[]) => (el as any)._log.append(lines);
-
 describe("logs-dialog crash callout", () => {
   let el: ESPHomeLogsDialog;
 
   beforeEach(() => {
-    el = new ESPHomeLogsDialog();
-    (el as any)._api = { logs: () => "s1", stopStream: () => Promise.resolve() };
-    document.body.appendChild(el);
+    el = makeLogsDialog();
   });
 
   const callout = () => el.shadowRoot!.querySelector(".crash-callout");

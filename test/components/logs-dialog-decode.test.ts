@@ -3,15 +3,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import { append, makeLogsDialog } from "./_logs-dialog-env.js";
 
-import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 import { STALE_BUILD_LOG_LINE } from "../../src/util/crash-decode.js";
 import { stripAnsi } from "../../src/util/ansi-escapes.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const append = (el: ESPHomeLogsDialog, lines: string[]) => (el as any)._log.append(lines);
 const lines = (el: ESPHomeLogsDialog): string[] => (el as any)._log.lines;
 
 // A Web Serial crash: no decoder attached, so no Decoded lines arrive.
@@ -35,19 +33,13 @@ describe("logs-dialog inline backtrace decode", () => {
   let decodeBacktrace: ReturnType<typeof vi.fn<DecodeMock>>;
 
   beforeEach(() => {
-    el = new ESPHomeLogsDialog();
     decodeBacktrace = vi.fn<DecodeMock>(async () => ({
       decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop() at main.cpp:42" }],
       stale_build: false,
       unavailable_reason: "",
     }));
-    (el as any)._api = {
-      logs: () => "s1",
-      stopStream: () => Promise.resolve(),
-      decodeBacktrace,
-    };
+    el = makeLogsDialog({ decodeBacktrace });
     el.configuration = "ol.yaml";
-    document.body.appendChild(el);
     el.open("OTA");
   });
 

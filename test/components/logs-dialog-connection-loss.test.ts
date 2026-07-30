@@ -3,15 +3,11 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import "../_mock-webawesome.js";
+import { call, makeLogsDialog, session } from "./_logs-dialog-env.js";
 
-import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
-import type { LogsSession } from "../../src/components/logs-session.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._session;
-const call = (el: ESPHomeLogsDialog, method: string) => (el as any)[method]();
-
 type StreamCallbacks = {
   onOutput: (l: string) => void;
   onError: (e: string) => void;
@@ -24,20 +20,17 @@ describe("logs-dialog OTA connection loss", () => {
   let handlers: StreamCallbacks[];
 
   beforeEach(() => {
-    document.body.innerHTML = "";
-    el = new ESPHomeLogsDialog();
     handlers = [];
     let n = 0;
     logs = vi.fn((_c: string, _p: string, cb: StreamCallbacks) => {
       handlers.push(cb);
       return `stream-${++n}`;
     });
-    (el as any)._api = {
+    el = makeLogsDialog({
       logs,
       stopStream: vi.fn(() => Promise.resolve()),
       ready: Promise.resolve(),
-    };
-    document.body.appendChild(el);
+    });
   });
 
   it("marks the session interrupted on connection loss without appending a line", () => {
