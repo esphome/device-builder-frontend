@@ -8,7 +8,7 @@
  * means.
  *
  * Pin forms across the platforms ESPHome supports:
- *   - esp / esp8266 / rp2040          : bare int or "GPIOn"
+ *   - esp / esp8266 / rp2             : bare int or "GPIOn"
  *   - bk72xx (LibreTiny / Beken)      : bare "P{n}" (e.g. "P23"), n is the pin
  *   - rtl87xx (LibreTiny / Realtek)   : "PA{n}" (e.g. "PA02"); rtl87xx is
  *                                        single-port, so n is the GPIO directly
@@ -53,7 +53,7 @@ export const LONG_FORM_PIN_KEYS = new Set([
 // ln882x board's pin map; no other platform uses a "PB" form).
 const LN882X_PORT_B_OFFSET = 16;
 
-// Bare int / "GPIOn" form (esp / esp8266 / rp2040 / ln882x / libretiny GPIO).
+// Bare int / "GPIOn" form (esp / esp8266 / rp2 / ln882x / libretiny GPIO).
 const GPIO_PIN_RE = /^\s*(?:GPIO)?(\d+)\s*$/i;
 // nRF52 "P{port}.{pin}" form.
 const NRF52_PIN_RE = /^\s*P(\d+)\.(\d+)\s*$/i;
@@ -164,7 +164,7 @@ export function parseBoardGpio(s: unknown): number | null {
 
 /**
  * Format a GPIO number as the pin value ESPHome's platform validator
- * accepts. "GPIOn" is the default — taken by esp / esp8266 / rp2040 /
+ * accepts. "GPIOn" is the default — taken by esp / esp8266 / rp2 /
  * rtl87xx / ln882x (their validators all accept it). Two exceptions:
  * nRF52's validator rejects "GPIOn" and wants port.pin notation ("P0.27",
  * "P1.1") — port*32 + pin; BK72xx writes the bare "P{n}" form ("P23"), the

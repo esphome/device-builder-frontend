@@ -609,7 +609,7 @@ describe("filterRenderable", () => {
         {
           requiredOnly: true,
           showAdvanced: false,
-          targetPlatform: "rp2040",
+          targetPlatform: "rp2",
         }
       ).map((e) => e.key)
     ).toEqual([]);

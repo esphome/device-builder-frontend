@@ -6,6 +6,7 @@ import {
   distillValidatedConfig,
   inferComponentName,
   issuePlatform,
+  platformFromIntegrations,
   scrapeCrashData,
 } from "../../src/util/crash-report.js";
 import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
@@ -158,8 +159,17 @@ describe("issuePlatform / inferComponentName", () => {
     expect(issuePlatform("esp32")).toBe("ESP32");
     expect(issuePlatform("ESP8266")).toBe("ESP8266");
     expect(issuePlatform("BK72XX")).toBe("BK72XX");
+    // Both RP2 spellings land on the form's one RP2040 dropdown value.
+    expect(issuePlatform("rp2")).toBe("RP2040");
+    expect(issuePlatform("RP2040")).toBe("RP2040");
     expect(issuePlatform("nrf52840")).toBe("Other");
     expect(issuePlatform("")).toBe("");
+  });
+
+  it("falls back to the integration list for either RP2 spelling", () => {
+    expect(platformFromIntegrations(["logger", "rp2"])).toBe("rp2");
+    expect(platformFromIntegrations(["logger", "rp2040"])).toBe("rp2040");
+    expect(platformFromIntegrations(["logger"])).toBe("");
   });
 
   it("names the first component-owned decoded frame", () => {

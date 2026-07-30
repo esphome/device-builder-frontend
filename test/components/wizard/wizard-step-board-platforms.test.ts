@@ -47,7 +47,7 @@ describe("wizard step-board platform chips", () => {
   it("splits the libretiny platforms into per-chip filters, kept adjacent", () => {
     // The libretiny platforms bundle genuinely different silicon, so each
     // is split into per-chip filters (BK7231/BK7238/BK7251, RTL8710B/
-    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2040 splits.
+    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2 splits.
     // They stay contiguous so the user scanning the chip row sees them as
     // one family; pin both the mapping and the ordering.
     const bk72xx = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === "bk72xx");
@@ -124,7 +124,7 @@ describe("wizard step-board platform chips", () => {
     });
 
     it("maps the rp2040 / rp2350 chip series to their split filter labels", () => {
-      // The two rp2040-platform chips are distinguished by `mcu`, so the
+      // The two rp2-platform chips are distinguished by `mcu`, so the
       // chip-series name must resolve to its own label.
       expect(chipNameToFilterLabel("RP2040")).toBe("RP2040");
       expect(chipNameToFilterLabel("RP2350")).toBe("RP2350");
