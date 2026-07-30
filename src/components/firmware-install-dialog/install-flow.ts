@@ -8,6 +8,7 @@ import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.j
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
@@ -570,25 +571,44 @@ export function waitForRunningJob(
 ): Promise<boolean> {
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
-    host._streamId = host._api.firmwareFollowJob(jobId, {
-      onOutput: (line) => {
-        if (host._step === "queued") host._step = "compiling";
-        host._timer.noteLine(line);
-        host._log.enqueue(line);
-      },
-      onResult: () => {
-        host._streamId = "";
-        host._compileReject = null;
-        host._log.flush();
-        resolve(true);
-      },
-      onError: () => {
-        host._streamId = "";
-        host._compileReject = null;
-        host._fail(host._localize(failKey));
-        resolve(false);
-      },
-    });
+    const follow = (): void => {
+      host._streamId = host._api.firmwareFollowJob(jobId, {
+        onOutput: (line) => {
+          if (host._step === "queued") host._step = "compiling";
+          host._timer.noteLine(line);
+          host._log.enqueue(line);
+        },
+        onResult: () => {
+          host._streamId = "";
+          host._compileReject = null;
+          host._log.flush();
+          resolve(true);
+        },
+        onError: () => {
+          host._streamId = "";
+          host._compileReject = null;
+          host._fail(host._localize(failKey));
+          resolve(false);
+        },
+        onConnectionLost: () => {
+          host._streamId = "";
+          resumeFollowOnReady(host._api, {
+            // A dismissal settled the wait and nulled the reject hook.
+            isStale: () => host._compileReject === null || host._streamId !== "",
+            resume: () => {
+              host._log.reset();
+              follow();
+            },
+            giveUp: () => {
+              host._compileReject = null;
+              host._fail(host._localize(failKey));
+              resolve(false);
+            },
+          });
+        },
+      });
+    };
+    follow();
   });
 }
 
@@ -601,18 +621,8 @@ export function compileAndWait(
     // reopen) can settle this promise. followJob callbacks clear the hook to
     // null on fire so a normal completion doesn't double-reject on teardown.
     host._compileReject = reject;
-    // Not an async executor (no-misused-promises): an async function
-    // where the constructor expects a void-returning one.
-    const start = async () => {
-      const job = await host._api.firmwareCompile(configuration);
-      host._jobId = job.job_id;
-      // Capture so a compile failure can pick the right hint variant:
-      // local jobs get the link-to-reset, remote jobs get the plain-text
-      // "ask the operator of <receiver>" instruction.
-      host._jobSource = job.source;
-      host._jobSourceLabel = job.source_label;
-      host._jobSourcePin = job.source_pin_sha256;
-      host._streamId = host._api.firmwareFollowJob(job.job_id, {
+    const follow = (jobId: string): void => {
+      host._streamId = host._api.firmwareFollowJob(jobId, {
         onOutput: (line) => {
           if (host._step === "queued") {
             host._step = "compiling";
@@ -646,7 +656,37 @@ export function compileAndWait(
           host._compileReject = null;
           reject(new Error(error));
         },
+        onConnectionLost: () => {
+          host._streamId = "";
+          resumeFollowOnReady(host._api, {
+            // The submit gap (await firmwareCompile) means a retry can
+            // arm before its follow attaches; the job id pins ownership.
+            isStale: () => host._jobId !== jobId || host._streamId !== "",
+            resume: () => {
+              host._log.reset();
+              follow(jobId);
+            },
+            giveUp: () => {
+              host._jobId = "";
+              host._compileReject = null;
+              reject(new Error(host._localize("command.connection_interrupted")));
+            },
+          });
+        },
       });
+    };
+    // Not an async executor (no-misused-promises): an async function
+    // where the constructor expects a void-returning one.
+    const start = async () => {
+      const job = await host._api.firmwareCompile(configuration);
+      host._jobId = job.job_id;
+      // Capture so a compile failure can pick the right hint variant:
+      // local jobs get the link-to-reset, remote jobs get the plain-text
+      // "ask the operator of <receiver>" instruction.
+      host._jobSource = job.source;
+      host._jobSourceLabel = job.source_label;
+      host._jobSourcePin = job.source_pin_sha256;
+      follow(job.job_id);
     };
     start().catch((err: unknown) => {
       host._compileReject = null;

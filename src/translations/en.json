@@ -437,6 +437,7 @@
     "timer_offload_hint": "This compile took a while. Send builds to a faster machine on your network to speed it up.",
     "validate_success": "Configuration is valid!",
     "validate_failed": "Validation failed.",
+    "connection_interrupted": "Connection to the dashboard was lost. Run again to retry.",
     "show_secrets": "Show secrets",
     "hide_secrets": "Hide secrets",
     "show_secrets_tooltip": "Reveal resolved !secret values in the validate output",
