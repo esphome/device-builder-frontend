@@ -3,9 +3,11 @@ import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   MockWebSocket,
+  fireDocumentEvent,
   fireWindowEvent,
   installMockWebSocket,
   installMockWindow,
+  setDocumentVisibility,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
 import { stubStorage } from "../_storage.js";
@@ -2560,7 +2562,7 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 
-  it("ignores the online event after an intentional disconnect", async () => {
+  it("removes the network listeners on intentional disconnect", async () => {
     const api = new ESPHomeAPI();
     await connect(api);
     api.disconnect();
@@ -2568,17 +2570,41 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
-  it("suspends reconnect attempts while the browser reports offline", async () => {
+  it("holds retries at the backoff ceiling while the browser reports offline", async () => {
     vi.stubGlobal("navigator", { onLine: false });
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     fireWindowEvent("offline");
     expect(ws.readyState).toBe(MockWebSocket.CLOSED);
-    // No doomed retries while offline; the online event restarts the loop.
-    await vi.advanceTimersByTimeAsync(120000);
+    // No 1s retry storm, but no full suspension either: a
+    // false-negative onLine costs one slow cycle, not the loop.
+    await vi.advanceTimersByTimeAsync(29000);
     expect(MockWebSocket.instances).toHaveLength(1);
-    vi.stubGlobal("navigator", { onLine: true });
-    fireWindowEvent("online");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it("skips the heartbeat while the tab is hidden and catches up on the visibility edge", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    setDocumentVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(ws.sent).toHaveLength(0);
+    setDocumentVisibility("visible");
+    fireDocumentEvent("visibilitychange");
+    expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
+  });
+
+  it("times out a handshake that stalls in CONNECTING", async () => {
+    const api = new ESPHomeAPI();
+    void api.connect().catch(() => {});
+    expect(MockWebSocket.instances).toHaveLength(1);
+    const ws = MockWebSocket.latest();
+    // No open/ServerInfo ever arrives; the connect timeout force-closes
+    // the attempt so the backoff loop keeps going.
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    await vi.advanceTimersByTimeAsync(1000);
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 });

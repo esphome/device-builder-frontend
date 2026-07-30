@@ -234,8 +234,11 @@ export class ESPHomeLogsDialog extends LitElement {
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
-    if (changedProperties.has("_apiConnected") && this._apiConnected) {
-      resumeAfterReconnect(this);
+    if (changedProperties.has("_apiConnected")) {
+      // The banner toggling resizes the log area on both edges;
+      // re-pin the scroll so the tail stays visible.
+      this._resetAnsiLogScroll();
+      if (this._apiConnected) resumeAfterReconnect(this);
     }
   }
 

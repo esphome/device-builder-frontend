@@ -225,7 +225,12 @@ export function startOtaStream(host: ESPHomeLogsDialog): void {
         const wasCurrent =
           host._session.kind === "ota" && host._session.streamId === streamId;
         markOtaStopped(host, streamId);
-        if (wasCurrent) host._log.append([error]);
+        if (wasCurrent) {
+          // Drain batched output first so the error lands after the
+          // lines that preceded it.
+          host._log.flush();
+          host._log.append([error]);
+        }
       },
       onConnectionLost: () => {
         // Fires synchronously on a refused send (streamId still "",
@@ -254,6 +259,7 @@ export function resumeAfterReconnect(host: ESPHomeLogsDialog): void {
   const s = host._session;
   if (!host._open || s.kind !== "ota" || s.streamId !== null || !s.interrupted) return;
   host._session = { kind: "ota", port: s.port, streamId: null };
+  host._log.flush();
   host._log.append([host._localize("dashboard.logs_reconnected")]);
   void host._api.ready.then(() => startOtaStream(host));
 }
