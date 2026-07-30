@@ -31,6 +31,23 @@ function makeSensorEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
   });
 }
 
+// A light's initial_state: no name, no declaring id — nothing to seed.
+function makeInitialStateEntry(): ConfigEntry {
+  return makeConfigEntry({
+    key: "initial_state",
+    type: ConfigEntryType.NESTED,
+    platform_type: "light",
+    config_entries: [
+      makeConfigEntry({ key: "brightness", type: ConfigEntryType.FLOAT }),
+      makeConfigEntry({
+        key: "power_supply",
+        type: ConfigEntryType.ID,
+        references_component: "power_supply",
+      }),
+    ],
+  });
+}
+
 const switchesOf = (tpl: unknown) => findElementBindings(tpl, "wa-switch");
 
 describe("renderNestedField enable switch", () => {
@@ -80,44 +97,44 @@ describe("renderNestedField enable switch", () => {
 describe("onEnableToggle", () => {
   it("enabling with no stash seeds the name with the entity label and expands", () => {
     const ctx = makeRenderCtx({});
-    onEnableToggle(
-      makeSensorEntry(),
-      ["min_free"],
-      "min_free",
-      false,
-      true,
-      "Min Free",
-      ctx
-    );
+    onEnableToggle({
+      entry: makeSensorEntry(),
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: false,
+      checked: true,
+      label: "Min Free",
+      ctx,
+    });
     expect(ctx.emitChange).toHaveBeenCalledWith(["min_free", "name"], "Min Free");
     expect(ctx.toggleNested).toHaveBeenCalledWith("min_free");
   });
 
   it("does not re-expand an already-open group on enable", () => {
     const ctx = makeRenderCtx({});
-    onEnableToggle(
-      makeSensorEntry(),
-      ["min_free"],
-      "min_free",
-      true,
-      true,
-      "Min Free",
-      ctx
-    );
+    onEnableToggle({
+      entry: makeSensorEntry(),
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: true,
+      checked: true,
+      label: "Min Free",
+      ctx,
+    });
     expect(ctx.toggleNested).not.toHaveBeenCalled();
   });
 
   it("disabling clears the whole group and collapses it", () => {
     const ctx = makeRenderCtx({ min_free: { name: "Min Free" } });
-    onEnableToggle(
-      makeSensorEntry(),
-      ["min_free"],
-      "min_free",
-      true,
-      false,
-      "Min Free",
-      ctx
-    );
+    onEnableToggle({
+      entry: makeSensorEntry(),
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: true,
+      checked: false,
+      label: "Min Free",
+      ctx,
+    });
     expect(ctx.emitChange).toHaveBeenCalledWith(["min_free"], undefined);
     expect(ctx.toggleNested).toHaveBeenCalledWith("min_free");
   });
@@ -140,26 +157,26 @@ describe("onEnableToggle", () => {
       }
     );
 
-    onEnableToggle(
-      makeSensorEntry(),
-      ["min_free"],
-      "min_free",
-      true,
-      false,
-      "Min Free",
-      ctx
-    );
+    onEnableToggle({
+      entry: makeSensorEntry(),
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: true,
+      checked: false,
+      label: "Min Free",
+      ctx,
+    });
     expect(getIn(values, ["min_free"])).toBeUndefined();
 
-    onEnableToggle(
-      makeSensorEntry(),
-      ["min_free"],
-      "min_free",
-      false,
-      true,
-      "Min Free",
-      ctx
-    );
+    onEnableToggle({
+      entry: makeSensorEntry(),
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: false,
+      checked: true,
+      label: "Min Free",
+      ctx,
+    });
     expect(ctx.emitChange).toHaveBeenLastCalledWith(["min_free"], configured);
   });
 
@@ -182,15 +199,15 @@ describe("onEnableToggle", () => {
         },
       }
     );
-    onEnableToggle(
-      entry,
-      ["battery_float_voltage"],
-      "battery_float_voltage",
-      false,
-      true,
-      "Battery Float Voltage",
-      ctx
-    );
+    onEnableToggle({
+      entry: entry,
+      path: ["battery_float_voltage"],
+      key: "battery_float_voltage",
+      isOpen: false,
+      checked: true,
+      label: "Battery Float Voltage",
+      ctx,
+    });
     expect(ctx.emitChange).toHaveBeenCalledWith(
       ["battery_float_voltage", "id"],
       "battery_float_voltage_2"
@@ -214,37 +231,70 @@ describe("onEnableToggle", () => {
       ],
     });
     const ctx = makeRenderCtx({});
-    onEnableToggle(entry, ["t_set"], "t_set", false, true, "T Set", ctx);
+    onEnableToggle({
+      entry: entry,
+      path: ["t_set"],
+      key: "t_set",
+      isOpen: false,
+      checked: true,
+      label: "T Set",
+      ctx,
+    });
     expect(ctx.emitChange).toHaveBeenCalledWith(["t_set", "id"], "t_set_1");
   });
 
-  it("seeds nothing when the schema offers neither a name nor an id", () => {
+  it("writes no field when the schema offers neither a name nor an id", () => {
     // A light's ``initial_state`` has only colour/brightness fields; it
     // persists once the user sets one, and must not get an invalid ``name:``.
-    const entry = makeConfigEntry({
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry: makeInitialStateEntry(),
+      path: ["initial_state"],
       key: "initial_state",
-      type: ConfigEntryType.NESTED,
-      platform_type: "light",
+      isOpen: false,
+      checked: true,
+      label: "Initial",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["initial_state"], undefined);
+    expect(ctx.toggleNested).toHaveBeenCalledWith("initial_state");
+  });
+
+  it("re-emits an already-open identity-less group so the switch walks back", () => {
+    // Nothing valid to write and no expand to trigger a re-render, so the
+    // switch would otherwise read "on" over an absent group indefinitely.
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry: makeInitialStateEntry(),
+      path: ["initial_state"],
+      key: "initial_state",
+      isOpen: true,
+      checked: true,
+      label: "Initial",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["initial_state"], undefined);
+    expect(ctx.toggleNested).not.toHaveBeenCalled();
+  });
+
+  it("prefers the name over a declaring id when the schema has both", () => {
+    const entry = makeSensorEntry({
       config_entries: [
-        makeConfigEntry({ key: "brightness", type: ConfigEntryType.FLOAT }),
-        makeConfigEntry({
-          key: "power_supply",
-          type: ConfigEntryType.ID,
-          references_component: "power_supply",
-        }),
+        makeConfigEntry({ key: "name", type: ConfigEntryType.STRING }),
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
       ],
     });
     const ctx = makeRenderCtx({});
-    onEnableToggle(
+    onEnableToggle({
       entry,
-      ["initial_state"],
-      "initial_state",
-      false,
-      true,
-      "Initial",
-      ctx
-    );
-    expect(ctx.emitChange).not.toHaveBeenCalled();
-    expect(ctx.toggleNested).toHaveBeenCalledWith("initial_state");
+      path: ["min_free"],
+      key: "min_free",
+      isOpen: false,
+      checked: true,
+      label: "Min Free",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["min_free", "name"], "Min Free");
+    expect(ctx.emitChange).not.toHaveBeenCalledWith(["min_free", "id"], "min_free_1");
   });
 });

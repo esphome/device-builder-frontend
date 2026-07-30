@@ -85,15 +85,15 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                 aria-label=${enableLabel}
                 title=${enableLabel}
                 @change=${(e: Event) =>
-                  onEnableToggle(
+                  onEnableToggle({
                     entry,
                     path,
                     key,
                     isOpen,
-                    (e.target as unknown as { checked: boolean }).checked,
+                    checked: (e.target as unknown as { checked: boolean }).checked,
                     label,
-                    ctx
-                  )}
+                    ctx,
+                  })}
               ></wa-switch>`
             : nothing
         }
@@ -135,15 +135,16 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
 // serializer prunes the empty object so the block leaves the YAML — and
 // collapses. Exported for direct unit testing (the render path only
 // wires it up).
-export function onEnableToggle(
-  entry: ConfigEntry,
-  path: string[],
-  key: string,
-  isOpen: boolean,
-  checked: boolean,
-  label: string,
-  ctx: RenderCtx
-): void {
+export function onEnableToggle(opts: {
+  entry: ConfigEntry;
+  path: string[];
+  key: string;
+  isOpen: boolean;
+  checked: boolean;
+  label: string;
+  ctx: RenderCtx;
+}): void {
+  const { entry, path, key, isOpen, checked, label, ctx } = opts;
   const stash = _enableStash(ctx);
   if (checked) {
     const restored = stash.get(key);
@@ -160,11 +161,14 @@ export function onEnableToggle(
     } else {
       // A nameless group (pipsolar's output sub-entities, opentherm's)
       // rejects ``name:`` outright, so seed its id instead — required or
-      // not, it's the only identity the group has to serialize on. A
-      // group with neither (a light's ``initial_state``) seeds nothing
-      // and persists once the user sets one of its fields.
+      // not, it's the only identity the group has to serialize on.
       const seed = seedIdFor(entry, ctx);
+      // With neither (a light's ``initial_state``) there's nothing valid to
+      // write, so re-emit the still-absent group: the switch the user just
+      // clicked has no backing value, and only a re-render walks it back to
+      // off. The group persists once they set one of its own fields.
       if (seed) ctx.emitChange([...path, seed.key], seed.id);
+      else ctx.emitChange(path, undefined);
     }
     if (!isOpen) ctx.toggleNested(key);
   } else {
