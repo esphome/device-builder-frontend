@@ -5,9 +5,9 @@ import {
   MockWebSocket,
   fireDocumentEvent,
   fireWindowEvent,
-  installMockDocument,
-  installMockWindow,
+  installMockWebSocket,
   setDocumentVisibility,
+  uninstallMockWebSocket,
 } from "./mock-websocket.js";
 
 type Hooks = {
@@ -31,14 +31,14 @@ function makeMonitor(overrides: Partial<Hooks> = {}) {
 
 describe("LivenessMonitor", () => {
   beforeEach(() => {
-    installMockWindow();
-    installMockDocument();
+    // Installs the WebSocket global too: the monitor's tick reads
+    // WebSocket.OPEN, which bare node runs may not define.
+    installMockWebSocket();
     vi.useFakeTimers();
   });
   afterEach(() => {
     vi.useRealTimers();
-    delete (globalThis as unknown as { window?: unknown }).window;
-    delete (globalThis as unknown as { document?: unknown }).document;
+    uninstallMockWebSocket();
   });
 
   it("pings only after the silence threshold", async () => {
