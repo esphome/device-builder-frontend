@@ -15,7 +15,12 @@ import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import {
+  apiConnectedContext,
+  apiContext,
+  darkModeContext,
+  localizeContext,
+} from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -41,6 +46,7 @@ import {
   onStop,
   openOta,
   openPassive,
+  resumeAfterReconnect,
   setSerialOpenFailed,
   setSerialStream,
   switchToOtaLogs,
@@ -107,6 +113,12 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @consume({ context: apiContext })
   _api!: ESPHomeAPI;
+
+  /** WS liveness; false shows the connection-lost banner, the
+   *  false→true edge resumes a stream the drop stopped. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  _apiConnected = true;
 
   @property()
   configuration = "";
@@ -222,6 +234,14 @@ export class ESPHomeLogsDialog extends LitElement {
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
+    // A Web Serial session reads USB, not the dashboard WS; the
+    // connection banner and its scroll re-pin are ota-only.
+    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
+      // The banner toggling resizes the log area on both edges;
+      // re-pin the scroll so the tail stays visible.
+      this._resetAnsiLogScroll();
+      if (this._apiConnected) resumeAfterReconnect(this);
+    }
   }
 
   public open(port = OTA_PORT, options: { onBackToInstall?: () => void } = {}) {
@@ -296,6 +316,9 @@ export class ESPHomeLogsDialog extends LitElement {
     const expandLabel = this._localize(
       this._expanded ? "dashboard.logs_collapse" : "dashboard.logs_expand"
     );
+    // Only the ota source rides the dashboard WS; a Web Serial stream
+    // is healthy regardless, so no false error banner there.
+    const wsDown = s.kind === "ota" && !this._apiConnected;
 
     return html`
       <esphome-base-dialog
@@ -312,6 +335,8 @@ export class ESPHomeLogsDialog extends LitElement {
           placeholder=${this._localize("dashboard.logs_placeholder")}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
+          .state=${wsDown ? "error" : null}
+          .statusMessage=${wsDown ? this._localize("dashboard.logs_connection_lost") : ""}
         >
           ${
             this._backToInstall

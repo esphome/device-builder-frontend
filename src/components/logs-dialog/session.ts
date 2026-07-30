@@ -221,11 +221,57 @@ export function startOtaStream(host: ESPHomeLogsDialog): void {
         host._enqueueLine(line);
       },
       onResult: () => markOtaStopped(host, streamId),
-      onError: () => markOtaStopped(host, streamId),
+      onError: (error: string) => {
+        const wasCurrent =
+          host._session.kind === "ota" && host._session.streamId === streamId;
+        markOtaStopped(host, streamId);
+        if (wasCurrent) {
+          // Drain batched output first so the error lands after the
+          // lines that preceded it.
+          host._log.flush();
+          host._log.append([error]);
+        }
+      },
+      onConnectionLost: () => {
+        // Fires synchronously on a refused send (streamId still "",
+        // session already stopped) or later when the socket dies; a
+        // stale stream's late signal must not flag the replacement.
+        const cur = host._session;
+        const current = cur.kind === "ota" && cur.streamId === streamId;
+        if (streamId !== "" && !current) return;
+        host._session = { kind: "ota", port: s.port, streamId: null, interrupted: true };
+      },
     },
     { noStates: !host._showStates }
   );
+  // A refused send already stopped the session via onConnectionLost.
+  if (streamId === "") return;
   host._session = { kind: "ota", port: s.port, streamId };
+}
+
+/**
+ * Resume an OTA stream the connection drop stopped, once the WS is back.
+ *
+ * Waits on 'api.ready' so the respawned command lands after the
+ * reconnect's auth dance instead of racing it.
+ */
+export function resumeAfterReconnect(host: ESPHomeLogsDialog): void {
+  const s = host._session;
+  if (!host._open || s.kind !== "ota" || s.streamId !== null || !s.interrupted) return;
+  host._session = { kind: "ota", port: s.port, streamId: null };
+  host._log.flush();
+  host._log.append([host._localize("dashboard.logs_reconnected")]);
+  void host._api.ready
+    .then(() => startOtaStream(host))
+    .catch((err: unknown) => {
+      // Restore the flag so the next reconnect edge retries instead of
+      // stranding the user on a resume line that never resumed.
+      console.error("[logs] Resume after reconnect failed", err);
+      const cur = host._session;
+      if (cur.kind === "ota" && cur.streamId === null) {
+        host._session = { ...cur, interrupted: true };
+      }
+    });
 }
 
 function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {

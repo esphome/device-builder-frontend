@@ -71,16 +71,86 @@ export class MockWebSocket {
   }
 }
 
+type WindowListener = (event: unknown) => void;
+
+let windowListeners = new Map<string, Set<WindowListener>>();
+
+/** Minimal window stand-in: location for URL building plus the event
+ *  surface the API client's offline/online listeners need. */
+export function installMockWindow(
+  location: { protocol: string; host: string } = {
+    protocol: "http:",
+    host: "localhost:8000",
+  }
+): void {
+  const listeners = new Map<string, Set<WindowListener>>();
+  windowListeners = listeners;
+  (globalThis as unknown as { window: unknown }).window = {
+    location,
+    addEventListener(type: string, listener: WindowListener): void {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type: string, listener: WindowListener): void {
+      listeners.get(type)?.delete(listener);
+    },
+  };
+}
+
+/** Fire a window event (e.g. 'offline' / 'online') on the mock window.
+ *  Throws when nothing listens, so an unregistered-listener state is
+ *  assertable and never mistaken for a dispatch that ran. */
+export function fireWindowEvent(type: string): void {
+  const listeners = windowListeners.get(type);
+  if (!listeners?.size) throw new Error(`no window listeners for ${type}`);
+  listeners.forEach((l) => l({}));
+}
+
+let documentListeners = new Map<string, Set<WindowListener>>();
+let documentVisibility: "visible" | "hidden" = "visible";
+
+/** Minimal document stand-in: the visibility surface the API client's
+ *  heartbeat needs (the node test env has no document at all). */
+export function installMockDocument(): void {
+  const listeners = new Map<string, Set<WindowListener>>();
+  documentListeners = listeners;
+  documentVisibility = "visible";
+  (globalThis as unknown as { document: unknown }).document = {
+    get visibilityState() {
+      return documentVisibility;
+    },
+    addEventListener(type: string, listener: WindowListener): void {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type: string, listener: WindowListener): void {
+      listeners.get(type)?.delete(listener);
+    },
+  };
+}
+
+export function setDocumentVisibility(state: "visible" | "hidden"): void {
+  documentVisibility = state;
+}
+
+/** Fire a document event (e.g. 'visibilitychange') on the mock document.
+ *  Throws when nothing listens, same contract as fireWindowEvent. */
+export function fireDocumentEvent(type: string): void {
+  const listeners = documentListeners.get(type);
+  if (!listeners?.size) throw new Error(`no document listeners for ${type}`);
+  listeners.forEach((l) => l({}));
+}
+
 export function installMockWebSocket(): void {
   MockWebSocket.reset();
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
-  (globalThis as unknown as { window: unknown }).window = {
-    location: { protocol: "http:", host: "localhost:8000" },
-  };
+  installMockWindow();
+  installMockDocument();
 }
 
 export function uninstallMockWebSocket(): void {
   MockWebSocket.reset();
   delete (globalThis as unknown as { WebSocket?: unknown }).WebSocket;
   delete (globalThis as unknown as { window?: unknown }).window;
+  delete (globalThis as unknown as { document?: unknown }).document;
 }

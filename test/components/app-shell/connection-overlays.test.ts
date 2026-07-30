@@ -30,6 +30,13 @@ describe("connection overlays", () => {
     expect(pill!.getAttribute("role")).toBe("status");
     expect(pill!.textContent).toContain("layout.reconnecting");
   });
+
+  it("renders the pill as a manual popover so it paints above modal top layers", () => {
+    const pill = renderInto(
+      renderReconnectPill(identityLocalize as LocalizeFunc)
+    ).querySelector(".reconnect-pill");
+    expect(pill!.getAttribute("popover")).toBe("manual");
+  });
 });
 
 describe("ReconnectPillGate", () => {

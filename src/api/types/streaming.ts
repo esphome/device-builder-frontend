@@ -12,4 +12,8 @@ export interface StreamCallbacks<TResult = { success: boolean; code: number }> {
   onOutput?: (line: string) => void;
   onResult?: (data: TResult) => void;
   onError?: (error: string) => void;
+  /** The WS itself dropped (or the send was refused). Fired instead of
+   *  onError when provided, so consumers can tell a connection-level
+   *  stop from a command error without parsing the message. */
+  onConnectionLost?: () => void;
 }

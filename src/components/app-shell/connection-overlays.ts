@@ -1,4 +1,5 @@
 import { css, html, type TemplateResult } from "lit";
+import { ref } from "lit/directives/ref.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 
 /**
@@ -42,6 +43,12 @@ export const connectionOverlayStyles = css`
 
   .reconnect-pill {
     position: fixed;
+    /* Reset the UA popover centering (inset: 0 + margin: auto) so the
+       fixed bottom-center placement below wins. */
+    inset: auto;
+    margin: 0;
+    border: none;
+    overflow: visible;
     bottom: var(--wa-space-l);
     left: 50%;
     transform: translateX(-50%);
@@ -71,8 +78,36 @@ export function renderRouteLoadingBar(): TemplateResult {
   return html`<div class="route-loading-bar" aria-hidden="true"></div>`;
 }
 
+// Module-level so the ref callback keeps one identity across renders;
+// an inline arrow would re-fire on every host render. The microtask
+// defers past the commit: ref fires before Lit inserts the fragment,
+// and showPopover() throws on a disconnected element.
+function showPillOnAttach(el?: Element): void {
+  if (!(el instanceof HTMLElement)) return;
+  queueMicrotask(() => {
+    try {
+      if (!el.matches(":popover-open")) el.showPopover();
+    } catch {
+      // No popover support or a detached element: degrade to the plain
+      // fixed pill (visible everywhere except under a modal's top
+      // layer) rather than staying display:none forever.
+      el.removeAttribute("popover");
+    }
+  });
+}
+
+/**
+ * A manual popover, not a plain fixed div: modal dialogs sit in the
+ * browser top layer above any z-index. Shows itself on attach; DOM
+ * removal hides it.
+ */
 export function renderReconnectPill(localize: LocalizeFunc): TemplateResult {
-  return html`<div class="reconnect-pill" role="status">
+  return html`<div
+    class="reconnect-pill"
+    popover="manual"
+    role="status"
+    ${ref(showPillOnAttach)}
+  >
     ${localize("layout.reconnecting")}
   </div>`;
 }

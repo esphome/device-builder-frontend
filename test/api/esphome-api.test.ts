@@ -3,7 +3,11 @@ import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   MockWebSocket,
+  fireDocumentEvent,
+  fireWindowEvent,
   installMockWebSocket,
+  installMockWindow,
+  setDocumentVisibility,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
 import { stubStorage } from "../_storage.js";
@@ -24,6 +28,22 @@ const serverInfoAuthRequired = {
 const stubLocalStorage = (initial?: Record<string, string>) =>
   stubStorage("localStorage", initial);
 
+// Every instance is tracked and disconnected after each test; a leaked
+// heartbeat interval otherwise ticks into the gap where the mock
+// WebSocket global is already gone.
+const liveApis: ESPHomeAPI[] = [];
+
+function makeApi(): ESPHomeAPI {
+  const api = new ESPHomeAPI();
+  liveApis.push(api);
+  return api;
+}
+
+afterEach(() => {
+  for (const api of liveApis) api.disconnect();
+  liveApis.length = 0;
+});
+
 async function connect(api: ESPHomeAPI): Promise<MockWebSocket> {
   const pending = api.connect();
   const ws = MockWebSocket.latest();
@@ -42,7 +62,7 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("opens a ws:// URL from the page location", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -52,12 +72,8 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (
-      globalThis as unknown as {
-        window: { location: { protocol: string; host: string } };
-      }
-    ).window = { location: { protocol: "https:", host: "example.test" } };
-    const api = new ESPHomeAPI();
+    installMockWindow({ protocol: "https:", host: "example.test" });
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -67,7 +83,7 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("resolves with server info and fires onConnected", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onConnected = vi.fn();
     api.onConnected = onConnected;
     const ws = await connect(api);
@@ -78,21 +94,21 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("returns the existing server info when already connected", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     await connect(api);
     const second = await api.connect();
     expect(second).toEqual(serverInfo);
   });
 
   it("rejects connect() on transport error", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     MockWebSocket.latest().triggerError();
     await expect(pending).rejects.toThrow(/WebSocket connection failed/);
   });
 
   it("does not fire onDisconnected if connect never succeeded", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onDisconnected = vi.fn();
     api.onDisconnected = onDisconnected;
     const pending = api.connect();
@@ -104,13 +120,29 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("fires onDisconnected when an established connection closes", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onDisconnected = vi.fn();
     api.onDisconnected = onDisconnected;
     const ws = await connect(api);
     ws.close();
     expect(onDisconnected).toHaveBeenCalledTimes(1);
     expect(api.connected).toBe(false);
+  });
+
+  it("disconnect() runs the close cleanup for pending work", async () => {
+    // The socket's own close event is async in real browsers and the
+    // identity guard ignores it once _ws moved on, so disconnect()
+    // must reject and notify everything itself.
+    const api = makeApi();
+    await connect(api);
+    const pending = api.sendCommand("ping");
+    const onConnectionLost = vi.fn();
+    api.sendStreamCommand("devices/logs", {}, { onConnectionLost });
+    api.disconnect();
+    await expect(pending).rejects.toThrow(/WebSocket connection closed/);
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(api.connected).toBe(false);
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });
 
@@ -124,7 +156,7 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 
   it("sends a command with a message_id and resolves the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.sendCommand<{ ok: boolean }>("ping", { foo: "bar" });
@@ -138,15 +170,15 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 
   it("omits args when none are given", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.sendCommand("ping");
+    void api.sendCommand("ping").catch(() => {});
     const sent = ws.sentAs<{ args?: unknown }>(0);
     expect(sent.args).toBeUndefined();
   });
 
   it("rejects with an APIError carrying error_code + details", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.sendCommand("boom");
     const { message_id } = ws.sentAs<{ message_id: string }>(0);
@@ -171,7 +203,7 @@ describe("ESPHomeAPI — sendCommand", () => {
 
   it("rejects when no response arrives before the timeout", async () => {
     vi.useFakeTimers();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -189,22 +221,22 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 
   it("throws when the socket is not open", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     await expect(api.sendCommand("ping")).rejects.toThrow(/not connected/);
   });
 
   it("assigns sequential message_ids", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.sendCommand("a");
-    void api.sendCommand("b");
+    void api.sendCommand("a").catch(() => {});
+    void api.sendCommand("b").catch(() => {});
     const id0 = ws.sentAs<{ message_id: string }>(0).message_id;
     const id1 = ws.sentAs<{ message_id: string }>(1).message_id;
     expect(Number(id1)).toBe(Number(id0) + 1);
   });
 
   it("rejects all pending requests when the socket closes", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.sendCommand("ping");
     ws.close();
@@ -229,7 +261,7 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
   };
 
   it("omits the yaml arg when the draft is empty so the backend reads disk (#1348)", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.getAvailableAutomations("device.yaml", "");
     const sent = ws.sentAs<{ command: string; message_id: string; args: unknown }>(0);
@@ -240,7 +272,7 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
   });
 
   it("forwards a non-empty draft so the backend scopes off it (#1348)", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const draft = "esphome:\n  name: d\n";
     const pending = api.getAvailableAutomations("device.yaml", draft);
@@ -260,7 +292,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
   });
 
   it("sends ``devices/clone`` with snake_case args and returns the new configuration", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.cloneDevice(
@@ -291,10 +323,10 @@ describe("ESPHomeAPI — cloneDevice", () => {
     // ``friendly_name:`` line untouched, producing two list
     // entries with the same label. Pin that the helper omits the
     // key entirely on ``undefined`` so the default kicks in.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
-    void api.cloneDevice("kitchen.yaml", "bedroom-bulb");
+    void api.cloneDevice("kitchen.yaml", "bedroom-bulb").catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
 
     expect(sent.args).toEqual({
@@ -311,10 +343,10 @@ describe("ESPHomeAPI — cloneDevice", () => {
     // ``new_friendly_name: ""`` on the wire so the backend's
     // ``if new_friendly_name:`` short-circuit fires and the
     // rewrite is skipped.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
-    void api.cloneDevice("kitchen.yaml", "bedroom-bulb", "");
+    void api.cloneDevice("kitchen.yaml", "bedroom-bulb", "").catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
 
     expect(sent.args).toEqual({
@@ -343,7 +375,7 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
     // boundary so every caller is safe by construction (avoids
     // duplicating the backfill in ``loadAndHydrateAvailable``,
     // ``api-action-editor``, ``script-editor``, etc.).
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAvailableAutomations("device.yaml");
@@ -367,7 +399,7 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
   });
 
   it("preserves config_entries when the wire payload already carries them", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAvailableAutomations("device.yaml");
@@ -403,7 +435,7 @@ describe("ESPHomeAPI — editFriendlyName", () => {
   });
 
   it("sends ``devices/edit_friendly_name`` with snake_case args", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.editFriendlyName("kitchen.yaml", "Reading Lamp");
@@ -431,7 +463,7 @@ describe("ESPHomeAPI — editFriendlyName", () => {
     // ``rewritten: false`` so the caller knows to skip the
     // follow-up install. Pin that the helper passes the flag
     // through unchanged so the dashboard handler can branch on it.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.editFriendlyName("kitchen.yaml", "Kitchen");
@@ -455,7 +487,7 @@ describe("ESPHomeAPI — updateConfig", () => {
   });
 
   it("sends ``allow_wipe: true`` when allowWipe is set", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.updateConfig("secrets.yaml", "", { allowWipe: true });
@@ -476,7 +508,7 @@ describe("ESPHomeAPI — updateConfig", () => {
   });
 
   it("omits ``allow_wipe`` when opts is unset", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.updateConfig("kitchen.yaml", "esphome:\n  name: kitchen\n");
@@ -496,7 +528,7 @@ describe("ESPHomeAPI — updateConfig", () => {
   });
 
   it("omits ``allow_wipe`` when allowWipe is false", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.updateConfig("secrets.yaml", "wifi_ssid: home\n", {
@@ -523,7 +555,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("delivers output events to onOutput", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const onOutput = vi.fn();
     const onResult = vi.fn();
@@ -540,7 +572,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("delivers result events and stops listening afterwards", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const onOutput = vi.fn();
     const onResult = vi.fn();
@@ -561,7 +593,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("routes ErrorMessage to the stream's onError", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const onError = vi.fn();
     const messageId = api.sendStreamCommand(
@@ -578,7 +610,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("calls onError with connection-closed when the socket drops", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const onError = vi.fn();
     api.sendStreamCommand("devices/logs", { configuration: "foo.yaml" }, { onError });
@@ -586,8 +618,33 @@ describe("ESPHomeAPI — streaming commands", () => {
     expect(onError).toHaveBeenCalledWith("WebSocket connection closed");
   });
 
+  it("prefers onConnectionLost over onError when the socket drops", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const onError = vi.fn();
+    const onConnectionLost = vi.fn();
+    api.sendStreamCommand(
+      "devices/logs",
+      { configuration: "foo.yaml" },
+      { onError, onConnectionLost }
+    );
+    ws.close();
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("prefers onConnectionLost over onError on a refused send", () => {
+    const api = makeApi();
+    const onError = vi.fn();
+    const onConnectionLost = vi.fn();
+    const id = api.sendStreamCommand("x", {}, { onError, onConnectionLost });
+    expect(id).toBe("");
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("stopStream sends devices/stop_stream with the stream id", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     // Start a streaming command so we have a message_id worth cancelling.
@@ -611,7 +668,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("stopStream drops the local handler so further output events are ignored", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const onOutput = vi.fn();
     const onResult = vi.fn();
@@ -626,7 +683,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     ws.receive({ message_id: streamId, event: "output", data: "before-stop" });
     expect(onOutput).toHaveBeenCalledWith("before-stop");
 
-    void api.stopStream(streamId);
+    void api.stopStream(streamId).catch(() => {});
 
     // Anything that arrives after stop — whether genuinely racing or a
     // misbehaving backend that keeps sending — must not reach the caller.
@@ -642,7 +699,7 @@ describe("ESPHomeAPI — streaming commands", () => {
   });
 
   it("signals an error via onError if send is attempted while disconnected", () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onError = vi.fn();
     const id = api.sendStreamCommand("x", {}, { onError });
     expect(id).toBe("");
@@ -659,7 +716,7 @@ describe("ESPHomeAPI — event subscriptions", () => {
   });
 
   it("confirms the subscription via a result and then forwards events", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const received: Array<{ event: string; data: unknown }> = [];
     const subscribed = api.subscribeEvents((event, data) =>
@@ -689,7 +746,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("listDevices sends devices/list and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = { configured: [], importable: [] };
     const pending = api.listDevices();
@@ -701,7 +758,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("desktopCheckUpdate sends desktop/check_update and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = {
       any_available: true,
@@ -723,7 +780,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("desktopInstallUpdate sends desktop/update and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.desktopInstallUpdate();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
@@ -734,7 +791,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("addComponent merges configuration into args", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.addComponent("foo.yaml", {
       component_id: "dht",
@@ -756,7 +813,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("addComponent forwards the draft yaml when given", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.addComponent(
       "foo.yaml",
@@ -778,9 +835,9 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("firmwareInstall defaults port to OTA, force_local and bootloader to false", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.firmwareInstall("foo.yaml");
+    void api.firmwareInstall("foo.yaml").catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -791,9 +848,9 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("firmwareInstall threads force_local through to the backend", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.firmwareInstall("foo.yaml", "OTA", true);
+    void api.firmwareInstall("foo.yaml", "OTA", true).catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -804,9 +861,9 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("firmwareInstall threads bootloader through to the backend", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.firmwareInstall("foo.yaml", "OTA", false, true);
+    void api.firmwareInstall("foo.yaml", "OTA", false, true).catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -817,7 +874,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("validate sends devices/validate through the stream API", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const id = api.validate("foo.yaml", { onOutput: () => {} });
     expect(id).toBeTruthy();
@@ -827,7 +884,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("logs sends devices/logs without no_states by default", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const id = api.logs("foo.yaml", "OTA", { onOutput: () => {} });
     expect(id).toBeTruthy();
@@ -837,7 +894,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("logs forwards no_states=true when noStates is set", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     api.logs("foo.yaml", "OTA", { onOutput: () => {} }, { noStates: true });
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
@@ -849,7 +906,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("logs omits no_states when noStates is false", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     api.logs("foo.yaml", "OTA", { onOutput: () => {} }, { noStates: false });
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
@@ -857,16 +914,16 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("updatePreferences passes the partial prefs as args", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
-    void api.updatePreferences({ theme: "dark" as never });
+    void api.updatePreferences({ theme: "dark" as never }).catch(() => {});
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("config/set_preferences");
     expect(sent.args).toEqual({ theme: "dark" });
   });
 
   it("detectChip sends config/detect_chip with the port arg and unwraps the chip info", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = {
       chip_family: "ESP32-C3",
@@ -887,7 +944,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("detectChip surfaces a backend error message to the caller", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.detectChip("/dev/cu.usbserial-10");
     const sent = ws.sentAs<{ message_id: string }>(0);
@@ -902,7 +959,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = { enabled: true, peers: [] };
     const pending = api.getRemoteBuildSettings();
@@ -914,7 +971,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("setRemoteBuildSettings sends remote_build/set_settings with the args and returns the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setRemoteBuildSettings({ enabled: true });
     const sent = ws.sentAs<{
@@ -935,7 +992,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     // flag and the pairings list off the same round-trip; live
     // updates flow through the OFFLOADER_REMOTE_BUILDS_TOGGLED
     // / OFFLOADER_PAIRING_ENABLED_CHANGED events on subscribe.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.getOffloaderRemoteBuildSettings();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
@@ -952,7 +1009,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     // build" switch. The backend round-trip carries strict
     // boolean validation (rejects truthy non-booleans); the
     // API helper passes the value through unchanged.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setOffloaderRemoteBuildSettings({
       remote_builds_enabled: false,
@@ -975,7 +1032,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     // from ``(host, port)`` to pin so receiver hostname
     // changes don't break the row identity); the API helper
     // matches.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setOffloaderPairingEnabled({
       pin_sha256: "a".repeat(64),
@@ -1012,7 +1069,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("setOffloaderRemoteBuildSettings forwards version_match_policy", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setOffloaderRemoteBuildSettings({
       version_match_policy: "exact_required",
@@ -1037,7 +1094,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     // The advanced "include this machine in the build pool" toggle
     // flips this field alone; the helper must accept it without
     // requiring the other two settings.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setOffloaderRemoteBuildSettings({
       include_local_in_pool: true,
@@ -1069,7 +1126,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   // the ``listRemoteBuildPeers`` deletion in #248.
 
   it("approveRemoteBuildPeer sends remote_build/approve_peer with dashboard_id", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.approveRemoteBuildPeer({ dashboard_id: "green" });
     const sent = ws.sentAs<{
@@ -1085,7 +1142,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("removeRemoteBuildPeer sends remote_build/remove_peer with dashboard_id", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.removeRemoteBuildPeer({ dashboard_id: "green" });
     const sent = ws.sentAs<{
@@ -1101,7 +1158,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("setRemoteBuildPairingWindow sends remote_build/set_pairing_window with open flag", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.setRemoteBuildPairingWindow({ open: true });
     const sent = ws.sentAs<{
@@ -1117,7 +1174,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("previewRemoteBuildPair sends remote_build/preview_pair and unwraps the pin", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.previewRemoteBuildPair({
       hostname: "build.local",
@@ -1136,7 +1193,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("requestRemoteBuildPair sends host + pin + both labels (TOCTOU + dual label)", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const args = {
       hostname: "build.local",
@@ -1170,7 +1227,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("remoteBuildResetPeerBuildEnv sends remote_build/reset_peer_build_env and returns the mirror job", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.remoteBuildResetPeerBuildEnv({
       pin_sha256: "a".repeat(64),
@@ -1188,7 +1245,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("unpairRemoteBuild sends remote_build/unpair with pin_sha256", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.unpairRemoteBuild({
       pin_sha256: "a".repeat(64),
@@ -1206,7 +1263,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("editRemoteBuildPairingEndpoint sends remote_build/edit_pairing_endpoint with pin + new coords", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const pending = api.editRemoteBuildPairingEndpoint({
       pin_sha256: "a".repeat(64),
@@ -1245,7 +1302,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = {
       dashboard_id: "abc123",
@@ -1263,7 +1320,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   });
 
   it("rotateRemoteBuildIdentity sends remote_build/rotate_identity and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const payload = {
       dashboard_id: "abc123",
@@ -1292,7 +1349,7 @@ describe("ESPHomeAPI — auth", () => {
   });
 
   it("ready resolves immediately when requires_auth is false", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1303,7 +1360,7 @@ describe("ESPHomeAPI — auth", () => {
   });
 
   it("fires onAuthRequired when requires_auth is true and no token is stored", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onAuthRequired = vi.fn();
     api.onAuthRequired = onAuthRequired;
     const pending = api.connect();
@@ -1321,7 +1378,7 @@ describe("ESPHomeAPI — auth", () => {
         expires_at: 1_700_000_000,
       }),
     });
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onAuthRequired = vi.fn();
     api.onAuthRequired = onAuthRequired;
 
@@ -1361,7 +1418,7 @@ describe("ESPHomeAPI — auth", () => {
         expires_at: 1_700_000_000,
       }),
     });
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onAuthRequired = vi.fn();
     api.onAuthRequired = onAuthRequired;
 
@@ -1386,7 +1443,7 @@ describe("ESPHomeAPI — auth", () => {
   });
 
   it("login(credentials) sends username/password and persists the token", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1418,7 +1475,7 @@ describe("ESPHomeAPI — auth", () => {
   });
 
   it("login surfaces APIError with not_authenticated for bad credentials", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1444,7 +1501,7 @@ describe("ESPHomeAPI — auth", () => {
   });
 
   it("login surfaces APIError with rate_limited including the details string", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1476,7 +1533,7 @@ describe("ESPHomeAPI — auth", () => {
         expires_at: 1_700_000_000,
       }),
     });
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1516,7 +1573,7 @@ describe("ESPHomeAPI — auth", () => {
       clear: () => {},
     });
 
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const onAuthRequired = vi.fn();
     api.onAuthRequired = onAuthRequired;
 
@@ -1565,7 +1622,7 @@ describe("ESPHomeAPI — auth", () => {
     // Without this contract, any caller that awaits ``api.ready``
     // during the reconnect-backoff window resumes against the closed
     // socket and immediately hits "WebSocket not connected".
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1608,7 +1665,7 @@ describe("ESPHomeAPI — auth", () => {
         expires_at: 1_700_000_000,
       }),
     });
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
     ws.open();
@@ -1646,7 +1703,7 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 
   it("sends ``automations/get_triggers`` and returns the list as-is", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAutomationTriggers();
@@ -1684,10 +1741,10 @@ describe("ESPHomeAPI — automations catalog", () => {
     // them as snake_case ``board_id`` on the wire — TypeScript camel
     // case at the call site, Python snake_case across the
     // protocol.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
-    void api.getAutomationTriggers("esp32", "esp32-s3-devkitc-1");
+    void api.getAutomationTriggers("esp32", "esp32-s3-devkitc-1").catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       platform: "esp32",
@@ -1696,7 +1753,7 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 
   it("sends ``automations/get_actions`` and returns the list", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAutomationActions("esp32");
@@ -1712,7 +1769,7 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 
   it("sends ``automations/get_conditions`` and returns the list", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAutomationConditions();
@@ -1727,7 +1784,7 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 
   it("sends ``automations/get_light_effects`` and returns the list", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getLightEffects();
@@ -1742,7 +1799,7 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 
   it("sends ``automations/get_available`` with the YAML path and returns the context payload", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getAvailableAutomations("kitchen.yaml");
@@ -1777,7 +1834,7 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 
   it("sends ``components/get_component_bodies`` with the requested ids", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getComponentBodies(["wifi", "api"]);
@@ -1798,10 +1855,10 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 
   it("forwards platform / board_id as snake_case when provided", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
-    void api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1");
+    void api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1").catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({
       component_ids: ["wifi"],
@@ -1811,10 +1868,10 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 
   it("omits platform / board_id when not provided so the backend's default path runs", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
-    void api.getComponentBodies(["wifi"]);
+    void api.getComponentBodies(["wifi"]).catch(() => {});
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
     expect(sent.args).toEqual({ component_ids: ["wifi"] });
     expect("platform" in sent.args).toBe(false);
@@ -1822,7 +1879,7 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 
   it("short-circuits on an empty id list without touching the socket", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const result = await api.getComponentBodies([]);
@@ -1840,7 +1897,7 @@ describe("ESPHomeAPI — getCompatibleBoards", () => {
   });
 
   it("sends ``boards/get_compatible_boards`` with board_id and hydrates the slim results", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getCompatibleBoards("generic-esp32c3");
@@ -1906,7 +1963,7 @@ describe("ESPHomeAPI — getCompatibleBoards", () => {
   });
 
   it("returns an empty list when the backend has no siblings", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.getCompatibleBoards("m5stack-cores3");
@@ -1929,7 +1986,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   });
 
   it("sends ``automations/parse`` and returns the structured ParsedAutomation list", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.parseDeviceAutomations("kitchen.yaml");
@@ -1965,7 +2022,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     // YAML range. Pin that the helper preserves the tree's shape
     // verbatim (no key-mangling) so the structured editor's
     // representation lines up with the backend dataclass.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const automation = {
@@ -2009,7 +2066,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   });
 
   it("sends ``automations/delete`` with the location locator", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const location = { kind: "script" as const, id: "morning_alarm" };
@@ -2029,7 +2086,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   });
 
   it("sends ``editor/migrate_config`` with the draft content", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.migrateConfig("api:\n  services: []\n");
@@ -2051,7 +2108,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     // has a non-catalog action — edit raw YAML" rather than
     // best-effort-rebuild. Pin that the typed APIError shape
     // round-trips.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.parseDeviceAutomations("broken.yaml");
@@ -2078,7 +2135,7 @@ describe("ESPHomeAPI — setDeviceLabelsBulk", () => {
     // and spreads ``updates`` straight through would break the
     // backend contract silently because the dialog-side tests
     // only exercise ``computeUpdates()``'s in-memory shape.
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.setDeviceLabelsBulk([
@@ -2109,7 +2166,7 @@ describe("ESPHomeAPI — setDeviceLabelsBulk", () => {
   });
 
   it("forwards per-entry failures from the backend response", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.setDeviceLabelsBulk([
@@ -2140,7 +2197,7 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
 
   it("mints a download token over the WebSocket", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.firmwareDownloadToken("kitchen.yaml", "firmware.elf");
@@ -2159,7 +2216,7 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
   });
 
   it("builds a base-path-aware, token-encoded URL and passes the filename through", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     vi.spyOn(api, "firmwareDownloadToken").mockResolvedValue({
       token: "a b/c+d",
       filename: "kitchen-firmware.elf",
@@ -2178,7 +2235,7 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
   });
 
   it("fetches the bytes for Web Serial flashing", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue({
       url: "/api/firmware/download?token=t",
       filename: "kitchen-firmware.factory.bin",
@@ -2197,7 +2254,7 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
   });
 
   it("throws when the byte fetch responds non-ok", async () => {
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue({
       url: "/api/firmware/download?token=t",
       filename: "kitchen-missing.bin",
@@ -2246,7 +2303,7 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
 
   it("mints a token over the WS then POSTs the file (detect pass)", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
     vi.stubGlobal("fetch", fetchFn);
@@ -2264,7 +2321,7 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
 
   it("adds mode=resolve and a repeated overwrite param per path", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
     vi.stubGlobal("fetch", fetchFn);
@@ -2280,7 +2337,7 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
 
   it("emits mode=resolve with no overwrite params for an empty resolve (keep all)", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     const fetchFn = vi.fn(async () => ({ ok: true, json: async () => IMPORTED }));
     vi.stubGlobal("fetch", fetchFn);
@@ -2296,7 +2353,7 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
 
   it("surfaces the server's {error_code, details} on a non-OK JSON response", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     vi.stubGlobal(
       "fetch",
@@ -2317,7 +2374,7 @@ describe("ESPHomeAPI — import bundle upload (HTTP)", () => {
 
   it("falls back to status + statusText when the error body isn't JSON (e.g. a 413)", async () => {
     installMockWebSocket();
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
     vi.stubGlobal(
       "fetch",
@@ -2352,7 +2409,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
 
   it("redacts the password in a logged auth/login frame", async () => {
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.login({ username: "admin", password: "hunter2" });
@@ -2370,7 +2427,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
 
   it("redacts the fresh token in a received auth/login result", async () => {
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.login({ token: "old-token" });
@@ -2390,7 +2447,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
 
   it("leaves non-auth command traffic untouched", async () => {
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.sendCommand("ping", { foo: "bar" });
@@ -2405,7 +2462,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
 
   it("redacts the value of a config/set_secret frame (but sends it on the wire)", async () => {
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.setSecret("api_key", "topsecretvalue", false);
@@ -2423,7 +2480,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
 
   it("redacts the pairing_key of a request_pair frame (but sends it on the wire)", async () => {
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const api = new ESPHomeAPI();
+    const api = makeApi();
     const ws = await connect(api);
 
     const pending = api.requestRemoteBuildPair({
@@ -2444,5 +2501,163 @@ describe("ESPHomeAPI — console-debug redaction", () => {
     const text = debugText(debugSpy);
     expect(text).not.toContain("ABCD-EFGH-JKMN-PQRS");
     expect(text).toContain("<redacted>");
+  });
+});
+
+describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    uninstallMockWebSocket();
+  });
+
+  it("sends a ping after an idle interval", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ command: string }>(0);
+    expect(sent.command).toBe("ping");
+  });
+
+  it("suppresses the ping when a frame arrived within the interval", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(10000);
+    // Any received frame counts as liveness, even an unroutable one.
+    ws.receive({ message_id: "nope", event: "output", data: "x" });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.sent).toHaveLength(0);
+  });
+
+  it("closes the socket and disconnects when the ping gets no reply", async () => {
+    const api = makeApi();
+    const onDisconnected = vi.fn();
+    api.onDisconnected = onDisconnected;
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    expect(api.connected).toBe(false);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the socket open when the ping is answered", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ command: string; message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { pong: true } });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.readyState).toBe(MockWebSocket.OPEN);
+    expect(api.connected).toBe(true);
+  });
+
+  it("keeps the socket open when the ping is rejected by the auth gate", async () => {
+    // An error frame is still a reply; the link is alive, and only
+    // silence may force-close the socket.
+    const api = makeApi();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "not_authenticated",
+      details: "auth required",
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.readyState).toBe(MockWebSocket.OPEN);
+    expect(api.connected).toBe(true);
+  });
+
+  it("closes the socket on the window offline event", async () => {
+    const api = makeApi();
+    const onDisconnected = vi.fn();
+    api.onDisconnected = onDisconnected;
+    const ws = await connect(api);
+    fireWindowEvent("offline");
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects immediately on the window online event", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    ws.close();
+    // The backoff timer is pending; online preempts it.
+    expect(MockWebSocket.instances).toHaveLength(1);
+    fireWindowEvent("online");
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it("removes the network listeners on intentional disconnect", async () => {
+    const api = makeApi();
+    await connect(api);
+    api.disconnect();
+    expect(() => fireWindowEvent("online")).toThrow(/no window listeners/);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("ignores the online event while already connected", async () => {
+    const api = makeApi();
+    await connect(api);
+    fireWindowEvent("online");
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("online abandons a connect attempt stalled in CONNECTING", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    ws.close();
+    await vi.advanceTimersByTimeAsync(1000);
+    // The retry fired and its handshake is stalling.
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const stalled = MockWebSocket.latest();
+    expect(stalled.readyState).toBe(MockWebSocket.CONNECTING);
+    fireWindowEvent("online");
+    expect(stalled.readyState).toBe(MockWebSocket.CLOSED);
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it("holds retries at the backoff ceiling while the browser reports offline", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const api = makeApi();
+    const ws = await connect(api);
+    fireWindowEvent("offline");
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    // No 1s retry storm, but no full suspension either: a
+    // false-negative onLine costs one slow cycle, not the loop.
+    await vi.advanceTimersByTimeAsync(29000);
+    expect(MockWebSocket.instances).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it("skips the heartbeat while the tab is hidden and catches up on the visibility edge", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    setDocumentVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(ws.sent).toHaveLength(0);
+    setDocumentVisibility("visible");
+    fireDocumentEvent("visibilitychange");
+    expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
+  });
+
+  it("times out a handshake that stalls in CONNECTING", async () => {
+    const api = makeApi();
+    void api.connect().catch(() => {});
+    expect(MockWebSocket.instances).toHaveLength(1);
+    const ws = MockWebSocket.latest();
+    // No open/ServerInfo ever arrives; the connect timeout force-closes
+    // the attempt so the backoff loop keeps going.
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 });

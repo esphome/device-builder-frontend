@@ -148,6 +148,26 @@ type PendingRequest = {
   reject: (error: Error) => void;
 };
 
+// Liveness probe: after HEARTBEAT_INTERVAL_MS of receive silence send
+// a 'ping'; no reply within HEARTBEAT_TIMEOUT_MS force-closes the
+// socket. Protocol-level server pings are invisible to page JS, so a
+// dead link otherwise stays OPEN forever. The tick runs faster than
+// the silence threshold so detection lags the threshold by at most
+// one tick; the in-flight guard keeps pings non-overlapping. The
+// timeout is generous because a backend busy compiling can take over
+// 10s to answer (the HA frontend uses 15s for the same reason).
+const HEARTBEAT_INTERVAL_MS = 15000;
+const HEARTBEAT_TIMEOUT_MS = 15000;
+const HEARTBEAT_TICK_MS = 5000;
+
+// A handshake against a dead peer stalls in CONNECTING with no
+// error/close event; time it out so the backoff loop keeps going.
+// Generous so a slow link never loses a handshake that would have
+// completed; the browser's own stall timeout is minutes.
+const CONNECT_TIMEOUT_MS = 30000;
+
+const RECONNECT_MAX_DELAY_MS = 30000;
+
 // Type-erased bucket for in-flight streams; each command's real result
 // shape is bound at its sendStreamCommand call site.
 type StreamHandler = StreamCallbacks<unknown>;
@@ -170,6 +190,10 @@ export class ESPHomeAPI {
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _reconnectDelay = 1000;
   private _intentionalDisconnect = false;
+  private _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private _heartbeatInFlight = false;
+  private _lastMessageAt = 0;
+  private _connectTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private _connectPromise: {
     resolve: (info: ServerInfoMessage) => void;
     reject: (error: Error) => void;
@@ -258,26 +282,51 @@ export class ESPHomeAPI {
     return new Promise((resolve, reject) => {
       this._connectPromise = { resolve, reject };
       this._intentionalDisconnect = false;
+      this._registerNetworkListeners();
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}${BASE_PATH}ws`;
 
-      this._ws = new WebSocket(wsUrl);
+      // Listeners ignore events from a socket a reconnect replaced.
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        // A synchronous constructor throw (CSP, malformed host) fires
+        // no close event; route it through the normal close path so
+        // the failure is logged and the backoff loop keeps going.
+        console.error("[WS] Failed to open a socket", err);
+        this._onClose();
+        return;
+      }
+      this._ws = ws;
 
-      this._ws.addEventListener("message", (event) => {
+      ws.addEventListener("message", (event) => {
+        if (this._ws !== ws) return;
         this._onMessage(event);
       });
 
-      this._ws.addEventListener("error", () => {
+      ws.addEventListener("error", () => {
+        if (this._ws !== ws) return;
         if (this._connectPromise) {
           this._connectPromise.reject(new Error("WebSocket connection failed"));
           this._connectPromise = null;
         }
       });
 
-      this._ws.addEventListener("close", () => {
+      ws.addEventListener("close", () => {
+        if (this._ws !== ws) return;
         this._onClose();
       });
+
+      this._clearConnectTimeout();
+      this._connectTimeoutTimer = setTimeout(() => {
+        this._connectTimeoutTimer = null;
+        if (this._ws === ws && !this._connected) {
+          console.debug(`[WS] Handshake stalled for ${CONNECT_TIMEOUT_MS}ms; closing`);
+          this._forceClose(ws);
+        }
+      }, CONNECT_TIMEOUT_MS);
     });
   }
 
@@ -288,12 +337,141 @@ export class ESPHomeAPI {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
     }
-    this._ws?.close();
-    this._ws = null;
+    this._unregisterNetworkListeners();
+    // Run the close cleanup (reject pending work, notify streams) now:
+    // the per-socket identity guard keeps the socket's own async close
+    // event from re-running it, so waiting on the event would leave
+    // everything hanging.
+    if (this._ws) this._forceClose(this._ws);
     this._connected = false;
   }
 
+  // ─── Liveness ─────────────────────────────────────────────
+
+  // Stable handler references make the add/remove pairs idempotent, so
+  // no registration flag is needed across reconnects. The existence
+  // guards keep teardown order-independent under test.
+  private _registerNetworkListeners(): void {
+    if (typeof window !== "undefined") {
+      window.addEventListener("offline", this._onWindowOffline);
+      window.addEventListener("online", this._onWindowOnline);
+    }
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this._onVisibilityChange);
+    }
+  }
+
+  private _unregisterNetworkListeners(): void {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("offline", this._onWindowOffline);
+      window.removeEventListener("online", this._onWindowOnline);
+    }
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    }
+  }
+
+  private readonly _onWindowOffline = (): void => {
+    // An idle socket doesn't error when the interface drops; surface
+    // the disconnect now instead of after the heartbeat window.
+    if (this._ws) this._forceClose(this._ws);
+  };
+
+  private readonly _onWindowOnline = (): void => {
+    if (this._intentionalDisconnect || this._connected) return;
+    // An attempt stalled in CONNECTING was made against the interface
+    // that just came back; abandon it rather than waiting out its
+    // connect timeout. Before clearing the retry timer, since the
+    // forced close re-arms one.
+    const stalled = this._ws;
+    if (stalled && stalled.readyState === WebSocket.CONNECTING) {
+      this._forceClose(stalled);
+    }
+    this._reconnectDelay = 1000;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    // A non-null socket means a connect attempt is already in flight.
+    if (!this._ws) {
+      this.connect().catch(() => {
+        // _onClose schedules the next retry.
+      });
+    }
+  };
+
+  private readonly _onVisibilityChange = (): void => {
+    // The tick skips while hidden; catch up the moment the tab returns.
+    if (document.visibilityState === "visible") this._heartbeatTick();
+  };
+
+  private _startHeartbeat(): void {
+    this._stopHeartbeat();
+    this._lastMessageAt = Date.now();
+    this._heartbeatTimer = setInterval(() => {
+      this._heartbeatTick();
+    }, HEARTBEAT_TICK_MS);
+  }
+
+  private _stopHeartbeat(): void {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+  }
+
+  private _clearConnectTimeout(): void {
+    if (this._connectTimeoutTimer) {
+      clearTimeout(this._connectTimeoutTimer);
+      this._connectTimeoutTimer = null;
+    }
+  }
+
+  private _heartbeatTick(): void {
+    // A hidden tab has no one to show the disconnect to; the
+    // visibilitychange listener ticks immediately on return.
+    if (globalThis.document?.visibilityState === "hidden") return;
+    if (this._heartbeatInFlight) return;
+    if (Date.now() - this._lastMessageAt < HEARTBEAT_INTERVAL_MS) return;
+    const ws = this._ws;
+    // Probe only an OPEN socket: a visibility-edge tick during an
+    // in-flight connect would otherwise force-close the new attempt.
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    this._heartbeatInFlight = true;
+    this.ping(HEARTBEAT_TIMEOUT_MS)
+      .catch((err: unknown) => {
+        // An APIError reply proves the link is alive (e.g. the pre-auth
+        // gate); only silence or a failed send means a dead socket.
+        if (err instanceof APIError) return;
+        console.debug("[WS] Heartbeat got no reply; closing socket", err);
+        if (this._ws === ws) this._forceClose(ws);
+      })
+      .catch((err: unknown) => {
+        // A throw from the disconnect fan-out must not become an
+        // unhandled rejection, but it must not vanish either.
+        console.error("[WS] Heartbeat close path threw", err);
+      })
+      .finally(() => {
+        this._heartbeatInFlight = false;
+      });
+  }
+
+  /**
+   * Close a socket known dead and run the disconnect path now.
+   *
+   * close() only starts the closing handshake; against a dead peer
+   * the close event never fires.
+   */
+  private _forceClose(ws: WebSocket): void {
+    ws.close();
+    // Skipped when close() dispatched the close event synchronously
+    // (test mocks do); the close listener already ran _onClose.
+    if (this._ws === ws) this._onClose();
+  }
+
   private _onMessage(event: MessageEvent): void {
+    // Any frame proves the link is alive, parseable or not.
+    this._lastMessageAt = Date.now();
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(event.data);
@@ -313,6 +491,8 @@ export class ESPHomeAPI {
       // value rather than the previous one.
       this._connectionGeneration += 1;
       this._reconnectDelay = 1000;
+      this._clearConnectTimeout();
+      this._startHeartbeat();
       if (this._connectPromise) {
         this._connectPromise.resolve(this._serverInfo);
         this._connectPromise = null;
@@ -431,6 +611,15 @@ export class ESPHomeAPI {
     const wasConnected = this._connected;
     this._connected = false;
     this._ws = null;
+    this._stopHeartbeat();
+    this._clearConnectTimeout();
+
+    // A force-closed handshake fires no error event, so a pending
+    // connect() would otherwise hang forever.
+    if (this._connectPromise) {
+      this._connectPromise.reject(new Error("WebSocket connection closed"));
+      this._connectPromise = null;
+    }
 
     // Park ``ready`` until the next successful connect+auth. Without
     // this, anyone awaiting it during the reconnect-backoff window
@@ -444,9 +633,16 @@ export class ESPHomeAPI {
     }
     this._pendingRequests.clear();
 
-    // Notify stream handlers
+    // Notify stream handlers. Each callback is isolated so one
+    // consumer throwing can't abort the fan-out or the reconnect
+    // scheduling below.
     for (const [, stream] of this._streamHandlers) {
-      stream.onError?.("WebSocket connection closed");
+      try {
+        if (stream.onConnectionLost) stream.onConnectionLost();
+        else stream.onError?.("WebSocket connection closed");
+      } catch (err) {
+        console.error("[WS] Stream close handler threw", err);
+      }
     }
     this._streamHandlers.clear();
 
@@ -454,13 +650,24 @@ export class ESPHomeAPI {
     this._eventSubscriptions.clear();
 
     if (wasConnected) {
-      this.onDisconnected?.();
+      try {
+        this.onDisconnected?.();
+      } catch (err) {
+        console.error("[WS] onDisconnected handler threw", err);
+      }
     }
 
-    // Auto-reconnect unless intentionally disconnected
+    // Auto-reconnect unless intentionally disconnected. While the
+    // browser reports offline every retry is doomed, so hold at the
+    // backoff ceiling; the online listener preempts for instant
+    // recovery, and the slow retries cover a false-negative onLine
+    // (embedded webviews are known to misreport it).
     if (!this._intentionalDisconnect) {
-      const delay = this._reconnectDelay;
-      this._reconnectDelay = Math.min(this._reconnectDelay * 2, 30000);
+      const offline = globalThis.navigator?.onLine === false;
+      const delay = offline ? RECONNECT_MAX_DELAY_MS : this._reconnectDelay;
+      if (!offline) {
+        this._reconnectDelay = Math.min(this._reconnectDelay * 2, RECONNECT_MAX_DELAY_MS);
+      }
       console.debug(`[WS] Reconnecting in ${delay}ms...`);
       this._reconnectTimer = setTimeout(() => {
         this._reconnectTimer = null;
@@ -526,7 +733,9 @@ export class ESPHomeAPI {
     callbacks: StreamCallbacks<TResult>
   ): string {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
-      callbacks.onError?.("WebSocket not connected");
+      console.debug(`[WS] Stream send refused (not connected): ${command}`);
+      if (callbacks.onConnectionLost) callbacks.onConnectionLost();
+      else callbacks.onError?.("WebSocket not connected");
       return "";
     }
 
@@ -2280,8 +2489,8 @@ export class ESPHomeAPI {
   }
 
   /** Ping the server. */
-  async ping(): Promise<{ pong: boolean }> {
-    return this.sendCommand("ping");
+  async ping(timeout?: number): Promise<{ pong: boolean }> {
+    return this.sendCommand("ping", undefined, timeout);
   }
 
   // ─── Editor (live YAML validation) ────────────────────────
