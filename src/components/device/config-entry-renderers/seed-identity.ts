@@ -1,8 +1,9 @@
 /**
  * Identity seeding for a subtree the user just materialized — a new
- * nested-list row, or a sub-entity switched on. Both need something in the
- * group for it to serialize at all, and neither should make the user invent
- * an id (device-builder#2452, #2459).
+ * nested-list row, or a sub-entity switched on. Neither should make the user
+ * invent an id (device-builder#2452, #2459). A row serializes as a bare item
+ * regardless, so only a required declaring id is prefilled there; a
+ * switched-on sub-entity needs an identity field to persist at all.
  */
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
