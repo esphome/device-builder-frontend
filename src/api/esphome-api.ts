@@ -378,7 +378,9 @@ export class ESPHomeAPI {
     if (globalThis.document?.visibilityState === "hidden") return;
     if (Date.now() - this._lastMessageAt < HEARTBEAT_INTERVAL_MS) return;
     const ws = this._ws;
-    if (!ws) return;
+    // Probe only an OPEN socket: a visibility-edge tick during an
+    // in-flight connect would otherwise force-close the new attempt.
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     this.ping(HEARTBEAT_TIMEOUT_MS).catch((err: unknown) => {
       // An APIError reply proves the link is alive (e.g. the pre-auth
       // gate); only silence or a failed send means a dead socket.

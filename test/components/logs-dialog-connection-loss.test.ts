@@ -3,8 +3,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import "../_mock-webawesome.js";
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 import type { LogsSession } from "../../src/components/logs-session.js";
