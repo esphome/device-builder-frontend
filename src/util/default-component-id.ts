@@ -1,4 +1,4 @@
-import { normalizeEspHomeId } from "./esphome-id.js";
+import { isValidEspHomeId, normalizeEspHomeId } from "./esphome-id.js";
 import { isPlatformComponentId } from "./featured-id.js";
 import { collectInstanceScalars, readInstanceScalar } from "./yaml-instance-scalars.js";
 import { YamlRawValue } from "./yaml-serialize.js";
@@ -92,13 +92,13 @@ export function addTakenIdsFromValues(node: unknown, out: Set<string>): void {
   }
 }
 
-// Slug *raw* into a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*), then walk a
-// numeric suffix until it clears *existing*. Unlike user-typed input, a
-// generated id has no mid-typing UX to preserve, so a digit-leading slug
+// Slug *raw* into a valid ESPHome id, then walk a numeric suffix until it
+// clears *existing*. A normalised slug can only be invalid by leading with a
+// digit; unlike user-typed input it has no mid-typing UX to preserve, so it
 // takes an underscore prefix rather than being left invalid.
 function generateUniqueId(raw: string, existing: ReadonlySet<string>): string {
   const slug = normalizeEspHomeId(raw.toLowerCase());
-  const base = /^[a-z_]/.test(slug) ? slug : `_${slug}`;
+  const base = isValidEspHomeId(slug) ? slug : `_${slug}`;
   let n = 1;
   while (existing.has(`${base}_${n}`)) n++;
   return `${base}_${n}`;
