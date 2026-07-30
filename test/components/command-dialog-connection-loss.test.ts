@@ -12,16 +12,16 @@ import {
   startValidateStream,
   stopCommand,
 } from "../../src/components/command-dialog/commands.js";
-import { flushMicrotasks } from "../_dom.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
-import { type StreamCbs, makeCommandDialogHost } from "./_command-dialog-host.js";
+import {
+  type StreamCbs,
+  flushResume,
+  makeCommandDialogHost,
+} from "./_command-dialog-host.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const jobsOf = (...jobs: FirmwareJob[]) =>
   new Map(jobs.map((j) => [j.job_id, j] as const));
-
-// ready resolves immediately in the fake; drain its .then chain.
-const flushResume = () => flushMicrotasks(4);
 
 describe("command-dialog follow connection loss", () => {
   it("keeps the job, stays running, and re-follows with a reset log", async () => {

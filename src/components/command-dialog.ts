@@ -181,8 +181,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // missing — the build itself was fine, so the clean/reset hint is suppressed.
   @state() _compileMissingDependent = false;
 
-  // Flips true when a run ended because the connection was lost — not a
-  // build or YAML problem, so the failure hints are suppressed.
+  // Run ended on a lost connection; suppresses the failure hints.
   @state() _connectionInterrupted = false;
 
   // Locally-primed status / source so the queued overlay + remote-builder

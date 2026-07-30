@@ -13,14 +13,20 @@ import {
   cardStatusMessage,
 } from "../../../src/components/firmware-install-dialog/renderers.js";
 import { fakeLogBuffer } from "../../_fake-host.js";
-import { flushMicrotasks, identityLocalize } from "../../_dom.js";
-import type { StreamCbs } from "../_command-dialog-host.js";
+import { identityLocalize } from "../../_dom.js";
+import {
+  type StreamCbs,
+  flushResume,
+  makeReconnectApi,
+} from "../_command-dialog-host.js";
 
 function makeHost() {
   const follows: StreamCbs[] = [];
-  let generation = 0;
+  const reconnectApi = makeReconnectApi();
   const host = {
-    _api: {
+    // Assigned onto the reconnect fake so its generation getter survives
+    // (a spread would snapshot the getter's value).
+    _api: Object.assign(reconnectApi, {
       firmwareCompile: vi.fn(async () => ({
         job_id: "j1",
         source: "local",
@@ -31,13 +37,7 @@ function makeHost() {
         follows.push(cbs);
         return `stream-${follows.length}`;
       }),
-      ready: Promise.resolve(),
-      // Static until the test's bumpGeneration models a reconnect; an
-      // unbumped resume is the refused-send give-up path.
-      get connectionGeneration(): number {
-        return generation;
-      },
-    },
+    }),
     _jobId: "",
     _streamId: "",
     _compileReject: null as (() => void) | null,
@@ -57,13 +57,9 @@ function makeHost() {
     host: host as unknown as ESPHomeFirmwareInstallDialog,
     follows,
     raw: host,
-    bumpGeneration: () => {
-      generation += 1;
-    },
+    bumpGeneration: reconnectApi.bumpGeneration,
   };
 }
-
-const flushResume = () => flushMicrotasks(4);
 
 describe("compileAndWait connection loss", () => {
   it("keeps the promise pending, re-follows, and the replayed result resolves", async () => {

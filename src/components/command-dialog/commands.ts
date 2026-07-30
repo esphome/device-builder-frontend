@@ -126,10 +126,7 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
         // The validate subprocess died with the connection; a re-run
         // would be a fresh submission, so leave that to the user.
         host._streamId = "";
-        host._log.flush();
-        host._state = "error";
-        host._statusMessage = host._localize("command.connection_interrupted");
-        host._connectionInterrupted = true;
+        markConnectionInterrupted(host);
       },
     },
     { showSecrets: host._showSecrets }
@@ -318,12 +315,8 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           host._resetAnsiLogScroll();
           followJob(host, jobId);
         },
-        giveUp: (err) => {
-          console.error("[command] Re-follow after reconnect failed", err);
-          host._log.flush();
-          host._state = "error";
-          host._statusMessage = host._localize("command.connection_interrupted");
-          host._connectionInterrupted = true;
+        giveUp: () => {
+          markConnectionInterrupted(host);
           host._jobId = "";
         },
       });
@@ -331,10 +324,18 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
   });
 }
 
+// Terminal interruption state; the message and the hint-suppressing
+// flag travel together.
+function markConnectionInterrupted(host: ESPHomeCommandDialog): void {
+  host._log.flush();
+  host._state = "error";
+  host._statusMessage = host._localize("command.connection_interrupted");
+  host._connectionInterrupted = true;
+}
+
 export function stopCommand(host: ESPHomeCommandDialog): void {
   if (host._state !== "running") return;
-  // The cancel can't reach the backend while disconnected; claiming
-  // "Stopped." would be a lie the job disproves by finishing.
+  // The cancel can't reach the backend while disconnected.
   if (!host._apiConnected) return;
   if (host._jobId) host._api.firmwareCancel(host._jobId).catch(() => {});
   host._state = "error";

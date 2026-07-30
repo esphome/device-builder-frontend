@@ -374,7 +374,6 @@ function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof noth
   });
   switch (host._state) {
     case "running":
-      // Disabled while disconnected: the cancel can't reach the backend.
       return renderTermButton({
         icon: "stop",
         label: host._localize("command.stop"),

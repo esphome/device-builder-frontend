@@ -599,9 +599,7 @@ export function waitForRunningJob(
               host._log.reset();
               follow();
             },
-            giveUp: (err) => {
-              console.error("[install] Re-follow after reconnect failed", err);
-              host._streamId = "";
+            giveUp: () => {
               host._compileReject = null;
               host._fail(host._localize(failKey));
               resolve(false);
@@ -668,9 +666,7 @@ export function compileAndWait(
               host._log.reset();
               follow(jobId);
             },
-            giveUp: (err) => {
-              console.error("[install] Re-follow after reconnect failed", err);
-              host._streamId = "";
+            giveUp: () => {
               host._jobId = "";
               host._compileReject = null;
               reject(new Error(host._localize("command.connection_interrupted")));
