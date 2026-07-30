@@ -29,13 +29,11 @@ import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
-import { assessBusHostability, exclusiveBusTarget } from "../../util/bus-availability.js";
-import { yamlHasExternalIdSources } from "../../util/config-entry-yaml-scan.js";
-import { loadCatalog } from "../../util/yaml-completion-catalog.js";
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
 } from "./add-component-deps.js";
+import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
@@ -302,88 +300,29 @@ export class ESPHomeAddComponentForm extends LitElement {
     }
   }
 
-  /**
-   * Refresh the bus verdict for the current `(component, yaml)`: no
-   * attachable bus flags the dep missing, a sole compatible bus seeds the
-   * reference field, several force the picker. Anything uncertain — a
-   * catalog failure, a configured bus provider (a `usb_uart:` channel the
-   * bus scan can't model), an include or anchor merge hiding ids — resolves
-   * to no gating.
-   */
+  /** Refresh the bus verdict for the current `(component, yaml)`; the
+   *  decision logic lives in `add-component-form-bus.ts`. */
   private async _resolveBusHostability(): Promise<void> {
     const seq = ++this._busAssessSeq;
     const api = this._api;
-    const target = this.component ? exclusiveBusTarget(this.component) : null;
-    let blocked: string | null = null;
-    let picker: string | null = null;
-    let reference: string | null = null;
-    if (api && target && !yamlHasExternalIdSources(this.yaml)) {
-      // `loadCatalog` resolves to an empty index on failure rather than
-      // rejecting; an empty index records no claims, so bail with no
-      // verdict instead of affirmatively seeding a bus it has no
-      // evidence for.
-      const catalog = await loadCatalog(api);
-      if (seq !== this._busAssessSeq) return;
-      if (catalog.byId.size > 0) {
-        const { busCount, compatibleIds } = assessBusHostability(
-          this.yaml,
-          target.domain,
-          target.constraints,
-          (id) => catalog.byId.get(id)?.bus_constraints
-        );
-        // On a multi-bus config an un-idded compatible bus is unusable —
-        // without an explicit reference esphome fails on the ambiguity —
-        // so it falls through to the detour rather than shipping one.
-        const usable =
-          busCount > 1 ? compatibleIds.filter((id) => id !== null) : compatibleIds;
-        if (busCount > 0 && usable.length === 0) {
-          // The local verdict stands on parsed evidence; the provider
-          // escape (a `usb_uart:` channel the bus scan can't model) only
-          // clears it, and a failed provider lookup doesn't discard it.
-          blocked = target.domain;
-          try {
-            const present = parseTopLevelComponents(this.yaml);
-            const satisfied = await depsSatisfiedByProvides(
-              api,
-              [target.domain],
-              present,
-              {
-                platform: this.board?.esphome.platform ?? null,
-                boardId: this.board?.id ?? null,
-              }
-            );
-            if (satisfied.has(target.domain)) blocked = null;
-          } catch (err) {
-            console.warn("[add-component-form] bus provider lookup failed", err);
-          }
-        } else if (usable.length === 1) {
-          reference = usable[0];
-        } else if (usable.length > 1) {
-          // `overlayRequired` matches top-level keys only; a nested
-          // reference (none exists today) just skips the forcing.
-          const path = findReferencePath(
-            this.component.config_entries,
-            target.domain,
-            []
-          );
-          if (path?.length === 1) picker = path[0];
-        }
-      }
-    }
+    const verdict =
+      api && this.component
+        ? await resolveBusVerdict(api, this.component, this.yaml, this.board)
+        : NO_BUS_VERDICT;
     if (seq !== this._busAssessSeq) return;
-    if (this._busBlockedDep !== blocked) this._busBlockedDep = blocked;
-    if (this._busPickerKey !== picker) this._busPickerKey = picker;
-    if (reference !== null && target) {
+    if (this._busBlockedDep !== verdict.blocked) this._busBlockedDep = verdict.blocked;
+    if (this._busPickerKey !== verdict.picker) this._busPickerKey = verdict.picker;
+    if (verdict.reference) {
       // Seed the sole compatible bus into a still-empty reference field so
       // the attachment is explicit; a detour-created bus or a value the
       // user typed already fills the field and wins.
       const path = findReferencePath(
         this.component.config_entries,
-        target.domain,
+        verdict.reference.domain,
         [],
         this._values
       );
-      if (path) this._values = setIn(this._values, path, reference);
+      if (path) this._values = setIn(this._values, path, verdict.reference.id);
     }
   }
 

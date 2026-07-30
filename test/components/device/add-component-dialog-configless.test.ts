@@ -77,6 +77,25 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 
+  it("opens the form for a bus-constrained component even when input-free", async () => {
+    // The bus-hostability verdict resolves async inside the form; the
+    // fast path must not add before it can gate.
+    const entry = makeComponentEntry("sensor.a01nyub", {
+      name: "A01NYUB",
+      config_entries: [],
+      dependencies: ["uart"],
+      bus_constraints: { uart: { baud_rate: 9600, require_rx: true } },
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    dialog.yaml = "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    id: uart_1\n";
+
+    await select(dialog, "sensor.a01nyub");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
+  });
+
   it("opens the form (no direct add) when the component has a required field", async () => {
     const entry = makeComponentEntry("wifi", {
       name: "WiFi",
