@@ -10,11 +10,11 @@
  */
 import { cppLanguage } from "@codemirror/lang-cpp";
 import {
-  LRLanguage,
-  LanguageSupport,
   foldInside,
   foldNodeProp,
   indentService,
+  LanguageSupport,
+  LRLanguage,
 } from "@codemirror/language";
 import type { Input, SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { parseMixed } from "@lezer/common";

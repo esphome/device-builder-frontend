@@ -14,10 +14,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "../_mock-webawesome.js";
 
 import type { LitElement } from "lit";
+import { pressEnter } from "../_press-enter.js";
 import { ESPHomeBulkLabelsDialog } from "../../src/components/labels/bulk-labels-dialog.js";
 import { ESPHomePairBuildServerDialog } from "../../src/components/pair-build-server-dialog.js";
 import { ESPHomeWizardStepImportPartial } from "../../src/components/wizard/wizard-step-import-partial.js";
-import { pressEnter } from "../_press-enter.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

@@ -16,10 +16,10 @@ vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import { LitElement } from "lit";
+import { identityLocalize } from "../../_dom.js";
 import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
 import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
-import { identityLocalize } from "../../_dom.js";
 
 afterEach(() => {
   vi.clearAllMocks();

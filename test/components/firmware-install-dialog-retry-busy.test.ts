@@ -17,11 +17,11 @@ vi.mock("../../src/util/web-serial.js", () => ({
   SERIAL_ACTIVITY_WINDOW_MS: 6000,
 }));
 
+import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 // The log as the failed run left it, so Retry has something to drop.
 const failedRunLog = () => {

@@ -39,6 +39,7 @@ import {
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
+  hideDeviceBuilderContext,
   importableDevicesContext,
   integrationDocsContext,
   isHaAddonContext,
@@ -53,7 +54,6 @@ import {
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
-  hideDeviceBuilderContext,
   remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
@@ -71,6 +71,12 @@ import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
+  connectionOverlayStyles,
+  ReconnectPillGate,
+  renderReconnectPill,
+  renderRouteLoadingBar,
+} from "./app-shell/connection-overlays.js";
+import {
   loadIntegrationDocs,
   loadLabels,
   loadOnboardingState,
@@ -83,17 +89,12 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
-import {
-  connectionOverlayStyles,
-  ReconnectPillGate,
-  renderReconnectPill,
-  renderRouteLoadingBar,
-} from "./app-shell/connection-overlays.js";
 import { consumePreAuthExhaustion, createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
   onSetExpertMode,
+  onSetHideDeviceBuilder,
   onSetLanguage,
   onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
@@ -101,7 +102,6 @@ import {
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
-  onSetHideDeviceBuilder,
   onSetRemoteComputeOnly,
   onSetTheme,
   onSetVersionHistoryEnabled,

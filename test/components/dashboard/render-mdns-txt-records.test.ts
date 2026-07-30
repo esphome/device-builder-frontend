@@ -24,13 +24,13 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
-import { renderMdnsTxtRecords } from "../../../src/components/dashboard/device-drawer-render.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   findTemplatesByAnchor,
   isTemplateResult,
   visitTemplates,
 } from "../../_lit-template-walker.js";
+import { renderMdnsTxtRecords } from "../../../src/components/dashboard/device-drawer-render.js";
 
 describe("renderMdnsTxtRecords", () => {
   it("renders a details/dl with one dt+dd per record, alphabetically sorted", () => {

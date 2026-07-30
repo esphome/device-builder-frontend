@@ -7,7 +7,7 @@ import {
   mdiMonitorDashboard,
   mdiServerNetwork,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -21,9 +21,9 @@ import type {
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
+  buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
-  buildOffloadPairingsContext,
   buildServerPeersContext,
   devicesContext,
   firmwareJobsContext,
@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { pairingWindowStyles } from "../styles/pairing-window.js";
+import { peerRowStyles } from "../styles/peer-rows.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
@@ -44,14 +45,14 @@ import { PairingWindowController } from "../util/pairing-window-controller.js";
 import { approvePeerRequest, rejectPeerRequest } from "../util/peer-pairing-actions.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { RemoteBuildIdentityController } from "../util/remote-build-identity-controller.js";
 import "./accept-peer-dialog.js";
-import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
+import { RemoteBuildIdentityController } from "../util/remote-build-identity-controller.js";
 import "./command-dialog.js";
-import type { ESPHomeCommandDialog } from "./command-dialog.js";
+import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
 import "./logs-dialog.js";
-import type { ESPHomeLogsDialog } from "./logs-dialog.js";
+import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./pin-emoji-grid.js";
+import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 import {
   renderDisabledCta,
   renderOnboarding,
@@ -59,10 +60,9 @@ import {
 import { renderPeersCard, renderRequestCard } from "./remote-build-panel/render-peers.js";
 import { renderQueueCard } from "./remote-build-panel/render-queue.js";
 import { remoteBuildPanelStyles } from "./remote-build-panel/styles.js";
-import { bucketJobs } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
+import { bucketJobs } from "./shared/firmware-jobs-list.js";
 import { stackBarStyles } from "./shared/stack-bar-styles.js";
-import { peerRowStyles } from "../styles/peer-rows.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,

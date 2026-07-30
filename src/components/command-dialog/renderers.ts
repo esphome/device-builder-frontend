@@ -3,9 +3,8 @@ import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
-import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
-import { canResetBuildEnv } from "../remote-build-hint.js";
 import { formatElapsed } from "../../util/format-job-time.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
@@ -20,6 +19,7 @@ import {
   renderTermButton,
   renderTermToggle,
 } from "../process-terminal/toolbar-button.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
 // the locally-primed snapshot for the gap between followJob and the first

@@ -9,9 +9,9 @@
 
 import { describe, expect, it } from "vitest";
 
+import { renderInto } from "../_dom.js";
 import { renderTextLinks } from "../../src/util/markdown.js";
 import { renderMessageNode } from "../../src/util/yaml-lint-backend.js";
-import { renderInto } from "../_dom.js";
 
 const MSG = "check the list at https://example.com/tz.";
 

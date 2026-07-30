@@ -9,11 +9,11 @@ import type {
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import {
+  type AutomationBodyFetcher,
   emptyHydrationResult,
   hydrateEntryConfigEntries,
-  tallyOutcome,
-  type AutomationBodyFetcher,
   type HydrationResult,
+  tallyOutcome,
 } from "../../../util/automation-body-hydration.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";

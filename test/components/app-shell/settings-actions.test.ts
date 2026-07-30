@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flush, identityLocalize } from "../../_dom.js";
 import type { VersionMatchPolicy } from "../../../src/api/types/event-subscription.js";
 import type { PairingSummary } from "../../../src/api/types/remote-build.js";
 import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
   onSetExpertMode,
+  onSetHideDeviceBuilder,
   onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildEnabled,
-  onSetHideDeviceBuilder,
   onSetRemoteComputeOnly,
   onSetTheme,
   onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
-import { flush, identityLocalize } from "../../_dom.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner-js", () => ({

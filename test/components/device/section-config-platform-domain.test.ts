@@ -14,8 +14,8 @@ vi.mock("sonner-js", () => ({
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import {
-  ComponentCategory,
   type ComponentCatalogEntry,
+  ComponentCategory,
 } from "../../../src/api/types/components.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { loadConfig } from "../../../src/components/device/device-section-config/loading.js";

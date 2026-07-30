@@ -28,6 +28,7 @@ vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
+import { flushMicrotasks, mount } from "../../../_dom.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   ActionNode,
@@ -42,7 +43,6 @@ import { ESPHomeAutomationActionNode } from "../../../../src/components/device/a
 import { ESPHomeAutomationConditionTree } from "../../../../src/components/device/automation-editor/automation-condition-tree.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 import type { AutomationFocus } from "../../../../src/components/device/automation-editor/automation-focus.js";
-import { flushMicrotasks, mount } from "../../../_dom.js";
 
 const entry = (key: string, advanced = false) =>
   ({ key, type: "string", label: key, advanced }) as unknown as ConfigEntry;

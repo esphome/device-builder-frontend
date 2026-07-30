@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
 
 import "./_mock-device-children.js";
 
-import { ESPHomePageDevice } from "../../src/pages/device.js";
 import type { SectionEditor } from "../../src/components/device/section-editor.js";
+import { ESPHomePageDevice } from "../../src/pages/device.js";
 
 /** Narrow typed view of the page internals this suite drives. */
 interface DirtyGuardView {

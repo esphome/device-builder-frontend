@@ -1,4 +1,5 @@
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
+import { choicePinned } from "../../util/config-entry-tree.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import {
   filterRenderable,
@@ -6,10 +7,9 @@ import {
 } from "./config-entry-render-filter.js";
 import {
   buildConstraintClusters,
-  isRadioCluster,
   type ConstraintCluster,
+  isRadioCluster,
 } from "./config-entry-renderers/constraint-cluster.js";
-import { choicePinned } from "../../util/config-entry-tree.js";
 import { orderExclusiveGroups } from "./config-entry-renderers/exclusive-group.js";
 
 /**

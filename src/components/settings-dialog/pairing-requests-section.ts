@@ -1,11 +1,10 @@
 import { consume } from "@lit/context";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify } from "../../util/notify.js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { PairingWindowState, PeerSummary } from "../../api/types/remote-build.js";
-import { peerDisplayName } from "../../util/pairing-display-name.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
@@ -16,6 +15,7 @@ import {
 import { pairingWindowStyles } from "../../styles/pairing-window.js";
 import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { peerDisplayName } from "../../util/pairing-display-name.js";
 import { PairingWindowController } from "../../util/pairing-window-controller.js";
 import {
   approvePeerRequest,

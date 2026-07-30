@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify } from "../../util/notify.js";
 
@@ -30,14 +30,14 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { pairingAddress } from "../../util/pairing-address.js";
-import { renderPairingAddress } from "../shared/pairing-address.js";
+import { peerDisplayName } from "../../util/pairing-display-name.js";
+import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
-import { peerDisplayName } from "../../util/pairing-display-name.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import { RemoteBuildIdentityController } from "../../util/remote-build-identity-controller.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
+import { renderPairingAddress } from "../shared/pairing-address.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";

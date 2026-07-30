@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FLASHER_ORIGIN } from "../../src/common/docs.js";
-import { openFlasher, type FlasherCallbacks } from "../../src/util/usb-flasher.js";
+import { type FlasherCallbacks, openFlasher } from "../../src/util/usb-flasher.js";
 
 function makeCallbacks(): FlasherCallbacks & {
   progress: number[];

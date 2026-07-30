@@ -1,5 +1,5 @@
 import { mdiAlertCircle, mdiCheckCircle } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 
 import { espHomeStyles } from "../../styles/shared.js";

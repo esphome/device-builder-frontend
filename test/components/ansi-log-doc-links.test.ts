@@ -2,10 +2,10 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { mount } from "../_dom.js";
 import type { IntegrationDoc } from "../../src/api/types/components.js";
 import { ESPHomeAnsiLog } from "../../src/components/ansi-log.js";
 import { ESPHomeLogParser } from "../../src/util/esphome-log-parser.js";
-import { mount } from "../_dom.js";
 
 const DOCS = {
   ethernet: {

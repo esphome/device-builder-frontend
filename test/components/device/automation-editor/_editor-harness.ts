@@ -48,6 +48,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
+import { flushMicrotasks } from "../../../_dom.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
@@ -55,7 +56,6 @@ import type {
   AvailableAutomations,
 } from "../../../../src/api/types/automations.js";
 import type { BaseAutomationEditor } from "../../../../src/components/device/automation-editor/base-editor.js";
-import { flushMicrotasks } from "../../../_dom.js";
 
 /** Minimal editable tree for seeding an editor in edit mode. */
 export const seedTree = (): AutomationTree => ({

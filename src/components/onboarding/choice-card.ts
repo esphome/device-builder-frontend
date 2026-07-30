@@ -1,4 +1,4 @@
-import { type TemplateResult, html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 
 export interface ChoiceCardProps {
   /** mdi icon name; the caller is responsible for registering it.

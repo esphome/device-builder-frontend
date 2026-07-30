@@ -1,6 +1,5 @@
 import { flexRender } from "@tanstack/lit-table";
 import type { Cell, Header, HeaderGroup, Row, Table } from "@tanstack/lit-table";
-import type { DeviceRow } from "./table-columns.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -8,6 +7,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
+import type { DeviceRow } from "./table-columns.js";
 
 export interface DeviceTableHeadProps {
   table: Table<DeviceRow>;

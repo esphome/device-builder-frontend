@@ -8,7 +8,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import "../_mock-webawesome.js";
 
-import { ESPHomeCloneDeviceDialog } from "../../src/components/clone-device-dialog.js";
 import {
   baseDialogSettled,
   deviceNameInputsOf,
@@ -16,6 +15,7 @@ import {
   typeFriendlyName,
 } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
+import { ESPHomeCloneDeviceDialog } from "../../src/components/clone-device-dialog.js";
 
 describe("clone-device-dialog ENTER", () => {
   it("confirms a valid new name on Enter", async () => {

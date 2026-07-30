@@ -10,8 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 // stub the import so the wrapper can render in the test.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
-import { closeOpenDialogs, ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { mount } from "../_dom.js";
+import { closeOpenDialogs, ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 
 /* The real element registration is stubbed out above; register a stand-in
    whose requestClose mimics the real one's entry point — fire the cancelable

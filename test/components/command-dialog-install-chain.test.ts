@@ -1,6 +1,7 @@
 // Install follows the COMPILE then its dependent UPLOAD (#1131): success is
 // reported only after the upload, not when the compile finishes.
 import { describe, expect, it, vi } from "vitest";
+import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import {
   type FirmwareJob,
   JobSource,
@@ -11,7 +12,6 @@ import {
   followJob,
   onForceLocalClick,
 } from "../../src/components/command-dialog/commands.js";
-import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { makeCommandDialogHost as makeHost } from "./_command-dialog-host.js";
 
 // A host pre-loaded with an install chain: a COMPILE "c1" and its held UPLOAD

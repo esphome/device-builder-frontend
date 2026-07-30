@@ -13,11 +13,11 @@ vi.mock("sonner-js", () => ({
 }));
 
 import toast from "sonner-js";
+import { mount } from "../../_dom.js";
+import { makeSlimBoard } from "../../_make-slim-board.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeBoardReselectDialog } from "../../../src/components/device/board-reselect-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "../../../src/components/device/change-board-dialog.js";
-import { mount } from "../../_dom.js";
-import { makeSlimBoard } from "../../_make-slim-board.js";
 
 const C3_CURATED = makeSlimBoard("c3-curated", {
   board: "esp32-c3-devkitm-1",

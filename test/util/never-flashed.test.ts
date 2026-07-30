@@ -2,12 +2,12 @@
 // deployed_config_hash / mac_address / currently ONLINE), never
 // compile-side ones a deferred compile would set itself.
 import { describe, expect, it } from "vitest";
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { isNeverFlashed } from "../../src/util/never-flashed.js";
-import {
-  makeConfiguredDevice,
-  type ConfiguredDeviceOverrides,
-} from "../_make-configured-device.js";
 
 describe("isNeverFlashed", () => {
   it("is true for a fresh device with no deploy evidence", () => {

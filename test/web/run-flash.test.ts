@@ -15,7 +15,7 @@ import {
   isPortPickerCancel,
   resetAndDisconnect,
 } from "../../src/util/web-serial.js";
-import { runFlash, type FlashHooks } from "../../src/web/install/run-flash.js";
+import { type FlashHooks, runFlash } from "../../src/web/install/run-flash.js";
 
 const port = {} as SerialPort;
 

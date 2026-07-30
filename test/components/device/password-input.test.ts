@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   buildPasswordValueChangeEvent,
+  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   type PasswordInputValueChange,
 } from "../../../src/components/device/password-input-event.js";
 

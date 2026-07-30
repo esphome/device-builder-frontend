@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import toast from "sonner-js";
-import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
+import { identityLocalize } from "../../../_dom.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationAction,
@@ -17,10 +17,10 @@ import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import {
   hydrateAvailableBodies,
   loadAndHydrateAvailable,
-  resolveLoadedAvailable,
   type LoadAndHydrateOutcome,
+  resolveLoadedAvailable,
 } from "../../../../src/components/device/automation-editor/hydrate-available-bodies.js";
-import { identityLocalize } from "../../../_dom.js";
+import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 
 const configEntry = (key: string): ConfigEntry => ({ key }) as ConfigEntry;
 

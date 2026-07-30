@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -10,18 +10,18 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { isTypingTarget } from "../../util/typing-target.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
 import {
-  TOUR_ANCHOR_EVENT,
   requestTourReveal,
+  TOUR_ANCHOR_EVENT,
   type TourAnchorEventDetail,
 } from "./tour-anchor.js";
 import { TourBubbleFit } from "./tour-bubble-fit.js";
 import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
 import {
   computeTourFrame,
-  toRect,
-  unionRects,
   type Rect,
+  toRect,
   type TourFrame,
+  unionRects,
 } from "./tour-geometry.js";
 import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
 import { TourNavigatorController } from "./tour-navigator-controller.js";

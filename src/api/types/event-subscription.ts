@@ -4,12 +4,12 @@
  * Part of the src/api/types.ts barrel split.
  */
 import {
-  DeviceState,
   type AdoptableDevice,
   type ConfiguredDevice,
+  DeviceState,
   type Label,
 } from "./devices.js";
-import { JobStatus, type FirmwareJob } from "./firmware-jobs.js";
+import { type FirmwareJob, JobStatus } from "./firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "./remote-build-events.js";
 import type {
   PairingSummary,

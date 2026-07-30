@@ -1,4 +1,4 @@
-import { type CSSResult, css } from "lit";
+import { css, type CSSResult } from "lit";
 
 import { MOBILE_BREAKPOINT } from "./breakpoints.js";
 

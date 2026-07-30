@@ -4,16 +4,16 @@
  * subgroup surfaces the sum on its header so errored rows stay findable.
  */
 import { describe, expect, it } from "vitest";
-import type { NavRow } from "../../../src/components/device/navigator-labels.js";
-import {
-  renderNavSection,
-  type NavSectionView,
-} from "../../../src/components/device/navigator-render.js";
-import type { YamlSection } from "../../../src/util/yaml-sections.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
+import type { NavRow } from "../../../src/components/device/navigator-labels.js";
+import {
+  type NavSectionView,
+  renderNavSection,
+} from "../../../src/components/device/navigator-render.js";
+import type { YamlSection } from "../../../src/util/yaml-sections.js";
 
 function section(key: string, fromLine: number): YamlSection {
   return { key, fromLine, toLine: fromLine + 2 };

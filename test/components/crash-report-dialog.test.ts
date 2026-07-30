@@ -18,13 +18,13 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
   downloadBlob,
 }));
 
-import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
-import type { StreamCallbacks } from "../../src/api/types/streaming.js";
 import {
   CRASH_BLOCK as CRASH_LINES,
-  VALIDATED_CONFIG_YAML,
   VALIDATE_OUTPUT,
+  VALIDATED_CONFIG_YAML,
 } from "../_crash-lines.js";
+import type { StreamCallbacks } from "../../src/api/types/streaming.js";
+import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

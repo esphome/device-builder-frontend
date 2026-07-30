@@ -6,9 +6,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  STORAGE_KEY,
   loadExpandedStack,
   saveExpandedStack,
+  STORAGE_KEY,
 } from "../../src/util/dashboard-stacks-session.js";
 
 describe("dashboard-stacks-session", () => {

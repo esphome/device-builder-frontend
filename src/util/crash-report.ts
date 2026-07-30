@@ -4,15 +4,15 @@ import {
   ADDRESS_RE,
   CRASH_END_RE,
   DECODED_RE,
-  MAX_LINES_AFTER_MARKER,
   isCrashMarker,
+  MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
 import {
-  TRIM_MARKER,
   encodedCost,
   fitLines,
   formEncodedLength,
   takeLinesUnderBudget,
+  TRIM_MARKER,
 } from "./crash-report-budget.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";

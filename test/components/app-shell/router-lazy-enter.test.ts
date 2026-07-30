@@ -6,6 +6,7 @@ vi.mock("sonner-js", () => ({
 }));
 
 import toast from "sonner-js";
+import { identityLocalize } from "../../_dom.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import {
   consumePreAuthExhaustion,
@@ -13,7 +14,6 @@ import {
   type RouterHooks,
 } from "../../../src/components/app-shell/router.js";
 import { consumePopGuardSuppression, navigate } from "../../../src/util/navigation.js";
-import { identityLocalize } from "../../_dom.js";
 
 /**
  * Pins the lazy-route chunk loader: pending feedback only after the

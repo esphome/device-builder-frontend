@@ -5,8 +5,8 @@
  * modifiers, IME, already-handled events, and self-handling focus targets.
  */
 import { describe, expect, it, vi } from "vitest";
-import { EnterController } from "../../src/util/enter-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { EnterController } from "../../src/util/enter-controller.js";
 
 const stubHost = new FakeHost();
 

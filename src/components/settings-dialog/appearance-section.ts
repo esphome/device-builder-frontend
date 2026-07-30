@@ -4,17 +4,17 @@ import {
   mdiFileCompare,
   mdiHandshake,
   mdiMagnify,
-  mdiServerNetwork,
   mdiMemory,
+  mdiServerNetwork,
 } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   expertModeContext,
-  localizeContext,
   hideDeviceBuilderContext,
+  localizeContext,
   remoteComputeOnlyContext,
   versionHistoryEnabledContext,
 } from "../../context/index.js";
@@ -25,12 +25,12 @@ import { storedTheme } from "../../util/dark-mode.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDisclosure } from "../shared/disclosure.js";
+import { featureListStyles } from "../shared/feature-list-styles.js";
 import {
+  type FeatureItem,
   REMOTE_COMPUTE_FEATURES,
   renderFeatureList,
-  type FeatureItem,
 } from "../shared/feature-list.js";
-import { featureListStyles } from "../shared/feature-list-styles.js";
 import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 

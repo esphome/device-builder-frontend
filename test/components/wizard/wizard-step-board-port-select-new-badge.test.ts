@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
+import { makeSerialPort } from "../../_make-serial-port.js";
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepBoardPortSelect } from "../../../src/components/wizard/wizard-step-board-port-select.js";
-import { makeSerialPort } from "../../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(

@@ -1,8 +1,8 @@
 /**
  * @vitest-environment happy-dom
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveControllerHost } from "lit";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TourBubbleFit } from "../../src/components/guided-tour/tour-bubble-fit.js";
 import {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { identityLocalize } from "../../_dom.js";
 import { APIError, type ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import {
@@ -7,7 +8,6 @@ import {
   type SelectionHost,
 } from "../../../src/components/device/add-component-dialog-selection.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
-import { identityLocalize } from "../../_dom.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function makeHost(

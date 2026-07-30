@@ -25,8 +25,8 @@ vi.mock("../../../src/components/device/component-catalog.js", () => {
   return {};
 });
 
-import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 
 const dialog = (el: ESPHomeAddComponentDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;

@@ -11,12 +11,12 @@ vi.mock("../../src/util/notify.js", () => ({
   },
 }));
 
+import { identityLocalize } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
 import { cancelFirmwareJob } from "../../src/util/firmware-job-actions.js";
 import { notify } from "../../src/util/notify.js";
-import { identityLocalize } from "../_dom.js";
 
 function makeApi(firmwareCancel: unknown): ESPHomeAPI {
   return { firmwareCancel } as unknown as ESPHomeAPI;

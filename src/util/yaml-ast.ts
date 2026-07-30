@@ -26,9 +26,9 @@
  * caller doesn't need a fallback for "the parse failed".
  */
 import { syntaxTree } from "@codemirror/language";
-import { isAutomationKey } from "./yaml-section-lexer.js";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
+import { isAutomationKey } from "./yaml-section-lexer.js";
 
 /**
  * Slice the literal text of a ``Literal`` / ``QuotedLiteral`` node

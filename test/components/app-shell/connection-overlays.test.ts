@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { identityLocalize, renderInto } from "../../_dom.js";
+import type { LocalizeFunc } from "../../../src/common/localize.js";
 import {
   ReconnectPillGate,
   renderReconnectPill,
   renderRouteLoadingBar,
 } from "../../../src/components/app-shell/connection-overlays.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
-import type { LocalizeFunc } from "../../../src/common/localize.js";
 
 /**
  * Pins the overlays' assistive-tech contract (the bar is decorative,

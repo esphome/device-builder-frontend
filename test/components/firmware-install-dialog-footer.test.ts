@@ -7,13 +7,13 @@
  * Stop button mid-download.
  */
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../_dom.js";
+import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
 } from "../../src/components/firmware-install-dialog.js";
 import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
-import { identityLocalize } from "../_dom.js";
-import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 
 function footerHost(step: string) {
   return {

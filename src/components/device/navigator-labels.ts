@@ -3,7 +3,7 @@ import { actionFieldLabel } from "../../util/action-field-label.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
 import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
-import { type YamlSection, sectionKeyOf } from "../../util/yaml-sections.js";
+import { sectionKeyOf, type YamlSection } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
 import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
 

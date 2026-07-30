@@ -37,10 +37,10 @@ import {
   resolveBundleContext,
 } from "./yaml-ast.js";
 import {
-  descendNestedEntries,
   type CompletionTarget,
+  descendNestedEntries,
 } from "./yaml-completion-catalog.js";
-import { bundleFor, loadCatalog, type CatalogIndex } from "./yaml-completion.js";
+import { bundleFor, type CatalogIndex, loadCatalog } from "./yaml-completion.js";
 import {
   findParentKey,
   findTopLevelBlock,

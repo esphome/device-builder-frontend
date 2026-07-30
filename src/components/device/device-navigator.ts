@@ -28,17 +28,17 @@ import {
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
-  type YamlSection,
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   sectionKeyOf,
+  type YamlSection,
 } from "../../util/yaml-sections.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
-import { type NavigatorBuckets, deriveNavigatorBuckets } from "./navigator-buckets.js";
+import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";

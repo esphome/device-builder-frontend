@@ -12,7 +12,7 @@ import {
   mdiOpenInNew,
   mdiServerNetwork,
 } from "@mdi/js";
-import { LitElement, css, html, type PropertyValues } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {

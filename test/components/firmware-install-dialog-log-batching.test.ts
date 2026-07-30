@@ -23,9 +23,9 @@ vi.mock("../../src/util/download-text.js", () => ({
   triggerDownload: vi.fn(),
 }));
 
+import { identityLocalize, renderInto } from "../_dom.js";
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderLogs } from "../../src/components/firmware-install-dialog/renderers.js";
-import { identityLocalize, renderInto } from "../_dom.js";
 
 function makeDialog(): ESPHomeFirmwareInstallDialog {
   const dialog = new ESPHomeFirmwareInstallDialog();

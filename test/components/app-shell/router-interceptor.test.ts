@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
 import type { ReactiveController } from "lit";
+import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../../_dom.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { createRouter } from "../../../src/components/app-shell/router.js";
 import { PopLeaveGuardController } from "../../../src/util/navigation.js";
-import { identityLocalize } from "../../_dom.js";
 
 /**
  * Pins createRouter's interceptor wiring: the leave-guard veto must land

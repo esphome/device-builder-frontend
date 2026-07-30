@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiUsb } from "@mdi/js";
-import { LitElement, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 

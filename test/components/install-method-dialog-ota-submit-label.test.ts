@@ -12,10 +12,10 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+import { flushMicrotasks } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
-import { flushMicrotasks } from "../_dom.js";
 
 async function mountWithOtaCardOpen(
   mode: "install" | "logs"

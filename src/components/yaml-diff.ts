@@ -1,10 +1,10 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { initialDarkMode } from "../util/dark-mode.js";
-import { diffLines, type DiffLine } from "../util/diff-lines.js";
+import { type DiffLine, diffLines } from "../util/diff-lines.js";
 
 @customElement("esphome-yaml-diff")
 export class ESPHomeYamlDiff extends LitElement {

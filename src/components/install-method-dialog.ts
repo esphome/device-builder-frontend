@@ -11,7 +11,7 @@ import {
   mdiUsb,
   mdiWifi,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -27,7 +27,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
+import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -38,13 +38,13 @@ import {
   type WebSerialAvailability,
 } from "../util/web-serial.js";
 import {
+  type MethodRowContext,
   renderBootloaderOption,
   renderInstallNotice,
   renderManualDownloadOption,
   renderMethodRow,
   renderOtaOption,
   renderServerSerialOption,
-  type MethodRowContext,
 } from "./install-method-dialog-rows.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
 import { renderDisclosure } from "./shared/disclosure.js";

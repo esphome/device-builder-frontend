@@ -5,9 +5,9 @@
  * the user to the pre-filled form to retry).
  */
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../../_dom.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { onPreviewSubmit } from "../../../src/components/pair-build-server-dialog/actions.js";
-import { identityLocalize } from "../../_dom.js";
 
 function makeHost(
   preview: () => Promise<{ pin_sha256: string; requires_pairing_key?: boolean }>

@@ -17,12 +17,12 @@ vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+import { identityLocalize } from "../../_dom.js";
 import type { YamlDiff } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
 import type { YamlDraftDetail } from "../../../src/components/device/section-editor.js";
-import { identityLocalize } from "../../_dom.js";
 
 function deferred<T>() {
   let resolve!: (v: T) => void;

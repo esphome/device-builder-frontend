@@ -24,8 +24,8 @@ import {
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
-  reconnectWebSerialLogs,
   type PostInstallShowLogsDetail,
+  reconnectWebSerialLogs,
 } from "../../src/util/post-install-logs.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

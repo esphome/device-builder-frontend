@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 // Stub the real wa-dialog: happy-dom can't run its form-associated internals.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
+import { identityLocalize as t } from "../_dom.js";
 import { buildCommands } from "../../src/components/command-palette-actions.js";
 import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
-import { identityLocalize as t } from "../_dom.js";
 
 describe("buildCommands Expert Mode entry", () => {
   it("labels the entry by state and wires the toggle", () => {

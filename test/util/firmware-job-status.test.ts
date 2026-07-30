@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import {
-  TERMINAL_JOB_STATUSES,
   isTerminalJob,
   isTerminalJobStatus,
+  TERMINAL_JOB_STATUSES,
 } from "../../src/util/firmware-job-status.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 /**
  * Build a structurally-accurate ``FirmwareJob`` for tests. Mirrors

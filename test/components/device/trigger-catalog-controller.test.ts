@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { flush } from "../../_dom.js";
+import { fakeHost } from "../../_fake-host.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { AutomationTrigger } from "../../../src/api/types/automations.js";
 import { TriggerCatalogController } from "../../../src/components/device/trigger-catalog-controller.js";
@@ -8,8 +10,6 @@ import {
   fetchAutomationTriggers,
   getCachedAutomationTriggers,
 } from "../../../src/util/automation-catalog-cache.js";
-import { flush } from "../../_dom.js";
-import { fakeHost } from "../../_fake-host.js";
 
 const trigger = (id: string, name: string): AutomationTrigger => ({
   id,

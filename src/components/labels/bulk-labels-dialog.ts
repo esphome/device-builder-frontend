@@ -20,7 +20,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiCheck, mdiMinus } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import memoizeOne from "memoize-one";
@@ -39,8 +39,8 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
 import { notifyError, notifyInfo, notifySuccess } from "../../util/notify.js";
-import { setsEqual } from "../../util/set-equal.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { setsEqual } from "../../util/set-equal.js";
 import "../base-dialog.js";
 import { labelsListStyles } from "./labels-list-styles.js";
 

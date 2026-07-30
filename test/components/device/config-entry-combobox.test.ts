@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import type { ConfigValueOption } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderSelectField } from "../../../src/components/device/config-entry-renderers/primitives.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const BOARDS: ConfigValueOption[] = [

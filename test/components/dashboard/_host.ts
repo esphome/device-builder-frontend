@@ -1,5 +1,5 @@
-import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 import { identityLocalize } from "../../_dom.js";
+import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 
 /**
  * Overrides-based stub for helpers that take the dashboard page as host.

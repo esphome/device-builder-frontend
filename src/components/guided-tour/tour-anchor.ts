@@ -1,11 +1,11 @@
 import { nothing } from "lit";
 import { AsyncDirective } from "lit/async-directive.js";
 import {
+  directive,
   type DirectiveParameters,
   type ElementPart,
   type PartInfo,
   PartType,
-  directive,
 } from "lit/directive.js";
 
 export const TOUR_ANCHOR_EVENT = "esphome-tour-anchor";

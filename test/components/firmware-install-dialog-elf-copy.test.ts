@@ -6,12 +6,12 @@
  * to <esphome-process-terminal>.
  */
 import { describe, expect, it } from "vitest";
+import { identityLocalize } from "../_dom.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import {
   cardStatusDetail,
   cardStatusMessage,
 } from "../../src/components/firmware-install-dialog/renderers.js";
-import { identityLocalize } from "../_dom.js";
 
 function textFor(filename: string): string {
   const host = {

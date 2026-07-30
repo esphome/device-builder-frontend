@@ -15,8 +15,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
 
 describe("add-script-dialog base-dialog open contract", () => {
   it("open() drives the reactive open flag", async () => {

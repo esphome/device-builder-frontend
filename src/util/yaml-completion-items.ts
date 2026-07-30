@@ -12,10 +12,10 @@
  * ``CatalogIndex`` *type*, so the value-level dependency is strictly
  * one-directional (this module ← yaml-completion.ts).
  */
-import { startCompletion, type Completion } from "@codemirror/autocomplete";
+import { type Completion, startCompletion } from "@codemirror/autocomplete";
 import type { EditorView } from "@codemirror/view";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
-import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
+import { type ConfigEntry, ConfigEntryType } from "../api/types/config-entries.js";
 import type {
   SchemaAction,
   SchemaConfigVarKey,

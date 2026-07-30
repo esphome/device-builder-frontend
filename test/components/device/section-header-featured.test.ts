@@ -7,13 +7,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { renderSectionHeader } from "../../../src/components/device/device-section-config/render-header.js";
-import type { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
-import type { SectionConfigResponse } from "../../../src/components/device/device-section-config/loading.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
+import type { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
+import type { SectionConfigResponse } from "../../../src/components/device/device-section-config/loading.js";
+import { renderSectionHeader } from "../../../src/components/device/device-section-config/render-header.js";
 import { makeTestBoard } from "./_renderer-fixtures.js";
 
 const BOARD = makeTestBoard({

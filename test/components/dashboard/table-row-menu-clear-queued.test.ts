@@ -8,9 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomeTableRowMenu } from "../../../src/components/dashboard/table-row-menu.js";
 import { mount } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { ESPHomeTableRowMenu } from "../../../src/components/dashboard/table-row-menu.js";
 
 function findClearItem(el: ESPHomeTableRowMenu): Element | undefined {
   return [...el.shadowRoot!.querySelectorAll(".menu-item")].find((item) =>

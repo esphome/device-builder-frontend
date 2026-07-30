@@ -14,15 +14,15 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
-import type { IdentityView } from "../../../src/api/types/remote-build.js";
-import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
-import { renderSentStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../../_lit-template-walker.js";
+import type { IdentityView } from "../../../src/api/types/remote-build.js";
+import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
+import { renderSentStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
 
 const IDENTITY: IdentityView = {
   dashboard_id: "7f3c1a9e-2b04-4d6a-9c17-8e5f0a2b3c4d",

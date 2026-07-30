@@ -5,6 +5,10 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../_lit-template-walker.js";
 import type {
   ConfigEntry,
   RequiredGroup,
@@ -19,10 +23,6 @@ import {
   renderConstraintRadioField,
   selectClusterAlternative,
 } from "../../../src/components/device/config-entry-renderers/constraint-cluster.js";
-import {
-  extractAttributeBindings,
-  findTemplatesByAnchor,
-} from "../../_lit-template-walker.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const radioGroupBindings = (tpl: unknown) =>

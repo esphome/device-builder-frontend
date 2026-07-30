@@ -18,7 +18,7 @@ import {
   mdiPlus,
   mdiTrashCanOutline,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";

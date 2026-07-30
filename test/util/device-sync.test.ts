@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import {
   deployedIdentityTrusted,
   showPendingChanges,
   showUpdateAvailable,
 } from "../../src/util/device-sync.js";
-import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
   it("trusts the deployed identity per api_enabled, live source, and identity evidence", () => {

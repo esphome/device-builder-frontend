@@ -18,9 +18,9 @@ vi.mock("../../../src/util/post-install-logs.js", () => ({
   dispatchShowLogsAfterInstall,
 }));
 
+import { identityLocalize } from "../../_dom.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { flipToLogs } from "../../../src/components/firmware-install-dialog/install-flow.js";
-import { identityLocalize } from "../../_dom.js";
 
 function makeHost(
   loggerBaudRate: number | null,

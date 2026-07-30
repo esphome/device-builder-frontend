@@ -1,6 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-import { runFlash, type FlashPlan, type FlashStep } from "./run-flash.js";
+import { type FlashPlan, type FlashStep, runFlash } from "./run-flash.js";
 
 /**
  * Drives a single flash operation for an install dialog and exposes the

@@ -3,12 +3,12 @@ import { describe, expect, test } from "vitest";
 
 import "../_mock-webawesome.js";
 
+import { mount } from "../_dom.js";
 import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { commandDialogStyles } from "../../src/components/command-dialog/styles.js";
 import { firmwareInstallDialogStyles } from "../../src/components/firmware-install-dialog/styles.js";
 import { primaryHeaderDialogStyles } from "../../src/styles/dialog-chrome.js";
 import { primaryDialogHeaderStyles } from "../../src/styles/dialog-header.js";
-import { mount } from "../_dom.js";
 
 /**
  * Pins that the default dialog title wraps instead of ellipsizing

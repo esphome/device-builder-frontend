@@ -6,12 +6,12 @@
  * survives.
  */
 import { describe, expect, it, vi } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   orderExclusiveGroups,
   renderExclusiveGroupField,
 } from "../../../src/components/device/config-entry-renderers.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function members() {

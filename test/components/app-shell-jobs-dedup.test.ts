@@ -1,10 +1,10 @@
 // Live-jobs dedup keys on (config, type) so an install's compile and upload
 // both survive — the upload's terminal must not evict the compile (#1131).
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
 import { handleJobEvent } from "../../src/components/app-shell/jobs.js";
-import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 
 function makeHost(): ESPHomeApp {
   return {

@@ -3,10 +3,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { FakeHost } from "../_fake-host.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { IdentityView } from "../../src/api/types/remote-build.js";
 import { RemoteBuildIdentityController } from "../../src/util/remote-build-identity-controller.js";
-import { FakeHost } from "../_fake-host.js";
 
 const IDENTITY: IdentityView = {
   dashboard_id: "dash-0",

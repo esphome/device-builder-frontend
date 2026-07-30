@@ -5,8 +5,8 @@ import { isSafeDocsUrl } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { deployedIdentityTrusted } from "../../../util/device-sync.js";
 import {
-  getEncryptionVisual,
   type EncryptionState,
+  getEncryptionVisual,
 } from "../../../util/encryption-state.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatFileSize } from "../../../util/format-file-size.js";

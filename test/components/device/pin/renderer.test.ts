@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
-  type ConfigEntry,
-  ConfigEntryType,
-  PinFeature,
-} from "../../../../src/api/types/config-entries.js";
-import {
-  formatPinValue,
-  parsePinGpio,
-  renderPinField,
-} from "../../../../src/components/device/pin/renderer.js";
-import { fieldKeyAttr } from "../../../../src/components/device/config-entry-renderers-shared.js";
-import {
-  extractAttributeBindings,
-  findTemplatesByAnchor,
-} from "../../../_lit-template-walker.js";
-import {
   findElementBindings,
   makeBoardPin,
   makeEntry,
   makeRenderCtx,
   makeTestBoard,
 } from "../_renderer-fixtures.js";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../../_lit-template-walker.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+  PinFeature,
+} from "../../../../src/api/types/config-entries.js";
+import { fieldKeyAttr } from "../../../../src/components/device/config-entry-renderers-shared.js";
+import {
+  formatPinValue,
+  parsePinGpio,
+  renderPinField,
+} from "../../../../src/components/device/pin/renderer.js";
 
 describe("parsePinGpio", () => {
   it("accepts bare integers", () => {

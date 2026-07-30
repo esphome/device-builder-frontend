@@ -13,8 +13,8 @@
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isIndexSegment } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
-import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
+import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import {
   _skipBlankAndCommentLines,
   endsBlockAtIndent,

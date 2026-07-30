@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSplicedBody,
-  yamlValueEqual,
   type KeyMeta,
   type ParsedSection,
+  yamlValueEqual,
 } from "../../src/util/yaml-section-splice.js";
 import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 

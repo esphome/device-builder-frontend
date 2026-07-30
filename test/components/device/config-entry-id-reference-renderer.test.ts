@@ -6,13 +6,13 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   ADD_NEW_SENTINEL,
   AUTO_SENTINEL,
   renderIdReferenceField,
 } from "../../../src/components/device/config-entry-id-reference-renderer.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const LOCAL_SCRIPT_YAML = "script:\n  - id: local_script\n";

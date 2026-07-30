@@ -63,11 +63,11 @@
     "@types/node": "26.1.2",
     "@types/w3c-web-serial": "^1.0.8",
     "eslint": "^10.8.0",
+    "eslint-plugin-perfectionist": "^5.10.0",
     "fflate": "^0.8.3",
     "happy-dom": "^20.11.1",
     "husky": "^9.1.7",
     "prettier": "3.9.6",
-    "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "7.0.2",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"

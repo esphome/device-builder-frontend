@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { identityLocalize } from "../../../_dom.js";
 import type { BoardCatalogEntry } from "../../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
@@ -8,7 +9,6 @@ import {
   filteredBundles,
   visibleComponents,
 } from "../../../../src/components/device/component-catalog/filters.js";
-import { identityLocalize } from "../../../_dom.js";
 
 function entry(
   id: string,

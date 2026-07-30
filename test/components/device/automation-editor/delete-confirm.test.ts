@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import "./_editor-harness.js";
 
+import { flushMicrotasks } from "../../../_dom.js";
 import type {
   AutomationLocation,
   AvailableAutomations,
@@ -17,7 +18,6 @@ import type {
 import { ESPHomeApiActionEditor } from "../../../../src/components/device/automation-editor/api-action-editor.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
-import { flushMicrotasks } from "../../../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

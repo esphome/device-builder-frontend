@@ -5,7 +5,7 @@
  * YAML. These cases pin that agreement.
  */
 import { describe, expect, it } from "vitest";
-import { YamlRawValue, hasSerializableValue } from "../../src/util/yaml-serialize.js";
+import { hasSerializableValue, YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 describe("hasSerializableValue", () => {
   it("treats undefined / null / empty string as no value", () => {

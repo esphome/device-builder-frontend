@@ -11,7 +11,7 @@ import {
   mdiServerNetworkOutline,
   mdiTranslate,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
@@ -27,7 +27,7 @@ import {
   settingsRowStyles,
   settingsSharedStyles,
 } from "./settings-dialog/shared-styles.js";
-import { SECTIONS, type Section, type SectionDef } from "./settings-dialog/types.js";
+import { type Section, type SectionDef, SECTIONS } from "./settings-dialog/types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./settings-dialog/appearance-section.js";

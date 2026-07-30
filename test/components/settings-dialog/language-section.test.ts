@@ -1,15 +1,15 @@
 // @vitest-environment happy-dom
-import { type TemplateResult, nothing } from "lit";
+import { nothing, type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 
-import type { LanguageOption, LocalizeFunc } from "../../../src/common/localize.js";
-import { ESPHomeSettingsLanguage } from "../../../src/components/settings-dialog/language-section.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../../_lit-template-walker.js";
+import type { LanguageOption, LocalizeFunc } from "../../../src/common/localize.js";
+import { ESPHomeSettingsLanguage } from "../../../src/components/settings-dialog/language-section.js";
 
 const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 

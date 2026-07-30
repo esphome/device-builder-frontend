@@ -10,6 +10,7 @@
  * shortened path.
  */
 
+import { RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import {
   BARE_MAPPING_KEY_RE,
   BLOCK_SCALAR_RE,
@@ -17,7 +18,6 @@ import {
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
 import { _blockScalarBodyEnd } from "./yaml-section-list.js";
-import { RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import {
   lineIndent,
   listItemChildIndent,

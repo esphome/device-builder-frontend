@@ -8,9 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import { ESPHomeWizardStepEmptyConfig } from "../../../src/components/wizard/wizard-step-empty-config.js";
 import { typeFriendlyName } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
+import { ESPHomeWizardStepEmptyConfig } from "../../../src/components/wizard/wizard-step-empty-config.js";
 
 async function mount(): Promise<ESPHomeWizardStepEmptyConfig> {
   const el = new ESPHomeWizardStepEmptyConfig();

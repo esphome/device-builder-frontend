@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  WIZARD_BOARD_PLATFORMS,
   chipNameToFilterLabel,
+  WIZARD_BOARD_PLATFORMS,
 } from "../../../src/components/wizard/wizard-step-board-platforms.js";
 
 describe("wizard step-board platform chips", () => {

@@ -7,14 +7,14 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
+import { identityLocalize, renderInto } from "../../_dom.js";
+import { makeFirmwareJob } from "../../_make-firmware-job.js";
 import { JobSource, JobStatus, JobType } from "../../../src/api/types/firmware-jobs.js";
 import {
   bucketJobs,
   renderGroups,
   renderSourceLine,
 } from "../../../src/components/shared/firmware-jobs-list.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
-import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 // renderSourceLine only reads host._localize; a key-echoing stub lets us assert
 // which localization key the branch picked.

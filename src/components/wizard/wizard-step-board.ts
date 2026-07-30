@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiUsbPort } from "@mdi/js";
-import { LitElement, html, nothing, type PropertyValues } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -11,7 +11,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
-import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
+import { type DeploymentEnvironment, detectEnvironment } from "../../util/environment.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -24,8 +24,8 @@ import {
   readDeviceManifest,
 } from "../../util/web-serial.js";
 import {
-  WIZARD_BOARD_PLATFORMS,
   chipNameToFilterLabel,
+  WIZARD_BOARD_PLATFORMS,
 } from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";

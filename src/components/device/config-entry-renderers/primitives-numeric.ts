@@ -3,6 +3,10 @@ import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import {
+  coerceFloatFieldValue,
+  coerceValueToEntryType,
+} from "../../../util/coerce-entry-value.js";
+import {
   chooseDisplayUnit,
   defaultUnitForFloatWithUnit,
   parseFloatWithUnit,
@@ -10,10 +14,6 @@ import {
   serializeFloatWithUnit,
   visibleUnitOptions,
 } from "../../../util/float-with-unit.js";
-import {
-  coerceFloatFieldValue,
-  coerceValueToEntryType,
-} from "../../../util/coerce-entry-value.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
 import {
@@ -25,13 +25,13 @@ import {
 import {
   effectiveDisabled,
   fieldKeyAttr,
+  type RenderCtx,
   renderFieldError,
   renderFieldShell,
   renderLabel,
   renderStringField,
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
 export function renderNumberField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {

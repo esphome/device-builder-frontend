@@ -5,8 +5,8 @@
  * main-config row flag, the secrets note, and the resolve-conflicts emit.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ESPHomeWizardStepResolveConflicts } from "../../../src/components/wizard/wizard-step-resolve-conflicts.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeWizardStepResolveConflicts } from "../../../src/components/wizard/wizard-step-resolve-conflicts.js";
 
 describe("wizard-step-resolve-conflicts", () => {
   it("emits the checked paths as the overwrite set", async () => {

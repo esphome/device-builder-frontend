@@ -11,15 +11,15 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 
+import { flush } from "../_dom.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import type { YamlAutoFix } from "../../src/util/yaml-error-analysis.js";
 import {
-  createBackendYamlLinter,
   type BannerError,
+  createBackendYamlLinter,
   type MappedValidationError,
 } from "../../src/util/yaml-lint-backend.js";
-import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
-import { flush } from "../_dom.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
 import { makeConfigEntry } from "./_make-config-entry.js";
 

@@ -7,6 +7,8 @@
  * stage. Typed credentials pass through for the backend to persist.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { deviceNameInputsOf, typeFriendlyName } from "../../_dom.js";
+import { pressEnter } from "../../_press-enter.js";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import {
   clearTourPending,
@@ -14,11 +16,9 @@ import {
   setTourPending,
   setTourSuggestedName,
 } from "../../../src/components/guided-tour/tour-session.js";
-import { slugifyHostname } from "../../../src/util/slugify-hostname.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
-import { deviceNameInputsOf, typeFriendlyName } from "../../_dom.js";
-import { pressEnter } from "../../_press-enter.js";
+import { slugifyHostname } from "../../../src/util/slugify-hostname.js";
 
 // The real wa-checkbox is a form-associated element that crashes under happy-dom
 // (no ElementInternals); the step only needs its checked/change contract, so

@@ -22,18 +22,18 @@ import {
   isSubstitutionString,
   resolveSubstitutions,
 } from "../../../util/substitutions.js";
-import { renderPinWiring } from "./wiring.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
+  type LockedReasonCarrier,
+  type RenderCtx,
   renderFieldError,
   renderLabel,
   renderStringField,
   renderSubstitutionHint,
   tooltipAnchorId,
-  type LockedReasonCarrier,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { renderPinWiring } from "./wiring.js";
 
 // `parsePinGpio` / `formatPinValue` moved to `util/pin/gpio.ts` so the YAML
 // used-pin scanner shares the same platform pin-format rules. Re-exported

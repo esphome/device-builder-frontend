@@ -6,12 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
+import { identityLocalize } from "../../../_dom.js";
 import type {
   AutomationLocation,
   AvailableComponentInstance,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationTargetPicker } from "../../../../src/components/device/automation-editor/automation-target-picker.js";
-import { identityLocalize } from "../../../_dom.js";
 
 async function mount(
   devices: AvailableComponentInstance[],

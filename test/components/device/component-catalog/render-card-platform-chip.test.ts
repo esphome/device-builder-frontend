@@ -6,12 +6,12 @@
 
 import { describe, expect, it } from "vitest";
 
+import { identityLocalize as localize, renderInto } from "../../../_dom.js";
 import {
   type ComponentCatalogEntry,
   ComponentCategory,
 } from "../../../../src/api/types/components.js";
 import { renderCard } from "../../../../src/components/device/component-catalog/renderers.js";
-import { identityLocalize as localize, renderInto } from "../../../_dom.js";
 import { makeCatalogHost } from "./_host.js";
 
 function host(category = "stepper"): unknown {

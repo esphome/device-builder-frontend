@@ -17,16 +17,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "./_mock-device-children.js";
 vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
-import type { ESPHomeAPI } from "../../src/api/index.js";
-import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
-import type { ConfiguredDevice } from "../../src/api/types/devices.js";
-import { ESPHomePageDevice } from "../../src/pages/device.js";
-import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 import { flushMicrotasks } from "../_dom.js";
 import {
   type ConfiguredDeviceOverrides,
   makeConfiguredDevice,
 } from "../_make-configured-device.js";
+import type { ESPHomeAPI } from "../../src/api/index.js";
+import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import { ESPHomePageDevice } from "../../src/pages/device.js";
+import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 
 const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>
   ({

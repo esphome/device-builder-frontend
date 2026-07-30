@@ -22,8 +22,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  YAML_ONLY_SECTIONS,
   isYamlOnlySection,
+  YAML_ONLY_SECTIONS,
 } from "../../../src/components/device/yaml-only-sections.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,

@@ -12,13 +12,13 @@ vi.mock("sonner-js", () => ({
 }));
 
 import toast from "sonner-js";
+import { flush, identityLocalize } from "../_dom.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   ensureSecretWithToast,
   setSecretWithToast,
 } from "../../src/util/ensure-secret-with-toast.js";
 import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
-import { flush, identityLocalize } from "../_dom.js";
 
 const localize = identityLocalize as (key: string, args?: unknown) => string;
 const messages = {

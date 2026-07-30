@@ -12,9 +12,9 @@ import { getKeyPath } from "./yaml-ast.js";
 import { loadCatalog, resolveAvailableEntries } from "./yaml-completion-catalog.js";
 import {
   lineKeyToken,
+  type ValueTypeCause,
   WALK_BOUND,
   YAML_INDENT_STEP,
-  type ValueTypeCause,
 } from "./yaml-error-analysis.js";
 import type { YamlFixContext } from "./yaml-fix-context.js";
 import {

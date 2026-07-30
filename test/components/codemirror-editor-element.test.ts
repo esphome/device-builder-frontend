@@ -10,8 +10,8 @@ import { html } from "lit";
 import { customElement } from "lit/decorators.js";
 import { describe, expect, it } from "vitest";
 
-import { CodeMirrorEditorElement } from "../../src/components/codemirror-editor-element.js";
 import { mount } from "../_dom.js";
+import { CodeMirrorEditorElement } from "../../src/components/codemirror-editor-element.js";
 
 @customElement("test-cm-editor")
 class TestCmEditor extends CodeMirrorEditorElement {

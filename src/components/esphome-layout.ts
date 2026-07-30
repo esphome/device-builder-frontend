@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {

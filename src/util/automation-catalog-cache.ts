@@ -11,8 +11,8 @@ import type {
 import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,
-  tallyOutcome,
   type HydrationResult,
+  tallyOutcome,
 } from "./automation-body-hydration.js";
 import { createSessionBlobCache, type SessionBlobCache } from "./session-blob-cache.js";
 

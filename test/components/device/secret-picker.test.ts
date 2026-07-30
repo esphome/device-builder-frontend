@@ -26,13 +26,13 @@ vi.mock("sonner-js", () => ({
 }));
 
 import toast from "sonner-js";
+import { flush } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
 import { ESPHomeSecretPicker } from "../../../src/components/device/secret-picker.js";
 import {
   _resetSecretKeysCache,
   fetchSecretKeys,
 } from "../../../src/util/secrets-cache.js";
-import { flush } from "../../_dom.js";
 
 const makeApi = (keys: string[]): ESPHomeAPI =>
   ({ getSecretKeys: vi.fn(async () => keys) }) as unknown as ESPHomeAPI;

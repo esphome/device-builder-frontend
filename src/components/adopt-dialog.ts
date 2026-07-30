@@ -1,12 +1,10 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
-import type { AdoptedDetail } from "./dashboard/actions-ui.js";
-import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 import {
   dialogActionButtonStyles,
   dialogActionsRowStyles,
@@ -22,8 +20,10 @@ import { markJustCreated } from "../util/just-created.js";
 import { notifyWarning } from "../util/notify.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
+import type { AdoptedDetail } from "./dashboard/actions-ui.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
+import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 
 import "./base-dialog.js";
 import "./shared/device-name-inputs.js";

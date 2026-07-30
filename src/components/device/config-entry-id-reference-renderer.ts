@@ -18,10 +18,10 @@ import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
+  type RenderCtx,
   renderFieldError,
   renderLabel,
   renderYamlOnlyFallbackIfNonPrimitive,
-  type RenderCtx,
 } from "./config-entry-renderers-shared.js";
 
 export const ADD_NEW_SENTINEL = "__esphome_add_new__";

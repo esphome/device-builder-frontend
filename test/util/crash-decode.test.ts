@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CRASH_BLOCK_UNDECODED } from "../_crash-lines.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { DecodeBacktraceResponse } from "../../src/api/types/devices.js";
+import { stripAnsi } from "../../src/util/ansi-escapes.js";
 import {
   type CrashDecodeCache,
   CrashRegionCollector,
-  STALE_BUILD_LOG_LINE,
   decodeCrashRegion,
   interleaveDecoded,
   resetElfCache,
+  STALE_BUILD_LOG_LINE,
 } from "../../src/util/crash-decode.js";
-import { hostedDecoder, resetHostedDecoder } from "../../src/util/stacktrace-decoder.js";
-import { stripAnsi } from "../../src/util/ansi-escapes.js";
 import { normalizeLogLine } from "../../src/util/log-line.js";
-import { CRASH_BLOCK_UNDECODED } from "../_crash-lines.js";
+import { hostedDecoder, resetHostedDecoder } from "../../src/util/stacktrace-decoder.js";
 
 const reply = (over: Partial<DecodeBacktraceResponse> = {}): DecodeBacktraceResponse => ({
   decoded: [{ index: 2, text: "Decoded 0x400d9150: setup() at application.cpp:59" }],

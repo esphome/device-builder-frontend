@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
-import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { identityLocalize } from "../../_dom.js";
+import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 
 function makeApi() {
   return {

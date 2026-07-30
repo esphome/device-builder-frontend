@@ -21,8 +21,8 @@ import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { buildSplicedBody, yamlValueEqual } from "./yaml-section-splice.js";
 import {
   formatYamlScalar,
-  serializeYamlValues,
   type SerializeYamlOptions,
+  serializeYamlValues,
 } from "./yaml-serialize.js";
 
 /**

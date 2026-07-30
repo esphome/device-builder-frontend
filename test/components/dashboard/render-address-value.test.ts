@@ -13,12 +13,12 @@
  * placeholder text — without a DOM.
  */
 import { describe, expect, it } from "vitest";
-import { renderAddressValue } from "../../../src/components/dashboard/device-drawer-render.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
+import { renderAddressValue } from "../../../src/components/dashboard/device-drawer-render.js";
 
 describe("renderAddressValue", () => {
   it("omits the visit link when url is empty", () => {

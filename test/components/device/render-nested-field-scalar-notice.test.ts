@@ -5,10 +5,10 @@
  * group; a cleared "" falls through to the group.
  */
 import { describe, expect, it } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 const modeEntry = () =>

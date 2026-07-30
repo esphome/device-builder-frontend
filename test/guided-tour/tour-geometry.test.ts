@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   BUBBLE_GAP,
   BUBBLE_WIDTH,
-  SPOTLIGHT_PADDING,
   clamp,
   computeHole,
   computeTourFrame,
-  unionRects,
   type Rect,
+  SPOTLIGHT_PADDING,
+  unionRects,
   type Viewport,
 } from "../../src/components/guided-tour/tour-geometry.js";
 

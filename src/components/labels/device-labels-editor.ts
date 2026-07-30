@@ -25,7 +25,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiCheck, mdiClose, mdiPencil, mdiTagMultiple } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";

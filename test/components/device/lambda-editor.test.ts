@@ -10,8 +10,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { ESPHomeLambdaEditor } from "../../../src/components/device/config-entry-renderers/lambda-editor.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeLambdaEditor } from "../../../src/components/device/config-entry-renderers/lambda-editor.js";
 
 describe("lambda-editor lambda-change emission", () => {
   it("does not emit on a programmatic value-prop sync", async () => {

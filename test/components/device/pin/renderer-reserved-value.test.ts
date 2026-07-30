@@ -8,15 +8,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ConfigEntryType } from "../../../../src/api/types/config-entries.js";
-import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
-import { renderInto } from "../../../_dom.js";
 import {
   makeBoardPin,
   makeEntry,
   makeRenderCtx,
   makeTestBoard,
 } from "../_renderer-fixtures.js";
+import { renderInto } from "../../../_dom.js";
+import { ConfigEntryType } from "../../../../src/api/types/config-entries.js";
+import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
 
 const board = () =>
   makeTestBoard({

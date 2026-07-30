@@ -23,12 +23,12 @@ vi.mock("../../src/util/post-install-logs.js", () => ({
   dispatchShowLogsAfterInstall: vi.fn(() => false),
 }));
 
+import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 import { JobSource, JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
-import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 function makeHost() {
   const api = {

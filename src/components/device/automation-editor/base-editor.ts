@@ -17,16 +17,16 @@ import type {
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { formatApiError } from "../../../util/format-api-error.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { formatApiError } from "../../../util/format-api-error.js";
+import type { SectionEditor } from "../section-editor.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
-import type { SectionEditor } from "../section-editor.js";
 import { renderDeleteRow } from "./render-delete-row.js";
 import { sectionKeyFromLocation } from "./serialise.js";
 

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage } from "../_storage.js";
 import {
   consumePendingHighlight,
   markPendingHighlight,
 } from "../../src/util/pending-highlight.js";
-import { stubStorage } from "../_storage.js";
 
 describe("pending-highlight", () => {
   beforeEach(() => {

@@ -8,6 +8,7 @@
  * clocks restore alongside (backend stamps → store → live detection).
  */
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import { type FirmwareJob, JobType } from "../../src/api/types/firmware-jobs.js";
 import {
   type CommandType,
@@ -16,7 +17,6 @@ import {
 import { showRunTimer } from "../../src/components/command-dialog/renderers.js";
 import { markCompileStarted } from "../../src/util/compile-timing.js";
 import type { RunTimerController } from "../../src/util/run-timer-controller.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 interface Harness {
   _port: string;

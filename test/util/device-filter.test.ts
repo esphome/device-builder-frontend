@@ -6,6 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import {
@@ -15,10 +19,6 @@ import {
   hasActiveFilters,
   matchesDeviceSearch,
 } from "../../src/util/device-filter.js";
-import {
-  type ConfiguredDeviceOverrides,
-  makeConfiguredDevice,
-} from "../_make-configured-device.js";
 
 function device(over: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
   // Online with a trusted identity by default, so update/modified

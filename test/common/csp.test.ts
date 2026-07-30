@@ -8,10 +8,10 @@
  * loads this file. That is exactly how the decoder iframe shipped blocked.
  */
 import { describe, expect, it } from "vitest";
-import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 // The shipped file itself, not a copy of its text: a policy asserted against a
 // duplicate would pass while the real page blocked everything.
 import html from "../../public/index.html?raw";
+import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 
 // Find the CSP meta tag, then read its content, so attribute order or an added
 // attribute (a reformat) doesn't break the test while the policy is unchanged.

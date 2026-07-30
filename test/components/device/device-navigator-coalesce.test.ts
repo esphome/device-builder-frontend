@@ -14,11 +14,11 @@ vi.mock("../../../src/components/device/add-config-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { flushMicrotasks } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 import { _clearAutomationCatalogCache } from "../../../src/util/automation-catalog-cache.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
-import { flushMicrotasks } from "../../_dom.js";
 
 async function mountNavigator(
   api: ESPHomeAPI,

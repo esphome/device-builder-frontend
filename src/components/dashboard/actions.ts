@@ -3,11 +3,11 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { navigate } from "../../util/navigation.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { notifyError, notifySuccess, type NotifyOptions } from "../../util/notify.js";
+import { navigate } from "../../util/navigation.js";
+import { notifyError, type NotifyOptions, notifySuccess } from "../../util/notify.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import {
   connectToPort,

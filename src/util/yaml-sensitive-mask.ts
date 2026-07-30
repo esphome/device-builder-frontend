@@ -25,13 +25,13 @@
  */
 
 import {
-  StateEffect,
-  StateField,
   type EditorState,
   type Extension,
   type Range,
+  StateEffect,
+  StateField,
 } from "@codemirror/state";
-import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
+import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 import { findSensitiveValueRanges } from "./yaml-sensitive-scan.js";
 
 export const setRevealSensitiveEffect = StateEffect.define<boolean>();

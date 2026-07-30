@@ -6,8 +6,8 @@ import { describe, expect, test } from "vitest";
 import { vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
-import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { mount } from "../_dom.js";
+import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 
 /**
  * Regression coverage for the ``header-prefix`` slot added so the

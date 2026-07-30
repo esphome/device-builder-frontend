@@ -15,12 +15,13 @@ import {
   mdiRenameOutline,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
@@ -42,19 +43,18 @@ import { notifyError } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
 import { pairingDisplayName } from "../util/pairing-display-name.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
-import { registerMdiIcons } from "../util/register-icons.js";
 import "./base-dialog.js";
 import "./command-dialog.js";
-import type { ESPHomeCommandDialog } from "./command-dialog.js";
+import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
+import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
-import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
+import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 import { canResetBuildEnv } from "./remote-build-hint.js";
-import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./logs-dialog.js";
-import type { ESPHomeLogsDialog } from "./logs-dialog.js";
+import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
 
 registerMdiIcons({
   broom: mdiBroom,

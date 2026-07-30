@@ -4,8 +4,9 @@
  * renderers read, so a new member lands here once instead of in each
  * suite's hand-rolled copy.
  */
-import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
+
 import { identityLocalize } from "../../../_dom.js";
+import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
 
 export function makeCatalogHost(
   overrides: Record<string, unknown> = {}

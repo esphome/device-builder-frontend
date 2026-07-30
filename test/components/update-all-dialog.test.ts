@@ -16,12 +16,12 @@ vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/filters/filter-section.js", () => ({}));
 vi.mock("../../src/components/filters/labels-filter-section.js", () => ({}));
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { ESPHomeUpdateAllDialog } from "../../src/components/update-all-dialog.js";
 import { saveDashboardFilters } from "../../src/util/dashboard-filters-session.js";
 import type { FacetSelection } from "../../src/util/device-filter.js";
-import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 interface DialogInternals {
   _devices: ReturnType<typeof makeConfiguredDevice>[];

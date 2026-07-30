@@ -10,13 +10,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { flushMicrotasks } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
-import { flushMicrotasks } from "../../_dom.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function providersResponse(ids: string[]) {

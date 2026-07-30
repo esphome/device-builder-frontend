@@ -11,7 +11,7 @@
  * array and call ``renderLabelChip`` / ``renderLabelChips`` from
  * their own template.
  */
-import { css, html, nothing, type CSSResult, type TemplateResult } from "lit";
+import { css, type CSSResult, html, nothing, type TemplateResult } from "lit";
 import type { Label } from "../api/types/devices.js";
 import { labelChipStyleString } from "./label-style.js";
 

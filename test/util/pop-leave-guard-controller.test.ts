@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveController } from "lit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushMicrotasks } from "../_dom.js";
 import {
-  PopLeaveGuardController,
   consumePopGuardSuppression,
   installLeaveGuardInterceptor,
+  PopLeaveGuardController,
   popPushedEntrySilently,
   runLeaveGuard,
 } from "../../src/util/navigation.js";
-import { flushMicrotasks } from "../_dom.js";
 
 /**
  * Pins the centralized popstate leave-guard: suppression first, one-shot

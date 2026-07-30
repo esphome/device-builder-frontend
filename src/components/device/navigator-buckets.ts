@@ -1,9 +1,9 @@
 import { parseSubstitutions } from "../../util/substitutions.js";
 import {
-  type YamlSection,
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
+  type YamlSection,
 } from "../../util/yaml-sections.js";
 
 export interface NavigatorBuckets {

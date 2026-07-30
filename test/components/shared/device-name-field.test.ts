@@ -1,15 +1,15 @@
-import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { describe, expect, it } from "vitest";
-import {
-  deviceNameValidity,
-  renderDeviceNameField,
-} from "../../../src/components/shared/device-name-field.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../../_lit-template-walker.js";
+import type { LocalizeFunc } from "../../../src/common/localize.js";
+import {
+  deviceNameValidity,
+  renderDeviceNameField,
+} from "../../../src/components/shared/device-name-field.js";
 
 const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 

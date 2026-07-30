@@ -10,6 +10,9 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
+import { identityLocalize } from "../../_dom.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
+import { makeConfiguredDevice as _device } from "../../_make-configured-device.js";
 import {
   renderBluetoothMacRow,
   renderConfigHashSection,
@@ -17,9 +20,6 @@ import {
   renderMacAddressRow,
   renderVersionSection,
 } from "../../../src/components/dashboard/device-drawer-content/render-sections.js";
-import { identityLocalize } from "../../_dom.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
-import { makeConfiguredDevice as _device } from "../../_make-configured-device.js";
 
 const _localize = identityLocalize;
 

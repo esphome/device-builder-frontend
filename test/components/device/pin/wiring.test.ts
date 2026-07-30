@@ -6,14 +6,6 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, PinMode } from "../../../../src/api/types/config-entries.js";
-import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
-import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
-import type { RenderCtx } from "../../../../src/components/device/config-entry-renderers-shared.js";
-import {
-  extractAttributeBindings,
-  findTemplatesByAnchor,
-} from "../../../_lit-template-walker.js";
 import {
   findElementBindings,
   makeBoardPin,
@@ -21,6 +13,14 @@ import {
   makeRenderCtx,
   makeTestBoard,
 } from "../_renderer-fixtures.js";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../../_lit-template-walker.js";
+import { ConfigEntryType, PinMode } from "../../../../src/api/types/config-entries.js";
+import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
+import type { RenderCtx } from "../../../../src/components/device/config-entry-renderers-shared.js";
+import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
 
 const flag = (key: string, label: string) =>
   makeEntry(ConfigEntryType.BOOLEAN, { key, label, advanced: true });

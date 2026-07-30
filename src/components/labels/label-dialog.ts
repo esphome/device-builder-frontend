@@ -7,7 +7,7 @@
  * so the owner can clear its state on any close path.
  */
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";

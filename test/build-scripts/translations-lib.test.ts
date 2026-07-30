@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   findOrphans,
   flagValue,
-  localeCompleteness,
   flattenKeys,
-  projectIdMismatch,
-  nonEmptyFlagValue,
   keyNameCandidates,
+  localeCompleteness,
   localeFromZipEntry,
+  type LokaliseKey,
+  nonEmptyFlagValue,
+  projectIdMismatch,
   resolveDownloadSource,
   toBcp47,
-  type LokaliseKey,
 } from "../../build-scripts/translations-lib.js";
 
 describe("toBcp47", () => {

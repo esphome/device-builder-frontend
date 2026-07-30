@@ -9,7 +9,7 @@ import {
   mdiServerNetwork,
   mdiSprout,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { RemoteBuildPeer } from "../../api/types/remote-build.js";
@@ -40,7 +40,7 @@ import { REMOTE_COMPUTE_FEATURES, renderFeatureList } from "../shared/feature-li
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
-import { wizardScreens, type UsageChoice, type WizardScreen } from "./wizard-screens.js";
+import { type UsageChoice, type WizardScreen, wizardScreens } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";

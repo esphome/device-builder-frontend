@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { SaveShortcutController } from "../../src/util/save-shortcut-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { SaveShortcutController } from "../../src/util/save-shortcut-controller.js";
 
 /* Plain Node test env (no jsdom): feed the controller our own
    EventTarget and dispatch raw ``Event``s with the modifier/key props

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DialogOpenController } from "../../src/util/dialog-open-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { DialogOpenController } from "../../src/util/dialog-open-controller.js";
 
 describe("DialogOpenController", () => {
   it("registers itself on the host and starts closed", () => {

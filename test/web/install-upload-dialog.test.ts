@@ -15,8 +15,8 @@ vi.mock("../../src/web/install/run-flash.js", () => ({
   }),
 }));
 
-import { runFlash } from "../../src/web/install/run-flash.js";
 import { ESPHomeWebInstallUploadDialog } from "../../src/web/install/esphome-web-install-upload-dialog.js";
+import { runFlash } from "../../src/web/install/run-flash.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(): Promise<ESPHomeWebInstallUploadDialog> {

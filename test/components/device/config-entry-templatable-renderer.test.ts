@@ -11,10 +11,10 @@
  */
 import type { TemplateResult } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { isTemplateResult, visitTemplates } from "../../_lit-template-walker.js";
 import type { LambdaValue } from "../../../src/api/types/automations.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderTemplatableField } from "../../../src/components/device/config-entry-renderers/templatable.js";
-import { isTemplateResult, visitTemplates } from "../../_lit-template-walker.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 /**

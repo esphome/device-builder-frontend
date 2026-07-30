@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiHelpCircleOutline } from "@mdi/js";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -15,8 +15,8 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { HOSTNAME_MAX_LEN, slugifyHostname } from "../../util/slugify-hostname.js";
 import {
   deviceNameValidity,
-  renderDeviceNameField,
   type DeviceNameValidity,
+  renderDeviceNameField,
 } from "./device-name-field.js";
 import { renderDisclosure } from "./disclosure.js";
 

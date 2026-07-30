@@ -14,6 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // so no-op the heavy children.
 import "./_mock-dashboard-children.js";
 
+import { flushMicrotasks } from "../_dom.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { PeerSummary } from "../../src/api/types/remote-build.js";
@@ -24,9 +27,6 @@ import {
 } from "../../src/components/guided-tour/tour-session.js";
 import type { ESPHomeRemoteBuildPanel } from "../../src/components/remote-build-panel.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
-import { flushMicrotasks } from "../_dom.js";
-import { makeConfiguredDevice } from "../_make-configured-device.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 function makePeer(overrides: Partial<PeerSummary> = {}): PeerSummary {
   return {

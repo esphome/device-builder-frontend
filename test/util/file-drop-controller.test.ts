@@ -2,9 +2,9 @@
  * @vitest-environment happy-dom
  */
 import { describe, expect, it, vi } from "vitest";
-import { FileDropController } from "../../src/util/file-drop-controller.js";
 import { dragEvent } from "../_drag-event.js";
 import { FakeHost } from "../_fake-host.js";
+import { FileDropController } from "../../src/util/file-drop-controller.js";
 
 function make(opts: { visible?: boolean } = {}) {
   const host = new FakeHost();

@@ -6,6 +6,7 @@
  * list and the next picker to mount reads it too — without flashing empty.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { flush } from "../_dom.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   _resetSecretKeysCache,
@@ -13,7 +14,6 @@ import {
   getCachedSecretKeys,
   subscribeSecretKeys,
 } from "../../src/util/secrets-cache.js";
-import { flush } from "../_dom.js";
 
 const makeApi = (impl: () => Promise<string[]>): ESPHomeAPI =>
   ({ getSecretKeys: vi.fn(impl) }) as unknown as ESPHomeAPI;

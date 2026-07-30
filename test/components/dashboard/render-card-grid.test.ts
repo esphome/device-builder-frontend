@@ -11,6 +11,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
+import { renderInto } from "../../_dom.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderCardGrid } from "../../../src/components/dashboard/render-content.js";
@@ -19,8 +21,6 @@ import {
   setTourActive,
   setTourConfiguration,
 } from "../../../src/components/guided-tour/tour-session.js";
-import { renderInto } from "../../_dom.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
 
 afterEach(() => {

@@ -4,14 +4,14 @@
  * must still render the IP row and its visit link from d.ip.
  */
 import { describe, expect, it } from "vitest";
-import type { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/device-drawer-content.js";
-import { renderIpAddressRow } from "../../../src/components/dashboard/device-drawer-content/render-sections.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
 import { makeConfiguredDevice as _device } from "../../_make-configured-device.js";
+import type { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/device-drawer-content.js";
+import { renderIpAddressRow } from "../../../src/components/dashboard/device-drawer-content/render-sections.js";
 
 const _host = {
   _localize: identityLocalize,

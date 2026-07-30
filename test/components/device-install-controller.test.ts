@@ -3,6 +3,8 @@
  * runtime_state.state, or UNKNOWN before the device loads.
  */
 import { describe, expect, it, vi } from "vitest";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { withWebSerial } from "../_web-serial.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { DeviceState } from "../../src/api/types/devices.js";
@@ -10,8 +12,6 @@ import {
   DeviceInstallController,
   type DeviceInstallControllerHost,
 } from "../../src/components/device/device-install-controller.js";
-import { makeConfiguredDevice } from "../_make-configured-device.js";
-import { withWebSerial } from "../_web-serial.js";
 
 type LogsDialogStub = {
   configuration?: string;

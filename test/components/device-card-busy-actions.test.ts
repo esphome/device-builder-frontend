@@ -11,8 +11,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import type { ESPHomeDeviceCard } from "../../src/components/device-card.js";
 import { clickCollect } from "../_dom.js";
+import type { ESPHomeDeviceCard } from "../../src/components/device-card.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
 
 function accentButton(el: ESPHomeDeviceCard): HTMLButtonElement {

@@ -1,6 +1,7 @@
 // A rename follows its COMPILE head into the dependent RENAME flash-and-swap
 // tail: success is reported only after the flash, not when the compile ends.
 import { describe, expect, it, vi } from "vitest";
+import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import {
   type FirmwareJob,
   JobStatus,
@@ -10,7 +11,6 @@ import {
   deriveFollowCommandType,
   followJob,
 } from "../../src/components/command-dialog/commands.js";
-import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { makeCommandDialogHost } from "./_command-dialog-host.js";
 
 function makeHost(jobs: Map<string, FirmwareJob>) {

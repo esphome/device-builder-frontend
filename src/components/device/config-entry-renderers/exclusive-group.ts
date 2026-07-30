@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
-import { isEntryVisible } from "../../../util/config-validation.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
+import { isEntryVisible } from "../../../util/config-validation.js";
 import {
   fieldKeyAttr,
   labelFor,

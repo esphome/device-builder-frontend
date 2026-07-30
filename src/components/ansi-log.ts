@@ -5,7 +5,7 @@
  * Supports auto-scrolling to the bottom as new lines arrive.
  */
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { IntegrationDoc } from "../api/types/components.js";
 import type { LocalizeFunc } from "../common/localize.js";

@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   downloadBuildParts,
   fetchEsphomeWebManifest,
+  type FirmwareManifest,
   picoUf2Url,
   selectBuild,
-  type FirmwareManifest,
 } from "../../src/web/util/esphome-web-firmware.js";
 
 const MANIFEST: FirmwareManifest = {

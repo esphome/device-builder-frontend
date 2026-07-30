@@ -5,8 +5,8 @@
  * open-device when the user continues to the editor.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ESPHomeWizardStepImportPartial } from "../../../src/components/wizard/wizard-step-import-partial.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeWizardStepImportPartial } from "../../../src/components/wizard/wizard-step-import-partial.js";
 
 describe("wizard-step-import-partial", () => {
   it("lists every kept file", async () => {

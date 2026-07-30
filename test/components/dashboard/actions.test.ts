@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { deleteDevice } from "../../../src/components/dashboard/actions.js";
-import { identityLocalize } from "../../_dom.js";
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),

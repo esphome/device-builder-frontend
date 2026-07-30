@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { renderInto } from "../../_dom.js";
 import { DashboardView } from "../../../src/api/types/system.js";
 import {
   renderSearchInput,
@@ -18,7 +19,6 @@ import {
   renderYamlToolbar,
 } from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { renderInto } from "../../_dom.js";
 import { makeDashboardHost } from "./_host.js";
 
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {

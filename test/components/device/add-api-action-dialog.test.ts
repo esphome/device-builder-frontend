@@ -14,8 +14,8 @@ vi.mock("../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
-import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
 import { identityLocalize } from "../../_dom.js";
+import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
 
 async function mountDialog(): Promise<ESPHomeAddApiActionDialog> {
   const dialog = new ESPHomeAddApiActionDialog();

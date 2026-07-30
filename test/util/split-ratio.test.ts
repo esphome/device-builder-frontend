@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 import {
+  clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
+  loadSplitRatio,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
-  clampSplitRatio,
-  loadSplitRatio,
   nextSplitRatioForKey,
   saveSplitRatio,
 } from "../../src/util/split-ratio.js";
-import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("split-ratio", () => {
   beforeEach(() => {

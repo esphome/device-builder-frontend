@@ -1,5 +1,4 @@
 import { consume } from "@lit/context";
-import { joinActionFieldPath } from "../../util/action-field-path.js";
 import {
   mdiAlertCircleOutline,
   mdiDelete,
@@ -18,9 +17,10 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { joinActionFieldPath } from "../../util/action-field-path.js";
 import {
-  NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
+  NO_INSTANCE_ERRORS,
 } from "../../util/backend-field-errors.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -41,15 +41,9 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
+import { writeAutomationDelete } from "./apply-removal.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
-import { writeAutomationDelete } from "./apply-removal.js";
-import type { SectionEditor } from "./section-editor.js";
-import {
-  announceSectionMount,
-  fireSectionEvent,
-  prepareSectionEvent,
-} from "./section-editor.js";
 import {
   applySectionValues,
   flushDraft,
@@ -62,11 +56,6 @@ import {
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
 import {
-  maybeFlashApiActionsList,
-  revealAdvancedForErrors,
-  revealAdvancedForFocus,
-} from "./device-section-config/reveal.js";
-import {
   renderPlatformDomainBranch,
   renderStructuredFormBranch,
   renderYamlOnlyBranch,
@@ -78,11 +67,22 @@ import {
 } from "./device-section-config/render-dialogs.js";
 import { renderSectionHeader } from "./device-section-config/render-header.js";
 import {
+  maybeFlashApiActionsList,
+  revealAdvancedForErrors,
+  revealAdvancedForFocus,
+} from "./device-section-config/reveal.js";
+import {
   resolveComponentId,
   resolveShortcutTarget,
   type ShortcutTarget,
 } from "./device-section-config/shortcut-target.js";
 import type { ApplySectionValuesDetail } from "./notice-banner.js";
+import type { SectionEditor } from "./section-editor.js";
+import {
+  announceSectionMount,
+  fireSectionEvent,
+  prepareSectionEvent,
+} from "./section-editor.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,

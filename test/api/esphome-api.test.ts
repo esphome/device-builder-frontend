@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage } from "../_storage.js";
 import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
-  MockWebSocket,
   fireDocumentEvent,
   fireWindowEvent,
   installMockWebSocket,
   installMockWindow,
+  MockWebSocket,
   setDocumentVisibility,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
-import { stubStorage } from "../_storage.js";
 
 const serverInfo = {
   server_version: "1.0.0",

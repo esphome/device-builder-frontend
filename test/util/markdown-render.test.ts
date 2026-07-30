@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { renderMarkdown } from "../../src/util/markdown.js";
 import { renderInto } from "../_dom.js";
+import { renderMarkdown } from "../../src/util/markdown.js";
 
 describe("renderMarkdown — bold-wrapped inline formatting", () => {
   it("renders a link inside bold as a clickable anchor", () => {

@@ -4,12 +4,12 @@
  * (text overflowed the square and read as an unstyled button, #766).
  */
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize as localize } from "../../_dom.js";
 import type {
   OffloaderPeerRevokedAlert,
   OffloaderPinMismatchAlert,
 } from "../../../src/api/types/remote-build-events.js";
 import { renderOffloaderAlert } from "../../../src/components/settings-dialog/build-offload-alert.js";
-import { identityLocalize as localize } from "../../_dom.js";
 
 const pinMismatch: OffloaderPinMismatchAlert = {
   kind: "pin_mismatch",

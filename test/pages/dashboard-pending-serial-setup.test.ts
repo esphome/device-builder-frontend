@@ -15,9 +15,9 @@ vi.mock("../../src/components/dashboard/actions.js", async (importActual) => ({
   detectAndOpenWizard: vi.fn(async () => {}),
 }));
 
+import { flushMicrotasks } from "../_dom.js";
 import { detectAndOpenWizard } from "../../src/components/dashboard/actions.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
-import { flushMicrotasks } from "../_dom.js";
 
 const fakePort = {} as SerialPort;
 

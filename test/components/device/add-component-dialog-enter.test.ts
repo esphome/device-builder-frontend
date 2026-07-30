@@ -39,9 +39,9 @@ vi.mock("../../../src/components/device/add-component-form.js", () => {
   return {};
 });
 
-import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { baseDialogSettled, mount } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
+import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 
 beforeEach(() => {
   requestSubmitCalls.length = 0;

@@ -9,10 +9,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { renderInto } from "../../_dom.js";
 import type { YamlSearchHit } from "../../../src/api/types/devices.js";
 import { renderYamlMode } from "../../../src/components/dashboard/render-yaml.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { renderInto } from "../../_dom.js";
 import { makeDashboardHost } from "./_host.js";
 
 function makeHit(): YamlSearchHit {

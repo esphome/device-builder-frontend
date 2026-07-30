@@ -11,7 +11,7 @@ import {
   mdiWeatherNight,
   mdiWeatherSunny,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -29,9 +29,9 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
 import type { CommandAction } from "./command-palette-actions.js";
 import {
-  OPEN_COMMAND_PALETTE_EVENT,
   buildCommands,
   buildYamlHitActions,
+  OPEN_COMMAND_PALETTE_EVENT,
 } from "./command-palette-actions.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";

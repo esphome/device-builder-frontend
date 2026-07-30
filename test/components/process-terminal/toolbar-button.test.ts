@@ -6,11 +6,11 @@
  */
 import type { TemplateResult } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { renderInto } from "../../_dom.js";
 import {
   renderTermButton,
   renderTermToggle,
 } from "../../../src/components/process-terminal/toolbar-button.js";
-import { renderInto } from "../../_dom.js";
 
 function mount(tpl: TemplateResult): HTMLButtonElement {
   const container = renderInto(tpl);

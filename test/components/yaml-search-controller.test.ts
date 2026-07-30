@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FakeHost } from "../_fake-host.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { YamlSearchHit } from "../../src/api/types/devices.js";
 import { YamlSearchController } from "../../src/components/yaml-search-controller.js";
-import { FakeHost } from "../_fake-host.js";
 
 /* The controller's only API surface is ``hits``, ``scheduleQuery``,
    ``clear``, and the host-lifecycle hooks. Tests stub the API and
