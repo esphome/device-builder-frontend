@@ -1,3 +1,4 @@
+import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
   ADDRESS_RE,
@@ -13,7 +14,6 @@ import {
   formEncodedLength,
   takeLinesUnderBudget,
 } from "./crash-report-budget.js";
-import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 

@@ -572,7 +572,7 @@ describe("filterRenderable", () => {
     // Mirrors ``sensor.debug.fragmentation`` upstream —
     // ``cv.Any(cv.only_on_esp8266, cv.only_on_esp32)`` collapses
     // to ``["esp32", "esp8266"]``. The entry shows on either chip,
-    // hides on others (e.g. rp2040).
+    // hides on others (e.g. rp2).
     const entries = [
       makeEntry({
         key: "fragmentation",

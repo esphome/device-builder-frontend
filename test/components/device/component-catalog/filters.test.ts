@@ -70,11 +70,11 @@ describe("visibleComponents platform gate", () => {
   });
 
   it("hides a single-instance component whose alias block is configured", () => {
-    // A `rp2:` block counts as the shipped rp2040 entry, so the card must
-    // not offer a duplicate platform block.
-    const cat = [entry("rp2040", ["rp2040"], [], false)];
+    // A legacy `rp2040:` block counts as the shipped rp2 entry, so the
+    // card must not offer a duplicate platform block.
+    const cat = [entry("rp2", ["rp2"], [], false)];
     const ids = visibleComponents(
-      host(cat, "rp2040", { yaml: "rp2:\n  board: rpipicow\n" })
+      host(cat, "rp2", { yaml: "rp2040:\n  board: rpipicow\n" })
     ).map((c) => c.id);
     expect(ids).toEqual([]);
   });
