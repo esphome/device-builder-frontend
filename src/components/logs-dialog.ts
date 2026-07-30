@@ -121,7 +121,7 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   _apiConnected = true;
 
-  /** The gated (debounced, ready-cleared) indicator the banner rides. */
+  /** Gated connection-lost indicator; drives the banner. */
   @consume({ context: apiConnectionLostContext, subscribe: true })
   @state()
   _connectionLost = false;

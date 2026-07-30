@@ -103,6 +103,70 @@ describe("process-terminal card variant", () => {
   });
 });
 
+describe("process-terminal connectionLost", () => {
+  it("overrides state and message with an error banner, reverting on clear", async () => {
+    const el = await mount((e) => {
+      e.state = "running";
+      e.connectionLost = true;
+      e.connectionLostMessage = "Connection lost. Reconnecting…";
+    });
+    const banner = sr(el).querySelector(".status-banner");
+    expect(banner?.classList.contains("status-banner--error")).toBe(true);
+    expect(banner?.textContent).toContain("Connection lost. Reconnecting…");
+    expect(banner?.getAttribute("role")).toBe("status");
+
+    el.connectionLost = false;
+    await el.updateComplete;
+    expect(sr(el).querySelector(".status-banner")).toBeNull();
+  });
+
+  it("takes precedence over a success state without losing it", async () => {
+    const el = await mount((e) => {
+      e.state = "success";
+      e.statusMessage = "Done!";
+      e.connectionLost = true;
+      e.connectionLostMessage = "Reconnecting…";
+    });
+    expect(
+      sr(el).querySelector(".status-banner")?.classList.contains("status-banner--error")
+    ).toBe(true);
+
+    el.connectionLost = false;
+    await el.updateComplete;
+    const banner = sr(el).querySelector(".status-banner");
+    expect(banner?.classList.contains("status-banner--success")).toBe(true);
+    expect(banner?.textContent).toContain("Done!");
+  });
+
+  it("pauses the streaming dot while flagged", async () => {
+    const el = await mount((e) => (e.streaming = true));
+    expect(sr(el).querySelector(".streaming-dot")).not.toBeNull();
+
+    el.connectionLost = true;
+    await el.updateComplete;
+    expect(sr(el).querySelector(".streaming-dot")).toBeNull();
+  });
+
+  it("overrides the card variant's status and hides the stale detail", async () => {
+    const el = await mount((e) => {
+      e.variant = "card";
+      e.state = "running";
+      e.statusMessage = "Compiling…";
+      e.statusDetail = "detail";
+      e.connectionLost = true;
+      e.connectionLostMessage = "Reconnecting…";
+    });
+    expect(sr(el).querySelector(".status-text")?.textContent).toBe("Reconnecting…");
+    expect(sr(el).querySelector(".status-detail")).toBeNull();
+    expect(sr(el).querySelector(".status-icon--error")).not.toBeNull();
+
+    el.connectionLost = false;
+    await el.updateComplete;
+    expect(sr(el).querySelector(".status-text")?.textContent).toBe("Compiling…");
+    expect(sr(el).querySelector(".status-detail")?.textContent).toBe("detail");
+  });
+});
+
 describe("process-terminal scrollToBottom", () => {
   it("forwards to the inner ansi-log (stream variant)", async () => {
     const el = await mount((e) => (e.lines = ["a", "b"]));

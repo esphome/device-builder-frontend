@@ -241,13 +241,11 @@ export class ESPHomeApp extends LitElement {
   // Provided so a routed page can redo work that failed while it was down.
   @provide({ context: apiConnectedContext }) @state() _apiConnected = false;
   @state() private _routeLoading = false;
-  // The gate's output doubles as the shared debounce every dialog
-  // banner consumes, so the pill and the banners always agree.
   @provide({ context: apiConnectionLostContext })
   @state()
-  private _showReconnectPill = false;
+  private _connectionLost = false;
   private _pillGate = new ReconnectPillGate(RECONNECT_PILL_DELAY_MS, (visible) => {
-    this._showReconnectPill = visible;
+    this._connectionLost = visible;
   });
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -572,7 +570,7 @@ export class ESPHomeApp extends LitElement {
 
     return html`
       ${this._routeLoading ? renderRouteLoadingBar() : nothing}
-      ${this._showReconnectPill ? renderReconnectPill(this._localize) : nothing}
+      ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

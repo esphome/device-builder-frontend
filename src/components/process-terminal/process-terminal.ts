@@ -63,9 +63,8 @@ export class ESPHomeProcessTerminal extends LitElement {
   @property() statusDetail = "";
 
   /** Connection-lost override: error-style banner/icon with the host's
-   *  localized message, taking precedence over state/statusMessage
-   *  (untouched underneath, so reverting is automatic) and pausing the
-   *  streaming dot. */
+   *  localized message, taking precedence over state/statusMessage and
+   *  pausing the streaming dot. */
   @property({ type: Boolean }) connectionLost = false;
   @property() connectionLostMessage = "";
 
