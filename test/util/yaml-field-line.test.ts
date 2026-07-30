@@ -227,6 +227,27 @@ describe("indexedPathAtLine", () => {
     expect(indexedPathAtLine(yaml, section, 2)).toEqual(["0"]);
   });
 
+  it("returns null on a flat section's own header line", () => {
+    const yaml = ["wifi:", "  ssid: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 1)).toBeNull();
+  });
+
+  it("inverts a bare inline first key on the section's dash line", () => {
+    const yaml = ["sprinkler:", "  - valves:", "      - valve_switch: Front", ""].join(
+      "\n"
+    );
+    const section = sectionAt(yaml, 2);
+    expect(indexedPathAtLine(yaml, section, 2)).toEqual(["valves"]);
+    expect(findFieldLine(yaml, section, ["valves"])).toBe(2);
+  });
+
+  it("returns null for a keyless scalar list item line", () => {
+    const yaml = ["wifi:", "  networks:", "  - one", "  - two", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 3)).toBeNull();
+  });
+
   it("returns null for blank, comment, block-scalar-body, and out-of-section lines", () => {
     const yaml = [
       "sensor:",
