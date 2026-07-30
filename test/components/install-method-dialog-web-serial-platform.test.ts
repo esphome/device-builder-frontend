@@ -51,8 +51,9 @@ afterEach(() => {
 });
 
 describe("install-method-dialog platform gating", () => {
-  // ESPHome's platform key for RP2350 is "rp2040"; "rp2350" included defensively.
-  it.each(["rp2040", "rp2350", "nrf52", "bk72xx", "rtl87xx", "ln882x"])(
+  // ESPHome's platform key for both RP2 chips is "rp2"; the legacy
+  // "rp2040" spelling and "rp2350" are included defensively.
+  it.each(["rp2", "rp2040", "rp2350", "nrf52", "bk72xx", "rtl87xx", "ln882x"])(
     "hides Web Serial and keeps server-serial for non-ESP platform %s",
     async (platform) => {
       const d = await mount(platform);

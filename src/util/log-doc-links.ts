@@ -104,7 +104,9 @@ const ACTIONABLE: readonly ActionableEntry[] = [
   {
     level: "E",
     // One crash handler per platform, each logging under its own tag.
-    tags: ["esp32.crash", "esp8266", "rp2040.crash"],
+    // Both RP2 spellings: 2026.7+ firmware logs under rp2.crash,
+    // older builds under rp2040.crash.
+    tags: ["esp32.crash", "esp8266", "rp2.crash", "rp2040.crash"],
     pattern: /CRASH DETECTED ON PREVIOUS BOOT/,
     url: TROUBLESHOOTING_URL,
     body: "crash",

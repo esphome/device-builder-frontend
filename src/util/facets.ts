@@ -76,7 +76,7 @@ export function computeAreaFacet(devices: ConfiguredDevice[]): FacetOption[] {
 }
 
 /** Platform facet — derived from ``target_platform`` (esp32,
- *  esp8266, rp2040, …). Lower-case wire values get rendered
+ *  esp8266, rp2, …). Lower-case wire values get rendered
  *  exactly as-is; the dashboard pill carries the raw stem because
  *  that's what users see in YAML / docs and an aliasing layer
  *  would lie about what the device actually runs. */
