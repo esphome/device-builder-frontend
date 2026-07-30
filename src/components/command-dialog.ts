@@ -510,7 +510,7 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._log.lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && !showRunTimer(this)}
+          ?streaming=${this._state === "running" && !showRunTimer(this) && !wsDown}
           .state=${wsDown ? "error" : this._state}
           .statusMessage=${
             wsDown ? this._localize("layout.reconnecting") : this._statusMessage

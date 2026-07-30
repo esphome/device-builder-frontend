@@ -84,6 +84,8 @@ describe("command-dialog reconnecting banner overlay", () => {
     const terminal = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
     expect(terminal.state).toBe("error");
     expect(terminal.statusMessage).toBe("layout.reconnecting");
+    // The stream is paused, so the pulsing dot pauses with it.
+    expect(terminal.hasAttribute("streaming")).toBe(false);
 
     (el as any)._apiConnected = true;
     await el.updateComplete;
