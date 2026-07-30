@@ -138,6 +138,15 @@ describe("process-terminal connectionLost", () => {
     expect(banner?.textContent).toContain("Done!");
   });
 
+  it("falls back to statusMessage when the lost message is empty", async () => {
+    const el = await mount((e) => {
+      e.state = "running";
+      e.statusMessage = "Compiling…";
+      e.connectionLost = true;
+    });
+    expect(sr(el).querySelector(".status-banner")?.textContent).toContain("Compiling…");
+  });
+
   it("pauses the streaming dot while flagged", async () => {
     const el = await mount((e) => (e.streaming = true));
     expect(sr(el).querySelector(".streaming-dot")).not.toBeNull();

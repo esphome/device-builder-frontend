@@ -91,7 +91,11 @@ export class ESPHomeProcessTerminal extends LitElement {
   }
 
   private get _effectiveMessage(): string {
-    return this.connectionLost ? this.connectionLostMessage : this.statusMessage;
+    // Fall back so a host that forgets the message never renders a
+    // blank error surface.
+    return this.connectionLost
+      ? this.connectionLostMessage || this.statusMessage
+      : this.statusMessage;
   }
 
   private _renderBanner() {
