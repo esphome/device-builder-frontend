@@ -3,6 +3,7 @@ import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-j
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
+import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
@@ -77,6 +78,7 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._userStopped = false;
   host._failedDuringValidate = false;
   host._compileMissingDependent = false;
+  host._connectionInterrupted = false;
 }
 
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
@@ -119,6 +121,12 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
         host._log.flush();
         host._state = "error";
         host._statusMessage = error;
+      },
+      onConnectionLost: () => {
+        // The validate subprocess died with the connection; a re-run
+        // would be a fresh submission, so leave that to the user.
+        host._streamId = "";
+        markConnectionInterrupted(host);
       },
     },
     { showSecrets: host._showSecrets }
@@ -293,11 +301,42 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._statusMessage = error;
       host._jobId = "";
     },
+    onConnectionLost: () => {
+      // The job keeps running server-side; keep _jobId and re-follow
+      // once the reconnect's auth lands. The follow replays the full
+      // history, so the log resets rather than duplicating it.
+      host._streamId = "";
+      resumeFollowOnReady(host._api, {
+        // Stale when the dialog closed, the user stopped, the chain
+        // moved to the dependent flash, or something already reattached.
+        isStale: () => !host._open || host._jobId !== jobId || host._streamId !== "",
+        resume: () => {
+          host._log.reset();
+          host._resetAnsiLogScroll();
+          followJob(host, jobId);
+        },
+        giveUp: () => {
+          markConnectionInterrupted(host);
+          host._jobId = "";
+        },
+      });
+    },
   });
+}
+
+// Terminal interruption state; the message and the hint-suppressing
+// flag travel together.
+function markConnectionInterrupted(host: ESPHomeCommandDialog): void {
+  host._log.flush();
+  host._state = "error";
+  host._statusMessage = host._localize("command.connection_interrupted");
+  host._connectionInterrupted = true;
 }
 
 export function stopCommand(host: ESPHomeCommandDialog): void {
   if (host._state !== "running") return;
+  // The cancel can't reach the backend while disconnected.
+  if (!host._apiConnected) return;
   if (host._jobId) host._api.firmwareCancel(host._jobId).catch(() => {});
   host._state = "error";
   host._userStopped = true;

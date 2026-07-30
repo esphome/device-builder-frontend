@@ -136,6 +136,8 @@ export function renderResetSuggestion(
   // A compile that succeeded but found no dependent flash isn't a build
   // failure — clean/reset wouldn't help.
   if (host._compileMissingDependent) return nothing;
+  // A lost connection isn't a build or YAML problem either.
+  if (host._connectionInterrupted) return nothing;
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }
@@ -376,6 +378,7 @@ function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof noth
         icon: "stop",
         label: host._localize("command.stop"),
         variant: "stop",
+        disabled: !host._apiConnected,
         onClick: host._stop,
       });
     case "error":

@@ -22,6 +22,7 @@ import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
+  apiConnectedContext,
   apiContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
@@ -105,6 +106,11 @@ export class ESPHomeCommandDialog extends LitElement {
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
+  /** WS liveness; drives the transient reconnecting banner over a run. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  _apiConnected = true;
+
   // Live firmware-job snapshot keyed by job_id. Drives the queued overlay so
   // we tell the user the dialog is waiting in line instead of sitting empty.
   @consume({ context: firmwareJobsContext, subscribe: true })
@@ -174,6 +180,9 @@ export class ESPHomeCommandDialog extends LitElement {
   // Flips true when a chain COMPILE succeeded but its dependent flash is
   // missing — the build itself was fine, so the clean/reset hint is suppressed.
   @state() _compileMissingDependent = false;
+
+  // Run ended on a lost connection; suppresses the failure hints.
+  @state() _connectionInterrupted = false;
 
   // Locally-primed status / source so the queued overlay + remote-builder
   // sub-line paint on the first frame instead of waiting for the next jobs
@@ -490,6 +499,9 @@ export class ESPHomeCommandDialog extends LitElement {
   };
 
   protected render() {
+    // Reconnecting banner only over an active run; terminal states
+    // keep their own message.
+    const wsDown = !this._apiConnected && this._state === "running";
     return html`
       <esphome-base-dialog
         ?open=${this._open}
@@ -500,9 +512,11 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._log.lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && !showRunTimer(this)}
-          .state=${this._state}
-          .statusMessage=${this._statusMessage}
+          ?streaming=${this._state === "running" && !showRunTimer(this) && !wsDown}
+          .state=${wsDown ? "error" : this._state}
+          .statusMessage=${
+            wsDown ? this._localize("layout.reconnecting") : this._statusMessage
+          }
         >
           ${renderRemoteBuilderSubLine(this)} ${renderQueuedOverlay(this)}
           ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}
