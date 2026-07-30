@@ -11,9 +11,9 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
-import { renderMdnsExpiry } from "../../../src/components/dashboard/device-drawer-render.js";
 import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
+import { renderMdnsExpiry } from "../../../src/components/dashboard/device-drawer-render.js";
 
 describe("renderMdnsExpiry", () => {
   it("renders a details fold-down when remaining + lifetime are present", () => {

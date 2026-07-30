@@ -11,9 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomeYamlValidationDialog } from "../../src/components/yaml-validation-dialog.js";
 import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
+import { ESPHomeYamlValidationDialog } from "../../src/components/yaml-validation-dialog.js";
 
 const baseDialog = (el: ESPHomeYamlValidationDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;

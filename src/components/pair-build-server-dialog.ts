@@ -1,7 +1,7 @@
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 import { consume } from "@lit/context";
-import { LitElement, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";

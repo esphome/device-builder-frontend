@@ -7,8 +7,8 @@ import {
   ADDRESS_RE,
   CRASH_END_RE,
   DECODED_RE,
-  MAX_LINES_AFTER_MARKER,
   isCrashMarker,
+  MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 import { normalizeLogLine } from "./log-line.js";

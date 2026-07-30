@@ -2,14 +2,14 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import {
-  ComponentCategory,
   type ComponentCatalogEntry,
+  ComponentCategory,
 } from "../../../src/api/types/components.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
+  type DepNavHost,
   matchesDepDomain,
   navigateToDep,
-  type DepNavHost,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";

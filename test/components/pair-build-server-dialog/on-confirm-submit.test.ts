@@ -5,10 +5,10 @@
  * that the fixed args (host, port, pin, labels) always ride along.
  */
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { onConfirmSubmit } from "../../../src/components/pair-build-server-dialog/actions.js";
-import { identityLocalize } from "../../_dom.js";
 
 type RequestArgs = Parameters<ESPHomeAPI["requestRemoteBuildPair"]>[0];
 

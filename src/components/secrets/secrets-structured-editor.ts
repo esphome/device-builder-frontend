@@ -5,7 +5,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClose, mdiPlus } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { live } from "lit/directives/live.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
@@ -27,9 +27,9 @@ import {
   parseSecretsEntries,
   removeSecret,
   renameSecretKey,
-  setSecretValue,
   type SecretEntry,
   type SecretGroup,
+  setSecretValue,
 } from "../../util/secrets-entries.js";
 import type { PasswordInputValueChange } from "../device/password-input-event.js";
 import { secretsStructuredEditorStyles } from "./secrets-structured-editor.styles.js";

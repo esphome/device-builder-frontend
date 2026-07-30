@@ -30,9 +30,9 @@ import {
   effectiveDisabled,
   fieldKeyAttr,
   fieldRendererStyles,
+  type RenderCtx,
   renderFieldError,
   renderLabel,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 import {
   renderListAddButton,
@@ -45,9 +45,9 @@ import {
   formatRegistryId,
   itemId,
   REGISTRY_OPS,
+  type RegistryOps,
   spliceEditable,
   VALUE_TYPE_TO_CONFIG_TYPE,
-  type RegistryOps,
 } from "./registry-list-helpers.js";
 
 @customElement("esphome-registry-list")

@@ -7,8 +7,8 @@
 import { EditorState } from "@codemirror/state";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  ComponentCategory,
   type ComponentCatalogEntry,
+  ComponentCategory,
 } from "../../src/api/types/components.js";
 import { _clearComponentCache } from "../../src/util/component-name-cache.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";

@@ -11,9 +11,9 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
+import { identityLocalize } from "../_dom.js";
 import { ESPHomeWebHeaderActions } from "../../src/web/header/esphome-web-header-actions.js";
 import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
-import { identityLocalize } from "../_dom.js";
 
 afterEach(() => {
   document.body.innerHTML = "";

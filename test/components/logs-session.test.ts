@@ -4,8 +4,8 @@ import {
   isOtaNetwork,
   isPassive,
   isStreaming,
-  OTA_PORT,
   type LogsSession,
+  OTA_PORT,
 } from "../../src/components/logs-session.js";
 
 const fakePort = {} as SerialPort;

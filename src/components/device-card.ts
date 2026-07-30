@@ -1,10 +1,10 @@
 import { consume } from "@lit/context";
 import {
   mdiCancel,
-  mdiCheckCircle,
-  mdiCheckNetworkOutline,
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
+  mdiCheckCircle,
+  mdiCheckNetworkOutline,
   mdiClockOutline,
   mdiCloseCircle,
   mdiDotsVertical,
@@ -19,7 +19,7 @@ import {
   mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../api/types/devices.js";
 import { DeviceState } from "../api/types/devices.js";

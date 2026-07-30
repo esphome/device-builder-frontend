@@ -18,9 +18,9 @@ vi.mock("../../src/util/board-change.js", () => ({
   ) => dialog?.open(opts) ?? Promise.resolve(false),
 }));
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 import { findBoardDisagreement } from "../../src/util/board-change.js";
-import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 const DEVICE = makeConfiguredDevice({ configuration: "stale.yaml" });
 

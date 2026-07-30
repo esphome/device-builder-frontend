@@ -17,13 +17,13 @@ import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-
 import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { ConfigLoadController } from "../util/config-load-controller.js";
 import {
   prefToSecretsLayout,
-  secretsLayoutToPref,
   type SecretsLayout,
+  secretsLayoutToPref,
 } from "../util/editor-layout.js";
 import { PopLeaveGuardController } from "../util/navigation.js";
-import { ConfigLoadController } from "../util/config-load-controller.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";

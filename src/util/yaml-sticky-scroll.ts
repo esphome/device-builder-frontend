@@ -39,14 +39,14 @@ import { syntaxTree } from "@codemirror/language";
 import type { Extension, Text } from "@codemirror/state";
 import {
   EditorView,
-  ViewPlugin,
   type PluginValue,
+  ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
 import {
   createStickyRow,
-  patchStickyRow,
   type GutterMetrics,
+  patchStickyRow,
 } from "./yaml-sticky-render.js";
 import {
   computeStickyScope,

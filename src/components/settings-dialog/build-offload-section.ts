@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiBroom, mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify, notifyError, notifySuccess } from "../../util/notify.js";
 import { desktopDocsUrl } from "../../util/release-notes-url.js";
@@ -26,18 +26,18 @@ import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   pairingDisplayName,
   pairingDisplayNameForPin,
 } from "../../util/pairing-display-name.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 import type { ESPHomeReauthWizardDialog } from "../reauth-wizard-dialog.js";
-import { renderOffloaderAlert } from "./build-offload-alert.js";
 import { requestResetPeerBuildEnv } from "../remote-build-hint.js";
+import { renderOffloaderAlert } from "./build-offload-alert.js";
 import { renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";

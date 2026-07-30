@@ -18,8 +18,8 @@ import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import {
-  NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
+  NO_INSTANCE_ERRORS,
 } from "../../util/backend-field-errors.js";
 import { effectiveDeviceLayout } from "../../util/editor-layout.js";
 import { fireEvent } from "../../util/fire-event.js";

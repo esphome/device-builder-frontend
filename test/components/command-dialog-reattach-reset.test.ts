@@ -8,9 +8,9 @@
  * on a subsequently-replayed real build failure. Pin the reset here.
  */
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import { type FirmwareJob, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 describe("command-dialog public followJob state reset", () => {
   it("clears a stale _compileMissingDependent on reattach", () => {

@@ -9,10 +9,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "./_mock-device-children.js";
 vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 
+import { flushMicrotasks, mount } from "../_dom.js";
 import { APIError, type ESPHomeAPI } from "../../src/api/index.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
-import { flushMicrotasks, mount } from "../_dom.js";
 
 interface Deferred {
   resolve(value: string): void;

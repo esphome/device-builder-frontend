@@ -8,9 +8,9 @@
  */
 import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
+import { identityLocalize, renderInto } from "../../_dom.js";
 import type { RemoteBuildPeer } from "../../../src/api/types/remote-build.js";
 import { ESPHomeSettingsBuildOffload } from "../../../src/components/settings-dialog/build-offload-section.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
 
 function peer(
   name: string,

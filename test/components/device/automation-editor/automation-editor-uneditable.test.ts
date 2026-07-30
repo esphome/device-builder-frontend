@@ -10,13 +10,13 @@ import { describe, expect, it, vi } from "vitest";
 import "./_editor-harness.js";
 import { mountEditor, slimAvailable } from "./_editor-harness.js";
 
+import { flushMicrotasks } from "../../../_dom.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
-import { flushMicrotasks } from "../../../_dom.js";
 
 const ON_BOOT: AutomationLocation = {
   kind: "device_on",

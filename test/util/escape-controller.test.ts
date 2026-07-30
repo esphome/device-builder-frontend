@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { EscapeController } from "../../src/util/escape-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { EscapeController } from "../../src/util/escape-controller.js";
 
 /* The runtime test environment is plain Node (no jsdom), so we feed
    the controller our own EventTarget and dispatch raw ``Event``s with

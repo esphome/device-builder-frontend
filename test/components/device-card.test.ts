@@ -12,8 +12,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import { JobType } from "../../src/api/types/firmware-jobs.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
+import { JobType } from "../../src/api/types/firmware-jobs.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
 
 describe("device-card encryption indicator uses the raw pending flag", () => {

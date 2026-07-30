@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomeDeviceActionsMenu } from "../../../src/components/device/device-actions-menu.js";
 import { identityLocalize } from "../../_dom.js";
+import { ESPHomeDeviceActionsMenu } from "../../../src/components/device/device-actions-menu.js";
 
 afterEach(() => {
   vi.clearAllMocks();

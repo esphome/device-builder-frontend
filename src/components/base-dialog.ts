@@ -1,7 +1,7 @@
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
 import type { PropertyValues } from "lit";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";

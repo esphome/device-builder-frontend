@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  stickyNumPaddingRight,
   type GutterMetrics,
+  stickyNumPaddingRight,
 } from "../../src/util/yaml-sticky-render.js";
 
 /**

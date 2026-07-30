@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import { mount } from "../../_dom.js";
 
 import {
-  ESPHomeSectionAutomationList,
   type AutomationListRow,
+  ESPHomeSectionAutomationList,
 } from "../../../src/components/device/device-section-automation-list.js";
 
 const ROWS: AutomationListRow[] = [

@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   backendErrorCounts,
   backendErrorsForInstance,
+  type BackendFieldError,
   formRelativePath,
   instanceKey,
   mappedFormPath,
   resolveBackendErrors,
-  type BackendFieldError,
 } from "../../src/util/backend-field-errors.js";
 import { _clearYamlSectionsMemo } from "../../src/util/yaml-sections.js";
 

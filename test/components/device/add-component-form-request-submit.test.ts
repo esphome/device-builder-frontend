@@ -12,10 +12,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
+import { identityLocalize } from "../../_dom.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
-import { identityLocalize } from "../../_dom.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 function makeForm(component?: ComponentCatalogEntry): {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { makeConfiguredDevice as _device } from "../_make-configured-device.js";
 import {
   buildWebUiUrl,
   buildWebUiUrlForHost,
   safeWebUiUrl,
 } from "../../src/util/web-ui-url.js";
-import { makeConfiguredDevice as _device } from "../_make-configured-device.js";
 
 describe("safeWebUiUrl", () => {
   it("accepts http URLs", () => {

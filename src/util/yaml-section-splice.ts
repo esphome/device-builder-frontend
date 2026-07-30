@@ -15,9 +15,9 @@ import {
   formatYamlFlowList,
   formatYamlScalar,
   serializeListItem,
+  type SerializeYamlOptions,
   serializeYamlValues,
   YamlRawValue,
-  type SerializeYamlOptions,
 } from "./yaml-serialize.js";
 
 /**

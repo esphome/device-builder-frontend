@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 
+import { identityLocalize, renderInto } from "../../_dom.js";
 import { renderCrashCallout } from "../../../src/components/process-terminal/crash-callout.js";
 import type { CrashKind } from "../../../src/util/crash-detector.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
 
 function mount(kind: CrashKind | null, action?: ReturnType<typeof html>): HTMLElement {
   return renderInto(renderCrashCallout(identityLocalize, kind, action));

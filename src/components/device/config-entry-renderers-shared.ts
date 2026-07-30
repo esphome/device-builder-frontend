@@ -24,9 +24,9 @@ import {
   isApiEncryptionKeyField,
   isValidApiEncryptionKey,
 } from "../../util/api-encryption-key.js";
+import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
-import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -54,12 +54,12 @@ import { constraintClusterStyles } from "./config-entry-renderers/constraint-clu
 import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
-import { substitutionNoteStyles } from "./substitution-note.styles.js";
 // Type-only — the `<esphome-secret-picker>` element is registered by the
 // form host (`config-entry-form.ts`). Keeping this module free of the
 // element's DOM-dependent side-effect import lets the renderer unit tests
 // run under the lightweight node environment.
 import type { SecretSelectedDetail } from "./secret-picker.js";
+import { substitutionNoteStyles } from "./substitution-note.styles.js";
 
 /** Stylesheets every element that hosts ``ctx.renderEntry`` output
  *  needs in its shadow root: field shell, input styling, and the

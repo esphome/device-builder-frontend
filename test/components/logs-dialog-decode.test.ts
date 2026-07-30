@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { append, makeLogsDialog } from "./_logs-dialog-env.js";
 
-import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
-import { STALE_BUILD_LOG_LINE } from "../../src/util/crash-decode.js";
 import { stripAnsi } from "../../src/util/ansi-escapes.js";
+import { STALE_BUILD_LOG_LINE } from "../../src/util/crash-decode.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const lines = (el: ESPHomeLogsDialog): string[] => (el as any)._log.lines;

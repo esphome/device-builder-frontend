@@ -1,7 +1,7 @@
-import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
-import { ESPHomeDeviceDrawer } from "../../../src/components/dashboard/device-drawer.js";
 import { mount } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
+import { ESPHomeDeviceDrawer } from "../../../src/components/dashboard/device-drawer.js";
 
 /**
  * Drawer-footer test harness (drawer opens by default).

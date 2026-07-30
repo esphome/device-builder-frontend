@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";

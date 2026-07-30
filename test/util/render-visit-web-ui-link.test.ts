@@ -5,12 +5,12 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
-import { renderVisitWebUiLink } from "../../src/util/visit-web-ui-link.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../_lit-template-walker.js";
+import { renderVisitWebUiLink } from "../../src/util/visit-web-ui-link.js";
 
 const _localize = (key: string) =>
   key === "dashboard.action_visit_web_ui" ? "Visit web UI" : key;

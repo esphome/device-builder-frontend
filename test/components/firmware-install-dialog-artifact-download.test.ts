@@ -19,6 +19,8 @@ vi.mock("../../src/util/web-serial.js", () => ({
   SERIAL_ACTIVITY_WINDOW_MS: 6000,
 }));
 
+import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 import {
   type FirmwareBinary,
   JobSource,
@@ -29,8 +31,6 @@ import {
   downloadSelectedBinary,
   startArtifactDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
-import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
 const OTA: FirmwareBinary = { title: "OTA format", file: "firmware.ota.bin" };

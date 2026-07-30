@@ -10,7 +10,7 @@
  * Each section emits the existing bubbling ``facet-change`` /
  * ``labels-filter-change``; selection state stays on the host.
  */
-import { type TemplateResult, html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { FacetSelection } from "../../util/device-filter.js";

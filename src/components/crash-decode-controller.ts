@@ -1,9 +1,9 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import {
+  colorizeCrash,
   type CrashDecodeCache,
   type CrashRegion,
   CrashRegionCollector,
-  colorizeCrash,
   decodeCrashRegion,
   interleaveDecoded,
 } from "../util/crash-decode.js";

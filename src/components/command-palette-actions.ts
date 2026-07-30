@@ -1,6 +1,6 @@
 import type { ConfiguredDevice, YamlSearchHit } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
-import { LANGUAGES, languageLabel } from "../common/localize.js";
+import { languageLabel, LANGUAGES } from "../common/localize.js";
 import { navigate } from "../util/navigation.js";
 import {
   forEachYamlMatch,

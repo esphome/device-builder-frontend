@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FakeHost } from "../_fake-host.js";
+import { MockObserver } from "../_intersection-observer.js";
 import {
   IntersectionController,
   type IntersectionControllerOptions,
 } from "../../src/util/intersection-controller.js";
-import { FakeHost } from "../_fake-host.js";
-import { MockObserver } from "../_intersection-observer.js";
 
 class SentinelHost extends FakeHost {
   renderRoot = document.createElement("div");

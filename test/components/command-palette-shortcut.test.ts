@@ -4,8 +4,8 @@ import { describe, expect, test, vi } from "vitest";
 // Stub the real wa-dialog: happy-dom can't run its form-associated internals.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
-import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
 import { mount } from "../_dom.js";
+import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
 
 /** The Cmd/Ctrl+K open shortcut, and that Shift is excluded (#1705). */
 describe("esphome-command-palette open shortcut", () => {

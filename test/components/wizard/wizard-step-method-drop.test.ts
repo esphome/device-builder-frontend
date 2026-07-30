@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { dragEvent } from "../../_drag-event.js";
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepMethod } from "../../../src/components/wizard/wizard-step-method.js";
-import { dragEvent } from "../../_drag-event.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(): Promise<ESPHomeWizardStepMethod> {

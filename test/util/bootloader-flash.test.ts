@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { canFlashBootloader } from "../../src/util/bootloader-flash.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { canFlashBootloader } from "../../src/util/bootloader-flash.js";
 
 describe("canFlashBootloader", () => {
   it("requires the YAML flag and a deployed firmware built from the current config", () => {

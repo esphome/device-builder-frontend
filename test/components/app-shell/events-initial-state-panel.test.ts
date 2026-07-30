@@ -3,15 +3,15 @@
 // one-shot firmware-jobs snapshot (no per-frame queue buildup).
 
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob } from "../../_make-firmware-job.js";
 import {
   DeviceEventType,
   type InitialStateEventData,
 } from "../../../src/api/types/event-subscription.js";
-import { CLEANUP_TTL_DEFAULT_SECONDS } from "../../../src/api/types/remote-build.js";
 import { JobStatus, JobType } from "../../../src/api/types/firmware-jobs.js";
+import { CLEANUP_TTL_DEFAULT_SECONDS } from "../../../src/api/types/remote-build.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
-import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 type Host = { [key: string]: unknown } & Pick<
   ESPHomeApp,

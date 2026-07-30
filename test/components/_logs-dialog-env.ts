@@ -4,7 +4,7 @@
 import "./_logs-dialog-mocks.js";
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
-import { type LogsSession, isStreaming } from "../../src/components/logs-session.js";
+import { isStreaming, type LogsSession } from "../../src/components/logs-session.js";
 
 export { toastError } from "./_logs-dialog-mocks.js";
 // The one path to the component for the family: a direct value import

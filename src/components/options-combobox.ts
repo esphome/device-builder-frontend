@@ -11,7 +11,7 @@
  * `options-combobox-change` on every keystroke and on option select.
  */
 import { mdiChevronDown } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
 import { textStyles } from "../styles/text.js";

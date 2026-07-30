@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isCrashMarker, latchCrashKind } from "../../src/util/crash-detector.js";
 import { CRASH_BANNER_LINE } from "../_crash-lines.js";
+import { isCrashMarker, latchCrashKind } from "../../src/util/crash-detector.js";
 
 // Realistic crash lines, one per supported shape.
 const CRASH_LINES: ReadonlyArray<[string, string]> = [

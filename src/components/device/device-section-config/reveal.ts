@@ -4,10 +4,10 @@
  */
 import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
+import { API_ACTIONS_BLOCK_KEYS } from "../../../util/yaml-automations.js";
 import { unitAdvancedGate } from "../config-entry-form-plan.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { scrollFlashRow } from "../field-highlight.js";
-import { API_ACTIONS_BLOCK_KEYS } from "../../../util/yaml-automations.js";
 
 /**
  * When a backend error lands on an advanced field that's currently

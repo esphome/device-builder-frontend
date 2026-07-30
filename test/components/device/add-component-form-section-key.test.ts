@@ -6,15 +6,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
-import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
-import { buildFeaturedId } from "../../../src/util/featured-id.js";
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
+import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
+import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { buildFeaturedId } from "../../../src/util/featured-id.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeTestBoard } from "./_renderer-fixtures.js";
 

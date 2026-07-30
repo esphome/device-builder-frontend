@@ -17,10 +17,10 @@ vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
+import { flushMicrotasks, identityLocalize } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
-import { flushMicrotasks, identityLocalize } from "../../_dom.js";
 
 const flush = () => flushMicrotasks(5);
 

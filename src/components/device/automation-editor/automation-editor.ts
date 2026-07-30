@@ -42,8 +42,8 @@ import { parseSubstitutions } from "../../../util/substitutions.js";
 import { actionsFocus, entryFieldFocus } from "./automation-focus.js";
 import { BaseAutomationEditor } from "./base-editor.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
-import { renderAutomationHeader } from "./render-automation-header.js";
 import { renderActionsSection } from "./render-actions-section.js";
+import { renderAutomationHeader } from "./render-automation-header.js";
 import {
   renderAddModePickers,
   renderIdentityFields,

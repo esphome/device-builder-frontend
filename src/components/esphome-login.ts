@@ -7,7 +7,7 @@
  * which dispatches to ``esphome-api``.
  */
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";

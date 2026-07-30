@@ -12,7 +12,7 @@
  * after a ``request-popover-close``.
  */
 import { mdiFilterVariant } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";

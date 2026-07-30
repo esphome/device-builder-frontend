@@ -7,7 +7,7 @@
  * and gets Escape / outside-click light-dismiss for free.
  */
 import { mdiOpenInNew } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 

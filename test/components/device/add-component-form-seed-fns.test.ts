@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { identityLocalize } from "../../_dom.js";
 import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
@@ -15,7 +16,6 @@ import {
   findReferencePath,
   seedDefaults,
 } from "../../../src/components/device/add-component-form-seed.js";
-import { identityLocalize } from "../../_dom.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const localize = identityLocalize;

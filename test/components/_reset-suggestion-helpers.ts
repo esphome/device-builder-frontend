@@ -9,8 +9,8 @@
  */
 import type { TemplateResult } from "lit";
 import { expect } from "vitest";
-import enMessages from "../../src/translations/en.json";
 import { findTemplatesByAnchor } from "../_lit-template-walker.js";
+import enMessages from "../../src/translations/en.json";
 
 const RESET_SUGGESTION_ANCHOR = 'class="reset-suggestion"';
 

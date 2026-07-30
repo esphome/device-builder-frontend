@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveController } from "lit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushMicrotasks } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ConfigLoadController } from "../../src/util/config-load-controller.js";
-import { flushMicrotasks } from "../_dom.js";
 
 /**
  * Pins the shared load ladder: start vs refresh semantics, server-reply

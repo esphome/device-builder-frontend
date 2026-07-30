@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { identityLocalize } from "../../../_dom.js";
 import type {
   AutomationAction,
   AvailableComponentInstance,
@@ -27,7 +28,6 @@ import type {
 import type { CatalogPickedDetail } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 import { makeConfigEntry } from "../../../../src/util/config-entry-defaults.js";
-import { identityLocalize } from "../../../_dom.js";
 
 function action(
   over: Pick<AutomationAction, "id" | "name" | "domain"> & Partial<AutomationAction>

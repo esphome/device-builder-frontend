@@ -8,9 +8,9 @@
  * inputs and string values.
  */
 import { describe, expect, it } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderMultiValueField } from "../../../src/components/device/config-entry-renderers.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function fireInput(binding: Record<string, unknown>, value: string): void {

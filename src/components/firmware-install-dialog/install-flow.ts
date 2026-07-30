@@ -1,26 +1,26 @@
 import {
+  type FirmwareBinary,
   JobSource,
   JobStatus,
-  type FirmwareBinary,
 } from "../../api/types/firmware-jobs.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
-import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
+import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { openFlasher } from "../../util/usb-flasher.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import {
   detectChip,
+  type DetectedChip,
   disconnect,
   flashFirmware,
   isPortPickerCancel,
   resetAndDisconnect,
   UnsupportedChipError,
-  type DetectedChip,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { OTA_PORT } from "../logs-session.js";

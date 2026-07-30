@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { renderTourSpotlightBackdrop } from "../../src/components/guided-tour/tour-spotlight.js";
-import type { TourFrame } from "../../src/components/guided-tour/tour-geometry.js";
 import { findTemplatesByAnchor } from "../_lit-template-walker.js";
+import type { TourFrame } from "../../src/components/guided-tour/tour-geometry.js";
+import { renderTourSpotlightBackdrop } from "../../src/components/guided-tour/tour-spotlight.js";
 
 const FRAME: TourFrame = {
   hole: { x: 100, y: 80, w: 200, h: 120 },

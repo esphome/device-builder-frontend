@@ -27,11 +27,11 @@ import {
   parseExtendsRef,
   pushConfigVars,
   SCHEMA_REGISTRY_KEYS,
-  walkConfigVarExtends,
   type SchemaComponent,
   type SchemaConfigVar,
   type SchemaConfigVarKey,
   type SchemaSchema,
+  walkConfigVarExtends,
 } from "./esphome-schema-core.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 

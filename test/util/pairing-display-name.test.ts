@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { PairingSummary, PeerSummary } from "../../src/api/types/remote-build.js";
 import {
   jobPeerDisplayName,
-  pairingDisplayNameForPin,
   pairingDisplayName,
+  pairingDisplayNameForPin,
   peerDisplayName,
 } from "../../src/util/pairing-display-name.js";
 

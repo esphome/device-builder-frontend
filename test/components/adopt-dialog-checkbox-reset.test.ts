@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 
+import { mount } from "../_dom.js";
 import type { AdoptableDevice } from "../../src/api/types/devices.js";
 import { ESPHomeAdoptDialog } from "../../src/components/adopt-dialog.js";
-import { mount } from "../_dom.js";
 
 const DEVICE = {
   name: "foo-1234",

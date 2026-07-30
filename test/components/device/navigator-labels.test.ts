@@ -7,13 +7,13 @@ vi.mock("../../../src/util/component-name-cache.js", () => ({
   getCachedComponent: vi.fn(),
 }));
 
+import { identityLocalize } from "../../_dom.js";
 import {
   type LabelContext,
   resolveNavItemLabels,
 } from "../../../src/components/device/navigator-labels.js";
 import { getCachedComponent } from "../../../src/util/component-name-cache.js";
 import type { YamlSection } from "../../../src/util/yaml-sections.js";
-import { identityLocalize } from "../../_dom.js";
 
 const mockGetCached = vi.mocked(getCachedComponent);
 const named = (name: string) =>

@@ -4,11 +4,11 @@ import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { trimTrailingDot } from "../../util/hostname.js";
 import { pairingDisplayName } from "../../util/pairing-display-name.js";
-import { canResetBuildEnv } from "../remote-build-hint.js";
 import {
   classifyVersionMismatch,
   isPinnableVersion,
 } from "../../util/version-mismatch.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 
 interface PillResult {
   pillClass: string;

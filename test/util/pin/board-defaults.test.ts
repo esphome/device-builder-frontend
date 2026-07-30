@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { makeConfigEntry } from "../_make-config-entry.js";
 import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.js";
 import {
   type ConfigEntry,
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
 import { seedBoardPinDefaults } from "../../../src/util/pin/board-defaults.js";
-import { makeConfigEntry } from "../_make-config-entry.js";
 
 function makePin(overrides: Partial<BoardPin>): BoardPin {
   return {

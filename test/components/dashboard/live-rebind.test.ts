@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { relinkLive } from "../../../src/components/dashboard/live-rebind.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { relinkLive } from "../../../src/components/dashboard/live-rebind.js";
 
 describe("relinkLive", () => {
   const stale = makeConfiguredDevice({ configuration: "kitchen.yaml" });

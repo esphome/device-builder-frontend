@@ -12,21 +12,21 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("../../../src/components/dashboard/table-column-toggle.js", () => ({}));
 vi.mock("../../../src/components/dashboard/table-row-menu.js", () => ({}));
 
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeDeviceTable } from "../../../src/components/dashboard/device-table.js";
-import {
-  clearTourConfiguration,
-  setTourActive,
-  setTourConfiguration,
-} from "../../../src/components/guided-tour/tour-session.js";
 import {
   ALL_PAGE_SIZE,
   effectiveTablePageSize,
 } from "../../../src/components/dashboard/pagination.js";
 import {
-  makeConfiguredDevice,
-  type ConfiguredDeviceOverrides,
-} from "../../_make-configured-device.js";
+  clearTourConfiguration,
+  setTourActive,
+  setTourConfiguration,
+} from "../../../src/components/guided-tour/tour-session.js";
 
 afterEach(() => {
   setTourActive(false);

@@ -24,23 +24,23 @@ import {
   PIN_WIRING_KEYS,
   presetsForPinMode,
   presetUnavailableReason,
+  type WiringPreset,
+  type WiringState,
   wiringStateOf,
   wiringTechSummary,
   wiringValuesPresetSafe,
-  type WiringPreset,
-  type WiringState,
 } from "../../../util/pin/wiring-presets.js";
-import { parseYamlBoolean } from "../../../util/yaml-serialize.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { parseYamlBoolean } from "../../../util/yaml-serialize.js";
 import { onChoiceGroupKeydown, rovingTabStopIndex } from "../../shared/choice-group.js";
 import { renderDisclosure } from "../../shared/disclosure.js";
-import { renderCustomEditor, renderLongFormChild, wiringDiagram } from "./mode-editor.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
   type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { renderCustomEditor, renderLongFormChild, wiringDiagram } from "./mode-editor.js";
 
 registerMdiIcons({ tune: mdiTune });
 

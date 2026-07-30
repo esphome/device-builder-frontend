@@ -10,11 +10,11 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
+import { identityLocalize } from "../../_dom.js";
+import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../../src/api/types/reachability.js";
 import { renderMdnsStaleWarning } from "../../../src/components/dashboard/device-drawer-render.js";
-import { identityLocalize } from "../../_dom.js";
-import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
 
 function reachability(
   overrides: Partial<ReachabilityStateEvent> = {}

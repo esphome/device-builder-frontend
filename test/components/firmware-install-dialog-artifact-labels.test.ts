@@ -7,12 +7,12 @@
  * localize so the localized path is actually exercised.
  */
 import { describe, expect, it } from "vitest";
+import { renderInto } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
-import { renderInto } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 function rowsText(binaries: FirmwareBinary[]): string {
   const host = {

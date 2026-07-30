@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 import {
   loadDashboardFilters,
   saveDashboardFilters,
   STORAGE_KEY,
 } from "../../src/util/dashboard-filters-session.js";
-import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("dashboard-filters-session", () => {
   let store: Map<string, string>;

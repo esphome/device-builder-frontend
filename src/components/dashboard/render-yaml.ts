@@ -7,8 +7,8 @@ import {
   buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
   yamlHitDeviceLabel,
-  yamlSnippetBlockHref,
   type YamlSnippetBlock,
+  yamlSnippetBlockHref,
 } from "../../util/yaml-search-helpers.js";
 
 export function highlightMatch(text: string, needle: string): unknown {

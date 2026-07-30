@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import "../_mock-webawesome.js";
 
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import {
@@ -12,11 +13,10 @@ import {
   startValidateStream,
   stopCommand,
 } from "../../src/components/command-dialog/commands.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 import {
-  type StreamCbs,
   flushResume,
   makeCommandDialogHost,
+  type StreamCbs,
 } from "./_command-dialog-host.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -18,8 +18,8 @@ vi.mock("../../../src/util/notify.js", () => ({
   },
 }));
 
-import { ESPHomeSettingsBuildServer } from "../../../src/components/settings-dialog/build-server-section.js";
 import type { IdentityView } from "../../../src/api/types/remote-build.js";
+import { ESPHomeSettingsBuildServer } from "../../../src/components/settings-dialog/build-server-section.js";
 import { notify } from "../../../src/util/notify.js";
 
 const IDENTITY: IdentityView = {

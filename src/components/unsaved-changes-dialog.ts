@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiAlertOutline, mdiContentSave } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";

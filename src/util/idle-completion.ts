@@ -10,7 +10,7 @@
  */
 import { completionStatus, startCompletion } from "@codemirror/autocomplete";
 import type { EditorState } from "@codemirror/state";
-import { ViewPlugin, type EditorView, type ViewUpdate } from "@codemirror/view";
+import { type EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { matchKeyPosition, matchValuePosition } from "./yaml-completion-catalog.js";
 
 /**

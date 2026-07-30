@@ -5,11 +5,11 @@ vi.mock("sonner-js", () => ({
 }));
 
 import toast from "sonner-js";
+import { withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
-import { withWebSerial } from "../_web-serial.js";
 
 function makeDevice(): ConfiguredDevice {
   return {

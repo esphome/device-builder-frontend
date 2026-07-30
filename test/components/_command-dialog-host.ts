@@ -1,11 +1,11 @@
+import { flushMicrotasks } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 // Shared fake ESPHomeCommandDialog host for the chain-follow tests
 // (install + rename) so the mirrored follow-path fields live in one place.
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
-import { flushMicrotasks } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 export interface StreamCbs {
   onOutput: (line: string) => void;

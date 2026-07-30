@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
-import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
+import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
 import { evaluateGroup } from "../../../util/constraint-groups.js";
 import {
   fieldKeyAttr,

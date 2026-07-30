@@ -11,32 +11,32 @@
  * Wired via `linter()` (no `lintGutter()` — diagnostics show as red wavy
  * underlines only, never as a round pill in the gutter).
  */
-import { forEachDiagnostic, linter, type Diagnostic } from "@codemirror/lint";
+import { type Diagnostic, forEachDiagnostic, linter } from "@codemirror/lint";
 import {
-  RangeSetBuilder,
-  StateEffect,
-  StateField,
   type EditorState,
   type Extension,
   type RangeSet,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
   type Text,
 } from "@codemirror/state";
-import { gutterLineClass, GutterMarker, type EditorView } from "@codemirror/view";
+import { type EditorView, gutterLineClass, GutterMarker } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { mappedFormPath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
 import { getKeyPathWithListIndices, isScalarListItemAt } from "./yaml-ast.js";
+import { describeComponentNotFoundFix } from "./yaml-component-not-found-fix.js";
 import {
   describeValueTypeCause,
   describeYamlError,
   parseYamlErrorPosition,
-  sanitizeMessage,
   type ReadLine,
+  sanitizeMessage,
   type YamlAutoFix,
 } from "./yaml-error-analysis.js";
-import { describeComponentNotFoundFix } from "./yaml-component-not-found-fix.js";
 import { describeInvalidOptionFix } from "./yaml-invalid-option-fix.js";
 import { indentOf } from "./yaml-line-walker.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";

@@ -1,8 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { withBase } from "../../util/base-path.js";
-import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
 import { iconForDomain } from "./navigator-row-icons.js";

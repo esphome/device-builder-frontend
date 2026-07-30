@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   assessBusHostability,
-  exclusiveBusTarget,
   type BusConstraintsLookup,
+  exclusiveBusTarget,
 } from "../../src/util/bus-availability.js";
 import { _clearYamlSectionsMemo } from "../../src/util/yaml-sections-core.js";
 

@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiArchiveArrowUpOutline, mdiArchiveOutline, mdiTrashCanOutline } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ArchivedDevice } from "../api/types/system.js";

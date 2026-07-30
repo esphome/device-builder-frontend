@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { mount } from "../../_dom.js";
 import type { Label } from "../../../src/api/types/devices.js";
 import { ESPHomeLabelForm } from "../../../src/components/labels/label-form.js";
-import { mount } from "../../_dom.js";
 
 const LABEL: Label = { id: "l1", name: "kitchen", color: "#ff0000" } as Label;
 

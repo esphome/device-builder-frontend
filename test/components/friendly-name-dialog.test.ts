@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 
-import { ESPHomeFriendlyNameDialog } from "../../src/components/friendly-name-dialog.js";
 import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
+import { ESPHomeFriendlyNameDialog } from "../../src/components/friendly-name-dialog.js";
 
 function setValue(el: ESPHomeFriendlyNameDialog, value: string): Promise<unknown> {
   const input = el.shadowRoot!.querySelector<HTMLInputElement>("#friendly-name-input")!;

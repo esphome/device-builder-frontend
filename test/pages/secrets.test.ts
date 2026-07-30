@@ -8,14 +8,14 @@ vi.mock("sonner-js", () => ({
 import toast from "sonner-js";
 
 import "../_mock-webawesome.js";
-import { APIError } from "../../src/api/api-error.js";
-import type { ESPHomeAPI } from "../../src/api/index.js";
-import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
 import { flushMicrotasks } from "../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../_lit-template-walker.js";
+import { APIError } from "../../src/api/api-error.js";
+import type { ESPHomeAPI } from "../../src/api/index.js";
+import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
 
 // The load cells below mount the page for real, which upgrades these
 // children; Web Awesome's form-associated base and CodeMirror both crash

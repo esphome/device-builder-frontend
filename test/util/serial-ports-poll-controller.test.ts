@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushTimers } from "../_dom.js";
+import { FakeHost } from "../_fake-host.js";
+import { makeSerialPort } from "../_make-serial-port.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { SerialPort } from "../../src/api/types/system.js";
 import {
@@ -6,9 +9,6 @@ import {
   SerialPortsPollController,
   sortSerialPorts,
 } from "../../src/util/serial-ports-poll-controller.js";
-import { flushTimers } from "../_dom.js";
-import { FakeHost } from "../_fake-host.js";
-import { makeSerialPort } from "../_make-serial-port.js";
 
 const A: SerialPort = makeSerialPort("/dev/ttyUSB0", "CP2102");
 const B: SerialPort = makeSerialPort("/dev/ttyUSB1", "CH340");

@@ -12,11 +12,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../../src/components/filters/filter-section.js", () => ({}));
 vi.mock("../../../src/components/filters/labels-filter-section.js", () => ({}));
 
+import { identityLocalize, renderInto } from "../../_dom.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderFacetSections } from "../../../src/components/filters/facet-sections.js";
 import type { FacetSelection } from "../../../src/util/device-filter.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
 const DEVICES = [
   makeConfiguredDevice({

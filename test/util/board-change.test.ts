@@ -6,11 +6,11 @@ vi.mock("sonner-js", () => ({
 vi.mock("../../src/util/board-body-cache.js", () => ({ fetchBoard: vi.fn() }));
 
 import toast from "sonner-js";
+import { makeSlimBoard } from "../_make-slim-board.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { fetchBoard } from "../../src/util/board-body-cache.js";
 import { findBoardDisagreement } from "../../src/util/board-change.js";
-import { makeSlimBoard } from "../_make-slim-board.js";
 
 // Inline stub: this suite runs in node, and test/_dom.ts drags in Lit's
 // DOM helpers.

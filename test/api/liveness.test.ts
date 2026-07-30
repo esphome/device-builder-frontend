@@ -1,11 +1,11 @@
-import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { LivenessMonitor } from "../../src/api/liveness.js";
 import {
-  MockWebSocket,
   fireDocumentEvent,
   fireWindowEvent,
   installMockWebSocket,
+  MockWebSocket,
   setDocumentVisibility,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";

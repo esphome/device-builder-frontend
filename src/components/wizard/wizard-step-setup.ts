@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -12,13 +12,13 @@ import { EnterController } from "../../util/enter-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
+import { slugifyHostname } from "../../util/slugify-hostname.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import {
   clearTourSuggestedName,
   getTourSuggestedName,
   isTourActive,
 } from "../guided-tour/tour-session.js";
-import { slugifyHostname } from "../../util/slugify-hostname.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 import type { ESPHomeDeviceNameInputs } from "../shared/device-name-inputs.js";

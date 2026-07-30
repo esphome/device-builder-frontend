@@ -24,9 +24,9 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
+import { mount } from "../../../_dom.js";
 import type { ActionNode } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationActionNode } from "../../../../src/components/device/automation-editor/automation-action-node.js";
-import { mount } from "../../../_dom.js";
 
 const unknownNode: ActionNode = {
   action_id: "storage.file_append",

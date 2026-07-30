@@ -8,9 +8,9 @@
  * ``overwrite=true`` and always announces.
  */
 import { describe, expect, it, vi } from "vitest";
+import { flush } from "../_dom.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { ensureSecretInYaml, setSecretInYaml } from "../../src/util/secrets-write.js";
-import { flush } from "../_dom.js";
 
 function apiWith(created: boolean) {
   return {

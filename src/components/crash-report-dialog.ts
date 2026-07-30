@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClipboardTextOutline, mdiDownload } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -16,18 +16,18 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
-import { notifyError, notifySuccess } from "../util/notify.js";
 import {
-  type CrashReport,
-  type CrashScrape,
   buildFullReport,
   buildIssueUrl,
+  type CrashReport,
+  type CrashScrape,
   distillValidatedConfig,
   platformFromIntegrations,
   scrapeCrashData,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

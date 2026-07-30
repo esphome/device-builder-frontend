@@ -1,9 +1,9 @@
 import type { TemplateResult } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { visitTemplates } from "../../_lit-template-walker.js";
 import type { PairingSummary } from "../../../src/api/types/remote-build.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { renderPairingRow } from "../../../src/components/settings-dialog/build-offload-pairing-row.js";
-import { visitTemplates } from "../../_lit-template-walker.js";
 
 const localize: LocalizeFunc = ((key: string, values?: Record<string, unknown>) =>
   values ? `${key} ${JSON.stringify(values)}` : key) as LocalizeFunc;

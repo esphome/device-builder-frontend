@@ -16,8 +16,8 @@ import { loadCatalog, resolveAvailableEntries } from "./yaml-completion-catalog.
 import {
   analyzeDedentedOption,
   analyzeOverIndentedOption,
-  parseInvalidOptionMessage,
   type DedentedOptionCandidate,
+  parseInvalidOptionMessage,
   type ReadLine,
   type ValueTypeCause,
 } from "./yaml-error-analysis.js";

@@ -11,8 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 import { flushMicrotasks } from "../_dom.js";
+import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 
 async function mountDashboard(
   yamlMode: boolean,

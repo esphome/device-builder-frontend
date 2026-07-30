@@ -11,12 +11,12 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+import { flushTimers } from "../_dom.js";
+import { makeSerialPort } from "../_make-serial-port.js";
 import type { SerialPort } from "../../src/api/types/system.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../src/util/serial-ports-poll-controller.js";
-import { flushTimers } from "../_dom.js";
-import { makeSerialPort } from "../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(getSerialPorts: () => Promise<SerialPort[]>) {

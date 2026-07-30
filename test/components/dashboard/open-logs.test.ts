@@ -4,11 +4,11 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+import { withWebSerial } from "../../_web-serial.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { openLogs } from "../../../src/components/dashboard/install.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { withWebSerial } from "../../_web-serial.js";
 
 function makeDevice(): ConfiguredDevice {
   return {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  YamlRawValue,
   formatYamlScalar,
   hasSerializableValue,
   parseConfiguredPlatforms,
   parseTopLevelComponents,
   parseYamlBoolean,
   serializeYamlValues,
+  YamlRawValue,
 } from "../../src/util/yaml-serialize.js";
 
 // A Material Design Icon glyph (Plane-15 Private Use Area) — the value

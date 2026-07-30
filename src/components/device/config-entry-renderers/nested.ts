@@ -8,10 +8,10 @@ import {
   fieldKeyAttr,
   labelFor,
   renderChildEntries,
+  type RenderCtx,
   renderFieldError,
   renderHelpLink,
   renderLabel,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 import { hasNameChild, seedIdFor } from "./seed-identity.js";
 

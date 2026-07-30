@@ -25,10 +25,10 @@ vi.mock("../../../src/components/confirm-dialog.js", () => {
 });
 
 import toast from "sonner-js";
+import { flush } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
 import { ESPHomeSecretValue } from "../../../src/components/device/secret-value.js";
 import { _resetSecretKeysCache } from "../../../src/util/secrets-cache.js";
-import { flush } from "../../_dom.js";
 
 async function mount(
   api: Partial<ESPHomeAPI>,

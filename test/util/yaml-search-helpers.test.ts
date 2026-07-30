@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../_dom.js";
 import type { YamlSearchHit, YamlSearchMatch } from "../../src/api/types/devices.js";
 import {
   buildYamlSnippetBlocks,
@@ -10,7 +11,6 @@ import {
   yamlHitLabel,
   yamlSnippetBlockHref,
 } from "../../src/util/yaml-search-helpers.js";
-import { identityLocalize } from "../_dom.js";
 
 /**
  * Build a ``YamlSearchMatch`` with sensible defaults.

@@ -5,8 +5,8 @@
  * Cancel routes back to the method step.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ESPHomeWizardStepOverwriteDevice } from "../../../src/components/wizard/wizard-step-overwrite-device.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeWizardStepOverwriteDevice } from "../../../src/components/wizard/wizard-step-overwrite-device.js";
 
 describe("wizard-step-overwrite-device", () => {
   it("renders a message paragraph and both actions", async () => {

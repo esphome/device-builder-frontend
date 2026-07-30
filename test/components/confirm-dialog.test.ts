@@ -8,9 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
 import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
+import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
 
 describe("confirm-dialog ENTER", () => {
   it("confirms a non-destructive dialog on Enter", async () => {

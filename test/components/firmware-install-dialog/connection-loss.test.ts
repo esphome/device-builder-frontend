@@ -2,6 +2,13 @@
  * @vitest-environment happy-dom
  */
 import { describe, expect, it, vi } from "vitest";
+import {
+  flushResume,
+  makeReconnectApi,
+  type StreamCbs,
+} from "../_command-dialog-host.js";
+import { identityLocalize } from "../../_dom.js";
+import { fakeLogBuffer } from "../../_fake-host.js";
 import { JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import {
@@ -12,13 +19,6 @@ import {
   cardState,
   cardStatusMessage,
 } from "../../../src/components/firmware-install-dialog/renderers.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
-import { identityLocalize } from "../../_dom.js";
-import {
-  type StreamCbs,
-  flushResume,
-  makeReconnectApi,
-} from "../_command-dialog-host.js";
 
 function makeHost() {
   const follows: StreamCbs[] = [];

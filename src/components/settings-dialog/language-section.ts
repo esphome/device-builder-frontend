@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiOpenInNew } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type {
@@ -8,7 +8,7 @@ import type {
   LanguageOption,
   LocalizeFunc,
 } from "../../common/localize.js";
-import { LANGUAGES, languageLabel, readStoredLocale } from "../../common/localize.js";
+import { languageLabel, LANGUAGES, readStoredLocale } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";

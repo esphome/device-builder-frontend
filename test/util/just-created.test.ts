@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 import {
   clearJustCreated,
   consumeJustCreated,
   markJustCreated,
 } from "../../src/util/just-created.js";
-import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("just-created", () => {
   beforeEach(() => {

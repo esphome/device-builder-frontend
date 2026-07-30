@@ -13,9 +13,9 @@ vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }))
 const sleep = vi.fn((_ms?: number) => Promise.resolve());
 vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }));
 
+import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
-import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 

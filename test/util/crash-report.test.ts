@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
 import {
-  type CrashReport,
   buildFullReport,
   buildIssueUrl,
+  type CrashReport,
   distillValidatedConfig,
   inferComponentName,
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
 } from "../../src/util/crash-report.js";
-import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
 
 const FILLER = Array.from(
   { length: 40 },

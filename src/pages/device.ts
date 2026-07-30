@@ -1,36 +1,35 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { cache } from "lit/directives/cache.js";
 import { classMap } from "lit/directives/class-map.js";
-import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
+import type { YamlDiff } from "../api/types/automations.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
+import { applyRemoval } from "../components/device/apply-removal.js";
+import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
-import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 // `NavSectionName` is consumed by the section-show event handler; the
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import { applyRemoval } from "../components/device/apply-removal.js";
-import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
-import type { YamlDiff } from "../api/types/automations.js";
 import type {
   SectionEditor,
   YamlDraftDetail,
   YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
-import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
+import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
@@ -48,22 +47,23 @@ import { espHomeStyles } from "../styles/shared.js";
 import {
   backendErrorCounts,
   backendErrorsForInstance,
+  type BackendFieldError,
   formRelativePath,
   instanceKey,
   resolveBackendErrors,
-  type BackendFieldError,
 } from "../util/backend-field-errors.js";
 import { fetchBoard } from "../util/board-body-cache.js";
 import { applyBoardChange, openBoardReselect } from "../util/board-change.js";
+import { ConfigLoadController } from "../util/config-load-controller.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { ConfigLoadController } from "../util/config-load-controller.js";
-import { renderAsyncState } from "../util/render-async-state.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
+import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 import { isTypingTarget } from "../util/typing-target.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import {

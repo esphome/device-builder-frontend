@@ -12,7 +12,7 @@ import {
   mdiWeb,
 } from "@mdi/js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
-import { LitElement, html, type PropertyValues, type TemplateResult } from "lit";
+import { html, LitElement, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -23,8 +23,8 @@ import type { ArchivedDevice } from "../api/types/system.js";
 import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
-  adoptFollowUp,
   type AdoptedDetail,
+  adoptFollowUp,
   deleteLabel,
   executeClone,
   executeFriendlyName,
@@ -56,16 +56,15 @@ import {
   renderTable,
 } from "../components/dashboard/render-content.js";
 import {
+  type PendingConfirm,
   renderDialogs,
   executeConfirm as runExecuteConfirm,
-  type PendingConfirm,
 } from "../components/dashboard/render-dialogs.js";
 import {
   dashboardStacksStyles,
   renderBuilderStack,
   renderRemoteStack,
 } from "../components/dashboard/render-stacks.js";
-import { stackBarStyles } from "../components/shared/stack-bar-styles.js";
 import {
   renderEmptySearch,
   renderSelectBarOrFab,
@@ -88,6 +87,7 @@ import {
 import { dashboardStyles } from "../components/dashboard/styles.js";
 import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
 import { TourActivityController } from "../components/guided-tour/tour-activity-controller.js";
+import { stackBarStyles } from "../components/shared/stack-bar-styles.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
@@ -119,9 +119,9 @@ import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
   activeFacetCount,
   applyFacetFilters,
+  type FacetSelection,
   hasActiveFilters,
   matchesDeviceSearch,
-  type FacetSelection,
 } from "../util/device-filter.js";
 import { matchesDeviceName } from "../util/device-search.js";
 import { sortDevices } from "../util/device-sort.js";
@@ -153,24 +153,24 @@ import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/device/board-reselect-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
-import { findBoardDisagreement, openBoardReselect } from "../util/board-change.js";
+import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
-import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
-import "../components/friendly-name-dialog.js";
 import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
+import "../components/friendly-name-dialog.js";
+import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
-import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
+import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/remote-build-panel.js";
-import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
+import "../components/rename-device-dialog.js";
+import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 import "../components/select-bar.js";
 import "../components/wizard/create-config-dialog.js";
-import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
+import { findBoardDisagreement, openBoardReselect } from "../util/board-change.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,

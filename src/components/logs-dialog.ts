@@ -11,7 +11,7 @@ import {
   mdiRestart,
   mdiStop,
 } from "@mdi/js";
-import { LitElement, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -25,21 +25,17 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
-import { type CrashKind, classifyLine, latchCrashKind } from "../util/crash-detector.js";
-import { normalizeLogLine } from "../util/log-line.js";
+import { classifyLine, type CrashKind, latchCrashKind } from "../util/crash-detector.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
+import { normalizeLogLine } from "../util/log-line.js";
 import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
-import { renderActionSuggestion } from "./process-terminal/reset-suggestion.js";
-import {
-  crashCalloutStyles,
-  renderCrashCallout,
-  repinTerminalForCallout,
-} from "./process-terminal/crash-callout.js";
+import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
+import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   abortSerialReconnect,
   onStart,
@@ -53,16 +49,19 @@ import {
   teardownSession,
   toggleShowStates,
 } from "./logs-dialog/session.js";
-import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
-import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
-  type LogsSession,
-  OTA_PORT,
   hasSerialPort,
   isOtaNetwork,
   isPassive,
   isStreaming,
+  type LogsSession,
+  OTA_PORT,
 } from "./logs-session.js";
+import {
+  crashCalloutStyles,
+  renderCrashCallout,
+  repinTerminalForCallout,
+} from "./process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
 import {
   fillTerminalOnMobile,
@@ -70,6 +69,7 @@ import {
   termSuggestionStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
+import { renderActionSuggestion } from "./process-terminal/reset-suggestion.js";
 import { renderTermButton, renderTermToggle } from "./process-terminal/toolbar-button.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

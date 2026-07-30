@@ -14,6 +14,7 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import type { ReactiveController } from "lit";
 import toast from "sonner-js";
+import { flushTimers, identityLocalize } from "../../../_dom.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   AutomationLocation,
@@ -28,7 +29,6 @@ import {
   type AutoApplyOptions,
 } from "../../../../src/components/device/automation-editor/auto-apply-controller.js";
 import type { YamlUpdatedDetail } from "../../../../src/components/device/section-editor.js";
-import { flushTimers, identityLocalize } from "../../../_dom.js";
 
 const SCRIPT: AutomationLocation = {
   kind: "script",

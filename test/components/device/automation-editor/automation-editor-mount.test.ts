@@ -11,9 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import "./_editor-harness.js";
 
+import { flushMicrotasks } from "../../../_dom.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
-import { flushMicrotasks } from "../../../_dom.js";
 import { makeEditorApi, mountEditor, seedTree } from "./_editor-harness.js";
 
 describe("automation-editor mount-time load (behavioral)", () => {

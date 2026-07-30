@@ -2,19 +2,19 @@ import { html, nothing } from "lit";
 import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
+import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
-import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
+  type RenderCtx,
   renderFieldError,
   renderLabel,
   renderSubstitutionHint,
   renderYamlOnlyField,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 import { seedIdFor } from "./seed-identity.js";
 

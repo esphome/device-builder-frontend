@@ -9,10 +9,10 @@
  */
 import {
   connectToPort,
+  type DetectedChip,
   disconnect,
   flashFirmware,
   resetAndDisconnect,
-  type DetectedChip,
 } from "../../util/web-serial.js";
 import type { FlashPart } from "../util/esphome-web-firmware.js";
 

@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
@@ -20,8 +20,8 @@ import { renderTermButton } from "../../components/process-terminal/toolbar-butt
 import { localizeContext } from "../../context/index.js";
 import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
 import {
-  type CrashKind,
   classifyLine,
+  type CrashKind,
   latchCrashKind,
 } from "../../util/crash-detector.js";
 import { downloadAnsiText } from "../../util/download-text.js";

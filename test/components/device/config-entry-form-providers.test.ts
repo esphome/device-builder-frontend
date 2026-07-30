@@ -12,11 +12,11 @@ vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+import { flushMicrotasks } from "../../_dom.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
 import type { ComponentProvider } from "../../../src/util/config-entry-yaml-scan.js";
 import { COMPONENT_FETCH_PAGE } from "../../../src/util/fetch-all-components.js";
-import { flushMicrotasks } from "../../_dom.js";
 
 const resolve = (
   form: ESPHomeConfigEntryForm,

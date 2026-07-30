@@ -6,8 +6,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
-import { takenHostnameSet } from "../../util/taken-hostnames.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
+import { takenHostnameSet } from "../../util/taken-hostnames.js";
 import { performRename } from "./actions-ui.js";
 import {
   archiveBulkDevices,

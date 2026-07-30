@@ -91,8 +91,10 @@ import {
   isRadioCluster,
   labelFor,
   renderBooleanField,
+  renderColorField,
   renderConstraintClusterField,
   renderConstraintRadioField,
+  type RenderCtx,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
   renderIconField,
@@ -101,7 +103,6 @@ import {
   renderMultiValueField,
   renderNestedField,
   renderNestedListField,
-  renderColorField,
   renderNumberField,
   renderPinField,
   renderRegistryListField,
@@ -109,7 +110,6 @@ import {
   renderStringField,
   renderTextareaField,
   renderTimePeriodField,
-  type RenderCtx,
 } from "./config-entry-renderers.js";
 import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";

@@ -9,10 +9,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import "./_mock-dashboard-children.js";
 
-import { DeviceState } from "../../src/api/types/devices.js";
-import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 import { flushMicrotasks } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { DeviceState } from "../../src/api/types/devices.js";
+import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 
 const OFFLINE = makeConfiguredDevice({
   runtime_state: { state: DeviceState.OFFLINE },

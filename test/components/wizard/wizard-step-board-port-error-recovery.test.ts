@@ -11,13 +11,13 @@ vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}))
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
+import { flushTimers } from "../../_dom.js";
+import { makeSerialPort } from "../../_make-serial-port.js";
 import type { SerialPort } from "../../../src/api/types/system.js";
 import { defaultLocalize } from "../../../src/common/localize.js";
 import type { ESPHomeWizardStepBoardPortSelect } from "../../../src/components/wizard/wizard-step-board-port-select.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../../src/util/serial-ports-poll-controller.js";
-import { flushTimers } from "../../_dom.js";
-import { makeSerialPort } from "../../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(getSerialPorts: () => Promise<SerialPort[]>) {

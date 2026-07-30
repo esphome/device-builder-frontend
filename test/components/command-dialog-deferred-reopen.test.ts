@@ -8,10 +8,10 @@
  * queued-update message, not "Compilation complete!".
  */
 import { describe, expect, it } from "vitest";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { deriveFollowCommandType } from "../../src/components/command-dialog/commands.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 import type { StreamCbs } from "./_command-dialog-host.js";
 
 function mount(jobs: ReturnType<typeof makeFirmwareJob>[]) {

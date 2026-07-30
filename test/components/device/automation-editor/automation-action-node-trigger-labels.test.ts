@@ -24,13 +24,13 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
+import { mount } from "../../../_dom.js";
 import type {
   ActionNode,
   AutomationAction,
 } from "../../../../src/api/types/automations.js";
 import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationActionNode } from "../../../../src/components/device/automation-editor/automation-action-node.js";
-import { mount } from "../../../_dom.js";
 
 const urlEntry = {
   key: "url",

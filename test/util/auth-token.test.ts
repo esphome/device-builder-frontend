@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 import {
   clearStoredToken,
   getStoredToken,
   setStoredToken,
 } from "../../src/util/auth-token.js";
-import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("auth-token", () => {
   beforeEach(() => {

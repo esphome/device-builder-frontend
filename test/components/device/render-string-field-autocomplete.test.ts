@@ -4,6 +4,7 @@
  * in the form doesn't trigger password autocomplete on the ID input.
  */
 import { describe, expect, it, vi } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import {
   type ConfigEntry,
   ConfigEntryType,
@@ -11,7 +12,6 @@ import {
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function ctxFor(value: string): RenderCtx {

@@ -29,7 +29,7 @@ import {
   mdiUpdate,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { IntegrationDoc } from "../../api/types/components.js";

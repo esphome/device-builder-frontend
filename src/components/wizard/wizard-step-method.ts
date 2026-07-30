@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiChevronRight, mdiCog } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LocalizeFunc } from "../../common/localize.js";

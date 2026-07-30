@@ -9,12 +9,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { renderInto } from "../../_dom.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DashboardView } from "../../../src/api/types/system.js";
 import { renderTable } from "../../../src/components/dashboard/render-content.js";
 import { sortDevices } from "../../../src/util/device-sort.js";
-import { renderInto } from "../../_dom.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
 
 // Backend snapshot order: lexicographic by YAML path, capitals first.

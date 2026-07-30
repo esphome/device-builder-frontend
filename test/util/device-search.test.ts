@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import {
+  type DeviceRowSearchFields,
   matchesDeviceName,
   matchesDeviceRow,
   matchesMacAddress,
-  type DeviceRowSearchFields,
 } from "../../src/util/device-search.js";
-import {
-  makeConfiguredDevice,
-  type ConfiguredDeviceOverrides,
-} from "../_make-configured-device.js";
 
 function _device(overrides: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
   return makeConfiguredDevice({ friendly_name: "Kitchen Lamp", ...overrides });

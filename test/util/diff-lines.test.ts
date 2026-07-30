@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffLines, hasChanges, type DiffLine } from "../../src/util/diff-lines.js";
+import { type DiffLine, diffLines, hasChanges } from "../../src/util/diff-lines.js";
 
 /**
  * Reconstruct the old document from a diff: the lines visible on the

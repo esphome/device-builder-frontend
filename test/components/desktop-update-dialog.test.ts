@@ -12,9 +12,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { identityLocalize } from "../_dom.js";
 import type { DesktopUpdateCheck } from "../../src/api/types/desktop.js";
 import { ESPHomeDesktopUpdateDialog } from "../../src/components/desktop-update-dialog.js";
-import { identityLocalize } from "../_dom.js";
 
 function makeCheck(anyAvailable: boolean): DesktopUpdateCheck {
   const upToDate = {

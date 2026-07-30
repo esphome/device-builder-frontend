@@ -16,7 +16,6 @@ import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
-import { fireSectionEvent } from "./section-editor.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -25,9 +24,9 @@ import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import { findMissingDependencies } from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
+  type DepNavHost,
   matchesDepDomain,
   navigateToDep,
-  type DepNavHost,
 } from "./add-component-dialog-dep-nav.js";
 import {
   hydrateForSelection,
@@ -38,6 +37,7 @@ import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormNeedsUserInput } from "./add-component-form-filter.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
+import { fireSectionEvent } from "./section-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";

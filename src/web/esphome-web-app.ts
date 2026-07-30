@@ -1,5 +1,5 @@
 import { provide } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
@@ -10,7 +10,7 @@ import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
-import { readMode, writeMode, type WebMode } from "./web-mode.js";
+import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
 /**
  * Standalone ESPHome Web app shell.

@@ -4,11 +4,11 @@
  * change detection), preserving the other runtime fields.
  */
 import { describe, expect, it } from "vitest";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { DeviceEventType } from "../../../src/api/types/event-subscription.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
 type Host = Pick<ESPHomeApp, "_devices">;
 

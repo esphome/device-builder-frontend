@@ -4,13 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { openFlasher } = vi.hoisted(() => ({ openFlasher: vi.fn() }));
 vi.mock("../../src/util/usb-flasher.js", () => ({ openFlasher }));
 
+import { identityLocalize } from "../_dom.js";
 import { FLASHER_HOST } from "../../src/common/docs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { handOffToFlasher } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { cardStatusDetail } from "../../src/components/firmware-install-dialog/renderers.js";
 import type { FlasherCallbacks } from "../../src/util/usb-flasher.js";
-import { identityLocalize } from "../_dom.js";
 
 function makeHost() {
   const host = {

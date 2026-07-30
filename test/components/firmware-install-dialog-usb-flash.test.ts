@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
+import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
@@ -9,8 +11,6 @@ import {
   showOtaLogs,
   startUsbFlash,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
-import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 
 const bin = (file: string): FirmwareBinary => ({ file, title: file });
 

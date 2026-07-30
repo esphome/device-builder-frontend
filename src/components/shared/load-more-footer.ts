@@ -1,4 +1,4 @@
-import { type TemplateResult, html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 
 export interface LoadMoreFooterOptions {

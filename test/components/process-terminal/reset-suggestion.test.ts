@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  renderBuildFailureSuggestion,
-  renderValidationFailureSuggestion,
-  type SuggestionHost,
-} from "../../../src/components/process-terminal/reset-suggestion.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
-import {
   expectLocalSuggestion,
   expectRemoteSuggestion,
   localize,
 } from "../_reset-suggestion-helpers.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
+import {
+  renderBuildFailureSuggestion,
+  renderValidationFailureSuggestion,
+  type SuggestionHost,
+} from "../../../src/components/process-terminal/reset-suggestion.js";
 
 function makeHost(): SuggestionHost {
   return {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PagedListController } from "../../src/util/paged-list-controller.js";
 import { flushTimers } from "../_dom.js";
 import { FakeHost } from "../_fake-host.js";
+import { PagedListController } from "../../src/util/paged-list-controller.js";
 
 // A fetcher over a fixed dataset that slices by offset/limit.
 function datasetFetch(total: number) {

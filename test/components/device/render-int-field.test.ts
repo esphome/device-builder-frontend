@@ -6,13 +6,13 @@
  * "hex"`` path keeps canonicalizing.
  */
 import { describe, expect, it, vi } from "vitest";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import {
   type ConfigEntry,
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
 import { renderNumberField } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import {
   findElementBindings,
   fireInput,

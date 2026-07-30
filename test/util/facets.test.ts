@@ -6,10 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { LocalizeFunc } from "../../src/common/localize.js";
-import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 import { identityLocalize } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import type { LocalizeFunc } from "../../src/common/localize.js";
+import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 
 // computeUpdateFacet reads update_available / has_pending_changes, gated
 // through showUpdateAvailable / showPendingChanges. The shared fixture

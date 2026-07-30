@@ -26,19 +26,19 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  ConfigEntryType,
-  PinFeature,
-  PinMode,
-} from "../../../../src/api/types/config-entries.js";
-import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
-import { findTemplatesByAnchor } from "../../../_lit-template-walker.js";
-import {
   findElementBindings,
   makeBoardPin,
   makeEntry,
   makeRenderCtx,
   makeTestBoard,
 } from "../_renderer-fixtures.js";
+import { findTemplatesByAnchor } from "../../../_lit-template-walker.js";
+import {
+  ConfigEntryType,
+  PinFeature,
+  PinMode,
+} from "../../../../src/api/types/config-entries.js";
+import { renderPinField } from "../../../../src/components/device/pin/renderer.js";
 
 const pinEntry = () =>
   makeEntry(ConfigEntryType.PIN, {

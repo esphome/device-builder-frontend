@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
@@ -15,7 +16,6 @@ import {
   type PendingConfirm,
 } from "../../../src/components/dashboard/render-dialogs.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
 
 const { toastError, toastSuccess, toastInfo } = vi.hoisted(() => ({

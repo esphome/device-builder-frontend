@@ -9,7 +9,7 @@ import {
   mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
-import { LitElement, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";

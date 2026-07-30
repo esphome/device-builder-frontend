@@ -4,9 +4,9 @@ import type { ESPHomeAPI } from "../../../api/index.js";
 import type { AvailableAutomations } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import {
+  type HydrateList,
   loadAndHydrateAvailable,
   resolveLoadedAvailable,
-  type HydrateList,
 } from "./hydrate-available-bodies.js";
 
 /**

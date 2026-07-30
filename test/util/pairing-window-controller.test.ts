@@ -3,9 +3,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FakeHost } from "../_fake-host.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { PairingWindowController } from "../../src/util/pairing-window-controller.js";
-import { FakeHost } from "../_fake-host.js";
 
 function makeApi(reject = false) {
   return {

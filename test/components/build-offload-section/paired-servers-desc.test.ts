@@ -6,8 +6,8 @@
  * linked copy everywhere else.
  */
 import { describe, expect, it } from "vitest";
-import { ESPHomeSettingsBuildOffload } from "../../../src/components/settings-dialog/build-offload-section.js";
 import { identityLocalize, renderInto } from "../../_dom.js";
+import { ESPHomeSettingsBuildOffload } from "../../../src/components/settings-dialog/build-offload-section.js";
 
 function renderDesc(desktopVersion: string): HTMLElement {
   const fn = (

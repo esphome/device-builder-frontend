@@ -8,8 +8,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { identityLocalize, renderInto } from "../../_dom.js";
+import { makeFirmwareJob } from "../../_make-firmware-job.js";
 import { JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { PeerSummary } from "../../../src/api/types/remote-build.js";
+import type { ESPHomeRemoteBuildPanel } from "../../../src/components/remote-build-panel.js";
 import {
   renderDisabledCta,
   renderOnboarding,
@@ -19,9 +22,6 @@ import {
   renderRequestCard,
 } from "../../../src/components/remote-build-panel/render-peers.js";
 import { renderQueueCard } from "../../../src/components/remote-build-panel/render-queue.js";
-import type { ESPHomeRemoteBuildPanel } from "../../../src/components/remote-build-panel.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
-import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 function makePeer(overrides: Partial<PeerSummary> = {}): PeerSummary {
   return {

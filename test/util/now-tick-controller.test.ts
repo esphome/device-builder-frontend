@@ -3,8 +3,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NowTickController } from "../../src/util/now-tick-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { NowTickController } from "../../src/util/now-tick-controller.js";
 
 describe("NowTickController", () => {
   beforeEach(() => {

@@ -4,13 +4,13 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { identityLocalize } from "../../../_dom.js";
+import { fakeHost } from "../../../_fake-host.js";
 import type {
   AutomationLocation,
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ParseErrorController } from "../../../../src/components/device/automation-editor/parse-error-controller.js";
-import { identityLocalize } from "../../../_dom.js";
-import { fakeHost } from "../../../_fake-host.js";
 
 const SCRIPT: AutomationLocation = {
   kind: "script",

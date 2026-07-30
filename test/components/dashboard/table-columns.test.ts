@@ -9,11 +9,11 @@
 import type { CellContext } from "@tanstack/lit-table";
 import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
+import { identityLocalize, renderInto } from "../../_dom.js";
 import {
   createDeviceColumns,
   type DeviceRow,
 } from "../../../src/components/dashboard/table-columns.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
 
 const columns = createDeviceColumns(identityLocalize);
 

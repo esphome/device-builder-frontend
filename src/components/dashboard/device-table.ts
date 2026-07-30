@@ -1,9 +1,9 @@
 import { consume } from "@lit/context";
 import {
   mdiCancel,
-  mdiCheckCircle,
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
+  mdiCheckCircle,
   mdiChevronDown,
   mdiChevronUp,
   mdiClockOutline,
@@ -20,18 +20,19 @@ import {
   mdiUpload,
 } from "@mdi/js";
 import {
-  TableController,
+  type ColumnDef,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  type ColumnDef,
   type PaginationState,
   type SortingState,
+  TableController,
   type VisibilityState,
 } from "@tanstack/lit-table";
+import type { Row, Table } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
-import { LitElement, html } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
@@ -58,7 +59,6 @@ import {
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
-import type { Row, Table } from "@tanstack/lit-table";
 import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

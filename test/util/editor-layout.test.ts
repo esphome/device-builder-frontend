@@ -5,8 +5,8 @@ import {
   deviceLayoutToPref,
   prefToDeviceLayout,
   prefToSecretsLayout,
-  secretsLayoutToPref,
   type SecretsLayout,
+  secretsLayoutToPref,
 } from "../../src/util/editor-layout.js";
 
 describe("device layout mapping", () => {

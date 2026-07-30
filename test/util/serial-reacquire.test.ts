@@ -8,11 +8,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { openLiveSerialPort, reacquirePort } from "../../src/util/serial-reacquire.js";
 import {
   openLiveSerialPort as openLiveViaBarrel,
   reacquirePort as reacquireViaBarrel,
 } from "../../src/util/web-serial.js";
-import { openLiveSerialPort, reacquirePort } from "../../src/util/serial-reacquire.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

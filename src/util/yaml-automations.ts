@@ -6,6 +6,8 @@
  */
 
 import { joinActionFieldPath } from "./action-field-path.js";
+import { walkIndexedPaths } from "./yaml-indexed-path.js";
+import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import {
   BARE_MAPPING_KEY_RE,
   endsBlockAtIndent,
@@ -13,8 +15,6 @@ import {
   isBlankOrCommentLine,
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
-import { readInstanceScalar } from "./yaml-instance-scalars.js";
-import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import {
   instanceComponentId,
   lineIndent,

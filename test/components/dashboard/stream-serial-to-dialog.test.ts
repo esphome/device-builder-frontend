@@ -10,8 +10,8 @@
  * receive-time stamp in place so the regression can't sneak back.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { streamSerialToDialog } from "../../../src/components/dashboard/actions.js";
 import { flushMicrotasks } from "../../_dom.js";
+import { streamSerialToDialog } from "../../../src/components/dashboard/actions.js";
 
 interface MockDialog {
   _lines: string[];

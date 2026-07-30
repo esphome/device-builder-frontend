@@ -1,10 +1,10 @@
 // A deferred install's COMPILE has no dependent flash; queued_update_armed on
 // the terminal result reports queued success instead of the missing-flash error.
 import { describe, expect, it, vi } from "vitest";
-import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
-import { followJob } from "../../src/components/command-dialog/commands.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
+import { followJob } from "../../src/components/command-dialog/commands.js";
 import { makeCommandDialogHost as makeHost } from "./_command-dialog-host.js";
 
 function lonelyCompileHost() {

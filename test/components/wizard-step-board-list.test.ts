@@ -10,10 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
-import { ESPHomeWizardStepBoardList } from "../../src/components/wizard/wizard-step-board-list.js";
 import { identityLocalize } from "../_dom.js";
 import { MockObserver } from "../_intersection-observer.js";
+import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
+import { ESPHomeWizardStepBoardList } from "../../src/components/wizard/wizard-step-board-list.js";
 
 const board = (i: number): BoardCatalogEntry =>
   ({

@@ -21,8 +21,8 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 import toast from "sonner-js";
 
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
-import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
 import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

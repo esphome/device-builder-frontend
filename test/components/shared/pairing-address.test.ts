@@ -14,11 +14,11 @@ vi.mock("../../../src/util/notify.js", () => ({
   notify: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
 }));
 
+import { identityLocalize, renderInto } from "../../_dom.js";
 import type { IdentityView } from "../../../src/api/types/remote-build.js";
 import { renderPairingAddress } from "../../../src/components/shared/pairing-address.js";
 import { copyToClipboard } from "../../../src/util/copy-to-clipboard.js";
 import { notify } from "../../../src/util/notify.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
 
 const IDENTITY: IdentityView = {
   dashboard_id: "dash-0",

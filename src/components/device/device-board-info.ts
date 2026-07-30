@@ -16,8 +16,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
-  NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
+  NO_INSTANCE_ERRORS,
 } from "../../util/backend-field-errors.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { fireEvent } from "../../util/fire-event.js";

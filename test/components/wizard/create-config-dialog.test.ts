@@ -24,12 +24,12 @@ vi.mock("sonner-js", () => ({
 import { IntlMessageFormat } from "intl-messageformat";
 import toast from "sonner-js";
 
+import { flushMicrotasks } from "../../_dom.js";
 import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
 import enMessages from "../../../src/translations/en.json";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
-import { flushMicrotasks } from "../../_dom.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;

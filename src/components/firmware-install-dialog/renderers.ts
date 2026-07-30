@@ -5,7 +5,6 @@ import { activeLocale } from "../../common/localize.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
-import { canResetBuildEnv } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   renderOffloadHint,
@@ -16,6 +15,7 @@ import {
   renderBuildFailureSuggestion,
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type

@@ -1,12 +1,11 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
-import { pairingDisplayName } from "../util/pairing-display-name.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -19,6 +18,7 @@ import {
   parsePortInput,
   trimTrailingDot,
 } from "../util/hostname.js";
+import { pairingDisplayName } from "../util/pairing-display-name.js";
 import { renderErrorBanner } from "../util/render-error.js";
 
 import "./base-dialog.js";

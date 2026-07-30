@@ -1,16 +1,17 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { chipNameToVariant } from "../../../util/chip-variant.js";
+import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
 import { isHexColor } from "../../../util/label-style.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
-import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
+  type RenderCtx,
   renderFieldError,
   renderHelpLink,
   renderLabel,
@@ -18,7 +19,6 @@ import {
   renderSuggestionSelect,
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
-  type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
 // An empty-value "(none)" option marks an optional enum — surface a clear

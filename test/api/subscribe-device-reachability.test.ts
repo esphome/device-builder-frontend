@@ -21,8 +21,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { ReachabilityStateEvent } from "../../src/api/types/reachability.js";
 import {
-  MockWebSocket,
   installMockWebSocket,
+  MockWebSocket,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
 

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { localize } from "../_reset-suggestion-helpers.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { JobSource } from "../../../src/api/types/firmware-jobs.js";
 import {
   OFFLOAD_HINT_THRESHOLD_MS,
   renderOffloadHint,
   shouldShowOffloadHint,
 } from "../../../src/components/process-terminal/offload-hint.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
-import { localize } from "../_reset-suggestion-helpers.js";
 
 const OVER = OFFLOAD_HINT_THRESHOLD_MS + 1;
 const UNDER = OFFLOAD_HINT_THRESHOLD_MS - 1;

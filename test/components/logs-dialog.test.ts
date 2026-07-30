@@ -4,8 +4,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  ESPHomeLogsDialog,
   call,
+  ESPHomeLogsDialog,
   makeLogsDialog,
   paused,
   session,
@@ -13,9 +13,9 @@ import {
   toastError,
 } from "./_logs-dialog-env.js";
 
-import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { startOtaStream } from "../../src/components/logs-dialog/session.js";
 import { hasSerialPort } from "../../src/components/logs-session.js";
+import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface DeferredStop {

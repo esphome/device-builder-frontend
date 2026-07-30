@@ -12,12 +12,12 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 
+import { flush } from "../_dom.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   createBackendYamlLinter,
   relintEffect,
 } from "../../src/util/yaml-lint-backend.js";
-import { flush } from "../_dom.js";
 
 function mountView(validateYaml: ESPHomeAPI["validateYaml"]): EditorView {
   const api = { validateYaml } as unknown as ESPHomeAPI;

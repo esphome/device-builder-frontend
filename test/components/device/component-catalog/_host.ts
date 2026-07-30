@@ -1,3 +1,4 @@
+import { identityLocalize } from "../../../_dom.js";
 /**
  * Shared catalog-host fake for the pure card render functions
  * (renderCard / renderBundleCard). Carries every host member the
@@ -5,7 +6,6 @@
  * suite's hand-rolled copy.
  */
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
-import { identityLocalize } from "../../../_dom.js";
 
 export function makeCatalogHost(
   overrides: Record<string, unknown> = {}

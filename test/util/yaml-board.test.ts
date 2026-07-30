@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { makeSlimBoard } from "../_make-slim-board.js";
 import type { SlimBoard } from "../../src/api/types/boards.js";
 import { boardDisagreesWithYaml, readPlatformBoard } from "../../src/util/yaml-board.js";
-import { makeSlimBoard } from "../_make-slim-board.js";
 
 const slimBoard = (esphome: Partial<SlimBoard["esphome"]>): SlimBoard =>
   makeSlimBoard("esp32dev", esphome);

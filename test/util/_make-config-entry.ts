@@ -7,7 +7,7 @@
  * synthesise an entry — currently the ``substitutions:`` section —
  * share one source of truth with the test fixtures.
  */
-import { ConfigEntryType, type ConfigEntry } from "../../src/api/types/config-entries.js";
+import { type ConfigEntry, ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 
 export { makeConfigEntry };

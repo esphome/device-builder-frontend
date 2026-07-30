@@ -12,8 +12,8 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
-  renderFieldShell,
   type RenderCtx,
+  renderFieldShell,
 } from "../config-entry-renderers-shared.js";
 import "./lambda-editor.js";
 

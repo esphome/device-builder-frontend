@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
-import { ESPHomeRenameDeviceDialog } from "../../src/components/rename-device-dialog.js";
 import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
+import { ESPHomeRenameDeviceDialog } from "../../src/components/rename-device-dialog.js";
 
 function setValue(el: ESPHomeRenameDeviceDialog, value: string): Promise<unknown> {
   const input = el.shadowRoot!.querySelector("input")!;

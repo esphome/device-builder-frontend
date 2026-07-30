@@ -9,8 +9,8 @@ import { undo, undoDepth } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 
-import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 import { mount } from "../_dom.js";
+import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
   (el as unknown as { _view: EditorView })._view;

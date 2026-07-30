@@ -7,11 +7,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { identityLocalize as localize, renderInto } from "../../_dom.js";
 import {
   renderStatusRow,
   renderToggleRow,
 } from "../../../src/components/settings-dialog/settings-rows.js";
-import { identityLocalize as localize, renderInto } from "../../_dom.js";
 
 describe("renderToggleRow", () => {
   it("renders the live toggle with a11y wiring and fires onToggle", () => {

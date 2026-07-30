@@ -14,11 +14,11 @@ vi.mock("../../../src/util/post-install-logs.js", () => ({
   reconnectWebSerialLogs: vi.fn(),
 }));
 
+import { renderInto } from "../../_dom.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderDialogs } from "../../../src/components/dashboard/render-dialogs.js";
-import { renderInto } from "../../_dom.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
 
 function renderInstallMethodDialog(device: ConfiguredDevice | null) {

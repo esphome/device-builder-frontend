@@ -26,8 +26,8 @@ import {
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNestedListField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { normalizeMaybeValues } from "../../../src/util/maybe-values.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeListEntry(): ConfigEntry {

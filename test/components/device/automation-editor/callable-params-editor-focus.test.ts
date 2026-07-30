@@ -10,8 +10,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
-import { ESPHomeCallableParamsEditor } from "../../../../src/components/device/automation-editor/callable-params-editor.js";
 import { mount } from "../../../_dom.js";
+import { ESPHomeCallableParamsEditor } from "../../../../src/components/device/automation-editor/callable-params-editor.js";
 
 afterEach(() => {
   vi.restoreAllMocks();

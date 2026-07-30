@@ -14,9 +14,9 @@ vi.mock("../../src/util/notify.js", () => ({
 
 import "../_mock-webawesome.js";
 
+import { deviceNameInputsOf, flush, mount } from "../_dom.js";
 import type { AdoptableDevice } from "../../src/api/types/devices.js";
 import { ESPHomeAdoptDialog } from "../../src/components/adopt-dialog.js";
-import { deviceNameInputsOf, flush, mount } from "../_dom.js";
 import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
 
 const DEVICE = {

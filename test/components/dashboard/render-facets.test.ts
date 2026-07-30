@@ -10,8 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { renderFacets } from "../../../src/components/dashboard/render-facets.js";
 import { renderInto } from "../../_dom.js";
+import { renderFacets } from "../../../src/components/dashboard/render-facets.js";
 import { makeDashboardHost } from "./_host.js";
 
 // Minimal host-shaped fake. Empty _devices means the Area/Platform

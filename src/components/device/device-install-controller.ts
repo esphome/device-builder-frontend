@@ -3,12 +3,12 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
-import { isNeverFlashed } from "../../util/never-flashed.js";
 import {
   launchLogs,
   launchLogsWithMethod,
   type LogsLaunchHost,
 } from "../../util/logs-launch.js";
+import { isNeverFlashed } from "../../util/never-flashed.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";

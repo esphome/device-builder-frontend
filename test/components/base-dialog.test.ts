@@ -9,8 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 // stub the import so the wrapper can render in the test.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
-import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { mount } from "../_dom.js";
+import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 
 // Dispatch a bubbling+composed Enter from `from`, which becomes
 // composedPath()[0] (the element the controller treats as focused) and reaches

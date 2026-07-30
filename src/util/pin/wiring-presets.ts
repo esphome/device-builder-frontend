@@ -8,8 +8,8 @@
 import type { BoardPin } from "../../api/types/boards.js";
 import { PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { isPlainObject } from "../nested-values.js";
-import { expandPinModeShorthand, PIN_MODE_SHORTHANDS } from "./mode.js";
 import { parseYamlBoolean } from "../yaml-serialize.js";
+import { expandPinModeShorthand, PIN_MODE_SHORTHANDS } from "./mode.js";
 
 /** Mode-flag keys the guided wiring editor understands — the five native
  *  flags, derived from the shorthand table so the two can't drift. A

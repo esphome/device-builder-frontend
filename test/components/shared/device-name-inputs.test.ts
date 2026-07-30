@@ -10,8 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import { ESPHomeDeviceNameInputs } from "../../../src/components/shared/device-name-inputs.js";
 import { mount } from "../../_dom.js";
+import { ESPHomeDeviceNameInputs } from "../../../src/components/shared/device-name-inputs.js";
 
 async function mountInputs(
   props: Partial<ESPHomeDeviceNameInputs> = {}

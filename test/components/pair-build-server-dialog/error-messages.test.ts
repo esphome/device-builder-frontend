@@ -3,6 +3,7 @@
  * detail text instead of only pointing at the dashboard logs.
  */
 import { describe, expect, it } from "vitest";
+import { identityLocalize } from "../../_dom.js";
 import { APIError } from "../../../src/api/api-error.js";
 import { ErrorCode } from "../../../src/api/types/protocol.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
@@ -10,7 +11,6 @@ import {
   previewErrorMessage,
   requestErrorMessage,
 } from "../../../src/components/pair-build-server-dialog/actions.js";
-import { identityLocalize } from "../../_dom.js";
 
 const host = {
   _localize: identityLocalize,

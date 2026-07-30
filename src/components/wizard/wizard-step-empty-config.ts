@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, type PropertyValues } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";

@@ -13,7 +13,7 @@
 import type { EditorState } from "@codemirror/state";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
-import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
+import { type ConfigEntry, ConfigEntryType } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import { fetchAllComponents } from "./fetch-all-components.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";

@@ -25,8 +25,8 @@ import type { ConfigEntry, RequiredGroup } from "../../src/api/types/config-entr
 import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,
-  tallyOutcome,
   type HydrationResult,
+  tallyOutcome,
 } from "../../src/util/automation-body-hydration.js";
 
 const configEntry = (key: string): ConfigEntry => ({ key }) as ConfigEntry;

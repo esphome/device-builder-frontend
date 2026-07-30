@@ -3,8 +3,8 @@ import { render } from "lit";
 import { describe, expect, it } from "vitest";
 import type { FeaturedBundle } from "../../../src/api/types/boards.js";
 import {
-  ComponentCategory,
   type ComponentCatalogEntry,
+  ComponentCategory,
 } from "../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../src/components/device/component-catalog.js";
 import {

@@ -1,5 +1,5 @@
 import { mdiArrowCollapseAll, mdiArrowExpandAll, mdiOpenInNew, mdiPlus } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { SlimBoard } from "../../api/types/boards.js";

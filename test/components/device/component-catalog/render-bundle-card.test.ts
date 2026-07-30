@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 
+import { renderInto } from "../../../_dom.js";
 import type { FeaturedBundle } from "../../../../src/api/types/boards.js";
 import { renderBundleCard } from "../../../../src/components/device/component-catalog/renderers.js";
-import { renderInto } from "../../../_dom.js";
 import { makeCatalogHost } from "./_host.js";
 
 function host(failed: string[] = []): unknown {

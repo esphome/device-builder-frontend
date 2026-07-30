@@ -10,6 +10,7 @@
  * the receiver label inlined.
  */
 import { describe, it } from "vitest";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import {
   type FirmwareJob,
   JobSource,
@@ -18,7 +19,6 @@ import {
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
-import { makeFirmwareJob } from "../_make-firmware-job.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,

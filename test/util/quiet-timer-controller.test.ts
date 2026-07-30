@@ -1,8 +1,8 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveControllerHost } from "lit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuietTimerController } from "../../src/util/quiet-timer-controller.js";
 
 function makeHost(): ReactiveControllerHost {

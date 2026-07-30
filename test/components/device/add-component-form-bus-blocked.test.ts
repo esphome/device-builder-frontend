@@ -14,6 +14,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // submit gate, and values, so an inert unknown element suffices.
 vi.mock("../../../src/components/device/config-entry-form.js", () => ({}));
 
+import { flushMicrotasks } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
@@ -23,7 +24,6 @@ import { _clearComponentCache } from "../../../src/util/component-name-cache.js"
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { _clearCatalogCache } from "../../../src/util/yaml-completion-catalog.js";
 import { _clearYamlSectionsMemo } from "../../../src/util/yaml-sections-core.js";
-import { flushMicrotasks } from "../../_dom.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
