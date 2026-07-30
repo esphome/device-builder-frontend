@@ -62,6 +62,12 @@ export class ESPHomeProcessTerminal extends LitElement {
   @property() statusMessage = "";
   @property() statusDetail = "";
 
+  /** Connection-lost override: error-style banner/icon with the host's
+   *  localized message, taking precedence over state/statusMessage and
+   *  pausing the streaming dot. */
+  @property({ type: Boolean }) connectionLost = false;
+  @property() connectionLostMessage = "";
+
   /** 0–100 to show the card progress bar; ``null`` hides it. */
   @property({ type: Number }) progress: number | null = null;
 
@@ -80,9 +86,22 @@ export class ESPHomeProcessTerminal extends LitElement {
     this._ansiLog?.scrollToBottom();
   }
 
+  private get _effectiveState(): ProcessTerminalState {
+    return this.connectionLost ? "error" : this.state;
+  }
+
+  private get _effectiveMessage(): string {
+    // Fall back so a host that forgets the message never renders a
+    // blank error surface.
+    return this.connectionLost
+      ? this.connectionLostMessage || this.statusMessage
+      : this.statusMessage;
+  }
+
   private _renderBanner() {
-    if (this.state !== "success" && this.state !== "error") return nothing;
-    const isSuccess = this.state === "success";
+    const state = this._effectiveState;
+    if (state !== "success" && state !== "error") return nothing;
+    const isSuccess = state === "success";
     return html`
       <div
         class="status-banner status-banner--${isSuccess ? "success" : "error"}"
@@ -92,7 +111,7 @@ export class ESPHomeProcessTerminal extends LitElement {
           library="mdi"
           name=${isSuccess ? "check-circle" : "alert-circle"}
         ></wa-icon>
-        <span>${this.statusMessage}</span>
+        <span>${this._effectiveMessage}</span>
       </div>
     `;
   }
@@ -113,7 +132,7 @@ export class ESPHomeProcessTerminal extends LitElement {
         <slot name="suggestion"></slot>
         <div class="terminal-toolbar">
           ${
-            this.streaming
+            this.streaming && !this.connectionLost
               ? html`<span class="streaming-dot" aria-hidden="true"></span>`
               : nothing
           }
@@ -126,15 +145,16 @@ export class ESPHomeProcessTerminal extends LitElement {
   }
 
   private _renderStatusIcon() {
-    if (this.state === "running") return html`<wa-spinner></wa-spinner>`;
-    if (this.state === "success") {
+    const state = this._effectiveState;
+    if (state === "running") return html`<wa-spinner></wa-spinner>`;
+    if (state === "success") {
       return html`<wa-icon
         class="status-icon status-icon--success"
         library="mdi"
         name="check-circle"
       ></wa-icon>`;
     }
-    if (this.state === "error") {
+    if (state === "error") {
       return html`<wa-icon
         class="status-icon status-icon--error"
         library="mdi"
@@ -150,12 +170,12 @@ export class ESPHomeProcessTerminal extends LitElement {
         <div class="status">
           ${this._renderStatusIcon()}
           ${
-            this.statusMessage
-              ? html`<span class="status-text">${this.statusMessage}</span>`
+            this._effectiveMessage
+              ? html`<span class="status-text">${this._effectiveMessage}</span>`
               : nothing
           }
           ${
-            this.statusDetail
+            this.statusDetail && !this.connectionLost
               ? html`<span class="status-detail">${this.statusDetail}</span>`
               : nothing
           }

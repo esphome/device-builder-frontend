@@ -103,28 +103,26 @@ describe("logs-dialog OTA connection loss", () => {
     expect(session(el)).toMatchObject({ kind: "ota", streamId: null });
   });
 
-  it("shows the connection-lost banner on the terminal while disconnected", async () => {
+  it("passes the gated connection-lost flag to the terminal for an ota session", async () => {
     el.open("OTA");
-    (el as any)._apiConnected = false;
+    (el as any)._connectionLost = true;
     await el.updateComplete;
     const terminal = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-    expect(terminal.state).toBe("error");
-    expect(terminal.statusMessage).toBe("dashboard.logs_connection_lost");
+    expect(terminal.connectionLost).toBe(true);
+    expect(terminal.connectionLostMessage).toBe("dashboard.logs_connection_lost");
 
-    (el as any)._apiConnected = true;
+    (el as any)._connectionLost = false;
     await el.updateComplete;
-    expect(terminal.state).toBeNull();
-    expect(terminal.statusMessage).toBe("");
+    expect(terminal.connectionLost).toBe(false);
   });
 
   it("shows no banner for a Web Serial session when the WS drops", async () => {
     // The serial bytes come off USB; the dashboard connection is
     // irrelevant to that stream.
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    (el as any)._apiConnected = false;
+    (el as any)._connectionLost = true;
     await el.updateComplete;
     const terminal = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-    expect(terminal.state).toBeNull();
-    expect(terminal.statusMessage).toBe("");
+    expect(terminal.connectionLost).toBe(false);
   });
 });

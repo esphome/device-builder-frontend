@@ -68,6 +68,12 @@ export const apiConnectedContext = createContext<boolean>(
   Symbol("esphome-api-connected")
 );
 
+/** True once an outage outlasts the reconnect-pill delay; cleared when
+ *  the reconnect authenticates. Shared by the pill and dialog banners. */
+export const apiConnectionLostContext = createContext<boolean>(
+  Symbol("esphome-api-connection-lost")
+);
+
 /** Context for whether the frontend is running inside HA ingress. */
 export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 

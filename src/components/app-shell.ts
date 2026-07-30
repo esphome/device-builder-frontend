@@ -22,6 +22,7 @@ import type { RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
   apiConnectedContext,
+  apiConnectionLostContext,
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
@@ -240,9 +241,11 @@ export class ESPHomeApp extends LitElement {
   // Provided so a routed page can redo work that failed while it was down.
   @provide({ context: apiConnectedContext }) @state() _apiConnected = false;
   @state() private _routeLoading = false;
-  @state() private _showReconnectPill = false;
+  @provide({ context: apiConnectionLostContext })
+  @state()
+  private _connectionLost = false;
   private _pillGate = new ReconnectPillGate(RECONNECT_PILL_DELAY_MS, (visible) => {
-    this._showReconnectPill = visible;
+    this._connectionLost = visible;
   });
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -474,7 +477,6 @@ export class ESPHomeApp extends LitElement {
       this._isHaIngress = info.ha_ingress;
       this._isHaAddon = info.ha_addon;
       this._apiConnected = true;
-      this._pillGate.connected();
       void this._api.ready.then(() => this._afterAuthenticated());
     };
     this._api.onAuthRequired = () => {
@@ -497,6 +499,9 @@ export class ESPHomeApp extends LitElement {
 
   // Idempotent across reconnects.
   private async _afterAuthenticated() {
+    // Cleared here rather than at socket open so no indicator clears
+    // before the ready-gated replays can start.
+    this._pillGate.connected();
     this._authState = "authed";
     this._authError = null;
     // Re-resolve a URL the router gave up on pre-auth (a deep link whose
@@ -565,7 +570,7 @@ export class ESPHomeApp extends LitElement {
 
     return html`
       ${this._routeLoading ? renderRouteLoadingBar() : nothing}
-      ${this._showReconnectPill ? renderReconnectPill(this._localize) : nothing}
+      ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

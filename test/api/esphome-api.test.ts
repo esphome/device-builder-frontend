@@ -2648,6 +2648,32 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
   });
 
+  it("parks ready across a drop until the next connection authenticates", async () => {
+    // The app shell clears the reconnect indicator from the ready
+    // continuation; if this parking regressed, the clear would revert
+    // to socket-open timing.
+    const api = makeApi();
+    const ws = await connect(api);
+    await api.ready;
+
+    ws.close();
+    let resolved = false;
+    void api.ready.then(() => {
+      resolved = true;
+    });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(resolved).toBe(false);
+
+    // The backoff retry fires at 1s; complete its handshake.
+    await vi.advanceTimersByTimeAsync(1);
+    const ws2 = MockWebSocket.latest();
+    expect(ws2).not.toBe(ws);
+    ws2.open();
+    ws2.receive(serverInfo);
+    await api.ready;
+    expect(resolved).toBe(true);
+  });
+
   it("times out a handshake that stalls in CONNECTING", async () => {
     const api = makeApi();
     void api.connect().catch(() => {});

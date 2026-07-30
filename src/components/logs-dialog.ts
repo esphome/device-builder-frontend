@@ -17,6 +17,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiConnectedContext,
+  apiConnectionLostContext,
   apiContext,
   darkModeContext,
   localizeContext,
@@ -114,11 +115,16 @@ export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: apiContext })
   _api!: ESPHomeAPI;
 
-  /** WS liveness; false shows the connection-lost banner, the
-   *  false→true edge resumes a stream the drop stopped. */
+  /** WS liveness; the false→true edge resumes a stream the drop
+   *  stopped. */
   @consume({ context: apiConnectedContext, subscribe: true })
   @state()
   _apiConnected = true;
+
+  /** Gated connection-lost indicator; drives the banner. */
+  @consume({ context: apiConnectionLostContext, subscribe: true })
+  @state()
+  _connectionLost = false;
 
   @property()
   configuration = "";
@@ -235,11 +241,13 @@ export class ESPHomeLogsDialog extends LitElement {
       else this._quietSerial.disarm();
     }
     // A Web Serial session reads USB, not the dashboard WS; the
-    // connection banner and its scroll re-pin are ota-only.
-    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
+    // connection banner and the resume are ota-only.
+    if (changedProperties.has("_connectionLost") && this._session.kind === "ota") {
       // The banner toggling resizes the log area on both edges;
       // re-pin the scroll so the tail stays visible.
       this._resetAnsiLogScroll();
+    }
+    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
       if (this._apiConnected) resumeAfterReconnect(this);
     }
   }
@@ -318,7 +326,7 @@ export class ESPHomeLogsDialog extends LitElement {
     );
     // Only the ota source rides the dashboard WS; a Web Serial stream
     // is healthy regardless, so no false error banner there.
-    const wsDown = s.kind === "ota" && !this._apiConnected;
+    const wsDown = s.kind === "ota" && this._connectionLost;
 
     return html`
       <esphome-base-dialog
@@ -335,8 +343,8 @@ export class ESPHomeLogsDialog extends LitElement {
           placeholder=${this._localize("dashboard.logs_placeholder")}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
-          .state=${wsDown ? "error" : null}
-          .statusMessage=${wsDown ? this._localize("dashboard.logs_connection_lost") : ""}
+          .connectionLost=${wsDown}
+          .connectionLostMessage=${this._localize("dashboard.logs_connection_lost")}
         >
           ${
             this._backToInstall
