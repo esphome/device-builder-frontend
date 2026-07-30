@@ -1,6 +1,12 @@
 import { normalizeEspHomeId } from "./esphome-id.js";
 import { isPlatformComponentId } from "./featured-id.js";
-import { collectInstanceScalars } from "./yaml-instance-scalars.js";
+import { collectInstanceScalars, readInstanceScalar } from "./yaml-instance-scalars.js";
+import { YamlRawValue } from "./yaml-serialize.js";
+
+// Keys that name an ESPHome id: `id` itself, or an `<prefix>_id` field. The
+// underscore keeps lookalikes (`valid`, `uuid`) out.
+const ID_NAMING_KEY_RE = /^(?:[a-z0-9_]+_)?id$/;
+const ID_NAMING_LINE_RE = /^\s+(?:-\s+)?((?:[a-z0-9_]+_)?id):/;
 
 /**
  * Auto-generate a default `id:` value for a component being added
@@ -55,6 +61,35 @@ export function generateNestedItemId(
 /** Scan the YAML for every `id:` line and return the set of values. */
 export function collectExistingIds(yaml: string): Set<string> {
   return collectInstanceScalars(yaml, "id");
+}
+
+/**
+ * Every value under an id-naming key (`id`, `*_id`) in *yaml*.
+ *
+ * Wider than `collectExistingIds` because a generated id must clear ids
+ * declared under another key too: tca9548a's `channels[].bus_id` mints from
+ * the same base slug as usb_uart's `channels[].id`. References land in the
+ * pool as well, which only ever bumps the numeric suffix.
+ */
+export function collectTakenIds(yaml: string): Set<string> {
+  const taken = new Set<string>();
+  for (const line of yaml.split("\n")) {
+    const key = line.match(ID_NAMING_LINE_RE)?.[1];
+    if (key === undefined) continue;
+    const value = readInstanceScalar(line, key);
+    if (value !== null) taken.add(value);
+  }
+  return taken;
+}
+
+/** Add every id-naming scalar in the form-values tree *node* to *out*. */
+export function addTakenIdsFromValues(node: unknown, out: Set<string>): void {
+  // Arrays fall through the same branch — their numeric keys can't name an id.
+  if (!node || typeof node !== "object" || node instanceof YamlRawValue) return;
+  for (const [key, value] of Object.entries(node)) {
+    if (typeof value === "string" && value && ID_NAMING_KEY_RE.test(key)) out.add(value);
+    addTakenIdsFromValues(value, out);
+  }
 }
 
 // Slug *raw* into a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*), then walk a

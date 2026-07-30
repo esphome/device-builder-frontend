@@ -169,6 +169,29 @@ describe("renderNestedListField", () => {
     );
   });
 
+  it("seeded id clears ids declared under another key", () => {
+    // tca9548a declares through ``channels[].bus_id`` and usb_uart through
+    // ``channels[].id``, so both mint from base ``channels`` — the pool has
+    // to span every id-naming key or the two collide.
+    const entry = makeConfigEntry({
+      key: "channels",
+      type: ConfigEntryType.NESTED,
+      multi_value: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+      ],
+    });
+    const { ctx, emitChange } = makeCtx(
+      { channels: [] },
+      {
+        yaml: "tca9548a:\n  - id: mux\n    channels:\n      - bus_id: channels_1\n",
+      }
+    );
+    const tpl = renderNestedListField(entry, ["channels"], ctx);
+    collectHandlers(tpl.values).pop()!();
+    expect(emitChange).toHaveBeenCalledWith(["channels"], [{ id: "channels_2" }]);
+  });
+
   it("addItem appends a bare {} when no child requires a declaring id", () => {
     const entry = makeConfigEntry({
       key: "devices",

@@ -3,7 +3,8 @@ import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import {
-  collectExistingIds,
+  addTakenIdsFromValues,
+  collectTakenIds,
   generateNestedItemId,
 } from "../../../util/default-component-id.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
@@ -51,29 +52,19 @@ function arrayItemHandlers(
 }
 
 // A new row whose schema requires a declaring id arrives with a unique one
-// prefilled (#2452). Uniqueness spans the document *and* the whole
-// form-values tree: the add dialog's values aren't in the YAML yet, a
-// just-added row may not have flushed through the draft debounce, and a
-// same-key sibling list under another parent row (esp32_ble_server's
-// ``services[].characteristics[]``) is invisible from this list's rows.
+// prefilled (#2452). The pool spans the document *and* the whole form-values
+// tree: the add dialog's values aren't in the YAML yet, a just-added row may
+// not have flushed through the draft debounce, and a same-key sibling list
+// under another parent row (esp32_ble_server's ``services[].characteristics[]``)
+// is invisible from this list's rows.
 function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, unknown> {
   const idChild = (entry.config_entries ?? []).find(
     (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
   );
   if (!idChild) return {};
-  const existing = collectExistingIds(ctx.yaml);
-  collectValuesAtKey(ctx.getAt([]), idChild.key, existing);
-  return { [idChild.key]: generateNestedItemId(entry.key, existing) };
-}
-
-// Walk the form-values tree and collect every string at *key*. Arrays fall
-// through the same branch — their numeric keys can't match a field name.
-function collectValuesAtKey(node: unknown, key: string, out: Set<string>): void {
-  if (!node || typeof node !== "object" || node instanceof YamlRawValue) return;
-  for (const [k, v] of Object.entries(node)) {
-    if (k === key && typeof v === "string" && v) out.add(v);
-    collectValuesAtKey(v, key, out);
-  }
+  const taken = collectTakenIds(ctx.yaml);
+  addTakenIdsFromValues(ctx.getAt([]), taken);
+  return { [idChild.key]: generateNestedItemId(entry.key, taken) };
 }
 
 export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
