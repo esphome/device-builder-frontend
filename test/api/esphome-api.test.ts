@@ -2508,7 +2508,7 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     const ws = await connect(api);
     await vi.advanceTimersByTimeAsync(15000);
     expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(15000);
     expect(ws.readyState).toBe(MockWebSocket.CLOSED);
     expect(api.connected).toBe(false);
     expect(onDisconnected).toHaveBeenCalledTimes(1);
@@ -2602,7 +2602,7 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     const ws = MockWebSocket.latest();
     // No open/ServerInfo ever arrives; the connect timeout force-closes
     // the attempt so the backoff loop keeps going.
-    await vi.advanceTimersByTimeAsync(10000);
+    await vi.advanceTimersByTimeAsync(30000);
     expect(ws.readyState).toBe(MockWebSocket.CLOSED);
     await vi.advanceTimersByTimeAsync(1000);
     expect(MockWebSocket.instances).toHaveLength(2);

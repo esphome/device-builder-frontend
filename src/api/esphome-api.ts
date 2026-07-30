@@ -153,14 +153,18 @@ type PendingRequest = {
 // socket. Protocol-level server pings are invisible to page JS, so a
 // dead link otherwise stays OPEN forever. The tick runs faster than
 // the silence threshold so detection lags the threshold by at most
-// one tick; the in-flight guard keeps pings non-overlapping.
+// one tick; the in-flight guard keeps pings non-overlapping. The
+// timeout is generous because a backend busy compiling can take over
+// 10s to answer (the HA frontend uses 15s for the same reason).
 const HEARTBEAT_INTERVAL_MS = 15000;
-const HEARTBEAT_TIMEOUT_MS = 5000;
+const HEARTBEAT_TIMEOUT_MS = 15000;
 const HEARTBEAT_TICK_MS = 5000;
 
 // A handshake against a dead peer stalls in CONNECTING with no
 // error/close event; time it out so the backoff loop keeps going.
-const CONNECT_TIMEOUT_MS = 10000;
+// Generous so a slow link never loses a handshake that would have
+// completed; the browser's own stall timeout is minutes.
+const CONNECT_TIMEOUT_MS = 30000;
 
 const RECONNECT_MAX_DELAY_MS = 30000;
 
