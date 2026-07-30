@@ -496,9 +496,8 @@ export class ESPHomeCommandDialog extends LitElement {
   };
 
   protected render() {
-    // Transient reconnecting banner over an active run only; idle and
-    // terminal states keep their own message, and the app-shell pill
-    // covers the global case.
+    // Reconnecting banner only over an active run; terminal states
+    // keep their own message.
     const wsDown = !this._apiConnected && this._state === "running";
     return html`
       <esphome-base-dialog

@@ -13,14 +13,8 @@ import {
   cardStatusMessage,
 } from "../../../src/components/firmware-install-dialog/renderers.js";
 import { fakeLogBuffer } from "../../_fake-host.js";
-import { identityLocalize } from "../../_dom.js";
-
-type StreamCbs = {
-  onOutput: (line: string) => void;
-  onResult: (data: unknown) => void;
-  onError: (error: string) => void;
-  onConnectionLost?: () => void;
-};
+import { flushMicrotasks, identityLocalize } from "../../_dom.js";
+import type { StreamCbs } from "../_command-dialog-host.js";
 
 function makeHost() {
   const follows: StreamCbs[] = [];
@@ -56,11 +50,7 @@ function makeHost() {
   return { host: host as unknown as ESPHomeFirmwareInstallDialog, follows, raw: host };
 }
 
-const flushResume = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-};
+const flushResume = () => flushMicrotasks(4);
 
 describe("compileAndWait connection loss", () => {
   it("keeps the promise pending, re-follows, and the replayed result resolves", async () => {

@@ -563,6 +563,29 @@ async function artifactsSettled(
  * case fails the dialog with *failKey*; a retry re-reads the active-jobs
  * map.
  */
+/**
+ * Re-attach a job follow once the reconnect's auth lands.
+ *
+ * The job keeps running server-side across a WS drop; the follow
+ * replays the full history, so the log resets rather than duplicating.
+ */
+function resumeFollowOnReady(
+  host: ESPHomeFirmwareInstallDialog,
+  isStale: () => boolean,
+  follow: () => void
+): void {
+  host._streamId = "";
+  void host._api.ready
+    .then(() => {
+      if (isStale() || host._streamId !== "") return;
+      host._log.reset();
+      follow();
+    })
+    .catch((err: unknown) => {
+      console.error("[install] Re-follow after reconnect failed", err);
+    });
+}
+
 export function waitForRunningJob(
   host: ESPHomeFirmwareInstallDialog,
   jobId: string,
@@ -589,18 +612,9 @@ export function waitForRunningJob(
           host._fail(host._localize(failKey));
           resolve(false);
         },
-        onConnectionLost: () => {
-          // The job keeps running server-side; keep the wait pending and
-          // re-follow once the reconnect's auth lands. The follow replays
-          // the full history, so reset the log rather than duplicating it.
-          host._streamId = "";
-          void host._api.ready.then(() => {
-            // A dismissal settled the wait and nulled the reject hook.
-            if (host._compileReject === null || host._streamId !== "") return;
-            host._log.reset();
-            follow();
-          });
-        },
+        onConnectionLost: () =>
+          // A dismissal settled the wait and nulled the reject hook.
+          resumeFollowOnReady(host, () => host._compileReject === null, follow),
       });
     };
     follow();
@@ -616,8 +630,6 @@ export function compileAndWait(
     // reopen) can settle this promise. followJob callbacks clear the hook to
     // null on fire so a normal completion doesn't double-reject on teardown.
     host._compileReject = reject;
-    // Not an async executor (no-misused-promises): an async function
-    // where the constructor expects a void-returning one.
     const follow = (jobId: string): void => {
       host._streamId = host._api.firmwareFollowJob(jobId, {
         onOutput: (line) => {
@@ -653,20 +665,18 @@ export function compileAndWait(
           host._compileReject = null;
           reject(new Error(error));
         },
-        onConnectionLost: () => {
-          // The compile keeps running server-side; keep the promise
-          // pending (a dismissal still settles it via _compileReject)
-          // and re-follow once the reconnect's auth lands. The follow
-          // replays the full history, so reset the log first.
-          host._streamId = "";
-          void host._api.ready.then(() => {
-            if (host._jobId !== jobId || host._streamId !== "") return;
-            host._log.reset();
-            follow(jobId);
-          });
-        },
+        onConnectionLost: () =>
+          // The submit gap (await firmwareCompile) means a retry can arm
+          // before its follow attaches; the job id pins ownership.
+          resumeFollowOnReady(
+            host,
+            () => host._jobId !== jobId,
+            () => follow(jobId)
+          ),
       });
     };
+    // Not an async executor (no-misused-promises): an async function
+    // where the constructor expects a void-returning one.
     const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
       host._jobId = job.job_id;

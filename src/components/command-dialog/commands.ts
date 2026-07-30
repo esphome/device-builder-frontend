@@ -306,14 +306,18 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       // once the reconnect's auth lands. The follow replays the full
       // history, so the log resets rather than duplicating it.
       host._streamId = "";
-      void host._api.ready.then(() => {
-        // Skipped when the dialog closed, the user stopped, the chain
-        // moved to the dependent flash, or something already reattached.
-        if (host._jobId !== jobId || host._streamId !== "") return;
-        host._log.reset();
-        host._resetAnsiLogScroll();
-        followJob(host, jobId);
-      });
+      void host._api.ready
+        .then(() => {
+          // Skipped when the dialog closed, the user stopped, the chain
+          // moved to the dependent flash, or something already reattached.
+          if (host._jobId !== jobId || host._streamId !== "") return;
+          host._log.reset();
+          host._resetAnsiLogScroll();
+          followJob(host, jobId);
+        })
+        .catch((err: unknown) => {
+          console.error("[command] Re-follow after reconnect failed", err);
+        });
     },
   });
 }
