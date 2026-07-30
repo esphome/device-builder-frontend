@@ -3,7 +3,9 @@ import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   MockWebSocket,
+  fireWindowEvent,
   installMockWebSocket,
+  installMockWindow,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
 import { stubStorage } from "../_storage.js";
@@ -52,11 +54,7 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (
-      globalThis as unknown as {
-        window: { location: { protocol: string; host: string } };
-      }
-    ).window = { location: { protocol: "https:", host: "example.test" } };
+    installMockWindow({ protocol: "https:", host: "example.test" });
     const api = new ESPHomeAPI();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
@@ -2444,5 +2442,103 @@ describe("ESPHomeAPI — console-debug redaction", () => {
     const text = debugText(debugSpy);
     expect(text).not.toContain("ABCD-EFGH-JKMN-PQRS");
     expect(text).toContain("<redacted>");
+  });
+});
+
+describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    uninstallMockWebSocket();
+  });
+
+  it("sends a ping after an idle interval", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ command: string }>(0);
+    expect(sent.command).toBe("ping");
+  });
+
+  it("suppresses the ping when a frame arrived within the interval", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(10000);
+    // Any received frame counts as liveness, even an unroutable one.
+    ws.receive({ message_id: "nope", event: "output", data: "x" });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.sent).toHaveLength(0);
+  });
+
+  it("closes the socket and disconnects when the ping gets no reply", async () => {
+    const api = new ESPHomeAPI();
+    const onDisconnected = vi.fn();
+    api.onDisconnected = onDisconnected;
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(ws.sentAs<{ command: string }>(0).command).toBe("ping");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    expect(api.connected).toBe(false);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the socket open when the ping is answered", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ command: string; message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { pong: true } });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.readyState).toBe(MockWebSocket.OPEN);
+    expect(api.connected).toBe(true);
+  });
+
+  it("keeps the socket open when the ping is rejected by the auth gate", async () => {
+    // An error frame is still a reply — the link is alive; only
+    // silence may force-close the socket.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    await vi.advanceTimersByTimeAsync(15000);
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "not_authenticated",
+      details: "auth required",
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ws.readyState).toBe(MockWebSocket.OPEN);
+    expect(api.connected).toBe(true);
+  });
+
+  it("closes the socket on the window offline event", async () => {
+    const api = new ESPHomeAPI();
+    const onDisconnected = vi.fn();
+    api.onDisconnected = onDisconnected;
+    const ws = await connect(api);
+    fireWindowEvent("offline");
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects immediately on the window online event", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    ws.close();
+    // The backoff timer is pending; online preempts it.
+    expect(MockWebSocket.instances).toHaveLength(1);
+    fireWindowEvent("online");
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it("ignores the online event after an intentional disconnect", async () => {
+    const api = new ESPHomeAPI();
+    await connect(api);
+    api.disconnect();
+    fireWindowEvent("online");
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });

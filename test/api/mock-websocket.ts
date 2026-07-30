@@ -71,12 +71,41 @@ export class MockWebSocket {
   }
 }
 
+type WindowListener = (event: unknown) => void;
+
+/** Minimal window stand-in: location for URL building plus the event
+ *  surface the API client's offline/online listeners need. */
+export function installMockWindow(
+  location: { protocol: string; host: string } = {
+    protocol: "http:",
+    host: "localhost:8000",
+  }
+): void {
+  const listeners = new Map<string, Set<WindowListener>>();
+  (globalThis as unknown as { window: unknown }).window = {
+    location,
+    addEventListener(type: string, listener: WindowListener): void {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type: string, listener: WindowListener): void {
+      listeners.get(type)?.delete(listener);
+    },
+    _fire(type: string): void {
+      listeners.get(type)?.forEach((l) => l({}));
+    },
+  };
+}
+
+/** Fire a window event (e.g. 'offline' / 'online') on the mock window. */
+export function fireWindowEvent(type: string): void {
+  (globalThis as unknown as { window: { _fire(type: string): void } }).window._fire(type);
+}
+
 export function installMockWebSocket(): void {
   MockWebSocket.reset();
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
-  (globalThis as unknown as { window: unknown }).window = {
-    location: { protocol: "http:", host: "localhost:8000" },
-  };
+  installMockWindow();
 }
 
 export function uninstallMockWebSocket(): void {

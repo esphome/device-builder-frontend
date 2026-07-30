@@ -15,7 +15,12 @@ import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import {
+  apiConnectedContext,
+  apiContext,
+  darkModeContext,
+  localizeContext,
+} from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -41,6 +46,7 @@ import {
   onStop,
   openOta,
   openPassive,
+  resumeAfterReconnect,
   setSerialOpenFailed,
   setSerialStream,
   switchToOtaLogs,
@@ -108,6 +114,12 @@ export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: apiContext })
   _api!: ESPHomeAPI;
 
+  /** WS liveness; false shows the connection-lost banner, the
+   *  false→true edge resumes a stream the drop stopped. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  _apiConnected = true;
+
   @property()
   configuration = "";
 
@@ -142,6 +154,11 @@ export class ESPHomeLogsDialog extends LitElement {
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
+
+  // Set when the OTA stream was stopped by a lost WS connection rather
+  // than by the user; the reconnect edge in willUpdate resumes it. A
+  // manual Stop/Start clears it so a user-stopped stream stays stopped.
+  _stoppedByConnectionLoss = false;
 
   // Watchdog for a Web Serial session that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
@@ -221,6 +238,9 @@ export class ESPHomeLogsDialog extends LitElement {
       const watching = this._open && s.kind === "serial" && !s.paused;
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
+    }
+    if (changedProperties.has("_apiConnected") && this._apiConnected) {
+      resumeAfterReconnect(this);
     }
   }
 
@@ -312,6 +332,10 @@ export class ESPHomeLogsDialog extends LitElement {
           placeholder=${this._localize("dashboard.logs_placeholder")}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
+          .state=${this._apiConnected ? null : "error"}
+          .statusMessage=${
+            this._apiConnected ? "" : this._localize("dashboard.logs_connection_lost")
+          }
         >
           ${
             this._backToInstall

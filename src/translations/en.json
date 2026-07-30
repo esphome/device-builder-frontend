@@ -97,6 +97,8 @@
     "logs_serial_unavailable": "Serial isn't available. {network_action}",
     "logs_switch_to_network": "Stream network logs instead",
     "logs_switched_to_network": "Switched to network logs; waiting for the device to come online…",
+    "logs_connection_lost": "Connection to the dashboard lost. Reconnecting…",
+    "logs_reconnected": "Reconnected to the dashboard; resuming logs…",
     "select_all": "Select all",
     "deselect_all": "Deselect all",
     "selected_count": "{count} selected",

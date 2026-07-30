@@ -52,6 +52,7 @@ function beginSession(host: ESPHomeLogsDialog, onBackToInstall?: () => void): vo
   host._clearLogs();
   host._expanded = false;
   host._showStates = true;
+  host._stoppedByConnectionLoss = false;
   host._backToInstallHandler = onBackToInstall ?? null;
   host._backToInstall = host._backToInstallHandler !== null;
 }
@@ -169,6 +170,7 @@ function stopBackendStream(host: ESPHomeLogsDialog, streamId: string): Promise<v
 export function onStart(host: ESPHomeLogsDialog): void {
   const s = host._session;
   if (isStreaming(s)) return;
+  host._stoppedByConnectionLoss = false;
   switch (s.kind) {
     case "ota":
       startOtaStream(host);
@@ -188,6 +190,7 @@ export function onStart(host: ESPHomeLogsDialog): void {
 // without a close/reopen that reboots the device (#526).
 export function onStop(host: ESPHomeLogsDialog): void {
   const s = host._session;
+  host._stoppedByConnectionLoss = false;
   switch (s.kind) {
     case "ota":
       if (s.streamId !== null) {
@@ -201,6 +204,14 @@ export function onStop(host: ESPHomeLogsDialog): void {
       break;
   }
 }
+
+// The API client's own failure strings: the '_onClose' fan-out when the
+// socket dies mid-stream, and 'sendStreamCommand' refusing a send on a
+// closed socket. Anything else is a real backend error worth showing.
+const CONNECTION_LOSS_ERRORS = new Set([
+  "WebSocket connection closed",
+  "WebSocket not connected",
+]);
 
 export function startOtaStream(host: ESPHomeLogsDialog): void {
   const s = host._session;
@@ -221,11 +232,47 @@ export function startOtaStream(host: ESPHomeLogsDialog): void {
         host._enqueueLine(line);
       },
       onResult: () => markOtaStopped(host, streamId),
-      onError: () => markOtaStopped(host, streamId),
+      onError: (error: string) => {
+        // The synchronous send-refused call lands while streamId is
+        // still ""; the empty-id check after the call handles it.
+        if (streamId === "") return;
+        const wasCurrent =
+          host._session.kind === "ota" && host._session.streamId === streamId;
+        markOtaStopped(host, streamId);
+        if (!wasCurrent) return;
+        if (CONNECTION_LOSS_ERRORS.has(error)) {
+          // The banner driven by _apiConnected explains the stop; the
+          // reconnect edge resumes the stream.
+          host._stoppedByConnectionLoss = true;
+        } else {
+          host._log.append([error]);
+        }
+      },
     },
     { noStates: !host._showStates }
   );
+  if (streamId === "") {
+    // sendStreamCommand refused the send: the socket is already known
+    // dead. Stay stopped and let the reconnect edge respawn.
+    host._stoppedByConnectionLoss = true;
+    return;
+  }
   host._session = { kind: "ota", port: s.port, streamId };
+}
+
+/**
+ * Resume an OTA stream the connection drop stopped, once the WS is back.
+ *
+ * Waits on 'api.ready' so the respawned command lands after the
+ * reconnect's auth dance instead of racing it.
+ */
+export function resumeAfterReconnect(host: ESPHomeLogsDialog): void {
+  if (!host._open || !host._stoppedByConnectionLoss) return;
+  const s = host._session;
+  if (s.kind !== "ota" || s.streamId !== null) return;
+  host._stoppedByConnectionLoss = false;
+  host._log.append([host._localize("dashboard.logs_reconnected")]);
+  void host._api.ready.then(() => startOtaStream(host));
 }
 
 function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {

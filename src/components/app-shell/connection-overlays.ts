@@ -42,6 +42,12 @@ export const connectionOverlayStyles = css`
 
   .reconnect-pill {
     position: fixed;
+    /* Reset the UA popover centering (inset: 0 + margin: auto) so the
+       fixed bottom-center placement below wins. */
+    inset: auto;
+    margin: 0;
+    border: none;
+    overflow: visible;
     bottom: var(--wa-space-l);
     left: 50%;
     transform: translateX(-50%);
@@ -71,8 +77,14 @@ export function renderRouteLoadingBar(): TemplateResult {
   return html`<div class="route-loading-bar" aria-hidden="true"></div>`;
 }
 
+/**
+ * A manual popover, not a plain fixed div: wa-dialog opens with the
+ * native showModal(), whose top layer paints above any z-index, so a
+ * fixed pill is invisible while a modal is open. The caller must
+ * showPopover() after render (removal from the DOM auto-hides it).
+ */
 export function renderReconnectPill(localize: LocalizeFunc): TemplateResult {
-  return html`<div class="reconnect-pill" role="status">
+  return html`<div class="reconnect-pill" popover="manual" role="status">
     ${localize("layout.reconnecting")}
   </div>`;
 }
