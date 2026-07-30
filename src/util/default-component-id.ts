@@ -1,5 +1,12 @@
-import { isFeaturedId } from "./featured-id.js";
-import { readInstanceScalar } from "./yaml-sections-core.js";
+import { isValidEspHomeId, normalizeEspHomeId } from "./esphome-id.js";
+import { isPlatformComponentId } from "./featured-id.js";
+import { collectInstanceScalars, readInstanceScalar } from "./yaml-instance-scalars.js";
+import { YamlRawValue } from "./yaml-serialize.js";
+
+// Keys that name an ESPHome id: `id` itself, or an `<prefix>_id` field. The
+// underscore keeps lookalikes (`valid`, `uuid`) out.
+const ID_NAMING_KEY_RE = /^(?:[a-z0-9_]+_)?id$/;
+const ID_NAMING_LINE_RE = /^\s+(?:-\s+)?((?:[a-z0-9_]+_)?id):/;
 
 /**
  * Auto-generate a default `id:` value for a component being added
@@ -30,40 +37,69 @@ export function generateDefaultComponentId(
   multiConf: boolean,
   existing: ReadonlySet<string>
 ): string | null {
-  // A featured id (`featured.<board>.<local>`) carries dots but wraps one
-  // underlying component, so judge singleton-ness by `multiConf` alone —
-  // the dotted form would otherwise always read as a platform entry and a
+  // A featured wrap judges singleton-ness by `multiConf` alone — the dotted
+  // form would otherwise always read as a platform entry and a
   // single-instance wrap (ethernet, wifi) would wrongly get an id.
-  const looksPlatform = isFeaturedId(componentId) ? false : componentId.includes(".");
-  const isSingleton = !multiConf && !looksPlatform;
+  const isSingleton = !multiConf && !isPlatformComponentId(componentId);
   if (isSingleton) return null;
 
-  // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
-  // board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
-  const slug = componentId.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
-  let n = 1;
-  let candidate = `${slug}_${n}`;
-  while (existing.has(candidate)) {
-    n++;
-    candidate = `${slug}_${n}`;
-  }
-  return candidate;
+  return generateUniqueId(componentId, existing);
 }
 
 /**
- * Scan the YAML for every `id:` line and return the set of values.
- * Best-effort line scan via the shared `readInstanceScalar`, deliberately
- * simple (we only need a uniqueness check, not a full parse).
+ * Auto-generate an `id:` value for a new nested-list row whose schema
+ * requires one (e.g. `voice_assistant.microphone` items): the list key
+ * plus a numeric suffix, unique against *existing*.
  */
+export function generateNestedItemId(
+  listKey: string,
+  existing: ReadonlySet<string>
+): string {
+  return generateUniqueId(listKey, existing);
+}
+
+/** Scan the YAML for every `id:` line and return the set of values. */
 export function collectExistingIds(yaml: string): Set<string> {
-  const ids = new Set<string>();
-  if (!yaml) return ids;
+  return collectInstanceScalars(yaml, "id");
+}
+
+/**
+ * Every value under an id-naming key (`id`, `*_id`) in *yaml*.
+ *
+ * Wider than `collectExistingIds` because a generated id must clear ids
+ * declared under another key too: tca9548a's `channels[].bus_id` mints from
+ * the same base slug as usb_uart's `channels[].id`. References land in the
+ * pool as well, which only ever bumps the numeric suffix.
+ */
+export function collectTakenIds(yaml: string): Set<string> {
+  const taken = new Set<string>();
   for (const line of yaml.split("\n")) {
-    // A real component id is always indented under a block; `readInstanceScalar`
-    // leaves indent-gating to callers, so skip a column-0 `id:`.
-    if (!/^\s/.test(line)) continue;
-    const id = readInstanceScalar(line, "id");
-    if (id !== null) ids.add(id);
+    const key = line.match(ID_NAMING_LINE_RE)?.[1];
+    if (key === undefined) continue;
+    const value = readInstanceScalar(line, key);
+    if (value !== null) taken.add(value);
   }
-  return ids;
+  return taken;
+}
+
+/** Add every id-naming scalar in the form-values tree *node* to *out*. */
+export function addTakenIdsFromValues(node: unknown, out: Set<string>): void {
+  // Arrays fall through the same branch — their numeric keys can't name an id.
+  if (!node || typeof node !== "object" || node instanceof YamlRawValue) return;
+  for (const [key, value] of Object.entries(node)) {
+    if (typeof value === "string" && value && ID_NAMING_KEY_RE.test(key)) out.add(value);
+    addTakenIdsFromValues(value, out);
+  }
+}
+
+// Slug *raw* into a valid ESPHome id, then walk a numeric suffix until it
+// clears *existing*. A normalised slug can only be invalid by leading with a
+// digit; unlike user-typed input it has no mid-typing UX to preserve, so it
+// takes an underscore prefix rather than being left invalid.
+function generateUniqueId(raw: string, existing: ReadonlySet<string>): string {
+  const slug = normalizeEspHomeId(raw.toLowerCase());
+  const base = isValidEspHomeId(slug) ? slug : `_${slug}`;
+  let n = 1;
+  while (existing.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
 }

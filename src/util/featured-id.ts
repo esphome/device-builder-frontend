@@ -20,6 +20,16 @@ export function isFeaturedId(id: string): boolean {
 }
 
 /**
+ * True for platform-shaped catalog ids ('switch.gpio'). A featured id
+ * carries dots but wraps one underlying component, so it never reads
+ * as a platform entry. Shared by the id and name seeds so both judge
+ * platform-ness identically.
+ */
+export function isPlatformComponentId(id: string): boolean {
+  return isFeaturedId(id) ? false : id.includes(".");
+}
+
+/**
  * The featured entry a YAML instance materializes, or null.
 
  * Matches by section (``component_id``) plus the instance's emitted

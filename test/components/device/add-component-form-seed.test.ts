@@ -7,10 +7,12 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { buildInitialValues } from "../../../src/components/device/add-component-form-seed.js";
 import { identityLocalize } from "../../_dom.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -297,5 +299,48 @@ describe("add-component-form dep-add bus prefill (#1425)", () => {
     ]);
     // STRING entry keeps a string default, not a coerced number.
     expect(stop.default_value).toBe("1");
+  });
+});
+
+describe("board pin defaults skip YAML-occupied pins (#1555)", () => {
+  const uartBoard = {
+    id: "esp32-s3-devkitc-1",
+    esphome: { platform: "esp32", board: "esp32-s3-devkitc-1" },
+    pins: [
+      { gpio: 44, label: "GPIO44", features: ["uart_rx"] },
+      { gpio: 43, label: "GPIO43", features: ["uart_tx"] },
+    ],
+  } as unknown as BoardCatalogEntry;
+
+  function seedUart(yaml: string): Record<string, unknown> {
+    return buildInitialValues({
+      entries: [
+        makeConfigEntry({ key: "rx_pin", type: ConfigEntryType.PIN }),
+        makeConfigEntry({ key: "tx_pin", type: ConfigEntryType.PIN }),
+      ],
+      component: { id: "uart", config_entries: [] } as unknown as ComponentCatalogEntry,
+      board: uartBoard,
+      yaml,
+      prefillReference: null,
+      prefillFields: null,
+      restoredValues: null,
+      localize: identityLocalize,
+    });
+  }
+
+  it("leaves the pins unset when an existing bus already wires them", () => {
+    const yaml = [
+      "uart:",
+      "  - baud_rate: 9600",
+      "    rx_pin: 44",
+      "    tx_pin: 43",
+      "    id: uart_1",
+      "",
+    ].join("\n");
+    expect(seedUart(yaml)).toEqual({});
+  });
+
+  it("keeps seeding the first bus (pins not in the YAML yet)", () => {
+    expect(seedUart("")).toEqual({ rx_pin: 44, tx_pin: 43 });
   });
 });

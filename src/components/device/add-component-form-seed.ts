@@ -6,12 +6,14 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
 import {
   findReferenceCandidates,
+  findUsedPins,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
   collectExistingIds,
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
+import { suggestEntityName } from "../../util/default-entity-name.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
@@ -155,12 +157,13 @@ export function seedDefaults(
  * Build the initial form `_values` for the current component:
  *  1. Seed required entries' default values (recursively).
  *  2. Auto-generate a unique `id` for the top-level id field.
- *  3. Seed pin entries from the board manifest.
- *  4. Restore the values the user typed before a "+ Add <dep>" detour
+ *  3. Suggest an entity name for platform components.
+ *  4. Seed pin entries from the board manifest.
+ *  5. Restore the values the user typed before a "+ Add <dep>" detour
  *     (over the seeded defaults, under the prefills below).
- *  5. If we were just brought back from a "+ Add <domain>" detour,
+ *  6. If we were just brought back from a "+ Add <domain>" detour,
  *     prefill the field that points at that domain with the new id.
- *  6. Overlay constraint-derived prefill fields last.
+ *  7. Overlay constraint-derived prefill fields last.
  */
 export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   const {
@@ -196,14 +199,27 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     if (seeded !== null) next = { ...next, id: seeded };
   }
 
+  const nameEntry = entries.find(
+    (e) => e.key === "name" && e.type === ConfigEntryType.STRING
+  );
+  if (nameEntry && next["name"] === undefined) {
+    const seededName = suggestEntityName(component.id, component.name, yaml);
+    if (seededName !== null) next = { ...next, name: seededName };
+  }
+
   // Seed pin entries from the board's manifest when the board has
   // a pin tagged with the matching peripheral feature. Without this,
   // ESPHome falls back to its compile-time defaults — which on the
   // ESP32-C3 (and other variants without an SCL/SDA alias) are
   // either invalid or wrong-numbered: i2c on C3 emits an
   // "Invalid pin number: 22" squiggle because the bus block
-  // falls back to ESP32 GPIO22/21.
-  next = seedBoardPinDefaults(component.id, entries, board, next);
+  // falls back to ESP32 GPIO22/21. Pins the YAML already wires stay
+  // unseeded (a second uart would otherwise re-suggest the first
+  // bus's pins, #1555); no exclude range — the new component isn't
+  // in the YAML yet. The scan's known imprecision is inherited: a
+  // token like "esp32-p4" registers GPIO4 as used (over-suppresses a
+  // default), and a substitution-wired pin is invisible to it.
+  next = seedBoardPinDefaults(component.id, entries, board, next, findUsedPins(yaml));
 
   // Restore what the user typed before a "+ Add <dep>" detour, over the freshly
   // seeded defaults, but before `prefillReference` so the just-added dep's id

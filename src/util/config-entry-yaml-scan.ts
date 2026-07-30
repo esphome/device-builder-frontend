@@ -22,11 +22,11 @@ import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { hasSubstitutionReference } from "./substitutions.js";
 import { indentOf } from "./yaml-line-walker.js";
+import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import {
   collectIdsAtPath,
   findFieldLine,
   parseYamlTopLevelSections,
-  readInstanceScalar,
   type YamlSection,
 } from "./yaml-sections-core.js";
 

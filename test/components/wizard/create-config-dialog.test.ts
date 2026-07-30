@@ -164,6 +164,7 @@ function emitNextStep(el: ESPHomeCreateConfigDialog, step: string): void {
 // cases.
 afterEach(() => {
   _clearBoardBodyCache();
+  vi.mocked(toast.warning).mockClear();
 });
 
 describe("create-config-dialog create de-dupe + retry", () => {
@@ -176,6 +177,34 @@ describe("create-config-dialog create de-dupe + retry", () => {
     emitCreate(el, "kitchen");
 
     expect(createDevice).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the backend's package warning and still completes the create", async () => {
+    const createDevice = vi.fn().mockResolvedValue({
+      configuration: "proxy.yaml",
+      warning: "Created, but the remote package didn't validate",
+    });
+    const el = await mount({ createDevice });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
+    const closeSpy = vi.spyOn(el, "close");
+
+    emitCreate(el, "proxy");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledTimes(1);
+    expect((el as unknown as { _createError: string })._createError).toBe("");
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Created, but its remote package needs a repair in the editor",
+      expect.objectContaining({
+        description: "Created, but the remote package didn't validate",
+        duration: 8000,
+      })
+    );
+    // The toast is the repair signal on the editor page; it must fire
+    // after the dialog has closed, not under the still-open wizard.
+    expect(closeSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(toast.warning).mock.invocationCallOrder[0]
+    );
   });
 
   it("allows a retry after a failed create (no permanent lockout)", async () => {

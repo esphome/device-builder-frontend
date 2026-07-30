@@ -38,7 +38,8 @@ export function seedBoardPinDefaults(
   componentId: string,
   configEntries: ConfigEntry[],
   board: BoardCatalogEntry | null,
-  values: Record<string, unknown>
+  values: Record<string, unknown>,
+  usedPins: ReadonlyMap<number | string, string>
 ): Record<string, unknown> {
   if (!board?.pins?.length) return values;
   // Platform-qualified ids (``audio_adc.es7210``) → skip. Bus-like
@@ -46,6 +47,10 @@ export function seedBoardPinDefaults(
   // feature tags that match the board manifest's pin-feature list.
   if (componentId.includes(".")) return values;
   let next = values;
+  // Pins this pass already seeded: two roles tagged on one GPIO must
+  // not both resolve to it, or the seeder manufactures the same
+  // duplicate-pin error the used-pin skip exists to remove.
+  const taken = new Set<number | string>();
   for (const entry of configEntries) {
     if (entry.type !== ConfigEntryType.PIN) continue;
     if (next[entry.key] !== undefined) continue;
@@ -55,8 +60,16 @@ export function seedBoardPinDefaults(
     // ``_pin_feature_from_name`` (device-builder#1012 / #1165).
     const role = entry.key.toLowerCase().replace(/_(pin|gpio)$/, "");
     const featureTag = `${componentId}_${role}`;
-    const matchingPin = board.pins.find((p) => p.features.includes(featureTag));
+    // First tagged pin the YAML doesn't wire yet: a second bus falls
+    // through to the next tagged pin (a wesp32 tags i2c_sda on three),
+    // and a board with every tagged pin taken leaves the field for the
+    // user instead of re-suggesting the first bus's pins (#1555).
+    const matchingPin = board.pins.find(
+      (p) =>
+        p.features.includes(featureTag) && !usedPins.has(p.gpio) && !taken.has(p.gpio)
+    );
     if (!matchingPin) continue;
+    taken.add(matchingPin.gpio);
     next = { ...next, [entry.key]: matchingPin.gpio };
   }
   return next;

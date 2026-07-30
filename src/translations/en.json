@@ -27,6 +27,7 @@
     "adopt_submit_busy": "Taking control…",
     "adopt_error_generic": "Failed to take control of this device",
     "adopt_package_warning": "Adopted, but its remote package needs a repair in the editor",
+    "create_package_warning": "Created, but its remote package needs a repair in the editor",
     "add_new_device": "Add new device",
     "add_new_device_hint": "Create a new ESPHome configuration",
     "esphome_web": "ESPHome web",

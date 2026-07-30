@@ -2038,8 +2038,10 @@ sensor:
   });
 
   it("round-trips a freshly-added empty item via the renderer's Add button", () => {
-    // ``renderNestedListField`` emits ``[..., {}]`` when the user
-    // clicks Add. The serializer should emit a bare dash
+    // ``renderNestedListField`` emits ``[..., {}]`` on Add for lists
+    // whose row schema has no required declaring id (rows requiring one
+    // arrive with it prefilled, #2452); bare rows also come from
+    // externally-authored YAML. The serializer should emit a bare dash
     // placeholder so the YAML stays valid even before the user
     // fills in a key.
     const yaml = `esphome:
