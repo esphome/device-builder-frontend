@@ -32,10 +32,10 @@ function makeHost() {
         return `stream-${follows.length}`;
       }),
       ready: Promise.resolve(),
-      // Bumps per read: ready is pre-resolved here, so model the
-      // reconnect as having happened by the time a resume rechecks.
+      // Static until the test's bumpGeneration models a reconnect; an
+      // unbumped resume is the refused-send give-up path.
       get connectionGeneration(): number {
-        return ++generation;
+        return generation;
       },
     },
     _jobId: "",
@@ -53,14 +53,21 @@ function makeHost() {
     _localize: identityLocalize,
     _fail: vi.fn(),
   };
-  return { host: host as unknown as ESPHomeFirmwareInstallDialog, follows, raw: host };
+  return {
+    host: host as unknown as ESPHomeFirmwareInstallDialog,
+    follows,
+    raw: host,
+    bumpGeneration: () => {
+      generation += 1;
+    },
+  };
 }
 
 const flushResume = () => flushMicrotasks(4);
 
 describe("compileAndWait connection loss", () => {
   it("keeps the promise pending, re-follows, and the replayed result resolves", async () => {
-    const { host, follows, raw } = makeHost();
+    const { host, follows, raw, bumpGeneration } = makeHost();
     const pending = compileAndWait(host, "x.yaml");
     await Promise.resolve(); // firmwareCompile resolves, first follow attaches
     expect(follows).toHaveLength(1);
@@ -70,6 +77,7 @@ describe("compileAndWait connection loss", () => {
     expect(raw._jobId).toBe("j1");
     expect(raw._fail).not.toHaveBeenCalled();
 
+    bumpGeneration(); // the reconnect happened
     await flushResume();
     expect(follows).toHaveLength(2);
     expect(raw._log.lines).toEqual([]);
@@ -79,8 +87,21 @@ describe("compileAndWait connection loss", () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
-  it("does not re-follow after a dismissal settled the wait", async () => {
+  it("rejects with the interruption message when the send was refused with no reconnect", async () => {
     const { host, follows, raw } = makeHost();
+    const pending = compileAndWait(host, "x.yaml");
+    await Promise.resolve();
+
+    follows[0].onConnectionLost!();
+    // No bumpGeneration: ready resolved without a new socket.
+    await flushResume();
+    expect(follows).toHaveLength(1);
+    expect(raw._jobId).toBe("");
+    await expect(pending).rejects.toThrow("command.connection_interrupted");
+  });
+
+  it("does not re-follow after a dismissal settled the wait", async () => {
+    const { host, follows, raw, bumpGeneration } = makeHost();
     const pending = compileAndWait(host, "x.yaml");
     await Promise.resolve();
 
@@ -90,6 +111,7 @@ describe("compileAndWait connection loss", () => {
     raw._compileReject?.();
     raw._compileReject = null;
     raw._jobId = "";
+    bumpGeneration();
 
     await flushResume();
     expect(follows).toHaveLength(1);
@@ -99,11 +121,12 @@ describe("compileAndWait connection loss", () => {
 
 describe("waitForRunningJob connection loss", () => {
   it("re-follows and resolves from the replayed terminal result", async () => {
-    const { host, follows, raw } = makeHost();
+    const { host, follows, raw, bumpGeneration } = makeHost();
     const pending = waitForRunningJob(host, "j9");
 
     expect(follows).toHaveLength(1);
     follows[0].onConnectionLost!();
+    bumpGeneration();
     await flushResume();
     expect(follows).toHaveLength(2);
 
@@ -112,13 +135,26 @@ describe("waitForRunningJob connection loss", () => {
     expect(raw._fail).not.toHaveBeenCalled();
   });
 
-  it("does not re-follow after a dismissal", async () => {
+  it("fails the wait when the send was refused with no reconnect", async () => {
     const { host, follows, raw } = makeHost();
+    const pending = waitForRunningJob(host, "j9");
+
+    follows[0].onConnectionLost!();
+    // No bumpGeneration: ready resolved without a new socket.
+    await flushResume();
+    expect(follows).toHaveLength(1);
+    expect(raw._fail).toHaveBeenCalledWith("firmware.download_failed");
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it("does not re-follow after a dismissal", async () => {
+    const { host, follows, raw, bumpGeneration } = makeHost();
     const pending = waitForRunningJob(host, "j9");
 
     follows[0].onConnectionLost!();
     raw._compileReject?.();
     raw._compileReject = null;
+    bumpGeneration();
 
     await flushResume();
     expect(follows).toHaveLength(1);

@@ -10,6 +10,7 @@ import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import {
   followJob,
   startValidateStream,
+  stopCommand,
 } from "../../src/components/command-dialog/commands.js";
 import { flushMicrotasks } from "../_dom.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
@@ -24,7 +25,7 @@ const flushResume = () => flushMicrotasks(4);
 
 describe("command-dialog follow connection loss", () => {
   it("keeps the job, stays running, and re-follows with a reset log", async () => {
-    const { host, follows } = makeCommandDialogHost(
+    const { host, follows, bumpGeneration } = makeCommandDialogHost(
       jobsOf(makeFirmwareJob({ job_id: "j1" }))
     );
     (host as any)._jobId = "j1";
@@ -36,12 +37,13 @@ describe("command-dialog follow connection loss", () => {
     expect((host as any)._state).toBe("running");
     expect((host as any)._streamId).toBe("");
 
+    bumpGeneration(); // the reconnect happened
     await flushResume();
     expect((host as any)._streamId).toBe("stream-2");
     expect((host as any)._log.lines).toEqual([]);
   });
 
-  it("does not re-follow when the user stopped during the outage", async () => {
+  it("gives up with a terminal state when the send was refused with no reconnect", async () => {
     const { host, follows } = makeCommandDialogHost(
       jobsOf(makeFirmwareJob({ job_id: "j1" }))
     );
@@ -49,7 +51,25 @@ describe("command-dialog follow connection loss", () => {
     followJob(host, "j1");
 
     follows["j1"].onConnectionLost!();
+    // No bumpGeneration: ready resolved without a new socket.
+    await flushResume();
+    expect((host as any)._streamId).toBe("");
+    expect((host as any)._state).toBe("error");
+    expect((host as any)._statusMessage).toBe("command.connection_interrupted");
+    expect((host as any)._connectionInterrupted).toBe(true);
+    expect((host as any)._jobId).toBe("");
+  });
+
+  it("does not re-follow when the user stopped during the outage", async () => {
+    const { host, follows, bumpGeneration } = makeCommandDialogHost(
+      jobsOf(makeFirmwareJob({ job_id: "j1" }))
+    );
+    (host as any)._jobId = "j1";
+    followJob(host, "j1");
+
+    follows["j1"].onConnectionLost!();
     (host as any)._jobId = ""; // stopCommand during the outage
+    bumpGeneration();
 
     await flushResume();
     expect((host as any)._streamId).toBe("");
@@ -58,7 +78,7 @@ describe("command-dialog follow connection loss", () => {
   it("does not re-follow onto a dialog closed during the outage", async () => {
     // close()/_onDialogHide flip _open without clearing _jobId, so the
     // open check is the guard that covers dismissal.
-    const { host, follows } = makeCommandDialogHost(
+    const { host, follows, bumpGeneration } = makeCommandDialogHost(
       jobsOf(makeFirmwareJob({ job_id: "j1" }))
     );
     (host as any)._jobId = "j1";
@@ -66,14 +86,28 @@ describe("command-dialog follow connection loss", () => {
 
     follows["j1"].onConnectionLost!();
     (host as any)._open = false;
+    bumpGeneration();
 
     await flushResume();
     expect((host as any)._streamId).toBe("");
     expect((host as any)._jobId).toBe("j1");
   });
 
+  it("Stop is a no-op while disconnected so it can't claim a false stop", () => {
+    const firmwareCancel = vi.fn();
+    const { host } = makeCommandDialogHost(jobsOf(makeFirmwareJob({ job_id: "j1" })), {
+      firmwareCancel,
+    });
+    (host as any)._jobId = "j1";
+    (host as any)._apiConnected = false;
+    stopCommand(host);
+    expect(firmwareCancel).not.toHaveBeenCalled();
+    expect((host as any)._state).toBe("running");
+    expect((host as any)._jobId).toBe("j1");
+  });
+
   it("does not re-follow when something already reattached", async () => {
-    const { host, follows } = makeCommandDialogHost(
+    const { host, follows, bumpGeneration } = makeCommandDialogHost(
       jobsOf(makeFirmwareJob({ job_id: "j1" }))
     );
     (host as any)._jobId = "j1";
@@ -81,6 +115,7 @@ describe("command-dialog follow connection loss", () => {
 
     follows["j1"].onConnectionLost!();
     followJob(host, "j1"); // a manual reattach (stream-2) wins
+    bumpGeneration();
 
     await flushResume();
     expect((host as any)._streamId).toBe("stream-2");

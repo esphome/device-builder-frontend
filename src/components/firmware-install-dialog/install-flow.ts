@@ -8,6 +8,7 @@ import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.j
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
@@ -550,33 +551,6 @@ async function artifactsSettled(
 }
 
 /**
- * Re-attach a job follow once the reconnect's auth lands.
- *
- * The job keeps running server-side across a WS drop; the follow
- * replays the full history, so the log resets rather than duplicating.
- */
-function resumeFollowOnReady(
-  host: ESPHomeFirmwareInstallDialog,
-  isStale: () => boolean,
-  follow: () => void
-): void {
-  host._streamId = "";
-  const generation = host._api.connectionGeneration;
-  void host._api.ready
-    .then(() => {
-      // A refused send lands here synchronously with ready still
-      // resolved; only a genuinely new socket bumps the generation.
-      if (host._api.connectionGeneration === generation) return;
-      if (isStale() || host._streamId !== "") return;
-      host._log.reset();
-      follow();
-    })
-    .catch((err: unknown) => {
-      console.error("[install] Re-follow after reconnect failed", err);
-    });
-}
-
-/**
  * Stream an already-running job into the dialog and wait for it to reach
  * a terminal state.
  *
@@ -616,9 +590,24 @@ export function waitForRunningJob(
           host._fail(host._localize(failKey));
           resolve(false);
         },
-        onConnectionLost: () =>
-          // A dismissal settled the wait and nulled the reject hook.
-          resumeFollowOnReady(host, () => host._compileReject === null, follow),
+        onConnectionLost: () => {
+          host._streamId = "";
+          resumeFollowOnReady(host._api, {
+            // A dismissal settled the wait and nulled the reject hook.
+            isStale: () => host._compileReject === null || host._streamId !== "",
+            resume: () => {
+              host._log.reset();
+              follow();
+            },
+            giveUp: (err) => {
+              console.error("[install] Re-follow after reconnect failed", err);
+              host._streamId = "";
+              host._compileReject = null;
+              host._fail(host._localize(failKey));
+              resolve(false);
+            },
+          });
+        },
       });
     };
     follow();
@@ -669,14 +658,25 @@ export function compileAndWait(
           host._compileReject = null;
           reject(new Error(error));
         },
-        onConnectionLost: () =>
-          // The submit gap (await firmwareCompile) means a retry can arm
-          // before its follow attaches; the job id pins ownership.
-          resumeFollowOnReady(
-            host,
-            () => host._jobId !== jobId,
-            () => follow(jobId)
-          ),
+        onConnectionLost: () => {
+          host._streamId = "";
+          resumeFollowOnReady(host._api, {
+            // The submit gap (await firmwareCompile) means a retry can
+            // arm before its follow attaches; the job id pins ownership.
+            isStale: () => host._jobId !== jobId || host._streamId !== "",
+            resume: () => {
+              host._log.reset();
+              follow(jobId);
+            },
+            giveUp: (err) => {
+              console.error("[install] Re-follow after reconnect failed", err);
+              host._streamId = "";
+              host._jobId = "";
+              host._compileReject = null;
+              reject(new Error(host._localize("command.connection_interrupted")));
+            },
+          });
+        },
       });
     };
     // Not an async executor (no-misused-promises): an async function

@@ -29,13 +29,14 @@ export function makeCommandDialogHost(
         return `stream-${++streamSeq}`;
       },
       ready: Promise.resolve(),
-      // Bumps per read: ready is pre-resolved here, so model the
-      // reconnect as having happened by the time a resume rechecks.
+      // Static until the test's bumpGeneration models a reconnect; an
+      // unbumped resume is the refused-send give-up path.
       get connectionGeneration(): number {
-        return ++generation;
+        return generation;
       },
       ...apiExtra,
     },
+    _apiConnected: true,
     _jobs: jobs,
     _commandType: "install",
     _open: true,
@@ -70,5 +71,8 @@ export function makeCommandDialogHost(
     host: host as unknown as ESPHomeCommandDialog,
     follows,
     flipped: () => flipped,
+    bumpGeneration: () => {
+      generation += 1;
+    },
   };
 }
