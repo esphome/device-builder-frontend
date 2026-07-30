@@ -13,6 +13,7 @@ import {
   renderLabel,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { hasNameChild, seedIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
 // turned off, keyed by the form's ``stashOwner`` (the host element,
@@ -85,6 +86,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                 title=${enableLabel}
                 @change=${(e: Event) =>
                   onEnableToggle(
+                    entry,
                     path,
                     key,
                     isOpen,
@@ -127,12 +129,14 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
 
 // Enabling restores the values stashed by the last disable (so an
 // accidental off/on round-trip keeps the user's settings); with no
-// stash it seeds the entity's name (its label, editable) so the group
-// becomes non-empty and serializes. Either way it expands for editing.
-// Disabling stashes the current group, then clears it — the serializer
-// prunes the empty object so the block leaves the YAML — and collapses.
-// Exported for direct unit testing (the render path only wires it up).
+// stash it seeds whichever identity field the group's schema offers, so
+// the group becomes non-empty and serializes. Either way it expands for
+// editing. Disabling stashes the current group, then clears it — the
+// serializer prunes the empty object so the block leaves the YAML — and
+// collapses. Exported for direct unit testing (the render path only
+// wires it up).
 export function onEnableToggle(
+  entry: ConfigEntry,
   path: string[],
   key: string,
   isOpen: boolean,
@@ -146,13 +150,21 @@ export function onEnableToggle(
     if (restored && hasSerializableValue(restored)) {
       stash.delete(key);
       ctx.emitChange(path, restored);
-    } else {
+    } else if (hasNameChild(entry)) {
       // Seed the *localized* label the user is looking at, so the
       // name they get matches the switch they clicked (WYSIWYG) and
       // reads natively in their dashboard locale. It's a plain
       // editable value, not locale-pinned state — don't "fix" this
       // to the entry key.
       ctx.emitChange([...path, "name"], label);
+    } else {
+      // A nameless group (pipsolar's output sub-entities, opentherm's)
+      // rejects ``name:`` outright, so seed its id instead — required or
+      // not, it's the only identity the group has to serialize on. A
+      // group with neither (a light's ``initial_state``) seeds nothing
+      // and persists once the user sets one of its fields.
+      const seed = seedIdFor(entry, ctx);
+      if (seed) ctx.emitChange([...path, seed.key], seed.id);
     }
     if (!isOpen) ctx.toggleNested(key);
   } else {

@@ -5,10 +5,10 @@
  * sensors, a DHT's temperature/humidity) only land in YAML once
  * their group holds a value, so an untouched one is silently "off".
  * ``renderNestedField`` gives those a ``wa-switch``; ``onEnableToggle``
- * is the change handler: on restores the stashed config (or seeds the
- * name) and expands, off stashes then clears the group so the block
- * leaves the YAML. Switch state derives from the current values
- * (loaded from YAML), so it round-trips.
+ * is the change handler: on restores the stashed config (or seeds
+ * whichever identity field the schema offers) and expands, off stashes
+ * then clears the group so the block leaves the YAML. Switch state
+ * derives from the current values (loaded from YAML), so it round-trips.
  */
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -80,20 +80,44 @@ describe("renderNestedField enable switch", () => {
 describe("onEnableToggle", () => {
   it("enabling with no stash seeds the name with the entity label and expands", () => {
     const ctx = makeRenderCtx({});
-    onEnableToggle(["min_free"], "min_free", false, true, "Min Free", ctx);
+    onEnableToggle(
+      makeSensorEntry(),
+      ["min_free"],
+      "min_free",
+      false,
+      true,
+      "Min Free",
+      ctx
+    );
     expect(ctx.emitChange).toHaveBeenCalledWith(["min_free", "name"], "Min Free");
     expect(ctx.toggleNested).toHaveBeenCalledWith("min_free");
   });
 
   it("does not re-expand an already-open group on enable", () => {
     const ctx = makeRenderCtx({});
-    onEnableToggle(["min_free"], "min_free", true, true, "Min Free", ctx);
+    onEnableToggle(
+      makeSensorEntry(),
+      ["min_free"],
+      "min_free",
+      true,
+      true,
+      "Min Free",
+      ctx
+    );
     expect(ctx.toggleNested).not.toHaveBeenCalled();
   });
 
   it("disabling clears the whole group and collapses it", () => {
     const ctx = makeRenderCtx({ min_free: { name: "Min Free" } });
-    onEnableToggle(["min_free"], "min_free", true, false, "Min Free", ctx);
+    onEnableToggle(
+      makeSensorEntry(),
+      ["min_free"],
+      "min_free",
+      true,
+      false,
+      "Min Free",
+      ctx
+    );
     expect(ctx.emitChange).toHaveBeenCalledWith(["min_free"], undefined);
     expect(ctx.toggleNested).toHaveBeenCalledWith("min_free");
   });
@@ -116,10 +140,111 @@ describe("onEnableToggle", () => {
       }
     );
 
-    onEnableToggle(["min_free"], "min_free", true, false, "Min Free", ctx);
+    onEnableToggle(
+      makeSensorEntry(),
+      ["min_free"],
+      "min_free",
+      true,
+      false,
+      "Min Free",
+      ctx
+    );
     expect(getIn(values, ["min_free"])).toBeUndefined();
 
-    onEnableToggle(["min_free"], "min_free", false, true, "Min Free", ctx);
+    onEnableToggle(
+      makeSensorEntry(),
+      ["min_free"],
+      "min_free",
+      false,
+      true,
+      "Min Free",
+      ctx
+    );
     expect(ctx.emitChange).toHaveBeenLastCalledWith(["min_free"], configured);
+  });
+
+  it("seeds a unique id when the group has no name field (#2459)", () => {
+    // pipsolar's output sub-entities reject ``name:`` and require an id.
+    const entry = makeConfigEntry({
+      key: "battery_float_voltage",
+      type: ConfigEntryType.NESTED,
+      platform_type: "output",
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+        makeConfigEntry({ key: "inverted", type: ConfigEntryType.BOOLEAN }),
+      ],
+    });
+    const ctx = makeRenderCtx(
+      {},
+      {
+        overrides: {
+          yaml: "output:\n  - platform: pipsolar\n    id: battery_float_voltage_1\n",
+        },
+      }
+    );
+    onEnableToggle(
+      entry,
+      ["battery_float_voltage"],
+      "battery_float_voltage",
+      false,
+      true,
+      "Battery Float Voltage",
+      ctx
+    );
+    expect(ctx.emitChange).toHaveBeenCalledWith(
+      ["battery_float_voltage", "id"],
+      "battery_float_voltage_2"
+    );
+    expect(ctx.toggleNested).toHaveBeenCalledWith("battery_float_voltage");
+  });
+
+  it("seeds an optional declaring id — it is the group's only identity", () => {
+    // opentherm's output sub-entities: no name, id present but not required.
+    const entry = makeConfigEntry({
+      key: "t_set",
+      type: ConfigEntryType.NESTED,
+      platform_type: "output",
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
+        makeConfigEntry({
+          key: "power_supply",
+          type: ConfigEntryType.ID,
+          references_component: "power_supply",
+        }),
+      ],
+    });
+    const ctx = makeRenderCtx({});
+    onEnableToggle(entry, ["t_set"], "t_set", false, true, "T Set", ctx);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["t_set", "id"], "t_set_1");
+  });
+
+  it("seeds nothing when the schema offers neither a name nor an id", () => {
+    // A light's ``initial_state`` has only colour/brightness fields; it
+    // persists once the user sets one, and must not get an invalid ``name:``.
+    const entry = makeConfigEntry({
+      key: "initial_state",
+      type: ConfigEntryType.NESTED,
+      platform_type: "light",
+      config_entries: [
+        makeConfigEntry({ key: "brightness", type: ConfigEntryType.FLOAT }),
+        makeConfigEntry({
+          key: "power_supply",
+          type: ConfigEntryType.ID,
+          references_component: "power_supply",
+        }),
+      ],
+    });
+    const ctx = makeRenderCtx({});
+    onEnableToggle(
+      entry,
+      ["initial_state"],
+      "initial_state",
+      false,
+      true,
+      "Initial",
+      ctx
+    );
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+    expect(ctx.toggleNested).toHaveBeenCalledWith("initial_state");
   });
 });
