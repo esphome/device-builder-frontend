@@ -324,11 +324,12 @@ export class ESPHomeAPI {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
     }
-    this._stopHeartbeat();
-    this._clearConnectTimeout();
     this._unregisterNetworkListeners();
-    this._ws?.close();
-    this._ws = null;
+    // Run the close cleanup (reject pending work, notify streams) now:
+    // the per-socket identity guard keeps the socket's own async close
+    // event from re-running it, so waiting on the event would leave
+    // everything hanging.
+    if (this._ws) this._forceClose(this._ws);
     this._connected = false;
   }
 

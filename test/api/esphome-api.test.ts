@@ -112,6 +112,22 @@ describe("ESPHomeAPI — connection", () => {
     expect(onDisconnected).toHaveBeenCalledTimes(1);
     expect(api.connected).toBe(false);
   });
+
+  it("disconnect() runs the close cleanup for pending work", async () => {
+    // The socket's own close event is async in real browsers and the
+    // identity guard ignores it once _ws moved on, so disconnect()
+    // must reject and notify everything itself.
+    const api = new ESPHomeAPI();
+    await connect(api);
+    const pending = api.sendCommand("ping");
+    const onConnectionLost = vi.fn();
+    api.sendStreamCommand("devices/logs", {}, { onConnectionLost });
+    api.disconnect();
+    await expect(pending).rejects.toThrow(/WebSocket connection closed/);
+    expect(onConnectionLost).toHaveBeenCalledTimes(1);
+    expect(api.connected).toBe(false);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
 });
 
 describe("ESPHomeAPI — sendCommand", () => {
