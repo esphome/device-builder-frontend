@@ -10,7 +10,7 @@ import {
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
-  collectExistingIds,
+  collectTakenIds,
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
 import { suggestEntityName } from "../../util/default-entity-name.js";
@@ -194,7 +194,7 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     const seeded = generateDefaultComponentId(
       component.id,
       component.multi_conf,
-      collectExistingIds(yaml)
+      collectTakenIds(yaml)
     );
     if (seeded !== null) next = { ...next, id: seeded };
   }
