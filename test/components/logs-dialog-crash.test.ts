@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { append, makeLogsDialog } from "./_logs-dialog-env.js";
 
-import type { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 import { CRASH_BANNER_LINE as CRASH_LINE } from "../_crash-lines.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

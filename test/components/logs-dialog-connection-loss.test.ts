@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { call, makeLogsDialog, session } from "./_logs-dialog-env.js";
 
-import type { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./_logs-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type StreamCallbacks = {

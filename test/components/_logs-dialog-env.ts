@@ -7,6 +7,10 @@ import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 import { type LogsSession, isStreaming } from "../../src/components/logs-session.js";
 
 export { toastError } from "./_logs-dialog-mocks.js";
+// The one path to the component for the family: a direct value import
+// in a test file would evaluate before this module registers the
+// mocks whenever it sorts first.
+export { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._session;
