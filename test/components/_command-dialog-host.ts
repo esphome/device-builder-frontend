@@ -21,6 +21,7 @@ export function makeCommandDialogHost(
   const follows: Record<string, StreamCbs> = {};
   let flipped = false;
   let streamSeq = 0;
+  let generation = 0;
   const host = {
     _api: {
       firmwareFollowJob: (jobId: string, cbs: StreamCbs): string => {
@@ -28,10 +29,16 @@ export function makeCommandDialogHost(
         return `stream-${++streamSeq}`;
       },
       ready: Promise.resolve(),
+      // Bumps per read: ready is pre-resolved here, so model the
+      // reconnect as having happened by the time a resume rechecks.
+      get connectionGeneration(): number {
+        return ++generation;
+      },
       ...apiExtra,
     },
     _jobs: jobs,
     _commandType: "install",
+    _open: true,
     _jobId: "",
     _timerJobId: "",
     _timer: { reset: () => {} },

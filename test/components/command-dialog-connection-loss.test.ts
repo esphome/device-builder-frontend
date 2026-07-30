@@ -49,10 +49,27 @@ describe("command-dialog follow connection loss", () => {
     followJob(host, "j1");
 
     follows["j1"].onConnectionLost!();
-    (host as any)._jobId = ""; // stopCommand / dialog close during the outage
+    (host as any)._jobId = ""; // stopCommand during the outage
 
     await flushResume();
     expect((host as any)._streamId).toBe("");
+  });
+
+  it("does not re-follow onto a dialog closed during the outage", async () => {
+    // close()/_onDialogHide flip _open without clearing _jobId, so the
+    // open check is the guard that covers dismissal.
+    const { host, follows } = makeCommandDialogHost(
+      jobsOf(makeFirmwareJob({ job_id: "j1" }))
+    );
+    (host as any)._jobId = "j1";
+    followJob(host, "j1");
+
+    follows["j1"].onConnectionLost!();
+    (host as any)._open = false;
+
+    await flushResume();
+    expect((host as any)._streamId).toBe("");
+    expect((host as any)._jobId).toBe("j1");
   });
 
   it("does not re-follow when something already reattached", async () => {

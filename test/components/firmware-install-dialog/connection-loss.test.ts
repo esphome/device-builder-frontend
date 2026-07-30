@@ -18,6 +18,7 @@ import type { StreamCbs } from "../_command-dialog-host.js";
 
 function makeHost() {
   const follows: StreamCbs[] = [];
+  let generation = 0;
   const host = {
     _api: {
       firmwareCompile: vi.fn(async () => ({
@@ -31,6 +32,11 @@ function makeHost() {
         return `stream-${follows.length}`;
       }),
       ready: Promise.resolve(),
+      // Bumps per read: ready is pre-resolved here, so model the
+      // reconnect as having happened by the time a resume rechecks.
+      get connectionGeneration(): number {
+        return ++generation;
+      },
     },
     _jobId: "",
     _streamId: "",

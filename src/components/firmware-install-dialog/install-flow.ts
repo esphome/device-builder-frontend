@@ -550,6 +550,33 @@ async function artifactsSettled(
 }
 
 /**
+ * Re-attach a job follow once the reconnect's auth lands.
+ *
+ * The job keeps running server-side across a WS drop; the follow
+ * replays the full history, so the log resets rather than duplicating.
+ */
+function resumeFollowOnReady(
+  host: ESPHomeFirmwareInstallDialog,
+  isStale: () => boolean,
+  follow: () => void
+): void {
+  host._streamId = "";
+  const generation = host._api.connectionGeneration;
+  void host._api.ready
+    .then(() => {
+      // A refused send lands here synchronously with ready still
+      // resolved; only a genuinely new socket bumps the generation.
+      if (host._api.connectionGeneration === generation) return;
+      if (isStale() || host._streamId !== "") return;
+      host._log.reset();
+      follow();
+    })
+    .catch((err: unknown) => {
+      console.error("[install] Re-follow after reconnect failed", err);
+    });
+}
+
+/**
  * Stream an already-running job into the dialog and wait for it to reach
  * a terminal state.
  *
@@ -563,29 +590,6 @@ async function artifactsSettled(
  * case fails the dialog with *failKey*; a retry re-reads the active-jobs
  * map.
  */
-/**
- * Re-attach a job follow once the reconnect's auth lands.
- *
- * The job keeps running server-side across a WS drop; the follow
- * replays the full history, so the log resets rather than duplicating.
- */
-function resumeFollowOnReady(
-  host: ESPHomeFirmwareInstallDialog,
-  isStale: () => boolean,
-  follow: () => void
-): void {
-  host._streamId = "";
-  void host._api.ready
-    .then(() => {
-      if (isStale() || host._streamId !== "") return;
-      host._log.reset();
-      follow();
-    })
-    .catch((err: unknown) => {
-      console.error("[install] Re-follow after reconnect failed", err);
-    });
-}
-
 export function waitForRunningJob(
   host: ESPHomeFirmwareInstallDialog,
   jobId: string,
