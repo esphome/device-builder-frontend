@@ -10,6 +10,7 @@ import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-t
 import { BASE_PATH } from "../util/base-path.js";
 import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
 import { APIError, CommandTimeoutError } from "./api-error.js";
+import { LivenessMonitor } from "./liveness.js";
 import type {
   AutomationAction,
   AutomationCatalogBody,
@@ -148,18 +149,6 @@ type PendingRequest = {
   reject: (error: Error) => void;
 };
 
-// Liveness probe: after HEARTBEAT_INTERVAL_MS of receive silence send
-// a 'ping'; no reply within HEARTBEAT_TIMEOUT_MS force-closes the
-// socket. Protocol-level server pings are invisible to page JS, so a
-// dead link otherwise stays OPEN forever. The tick runs faster than
-// the silence threshold so detection lags the threshold by at most
-// one tick; the in-flight guard keeps pings non-overlapping. The
-// timeout is generous because a backend busy compiling can take over
-// 10s to answer (the HA frontend uses 15s for the same reason).
-const HEARTBEAT_INTERVAL_MS = 15000;
-const HEARTBEAT_TIMEOUT_MS = 15000;
-const HEARTBEAT_TICK_MS = 5000;
-
 // A handshake against a dead peer stalls in CONNECTING with no
 // error/close event; time it out so the backoff loop keeps going.
 // Generous so a slow link never loses a handshake that would have
@@ -190,10 +179,13 @@ export class ESPHomeAPI {
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _reconnectDelay = 1000;
   private _intentionalDisconnect = false;
-  private _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  private _heartbeatInFlight = false;
-  private _lastMessageAt = 0;
   private _connectTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly _liveness = new LivenessMonitor({
+    getSocket: () => this._ws,
+    ping: (timeoutMs) => this.ping(timeoutMs),
+    onDead: (ws) => this._forceClose(ws),
+    onOnline: () => this._onNetworkOnline(),
+  });
   private _connectPromise: {
     resolve: (info: ServerInfoMessage) => void;
     reject: (error: Error) => void;
@@ -282,7 +274,7 @@ export class ESPHomeAPI {
     return new Promise((resolve, reject) => {
       this._connectPromise = { resolve, reject };
       this._intentionalDisconnect = false;
-      this._registerNetworkListeners();
+      this._liveness.registerNetworkListeners();
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}${BASE_PATH}ws`;
@@ -337,7 +329,7 @@ export class ESPHomeAPI {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
     }
-    this._unregisterNetworkListeners();
+    this._liveness.unregisterNetworkListeners();
     // Run the close cleanup (reject pending work, notify streams) now:
     // the per-socket identity guard keeps the socket's own async close
     // event from re-running it, so waiting on the event would leave
@@ -348,36 +340,8 @@ export class ESPHomeAPI {
 
   // ─── Liveness ─────────────────────────────────────────────
 
-  // Stable handler references make the add/remove pairs idempotent, so
-  // no registration flag is needed across reconnects. The existence
-  // guards keep teardown order-independent under test.
-  private _registerNetworkListeners(): void {
-    if (typeof window !== "undefined") {
-      window.addEventListener("offline", this._onWindowOffline);
-      window.addEventListener("online", this._onWindowOnline);
-    }
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", this._onVisibilityChange);
-    }
-  }
-
-  private _unregisterNetworkListeners(): void {
-    if (typeof window !== "undefined") {
-      window.removeEventListener("offline", this._onWindowOffline);
-      window.removeEventListener("online", this._onWindowOnline);
-    }
-    if (typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", this._onVisibilityChange);
-    }
-  }
-
-  private readonly _onWindowOffline = (): void => {
-    // An idle socket doesn't error when the interface drops; surface
-    // the disconnect now instead of after the heartbeat window.
-    if (this._ws) this._forceClose(this._ws);
-  };
-
-  private readonly _onWindowOnline = (): void => {
+  /** The LivenessMonitor's online hook: reconnect policy. */
+  private _onNetworkOnline(): void {
     if (this._intentionalDisconnect || this._connected) return;
     // An attempt stalled in CONNECTING was made against the interface
     // that just came back; abandon it rather than waiting out its
@@ -398,26 +362,6 @@ export class ESPHomeAPI {
         // _onClose schedules the next retry.
       });
     }
-  };
-
-  private readonly _onVisibilityChange = (): void => {
-    // The tick skips while hidden; catch up the moment the tab returns.
-    if (document.visibilityState === "visible") this._heartbeatTick();
-  };
-
-  private _startHeartbeat(): void {
-    this._stopHeartbeat();
-    this._lastMessageAt = Date.now();
-    this._heartbeatTimer = setInterval(() => {
-      this._heartbeatTick();
-    }, HEARTBEAT_TICK_MS);
-  }
-
-  private _stopHeartbeat(): void {
-    if (this._heartbeatTimer) {
-      clearInterval(this._heartbeatTimer);
-      this._heartbeatTimer = null;
-    }
   }
 
   private _clearConnectTimeout(): void {
@@ -425,35 +369,6 @@ export class ESPHomeAPI {
       clearTimeout(this._connectTimeoutTimer);
       this._connectTimeoutTimer = null;
     }
-  }
-
-  private _heartbeatTick(): void {
-    // A hidden tab has no one to show the disconnect to; the
-    // visibilitychange listener ticks immediately on return.
-    if (globalThis.document?.visibilityState === "hidden") return;
-    if (this._heartbeatInFlight) return;
-    if (Date.now() - this._lastMessageAt < HEARTBEAT_INTERVAL_MS) return;
-    const ws = this._ws;
-    // Probe only an OPEN socket: a visibility-edge tick during an
-    // in-flight connect would otherwise force-close the new attempt.
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    this._heartbeatInFlight = true;
-    this.ping(HEARTBEAT_TIMEOUT_MS)
-      .catch((err: unknown) => {
-        // An APIError reply proves the link is alive (e.g. the pre-auth
-        // gate); only silence or a failed send means a dead socket.
-        if (err instanceof APIError) return;
-        console.debug("[WS] Heartbeat got no reply; closing socket", err);
-        if (this._ws === ws) this._forceClose(ws);
-      })
-      .catch((err: unknown) => {
-        // A throw from the disconnect fan-out must not become an
-        // unhandled rejection, but it must not vanish either.
-        console.error("[WS] Heartbeat close path threw", err);
-      })
-      .finally(() => {
-        this._heartbeatInFlight = false;
-      });
   }
 
   /**
@@ -470,8 +385,7 @@ export class ESPHomeAPI {
   }
 
   private _onMessage(event: MessageEvent): void {
-    // Any frame proves the link is alive, parseable or not.
-    this._lastMessageAt = Date.now();
+    this._liveness.noteMessage();
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(event.data);
@@ -492,7 +406,7 @@ export class ESPHomeAPI {
       this._connectionGeneration += 1;
       this._reconnectDelay = 1000;
       this._clearConnectTimeout();
-      this._startHeartbeat();
+      this._liveness.startHeartbeat();
       if (this._connectPromise) {
         this._connectPromise.resolve(this._serverInfo);
         this._connectPromise = null;
@@ -611,7 +525,7 @@ export class ESPHomeAPI {
     const wasConnected = this._connected;
     this._connected = false;
     this._ws = null;
-    this._stopHeartbeat();
+    this._liveness.stopHeartbeat();
     this._clearConnectTimeout();
 
     // A force-closed handshake fires no error event, so a pending
