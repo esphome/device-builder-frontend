@@ -263,9 +263,26 @@ describe("onEnableToggle", () => {
   it("re-emits an already-open identity-less group so the switch walks back", () => {
     // Nothing valid to write and no expand to trigger a re-render, so the
     // switch would otherwise read "on" over an absent group indefinitely.
-    const ctx = makeRenderCtx({});
+    // The no-op emit has to hand the host a *new* values object or nothing
+    // invalidates — pin that, not just the call, so a future
+    // identity-preserving fast path in setIn fails here instead of silently
+    // stranding the switch on.
+    let values: Record<string, unknown> = {};
+    const entry = makeInitialStateEntry();
+    const ctx = makeRenderCtx(
+      {},
+      {
+        overrides: {
+          emitChange: vi.fn((path: string[], value: unknown) => {
+            values = setIn(values, path, value);
+          }),
+          getAt: (path: string[]) => getIn(values, path),
+        },
+      }
+    );
+    const before = values;
     onEnableToggle({
-      entry: makeInitialStateEntry(),
+      entry,
       path: ["initial_state"],
       key: "initial_state",
       isOpen: true,
@@ -274,7 +291,11 @@ describe("onEnableToggle", () => {
       ctx,
     });
     expect(ctx.emitChange).toHaveBeenCalledWith(["initial_state"], undefined);
+    expect(values).not.toBe(before);
     expect(ctx.toggleNested).not.toHaveBeenCalled();
+    // Nothing landed, so the re-render paints the switch off.
+    const [sw] = switchesOf(renderNestedField(entry, ["initial_state"], ctx));
+    expect(sw[".checked"]).toBe(false);
   });
 
   it("prefers the name over a declaring id when the schema has both", () => {

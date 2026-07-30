@@ -166,7 +166,10 @@ export function onEnableToggle(opts: {
       // With neither (a light's ``initial_state``) there's nothing valid to
       // write, so re-emit the still-absent group: the switch the user just
       // clicked has no backing value, and only a re-render walks it back to
-      // off. The group persists once they set one of its own fields.
+      // off. The group persists once they set one of its own fields. This
+      // leans on the host handing itself a fresh values object for every
+      // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
+      // an identity-preserving fast path there would strand the switch on.
       if (seed) ctx.emitChange([...path, seed.key], seed.id);
       else ctx.emitChange(path, undefined);
     }
