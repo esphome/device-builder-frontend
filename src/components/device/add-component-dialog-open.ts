@@ -15,11 +15,7 @@ export interface OpenComponentHost extends SelectionHost {
   board: { id: string; featured_components?: FeaturedComponent[] } | null;
   _selected: ComponentCatalogEntry | null;
   _submitError: string;
-  _submitting: boolean;
-  _dialog: { open: boolean };
-  _catalog: { load(): void } | null;
-  readonly updateComplete: Promise<boolean>;
-  _resetDetourState(): void;
+  open(): void;
   _startFeaturedSequence(
     fullIds: string[],
     boardId: string,
@@ -76,19 +72,13 @@ export async function applyHydratedSelection(
 /**
  * Open the dialog directly onto *id*'s add form (or fast-path the add
  * when it needs no input). The catalog still loads behind the form so
- * Back lands on it. Exact-id targeting skips ``openWithSearch``'s
- * fuzzy filter, which can bury the exact entry.
+ * Back lands on it.
  */
 export async function openComponentById(
   host: OpenComponentHost,
   id: string
 ): Promise<void> {
-  host._resetDetourState();
-  host._selected = null;
-  host._submitError = "";
-  host._submitting = false;
-  host._dialog.open = true;
-  void host.updateComplete.then(() => host._catalog?.load());
+  host.open();
   const result = await hydrateForSelection(host, id);
   await applyHydratedSelection(host, result);
 }

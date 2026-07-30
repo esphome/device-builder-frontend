@@ -16,6 +16,7 @@ import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import { fetchAllComponents } from "./fetch-all-components.js";
+import type { SessionBlobCacheBinding } from "./session-blob-cache-controller.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import {
   blankLineContext,
@@ -125,6 +126,8 @@ export interface CompletionTarget {
 }
 
 let catalogPromise: Promise<CatalogIndex> | null = null;
+let loadedIndex: CatalogIndex | undefined;
+const indexListeners = new Set<() => void>();
 
 /**
  * Load the component catalog once per session. The list is small enough
@@ -152,8 +155,33 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
   return catalogPromise;
 }
 
+/**
+ * `SessionBlobCacheBinding` view of the catalog index, for Lit hosts
+ * driving it through `SessionBlobCacheController`. `getCached` stays
+ * undefined after a failed load (`loadCatalog` resolves the empty
+ * index but resets for retry), so consumers treat it as unsettled.
+ */
+export const catalogIndexBinding: SessionBlobCacheBinding<CatalogIndex> = {
+  getCached: () => loadedIndex,
+  subscribe(cb) {
+    indexListeners.add(cb);
+    return () => indexListeners.delete(cb);
+  },
+  async fetch(api) {
+    const index = await loadCatalog(api);
+    // A failed load resets `catalogPromise` for retry; don't latch its
+    // empty-index resolution as settled.
+    if (catalogPromise) {
+      loadedIndex = index;
+      for (const cb of indexListeners) cb();
+    }
+    return index;
+  },
+};
+
 export function _clearCatalogCache(): void {
   catalogPromise = null;
+  loadedIndex = undefined;
 }
 
 /**

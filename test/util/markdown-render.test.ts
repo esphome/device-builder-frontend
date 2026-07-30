@@ -70,8 +70,7 @@ describe("renderMarkdown — codeLink option", () => {
     );
     const button = host.querySelector<HTMLButtonElement>("button.md-code.md-code-link")!;
     expect(button.getAttribute("type")).toBe("button");
-    // Trimmed: the template's indentation rides in as collapsible whitespace.
-    expect(button.textContent!.trim()).toBe("captive_portal:");
+    expect(button.textContent).toBe("captive_portal:");
     button.click();
     expect(onClick).toHaveBeenCalledTimes(1);
     // The declined span stays a plain code chip.

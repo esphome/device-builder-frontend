@@ -9,12 +9,7 @@
  * that are field refs (``id:``, ``name:``) fail the catalog-known
  * check and stay plain code.
  */
-import memoizeOne from "memoize-one";
-import {
-  canonicalComponentKey,
-  RP2_ALIAS_KEY,
-  RP2_CANONICAL_KEY,
-} from "./component-presence.js";
+import { canonicalComponentKey, platformKeyAlias } from "./component-presence.js";
 import { fireEvent } from "./fire-event.js";
 import type { CodeLinkResolver } from "./markdown.js";
 import type { CatalogIndex } from "./yaml-completion-catalog.js";
@@ -43,29 +38,36 @@ export function activateComponentLink(host: ComponentLinkHost, id: string): void
     fireEvent(host, "section-select", target);
     return;
   }
-  fireEvent(host, "request-add-component", { domain: id, componentId: id });
+  fireEvent(host, "request-add-component", { componentId: id });
 }
 
 /**
  * Resolver for `renderMarkdown`'s `codeLink` option: known catalog ids
  * link, everything else stays plain. Null while *index* is unsettled.
- * Memoized so the resolver's identity is stable across renders.
+ * Handlers are cached per id so their identity is render-stable;
+ * memoize the call itself on the host so the resolver's is too.
  */
-export const componentLinksFor = memoizeOne(
-  (host: ComponentLinkHost, index: CatalogIndex | null): CodeLinkResolver | null => {
-    if (!index) return null;
-    return (text) => {
-      const id = componentIdFromCodeSpan(text);
-      if (!id || !index.byId.has(canonicalComponentKey(id))) return null;
-      return () => activateComponentLink(host, id);
-    };
-  }
-);
+export function componentLinksFor(
+  host: ComponentLinkHost,
+  index: CatalogIndex | null
+): CodeLinkResolver | null {
+  if (!index) return null;
+  const handlers = new Map<string, () => void>();
+  return (text) => {
+    const id = componentIdFromCodeSpan(text);
+    if (!id || !index.byId.has(canonicalComponentKey(id))) return null;
+    let handler = handlers.get(id);
+    if (!handler) {
+      handler = () => activateComponentLink(host, id);
+      handlers.set(id, handler);
+    }
+    return handler;
+  };
+}
 
 function _sectionTarget(yaml: string, id: string) {
   const direct = findAddedSection(yaml, id, undefined);
   if (direct) return direct;
-  if (id === RP2_CANONICAL_KEY) return findAddedSection(yaml, RP2_ALIAS_KEY, undefined);
-  if (id === RP2_ALIAS_KEY) return findAddedSection(yaml, RP2_CANONICAL_KEY, undefined);
-  return null;
+  const alias = platformKeyAlias(id);
+  return alias ? findAddedSection(yaml, alias, undefined) : null;
 }

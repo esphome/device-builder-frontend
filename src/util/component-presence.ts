@@ -24,6 +24,10 @@ const PLATFORM_KEY_ALIAS: Readonly<Record<string, string>> = {
 export const canonicalComponentKey = (id: string): string =>
   id === RP2_ALIAS_KEY ? RP2_CANONICAL_KEY : id;
 
+/** The other accepted spelling of a platform key, when one exists. */
+export const platformKeyAlias = (id: string): string | undefined =>
+  PLATFORM_KEY_ALIAS[id];
+
 /** Whether `present` holds `id` under either alias spelling. */
 export function hasComponentKey(present: ReadonlySet<string>, id: string): boolean {
   if (present.has(id)) return true;

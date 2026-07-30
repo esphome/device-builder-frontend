@@ -63,10 +63,9 @@ describe("componentLinksFor", () => {
     expect(resolve("rp2040:")).toBeTypeOf("function");
   });
 
-  it("keeps a stable identity for the same host and index", () => {
-    const host = makeHost("");
-    const index = makeIndex("wifi");
-    expect(componentLinksFor(host, index)).toBe(componentLinksFor(host, index));
+  it("returns the same handler for the same id across renders", () => {
+    const resolve = componentLinksFor(makeHost(""), makeIndex("wifi"))!;
+    expect(resolve("wifi:")).toBe(resolve("wifi:"));
   });
 });
 
@@ -90,7 +89,7 @@ describe("activateComponentLink", () => {
       detail = (e as CustomEvent).detail;
     });
     activateComponentLink(host, "captive_portal");
-    expect(detail).toEqual({ domain: "captive_portal", componentId: "captive_portal" });
+    expect(detail).toEqual({ componentId: "captive_portal" });
   });
 
   it("reads the live yaml at click time", () => {

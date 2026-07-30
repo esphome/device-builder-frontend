@@ -123,9 +123,10 @@ function renderSegment(
     case "code": {
       const onClick = options?.codeLink?.(seg.text);
       if (onClick) {
-        return html`<button type="button" class="md-code md-code-link" @click=${onClick}>
-          ${seg.text}
-        </button>`;
+        // Kept on one line: breaking the label out would put collapsible
+        // whitespace inside the button's text content.
+        // prettier-ignore
+        return html`<button type="button" class="md-code md-code-link" @click=${onClick}>${seg.text}</button>`;
       }
       return html`<code class="md-code">${seg.text}</code>`;
     }

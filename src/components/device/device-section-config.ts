@@ -15,7 +15,10 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { CatalogIndexController } from "../../util/catalog-index-controller.js";
+import { componentLinksFor } from "../../util/component-doc-links.js";
+import type { CodeLinkResolver } from "../../util/markdown.js";
+import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
+import { catalogIndexBinding } from "../../util/yaml-completion-catalog.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -213,7 +216,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   }));
 
   // Gates description component links on catalog-known ids.
-  readonly _catalogIndex = new CatalogIndexController(this, () => this._api);
+  private readonly _catalogIndex = new SessionBlobCacheController(
+    this,
+    catalogIndexBinding,
+    () => this._api
+  );
+
+  private readonly _componentLinksMemo = memoizeOne(componentLinksFor);
+
+  /** Render-stable resolver for description component links. */
+  get _componentLinks(): CodeLinkResolver | null {
+    return this._componentLinksMemo(this, this._catalogIndex.value ?? null);
+  }
 
   // 200ms is short enough that the YAML pane feels live as the user moves
   // between fields, long enough to coalesce typing into one splice.
