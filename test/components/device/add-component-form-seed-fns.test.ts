@@ -351,6 +351,26 @@ describe("buildInitialValues", () => {
     expect(values.id).toBe("sensor_bme280_2");
   });
 
+  it("clears ids declared under another key", () => {
+    // Both minting paths share one pool, so a hand-typed ``bus_id`` counts.
+    const component = makeComponent({
+      id: "uart",
+      multi_conf: true,
+      config_entries: [makeConfigEntry({ key: "id", type: ConfigEntryType.ID })],
+    });
+    const values = buildInitialValues({
+      entries: component.config_entries,
+      component,
+      board: null,
+      yaml: "tca9548a:\n  - id: mux\n    channels:\n      - bus_id: uart_1\n",
+      prefillReference: null,
+      prefillFields: null,
+      restoredValues: null,
+      localize,
+    });
+    expect(values.id).toBe("uart_2");
+  });
+
   it("does not overwrite an id already seeded by a default_value", () => {
     const component = makeComponent({
       config_entries: [
