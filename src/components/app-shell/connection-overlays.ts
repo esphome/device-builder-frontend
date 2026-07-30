@@ -83,9 +83,17 @@ export function renderRouteLoadingBar(): TemplateResult {
 // defers past the commit: ref fires before Lit inserts the fragment,
 // and showPopover() throws on a disconnected element.
 function showPillOnAttach(el?: Element): void {
-  if (!(el instanceof HTMLElement) || typeof el.showPopover !== "function") return;
+  if (!(el instanceof HTMLElement)) return;
   queueMicrotask(() => {
-    if (el.isConnected && !el.matches(":popover-open")) el.showPopover();
+    if (!el.isConnected) return;
+    try {
+      if (!el.matches(":popover-open")) el.showPopover();
+    } catch {
+      // No popover support: degrade to the plain fixed pill (visible
+      // everywhere except under a modal's top layer) rather than
+      // staying display:none forever.
+      el.removeAttribute("popover");
+    }
   });
 }
 

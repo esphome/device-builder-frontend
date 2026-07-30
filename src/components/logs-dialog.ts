@@ -234,7 +234,9 @@ export class ESPHomeLogsDialog extends LitElement {
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
-    if (changedProperties.has("_apiConnected")) {
+    // A Web Serial session reads USB, not the dashboard WS; the
+    // connection banner and its scroll re-pin are ota-only.
+    if (changedProperties.has("_apiConnected") && this._session.kind === "ota") {
       // The banner toggling resizes the log area on both edges;
       // re-pin the scroll so the tail stays visible.
       this._resetAnsiLogScroll();
@@ -314,6 +316,9 @@ export class ESPHomeLogsDialog extends LitElement {
     const expandLabel = this._localize(
       this._expanded ? "dashboard.logs_collapse" : "dashboard.logs_expand"
     );
+    // Only the ota source rides the dashboard WS; a Web Serial stream
+    // is healthy regardless, so no false error banner there.
+    const wsDown = s.kind === "ota" && !this._apiConnected;
 
     return html`
       <esphome-base-dialog
@@ -330,10 +335,8 @@ export class ESPHomeLogsDialog extends LitElement {
           placeholder=${this._localize("dashboard.logs_placeholder")}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
-          .state=${this._apiConnected ? null : "error"}
-          .statusMessage=${
-            this._apiConnected ? "" : this._localize("dashboard.logs_connection_lost")
-          }
+          .state=${wsDown ? "error" : null}
+          .statusMessage=${wsDown ? this._localize("dashboard.logs_connection_lost") : ""}
         >
           ${
             this._backToInstall

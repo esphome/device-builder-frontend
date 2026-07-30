@@ -261,7 +261,16 @@ export function resumeAfterReconnect(host: ESPHomeLogsDialog): void {
   host._session = { kind: "ota", port: s.port, streamId: null };
   host._log.flush();
   host._log.append([host._localize("dashboard.logs_reconnected")]);
-  void host._api.ready.then(() => startOtaStream(host));
+  void host._api.ready
+    .then(() => startOtaStream(host))
+    .catch(() => {
+      // Restore the flag so the next reconnect edge retries instead of
+      // stranding the user on a resume line that never resumed.
+      const cur = host._session;
+      if (cur.kind === "ota" && cur.streamId === null) {
+        host._session = { ...cur, interrupted: true };
+      }
+    });
 }
 
 function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {

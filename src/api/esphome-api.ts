@@ -312,7 +312,10 @@ export class ESPHomeAPI {
       this._clearConnectTimeout();
       this._connectTimeoutTimer = setTimeout(() => {
         this._connectTimeoutTimer = null;
-        if (this._ws === ws && !this._connected) this._forceClose(ws);
+        if (this._ws === ws && !this._connected) {
+          console.debug(`[WS] Handshake stalled for ${CONNECT_TIMEOUT_MS}ms; closing`);
+          this._forceClose(ws);
+        }
       }, CONNECT_TIMEOUT_MS);
     });
   }
@@ -336,18 +339,23 @@ export class ESPHomeAPI {
   // ─── Liveness ─────────────────────────────────────────────
 
   // Stable handler references make the add/remove pairs idempotent, so
-  // no registration flag is needed across reconnects.
+  // no registration flag is needed across reconnects. The existence
+  // guards keep teardown order-independent under test.
   private _registerNetworkListeners(): void {
-    window.addEventListener("offline", this._onWindowOffline);
-    window.addEventListener("online", this._onWindowOnline);
+    if (typeof window !== "undefined") {
+      window.addEventListener("offline", this._onWindowOffline);
+      window.addEventListener("online", this._onWindowOnline);
+    }
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", this._onVisibilityChange);
     }
   }
 
   private _unregisterNetworkListeners(): void {
-    window.removeEventListener("offline", this._onWindowOffline);
-    window.removeEventListener("online", this._onWindowOnline);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("offline", this._onWindowOffline);
+      window.removeEventListener("online", this._onWindowOnline);
+    }
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", this._onVisibilityChange);
     }
@@ -417,7 +425,12 @@ export class ESPHomeAPI {
         // An APIError reply proves the link is alive (e.g. the pre-auth
         // gate); only silence or a failed send means a dead socket.
         if (err instanceof APIError) return;
+        console.debug("[WS] Heartbeat got no reply; closing socket", err);
         if (this._ws === ws) this._forceClose(ws);
+      })
+      .catch(() => {
+        // A throw from the disconnect fan-out must not become an
+        // unhandled rejection.
       })
       .finally(() => {
         this._heartbeatInFlight = false;

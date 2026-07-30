@@ -123,4 +123,15 @@ describe("logs-dialog OTA connection loss", () => {
     expect(terminal.state).toBeNull();
     expect(terminal.statusMessage).toBe("");
   });
+
+  it("shows no banner for a Web Serial session when the WS drops", async () => {
+    // The serial bytes come off USB; the dashboard connection is
+    // irrelevant to that stream.
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    (el as any)._apiConnected = false;
+    await el.updateComplete;
+    const terminal = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
+    expect(terminal.state).toBeNull();
+    expect(terminal.statusMessage).toBe("");
+  });
 });

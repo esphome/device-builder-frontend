@@ -97,9 +97,13 @@ export function installMockWindow(
   };
 }
 
-/** Fire a window event (e.g. 'offline' / 'online') on the mock window. */
+/** Fire a window event (e.g. 'offline' / 'online') on the mock window.
+ *  Throws when nothing listens, so an unregistered-listener state is
+ *  assertable and never mistaken for a dispatch that ran. */
 export function fireWindowEvent(type: string): void {
-  windowListeners.get(type)?.forEach((l) => l({}));
+  const listeners = windowListeners.get(type);
+  if (!listeners?.size) throw new Error(`no window listeners for ${type}`);
+  listeners.forEach((l) => l({}));
 }
 
 let documentListeners = new Map<string, Set<WindowListener>>();
@@ -129,9 +133,12 @@ export function setDocumentVisibility(state: "visible" | "hidden"): void {
   documentVisibility = state;
 }
 
-/** Fire a document event (e.g. 'visibilitychange') on the mock document. */
+/** Fire a document event (e.g. 'visibilitychange') on the mock document.
+ *  Throws when nothing listens, same contract as fireWindowEvent. */
 export function fireDocumentEvent(type: string): void {
-  documentListeners.get(type)?.forEach((l) => l({}));
+  const listeners = documentListeners.get(type);
+  if (!listeners?.size) throw new Error(`no document listeners for ${type}`);
+  listeners.forEach((l) => l({}));
 }
 
 export function installMockWebSocket(): void {
