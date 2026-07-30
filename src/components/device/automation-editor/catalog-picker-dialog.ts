@@ -1,7 +1,3 @@
-import { consume } from "@lit/context";
-import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
 /**
  * Action / condition picker dialog — the discoverable surface the
  * user reaches by clicking "+ Add action" / "+ Add condition" (or
@@ -37,6 +33,11 @@ import { customElement, property, state } from "lit/decorators.js";
  * (conditions don't have a target — they're tested against the
  * whole device state).
  */
+
+import { consume } from "@lit/context";
+import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
 import type {

@@ -1,10 +1,11 @@
-import { identityLocalize } from "../../../_dom.js";
 /**
  * Shared catalog-host fake for the pure card render functions
  * (renderCard / renderBundleCard). Carries every host member the
  * renderers read, so a new member lands here once instead of in each
  * suite's hand-rolled copy.
  */
+
+import { identityLocalize } from "../../../_dom.js";
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
 
 export function makeCatalogHost(
