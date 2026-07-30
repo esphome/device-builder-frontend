@@ -10,6 +10,7 @@ export interface StreamCbs {
   onOutput: (line: string) => void;
   onResult: (data: unknown) => void;
   onError: (error: string) => void;
+  onConnectionLost?: () => void;
 }
 
 export function makeCommandDialogHost(
@@ -26,6 +27,7 @@ export function makeCommandDialogHost(
         follows[jobId] = cbs;
         return `stream-${++streamSeq}`;
       },
+      ready: Promise.resolve(),
       ...apiExtra,
     },
     _jobs: jobs,
@@ -48,6 +50,7 @@ export function makeCommandDialogHost(
     _failedDuringValidate: false,
     _compileMissingDependent: false,
     _localize: (key: string) => key,
+    _resetAnsiLogScroll: () => {},
     _flipToLogs: () => {
       flipped = true;
     },

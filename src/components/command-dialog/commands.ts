@@ -120,6 +120,14 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
         host._state = "error";
         host._statusMessage = error;
       },
+      onConnectionLost: () => {
+        // The validate subprocess died with the connection; a re-run
+        // would be a fresh submission, so leave that to the user.
+        host._streamId = "";
+        host._log.flush();
+        host._state = "error";
+        host._statusMessage = host._localize("command.connection_interrupted");
+      },
     },
     { showSecrets: host._showSecrets }
   );
@@ -292,6 +300,20 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._state = "error";
       host._statusMessage = error;
       host._jobId = "";
+    },
+    onConnectionLost: () => {
+      // The job keeps running server-side; keep _jobId and re-follow
+      // once the reconnect's auth lands. The follow replays the full
+      // history, so the log resets rather than duplicating it.
+      host._streamId = "";
+      void host._api.ready.then(() => {
+        // Skipped when the dialog closed, the user stopped, the chain
+        // moved to the dependent flash, or something already reattached.
+        if (host._jobId !== jobId || host._streamId !== "") return;
+        host._log.reset();
+        host._resetAnsiLogScroll();
+        followJob(host, jobId);
+      });
     },
   });
 }

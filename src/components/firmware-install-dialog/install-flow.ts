@@ -570,25 +570,40 @@ export function waitForRunningJob(
 ): Promise<boolean> {
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
-    host._streamId = host._api.firmwareFollowJob(jobId, {
-      onOutput: (line) => {
-        if (host._step === "queued") host._step = "compiling";
-        host._timer.noteLine(line);
-        host._log.enqueue(line);
-      },
-      onResult: () => {
-        host._streamId = "";
-        host._compileReject = null;
-        host._log.flush();
-        resolve(true);
-      },
-      onError: () => {
-        host._streamId = "";
-        host._compileReject = null;
-        host._fail(host._localize(failKey));
-        resolve(false);
-      },
-    });
+    const follow = (): void => {
+      host._streamId = host._api.firmwareFollowJob(jobId, {
+        onOutput: (line) => {
+          if (host._step === "queued") host._step = "compiling";
+          host._timer.noteLine(line);
+          host._log.enqueue(line);
+        },
+        onResult: () => {
+          host._streamId = "";
+          host._compileReject = null;
+          host._log.flush();
+          resolve(true);
+        },
+        onError: () => {
+          host._streamId = "";
+          host._compileReject = null;
+          host._fail(host._localize(failKey));
+          resolve(false);
+        },
+        onConnectionLost: () => {
+          // The job keeps running server-side; keep the wait pending and
+          // re-follow once the reconnect's auth lands. The follow replays
+          // the full history, so reset the log rather than duplicating it.
+          host._streamId = "";
+          void host._api.ready.then(() => {
+            // A dismissal settled the wait and nulled the reject hook.
+            if (host._compileReject === null || host._streamId !== "") return;
+            host._log.reset();
+            follow();
+          });
+        },
+      });
+    };
+    follow();
   });
 }
 
@@ -603,16 +618,8 @@ export function compileAndWait(
     host._compileReject = reject;
     // Not an async executor (no-misused-promises): an async function
     // where the constructor expects a void-returning one.
-    const start = async () => {
-      const job = await host._api.firmwareCompile(configuration);
-      host._jobId = job.job_id;
-      // Capture so a compile failure can pick the right hint variant:
-      // local jobs get the link-to-reset, remote jobs get the plain-text
-      // "ask the operator of <receiver>" instruction.
-      host._jobSource = job.source;
-      host._jobSourceLabel = job.source_label;
-      host._jobSourcePin = job.source_pin_sha256;
-      host._streamId = host._api.firmwareFollowJob(job.job_id, {
+    const follow = (jobId: string): void => {
+      host._streamId = host._api.firmwareFollowJob(jobId, {
         onOutput: (line) => {
           if (host._step === "queued") {
             host._step = "compiling";
@@ -646,7 +653,30 @@ export function compileAndWait(
           host._compileReject = null;
           reject(new Error(error));
         },
+        onConnectionLost: () => {
+          // The compile keeps running server-side; keep the promise
+          // pending (a dismissal still settles it via _compileReject)
+          // and re-follow once the reconnect's auth lands. The follow
+          // replays the full history, so reset the log first.
+          host._streamId = "";
+          void host._api.ready.then(() => {
+            if (host._jobId !== jobId || host._streamId !== "") return;
+            host._log.reset();
+            follow(jobId);
+          });
+        },
       });
+    };
+    const start = async () => {
+      const job = await host._api.firmwareCompile(configuration);
+      host._jobId = job.job_id;
+      // Capture so a compile failure can pick the right hint variant:
+      // local jobs get the link-to-reset, remote jobs get the plain-text
+      // "ask the operator of <receiver>" instruction.
+      host._jobSource = job.source;
+      host._jobSourceLabel = job.source_label;
+      host._jobSourcePin = job.source_pin_sha256;
+      follow(job.job_id);
     };
     start().catch((err: unknown) => {
       host._compileReject = null;
