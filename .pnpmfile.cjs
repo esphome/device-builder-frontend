@@ -10,12 +10,24 @@
 //   construct can surface as an ESLint-only parse/type error.
 // - The pin below is disconnected from package.json and nothing warns
 //   on drift (the peer dependency is deleted on purpose).
-// DELETE THIS WHOLE FILE once typescript-eslint supports the TS 7 API.
+// eslint-plugin-perfectionist has the same gap: sort-imports probes
+// require("typescript") for isExternalModuleNameRelative, which the
+// TS 7 native port does not export; module resolution walks up past
+// the virtual store to the repo's TS 7, so the require succeeds and
+// the call crashes instead of hitting the plugin's no-typescript
+// fallback. Same private TS 6 pin until the plugin guards the probe.
+//
+// DELETE THIS WHOLE FILE once both pins are obsolete: typescript-eslint
+// supporting the TS 7 API, and perfectionist guarding its probe.
 // NOTE: any edit to this file (comments included) changes the
 // pnpmfileChecksum pnpm stamps into the lockfile; run `pnpm install`
 // afterwards or --frozen-lockfile installs fail.
 function readPackage(pkg) {
-  if (pkg.name === "typescript-eslint" || pkg.name?.startsWith("@typescript-eslint/")) {
+  if (
+    pkg.name === "typescript-eslint" ||
+    pkg.name?.startsWith("@typescript-eslint/") ||
+    pkg.name === "eslint-plugin-perfectionist"
+  ) {
     if (pkg.peerDependencies?.typescript) delete pkg.peerDependencies.typescript;
     pkg.dependencies = { ...pkg.dependencies, typescript: "~6.0.3" };
   }
