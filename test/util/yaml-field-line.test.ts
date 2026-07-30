@@ -227,6 +227,15 @@ describe("indexedPathAtLine", () => {
     expect(indexedPathAtLine(yaml, section, 2)).toEqual(["0"]);
   });
 
+  it("drops a digit-leading container's frame (documented inversion gap)", () => {
+    // ``0:`` inverts as a leaf but never opens a frame, so a child's
+    // path comes back shortened and does not round-trip.
+    const yaml = ["substitutions:", "  0:", "    name: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 3)).toEqual(["name"]);
+    expect(findFieldLine(yaml, section, ["0", "name"])).toBe(3);
+  });
+
   it("returns null on a flat section's own header line", () => {
     const yaml = ["wifi:", "  ssid: x", ""].join("\n");
     const section = sectionAt(yaml, 1);

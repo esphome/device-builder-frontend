@@ -5,8 +5,9 @@
  * `listItemChildIndent` on the section's own line (a flat host falls
  * back to `indent + 2` rather than reading the first child), block
  * scalars and flow collections aren't modelled, and only bare `key:`
- * lines open frames — a quoted or hyphenated container drops its frame,
- * which consumers detect as an index with no named parent.
+ * lines open frames — a quoted, hyphenated, or digit-leading container
+ * drops its frame, surfacing as an index with no named parent or as a
+ * shortened path.
  */
 
 import {
@@ -119,6 +120,10 @@ export function walkIndexedPaths(
  * key on 1-indexed *line*, list items as 0-based numeric indices, or
  * null (keyless / blank / comment line, block-scalar body, line outside
  * the section or shallower than its child column).
+ *
+ * Consumed today by the round-trip contract tests beside
+ * `findFieldLine`'s; one-shot queries only — a per-line sweep should
+ * use `walkIndexedPaths` directly.
  */
 export function indexedPathAtLine(
   yaml: string,
