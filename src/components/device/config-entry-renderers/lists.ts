@@ -2,11 +2,6 @@ import { html, nothing } from "lit";
 import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
-import {
-  addTakenIdsFromValues,
-  collectTakenIds,
-  generateNestedItemId,
-} from "../../../util/default-component-id.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -21,6 +16,7 @@ import {
   renderYamlOnlyField,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { seedIdFor } from "./seed-identity.js";
 
 // Returns an empty array (not undefined) when nothing's there or the value
 // isn't an array — list mutations always round-trip through this so the new
@@ -52,19 +48,10 @@ function arrayItemHandlers(
 }
 
 // A new row whose schema requires a declaring id arrives with a unique one
-// prefilled (#2452). The pool spans the document *and* the whole form-values
-// tree: the add dialog's values aren't in the YAML yet, a just-added row may
-// not have flushed through the draft debounce, and a same-key sibling list
-// under another parent row (esp32_ble_server's ``services[].characteristics[]``)
-// is invisible from this list's rows.
+// prefilled (#2452); a row without one exists fine as a bare item.
 function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, unknown> {
-  const idChild = (entry.config_entries ?? []).find(
-    (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
-  );
-  if (!idChild) return {};
-  const taken = collectTakenIds(ctx.yaml);
-  addTakenIdsFromValues(ctx.getAt([]), taken);
-  return { [idChild.key]: generateNestedItemId(entry.key, taken) };
+  const seed = seedIdFor(entry, ctx, { requiredOnly: true });
+  return seed ? { [seed.key]: seed.id } : {};
 }
 
 export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {

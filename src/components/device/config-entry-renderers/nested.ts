@@ -13,6 +13,7 @@ import {
   renderLabel,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { hasNameChild, seedIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
 // turned off, keyed by the form's ``stashOwner`` (the host element,
@@ -84,14 +85,15 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                 aria-label=${enableLabel}
                 title=${enableLabel}
                 @change=${(e: Event) =>
-                  onEnableToggle(
+                  onEnableToggle({
+                    entry,
                     path,
                     key,
                     isOpen,
-                    (e.target as unknown as { checked: boolean }).checked,
+                    checked: (e.target as unknown as { checked: boolean }).checked,
                     label,
-                    ctx
-                  )}
+                    ctx,
+                  })}
               ></wa-switch>`
             : nothing
         }
@@ -127,32 +129,49 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
 
 // Enabling restores the values stashed by the last disable (so an
 // accidental off/on round-trip keeps the user's settings); with no
-// stash it seeds the entity's name (its label, editable) so the group
-// becomes non-empty and serializes. Either way it expands for editing.
-// Disabling stashes the current group, then clears it — the serializer
-// prunes the empty object so the block leaves the YAML — and collapses.
-// Exported for direct unit testing (the render path only wires it up).
-export function onEnableToggle(
-  path: string[],
-  key: string,
-  isOpen: boolean,
-  checked: boolean,
-  label: string,
-  ctx: RenderCtx
-): void {
+// stash it seeds whichever identity field the group's schema offers, so
+// the group becomes non-empty and serializes. Either way it expands for
+// editing. Disabling stashes the current group, then clears it — the
+// serializer prunes the empty object so the block leaves the YAML — and
+// collapses. Exported for direct unit testing (the render path only
+// wires it up).
+export function onEnableToggle(opts: {
+  entry: ConfigEntry;
+  path: string[];
+  key: string;
+  isOpen: boolean;
+  checked: boolean;
+  label: string;
+  ctx: RenderCtx;
+}): void {
+  const { entry, path, key, isOpen, checked, label, ctx } = opts;
   const stash = _enableStash(ctx);
   if (checked) {
     const restored = stash.get(key);
     if (restored && hasSerializableValue(restored)) {
       stash.delete(key);
       ctx.emitChange(path, restored);
-    } else {
+    } else if (hasNameChild(entry)) {
       // Seed the *localized* label the user is looking at, so the
       // name they get matches the switch they clicked (WYSIWYG) and
       // reads natively in their dashboard locale. It's a plain
       // editable value, not locale-pinned state — don't "fix" this
       // to the entry key.
       ctx.emitChange([...path, "name"], label);
+    } else {
+      // A nameless group (pipsolar's output sub-entities, opentherm's)
+      // rejects ``name:`` outright, so seed its id instead — required or
+      // not, it's the only identity the group has to serialize on.
+      const seed = seedIdFor(entry, ctx);
+      // With neither (a light's ``initial_state``) there's nothing valid to
+      // write, so re-emit the still-absent group: the switch the user just
+      // clicked has no backing value, and only a re-render walks it back to
+      // off. The group persists once they set one of its own fields. This
+      // leans on the host handing itself a fresh values object for every
+      // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
+      // an identity-preserving fast path there would strand the switch on.
+      if (seed) ctx.emitChange([...path, seed.key], seed.id);
+      else ctx.emitChange(path, undefined);
     }
     if (!isOpen) ctx.toggleNested(key);
   } else {
