@@ -113,6 +113,39 @@ describe("parseYamlAutomations — component triggers", () => {
     expect(action?.actionField).toBe("open_action");
   });
 
+  it("keeps trigger rows before action rows, each in global line order", () => {
+    const yaml = [
+      "cover:",
+      "  - platform: template",
+      "    id: front_cover",
+      "    on_open:",
+      "      then:",
+      "        - logger.log: front open",
+      "    open_action:",
+      "      - switch.turn_on: relay_a",
+      "    close_action:",
+      "      - switch.turn_off: relay_a",
+      "  - platform: template",
+      "    id: back_cover",
+      "    on_open:",
+      "      then:",
+      "        - logger.log: back open",
+      "    open_action:",
+      "      - switch.turn_on: relay_b",
+      "    stop_action:",
+      "      - switch.turn_off: relay_b",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual([
+      "automation:component_on:front_cover:on_open",
+      "automation:component_on:back_cover:on_open",
+      "automation:component_action:front_cover:open_action",
+      "automation:component_action:front_cover:close_action",
+      "automation:component_action:back_cover:open_action",
+      "automation:component_action:back_cover:stop_action",
+    ]);
+  });
+
   it("does not double-count an on_*_action key as both trigger and action", () => {
     const yaml = [
       "cover:",
@@ -228,5 +261,45 @@ describe("parseYamlAutomations — empty / no-automation input", () => {
 
   it("returns an empty array for the empty string", () => {
     expect(parseYamlAutomations("")).toEqual([]);
+  });
+});
+
+describe("parseYamlAutomations — many-instance sweep", () => {
+  it("emits every nested action leaf across a large multi-instance config", () => {
+    const instance = (n: number) => [
+      `  - id: lawn_${n}`,
+      `    main_switch: Lawn ${n}`,
+      "    repeat_number:",
+      `      id: repeat_${n}`,
+      "      set_action:",
+      "        - logger.log: repeat changed",
+      "    valves:",
+      "      - valve_switch: Front",
+      "        run_duration_number:",
+      `          id: front_${n}`,
+      "          set_action:",
+      "            - logger.log: front changed",
+      "      - valve_switch: Back",
+      "        run_duration_number:",
+      `          id: back_${n}`,
+      "          set_action:",
+      "            - logger.log: back changed",
+    ];
+    const yaml = [
+      "sprinkler:",
+      ...Array.from({ length: 25 }, (_, n) => instance(n)).flat(),
+      "",
+    ].join("\n");
+    const rows = parseYamlAutomations(yaml);
+    expect(rows).toHaveLength(75);
+    expect(rows[0].key).toBe(
+      "automation:component_action:lawn_0:repeat_number.set_action"
+    );
+    expect(rows[1].key).toBe(
+      "automation:component_action:lawn_0:valves.0.run_duration_number.set_action"
+    );
+    expect(rows[74].key).toBe(
+      "automation:component_action:lawn_24:valves.1.run_duration_number.set_action"
+    );
   });
 });

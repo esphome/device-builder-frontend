@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { indexedPathAtLine } from "../../src/util/yaml-indexed-path.js";
 import { readInstanceScalar } from "../../src/util/yaml-instance-scalars.js";
 import {
   _clearYamlSectionsMemo,
@@ -174,5 +175,128 @@ describe("findFieldLine", () => {
     ].join("\n");
     const second = sectionAt(yaml, 4); // the second `- platform: gpio`
     expect(findFieldLine(yaml, second, ["name"])).toBe(5);
+  });
+});
+
+const AREAS_YAML = [
+  "esphome:",
+  "  name: x",
+  "  areas:",
+  "    - name: zombie",
+  "      id: ff",
+  "    - name: other",
+  "      id: gg",
+  "",
+].join("\n");
+
+describe("indexedPathAtLine", () => {
+  it("inverts a top-level and a nested field line", () => {
+    const section = sectionAt(LIST_YAML, 2);
+    expect(indexedPathAtLine(LIST_YAML, section, 2)).toEqual(["platform"]);
+    expect(indexedPathAtLine(LIST_YAML, section, 3)).toEqual(["name"]);
+    expect(indexedPathAtLine(LIST_YAML, section, 5)).toEqual(["pin"]);
+    expect(indexedPathAtLine(LIST_YAML, section, 6)).toEqual(["pin", "number"]);
+    expect(indexedPathAtLine(LIST_YAML, section, 7)).toEqual(["pin", "mode"]);
+  });
+
+  it("counts list items as numeric indices", () => {
+    const section = sectionAt(AREAS_YAML, 1);
+    expect(indexedPathAtLine(AREAS_YAML, section, 4)).toEqual(["areas", 0, "name"]);
+    expect(indexedPathAtLine(AREAS_YAML, section, 5)).toEqual(["areas", 0, "id"]);
+    expect(indexedPathAtLine(AREAS_YAML, section, 6)).toEqual(["areas", 1, "name"]);
+    expect(indexedPathAtLine(AREAS_YAML, section, 7)).toEqual(["areas", 1, "id"]);
+  });
+
+  it("inverts a same-indent compact block-sequence line", () => {
+    const yaml = [
+      "wifi:",
+      "  group:",
+      "    items:",
+      "    - ssid: a",
+      "    - ssid: b",
+      "",
+    ].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 4)).toEqual(["group", "items", 0, "ssid"]);
+    expect(indexedPathAtLine(yaml, section, 5)).toEqual(["group", "items", 1, "ssid"]);
+  });
+
+  it("reads a numeric mapping key as a string segment", () => {
+    const yaml = ["substitutions:", "  0: zero", "  name: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 2)).toEqual(["0"]);
+  });
+
+  it("drops a digit-leading container's frame (documented inversion gap)", () => {
+    // ``0:`` inverts as a leaf but never opens a frame, so a child's
+    // path comes back shortened and does not round-trip.
+    const yaml = ["substitutions:", "  0:", "    name: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 3)).toEqual(["name"]);
+    expect(findFieldLine(yaml, section, ["0", "name"])).toBe(3);
+  });
+
+  it("returns null on a flat section's own header line", () => {
+    const yaml = ["wifi:", "  ssid: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 1)).toBeNull();
+  });
+
+  it("inverts a bare inline first key on the section's dash line", () => {
+    const yaml = ["sprinkler:", "  - valves:", "      - valve_switch: Front", ""].join(
+      "\n"
+    );
+    const section = sectionAt(yaml, 2);
+    expect(indexedPathAtLine(yaml, section, 2)).toEqual(["valves"]);
+    expect(findFieldLine(yaml, section, ["valves"])).toBe(2);
+  });
+
+  it("returns null for a keyless scalar list item line", () => {
+    const yaml = ["wifi:", "  networks:", "  - one", "  - two", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(indexedPathAtLine(yaml, section, 3)).toBeNull();
+  });
+
+  it("returns null for blank, comment, block-scalar-body, and out-of-section lines", () => {
+    const yaml = [
+      "sensor:",
+      "  - platform: template",
+      "",
+      "    # a comment",
+      "    lambda: |-",
+      "      return id(x) + 1;",
+      "    update_interval: 60s",
+      "wifi:",
+      "  ssid: x",
+      "",
+    ].join("\n");
+    const section = sectionAt(yaml, 2);
+    expect(indexedPathAtLine(yaml, section, 3)).toBeNull(); // blank
+    expect(indexedPathAtLine(yaml, section, 4)).toBeNull(); // comment
+    expect(indexedPathAtLine(yaml, section, 6)).toBeNull(); // scalar body
+    expect(indexedPathAtLine(yaml, section, 7)).toEqual(["update_interval"]);
+    expect(indexedPathAtLine(yaml, section, 9)).toBeNull(); // outside the section
+  });
+
+  it("round-trips every keyed line through findFieldLine", () => {
+    for (const [yaml, fromLine] of [
+      [LIST_YAML, 2],
+      [AREAS_YAML, 1],
+    ] as const) {
+      const section = sectionAt(yaml, fromLine);
+      const lineCount = yaml.split("\n").length;
+      let inverted = 0;
+      for (
+        let line = section.fromLine;
+        line <= Math.min(section.toLine, lineCount);
+        line++
+      ) {
+        const path = indexedPathAtLine(yaml, section, line);
+        if (path === null) continue;
+        expect(findFieldLine(yaml, section, path.map(String))).toBe(line);
+        inverted++;
+      }
+      expect(inverted).toBeGreaterThan(3);
+    }
   });
 });

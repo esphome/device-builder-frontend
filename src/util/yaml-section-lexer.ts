@@ -62,6 +62,14 @@ export const TOP_LEVEL_KEY_RE = /^([a-zA-Z_][a-zA-Z0-9_]*):/;
 export const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s*-\\s+(${KEY_PATTERN}):\\s*(.*)$`);
 
 /**
+ * A bare mapping-key line (``temperature:``) — key, no value, optional
+ * comment. The frame-opening key shape structural walkers push: a
+ * valued ``key: value`` line has no children, and a quoted or
+ * hyphenated key deliberately doesn't match.
+ */
+export const BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
+
+/**
  * Detect a YAML list-item start. Accepts both the standard
  * `  - <content>` form and the bare `  -` (end-of-line) form
  * `updateSectionInYaml` emits when a list item's inline-keyed
