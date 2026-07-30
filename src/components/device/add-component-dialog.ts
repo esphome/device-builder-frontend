@@ -14,7 +14,7 @@ import { exclusiveBusTarget } from "../../util/bus-availability.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
-import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
+import { buildFeaturedId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { fireSectionEvent } from "./section-editor.js";
 import { formatApiError } from "../../util/format-api-error.js";
@@ -29,6 +29,11 @@ import {
   navigateToDep,
   type DepNavHost,
 } from "./add-component-dialog-dep-nav.js";
+import {
+  applyHydratedSelection,
+  openComponentById,
+  type OpenComponentHost,
+} from "./add-component-dialog-open.js";
 import {
   hydrateForSelection,
   type SelectionHost,
@@ -219,6 +224,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
+  /** Open the dialog directly onto *id*'s add form; a component whose
+   *  form needs no user input is added immediately. */
+  public openComponent(id: string): Promise<void> {
+    return openComponentById(this as unknown as OpenComponentHost, id);
+  }
+
   /** See ``navigateToDep`` for the seq-counter contract. */
   private _depNavSeq = 0;
 
@@ -369,83 +380,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this as unknown as SelectionHost,
       e.detail.component.id
     );
-    if (result.kind === "stale") return;
-    if (result.kind === "error") {
-      this._submitError = result.message;
-      return;
-    }
-    // A featured component can require hub(s)/a bus to exist first (a gpio pin
-    // on a pcf8574 needs the pcf8574 + i2c). Add the missing prerequisites
-    // ahead of it through the same sequential queue bundles use.
-    const prereqs = this._missingRequiredPrereqs(result.entry);
-    if (prereqs && prereqs.unresolved.length > 0) {
-      // A declared prerequisite isn't in the catalog (a same-release catalog
-      // bug). Refuse rather than add the component without its hub/bus and ship
-      // the broken config this flow exists to prevent.
-      this._submitError = this._localize("device.prereq_unresolved", {
-        name: result.entry.name,
-        ids: prereqs.unresolved.join(", "),
-      });
-      return;
-    }
-    if (prereqs && prereqs.missing.length > 0) {
-      // The intermediate steps are the prerequisites (bus, hub), not the picked
-      // component, so frame the banner as "Adding prerequisites for <name>".
-      await this._startFeaturedSequence(
-        [...prereqs.missing, result.entry.id],
-        prereqs.boardId,
-        this._localize("device.adding_prerequisites_for", { name: result.entry.name })
-      );
-      return;
-    }
-    this._selected = result.entry;
-    this._submitError = "";
-    const fields = this._fastPathFields(result.entry);
-    if (fields) await this._submitComponent(fields, /* notify */ true);
-  }
-
-  /**
-   * The featured prerequisites a just-selected featured component still needs:
-   * its `requires` local ids (bus then hub), resolved to full featured ids,
-   * keeping only those whose locked id isn't already in the YAML. Returns null
-   * for a non-featured entry or one with no requires.
-   *
-   * Invariant: `requires` must be the fully-flattened, ordered prerequisite set
-   * — only the selected component's direct `requires` is resolved here, and the
-   * queued items (added via `_startFeaturedSequence`) do NOT re-resolve their
-   * own `requires`. The backend (esphome/device-builder#1717) emits the complete
-   * chain (e.g. a gpio lists `[bus, hub]`, not just the hub).
-   */
-  private _missingRequiredPrereqs(
-    entry: ComponentCatalogEntry
-  ): { boardId: string; missing: string[]; unresolved: string[] } | null {
-    const board = this.board;
-    if (!board || !isFeaturedId(entry.id)) return null;
-    const featured = board.featured_components ?? [];
-    const fc = featured.find((c) => buildFeaturedId(board.id, c.id) === entry.id);
-    if (!fc?.requires?.length) return null;
-    const existingIds = collectExistingIds(this.yaml);
-    const missing: string[] = [];
-    const unresolved: string[] = [];
-    for (const reqLocal of fc.requires) {
-      const prereq = featured.find((c) => c.id === reqLocal);
-      if (!prereq) {
-        // A requires id with no matching featured component is a catalog bug in
-        // this same (lockstep) release, not version drift: adding the component
-        // without its prereq ships the broken hub-referencing config this flow
-        // exists to prevent. Record it so the caller refuses the add (and warn
-        // with the precise id for a developer).
-        console.warn(
-          `Featured component '${entry.id}' requires '${reqLocal}', which is not in the board catalog.`
-        );
-        unresolved.push(reqLocal);
-        continue;
-      }
-      const presetId = prereq.fields.id?.value;
-      if (typeof presetId === "string" && existingIds.has(presetId)) continue;
-      missing.push(buildFeaturedId(board.id, reqLocal));
-    }
-    return { boardId: board.id, missing, unresolved };
+    await applyHydratedSelection(this as unknown as OpenComponentHost, result);
   }
 
   /**

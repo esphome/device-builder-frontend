@@ -3,6 +3,7 @@
  * YAML-only section, and the structured config-entry form.
  */
 import { html, nothing, type TemplateResult } from "lit";
+import { componentLinksFor } from "../../../util/component-doc-links.js";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
 // The value import (isSecuritySection) already executes the module,
 // registering the notice element — no separate side-effect import needed.
@@ -96,6 +97,7 @@ export function renderStructuredFormBranch(
       .configuration=${host.configuration}
       .focusFieldPath=${host.focusFieldPath}
       .presentComponents=${host._presentComponents}
+      .componentLinks=${componentLinksFor(host, host._catalogIndex.index)}
       advanced-section
       gate-advanced
       ?show-advanced=${host._showAdvanced}

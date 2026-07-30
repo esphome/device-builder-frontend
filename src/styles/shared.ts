@@ -182,6 +182,26 @@ export const espHomeStyles = css`
     /* Keep long path-like code from breaking the line awkwardly. */
     word-break: break-word;
   }
+
+  /* A code span resolved to a component link (renderMarkdown codeLink
+     option): keeps the md-code chip chrome, adds link affordances. */
+  button.md-code-link {
+    border: 0;
+    margin: 0;
+    cursor: pointer;
+    color: var(--esphome-primary);
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+  }
+
+  button.md-code-link:hover {
+    text-decoration: underline;
+  }
+
+  button.md-code-link:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 1px;
+  }
 `;
 
 /** Common layout helpers. */

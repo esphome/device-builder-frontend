@@ -265,7 +265,9 @@ function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
     ? stripConstraintProse(raw)
     : raw;
   return description
-    ? html`<p class="field-description">${renderMarkdown(description)}</p>`
+    ? html`<p class="field-description">
+        ${renderMarkdown(description, { codeLink: ctx.componentLinks })}
+      </p>`
     : nothing;
 }
 

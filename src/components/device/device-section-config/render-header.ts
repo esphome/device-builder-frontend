@@ -8,6 +8,7 @@ import {
   featuredDisplayName,
   featuredEntryForInstance,
 } from "../../../util/featured-id.js";
+import { componentLinksFor } from "../../../util/component-doc-links.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import type { SectionConfigResponse } from "./loading.js";
@@ -68,7 +69,11 @@ export function renderSectionHeader(
         ${subtitle ? html`<p class="section-subtitle">${subtitle}</p>` : nothing}
         ${
           description
-            ? html`<p class="section-desc">${renderMarkdown(description)}</p>`
+            ? html`<p class="section-desc">
+                ${renderMarkdown(description, {
+                  codeLink: componentLinksFor(host, host._catalogIndex.index),
+                })}
+              </p>`
             : nothing
         }
       </div>

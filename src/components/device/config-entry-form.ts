@@ -44,6 +44,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fetchAllComponents } from "../../util/fetch-all-components.js";
 import { fireEvent } from "../../util/fire-event.js";
+import type { CodeLinkResolver } from "../../util/markdown.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
@@ -267,6 +268,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  `depends_on_component` visibility predicate. */
   @property({ attribute: false })
   presentComponents: Set<string> = new Set();
+
+  /** Resolver turning component-name code spans in descriptions into
+   *  add/navigate links; null keeps them plain code. */
+  @property({ attribute: false })
+  componentLinks: CodeLinkResolver | null = null;
 
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
@@ -1057,6 +1063,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
+      componentLinks: this.componentLinks,
       reactiveConstraintKeys,
       entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,

@@ -204,7 +204,14 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   }
 
   private _onRequestAddComponent = (e: Event) => {
-    const detail = (e as CustomEvent<{ domain: string }>).detail;
+    const detail = (e as CustomEvent<{ domain?: string; componentId?: string }>).detail;
+    // An exact catalog id (description component links) opens straight
+    // onto that component's form; a bare domain filters the catalog.
+    if (detail?.componentId) {
+      e.stopPropagation();
+      void this._addComponentDialog?.openComponent(detail.componentId);
+      return;
+    }
     if (!detail?.domain) return;
     e.stopPropagation();
     this._addComponentDialog?.openWithSearch(detail.domain);

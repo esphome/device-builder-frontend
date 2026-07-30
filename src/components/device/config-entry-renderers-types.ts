@@ -10,6 +10,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import type { CodeLinkResolver } from "../../util/markdown.js";
 
 export interface RenderCtx {
   localize: LocalizeFunc;
@@ -66,6 +67,10 @@ export interface RenderCtx {
    *  values), without overriding a later explicit user collapse. */
   seedNestedOpen: (key: string) => void;
   requestAddComponent: (domain: string) => void;
+  /** Turns known component-name code spans in descriptions into
+   *  add/navigate links; null when not opted in or the catalog index
+   *  hasn't settled. */
+  componentLinks?: CodeLinkResolver | null;
   /**
    * Providers of a cross-domain interface reference. Returns synchronously
    * from a per-form cache; a miss kicks an async catalog fetch and

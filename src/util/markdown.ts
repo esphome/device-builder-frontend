@@ -27,6 +27,14 @@ interface Segment {
   href?: string;
 }
 
+/** Map a code span's literal text to a click handler; null keeps the
+ *  plain code rendering. */
+export type CodeLinkResolver = (text: string) => (() => void) | null;
+
+export interface RenderMarkdownOptions {
+  codeLink?: CodeLinkResolver | null;
+}
+
 /**
  * Schemes we render as live anchors. Catalog descriptions in
  * practice only use ``http(s)://`` (docs cross-references) and a
@@ -90,7 +98,10 @@ function parseMarkdown(input: string): Segment[] {
   return segments;
 }
 
-function renderSegment(seg: Segment): TemplateResult | string {
+function renderSegment(
+  seg: Segment,
+  options?: RenderMarkdownOptions
+): TemplateResult | string {
   switch (seg.kind) {
     case "text":
       return seg.text;
@@ -109,12 +120,23 @@ function renderSegment(seg: Segment): TemplateResult | string {
         rel="noopener noreferrer"
         >${seg.text}</a
       >`;
-    case "code":
+    case "code": {
+      const onClick = options?.codeLink?.(seg.text);
+      if (onClick) {
+        return html`<button type="button" class="md-code md-code-link" @click=${onClick}>
+          ${seg.text}
+        </button>`;
+      }
       return html`<code class="md-code">${seg.text}</code>`;
+    }
     case "bold":
-      return html`<strong>${parseMarkdown(seg.text).map(renderSegment)}</strong>`;
+      return html`<strong
+        >${parseMarkdown(seg.text).map((s) => renderSegment(s, options))}</strong
+      >`;
     case "italic":
-      return html`<em>${parseMarkdown(seg.text).map(renderSegment)}</em>`;
+      return html`<em
+        >${parseMarkdown(seg.text).map((s) => renderSegment(s, options))}</em
+      >`;
   }
 }
 
@@ -124,11 +146,12 @@ function renderSegment(seg: Segment): TemplateResult | string {
  * conditional. Output is a Lit template; safe to interpolate.
  */
 export function renderMarkdown(
-  input: string | null | undefined
+  input: string | null | undefined,
+  options?: RenderMarkdownOptions
 ): TemplateResult | typeof nothing {
   if (!input) return nothing;
   const segments = parseMarkdown(input);
-  return html`${segments.map(renderSegment)}`;
+  return html`${segments.map((s) => renderSegment(s, options))}`;
 }
 
 /** Bare http(s) URLs embedded in otherwise-plain text (validation messages). */

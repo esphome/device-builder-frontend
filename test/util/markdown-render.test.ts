@@ -6,7 +6,7 @@
  * link inside the bold stays clickable instead of leaking as literal text.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderMarkdown } from "../../src/util/markdown.js";
 import { renderInto } from "../_dom.js";
@@ -57,5 +57,40 @@ describe("renderMarkdown — unwrapped link still works", () => {
     const anchor = host.querySelector("a.md-link")!;
     expect(anchor.getAttribute("href")).toBe("https://esphome.io/x");
     expect(anchor.textContent).toBe("Action");
+  });
+});
+
+describe("renderMarkdown — codeLink option", () => {
+  it("renders a resolved code span as a button and fires the handler on click", () => {
+    const onClick = vi.fn();
+    const host = renderInto(
+      renderMarkdown("Pair with `captive_portal:` or `web_server:`", {
+        codeLink: (text) => (text === "captive_portal:" ? onClick : null),
+      })
+    );
+    const button = host.querySelector<HTMLButtonElement>("button.md-code.md-code-link")!;
+    expect(button.getAttribute("type")).toBe("button");
+    // Trimmed: the template's indentation rides in as collapsible whitespace.
+    expect(button.textContent!.trim()).toBe("captive_portal:");
+    button.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+    // The declined span stays a plain code chip.
+    const codes = host.querySelectorAll("code.md-code");
+    expect(codes).toHaveLength(1);
+    expect(codes[0].textContent).toBe("web_server:");
+  });
+
+  it("links a bold-wrapped code span through the recursion", () => {
+    const onClick = vi.fn();
+    const host = renderInto(renderMarkdown("**`wifi:`**", { codeLink: () => onClick }));
+    const button = host.querySelector<HTMLButtonElement>("strong button.md-code-link")!;
+    button.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders plain code chips with no options", () => {
+    const host = renderInto(renderMarkdown("`captive_portal:`"));
+    expect(host.querySelector("button")).toBeNull();
+    expect(host.querySelector("code.md-code")!.textContent).toBe("captive_portal:");
   });
 });

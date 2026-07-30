@@ -15,6 +15,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { CatalogIndexController } from "../../util/catalog-index-controller.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -210,6 +211,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     platform: this.board?.esphome.platform || undefined,
     boardId: this.board?.id,
   }));
+
+  // Gates description component links on catalog-known ids.
+  readonly _catalogIndex = new CatalogIndexController(this, () => this._api);
 
   // 200ms is short enough that the YAML pane feels live as the user moves
   // between fields, long enough to coalesce typing into one splice.

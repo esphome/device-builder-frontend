@@ -115,7 +115,9 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
       </div>
       ${
         entry.description
-          ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
+          ? html`<p class="nested-desc">
+              ${renderMarkdown(entry.description, { codeLink: ctx.componentLinks })}
+            </p>`
           : nothing
       }
       ${

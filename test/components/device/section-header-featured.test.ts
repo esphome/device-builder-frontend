@@ -65,6 +65,7 @@ function makeHost(values: Record<string, unknown>): ESPHomeDeviceSectionConfig {
     board: BOARD,
     sectionKey: "light.esp32_rmt_led_strip",
     _values: values,
+    _catalogIndex: { index: null },
   } as unknown as ESPHomeDeviceSectionConfig;
 }
 
