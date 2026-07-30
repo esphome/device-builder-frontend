@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  addTakenIdsFromValues,
   collectExistingIds,
+  collectTakenIds,
   generateDefaultComponentId,
+  generateNestedItemId,
 } from "../../src/util/default-component-id.js";
 
 describe("generateDefaultComponentId", () => {
@@ -87,6 +90,70 @@ describe("generateDefaultComponentId", () => {
   it("lowercases mixed-case platform ids", () => {
     expect(generateDefaultComponentId("Switch.GPIO", true, new Set())).toBe(
       "switch_gpio_1"
+    );
+  });
+});
+
+describe("generateNestedItemId", () => {
+  it("suffixes the list key", () => {
+    expect(generateNestedItemId("microphone", new Set())).toBe("microphone_1");
+    expect(generateNestedItemId("devices", new Set())).toBe("devices_1");
+  });
+
+  it("increments past taken ids", () => {
+    const existing = new Set(["microphone_1", "microphone_2", "my_mic"]);
+    expect(generateNestedItemId("microphone", existing)).toBe("microphone_3");
+  });
+
+  it("slugs a key that isn't already id-shaped", () => {
+    expect(generateNestedItemId("On-Off", new Set())).toBe("on_off_1");
+  });
+
+  it("prefixes an underscore when the key starts with a digit", () => {
+    expect(generateNestedItemId("1wire", new Set())).toBe("_1wire_1");
+  });
+});
+
+describe("collectTakenIds", () => {
+  it("collects plain and prefixed id keys", () => {
+    const yaml = `tca9548a:
+  - id: mux
+    channels:
+      - bus_id: channels_1
+sensor:
+  - platform: dht
+    uart_id: uart_1
+`;
+    expect(collectTakenIds(yaml)).toEqual(new Set(["mux", "channels_1", "uart_1"]));
+  });
+
+  it("ignores keys that merely end in the letters id", () => {
+    const yaml = `foo:\n  valid: yes\n  uuid: abc\n`;
+    expect(collectTakenIds(yaml)).toEqual(new Set());
+  });
+
+  it("ignores top-level keys", () => {
+    expect(collectTakenIds("id: something\n")).toEqual(new Set());
+  });
+});
+
+describe("addTakenIdsFromValues", () => {
+  it("walks nested lists and mappings for id-naming keys", () => {
+    const taken = new Set<string>();
+    addTakenIdsFromValues(
+      {
+        services: [
+          { characteristics: [{ id: "characteristics_1" }] },
+          { characteristics: [{ id: "characteristics_2" }] },
+        ],
+        channels: [{ bus_id: "channels_9" }],
+        name: "not an id",
+        empty: "",
+      },
+      taken
+    );
+    expect(taken).toEqual(
+      new Set(["characteristics_1", "characteristics_2", "channels_9"])
     );
   });
 });

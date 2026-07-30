@@ -2,6 +2,11 @@ import { html, nothing } from "lit";
 import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
+import {
+  addTakenIdsFromValues,
+  collectTakenIds,
+  generateNestedItemId,
+} from "../../../util/default-component-id.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -44,6 +49,22 @@ function arrayItemHandlers(
   };
   const addItem = () => ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
   return { addItem, removeAt };
+}
+
+// A new row whose schema requires a declaring id arrives with a unique one
+// prefilled (#2452). The pool spans the document *and* the whole form-values
+// tree: the add dialog's values aren't in the YAML yet, a just-added row may
+// not have flushed through the draft debounce, and a same-key sibling list
+// under another parent row (esp32_ble_server's ``services[].characteristics[]``)
+// is invisible from this list's rows.
+function makeNewNestedItem(entry: ConfigEntry, ctx: RenderCtx): Record<string, unknown> {
+  const idChild = (entry.config_entries ?? []).find(
+    (c) => c.type === ConfigEntryType.ID && !c.references_component && c.required
+  );
+  if (!idChild) return {};
+  const taken = collectTakenIds(ctx.yaml);
+  addTakenIdsFromValues(ctx.getAt([]), taken);
+  return { [idChild.key]: generateNestedItemId(entry.key, taken) };
 }
 
 export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
@@ -358,7 +379,9 @@ export function renderNestedListField(
 
   const items = asMappingList(raw);
   const disabled = effectiveDisabled(entry, ctx);
-  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => ({}));
+  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () =>
+    makeNewNestedItem(entry, ctx)
+  );
   const itemTitle = labelFor(entry, ctx);
   const childrenSchema = entry.config_entries ?? [];
 
