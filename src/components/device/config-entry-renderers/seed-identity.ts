@@ -2,8 +2,9 @@
  * Identity seeding for a subtree the user just materialized — a new
  * nested-list row, or a sub-entity switched on. Neither should make the user
  * invent an id (device-builder#2452, #2459). A row serializes as a bare item
- * regardless, so only a required declaring id is prefilled there; a
- * switched-on sub-entity needs an identity field to persist at all.
+ * regardless, so only a required declaring id is prefilled there; a group
+ * serializes only once it holds a value, so it seeds whichever identity
+ * field its schema offers, if any.
  */
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
