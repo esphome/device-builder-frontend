@@ -1,6 +1,7 @@
 export {
   activeJobsContext,
   apiConnectedContext,
+  apiConnectionLostContext,
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,

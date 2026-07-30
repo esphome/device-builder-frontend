@@ -259,10 +259,14 @@ export function resumeAfterReconnect(host: ESPHomeLogsDialog): void {
   const s = host._session;
   if (!host._open || s.kind !== "ota" || s.streamId !== null || !s.interrupted) return;
   host._session = { kind: "ota", port: s.port, streamId: null };
-  host._log.flush();
-  host._log.append([host._localize("dashboard.logs_reconnected")]);
   void host._api.ready
-    .then(() => startOtaStream(host))
+    .then(() => {
+      // Appended post-auth so the line lands with the banner's clear,
+      // not under a banner still saying reconnecting.
+      host._log.flush();
+      host._log.append([host._localize("dashboard.logs_reconnected")]);
+      startOtaStream(host);
+    })
     .catch((err: unknown) => {
       // Restore the flag so the next reconnect edge retries instead of
       // stranding the user on a resume line that never resumed.

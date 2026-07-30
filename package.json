@@ -35,7 +35,7 @@
     "@codemirror/language": "^6.12.4",
     "@codemirror/lint": "^6.9.7",
     "@codemirror/state": "^6.7.1",
-    "@codemirror/view": "^6.43.6",
+    "@codemirror/view": "^6.43.7",
     "@home-assistant/webawesome": "3.7.0",
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
@@ -57,10 +57,10 @@
     "urlpattern-polyfill": "10.1.0"
   },
   "devDependencies": {
-    "@rspack/core": "2.1.5",
+    "@rspack/core": "2.1.7",
     "@rspack/dev-server": "2.1.0",
     "@swc/helpers": "0.5.23",
-    "@types/node": "26.1.1",
+    "@types/node": "26.1.2",
     "@types/w3c-web-serial": "^1.0.8",
     "eslint": "^10.8.0",
     "eslint-plugin-perfectionist": "^5.10.0",

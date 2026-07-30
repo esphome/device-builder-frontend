@@ -88,14 +88,13 @@ export function renderResetSuggestion(
 // download-ready screens have no status icon — their bespoke bodies render in
 // the status-extra slot below.
 
-// Transient reconnecting banner over the follow-backed phases only; the
-// job keeps running server-side and the flow re-attaches on reconnect.
-function wsDown(host: ESPHomeFirmwareInstallDialog): boolean {
-  return !host._apiConnected && (host._step === "queued" || host._step === "compiling");
+// Reconnecting banner over the follow-backed phases only; the job keeps
+// running server-side and the flow re-attaches on reconnect.
+export function connectionLost(host: ESPHomeFirmwareInstallDialog): boolean {
+  return host._connectionLost && (host._step === "queued" || host._step === "compiling");
 }
 
 export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalState {
-  if (wsDown(host)) return "error";
   switch (host._step) {
     case "choose-binary":
       return null;
@@ -146,7 +145,6 @@ function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
 }
 
 export function cardStatusMessage(host: ESPHomeFirmwareInstallDialog): string {
-  if (wsDown(host)) return host._localize("layout.reconnecting");
   if (host._step === "choose-binary") {
     return host._localize("firmware.choose_binary_title");
   }
