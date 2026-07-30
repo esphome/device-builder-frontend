@@ -69,6 +69,18 @@ describe("LivenessMonitor", () => {
     monitor.stopHeartbeat();
   });
 
+  it("stops ticking after stopHeartbeat", async () => {
+    const { monitor, hooks } = makeMonitor({
+      ping: vi.fn<(timeoutMs: number) => Promise<unknown>>(() => Promise.resolve()),
+    });
+    monitor.startHeartbeat();
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(hooks.ping).toHaveBeenCalledTimes(1);
+    monitor.stopHeartbeat();
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(hooks.ping).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onDead on a ping rejection that is not an APIError", async () => {
     const { monitor, hooks, socket } = makeMonitor({
       ping: vi.fn(() => Promise.reject(new Error("timed out"))),
@@ -102,6 +114,10 @@ describe("LivenessMonitor", () => {
     rejectPing(new Error("timed out"));
     await vi.advanceTimersByTimeAsync(0);
     expect(hooks.onDead).not.toHaveBeenCalled();
+    // The positive control: the catch handler ran and re-read the
+    // socket, so the missing onDead is the guard, not an undrained
+    // rejection.
+    expect(hooks.getSocket).toHaveBeenCalledTimes(2);
     monitor.stopHeartbeat();
   });
 
