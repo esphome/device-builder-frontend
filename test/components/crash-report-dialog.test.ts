@@ -26,7 +26,7 @@ import {
 } from "../_crash-lines.js";
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
-import { MAX_TITLE_LENGTH } from "../../src/util/crash-report.js";
+import { MAX_TITLE_LENGTH } from "../../src/util/crash-report-title.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

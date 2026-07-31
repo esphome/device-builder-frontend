@@ -17,17 +17,21 @@ import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import {
+  isFilableTitle,
+  MAX_TITLE_LENGTH,
+  MIN_TITLE_LENGTH,
+  suggestIssueTitle,
+} from "../util/crash-report-title.js";
+import {
   buildFullReport,
   buildIssueUrl,
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
   distillValidatedConfig,
-  isFilableTitle,
-  MAX_TITLE_LENGTH,
+  issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
-  suggestIssueTitle,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
@@ -107,6 +111,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // under a title every other report already shares.
   @state()
   private _userTitle = "";
+
+  // Whether the crash decoded to a location worth naming, so the note under
+  // the field doesn't claim a suggestion in the empty case it exists for.
+  @state()
+  private _titleSuggested = false;
 
   // Set once the report was delivered (copied/downloaded) and the issue
   // opened; the dialog then stays up offering copy-again / download, so a
@@ -251,7 +260,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
-    this._userTitle = suggestIssueTitle(this._scrape, this._buildMeta());
+    this._userTitle = suggestIssueTitle(
+      this._scrape.decodedFrames,
+      issuePlatform(this._buildMeta().targetPlatform)
+    );
+    this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
     this._captureConfig(this._session);
   }
@@ -434,9 +447,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
     const decoded = scrape.decodedFrames.length > 0;
     const configFailed = this._configYaml === "";
     // One list drives both the warnings and the confirm gate, so a field
-    // can't warn while the button stays enabled.
+    // can't warn while the button stays enabled. A title that is present but
+    // too brief gets its own message: the empty-field wording leaves the
+    // user retyping variations with no hint that length is the problem.
+    const title = this._userTitle.trim();
     const missing = [
-      !isFilableTitle(this._userTitle) && "crash_report.title_required",
+      !isFilableTitle(this._userTitle) &&
+        (title ? "crash_report.title_too_short" : "crash_report.title_required"),
       !this._userDescription.trim() && "crash_report.describe_required",
     ].filter((key): key is string => typeof key === "string");
     return html`
@@ -454,7 +471,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
         @input=${this._onTitleInput}
       />
       <p id="crash-title-note" class="describe-note">
-        ${this._localize("crash_report.title_note")}
+        ${this._localize(
+          this._titleSuggested
+            ? "crash_report.title_note"
+            : "crash_report.title_note_undecoded"
+        )}
       </p>
       <label class="describe-label" for="crash-description"
         >${this._localize("crash_report.describe_label")}</label
@@ -503,7 +524,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
       <p class="hint">${this._localize("crash_report.hint")}</p>
       ${missing.map(
         (key) =>
-          html`<p class="describe-required" role="status">${this._localize(key)}</p>`
+          html`<p class="describe-required" role="status">
+            ${this._localize(key, { min: String(MIN_TITLE_LENGTH) })}
+          </p>`
       )}
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
