@@ -235,6 +235,8 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
+  /** The user's issue title, seeded from `suggestIssueTitle`. */
+  userTitle: string;
   /** The frames were decoded against a build that no longer matches the
    *  running firmware, so they name the wrong lines. The log viewer's decode
    *  is what knows; scraping it back out of its own warning line would make
@@ -258,6 +260,87 @@ const PLATFORM_INTEGRATIONS = [
 /** Platform name from the integration list, for empty `target_platform`. */
 export function platformFromIntegrations(integrations: string[]): string {
   return PLATFORM_INTEGRATIONS.find((platform) => integrations.includes(platform)) ?? "";
+}
+
+// Frames naming the machinery that reached a crash rather than the crash.
+// Each appeared as the top frame of a real report, above the useful one.
+const NOISE_FRAME_RES: RegExp[] = [
+  // Panic / abort / assert handlers, esp-idf and esp8266.
+  /^(?:panic_abort|esp_system_abort|esp_vApplicationTickHook|__assert_func|abort|_esp_error_check_failed|user_fatal_exception_handler|__wrap_system_restart_local)\b/,
+  // Idle task and scheduler startup: what a core parked on, not a fault.
+  /^(?:esp_cpu_wait_for_intr|xt_utils_wait_for_intr|vTaskStartScheduler|prvCreateIdleTasks)\b/,
+  // esp8266 entry / continuation trampolines.
+  /^(?:call_user_start|app_entry_redefinable|cont_ret|cont_continue)\b/,
+  // C++ runtime and allocator: an allocation that threw should name the
+  // caller that asked for the memory, not `malloc`.
+  /^(?:std::|__cxa_|__wrap___cxa_|__wrap__ZSt|_Unwind_|operator new|operator delete|malloc|calloc|realloc)/,
+  // Lambda trampolines gcc emitted; the frame below names the component
+  // that invoked the lambda.
+  /(?:^|::)_FUN\b|\{lambda/,
+];
+
+// A frame's leading line: `0xADDR: symbol` plus esp-idf's ` at <path>:<line>`
+// tail. esp8266 emits the bare symbol, so the tail stays optional; it is
+// eaten whole because gcc appends ` (discriminator N)` past the line number.
+const FRAME_SYMBOL_RE = /^0x[0-9a-fA-F]+:\s*(.+?)(?:\s+at\s+.*)?$/;
+
+// Drop everything between balanced delimiters. Argument lists and template
+// parameters nest, so a regex mangles `FixedVector<...>::cleanup_`.
+function stripBalanced(text: string, open: string, close: string): string {
+  let depth = 0;
+  let out = "";
+  for (const char of text) {
+    if (char === open) depth++;
+    else if (char === close) depth = Math.max(0, depth - 1);
+    else if (depth === 0) out += char;
+  }
+  return out;
+}
+
+// A symbol short enough for an issue title: no argument list, no template
+// parameters, and at most the innermost two namespace segments.
+function shortenSymbol(symbol: string): string {
+  const bare = stripBalanced(stripBalanced(symbol, "(", ")"), "<", ">")
+    .replace(/\s+const$/, "")
+    // Stripping argument lists eats the name of `operator()` itself.
+    .replace(/\boperator$/, "operator()")
+    .trim();
+  const parts = bare.split("::").filter(Boolean);
+  // `esphome::` prefixes every one of our own frames; the component
+  // namespace below it is what identifies the code.
+  if (parts[0] === "esphome") parts.shift();
+  return parts.slice(-2).join("::");
+}
+
+/**
+ * The topmost decoded frame that isn't panic or runtime machinery; ""
+ * when every frame is noise or none decoded. esp8266 dumps are a stack
+ * scrape, so there this is a best guess rather than the faulting frame.
+ */
+export function crashSymbol(decodedFrames: string[]): string {
+  let previous = "";
+  for (const frame of decodedFrames) {
+    // `(inlined by)` continuations are folded into the entry; the outer
+    // frame is the one that owns the address.
+    const match = FRAME_SYMBOL_RE.exec(frame.split("\n")[0].trim());
+    if (!match) continue;
+    const symbol = match[1].trim();
+    // The decoder routinely emits the same frame twice for one address.
+    if (symbol === previous) continue;
+    previous = symbol;
+    if (NOISE_FRAME_RES.some((re) => re.test(symbol))) continue;
+    const short = shortenSymbol(symbol);
+    if (short) return short;
+  }
+  return "";
+}
+
+/** Suggested issue title naming the crash location and platform; "" when
+ *  no frame decoded to something worth naming. */
+export function suggestIssueTitle(scrape: CrashScrape, meta: CrashReportMeta): string {
+  const symbol = crashSymbol(scrape.decodedFrames);
+  if (!symbol) return "";
+  return `${issuePlatform(meta.targetPlatform) || "Device"}: crash in ${symbol}`;
 }
 
 /** Component owning the top decoded frame, for the form's component field. */
@@ -339,11 +422,16 @@ function environmentSection(meta: CrashReportMeta): string {
   ].join("\n");
 }
 
-/** Issue title: the crash banner line when present, else a generic one. */
+/**
+ * Issue title: the user's own, else the crash location, else generic.
+ * The crash banner is deliberately not a fallback — it is identical for
+ * every crash the handler reports.
+ */
 function buildIssueTitle(report: CrashReport): string {
-  const { excerpt, crashIndex } = report.scrape;
-  const banner = crashIndex === -1 ? "" : excerpt[crashIndex];
-  const title = banner ? `Crash: ${banner}` : `Device crash on ${report.meta.deviceName}`;
+  const title =
+    report.userTitle.trim() ||
+    suggestIssueTitle(report.scrape, report.meta) ||
+    `Device crash on ${report.meta.deviceName}`;
   return title.length > 100 ? `${title.slice(0, 97)}...` : title;
 }
 

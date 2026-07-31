@@ -20,10 +20,12 @@ import {
   buildFullReport,
   buildIssueUrl,
   type CrashReport,
+  type CrashReportMeta,
   type CrashScrape,
   distillValidatedConfig,
   platformFromIntegrations,
   scrapeCrashData,
+  suggestIssueTitle,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
@@ -42,6 +44,10 @@ registerMdiIcons({
 
 // The backend caps `esphome config` at 60s; the margin covers WS latency.
 const VALIDATE_TIMEOUT_MS = 90_000;
+
+// Floor on the issue title. Long enough that a one-word "crash" can't
+// pass, short enough to accept a real summary like "OTA reboot loop".
+const MIN_TITLE_LENGTH = 15;
 
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
@@ -97,6 +103,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // the report can be sent — a crash report without it isn't actionable.
   @state()
   private _userDescription = "";
+
+  // The issue title, seeded from the crash location on open() and editable.
+  // Required, so a crash whose frames decode to nothing can't be filed
+  // under a title every other report already shares.
+  @state()
+  private _userTitle = "";
 
   // Set once the report was delivered (copied/downloaded) and the issue
   // opened; the dialog then stays up offering copy-again / download, so a
@@ -241,6 +253,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
+    this._userTitle = suggestIssueTitle(this._scrape, this._buildMeta());
     this._dialog.open = true;
     this._captureConfig(this._session);
   }
@@ -294,26 +307,33 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private _buildReport(): CrashReport {
-    const device = this._devices.find((d) => d.configuration === this._configuration);
     return {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
       userDescription: this._userDescription.trim(),
+      userTitle: this._userTitle.trim(),
       staleBuild: this._staleBuild,
-      meta: {
-        deviceName: this._name,
-        configuration: this._configuration,
-        esphomeVersion: device?.current_version || this._esphomeVersion,
-        deployedVersion: device?.runtime_state.deployed_version ?? "",
-        dashboardVersion: this._serverVersion,
-        // Plain-ESP32 sidecars can leave target_platform empty; the
-        // integration list always names the platform component.
-        targetPlatform:
-          device?.target_platform ||
-          platformFromIntegrations(device?.loaded_integrations ?? []),
-        board: device?.board_id ?? "",
-        installation: this._detectInstallation(),
-      },
+      meta: this._buildMeta(),
+    };
+  }
+
+  // Split out of _buildReport so open() can seed the title suggestion,
+  // which needs the platform, before any of the report exists.
+  private _buildMeta(): CrashReportMeta {
+    const device = this._devices.find((d) => d.configuration === this._configuration);
+    return {
+      deviceName: this._name,
+      configuration: this._configuration,
+      esphomeVersion: device?.current_version || this._esphomeVersion,
+      deployedVersion: device?.runtime_state.deployed_version ?? "",
+      dashboardVersion: this._serverVersion,
+      // Plain-ESP32 sidecars can leave target_platform empty; the
+      // integration list always names the platform component.
+      targetPlatform:
+        device?.target_platform ||
+        platformFromIntegrations(device?.loaded_integrations ?? []),
+      board: device?.board_id ?? "",
+      installation: this._detectInstallation(),
     };
   }
 
@@ -407,12 +427,30 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._userDescription = (e.target as HTMLTextAreaElement).value;
   };
 
+  private _onTitleInput = (e: Event): void => {
+    this._userTitle = (e.target as HTMLInputElement).value;
+  };
+
   private _renderReady() {
     const scrape = this._scrape;
     const decoded = scrape.decodedFrames.length > 0;
     const configFailed = this._configYaml === "";
     const described = this._userDescription.trim() !== "";
+    const titled = this._userTitle.trim().length >= MIN_TITLE_LENGTH;
     return html`
+      <label class="describe-label" for="crash-title"
+        >${this._localize("crash_report.title_label")}</label
+      >
+      <input
+        id="crash-title"
+        class="describe-input"
+        type="text"
+        maxlength="100"
+        placeholder=${this._localize("crash_report.title_placeholder")}
+        .value=${this._userTitle}
+        @input=${this._onTitleInput}
+      />
+      <p class="describe-note">${this._localize("crash_report.title_note")}</p>
       <label class="describe-label" for="crash-description"
         >${this._localize("crash_report.describe_label")}</label
       >
@@ -459,6 +497,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
       </ul>
       <p class="hint">${this._localize("crash_report.hint")}</p>
       ${
+        titled
+          ? nothing
+          : html`<p class="describe-required" role="status">
+              ${this._localize("crash_report.title_required")}
+            </p>`
+      }
+      ${
         described
           ? nothing
           : html`<p class="describe-required" role="status">
@@ -471,7 +516,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         </button>
         <button
           class="btn btn--confirm"
-          ?disabled=${!described}
+          ?disabled=${!described || !titled}
           @click=${this._openIssue}
         >
           <wa-icon library="mdi" name="download"></wa-icon>

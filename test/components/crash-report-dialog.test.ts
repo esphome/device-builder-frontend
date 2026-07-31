@@ -19,6 +19,7 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
 }));
 
 import {
+  CRASH_BLOCK_NOISE_ONLY,
   CRASH_BLOCK as CRASH_LINES,
   VALIDATE_OUTPUT,
   VALIDATED_CONFIG_YAML,
@@ -70,6 +71,10 @@ describe("crash-report-dialog", () => {
     (el as any)._userDescription = text;
   };
 
+  const title_ = (text: string) => {
+    (el as any)._userTitle = text;
+  };
+
   it("collects, filters CLI log noise out of the config, then goes ready", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await el.updateComplete;
@@ -113,6 +118,58 @@ describe("crash-report-dialog", () => {
     describe_("Pressed the crash button");
     await el.updateComplete;
     expect(button!.disabled).toBe(false);
+  });
+
+  it("seeds the title from the crash location on open", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
+    expect(input!.value).toBe("Device: crash in Application::setup");
+  });
+
+  it("requires a title when no frame decoded to one worth naming", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    finishValidate();
+    describe_("Pressed the crash button");
+    await el.updateComplete;
+    const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      ".actions .btn--confirm"
+    );
+    // Described but untitled: the seed found nothing, so the user types it.
+    expect((el as any)._userTitle).toBe("");
+    expect(button!.disabled).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_required");
+
+    // A one-word title is no better than the generic one it replaces.
+    title_("crash");
+    await el.updateComplete;
+    expect(button!.disabled).toBe(true);
+
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+    expect(button!.disabled).toBe(false);
+  });
+
+  it("carries the edited title into the issue URL", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    describe_("Pressed the crash button");
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+
+    (el as any)._openIssue();
+    expect(new URL(openedUrls[0]).searchParams.get("title")).toBe(
+      "BLE scan reboots the ESP32"
+    );
+  });
+
+  it("re-seeds the title when a second crash opens the dialog", () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    expect((el as any)._userTitle).toBe("");
+    el.open("other.yaml", "Other", CRASH_LINES);
+    expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
   });
 
   it("shows the write-in-English note whether or not a description is entered", async () => {

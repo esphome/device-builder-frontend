@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
+import {
+  CRASH_BLOCK,
+  CRASH_BLOCK_ESP8266,
+  CRASH_BLOCK_NOISE_ONLY,
+  VALIDATED_CONFIG_YAML,
+} from "../_crash-lines.js";
 import {
   buildFullReport,
   buildIssueUrl,
   type CrashReport,
+  crashSymbol,
   distillValidatedConfig,
   inferComponentName,
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
+  suggestIssueTitle,
 } from "../../src/util/crash-report.js";
 
 const FILLER = Array.from(
@@ -46,6 +53,7 @@ const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   meta: META,
   configYaml: VALIDATED_CONFIG_YAML,
   userDescription: "Pressed the crash button in Home Assistant",
+  userTitle: "",
   ...overrides,
 });
 
@@ -251,6 +259,125 @@ describe("buildFullReport", () => {
   });
 });
 
+describe("crashSymbol", () => {
+  const symbolOf = (lines: string[]) => crashSymbol(scrapeCrashData(lines).decodedFrames);
+
+  it("names the top frame, dropping its argument list and namespace", () => {
+    expect(symbolOf(CRASH_BLOCK)).toBe("Application::setup");
+  });
+
+  it("reads esp8266's bare symbols, which carry no file:line", () => {
+    // Its decoder emits `0xADDR: symbol` with nothing after it, and the
+    // restart trampoline above the fault is skipped as machinery.
+    expect(symbolOf(CRASH_BLOCK_ESP8266)).toBe("cnx_node_search");
+  });
+
+  it("returns nothing when every frame is panic or idle machinery", () => {
+    // The alternative is a title naming the idle task, which is true of
+    // any crash and so tells a triager nothing.
+    expect(symbolOf(CRASH_BLOCK_NOISE_ONLY)).toBe("");
+  });
+
+  it("returns nothing when no frame decoded", () => {
+    expect(crashSymbol([])).toBe("");
+  });
+
+  it("skips the abort machinery above the frame that threw", () => {
+    expect(
+      crashSymbol([
+        "0x4038bc1c: panic_abort at /COMPONENT_ESP_SYSTEM_DIR/panic.c:491",
+        "0x4038f9ec: __assert_func at /COMPONENT_NEWLIB_DIR/src/assert.c:34",
+        "0x4212c628: __wrap___cxa_throw at /COMPONENT_CXX_DIR/cxx_exception_stubs.cpp:188",
+        "0x42037b40: esphome::api::APIOverflowBuffer::enqueue_iov(iovec const*, int) at api.cpp:49",
+      ])
+    ).toBe("APIOverflowBuffer::enqueue_iov");
+  });
+
+  it("names the caller that allocated, not the allocator", () => {
+    expect(
+      crashSymbol([
+        "0x401012b8: malloc",
+        "0x402253f7: operator new(unsigned int)",
+        "0x4021e950: esphome::mqtt::MQTTClientComponent::publish(std::string const&) at mqtt.cpp:12",
+      ])
+    ).toBe("MQTTClientComponent::publish");
+  });
+
+  it("keeps a templated symbol readable", () => {
+    // Nested `<>` and `()` have to be stripped as balanced pairs; a plain
+    // regex truncates mid-symbol and leaves `>>::operator`.
+    expect(
+      crashSymbol([
+        "0x400dce02: esphome::FixedVector<std::pair<int, char> >::cleanup_(int) at fixed_vector.h:88",
+      ])
+    ).toBe("FixedVector::cleanup_");
+  });
+
+  it("strips a file:line tail carrying gcc's discriminator suffix", () => {
+    expect(
+      crashSymbol([
+        "0x420144a4: esphome::modbus_controller::ModbusController::update_range_(esphome::modbus_controller::RegisterRange&) at /IDF_BUILD/../src/esphome/components/modbus_controller/modbus_controller.cpp:177 (discriminator 1)",
+      ])
+    ).toBe("ModbusController::update_range_");
+  });
+
+  it("keeps operator() named, which stripping argument lists would eat", () => {
+    expect(
+      crashSymbol([
+        "0x400e4185: esphome::TemplateLambda<std::__cxx11::basic_string<char> >::operator()() at /IDF_BUILD/../src/esphome/core/template_lambda.h:41",
+      ])
+    ).toBe("TemplateLambda::operator()");
+  });
+
+  it("skips a lambda trampoline for the component that invoked it", () => {
+    // `_FUN` and `{lambda(...)#N}` are the calling convention gcc emitted;
+    // neither is code a triager can look up.
+    expect(
+      crashSymbol([
+        "0x400dd565: setup()::{lambda(esphome::display::Display&)#1}::_FUN(esphome::display::Display&) at /TOOLCHAIN/bits/basic_string.h:651",
+        "0x400dfc5e: esphome::display::DisplayWriter<esphome::display::Display>::call(esphome::display::Display&) const at /IDF_BUILD/../src/esphome/components/display/display.h:256",
+      ])
+    ).toBe("DisplayWriter::call");
+  });
+
+  it("folds the repeated frame the decoder emits per address", () => {
+    expect(
+      crashSymbol([
+        "0x4010cbe0: esphome::ssd1306_base::SSD1306::fill(esphome::Color) at ssd1306.cpp:360",
+        "0x4010cbdd: esphome::ssd1306_base::SSD1306::fill(esphome::Color) at ssd1306.cpp:360",
+      ])
+    ).toBe("SSD1306::fill");
+  });
+});
+
+describe("suggestIssueTitle", () => {
+  it("names the platform and the crash location", () => {
+    // ESP32S3 reports as ESP32 — the platform table already folds variants.
+    expect(suggestIssueTitle(scrapeCrashData(BUFFER), META)).toBe(
+      "ESP32: crash in Application::setup"
+    );
+  });
+
+  it("uses each platform's own name, not just ESP32", () => {
+    expect(
+      suggestIssueTitle(scrapeCrashData(CRASH_BLOCK_ESP8266), {
+        ...META,
+        targetPlatform: "ESP8266",
+      })
+    ).toBe("ESP8266: crash in cnx_node_search");
+  });
+
+  it("falls back to Device when the platform is unknown", () => {
+    expect(
+      suggestIssueTitle(scrapeCrashData(BUFFER), { ...META, targetPlatform: "" })
+    ).toBe("Device: crash in Application::setup");
+  });
+
+  it("suggests nothing when no frame is worth naming", () => {
+    expect(suggestIssueTitle(scrapeCrashData(CRASH_BLOCK_NOISE_ONLY), META)).toBe("");
+  });
+});
+
 describe("buildIssueUrl", () => {
   const params = (r: CrashReport) => new URL(buildIssueUrl(r).url).searchParams;
 
@@ -259,13 +386,31 @@ describe("buildIssueUrl", () => {
     expect(p.get("template")).toBe("bug_report.yml");
     expect(p.get("version")).toBe("2026.6.4");
     expect(p.get("component_name")).toBe("wifi");
-    expect(p.get("title")).toContain("Guru Meditation Error");
+    expect(p.get("title")).toBe("ESP32: crash in Application::setup");
     expect(p.get("problem")).toContain("Pressed the crash button in Home Assistant");
     expect(p.get("problem")).toContain("Decoded backtrace:");
     expect(p.get("problem")).toContain("0x400d9150: esphome::Application::setup()");
     expect(p.get("logs")).toContain("Backtrace: 0x400d9150");
     // The whole sanitized config lands in the form's config field.
     expect(p.get("config")).toBe(VALIDATED_CONFIG_YAML);
+  });
+
+  it("prefers the user's title over the derived one", () => {
+    const p = params(report({ userTitle: "  BLE scan reboots the ESP32  " }));
+    expect(p.get("title")).toBe("BLE scan reboots the ESP32");
+  });
+
+  it("never titles an issue with the crash banner", () => {
+    // The banner is byte-identical across every report the crash handler
+    // produces, which is what made these issues indistinguishable.
+    const p = params(report({ scrape: scrapeCrashData(CRASH_BLOCK_NOISE_ONLY) }));
+    expect(p.get("title")).toBe("Device crash on Small Garage");
+  });
+
+  it("clamps a long title to what GitHub accepts", () => {
+    const p = params(report({ userTitle: "x".repeat(200) }));
+    expect(p.get("title")).toHaveLength(100);
+    expect(p.get("title")).toMatch(/\.\.\.$/);
   });
 
   it("surfaces platform and installation in problem (dropdowns can't prefill)", () => {

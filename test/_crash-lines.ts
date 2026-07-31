@@ -22,6 +22,28 @@ export const CRASH_BLOCK_UNDECODED = CRASH_BLOCK.filter(
   (line) => !line.startsWith("WARNING Decoded ")
 );
 
+// An esp8266 crash as stored and replayed at boot. Its decoder emits bare
+// symbols with no ` at file:line`, so the frame parse can't rely on one.
+export const CRASH_BLOCK_ESP8266 = [
+  "[E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+  "[E][esp8266:172]: BT0: 0x4025349f",
+  "WARNING Decoded 0x40100739: __wrap_system_restart_local",
+  "WARNING Decoded 0x4025349f: cnx_node_search",
+  "WARNING Decoded 0x40225716: loop_task(ETSEventTag*) at core_esp8266_main.cpp",
+  "Rebooting...",
+];
+
+// A crash whose every frame is panic or idle machinery: real reports look
+// like this whenever the fault lands in a parked core.
+export const CRASH_BLOCK_NOISE_ONLY = [
+  CRASH_BANNER_LINE,
+  "Backtrace: 0x4037989a:0x3ffb4f60 0x4037989a:0x3ffb4f90",
+  "WARNING Decoded 0x4037989a: esp_cpu_wait_for_intr at /COMPONENT_ESP_HW_SUPPORT_DIR/cpu.c:64",
+  "WARNING Decoded 0x4037989a: esp_cpu_wait_for_intr at /COMPONENT_ESP_HW_SUPPORT_DIR/cpu.c:64",
+  "WARNING Decoded 0x4037984a: xt_utils_wait_for_intr at /COMPONENT_XTENSA_DIR/include/xt_utils.h:82",
+  "Rebooting...",
+];
+
 // A `devices/validate` stream (esphome config output): CLI log records
 // interleaved with the sanitized YAML, and the YAML it distills to.
 export const VALIDATE_OUTPUT = [
