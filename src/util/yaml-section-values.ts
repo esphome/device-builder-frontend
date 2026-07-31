@@ -25,6 +25,14 @@ import {
   serializeYamlValues,
 } from "./yaml-serialize.js";
 
+/** Any non-whitespace character — a document with none counts as empty. */
+const NON_BLANK_RE = /\S/;
+
+/** Trailing newlines and whitespace-only lines at the document end. Leaves
+ *  trailing spaces on the last content line alone (a block scalar's final
+ *  line may carry meaningful ones). */
+const TRAILING_BLANK_LINES_RE = /(?:\n[ \t]*)+$/;
+
 /**
  * Find the 0-indexed line range [start, end) for a section.
  *
@@ -400,9 +408,7 @@ export function appendSectionToYaml(
     indentStep,
   });
   if (block.length === 0) return yaml;
-  // Trim only trailing newlines / blank lines: trailing spaces on the last
-  // content line survive, while a whitespace-only document counts as empty.
-  const base = /\S/.test(yaml) ? yaml.replace(/(?:\n[ \t]*)+$/, "") : "";
+  const base = NON_BLANK_RE.test(yaml) ? yaml.replace(TRAILING_BLANK_LINES_RE, "") : "";
   const body = block.join("\n");
   return base ? `${base}\n\n${body}\n` : `${body}\n`;
 }
