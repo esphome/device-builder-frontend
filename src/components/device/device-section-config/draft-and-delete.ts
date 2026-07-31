@@ -30,15 +30,7 @@ import { fireSectionEvent, prepareSectionEvent } from "../section-editor.js";
 export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   host._draftTimer = null;
   if (!host._config) return null;
-
-  const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
-  host._fieldErrors = validateEntries(
-    renderEntries,
-    host._values,
-    host._presentComponents,
-    host.board?.esphome.platform ?? null,
-    host.sectionKey
-  );
+  revalidateFields(host);
 
   const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
@@ -62,6 +54,18 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   );
 
   return emitYamlDraft(host, newYaml);
+}
+
+/** Recompute the section's field errors against the render schema. */
+function revalidateFields(host: ESPHomeDeviceSectionConfig): void {
+  if (!host._config) return;
+  host._fieldErrors = validateEntries(
+    resolveSectionEntries(host.sectionKey, host._config.entries),
+    host._values,
+    host._presentComponents,
+    host.board?.esphome.platform ?? null,
+    host.sectionKey
+  );
 }
 
 /** Clear the dirty flag and, when *newYaml* differs from the live buffer,
@@ -148,6 +152,7 @@ export function applySectionValues(
 /** Append a brand-new top-level block for the applied values, surfaced as an
  *  unsaved draft (the section has no local block, so the splice can't reach it). */
 function createSectionBlock(host: ESPHomeDeviceSectionConfig): void {
+  revalidateFields(host);
   emitYamlDraft(host, appendSectionToYaml(host.yaml, host.sectionKey, host._values));
 }
 
