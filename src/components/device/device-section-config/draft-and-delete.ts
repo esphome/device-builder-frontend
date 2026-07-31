@@ -1,10 +1,12 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
+import { isPlatformComponentId } from "../../../util/featured-id.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
+  LIST_SECTIONS,
   resolveSectionEntries,
 } from "../../../util/section-entry-overrides.js";
 import {
@@ -59,10 +61,15 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
     { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) }
   );
 
+  return emitYamlDraft(host, newYaml);
+}
+
+/** Clear the dirty flag and, when *newYaml* differs from the live buffer,
+ *  publish it as this element's own `yaml-draft` (tagged via
+ *  `_lastSelfWrittenYaml` so the parent's loop-back is ignored). */
+function emitYamlDraft(host: ESPHomeDeviceSectionConfig, newYaml: string): string | null {
   host._setDirty(false);
-
   if (newYaml === host.yaml) return null;
-
   host._lastSelfWrittenYaml = newYaml;
   fireSectionEvent(host, "yaml-draft", {
     configuration: host.configuration,
@@ -114,12 +121,15 @@ export function applySectionValues(
   // A map-singleton section supplied only by a `packages:` include (api /
   // web_server, reached via the ?section= deep-link) has no local block to
   // splice into, so the flush below would drop the write. Append a fresh
-  // top-level block instead; it deep-merges with the package on compile. A
-  // dotted platform section (ota.esphome) needs list-merge semantics we can't
-  // assume, so it falls through to the flush (unchanged).
+  // top-level block instead; it deep-merges with the package on compile.
+  // Restricted to map singletons: a dotted platform section (ota.esphome) or a
+  // list-bodied one (globals) needs a list shape / list-merge semantics we
+  // can't assume, so those fall through to the flush (unchanged).
+  const mapSingleton =
+    !isPlatformComponentId(host.sectionKey) && !LIST_SECTIONS.has(host.sectionKey);
   const absent =
     resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine) === undefined;
-  if (absent && !host.sectionKey.includes(".")) {
+  if (absent && mapSingleton) {
     createSectionBlock(host);
     return;
   }
@@ -132,17 +142,7 @@ export function applySectionValues(
 /** Append a brand-new top-level block for the applied values, surfaced as an
  *  unsaved draft (the section has no local block, so the splice can't reach it). */
 function createSectionBlock(host: ESPHomeDeviceSectionConfig): void {
-  const basedOn = host.yaml;
-  const newYaml = appendSectionToYaml(basedOn, host.sectionKey, host._values);
-  host._setDirty(false);
-  if (newYaml === basedOn) return;
-  host._lastSelfWrittenYaml = newYaml;
-  fireSectionEvent(host, "yaml-draft", {
-    configuration: host.configuration,
-    yaml: newYaml,
-    basedOn,
-    node: host,
-  });
+  emitYamlDraft(host, appendSectionToYaml(host.yaml, host.sectionKey, host._values));
 }
 
 /**

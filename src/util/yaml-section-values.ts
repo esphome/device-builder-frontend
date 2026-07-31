@@ -316,26 +316,6 @@ function _isInlinableScalar(value: unknown): boolean {
  * avoid a stray `sensor:` that ESPHome rejects, and to keep the
  * resulting YAML tidy.
  */
-/**
- * Append a brand-new top-level *sectionKey* block built from *values*, for a
- * section with no local block to splice into (a component supplied only by a
- * ``packages:`` include). The appended block deep-merges with the package on
- * the next compile. Reuses the splice path's serializer, so a ``!secret ...``
- * value round-trips as an unquoted tag rather than a quoted literal.
- */
-export function appendSectionToYaml(
-  yaml: string,
-  sectionKey: string,
-  values: Record<string, unknown>,
-  options: SerializeYamlOptions = {}
-): string {
-  const block = serializeYamlValues({ [sectionKey]: values }, "", options);
-  if (block.length === 0) return yaml;
-  const base = yaml.replace(/\s+$/, "");
-  const body = block.join("\n");
-  return base ? `${base}\n\n${body}\n` : `${body}\n`;
-}
-
 export function removeSectionFromYaml(
   yaml: string,
   sectionKey: string,
@@ -375,4 +355,24 @@ export function removeSectionFromYaml(
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Append a brand-new top-level *sectionKey* block built from *values*, for a
+ * section with no local block to splice into (a component supplied only by a
+ * ``packages:`` include). The appended block deep-merges with the package on
+ * the next compile. Reuses the splice path's serializer, so a ``!secret ...``
+ * value round-trips as an unquoted tag rather than a quoted literal.
+ */
+export function appendSectionToYaml(
+  yaml: string,
+  sectionKey: string,
+  values: Record<string, unknown>,
+  options: SerializeYamlOptions = {}
+): string {
+  const block = serializeYamlValues({ [sectionKey]: values }, "", options);
+  if (block.length === 0) return yaml;
+  const base = yaml.trimEnd();
+  const body = block.join("\n");
+  return base ? `${base}\n\n${body}\n` : `${body}\n`;
 }

@@ -110,4 +110,13 @@ describe("applySectionValues — package-provided section has no local block", (
     // No local ota block to splice and no map-singleton append path → dropped.
     expect(drafts).toHaveLength(0);
   });
+
+  it("leaves a list-bodied section (globals) to the flush (wrong shape to append)", () => {
+    const { c, drafts } = host("globals", PACKAGE_YAML, undefined, {});
+
+    applySectionValues(c, [{ path: ["id"], value: "x" }]);
+    // globals is a YAML list, not a map singleton — appending a map block would
+    // be malformed, so it is not created here.
+    expect(drafts).toHaveLength(0);
+  });
 });
