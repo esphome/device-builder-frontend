@@ -20,7 +20,7 @@ import {
   renderTable,
 } from "../../../src/components/dashboard/render-content.js";
 import { navigate } from "../../../src/util/navigation.js";
-import { makeDashboardHost } from "./_host.js";
+import { makeDashboardHost, makeTableHost } from "./_host.js";
 
 const DEEP_LINK = "/device/kitchen.yaml?section=api&reveal=1";
 
@@ -53,29 +53,7 @@ describe("open-encryption-settings wiring", () => {
 
   it("table deep-links the event's device to the api section", () => {
     const device = makeConfiguredDevice();
-    const host = makeDashboardHost({
-      _devices: [device],
-      _sortedDevices: [device],
-      _applyFacetFilters: (list: ConfiguredDevice[]) => list,
-      _activeJobs: new Map(),
-      _recentJobs: new Map(),
-      _tablePageSize: 25,
-      _tableSorting: [],
-      _tableColumnVisibility: {},
-      _selectMode: false,
-      _visibleImportableDevices: [],
-      _selectedDevices: new Set<string>(),
-      _recentlyAdopted: null,
-      _expertMode: false,
-      _selectedLabels: [],
-      _selectedAreas: [],
-      _selectedPlatforms: [],
-      _selectedStates: [],
-      _selectedUpdateStatus: [],
-      _activeFacetCount: 0,
-      _computeLabelUsage: () => new Map(),
-      _allVisibleSelected: false,
-    });
+    const host = makeTableHost({ _devices: [device], _sortedDevices: [device] });
     const container = renderInto(renderTable(host));
     const table = container.querySelector("esphome-device-table");
     expect(table).not.toBeNull();
