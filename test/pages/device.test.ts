@@ -106,6 +106,8 @@ describe("esphome-page-device one-shot reveal deep-link", () => {
     window.history.replaceState({}, "", "/device/kitchen.yaml?section=api&reveal=1");
     localStorage.setItem("esphome-editor-layout", "right");
     const page = makePage();
+    // The URL strip only runs on a still-mounted page.
+    Object.defineProperty(page, "isConnected", { value: true });
     page._api = { getPreferences: prefs } as unknown as ESPHomeAPI;
     await page._loadPreferences();
     expect(page._layout).toBe("both");
@@ -114,6 +116,18 @@ describe("esphome-page-device one-shot reveal deep-link", () => {
     // The one-shot intent is stripped so a reload keeps the saved layout.
     expect(window.location.search).not.toContain("reveal");
     expect(window.location.search).toContain("section=api");
+  });
+
+  test("a page unmounted during the fetch never rewrites the current route", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api&reveal=1");
+    const page = makePage(); // never attached: isConnected is false
+    page._api = { getPreferences: prefs } as unknown as ESPHomeAPI;
+    // Simulate the user navigating away while getPreferences was in flight.
+    window.history.replaceState({}, "", "/device/other.yaml");
+    await page._loadPreferences();
+    // No replaceState from the dead page; the current route is untouched.
+    expect(window.location.pathname).toBe("/device/other.yaml");
+    expect(window.location.search).toBe("");
   });
 
   test("a reload with only ?section keeps the YAML-only layout", async () => {

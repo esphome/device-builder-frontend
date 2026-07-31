@@ -149,7 +149,7 @@ export function renderCardGrid(
             ?select-mode=${host._selectMode}
             ?selected=${host._selectedDevices.has(device.configuration)}
             @edit-device=${() => editDevice(device)}
-            @open-encryption-settings=${() => editDeviceSection(device, "api")}
+            @open-encryption-settings=${() => editDeviceSection(device, "api", { reveal: true })}
             @install-device=${() => host._openInstallMethod(device)}
             @update-device=${() => host._openCommand(device, "install")}
             @open-logs=${() => host._openLogs(device)}
@@ -202,7 +202,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       @deselect-all=${(e: CustomEvent<string[]>) => host._removeFromSelection(e.detail)}
       @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
       @open-encryption-settings=${(e: CustomEvent<ConfiguredDevice>) =>
-        editDeviceSection(e.detail, "api")}
+        editDeviceSection(e.detail, "api", { reveal: true })}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "install")}
       @open-logs=${(e: CustomEvent<ConfiguredDevice>) => host._openLogs(e.detail)}
@@ -271,7 +271,7 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       }}
       @open-encryption-settings=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;
-        editDeviceSection(e.detail, "api");
+        editDeviceSection(e.detail, "api", { reveal: true });
       }}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;

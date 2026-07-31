@@ -27,6 +27,7 @@ import type {
   YamlDraftDetail,
   YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
+import { layoutRevealingAnchor } from "../components/device/tour-reveal-layout.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
@@ -759,16 +760,15 @@ export class ESPHomePageDevice extends LitElement {
 
     if (this._pendingReveal) {
       this._pendingReveal = false;
-      // In-memory only, so the saved layout returns on the next open. On
-      // mobile the split view collapses to YAML, so reveal the visual pane
-      // alone there; on desktop only a YAML-only layout needs the split.
-      if (this._isMobile) {
-        this._layout = "left";
-      } else if (this._layout === "right") {
-        this._layout = "both";
-      }
-      // Strip the intent from the URL so a reload doesn't re-fire it.
-      this._updateUrl();
+      // In-memory only, so the saved layout returns on the next open. The
+      // tour's reveal helper owns the mobile-collapse rule (visual-only on
+      // mobile, split on a YAML-only desktop layout).
+      const reveal = layoutRevealingAnchor("central", this._layout, this._isMobile);
+      if (reveal) this._layout = reveal;
+      // Strip the intent from the URL so a reload doesn't re-fire it. Not
+      // from a page unmounted during the preferences fetch — a detached
+      // replaceState would rewrite whatever route the user is on now.
+      if (this.isConnected) this._updateUrl();
     }
   }
 
