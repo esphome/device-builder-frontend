@@ -63,7 +63,6 @@ export function renderEncryptionIcon(
         id="ind-encryption"
         type="button"
         class="encryption-icon ${visual.cssClass}"
-        title=${label}
         aria-label=${label}
         @click=${(e: Event) => {
           e.stopPropagation();
