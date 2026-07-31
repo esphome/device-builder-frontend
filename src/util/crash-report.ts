@@ -4,6 +4,7 @@ import {
   ADDRESS_RE,
   CRASH_END_RE,
   DECODED_RE,
+  decodedFrameAddress,
   isCrashMarker,
   MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
@@ -186,6 +187,49 @@ export function extractDecodedFrames(excerpt: string[]): string[] {
   return frames;
 }
 
+// The esp32 crash handler labels every stored frame: `(backtrace)` for one
+// the unwinder produced, `(stack scan)` for a word that merely looks like a
+// return address in stack memory. A scanned word decodes to whatever symbol
+// owns that address, so it can name a component the crash never entered.
+const STACK_SCAN_RE = /BT\d+:\s*(?:0x)?([0-9a-fA-F]{8})\b.*\(stack scan\)/;
+
+// The crash handler's own verdict, `Reason: <type>` or `<type> - <detail>`
+// (`Task wdt`, `Fault - Store access fault`). Two crashes can share a frame
+// and differ entirely in why they got there.
+const CRASH_REASON_RE = /crash:\d+\]:\s*Reason:\s*(.+?)\s*$/;
+
+/** What the crash handler blamed, preferring its specific cause over the
+ *  exception class; "" when the dump carries no reason. */
+export function crashReason(scrape: CrashScrape): string {
+  for (const line of scrape.excerpt) {
+    const match = CRASH_REASON_RE.exec(line);
+    if (!match) continue;
+    const [type, detail] = match[1].split(" - ");
+    // A watchdog names the condition itself; its detail is only the trap
+    // that fired ("Soft WDT - Level1Int"), so there the type is what reads.
+    const chosen = /wdt/i.test(type) ? type : (detail ?? type);
+    // Drop the raw cause the handler appends: "(exccause=4)", "(cause 0)".
+    const reason = chosen.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    // "Unknown" is the handler saying it couldn't decode the cause.
+    return reason === "Unknown" ? "" : reason;
+  }
+  return "";
+}
+
+/**
+ * The decoded frames the unwinder vouched for. All of them when the dump
+ * draws no distinction — live panics and esp8266 print no such label.
+ */
+export function unwoundFrames(scrape: CrashScrape): string[] {
+  const scanned = new Set<string>();
+  for (const line of scrape.excerpt) {
+    const match = STACK_SCAN_RE.exec(line);
+    if (match) scanned.add(match[1].toLowerCase());
+  }
+  if (scanned.size === 0) return scrape.decodedFrames;
+  return scrape.decodedFrames.filter((frame) => !scanned.has(decodedFrameAddress(frame)));
+}
+
 // A bare tag match covers multi-line records too: both transports re-apply
 // the entry's `[L][tag]:` prefix to every continuation line before it
 // reaches the buffer (ESPHomeLogParser client-side, aioesphomeapi's
@@ -355,8 +399,9 @@ function buildIssueTitle(report: CrashReport): string {
   const title =
     report.userTitle.trim() ||
     suggestIssueTitle(
-      report.scrape.decodedFrames,
-      issuePlatform(report.meta.targetPlatform)
+      unwoundFrames(report.scrape),
+      issuePlatform(report.meta.targetPlatform),
+      crashReason(report.scrape)
     ) ||
     `Device crash on ${report.meta.deviceName}`;
   return clampTitle(title);

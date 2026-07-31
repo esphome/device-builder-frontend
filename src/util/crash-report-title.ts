@@ -95,11 +95,19 @@ export function crashSymbol(decodedFrames: string[]): string {
   return "";
 }
 
-/** Suggested issue title naming the crash location and *platform* (the bug
- *  form's dropdown value); "" when no frame is worth naming. */
-export function suggestIssueTitle(decodedFrames: string[], platform: string): string {
+/**
+ * Suggested issue title: what the crash handler blamed, where it happened,
+ * and the *platform* (the bug form's dropdown value). "" when no frame is
+ * worth naming — two crashes sharing a frame are told apart by *reason*.
+ */
+export function suggestIssueTitle(
+  decodedFrames: string[],
+  platform: string,
+  reason = ""
+): string {
   const symbol = crashSymbol(decodedFrames);
   if (!symbol) return "";
+  if (reason) return clampTitle(`${platform || "Device"}: ${reason} in ${symbol}`);
   // Clamped here, not at the seed: the input's maxlength bounds typing but
   // not an assigned value, so an unclamped suggestion would show in full in
   // the field and arrive truncated on GitHub.

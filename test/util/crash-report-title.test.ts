@@ -144,6 +144,24 @@ describe("suggestIssueTitle", () => {
     expect(suggestIssueTitle(framesOf(CRASH_BLOCK_NOISE_ONLY), "")).toBe("");
   });
 
+  it("leads with what the handler blamed, when it decoded a cause", () => {
+    // Two crashes can stop in the same frame for unrelated reasons; the
+    // frame alone would file both under one title.
+    const frames = framesOf(CRASH_BLOCK);
+    expect(suggestIssueTitle(frames, "ESP32", "Store access fault")).toBe(
+      "ESP32: Store access fault in Application::setup"
+    );
+    expect(suggestIssueTitle(frames, "ESP32", "Task wdt")).toBe(
+      "ESP32: Task wdt in Application::setup"
+    );
+  });
+
+  it("falls back to a plain crash when no cause decoded", () => {
+    expect(suggestIssueTitle(framesOf(CRASH_BLOCK), "ESP32", "")).toBe(
+      "ESP32: crash in Application::setup"
+    );
+  });
+
   it("clamps its own output, so the field and the issue can't disagree", () => {
     // The input's maxlength bounds typing, not an assigned value, so an
     // unclamped suggestion would show in full and arrive truncated.

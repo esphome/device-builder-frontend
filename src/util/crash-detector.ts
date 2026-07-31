@@ -66,6 +66,13 @@ export const DECODED_RE = /^(?:WARNING )?Decoded (0x[0-9a-fA-F]{8}.*)$/;
 // because gcc appends ` (discriminator N)` past the line number.
 const DECODED_FRAME_RE = /^0x[0-9a-fA-F]+:\s*(.+?)(?:\s+at\s+.*)?$/;
 
+/** The address a decoded frame carries, lowercased and without `0x`; ""
+ *  when the entry isn't a decoded frame. */
+export function decodedFrameAddress(frame: string): string {
+  const match = /^0x([0-9a-fA-F]+):/.exec(frame.split("\n")[0].trim());
+  return match ? match[1].toLowerCase() : "";
+}
+
 /** The symbol a decoded frame names, without its address or location; ""
  *  when the entry isn't a decoded frame. */
 export function decodedFrameSymbol(frame: string): string {

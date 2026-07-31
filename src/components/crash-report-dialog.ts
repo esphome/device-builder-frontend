@@ -25,6 +25,7 @@ import {
 import {
   buildFullReport,
   buildIssueUrl,
+  crashReason,
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
@@ -32,6 +33,7 @@ import {
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
+  unwoundFrames,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
@@ -261,8 +263,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
     this._userTitle = suggestIssueTitle(
-      this._scrape.decodedFrames,
-      issuePlatform(this._buildMeta().targetPlatform)
+      unwoundFrames(this._scrape),
+      issuePlatform(this._buildMeta().targetPlatform),
+      crashReason(this._scrape)
     );
     this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
