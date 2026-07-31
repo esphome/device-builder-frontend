@@ -291,7 +291,9 @@ export function buildFullReport(report: CrashReport): string {
   const { scrape, meta, configYaml } = report;
   // The user's title heads the download too — it is the paste fallback for
   // a truncated prefill, and the device is named in Environment regardless.
-  const sections: string[] = [`# Crash report: ${report.userTitle || meta.deviceName}`];
+  const sections: string[] = [
+    `# Crash report: ${report.userTitle.trim() || meta.deviceName}`,
+  ];
   if (report.userDescription) {
     // Fence the user's prose so a stray ``` run in it can't close the
     // surrounding markdown and hide the sections below.

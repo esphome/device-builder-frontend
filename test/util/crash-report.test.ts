@@ -237,6 +237,11 @@ describe("buildFullReport", () => {
       buildFullReport(report({ userTitle: "BLE scan reboots the ESP32" }))
     ).toContain("# Crash report: BLE scan reboots the ESP32");
     expect(buildFullReport(report())).toContain("# Crash report: Small Garage");
+    // Trimmed like the issue title is, so a blank-looking title falls back
+    // rather than heading the download with whitespace.
+    expect(buildFullReport(report({ userTitle: "   " }))).toContain(
+      "# Crash report: Small Garage"
+    );
   });
 
   it("notes an unavailable config instead of a yaml section", () => {
