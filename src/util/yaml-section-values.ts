@@ -384,7 +384,8 @@ function _detectDocumentIndentStep(lines: string[]): string | null {
  * the next compile. Reuses the splice path's serializer, so a ``!secret ...``
  * value round-trips as an unquoted tag rather than a quoted literal; the
  * indent step follows the document's own. Trailing blank lines collapse to
- * one separator blank line.
+ * one separator blank line; trailing spaces on the last content line are
+ * kept (a block scalar's final line may carry meaningful ones).
  */
 export function appendSectionToYaml(
   yaml: string,
@@ -399,7 +400,9 @@ export function appendSectionToYaml(
     indentStep,
   });
   if (block.length === 0) return yaml;
-  const base = yaml.trimEnd();
+  // Trim only trailing newlines / blank lines: trailing spaces on the last
+  // content line survive, while a whitespace-only document counts as empty.
+  const base = /\S/.test(yaml) ? yaml.replace(/(?:\n[ \t]*)+$/, "") : "";
   const body = block.join("\n");
   return base ? `${base}\n\n${body}\n` : `${body}\n`;
 }

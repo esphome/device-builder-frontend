@@ -3549,4 +3549,12 @@ describe("appendSectionToYaml", () => {
       "api:\n  reboot_timeout: 0s\n"
     );
   });
+
+  it("keeps trailing spaces on the last content line (block-scalar tail)", () => {
+    const yaml = "esphome:\n  comment: |\n    line with trailing spaces  \n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(
+      "esphome:\n  comment: |\n    line with trailing spaces  \n\napi:\n  reboot_timeout: 0s\n"
+    );
+  });
 });
