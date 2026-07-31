@@ -1,10 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
-import {
-  getCompactEncryptionVisual,
-  getEncryptionState,
-} from "../../util/encryption-state.js";
+import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
@@ -56,11 +53,12 @@ export function renderEncryptionIcon(
   };
   const visual = getCompactEncryptionVisual(inputs);
   if (!visual) return nothing;
-  // Plaintext is the only state with a one-click fix: deep-link to the api
-  // section's Enable-encryption affordance. The others already have
-  // encryption configured, so they stay passive indicators.
-  if (getEncryptionState(inputs) === "plaintext") {
-    const label = card._localize("dashboard.encryption_add_action");
+  const label = card._localize(visual.tooltipKey);
+  // Plaintext is the only actionable state: render the warning as a button
+  // that deep-links to the api section's Enable-encryption affordance. Keep
+  // the warning as the button's label so the "anyone on the LAN can access
+  // this device" notice isn't lost.
+  if (visual.actionable) {
     return html`<button
         id="ind-encryption"
         type="button"
@@ -83,9 +81,9 @@ export function renderEncryptionIcon(
       name=${visual.iconName}
       tabindex="0"
       role="img"
-      aria-label=${card._localize(visual.tooltipKey)}
+      aria-label=${label}
     ></wa-icon>
-    <wa-tooltip for="ind-encryption">${card._localize(visual.tooltipKey)}</wa-tooltip>`;
+    <wa-tooltip for="ind-encryption">${label}</wa-tooltip>`;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {

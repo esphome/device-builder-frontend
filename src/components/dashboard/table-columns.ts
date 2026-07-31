@@ -6,10 +6,7 @@ import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
-import {
-  getCompactEncryptionVisual,
-  getEncryptionState,
-} from "../../util/encryption-state.js";
+import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
@@ -166,9 +163,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           has_pending_changes: row.hasPendingChanges,
         };
         const encVisual = getCompactEncryptionVisual(encInputs);
-        // Plaintext is the only state with a one-click fix — deep-link to the
-        // api section's Enable-encryption affordance; the rest stay passive.
-        const encActionable = getEncryptionState(encInputs) === "plaintext";
+        const encTooltip = encVisual ? localize(encVisual.tooltipKey) : "";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${
@@ -200,12 +195,12 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           ${
             !encVisual
               ? nothing
-              : encActionable
+              : encVisual.actionable
                 ? html`<button
                     type="button"
                     class="cell-encryption ${encVisual.cssClass}"
-                    title=${localize("dashboard.encryption_add_action")}
-                    aria-label=${localize("dashboard.encryption_add_action")}
+                    title=${encTooltip}
+                    aria-label=${encTooltip}
                     @click=${(e: Event) =>
                       dispatchRowEvent(e, "open-encryption-settings", row._device)}
                   >
@@ -215,7 +210,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                     class="cell-encryption ${encVisual.cssClass}"
                     library="mdi"
                     name=${encVisual.iconName}
-                    title=${localize(encVisual.tooltipKey)}
+                    title=${encTooltip}
                   ></wa-icon>`
           }
         </span>`;

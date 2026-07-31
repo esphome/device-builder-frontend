@@ -33,6 +33,8 @@ describe("drawer encryption badge deep-link", () => {
     );
     const btn = host.querySelector<HTMLButtonElement>("button.status-badge");
     expect(btn).not.toBeNull();
+    // The warning notice stays as the tooltip even though it's now a button.
+    expect(btn!.title).toBe("dashboard.table_status_unencrypted_tooltip");
     let detail: unknown;
     host.addEventListener("open-encryption-settings", (e) => {
       detail = (e as CustomEvent).detail;

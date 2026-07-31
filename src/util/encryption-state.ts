@@ -105,6 +105,10 @@ export interface EncryptionVisual {
   labelKey: string;
   /** Localize key for the title / aria-label. */
   tooltipKey: string;
+  /** True for the one state with a one-click fix (plaintext): the card /
+   *  table / drawer render the indicator as a button that deep-links to the
+   *  api section's Enable-encryption affordance. */
+  actionable?: boolean;
 }
 
 const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
@@ -123,6 +127,7 @@ const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
     badgeClass: "status-badge--unencrypted",
     labelKey: "dashboard.table_status_unencrypted",
     tooltipKey: "dashboard.table_status_unencrypted_tooltip",
+    actionable: true,
   },
   pending: {
     iconName: "lock-clock",

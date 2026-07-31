@@ -59,14 +59,14 @@ export function renderEncryptionBadge(
   const v = getEncryptionVisual(state);
   if (!v) return nothing;
   const localize = host._localize;
-  // Plaintext is the only state with a one-click fix: a button that deep-links
-  // to the api section's Enable-encryption affordance. Keep the "Not encrypted"
-  // text as the accessible name and add the action as the hover hint.
-  if (state === "plaintext") {
+  // Plaintext is the only actionable state: a button that deep-links to the
+  // api section's Enable-encryption affordance. The warning tooltip stays so
+  // the "anyone on the LAN can access this device" notice isn't lost.
+  if (v.actionable) {
     return html`<button
       type="button"
       class="status-badge ${v.badgeClass}"
-      title=${localize("dashboard.encryption_add_action")}
+      title=${localize(v.tooltipKey)}
       @click=${() => fireEvent(host, "open-encryption-settings", d)}
     >
       <wa-icon library="mdi" name=${v.iconName}></wa-icon>
