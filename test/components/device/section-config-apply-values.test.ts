@@ -14,12 +14,18 @@ import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/devic
 import { applySectionValues } from "../../../src/components/device/device-section-config/draft-and-delete.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function host(sectionKey: string, yaml: string, fromLine: number, values: object) {
+function host(
+  sectionKey: string,
+  yaml: string,
+  fromLine: number | undefined,
+  values: object
+) {
   const c = new ESPHomeDeviceSectionConfig();
   const inner = c as any;
   inner.yaml = yaml;
   inner.sectionKey = sectionKey;
   inner.fromLine = fromLine;
+  inner.configuration = "dev.yaml";
   inner._config = { entries: [] };
   inner._presentComponents = new Set<string>();
   inner._values = values;
@@ -60,5 +66,48 @@ describe("applySectionValues — ethernet clk_mode migration", () => {
     // Untouched siblings survive the splice.
     expect(drafts[0]).toContain("mdc_pin: GPIO23");
     expect(drafts[0]).toContain("phy_addr: 0");
+  });
+});
+
+describe("applySectionValues — package-provided section has no local block", () => {
+  // api from a `packages:` include: no local `api:` key, so the splice can't
+  // reach it. Enabling encryption must append a fresh block so it merges with
+  // the package instead of silently dropping the write.
+  const PACKAGE_YAML = "packages:\n  x: github://a/b\nwifi:\n  ssid: !secret s\n";
+
+  it("appends a new top-level block with an unquoted !secret tag", () => {
+    const { c, drafts } = host("api", PACKAGE_YAML, undefined, {});
+
+    applySectionValues(c, [{ path: ["encryption", "key"], value: "!secret k" }]);
+
+    expect(drafts).toHaveLength(1);
+    // Prior content is preserved, and the block is appended (not spliced).
+    expect(drafts[0]).toContain("packages:");
+    expect(drafts[0]).toContain("api:");
+    expect(drafts[0]).toContain("encryption:");
+    // The secret round-trips as a real tag, not a quoted literal string.
+    expect(drafts[0]).toContain("key: !secret k");
+    expect(drafts[0]).not.toContain('"!secret k"');
+  });
+
+  it("splices into an existing local block (no new top-level key)", () => {
+    const yaml = "api:\n  reboot_timeout: 0s\n";
+    const { c, drafts } = host("api", yaml, 1, { reboot_timeout: "0s" });
+
+    applySectionValues(c, [{ path: ["encryption", "key"], value: "!secret k" }]);
+
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toContain("key: !secret k");
+    expect(drafts[0]).toContain("reboot_timeout: 0s");
+    // Spliced into the one api block, not a second appended api:.
+    expect(drafts[0].match(/^api:/gm) ?? []).toHaveLength(1);
+  });
+
+  it("leaves a dotted platform section (ota.esphome) to the flush (no block appended)", () => {
+    const { c, drafts } = host("ota.esphome", PACKAGE_YAML, undefined, {});
+
+    applySectionValues(c, [{ path: ["password"], value: "!secret p" }]);
+    // No local ota block to splice and no map-singleton append path → dropped.
+    expect(drafts).toHaveLength(0);
   });
 });

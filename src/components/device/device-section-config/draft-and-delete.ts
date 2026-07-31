@@ -8,6 +8,7 @@ import {
   resolveSectionEntries,
 } from "../../../util/section-entry-overrides.js";
 import {
+  appendSectionToYaml,
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../../util/yaml-section-values.js";
@@ -110,10 +111,38 @@ export function applySectionValues(
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
+  // A map-singleton section supplied only by a `packages:` include (api /
+  // web_server, reached via the ?section= deep-link) has no local block to
+  // splice into, so the flush below would drop the write. Append a fresh
+  // top-level block instead; it deep-merges with the package on compile. A
+  // dotted platform section (ota.esphome) needs list-merge semantics we can't
+  // assume, so it falls through to the flush (unchanged).
+  const absent =
+    resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine) === undefined;
+  if (absent && !host.sectionKey.includes(".")) {
+    createSectionBlock(host);
+    return;
+  }
   if (host._draftTimer !== null) {
     clearTimeout(host._draftTimer);
   }
   flushDraft(host);
+}
+
+/** Append a brand-new top-level block for the applied values, surfaced as an
+ *  unsaved draft (the section has no local block, so the splice can't reach it). */
+function createSectionBlock(host: ESPHomeDeviceSectionConfig): void {
+  const basedOn = host.yaml;
+  const newYaml = appendSectionToYaml(basedOn, host.sectionKey, host._values);
+  host._setDirty(false);
+  if (newYaml === basedOn) return;
+  host._lastSelfWrittenYaml = newYaml;
+  fireSectionEvent(host, "yaml-draft", {
+    configuration: host.configuration,
+    yaml: newYaml,
+    basedOn,
+    node: host,
+  });
 }
 
 /**
