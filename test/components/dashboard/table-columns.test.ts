@@ -221,6 +221,10 @@ describe("name-cell encryption deep-link", () => {
     );
     const btn = container.querySelector<HTMLButtonElement>("button.cell-encryption");
     expect(btn).not.toBeNull();
+    // The accessible name carries the warning plus the action.
+    expect(btn!.getAttribute("aria-label")).toBe(
+      "dashboard.table_status_unencrypted_action_tooltip"
+    );
     let detail: unknown;
     container.addEventListener("open-encryption-settings", (e) => {
       detail = (e as CustomEvent).detail;

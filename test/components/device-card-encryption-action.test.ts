@@ -23,6 +23,11 @@ describe("device-card encryption deep-link", () => {
     });
     const btn = el.shadowRoot!.querySelector<HTMLButtonElement>("button.encryption-icon");
     expect(btn).not.toBeNull();
+    // The accessible name carries the warning plus the action, not the
+    // plain warning tooltip.
+    expect(btn!.getAttribute("aria-label")).toBe(
+      "dashboard.table_status_unencrypted_action_tooltip"
+    );
     // stopPropagation keeps the card's own click (card-click → drawer) from firing.
     expect(clickCollect(el, btn!, ["open-encryption-settings", "card-click"])).toEqual([
       "open-encryption-settings",
