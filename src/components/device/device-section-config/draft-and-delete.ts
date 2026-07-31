@@ -153,7 +153,13 @@ export function applySectionValues(
  *  unsaved draft (the section has no local block, so the splice can't reach it). */
 function createSectionBlock(host: ESPHomeDeviceSectionConfig): void {
   revalidateFields(host);
-  emitYamlDraft(host, appendSectionToYaml(host.yaml, host.sectionKey, host._values));
+  emitYamlDraft(
+    host,
+    appendSectionToYaml(host.yaml, host.sectionKey, host._values, {
+      // Same serialization semantics as the splice in flushDraft.
+      keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey),
+    })
+  );
 }
 
 /**
