@@ -8,18 +8,17 @@ import {
   CRASH_BLOCK_UNWOUND,
   VALIDATED_CONFIG_YAML,
 } from "../_crash-lines.js";
+import { crashReason, unwoundFrames } from "../../src/util/crash-detector.js";
 import { crashSymbol } from "../../src/util/crash-report-title.js";
 import {
   buildFullReport,
   buildIssueUrl,
-  crashReason,
   type CrashReport,
   distillValidatedConfig,
   inferComponentName,
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
-  unwoundFrames,
 } from "../../src/util/crash-report.js";
 
 const FILLER = Array.from(
@@ -151,6 +150,9 @@ describe("scrapeCrashData", () => {
   });
 });
 
+const unwoundFramesOf = (s: ReturnType<typeof scrapeCrashData>) =>
+  unwoundFrames(s.excerpt, s.decodedFrames);
+
 describe("crashReason", () => {
   const reasonOf = (line: string) =>
     crashReason(
@@ -158,7 +160,7 @@ describe("crashReason", () => {
         "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
         `[E][esp32.crash:335]:   Reason: ${line}`,
         "Rebooting...",
-      ])
+      ]).excerpt
     );
 
   it("prefers the specific cause over the exception class", () => {
@@ -179,16 +181,18 @@ describe("crashReason", () => {
   it("treats an undecoded cause as no reason at all", () => {
     // Titling a crash "Unknown in foo" says less than naming the frame alone.
     expect(reasonOf("Fault - Unknown")).toBe("");
-    expect(crashReason(scrapeCrashData(CRASH_BLOCK))).toBe("");
+    expect(crashReason(scrapeCrashData(CRASH_BLOCK).excerpt)).toBe("");
   });
 
   it("tells two crashes sharing a frame apart", () => {
     // Both of these decode to Action::play_next_; only the reason differs.
     const store = scrapeCrashData(CRASH_BLOCK_UNWOUND);
     const wdt = scrapeCrashData(CRASH_BLOCK_TASK_WDT);
-    expect(crashReason(store)).toBe("Store access fault");
-    expect(crashReason(wdt)).toBe("Task wdt");
-    expect(crashSymbol(unwoundFrames(store))).toBe(crashSymbol(unwoundFrames(wdt)));
+    expect(crashReason(store.excerpt)).toBe("Store access fault");
+    expect(crashReason(wdt.excerpt)).toBe("Task wdt");
+    expect(crashSymbol(unwoundFrames(store.excerpt, store.decodedFrames))).toBe(
+      crashSymbol(unwoundFrames(wdt.excerpt, wdt.decodedFrames))
+    );
   });
 });
 
@@ -197,7 +201,7 @@ describe("unwoundFrames", () => {
     // Pinned against a real c3test abort: BT3's stack-scan hit decodes to an
     // mdns symbol, which titled the issue after a component the crash never
     // entered. Only the two unwound frames survive.
-    const frames = unwoundFrames(scrapeCrashData(CRASH_BLOCK_STACK_SCAN));
+    const frames = unwoundFramesOf(scrapeCrashData(CRASH_BLOCK_STACK_SCAN));
     expect(frames).toHaveLength(3);
     expect(frames.join("\n")).not.toContain("mdns_priv_browse_result_add_ip");
     expect(frames.join("\n")).not.toContain("IntervalSyncer");
@@ -205,7 +209,7 @@ describe("unwoundFrames", () => {
   });
 
   it("keeps an unwound frame that names something", () => {
-    const frames = unwoundFrames(scrapeCrashData(CRASH_BLOCK_UNWOUND));
+    const frames = unwoundFramesOf(scrapeCrashData(CRASH_BLOCK_UNWOUND));
     expect(crashSymbol(frames)).toBe("Action::play_next_");
     // The button below it is a stack-scan hit, so it is not what gets named.
     expect(frames.join("\n")).not.toContain("Button::press");
@@ -214,9 +218,9 @@ describe("unwoundFrames", () => {
   it("keeps every frame when the dump draws no distinction", () => {
     // Live panics and esp8266 print no (backtrace) / (stack scan) label.
     const scrape = scrapeCrashData(BUFFER);
-    expect(unwoundFrames(scrape)).toEqual(scrape.decodedFrames);
+    expect(unwoundFramesOf(scrape)).toEqual(scrape.decodedFrames);
     const esp8266 = scrapeCrashData(CRASH_BLOCK_ESP8266);
-    expect(unwoundFrames(esp8266)).toEqual(esp8266.decodedFrames);
+    expect(unwoundFramesOf(esp8266)).toEqual(esp8266.decodedFrames);
   });
 });
 

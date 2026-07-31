@@ -99,6 +99,17 @@ describe("crashSymbol", () => {
     ).toBe("TemplateLambda::operator()");
   });
 
+  it("keeps a real frame whose template argument is a closure type", () => {
+    // gcc demangles the closure into the argument list; `Bar<...>::run` is
+    // an instantiated function, not the trampoline `_FUN` names.
+    expect(
+      crashSymbol([
+        "0x1: esphome::foo::Bar<setup()::{lambda()#1}>::run() at bar.cpp:1",
+        "0x2: esphome::foo::Baz::caller() at baz.cpp:2",
+      ])
+    ).toBe("Bar::run");
+  });
+
   it("skips a lambda trampoline for the component that invoked it", () => {
     // `_FUN` and `{lambda(...)#N}` are the calling convention gcc emitted;
     // neither is code a triager can look up.
@@ -131,6 +142,14 @@ describe("suggestIssueTitle", () => {
   it("uses each platform's own name, not just ESP32", () => {
     expect(suggestIssueTitle(framesOf(CRASH_BLOCK_ESP8266), "ESP8266")).toBe(
       "ESP8266: crash in cnx_node_search"
+    );
+  });
+
+  it("says Device rather than the form's Other catch-all", () => {
+    // "Other" is meaningful beside the form's platform field and says
+    // nothing as a title prefix; nRF52 targets land there today.
+    expect(suggestIssueTitle(framesOf(CRASH_BLOCK), "Other")).toBe(
+      "Device: crash in Application::setup"
     );
   });
 

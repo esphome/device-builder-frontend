@@ -38,9 +38,14 @@ const NOISE_FRAME_RES = [
   // caller that asked for the memory, not `malloc`.
   /^(?:std::|__cxa_|__wrap___cxa_|__wrap__ZSt|_Unwind_|operator new|operator delete|malloc|calloc|realloc)/,
   // Lambda trampolines gcc emitted; the frame below names the component
-  // that invoked the lambda.
-  /(?:^|::)_FUN\b|\{lambda/,
+  // that invoked the lambda. Tested against the template-stripped symbol
+  // (see crashSymbol) — anchoring alone wouldn't do, since a closure type
+  // spells its own `::{lambda…}` inside the argument list.
+  /(?:^|::)_FUN\b|(?:^|::)\{lambda/,
 ];
+
+// A trailing cv-qualifier, which is not part of the name.
+const TRAILING_CONST_RE = /\s+const$/;
 
 // Operator names spelled with the delimiters the strippers balance, longest
 // spelling first. `operator<<` would otherwise open a template depth that
@@ -69,7 +74,7 @@ function shortenSymbol(symbol: string): string {
   // balance, so only the qualified path left of it goes through them.
   const path = operator ? symbol.slice(0, operator.index) : symbol;
   const parts = stripBalanced(stripBalanced(path, "(", ")"), "<", ">")
-    .replace(/\s+const$/, "")
+    .replace(TRAILING_CONST_RE, "")
     .trim()
     .split("::")
     .filter(Boolean);
@@ -88,7 +93,11 @@ function shortenSymbol(symbol: string): string {
 export function crashSymbol(decodedFrames: string[]): string {
   for (const frame of decodedFrames) {
     const symbol = decodedFrameSymbol(frame);
-    if (!symbol || NOISE_FRAME_RES.some((re) => re.test(symbol))) continue;
+    if (!symbol) continue;
+    // Judged with template arguments removed, so a closure type passed as
+    // one — `Bar<setup()::{lambda()#1}>::run`, a real instantiated frame —
+    // isn't read as the `{lambda…}::_FUN` trampoline it embeds.
+    if (NOISE_FRAME_RES.some((re) => re.test(stripBalanced(symbol, "<", ">")))) continue;
     const short = shortenSymbol(symbol);
     if (short) return short;
   }
@@ -107,9 +116,11 @@ export function suggestIssueTitle(
 ): string {
   const symbol = crashSymbol(decodedFrames);
   if (!symbol) return "";
-  if (reason) return clampTitle(`${platform || "Device"}: ${reason} in ${symbol}`);
+  // "Other" is the form dropdown's catch-all. It reads as a platform in the
+  // form and as nothing at all in a title, so it takes the empty fallback.
+  const prefix = platform && platform !== "Other" ? platform : "Device";
   // Clamped here, not at the seed: the input's maxlength bounds typing but
   // not an assigned value, so an unclamped suggestion would show in full in
   // the field and arrive truncated on GitHub.
-  return clampTitle(`${platform || "Device"}: crash in ${symbol}`);
+  return clampTitle(`${prefix}: ${reason || "crash"} in ${symbol}`);
 }

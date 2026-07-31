@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClipboardTextOutline, mdiDownload } from "@mdi/js";
-import { css, html, LitElement } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -16,6 +16,7 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import { crashReason, unwoundFrames } from "../util/crash-detector.js";
 import {
   isFilableTitle,
   MAX_TITLE_LENGTH,
@@ -25,7 +26,6 @@ import {
 import {
   buildFullReport,
   buildIssueUrl,
-  crashReason,
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
@@ -33,12 +33,12 @@ import {
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
-  unwoundFrames,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { crashReportDialogStyles } from "./crash-report-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -145,103 +145,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // a dialog closed/reopened mid-validate doesn't leave the timer to fire.
   private _validateTimer = 0;
 
-  static styles = [
-    espHomeStyles,
-    modalDialogStyles,
-    css`
-      esphome-base-dialog {
-        --width: 480px;
-      }
-
-      .collecting {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) 0;
-        color: var(--wa-color-text-quiet);
-      }
-
-      .summary {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-        margin: 0 0 var(--wa-space-m);
-        padding: 0;
-        list-style: none;
-        font-size: var(--wa-font-size-s);
-      }
-
-      .summary li {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-      }
-
-      .summary wa-icon {
-        flex-shrink: 0;
-        color: var(--esphome-primary);
-      }
-
-      .summary li.degraded {
-        color: var(--wa-color-text-quiet);
-      }
-
-      .summary li.degraded wa-icon {
-        color: var(--wa-color-warning-fill-loud, orange);
-      }
-
-      .hint {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-        margin: 0 0 var(--wa-space-s);
-      }
-
-      .describe-required {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-warning-fill-loud, orange);
-        margin: 0 0 var(--wa-space-s);
-      }
-
-      .describe-label {
-        display: block;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        margin: 0 0 var(--wa-space-2xs);
-      }
-
-      .describe-input {
-        width: 100%;
-        box-sizing: border-box;
-        resize: vertical;
-        font: inherit;
-        font-size: var(--wa-font-size-s);
-        padding: var(--wa-space-xs);
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-        color: var(--wa-color-text-normal);
-        margin: 0 0 var(--wa-space-2xs);
-      }
-
-      .describe-note {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        margin: 0 0 var(--wa-space-m);
-      }
-
-      /* Primary-CTA colour only; shape and the disabled state come from
-         modalDialogStyles' shared .btn / .btn:disabled. */
-      .btn--confirm {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--confirm:hover:not(:disabled) {
-        background: var(--esphome-primary-hover);
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, modalDialogStyles, crashReportDialogStyles];
 
   /** Open with a snapshot of the logs dialog's buffer. */
   public open(
@@ -263,9 +167,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
     this._userTitle = suggestIssueTitle(
-      unwoundFrames(this._scrape),
+      unwoundFrames(this._scrape.excerpt, this._scrape.decodedFrames),
       issuePlatform(this._buildMeta().targetPlatform),
-      crashReason(this._scrape)
+      crashReason(this._scrape.excerpt)
     );
     this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
@@ -445,33 +349,38 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._userTitle = (e.target as HTMLInputElement).value;
   };
 
-  private _renderReady() {
-    const scrape = this._scrape;
-    const decoded = scrape.decodedFrames.length > 0;
-    const configFailed = this._configYaml === "";
-    // One list drives both the warnings and the confirm gate, so a field
-    // can't warn while the button stays enabled. A title that is present but
-    // too brief gets its own message: the empty-field wording leaves the
-    // user retyping variations with no hint that length is the problem.
-    const title = this._userTitle.trim();
-    const titleError = isFilableTitle(this._userTitle)
+  // What each required field is still missing, as the id of the warning it
+  // renders. One list drives both the warnings and the confirm gate, so a
+  // field can't warn while the button stays enabled.
+  private get _missing(): { id: string; key: string }[] {
+    // A title that is present but too brief gets its own message: the
+    // empty-field wording leaves the user retyping variations with no hint
+    // that length is the problem.
+    const titled = isFilableTitle(this._userTitle);
+    const titleError = titled
       ? ""
-      : title
+      : this._userTitle.trim()
         ? "crash_report.title_too_short"
         : "crash_report.title_required";
     const describeError = this._userDescription.trim()
       ? ""
       : "crash_report.describe_required";
-    const missing = [
+    return [
       titleError && { id: "crash-title-error", key: titleError },
       describeError && { id: "crash-description-error", key: describeError },
     ].filter((row): row is { id: string; key: string } => typeof row === "object");
-    // The warnings render below the summary, so a field that only points at
-    // its note leaves a screen-reader user unable to find why the button is
-    // disabled. String-attribute aria form per CLAUDE.md — Lit's `?aria-`
-    // boolean binding drops the attribute on false.
+  }
+
+  // The two required fields. Split out because the dialog's render was past
+  // the ~100-line mark the README treats as the signal to extract.
+  private _renderFields(missing: { id: string; key: string }[]) {
+    const errorFor = (id: string) => (missing.some((m) => m.id === id) ? id : "");
+    // String-attribute aria form per CLAUDE.md — Lit's `?aria-` boolean
+    // binding drops the attribute on false, losing the announcement.
     const describedBy = (note: string, error: string) =>
       error ? `${note} ${error}` : note;
+    const titleError = errorFor("crash-title-error");
+    const describeError = errorFor("crash-description-error");
     return html`
       <label class="describe-label" for="crash-title"
         >${this._localize("crash_report.title_label")}</label
@@ -516,6 +425,16 @@ export class ESPHomeCrashReportDialog extends LitElement {
       <p id="crash-description-note" class="describe-note">
         ${this._localize("crash_report.describe_english")}
       </p>
+    `;
+  }
+
+  private _renderReady() {
+    const scrape = this._scrape;
+    const decoded = scrape.decodedFrames.length > 0;
+    const configFailed = this._configYaml === "";
+    const missing = this._missing;
+    return html`
+      ${this._renderFields(missing)}
       <ul class="summary">
         ${this._renderSummaryRow(
           this._localize(
