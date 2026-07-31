@@ -145,18 +145,14 @@ describe("suggestIssueTitle", () => {
     );
   });
 
-  it("says Device rather than the form's Other catch-all", () => {
+  it("says Device for an unknown platform and for the Other catch-all", () => {
     // "Other" is meaningful beside the form's platform field and says
     // nothing as a title prefix; nRF52 targets land there today.
-    expect(suggestIssueTitle(framesOf(CRASH_BLOCK), "Other")).toBe(
-      "Device: crash in Application::setup"
-    );
-  });
-
-  it("falls back to Device when the platform is unknown", () => {
-    expect(suggestIssueTitle(framesOf(CRASH_BLOCK), "")).toBe(
-      "Device: crash in Application::setup"
-    );
+    for (const platform of ["", "Other"]) {
+      expect(suggestIssueTitle(framesOf(CRASH_BLOCK), platform)).toBe(
+        "Device: crash in Application::setup"
+      );
+    }
   });
 
   it("suggests nothing when no frame is worth naming", () => {
@@ -173,10 +169,8 @@ describe("suggestIssueTitle", () => {
     expect(suggestIssueTitle(frames, "ESP32", "Task wdt")).toBe(
       "ESP32: Task wdt in Application::setup"
     );
-  });
-
-  it("falls back to a plain crash when no cause decoded", () => {
-    expect(suggestIssueTitle(framesOf(CRASH_BLOCK), "ESP32", "")).toBe(
+    // Without one it says only that it crashed.
+    expect(suggestIssueTitle(frames, "ESP32", "")).toBe(
       "ESP32: crash in Application::setup"
     );
   });

@@ -136,6 +136,24 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
   };
 }
 
+/** The frames of *scrape* the unwinder vouched for. */
+export function unwoundFramesOf(scrape: CrashScrape): string[] {
+  return unwoundFrames(scrape.excerpt, scrape.decodedFrames);
+}
+
+/**
+ * The title a crash suggests for itself: both the seed the dialog puts in
+ * the field and the fallback the issue carries, so the two can't drift
+ * into disagreeing about what a crash is called.
+ */
+export function suggestTitleFor(scrape: CrashScrape, targetPlatform: string): string {
+  return suggestIssueTitle(
+    unwoundFramesOf(scrape),
+    issuePlatform(targetPlatform),
+    crashReason(scrape.excerpt)
+  );
+}
+
 /**
  * Clean YAML from a `devices/validate` stream: normalize each line and
  * drop the esphome CLI log records interleaved on the merged stream.
@@ -356,11 +374,7 @@ function environmentSection(meta: CrashReportMeta): string {
 function buildIssueTitle(report: CrashReport): string {
   const title =
     report.userTitle.trim() ||
-    suggestIssueTitle(
-      unwoundFrames(report.scrape.excerpt, report.scrape.decodedFrames),
-      issuePlatform(report.meta.targetPlatform),
-      crashReason(report.scrape.excerpt)
-    ) ||
+    suggestTitleFor(report.scrape, report.meta.targetPlatform) ||
     `Device crash on ${report.meta.deviceName}`;
   return clampTitle(title);
 }

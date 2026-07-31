@@ -16,12 +16,10 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
-import { crashReason, unwoundFrames } from "../util/crash-detector.js";
 import {
   isFilableTitle,
   MAX_TITLE_LENGTH,
   MIN_TITLE_LENGTH,
-  suggestIssueTitle,
 } from "../util/crash-report-title.js";
 import {
   buildFullReport,
@@ -30,9 +28,9 @@ import {
   type CrashReportMeta,
   type CrashScrape,
   distillValidatedConfig,
-  issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
+  suggestTitleFor,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
@@ -49,6 +47,11 @@ registerMdiIcons({
   "clipboard-text-outline": mdiClipboardTextOutline,
   download: mdiDownload,
 });
+
+// Ids the required-field warnings render under, so each field's
+// aria-describedby can point at the one that belongs to it.
+const TITLE_ERROR_ID = "crash-title-error";
+const DESCRIBE_ERROR_ID = "crash-description-error";
 
 // The backend caps `esphome config` at 60s; the margin covers WS latency.
 const VALIDATE_TIMEOUT_MS = 90_000;
@@ -166,11 +169,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
-    this._userTitle = suggestIssueTitle(
-      unwoundFrames(this._scrape.excerpt, this._scrape.decodedFrames),
-      issuePlatform(this._buildMeta().targetPlatform),
-      crashReason(this._scrape.excerpt)
-    );
+    this._userTitle = suggestTitleFor(this._scrape, this._buildMeta().targetPlatform);
     this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
     this._captureConfig(this._session);
@@ -349,38 +348,34 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._userTitle = (e.target as HTMLInputElement).value;
   };
 
-  // What each required field is still missing, as the id of the warning it
-  // renders. One list drives both the warnings and the confirm gate, so a
-  // field can't warn while the button stays enabled.
-  private get _missing(): { id: string; key: string }[] {
+  // The warning each required field still owes, as its localize key; ""
+  // once the field passes. One source drives the warnings, the fields'
+  // invalid state and the confirm gate, so none can disagree.
+  private get _missing(): { title: string; description: string } {
     // A title that is present but too brief gets its own message: the
     // empty-field wording leaves the user retyping variations with no hint
     // that length is the problem.
-    const titled = isFilableTitle(this._userTitle);
-    const titleError = titled
-      ? ""
-      : this._userTitle.trim()
-        ? "crash_report.title_too_short"
-        : "crash_report.title_required";
-    const describeError = this._userDescription.trim()
-      ? ""
-      : "crash_report.describe_required";
-    return [
-      titleError && { id: "crash-title-error", key: titleError },
-      describeError && { id: "crash-description-error", key: describeError },
-    ].filter((row): row is { id: string; key: string } => typeof row === "object");
+    return {
+      title: isFilableTitle(this._userTitle)
+        ? ""
+        : this._userTitle.trim()
+          ? "crash_report.title_too_short"
+          : "crash_report.title_required",
+      description: this._userDescription.trim() ? "" : "crash_report.describe_required",
+    };
   }
 
   // The two required fields. Split out because the dialog's render was past
   // the ~100-line mark the README treats as the signal to extract.
-  private _renderFields(missing: { id: string; key: string }[]) {
-    const errorFor = (id: string) => (missing.some((m) => m.id === id) ? id : "");
+  private _renderFields(missing: { title: string; description: string }) {
     // String-attribute aria form per CLAUDE.md — Lit's `?aria-` boolean
     // binding drops the attribute on false, losing the announcement.
+    // The error id doubles as the flag: a field is invalid exactly when it
+    // has a warning to point at, so the two can't be wired up separately.
+    const titleError = missing.title ? TITLE_ERROR_ID : "";
+    const describeError = missing.description ? DESCRIBE_ERROR_ID : "";
     const describedBy = (note: string, error: string) =>
       error ? `${note} ${error}` : note;
-    const titleError = errorFor("crash-title-error");
-    const describeError = errorFor("crash-description-error");
     return html`
       <label class="describe-label" for="crash-title"
         >${this._localize("crash_report.title_label")}</label
@@ -391,10 +386,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         type="text"
         maxlength=${MAX_TITLE_LENGTH}
         aria-invalid=${titleError ? "true" : "false"}
-        aria-describedby=${describedBy(
-          "crash-title-note",
-          titleError ? "crash-title-error" : ""
-        )}
+        aria-describedby=${describedBy("crash-title-note", titleError)}
         placeholder=${this._localize("crash_report.title_placeholder")}
         .value=${this._userTitle}
         @input=${this._onTitleInput}
@@ -414,10 +406,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         class="describe-input"
         rows="3"
         aria-invalid=${describeError ? "true" : "false"}
-        aria-describedby=${describedBy(
-          "crash-description-note",
-          describeError ? "crash-description-error" : ""
-        )}
+        aria-describedby=${describedBy("crash-description-note", describeError)}
         placeholder=${this._localize("crash_report.describe_placeholder")}
         .value=${this._userDescription}
         @input=${this._onDescriptionInput}
@@ -433,6 +422,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
     const decoded = scrape.decodedFrames.length > 0;
     const configFailed = this._configYaml === "";
     const missing = this._missing;
+    const warnings = [
+      { id: TITLE_ERROR_ID, key: missing.title },
+      { id: DESCRIBE_ERROR_ID, key: missing.description },
+    ].filter((warning) => warning.key);
     return html`
       ${this._renderFields(missing)}
       <ul class="summary">
@@ -465,7 +458,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
       </ul>
       <p class="hint">${this._localize("crash_report.hint")}</p>
-      ${missing.map(
+      ${warnings.map(
         ({ id, key }) =>
           html`<p id=${id} class="describe-required" role="status">
             ${this._localize(key, { min: String(MIN_TITLE_LENGTH) })}
@@ -477,7 +470,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         </button>
         <button
           class="btn btn--confirm"
-          ?disabled=${missing.length > 0}
+          ?disabled=${warnings.length > 0}
           @click=${this._openIssue}
         >
           <wa-icon library="mdi" name="download"></wa-icon>
