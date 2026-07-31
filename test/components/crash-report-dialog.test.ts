@@ -128,6 +128,29 @@ describe("crash-report-dialog", () => {
     expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
     const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
     expect(input!.value).toBe("Device: crash in Application::setup");
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_note");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.title_note_undecoded");
+  });
+
+  it("points the title field at its error while it is rejected", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    finishValidate();
+    await el.updateComplete;
+    const input = () => el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title")!;
+    // A field that only points at its note leaves a screen-reader user with
+    // no way to reach why the confirm button is disabled.
+    expect(input().getAttribute("aria-invalid")).toBe("true");
+    expect(input().getAttribute("aria-describedby")).toBe(
+      "crash-title-note crash-title-error"
+    );
+    expect(el.shadowRoot!.querySelector("#crash-title-error")).not.toBeNull();
+
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+    // aria-invalid stays present and reads "false" — the boolean binding
+    // would drop the attribute entirely.
+    expect(input().getAttribute("aria-invalid")).toBe("false");
+    expect(input().getAttribute("aria-describedby")).toBe("crash-title-note");
   });
 
   it("requires a title when no frame decoded to one worth naming", async () => {
@@ -142,6 +165,8 @@ describe("crash-report-dialog", () => {
     expect((el as any)._userTitle).toBe("");
     expect(button!.disabled).toBe(true);
     expect(el.shadowRoot!.textContent).toContain("crash_report.title_required");
+    // The note must not claim a suggestion in the case it was added for.
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_note_undecoded");
 
     // A one-word title is no better than the generic one it replaces.
     title_("crash");

@@ -7,6 +7,7 @@ import {
 import {
   crashSymbol,
   isFilableTitle,
+  MAX_TITLE_LENGTH,
   suggestIssueTitle,
 } from "../../src/util/crash-report-title.js";
 import { scrapeCrashData } from "../../src/util/crash-report.js";
@@ -141,6 +142,14 @@ describe("suggestIssueTitle", () => {
 
   it("suggests nothing when no frame is worth naming", () => {
     expect(suggestIssueTitle(framesOf(CRASH_BLOCK_NOISE_ONLY), "")).toBe("");
+  });
+
+  it("clamps its own output, so the field and the issue can't disagree", () => {
+    // The input's maxlength bounds typing, not an assigned value, so an
+    // unclamped suggestion would show in full and arrive truncated.
+    const title = suggestIssueTitle([`0x1: Very${"Long".repeat(40)}::go`], "ESP32");
+    expect(title).toHaveLength(MAX_TITLE_LENGTH);
+    expect(title.endsWith("...")).toBe(true);
   });
 
   it("suggests a title its own gate accepts", () => {

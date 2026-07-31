@@ -14,7 +14,7 @@ import {
   takeLinesUnderBudget,
   TRIM_MARKER,
 } from "./crash-report-budget.js";
-import { MAX_TITLE_LENGTH, suggestIssueTitle } from "./crash-report-title.js";
+import { clampTitle, suggestIssueTitle } from "./crash-report-title.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -359,9 +359,7 @@ function buildIssueTitle(report: CrashReport): string {
       issuePlatform(report.meta.targetPlatform)
     ) ||
     `Device crash on ${report.meta.deviceName}`;
-  return title.length > MAX_TITLE_LENGTH
-    ? `${title.slice(0, MAX_TITLE_LENGTH - 3)}...`
-    : title;
+  return clampTitle(title);
 }
 
 export interface IssueUrl {

@@ -451,11 +451,24 @@ export class ESPHomeCrashReportDialog extends LitElement {
     // too brief gets its own message: the empty-field wording leaves the
     // user retyping variations with no hint that length is the problem.
     const title = this._userTitle.trim();
+    const titleError = isFilableTitle(this._userTitle)
+      ? ""
+      : title
+        ? "crash_report.title_too_short"
+        : "crash_report.title_required";
+    const describeError = this._userDescription.trim()
+      ? ""
+      : "crash_report.describe_required";
     const missing = [
-      !isFilableTitle(this._userTitle) &&
-        (title ? "crash_report.title_too_short" : "crash_report.title_required"),
-      !this._userDescription.trim() && "crash_report.describe_required",
-    ].filter((key): key is string => typeof key === "string");
+      titleError && { id: "crash-title-error", key: titleError },
+      describeError && { id: "crash-description-error", key: describeError },
+    ].filter((row): row is { id: string; key: string } => typeof row === "object");
+    // The warnings render below the summary, so a field that only points at
+    // its note leaves a screen-reader user unable to find why the button is
+    // disabled. String-attribute aria form per CLAUDE.md — Lit's `?aria-`
+    // boolean binding drops the attribute on false.
+    const describedBy = (note: string, error: string) =>
+      error ? `${note} ${error}` : note;
     return html`
       <label class="describe-label" for="crash-title"
         >${this._localize("crash_report.title_label")}</label
@@ -465,7 +478,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
         class="describe-input"
         type="text"
         maxlength=${MAX_TITLE_LENGTH}
-        aria-describedby="crash-title-note"
+        aria-invalid=${titleError ? "true" : "false"}
+        aria-describedby=${describedBy(
+          "crash-title-note",
+          titleError ? "crash-title-error" : ""
+        )}
         placeholder=${this._localize("crash_report.title_placeholder")}
         .value=${this._userTitle}
         @input=${this._onTitleInput}
@@ -484,7 +501,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
         id="crash-description"
         class="describe-input"
         rows="3"
-        aria-describedby="crash-description-note"
+        aria-invalid=${describeError ? "true" : "false"}
+        aria-describedby=${describedBy(
+          "crash-description-note",
+          describeError ? "crash-description-error" : ""
+        )}
         placeholder=${this._localize("crash_report.describe_placeholder")}
         .value=${this._userDescription}
         @input=${this._onDescriptionInput}
@@ -523,8 +544,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
       </ul>
       <p class="hint">${this._localize("crash_report.hint")}</p>
       ${missing.map(
-        (key) =>
-          html`<p class="describe-required" role="status">
+        ({ id, key }) =>
+          html`<p id=${id} class="describe-required" role="status">
             ${this._localize(key, { min: String(MIN_TITLE_LENGTH) })}
           </p>`
       )}

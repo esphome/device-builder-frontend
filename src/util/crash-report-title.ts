@@ -17,6 +17,14 @@ export function isFilableTitle(title: string): boolean {
   return title.trim().length >= MIN_TITLE_LENGTH;
 }
 
+/** A title cut to what GitHub accepts. Applied at every point a title is
+ *  produced, so the field, the issue and the download can't disagree. */
+export function clampTitle(title: string): string {
+  return title.length > MAX_TITLE_LENGTH
+    ? `${title.slice(0, MAX_TITLE_LENGTH - 3)}...`
+    : title;
+}
+
 // Frames naming the machinery that reached a crash rather than the crash.
 // Each appeared as the top frame of a real report, above the useful one.
 const NOISE_FRAME_RES = [
@@ -92,5 +100,8 @@ export function crashSymbol(decodedFrames: string[]): string {
 export function suggestIssueTitle(decodedFrames: string[], platform: string): string {
   const symbol = crashSymbol(decodedFrames);
   if (!symbol) return "";
-  return `${platform || "Device"}: crash in ${symbol}`;
+  // Clamped here, not at the seed: the input's maxlength bounds typing but
+  // not an assigned value, so an unclamped suggestion would show in full in
+  // the field and arrive truncated on GitHub.
+  return clampTitle(`${platform || "Device"}: crash in ${symbol}`);
 }
