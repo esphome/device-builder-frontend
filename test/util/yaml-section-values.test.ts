@@ -3557,4 +3557,18 @@ describe("appendSectionToYaml", () => {
       "esphome:\n  comment: |\n    line with trailing spaces  \n\napi:\n  reboot_timeout: 0s\n"
     );
   });
+
+  it("skips a column-0 dash body when detecting the indent step", () => {
+    // The dash item's 2-space child must not be read as the document step;
+    // the next key's real child indent (4-space) wins.
+    const yaml = "sensor:\n- platform: dht\n  pin: D1\nwifi:\n    ssid: y\n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(`${yaml}\napi:\n    reboot_timeout: 0s\n`);
+  });
+
+  it("falls back to the canonical step when only column-0 dash bodies exist", () => {
+    const yaml = "sensor:\n- platform: dht\n  pin: D1\n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(`${yaml}\napi:\n  reboot_timeout: 0s\n`);
+  });
 });
