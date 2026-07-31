@@ -20,6 +20,7 @@ import {
   isFilableTitle,
   MAX_TITLE_LENGTH,
   MIN_TITLE_LENGTH,
+  suggestTitleFor,
 } from "../util/crash-report-title.js";
 import {
   buildFullReport,
@@ -28,9 +29,9 @@ import {
   type CrashReportMeta,
   type CrashScrape,
   distillValidatedConfig,
+  issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
-  suggestTitleFor,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
@@ -169,7 +170,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = staleBuild;
-    this._userTitle = suggestTitleFor(this._scrape, this._buildMeta().targetPlatform);
+    this._userTitle = suggestTitleFor(
+      this._scrape,
+      issuePlatform(this._buildMeta().targetPlatform)
+    );
     this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
     this._captureConfig(this._session);

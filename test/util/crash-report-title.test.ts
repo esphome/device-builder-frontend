@@ -37,6 +37,19 @@ describe("crashSymbol", () => {
     expect(crashSymbol([])).toBe("");
   });
 
+  it("skips an address the decoder couldn't resolve", () => {
+    // `??` clears the filable floor once prefixed, so it would arrive
+    // seeded in the field as a title naming nothing.
+    expect(crashSymbol(["0x40000000: ?? at ??:0"])).toBe("");
+    expect(crashSymbol(["0x40000000: ?? ??:0"])).toBe("");
+    expect(
+      crashSymbol([
+        "0x40000000: ?? at ??:0",
+        "0x2: esphome::foo::Baz::caller() at baz.cpp:2",
+      ])
+    ).toBe("Baz::caller");
+  });
+
   it("skips the abort machinery above the frame that threw", () => {
     expect(
       crashSymbol([

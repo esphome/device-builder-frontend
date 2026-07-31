@@ -1,4 +1,4 @@
-import { decodedFrameSymbol } from "./crash-detector.js";
+import { crashReason, decodedFrameSymbol, unwoundFrames } from "./crash-detector.js";
 
 /**
  * Issue-title derivation: pick the frame a crash is worth being named
@@ -37,6 +37,9 @@ const NOISE_FRAME_RES = [
   // C++ runtime and allocator: an allocation that threw should name the
   // caller that asked for the memory, not `malloc`.
   /^(?:std::|__cxa_|__wrap___cxa_|__wrap__ZSt|_Unwind_|operator new|operator delete|malloc|calloc|realloc)/,
+  // addr2line's placeholder for an address it couldn't resolve — a ROM
+  // address, or a frame outside the ELF. It can never name anything.
+  /^\?\?/,
   // Lambda trampolines gcc emitted; the frame below names the component
   // that invoked the lambda. Tested against the template-stripped symbol
   // (see crashSymbol) — anchoring alone wouldn't do, since a closure type
@@ -130,4 +133,38 @@ export function suggestIssueTitle(
   // not an assigned value, so an unclamped suggestion would show in full in
   // the field and arrive truncated on GitHub.
   return clampTitle(`${prefix}: ${reason || "crash"} in ${symbol}`);
+}
+
+/** The parts of a crash scrape a title is derived from. */
+export interface TitleSource {
+  excerpt: string[];
+  decodedFrames: string[];
+  /** Index of the crash marker within `excerpt`; -1 when none. */
+  crashIndex: number;
+}
+
+/** The frames of *source* the unwinder vouched for. */
+export function unwoundFramesOf(source: TitleSource): string[] {
+  return unwoundFrames(source.excerpt, source.decodedFrames);
+}
+
+// The dump itself, without the context lines kept ahead of it. The reason
+// is read from here, not the whole excerpt: an ordinary log line whose
+// message opens `Reason:` would otherwise outrank the handler's verdict.
+function crashBlock(source: TitleSource): string[] {
+  return source.crashIndex === -1 ? [] : source.excerpt.slice(source.crashIndex);
+}
+
+/**
+ * The title a crash suggests for itself: both the seed the dialog puts in
+ * the field and the fallback the issue carries, so the two can't drift into
+ * disagreeing about what a crash is called. *platform* is the bug form's
+ * dropdown value.
+ */
+export function suggestTitleFor(source: TitleSource, platform: string): string {
+  return suggestIssueTitle(
+    unwoundFramesOf(source),
+    platform,
+    crashReason(crashBlock(source))
+  );
 }

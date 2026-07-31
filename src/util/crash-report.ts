@@ -3,11 +3,9 @@ import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
   ADDRESS_RE,
   CRASH_END_RE,
-  crashReason,
   DECODED_RE,
   isCrashMarker,
   MAX_LINES_AFTER_MARKER,
-  unwoundFrames,
 } from "./crash-detector.js";
 import {
   encodedCost,
@@ -16,7 +14,7 @@ import {
   takeLinesUnderBudget,
   TRIM_MARKER,
 } from "./crash-report-budget.js";
-import { clampTitle, suggestIssueTitle } from "./crash-report-title.js";
+import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -134,33 +132,6 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
     warnings,
     configLines,
   };
-}
-
-/** The frames of *scrape* the unwinder vouched for. */
-export function unwoundFramesOf(scrape: CrashScrape): string[] {
-  return unwoundFrames(scrape.excerpt, scrape.decodedFrames);
-}
-
-/**
- * The title a crash suggests for itself: both the seed the dialog puts in
- * the field and the fallback the issue carries, so the two can't drift
- * into disagreeing about what a crash is called.
- */
-export function suggestTitleFor(scrape: CrashScrape, targetPlatform: string): string {
-  return suggestIssueTitle(
-    unwoundFramesOf(scrape),
-    issuePlatform(targetPlatform),
-    crashReason(crashBlock(scrape))
-  );
-}
-
-/**
- * The dump itself, without the context lines kept ahead of it. The reason
- * is read from here, not the whole excerpt: an ordinary log line whose
- * message opens `Reason:` would otherwise outrank the handler's verdict.
- */
-function crashBlock(scrape: CrashScrape): string[] {
-  return scrape.crashIndex === -1 ? [] : scrape.excerpt.slice(scrape.crashIndex);
 }
 
 /**
@@ -383,7 +354,7 @@ function environmentSection(meta: CrashReportMeta): string {
 function buildIssueTitle(report: CrashReport): string {
   const title =
     report.userTitle.trim() ||
-    suggestTitleFor(report.scrape, report.meta.targetPlatform) ||
+    suggestTitleFor(report.scrape, issuePlatform(report.meta.targetPlatform)) ||
     `Device crash on ${report.meta.deviceName}`;
   return clampTitle(title);
 }
@@ -417,9 +388,7 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // From the unwound frames, like the title: `component_name` is what routes
   // the issue to a component's maintainers, so naming one off a scanned word
   // would move the misattribution from the title to the field they filter on.
-  const component = inferComponentName(
-    unwoundFrames(scrape.excerpt, scrape.decodedFrames)
-  );
+  const component = inferComponentName(unwoundFramesOf(scrape));
   if (component) params.set("component_name", component);
   const platform = issuePlatform(meta.targetPlatform);
   let missing = false;
