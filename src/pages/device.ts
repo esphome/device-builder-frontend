@@ -222,6 +222,12 @@ export class ESPHomePageDevice extends LitElement {
    *  re-derive focus on every later load (board swap). */
   private _pendingUrlLine?: number = this._readUrlLine();
 
+  /** One-shot ``?reveal=`` deep-link intent (the "Not encrypted"
+   *  indicator): show the visual pane this open even in a YAML-only or
+   *  mobile layout. Consumed in ``_loadPreferences``; ``buildDeviceUrl``
+   *  strips the param so a reload keeps the saved layout. */
+  private _pendingReveal = this._readUrlParam("reveal", null) !== null;
+
   /** Instance-relative field path the YAML cursor is on, for the form to
    *  scroll into view; empty on a section header / non-field line. */
   @state()
@@ -749,6 +755,20 @@ export class ESPHomePageDevice extends LitElement {
       // user silently dropped into the non-YAML first-open layout is
       // diagnosable.
       console.warn("Failed to load device preferences:", err);
+    }
+
+    if (this._pendingReveal) {
+      this._pendingReveal = false;
+      // In-memory only, so the saved layout returns on the next open. On
+      // mobile the split view collapses to YAML, so reveal the visual pane
+      // alone there; on desktop only a YAML-only layout needs the split.
+      if (this._isMobile) {
+        this._layout = "left";
+      } else if (this._layout === "right") {
+        this._layout = "both";
+      }
+      // Strip the intent from the URL so a reload doesn't re-fire it.
+      this._updateUrl();
     }
   }
 

@@ -104,6 +104,15 @@ describe("buildDeviceUrl", () => {
     expect(url).toBe("/device");
   });
 
+  it("always drops the one-shot reveal intent", () => {
+    const url = buildDeviceUrl("?section=api&reveal=1", base, {
+      selectedSection: "api",
+      selectedFromLine: undefined,
+      openSections: [],
+    });
+    expect(url).toBe("/device?section=api");
+  });
+
   it("serializes open sections as a comma-separated list", () => {
     const url = buildDeviceUrl("", base, {
       selectedSection: null,

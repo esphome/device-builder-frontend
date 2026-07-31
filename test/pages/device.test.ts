@@ -91,6 +91,50 @@ describe("esphome-page-device layout persistence", () => {
   });
 });
 
+describe("esphome-page-device one-shot reveal deep-link", () => {
+  const prefs = vi.fn(() =>
+    Promise.resolve({ navigator_visible: true, device_editor_layout: "yaml" })
+  );
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
+
+  test("reveal=1 shows the split view for a YAML-only user, then strips itself", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api&reveal=1");
+    localStorage.setItem("esphome-editor-layout", "right");
+    const page = makePage();
+    page._api = { getPreferences: prefs } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("both");
+    // In-memory only: the saved preference survives for the next open.
+    expect(localStorage.getItem("esphome-editor-layout")).toBe("right");
+    // The one-shot intent is stripped so a reload keeps the saved layout.
+    expect(window.location.search).not.toContain("reveal");
+    expect(window.location.search).toContain("section=api");
+  });
+
+  test("a reload with only ?section keeps the YAML-only layout", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api");
+    localStorage.setItem("esphome-editor-layout", "right");
+    const page = makePage();
+    page._api = { getPreferences: prefs } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("right");
+  });
+
+  test("reveal=1 on mobile shows the visual pane alone", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api&reveal=1");
+    const page = makePage();
+    (page as unknown as { _isMobile: boolean })._isMobile = true;
+    page._api = { getPreferences: prefs } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("left");
+  });
+});
+
 interface SaveView {
   _api: ESPHomeAPI;
   id: string;
