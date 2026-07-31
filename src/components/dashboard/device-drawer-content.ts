@@ -192,7 +192,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
                     </span>`
                   : nothing
               }
-              ${apiEnabled ? renderEncryptionBadge(this._localize, encState) : nothing}
+              ${apiEnabled ? renderEncryptionBadge(this, d, encState) : nothing}
             </div>`
           : nothing
       }

@@ -6,7 +6,10 @@ import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
-import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import {
+  getCompactEncryptionVisual,
+  getEncryptionState,
+} from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
@@ -153,7 +156,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const row = info.row.original;
         // Compact view: no lock for encrypted devices, only the
         // attention states (plaintext / pending / mismatch) get an icon.
-        const encVisual = getCompactEncryptionVisual({
+        const encInputs = {
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
           api_encryption_active: row.api_encryption_active,
@@ -161,7 +164,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           // "pending" state is about a local YAML edit not yet flashed, so it
           // must match the drawer's raw-flag badge (mDNS freshness is irrelevant).
           has_pending_changes: row.hasPendingChanges,
-        });
+        };
+        const encVisual = getCompactEncryptionVisual(encInputs);
+        // Plaintext is the only state with a one-click fix — deep-link to the
+        // api section's Enable-encryption affordance; the rest stay passive.
+        const encActionable = getEncryptionState(encInputs) === "plaintext";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${
@@ -191,14 +198,25 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
               : nothing
           }
           ${
-            encVisual
-              ? html`<wa-icon
-                  class="cell-encryption ${encVisual.cssClass}"
-                  library="mdi"
-                  name=${encVisual.iconName}
-                  title=${localize(encVisual.tooltipKey)}
-                ></wa-icon>`
-              : nothing
+            !encVisual
+              ? nothing
+              : encActionable
+                ? html`<button
+                    type="button"
+                    class="cell-encryption ${encVisual.cssClass}"
+                    title=${localize("dashboard.encryption_add_action")}
+                    aria-label=${localize("dashboard.encryption_add_action")}
+                    @click=${(e: Event) =>
+                      dispatchRowEvent(e, "open-encryption-settings", row._device)}
+                  >
+                    <wa-icon library="mdi" name=${encVisual.iconName}></wa-icon>
+                  </button>`
+                : html`<wa-icon
+                    class="cell-encryption ${encVisual.cssClass}"
+                    library="mdi"
+                    name=${encVisual.iconName}
+                    title=${localize(encVisual.tooltipKey)}
+                  ></wa-icon>`
           }
         </span>`;
       },

@@ -52,11 +52,27 @@ function emptyMdnsText(d: ConfiguredDevice, localize: LocalizeFunc): string {
 }
 
 export function renderEncryptionBadge(
-  localize: LocalizeFunc,
+  host: ESPHomeDeviceDrawerContent,
+  d: ConfiguredDevice,
   state: EncryptionState
 ): TemplateResult | typeof nothing {
   const v = getEncryptionVisual(state);
   if (!v) return nothing;
+  const localize = host._localize;
+  // Plaintext is the only state with a one-click fix: a button that deep-links
+  // to the api section's Enable-encryption affordance. Keep the "Not encrypted"
+  // text as the accessible name and add the action as the hover hint.
+  if (state === "plaintext") {
+    return html`<button
+      type="button"
+      class="status-badge ${v.badgeClass}"
+      title=${localize("dashboard.encryption_add_action")}
+      @click=${() => fireEvent(host, "open-encryption-settings", d)}
+    >
+      <wa-icon library="mdi" name=${v.iconName}></wa-icon>
+      ${localize(v.labelKey)}
+    </button>`;
+  }
   return html`<span class="status-badge ${v.badgeClass}" title=${localize(v.tooltipKey)}>
     <wa-icon library="mdi" name=${v.iconName}></wa-icon>
     ${localize(v.labelKey)}

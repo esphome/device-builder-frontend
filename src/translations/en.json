@@ -250,6 +250,7 @@
     "table_status_unencrypted_tooltip": "API traffic is unencrypted — anyone on the LAN can access this device",
     "table_status_encryption_pending_tooltip": "Encryption is configured in the YAML but the device is still running plaintext — install the firmware to apply",
     "table_status_encryption_mismatch_tooltip": "YAML enables encryption but the device is broadcasting plaintext — reinstall the firmware to apply",
+    "encryption_add_action": "Add encryption",
     "table_no_results": "No results found.",
     "pagination_total": "{count, plural, one {# row total} other {# rows total}}",
     "pagination_rows_per_page": "Rows per page",

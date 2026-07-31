@@ -79,6 +79,25 @@ export const tableCellStyles = css`
   .cell-encryption.mismatch {
     color: var(--esphome-error);
   }
+  /* Plaintext deep-links to the Enable-encryption affordance; reset the
+     native button chrome and reuse the busy cell's hover halo. */
+  button.cell-encryption {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    margin: -2px;
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    border-radius: var(--wa-border-radius-s);
+    transition: background 0.12s;
+  }
+  button.cell-encryption:hover,
+  button.cell-encryption:focus-visible {
+    background: var(--esphome-tint);
+    outline: none;
+  }
 
   .status-recent wa-icon {
     font-size: 16px;

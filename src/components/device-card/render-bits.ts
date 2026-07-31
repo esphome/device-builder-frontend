@@ -1,7 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
-import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import {
+  getCompactEncryptionVisual,
+  getEncryptionState,
+} from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
@@ -45,13 +48,34 @@ export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof n
 export function renderEncryptionIcon(
   card: ESPHomeDeviceCard
 ): TemplateResult | typeof nothing {
-  const visual = getCompactEncryptionVisual({
+  const inputs = {
     api_enabled: card.apiEnabled,
     api_encrypted: card.apiEncrypted,
     api_encryption_active: card.apiEncryptionActive,
     has_pending_changes: card.hasPendingChanges,
-  });
+  };
+  const visual = getCompactEncryptionVisual(inputs);
   if (!visual) return nothing;
+  // Plaintext is the only state with a one-click fix: deep-link to the api
+  // section's Enable-encryption affordance. The others already have
+  // encryption configured, so they stay passive indicators.
+  if (getEncryptionState(inputs) === "plaintext") {
+    const label = card._localize("dashboard.encryption_add_action");
+    return html`<button
+        id="ind-encryption"
+        type="button"
+        class="encryption-icon ${visual.cssClass}"
+        title=${label}
+        aria-label=${label}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-encryption-settings");
+        }}
+      >
+        <wa-icon library="mdi" name=${visual.iconName}></wa-icon>
+      </button>
+      <wa-tooltip for="ind-encryption">${label}</wa-tooltip>`;
+  }
   return html`<wa-icon
       id="ind-encryption"
       class="encryption-icon ${visual.cssClass}"

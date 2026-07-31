@@ -144,6 +144,22 @@ export const deviceCardStyles = [
       font-size: 14px;
       flex-shrink: 0;
     }
+    /* Plaintext is a button that deep-links to the Enable-encryption
+       affordance; reset the native chrome so it matches the passive icon. */
+    button.encryption-icon {
+      display: inline-flex;
+      align-items: center;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      cursor: pointer;
+    }
+    button.encryption-icon:focus-visible {
+      outline: 2px solid var(--esphome-primary);
+      outline-offset: 2px;
+      border-radius: var(--wa-border-radius-s);
+    }
     .encryption-icon.secure {
       color: var(--esphome-success);
       opacity: 0.85;

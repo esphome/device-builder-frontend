@@ -91,6 +91,47 @@ describe("esphome-page-device layout persistence", () => {
   });
 });
 
+describe("esphome-page-device section deep-link reveal", () => {
+  const prefs = (layout: string) =>
+    vi.fn(() =>
+      Promise.resolve({ navigator_visible: true, device_editor_layout: layout })
+    );
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
+
+  test("a ?section deep-link reveals the split view for a YAML-only user without persisting", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api");
+    localStorage.setItem("esphome-editor-layout", "right");
+    const page = makePage();
+    page._api = { getPreferences: prefs("yaml") } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("both");
+    // In-memory only — the saved YAML-only preference returns on the next open.
+    expect(localStorage.getItem("esphome-editor-layout")).toBe("right");
+  });
+
+  test("without a ?section param a YAML-only user stays in YAML-only", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml");
+    localStorage.setItem("esphome-editor-layout", "right");
+    const page = makePage();
+    page._api = { getPreferences: prefs("yaml") } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("right");
+  });
+
+  test("a ?section deep-link leaves a split-view user in split view", async () => {
+    window.history.replaceState({}, "", "/device/kitchen.yaml?section=api");
+    const page = makePage();
+    page._api = { getPreferences: prefs("both") } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("both");
+  });
+});
+
 interface SaveView {
   _api: ESPHomeAPI;
   id: string;

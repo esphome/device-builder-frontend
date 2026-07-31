@@ -9,7 +9,7 @@
 import type { CellContext } from "@tanstack/lit-table";
 import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
-import { identityLocalize, renderInto } from "../../_dom.js";
+import { clickCollect, identityLocalize, renderInto } from "../../_dom.js";
 import {
   createDeviceColumns,
   type DeviceRow,
@@ -205,5 +205,43 @@ describe("name-cell encryption indicator uses the raw pending flag", () => {
     );
     expect(container.querySelector(".cell-encryption")).not.toBeNull();
     expect(container.querySelector(".cell-indicator--modified")).toBeNull();
+  });
+});
+
+describe("name-cell encryption deep-link", () => {
+  it("plaintext renders a button that deep-links and stops the row click", () => {
+    const device = { configuration: "kitchen.yaml" } as unknown as DeviceRow["_device"];
+    const container = renderInto(
+      renderNameCell({
+        api_enabled: true,
+        api_encrypted: false,
+        api_encryption_active: null,
+        _device: device,
+      })
+    );
+    const btn = container.querySelector<HTMLButtonElement>("button.cell-encryption");
+    expect(btn).not.toBeNull();
+    let detail: unknown;
+    container.addEventListener("open-encryption-settings", (e) => {
+      detail = (e as CustomEvent).detail;
+    });
+    // stopPropagation keeps the row's own click (row-click → drawer) from firing.
+    expect(clickCollect(container, btn!, ["open-encryption-settings", "click"])).toEqual([
+      "open-encryption-settings",
+    ]);
+    expect(detail).toBe(device);
+  });
+
+  it("pending stays a passive icon (encryption already configured)", () => {
+    const container = renderInto(
+      renderNameCell({
+        api_enabled: true,
+        api_encrypted: true,
+        api_encryption_active: null,
+        hasPendingChanges: true,
+      })
+    );
+    expect(container.querySelector("button.cell-encryption")).toBeNull();
+    expect(container.querySelector("wa-icon.cell-encryption")).not.toBeNull();
   });
 });

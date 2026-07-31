@@ -750,6 +750,14 @@ export class ESPHomePageDevice extends LitElement {
       // diagnosable.
       console.warn("Failed to load device preferences:", err);
     }
+
+    // A ?section= deep-link (e.g. the "Not encrypted" pill → api section)
+    // targets the visual pane, so YAML-only would hide it. Reveal the split
+    // view for this open only — an in-memory set, not _cacheLayout, so the
+    // user's saved YAML-only preference returns on the next open.
+    if (this._layout === "right" && this._readUrlParam("section", null) !== null) {
+      this._layout = "both";
+    }
   }
 
   private async _loadBoard(boardId: string) {

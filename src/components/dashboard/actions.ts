@@ -24,6 +24,13 @@ export function editDevice(device: ConfiguredDevice) {
   void navigate(`/device/${encodeURIComponent(device.configuration)}`);
 }
 
+/** Open the editor deep-linked to a component section (e.g. ``api`` for the
+ *  encryption affordance); the section is read from ``?section=`` on load. */
+export function editDeviceSection(device: ConfiguredDevice, section: string) {
+  const path = `/device/${encodeURIComponent(device.configuration)}`;
+  void navigate(`${path}?section=${encodeURIComponent(section)}`);
+}
+
 /**
  * Soft-delete: backend moves YAML to ``<config_dir>/archive/`` and
  * wipes the per-device build dir. Reversible via ``unarchiveDevice``.

@@ -293,6 +293,18 @@ export const deviceDrawerContentStyles = css`
     font-size: 13px;
   }
 
+  /* The plaintext badge is a button deep-linking to the Enable-encryption
+     affordance; reset the native chrome so it matches the passive badge. */
+  button.status-badge {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button.status-badge:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 2px;
+  }
+
   .status-badge--modified {
     background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
     color: var(--esphome-warning, #d97706);
