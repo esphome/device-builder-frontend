@@ -87,7 +87,7 @@ export function getEncryptionState(d: EncryptionInputs): EncryptionState {
   return observed == null ? "active" : "mismatch";
 }
 
-export interface EncryptionVisual {
+interface EncryptionVisualBase {
   iconName: string;
   iconPath: string;
   /** CSS class on the lock icon — controls the colour treatment.
@@ -107,6 +107,16 @@ export interface EncryptionVisual {
   tooltipKey: string;
 }
 
+/** ``actionable: true`` marks the one state with a one-click fix (plaintext):
+ *  the card / table / drawer render the indicator as a button that deep-links
+ *  to the api section's Enable-encryption affordance, and it must carry
+ *  ``actionTooltipKey`` — the icon-only surfaces' accessible name (warning
+ *  plus action). The drawer keeps ``tooltipKey``; its visible label already
+ *  states the problem. */
+export type EncryptionVisual =
+  | (EncryptionVisualBase & { actionable?: false; actionTooltipKey?: never })
+  | (EncryptionVisualBase & { actionable: true; actionTooltipKey: string });
+
 const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
   active: {
     iconName: "lock",
@@ -123,6 +133,8 @@ const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
     badgeClass: "status-badge--unencrypted",
     labelKey: "dashboard.table_status_unencrypted",
     tooltipKey: "dashboard.table_status_unencrypted_tooltip",
+    actionable: true,
+    actionTooltipKey: "dashboard.table_status_unencrypted_action_tooltip",
   },
   pending: {
     iconName: "lock-clock",

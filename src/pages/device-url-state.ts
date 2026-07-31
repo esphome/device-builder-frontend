@@ -66,6 +66,11 @@ export function buildDeviceUrl(
 ): string {
   const params = new URLSearchParams(search);
 
+  // `reveal` is a one-shot navigation intent (the "Not encrypted"
+  // deep-link's pane reveal); it must never survive into a rebuilt URL
+  // or a reload would re-fire it.
+  params.delete("reveal");
+
   // Selected section + line
   if (state.selectedSection) {
     params.set("section", state.selectedSection);

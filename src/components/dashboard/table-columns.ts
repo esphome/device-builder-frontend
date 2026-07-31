@@ -162,6 +162,13 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           // must match the drawer's raw-flag badge (mDNS freshness is irrelevant).
           has_pending_changes: row.hasPendingChanges,
         });
+        // The button's name carries the warning plus the action; the passive
+        // icon keeps the plain warning.
+        const encTitle = encVisual
+          ? localize(
+              encVisual.actionable ? encVisual.actionTooltipKey : encVisual.tooltipKey
+            )
+          : "";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${
@@ -191,14 +198,25 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
               : nothing
           }
           ${
-            encVisual
-              ? html`<wa-icon
-                  class="cell-encryption ${encVisual.cssClass}"
-                  library="mdi"
-                  name=${encVisual.iconName}
-                  title=${localize(encVisual.tooltipKey)}
-                ></wa-icon>`
-              : nothing
+            !encVisual
+              ? nothing
+              : encVisual.actionable
+                ? html`<button
+                    type="button"
+                    class="cell-encryption ${encVisual.cssClass}"
+                    title=${encTitle}
+                    aria-label=${encTitle}
+                    @click=${(e: Event) =>
+                      dispatchRowEvent(e, "open-encryption-settings", row._device)}
+                  >
+                    <wa-icon library="mdi" name=${encVisual.iconName}></wa-icon>
+                  </button>`
+                : html`<wa-icon
+                    class="cell-encryption ${encVisual.cssClass}"
+                    library="mdi"
+                    name=${encVisual.iconName}
+                    title=${encTitle}
+                  ></wa-icon>`
           }
         </span>`;
       },

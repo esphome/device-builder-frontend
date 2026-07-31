@@ -11,7 +11,7 @@ import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
-import { downloadYaml, editDevice } from "./actions.js";
+import { downloadYaml, editDevice, editDeviceSection } from "./actions.js";
 import { renderFacets } from "./render-facets.js";
 import {
   renderAddDeviceCard,
@@ -149,6 +149,7 @@ export function renderCardGrid(
             ?select-mode=${host._selectMode}
             ?selected=${host._selectedDevices.has(device.configuration)}
             @edit-device=${() => editDevice(device)}
+            @open-encryption-settings=${() => editDeviceSection(device, "api", { reveal: true })}
             @install-device=${() => host._openInstallMethod(device)}
             @update-device=${() => host._openCommand(device, "install")}
             @open-logs=${() => host._openLogs(device)}
@@ -200,6 +201,8 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       @select-all=${(e: CustomEvent<string[]>) => host._addToSelection(e.detail)}
       @deselect-all=${(e: CustomEvent<string[]>) => host._removeFromSelection(e.detail)}
       @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
+      @open-encryption-settings=${(e: CustomEvent<ConfiguredDevice>) =>
+        editDeviceSection(e.detail, "api", { reveal: true })}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "install")}
       @open-logs=${(e: CustomEvent<ConfiguredDevice>) => host._openLogs(e.detail)}
@@ -265,6 +268,10 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       @edit-device=${(e: CustomEvent) => {
         host._drawerOpen = false;
         editDevice(e.detail);
+      }}
+      @open-encryption-settings=${(e: CustomEvent<ConfiguredDevice>) => {
+        host._drawerOpen = false;
+        editDeviceSection(e.detail, "api", { reveal: true });
       }}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;

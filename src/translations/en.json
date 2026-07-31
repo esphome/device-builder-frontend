@@ -248,6 +248,7 @@
     "table_status_encryption_mismatch": "Encryption mismatch",
     "table_status_encrypted_tooltip": "API traffic is encrypted",
     "table_status_unencrypted_tooltip": "API traffic is unencrypted — anyone on the LAN can access this device",
+    "table_status_unencrypted_action_tooltip": "API traffic is unencrypted — anyone on the LAN can access this device. Open the API settings to enable encryption",
     "table_status_encryption_pending_tooltip": "Encryption is configured in the YAML but the device is still running plaintext — install the firmware to apply",
     "table_status_encryption_mismatch_tooltip": "YAML enables encryption but the device is broadcasting plaintext — reinstall the firmware to apply",
     "table_no_results": "No results found.",

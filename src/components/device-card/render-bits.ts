@@ -52,6 +52,27 @@ export function renderEncryptionIcon(
     has_pending_changes: card.hasPendingChanges,
   });
   if (!visual) return nothing;
+  // Plaintext is the only actionable state: render the warning as a button
+  // that deep-links to the api section's Enable-encryption affordance, named
+  // with the warning plus the action so neither is lost. Passive while
+  // selecting — in select mode the whole card is one toggle target.
+  if (visual.actionable && !card.selectMode) {
+    const label = card._localize(visual.actionTooltipKey);
+    return html`<button
+        id="ind-encryption"
+        type="button"
+        class="encryption-icon ${visual.cssClass}"
+        aria-label=${label}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-encryption-settings");
+        }}
+      >
+        <wa-icon library="mdi" name=${visual.iconName}></wa-icon>
+      </button>
+      <wa-tooltip for="ind-encryption">${label}</wa-tooltip>`;
+  }
+  const tooltip = card._localize(visual.tooltipKey);
   return html`<wa-icon
       id="ind-encryption"
       class="encryption-icon ${visual.cssClass}"
@@ -59,9 +80,9 @@ export function renderEncryptionIcon(
       name=${visual.iconName}
       tabindex="0"
       role="img"
-      aria-label=${card._localize(visual.tooltipKey)}
+      aria-label=${tooltip}
     ></wa-icon>
-    <wa-tooltip for="ind-encryption">${card._localize(visual.tooltipKey)}</wa-tooltip>`;
+    <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {

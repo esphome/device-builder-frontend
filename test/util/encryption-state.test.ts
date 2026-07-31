@@ -207,4 +207,19 @@ describe("getCompactEncryptionVisual", () => {
   it("returns null when the API is disabled (no indicator at all)", () => {
     expect(getCompactEncryptionVisual(inputs({ api_enabled: false }))).toBeNull();
   });
+
+  it("marks only plaintext actionable (the one state with a one-click fix)", () => {
+    const plaintext = getCompactEncryptionVisual(
+      inputs({ api_encrypted: false, api_encryption_active: null })
+    );
+    expect(plaintext?.actionable).toBe(true);
+
+    const pending = getCompactEncryptionVisual(
+      inputs({ api_encryption_active: "", has_pending_changes: true })
+    );
+    expect(pending?.actionable).toBeUndefined();
+
+    const mismatch = getCompactEncryptionVisual(inputs({ api_encryption_active: "" }));
+    expect(mismatch?.actionable).toBeUndefined();
+  });
 });

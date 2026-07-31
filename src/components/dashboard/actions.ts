@@ -24,6 +24,21 @@ export function editDevice(device: ConfiguredDevice) {
   void navigate(`/device/${encodeURIComponent(device.configuration)}`);
 }
 
+/** Open the editor deep-linked to a component section (e.g. ``api`` for the
+ *  encryption affordance); the section is read from ``?section=`` on load.
+ *  ``reveal`` opts into the one-shot ``reveal=1`` intent: show the visual
+ *  pane even in a YAML-only or mobile layout — consumed and stripped on
+ *  arrival, so a reload keeps the user's saved layout. */
+export function editDeviceSection(
+  device: ConfiguredDevice,
+  section: string,
+  opts: { reveal?: boolean } = {}
+) {
+  const path = `/device/${encodeURIComponent(device.configuration)}`;
+  const reveal = opts.reveal ? "&reveal=1" : "";
+  void navigate(`${path}?section=${encodeURIComponent(section)}${reveal}`);
+}
+
 /**
  * Soft-delete: backend moves YAML to ``<config_dir>/archive/`` and
  * wipes the per-device build dir. Reversible via ``unarchiveDevice``.

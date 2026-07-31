@@ -27,6 +27,7 @@ import type {
   YamlDraftDetail,
   YamlUpdatedDetail,
 } from "../components/device/section-editor.js";
+import { layoutRevealingAnchor } from "../components/device/tour-reveal-layout.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
@@ -221,6 +222,12 @@ export class ESPHomePageDevice extends LitElement {
    *  state the URL round-trips, so parking the intent there would
    *  re-derive focus on every later load (board swap). */
   private _pendingUrlLine?: number = this._readUrlLine();
+
+  /** One-shot ``?reveal=`` deep-link intent (the "Not encrypted"
+   *  indicator): show the visual pane this open even in a YAML-only or
+   *  mobile layout. Consumed in ``_loadPreferences``; ``buildDeviceUrl``
+   *  strips the param so a reload keeps the saved layout. */
+  private _pendingReveal = this._readUrlParam("reveal", null) !== null;
 
   /** Instance-relative field path the YAML cursor is on, for the form to
    *  scroll into view; empty on a section header / non-field line. */
@@ -749,6 +756,19 @@ export class ESPHomePageDevice extends LitElement {
       // user silently dropped into the non-YAML first-open layout is
       // diagnosable.
       console.warn("Failed to load device preferences:", err);
+    }
+
+    if (this._pendingReveal) {
+      this._pendingReveal = false;
+      // In-memory only, so the saved layout returns on the next open. The
+      // tour's reveal helper owns the mobile-collapse rule (visual-only on
+      // mobile, split on a YAML-only desktop layout).
+      const reveal = layoutRevealingAnchor("central", this._layout, this._isMobile);
+      if (reveal) this._layout = reveal;
+      // Strip the intent from the URL so a reload doesn't re-fire it. Not
+      // from a page unmounted during the preferences fetch — a detached
+      // replaceState would rewrite whatever route the user is on now.
+      if (this.isConnected) this._updateUrl();
     }
   }
 
