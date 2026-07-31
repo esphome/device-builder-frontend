@@ -6,6 +6,7 @@ import {
   parseYamlSectionValues,
 } from "../../src/util/yaml-section-reader.js";
 import {
+  appendSectionToYaml,
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
@@ -3512,5 +3513,62 @@ describe("updateSectionInYaml — nested flow lists keep style and comment (#138
     expect(after).toContain("glyphs: [x, y] # icons");
     expect(after).toContain("file: c.ttf");
     expect(after).toContain("glyphs: [z]");
+  });
+});
+
+describe("appendSectionToYaml", () => {
+  it("appends a full block after one separator blank line (exact layout)", () => {
+    const yaml = "wifi:\n  ssid: !secret wifi_ssid\n\n\n";
+    const after = appendSectionToYaml(yaml, "api", {
+      encryption: { key: "!secret my_key" },
+    });
+    // Trailing blank lines collapse to the single separator; the !secret
+    // tag emits unquoted.
+    expect(after).toBe(
+      "wifi:\n  ssid: !secret wifi_ssid\n\napi:\n  encryption:\n    key: !secret my_key\n"
+    );
+  });
+
+  it("matches the document's 4-space indent step", () => {
+    const yaml = "wifi:\n    ssid: home\n";
+    const after = appendSectionToYaml(yaml, "api", {
+      encryption: { key: "!secret my_key" },
+    });
+    expect(after).toBe(
+      "wifi:\n    ssid: home\n\napi:\n    encryption:\n        key: !secret my_key\n"
+    );
+  });
+
+  it("returns the input unchanged when every value serializes empty", () => {
+    const yaml = "wifi:\n  ssid: home\n";
+    expect(appendSectionToYaml(yaml, "api", { encryption: { key: "" } })).toBe(yaml);
+  });
+
+  it("emits just the block for an empty document", () => {
+    expect(appendSectionToYaml("", "api", { reboot_timeout: "0s" })).toBe(
+      "api:\n  reboot_timeout: 0s\n"
+    );
+  });
+
+  it("keeps trailing spaces on the last content line (block-scalar tail)", () => {
+    const yaml = "esphome:\n  comment: |\n    line with trailing spaces  \n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(
+      "esphome:\n  comment: |\n    line with trailing spaces  \n\napi:\n  reboot_timeout: 0s\n"
+    );
+  });
+
+  it("skips a column-0 dash body when detecting the indent step", () => {
+    // The dash item's 2-space child must not be read as the document step;
+    // the next key's real child indent (4-space) wins.
+    const yaml = "sensor:\n- platform: dht\n  pin: D1\nwifi:\n    ssid: y\n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(`${yaml}\napi:\n    reboot_timeout: 0s\n`);
+  });
+
+  it("falls back to the canonical step when only column-0 dash bodies exist", () => {
+    const yaml = "sensor:\n- platform: dht\n  pin: D1\n";
+    const after = appendSectionToYaml(yaml, "api", { reboot_timeout: "0s" });
+    expect(after).toBe(`${yaml}\napi:\n  reboot_timeout: 0s\n`);
   });
 });
