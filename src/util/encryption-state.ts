@@ -109,6 +109,10 @@ export interface EncryptionVisual {
    *  table / drawer render the indicator as a button that deep-links to the
    *  api section's Enable-encryption affordance. */
   actionable?: boolean;
+  /** Tooltip / accessible-name key for the icon-only actionable surfaces
+   *  (card, table): the warning plus what clicking does. The drawer keeps
+   *  ``tooltipKey`` — its visible label already states the problem. */
+  actionTooltipKey?: string;
 }
 
 const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
@@ -128,6 +132,7 @@ const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
     labelKey: "dashboard.table_status_unencrypted",
     tooltipKey: "dashboard.table_status_unencrypted_tooltip",
     actionable: true,
+    actionTooltipKey: "dashboard.table_status_unencrypted_action_tooltip",
   },
   pending: {
     iconName: "lock-clock",

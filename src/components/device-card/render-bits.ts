@@ -45,20 +45,19 @@ export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof n
 export function renderEncryptionIcon(
   card: ESPHomeDeviceCard
 ): TemplateResult | typeof nothing {
-  const inputs = {
+  const visual = getCompactEncryptionVisual({
     api_enabled: card.apiEnabled,
     api_encrypted: card.apiEncrypted,
     api_encryption_active: card.apiEncryptionActive,
     has_pending_changes: card.hasPendingChanges,
-  };
-  const visual = getCompactEncryptionVisual(inputs);
+  });
   if (!visual) return nothing;
-  const label = card._localize(visual.tooltipKey);
   // Plaintext is the only actionable state: render the warning as a button
-  // that deep-links to the api section's Enable-encryption affordance. Keep
-  // the warning as the button's label so the "anyone on the LAN can access
-  // this device" notice isn't lost.
-  if (visual.actionable) {
+  // that deep-links to the api section's Enable-encryption affordance, named
+  // with the warning plus the action so neither is lost. Passive while
+  // selecting — in select mode the whole card is one toggle target.
+  if (visual.actionable && !card.selectMode) {
+    const label = card._localize(visual.actionTooltipKey ?? visual.tooltipKey);
     return html`<button
         id="ind-encryption"
         type="button"
@@ -73,6 +72,7 @@ export function renderEncryptionIcon(
       </button>
       <wa-tooltip for="ind-encryption">${label}</wa-tooltip>`;
   }
+  const tooltip = card._localize(visual.tooltipKey);
   return html`<wa-icon
       id="ind-encryption"
       class="encryption-icon ${visual.cssClass}"
@@ -80,9 +80,9 @@ export function renderEncryptionIcon(
       name=${visual.iconName}
       tabindex="0"
       role="img"
-      aria-label=${label}
+      aria-label=${tooltip}
     ></wa-icon>
-    <wa-tooltip for="ind-encryption">${label}</wa-tooltip>`;
+    <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {

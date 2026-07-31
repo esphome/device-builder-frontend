@@ -29,6 +29,17 @@ describe("device-card encryption deep-link", () => {
     ]);
   });
 
+  it("stays passive in select mode so the whole card remains one toggle target", async () => {
+    const el = await mount({
+      apiEnabled: true,
+      apiEncrypted: false,
+      apiEncryptionActive: null,
+      selectMode: true,
+    });
+    expect(el.shadowRoot!.querySelector("button.encryption-icon")).toBeNull();
+    expect(el.shadowRoot!.querySelector("wa-icon.encryption-icon")).not.toBeNull();
+  });
+
   it("encrypted device shows no lock at all", async () => {
     const el = await mount({
       apiEnabled: true,

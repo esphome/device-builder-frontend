@@ -153,7 +153,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const row = info.row.original;
         // Compact view: no lock for encrypted devices, only the
         // attention states (plaintext / pending / mismatch) get an icon.
-        const encInputs = {
+        const encVisual = getCompactEncryptionVisual({
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
           api_encryption_active: row.api_encryption_active,
@@ -161,9 +161,13 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           // "pending" state is about a local YAML edit not yet flashed, so it
           // must match the drawer's raw-flag badge (mDNS freshness is irrelevant).
           has_pending_changes: row.hasPendingChanges,
-        };
-        const encVisual = getCompactEncryptionVisual(encInputs);
+        });
         const encTooltip = encVisual ? localize(encVisual.tooltipKey) : "";
+        // The button's name carries the warning plus the action; the passive
+        // icon keeps the plain warning.
+        const encActionTooltip = encVisual
+          ? localize(encVisual.actionTooltipKey ?? encVisual.tooltipKey)
+          : "";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${
@@ -199,8 +203,8 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                 ? html`<button
                     type="button"
                     class="cell-encryption ${encVisual.cssClass}"
-                    title=${encTooltip}
-                    aria-label=${encTooltip}
+                    title=${encActionTooltip}
+                    aria-label=${encActionTooltip}
                     @click=${(e: Event) =>
                       dispatchRowEvent(e, "open-encryption-settings", row._device)}
                   >
