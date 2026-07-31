@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClipboardTextOutline, mdiDownload } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -23,6 +23,8 @@ import {
   type CrashReportMeta,
   type CrashScrape,
   distillValidatedConfig,
+  isFilableTitle,
+  MAX_TITLE_LENGTH,
   platformFromIntegrations,
   scrapeCrashData,
   suggestIssueTitle,
@@ -44,10 +46,6 @@ registerMdiIcons({
 
 // The backend caps `esphome config` at 60s; the margin covers WS latency.
 const VALIDATE_TIMEOUT_MS = 90_000;
-
-// Floor on the issue title. Long enough that a one-word "crash" can't
-// pass, short enough to accept a real summary like "OTA reboot loop".
-const MIN_TITLE_LENGTH = 15;
 
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
@@ -435,8 +433,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
     const scrape = this._scrape;
     const decoded = scrape.decodedFrames.length > 0;
     const configFailed = this._configYaml === "";
-    const described = this._userDescription.trim() !== "";
-    const titled = this._userTitle.trim().length >= MIN_TITLE_LENGTH;
+    // One list drives both the warnings and the confirm gate, so a field
+    // can't warn while the button stays enabled.
+    const missing = [
+      !isFilableTitle(this._userTitle) && "crash_report.title_required",
+      !this._userDescription.trim() && "crash_report.describe_required",
+    ].filter((key): key is string => typeof key === "string");
     return html`
       <label class="describe-label" for="crash-title"
         >${this._localize("crash_report.title_label")}</label
@@ -445,12 +447,15 @@ export class ESPHomeCrashReportDialog extends LitElement {
         id="crash-title"
         class="describe-input"
         type="text"
-        maxlength="100"
+        maxlength=${MAX_TITLE_LENGTH}
+        aria-describedby="crash-title-note"
         placeholder=${this._localize("crash_report.title_placeholder")}
         .value=${this._userTitle}
         @input=${this._onTitleInput}
       />
-      <p class="describe-note">${this._localize("crash_report.title_note")}</p>
+      <p id="crash-title-note" class="describe-note">
+        ${this._localize("crash_report.title_note")}
+      </p>
       <label class="describe-label" for="crash-description"
         >${this._localize("crash_report.describe_label")}</label
       >
@@ -496,27 +501,17 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
       </ul>
       <p class="hint">${this._localize("crash_report.hint")}</p>
-      ${
-        titled
-          ? nothing
-          : html`<p class="describe-required" role="status">
-              ${this._localize("crash_report.title_required")}
-            </p>`
-      }
-      ${
-        described
-          ? nothing
-          : html`<p class="describe-required" role="status">
-              ${this._localize("crash_report.describe_required")}
-            </p>`
-      }
+      ${missing.map(
+        (key) =>
+          html`<p class="describe-required" role="status">${this._localize(key)}</p>`
+      )}
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
           ${this._localize("layout.cancel")}
         </button>
         <button
           class="btn btn--confirm"
-          ?disabled=${!described || !titled}
+          ?disabled=${missing.length > 0}
           @click=${this._openIssue}
         >
           <wa-icon library="mdi" name="download"></wa-icon>

@@ -233,6 +233,15 @@ describe("buildFullReport", () => {
     expect(text).toContain("password: <removed>");
   });
 
+  it("heads the download with the user's title, falling back to the device", () => {
+    // The download is the paste fallback for a truncated prefill, so it
+    // must not be the one channel still headed generically.
+    expect(
+      buildFullReport(report({ userTitle: "BLE scan reboots the ESP32" }))
+    ).toContain("# Crash report: BLE scan reboots the ESP32");
+    expect(buildFullReport(report())).toContain("# Crash report: Small Garage");
+  });
+
   it("notes an unavailable config instead of a yaml section", () => {
     const text = buildFullReport(report({ configYaml: "" }));
     expect(text).toContain("could not be validated");
@@ -340,7 +349,7 @@ describe("crashSymbol", () => {
     ).toBe("DisplayWriter::call");
   });
 
-  it("folds the repeated frame the decoder emits per address", () => {
+  it("names the frame once when the decoder repeats it per address", () => {
     expect(
       crashSymbol([
         "0x4010cbe0: esphome::ssd1306_base::SSD1306::fill(esphome::Color) at ssd1306.cpp:360",

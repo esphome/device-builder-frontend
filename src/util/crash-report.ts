@@ -4,6 +4,7 @@ import {
   ADDRESS_RE,
   CRASH_END_RE,
   DECODED_RE,
+  decodedFrameSymbol,
   isCrashMarker,
   MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
@@ -264,7 +265,7 @@ export function platformFromIntegrations(integrations: string[]): string {
 
 // Frames naming the machinery that reached a crash rather than the crash.
 // Each appeared as the top frame of a real report, above the useful one.
-const NOISE_FRAME_RES: RegExp[] = [
+const NOISE_FRAME_RES = [
   // Panic / abort / assert handlers, esp-idf and esp8266.
   /^(?:panic_abort|esp_system_abort|esp_vApplicationTickHook|__assert_func|abort|_esp_error_check_failed|user_fatal_exception_handler|__wrap_system_restart_local)\b/,
   // Idle task and scheduler startup: what a core parked on, not a fault.
@@ -278,11 +279,6 @@ const NOISE_FRAME_RES: RegExp[] = [
   // that invoked the lambda.
   /(?:^|::)_FUN\b|\{lambda/,
 ];
-
-// A frame's leading line: `0xADDR: symbol` plus esp-idf's ` at <path>:<line>`
-// tail. esp8266 emits the bare symbol, so the tail stays optional; it is
-// eaten whole because gcc appends ` (discriminator N)` past the line number.
-const FRAME_SYMBOL_RE = /^0x[0-9a-fA-F]+:\s*(.+?)(?:\s+at\s+.*)?$/;
 
 // Drop everything between balanced delimiters. Argument lists and template
 // parameters nest, so a regex mangles `FixedVector<...>::cleanup_`.
@@ -318,21 +314,23 @@ function shortenSymbol(symbol: string): string {
  * scrape, so there this is a best guess rather than the faulting frame.
  */
 export function crashSymbol(decodedFrames: string[]): string {
-  let previous = "";
   for (const frame of decodedFrames) {
-    // `(inlined by)` continuations are folded into the entry; the outer
-    // frame is the one that owns the address.
-    const match = FRAME_SYMBOL_RE.exec(frame.split("\n")[0].trim());
-    if (!match) continue;
-    const symbol = match[1].trim();
-    // The decoder routinely emits the same frame twice for one address.
-    if (symbol === previous) continue;
-    previous = symbol;
-    if (NOISE_FRAME_RES.some((re) => re.test(symbol))) continue;
+    const symbol = decodedFrameSymbol(frame);
+    if (!symbol || NOISE_FRAME_RES.some((re) => re.test(symbol))) continue;
     const short = shortenSymbol(symbol);
     if (short) return short;
   }
   return "";
+}
+
+// What GitHub accepts in an issue title, and the floor below which a title
+// says no more than the generic one it replaces ("crash", "help").
+export const MAX_TITLE_LENGTH = 100;
+export const MIN_TITLE_LENGTH = 15;
+
+/** True when a title is specific enough to file an issue under. */
+export function isFilableTitle(title: string): boolean {
+  return title.trim().length >= MIN_TITLE_LENGTH;
 }
 
 /** Suggested issue title naming the crash location and platform; "" when
@@ -369,7 +367,9 @@ const fence = (lines: string[], language = "text"): string => {
  */
 export function buildFullReport(report: CrashReport): string {
   const { scrape, meta, configYaml } = report;
-  const sections: string[] = [`# Crash report: ${meta.deviceName}`];
+  // The user's title heads the download too — it is the paste fallback for
+  // a truncated prefill, and the device is named in Environment regardless.
+  const sections: string[] = [`# Crash report: ${report.userTitle || meta.deviceName}`];
   if (report.userDescription) {
     // Fence the user's prose so a stray ``` run in it can't close the
     // surrounding markdown and hide the sections below.
@@ -432,7 +432,9 @@ function buildIssueTitle(report: CrashReport): string {
     report.userTitle.trim() ||
     suggestIssueTitle(report.scrape, report.meta) ||
     `Device crash on ${report.meta.deviceName}`;
-  return title.length > 100 ? `${title.slice(0, 97)}...` : title;
+  return title.length > MAX_TITLE_LENGTH
+    ? `${title.slice(0, MAX_TITLE_LENGTH - 3)}...`
+    : title;
 }
 
 export interface IssueUrl {

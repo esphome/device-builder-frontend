@@ -26,6 +26,7 @@ import {
 } from "../_crash-lines.js";
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
+import { MAX_TITLE_LENGTH } from "../../src/util/crash-report.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -150,6 +151,16 @@ describe("crash-report-dialog", () => {
     title_("BLE scan reboots the ESP32");
     await el.updateComplete;
     expect(button!.disabled).toBe(false);
+  });
+
+  it("caps the title input at what the issue builder accepts", async () => {
+    // A maxlength above the builder's clamp would silently truncate a title
+    // the user could see themselves typing in full.
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
+    expect(input!.maxLength).toBe(MAX_TITLE_LENGTH);
   });
 
   it("carries the edited title into the issue URL", async () => {

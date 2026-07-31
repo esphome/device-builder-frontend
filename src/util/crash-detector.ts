@@ -60,6 +60,21 @@ export const ADDRESS_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)/;
 // esphome logs' inline decoder output, which an OTA session already carries.
 export const DECODED_RE = /^(?:WARNING )?Decoded (0x[0-9a-fA-F]{8}.*)$/;
 
+// What `DECODED_RE` captures, and what crash-decode builds for the hosted
+// decoder: `0xADDR: symbol` plus esp-idf's ` at <path>:<line>` tail. esp8266
+// emits the bare symbol, so the tail stays optional; it is eaten whole
+// because gcc appends ` (discriminator N)` past the line number.
+const DECODED_FRAME_RE = /^0x[0-9a-fA-F]+:\s*(.+?)(?:\s+at\s+.*)?$/;
+
+/** The symbol a decoded frame names, without its address or location; ""
+ *  when the entry isn't a decoded frame. */
+export function decodedFrameSymbol(frame: string): string {
+  // `(inlined by)` continuations are folded into the entry by
+  // `extractDecodedFrames`; the outer frame is the one that owns the address.
+  const match = DECODED_FRAME_RE.exec(frame.split("\n")[0].trim());
+  return match ? match[1].trim() : "";
+}
+
 /** True when a normalized line is a crash marker (either kind). */
 export function isCrashMarker(line: string): boolean {
   return CRASH_MARKERS.some(([re]) => re.test(line));
