@@ -150,8 +150,17 @@ export function suggestTitleFor(scrape: CrashScrape, targetPlatform: string): st
   return suggestIssueTitle(
     unwoundFramesOf(scrape),
     issuePlatform(targetPlatform),
-    crashReason(scrape.excerpt)
+    crashReason(crashBlock(scrape))
   );
+}
+
+/**
+ * The dump itself, without the context lines kept ahead of it. The reason
+ * is read from here, not the whole excerpt: an ordinary log line whose
+ * message opens `Reason:` would otherwise outrank the handler's verdict.
+ */
+function crashBlock(scrape: CrashScrape): string[] {
+  return scrape.crashIndex === -1 ? [] : scrape.excerpt.slice(scrape.crashIndex);
 }
 
 /**

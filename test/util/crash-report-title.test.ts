@@ -99,15 +99,18 @@ describe("crashSymbol", () => {
     ).toBe("TemplateLambda::operator()");
   });
 
-  it("keeps a real frame whose template argument is a closure type", () => {
-    // gcc demangles the closure into the argument list; `Bar<...>::run` is
-    // an instantiated function, not the trampoline `_FUN` names.
-    expect(
-      crashSymbol([
-        "0x1: esphome::foo::Bar<setup()::{lambda()#1}>::run() at bar.cpp:1",
-        "0x2: esphome::foo::Baz::caller() at baz.cpp:2",
-      ])
-    ).toBe("Bar::run");
+  it("keeps a real frame that merely takes a closure, however it is spelled", () => {
+    // A closure type reaches a frame as a template argument or as a call
+    // argument; `Bar::run` is an instantiated function either way, not the
+    // trampoline `_FUN` names.
+    for (const frame of [
+      "0x1: esphome::foo::Bar<setup()::{lambda()#1}>::run() at bar.cpp:1",
+      "0x1: esphome::foo::Bar::run(setup()::{lambda()#1}) at bar.cpp:1",
+    ]) {
+      expect(crashSymbol([frame, "0x2: esphome::foo::Baz::caller() at baz.cpp:2"])).toBe(
+        "Bar::run"
+      );
+    }
   });
 
   it("skips a lambda trampoline for the component that invoked it", () => {

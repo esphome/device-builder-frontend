@@ -66,6 +66,12 @@ function stripBalanced(text: string, open: string, close: string): string {
   return out;
 }
 
+// A symbol's qualified name, with the argument list and template
+// parameters it carries removed.
+function bareName(symbol: string): string {
+  return stripBalanced(stripBalanced(symbol, "(", ")"), "<", ">");
+}
+
 // A symbol short enough for an issue title: no argument list, no template
 // parameters, and at most the innermost two namespace segments.
 function shortenSymbol(symbol: string): string {
@@ -73,7 +79,7 @@ function shortenSymbol(symbol: string): string {
   // An operator's own name is spelled in the delimiters the strippers
   // balance, so only the qualified path left of it goes through them.
   const path = operator ? symbol.slice(0, operator.index) : symbol;
-  const parts = stripBalanced(stripBalanced(path, "(", ")"), "<", ">")
+  const parts = bareName(path)
     .replace(TRAILING_CONST_RE, "")
     .trim()
     .split("::")
@@ -94,10 +100,11 @@ export function crashSymbol(decodedFrames: string[]): string {
   for (const frame of decodedFrames) {
     const symbol = decodedFrameSymbol(frame);
     if (!symbol) continue;
-    // Judged with template arguments removed, so a closure type passed as
-    // one — `Bar<setup()::{lambda()#1}>::run`, a real instantiated frame —
-    // isn't read as the `{lambda…}::_FUN` trampoline it embeds.
-    if (NOISE_FRAME_RES.some((re) => re.test(stripBalanced(symbol, "<", ">")))) continue;
+    // Judged on the bare name: a closure type reaches a real frame as a
+    // template argument or a call argument (`Bar<setup()::{lambda()#1}>::run`,
+    // `Bar::run(setup()::{lambda()#1})`), and either would otherwise read as
+    // the `{lambda…}::_FUN` trampoline it embeds.
+    if (NOISE_FRAME_RES.some((re) => re.test(bareName(symbol)))) continue;
     const short = shortenSymbol(symbol);
     if (short) return short;
   }

@@ -288,6 +288,24 @@ describe("buildIssueUrl", () => {
     expect(p.get("config")).toBe(VALIDATED_CONFIG_YAML);
   });
 
+  it("reads the reason from the dump, not the log lines kept ahead of it", () => {
+    // The excerpt carries 25 lines of context before the marker; an
+    // ordinary record whose message opens `Reason:` must not outrank the
+    // crash handler's own verdict.
+    const p = params(
+      report({
+        scrape: scrapeCrashData([
+          "[D][ota:100]: Reason: user requested",
+          "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+          "[E][esp32.crash:335]:   Reason: Fault - LoadProhibited",
+          "[E][esp32.crash:305]:   BT0: 0x400d9150  (backtrace)",
+          "WARNING Decoded 0x400d9150: esphome::Application::setup() at application.cpp:59",
+        ]),
+      })
+    );
+    expect(p.get("title")).toBe("ESP32: LoadProhibited in Application::setup");
+  });
+
   it("prefers the user's title over the derived one", () => {
     const p = params(report({ userTitle: "  BLE scan reboots the ESP32  " }));
     expect(p.get("title")).toBe("BLE scan reboots the ESP32");
