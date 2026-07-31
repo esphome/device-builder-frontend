@@ -6,6 +6,7 @@ import {
   parseYamlSectionValues,
 } from "../../src/util/yaml-section-reader.js";
 import {
+  appendSectionToYaml,
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
@@ -3512,5 +3513,40 @@ describe("updateSectionInYaml — nested flow lists keep style and comment (#138
     expect(after).toContain("glyphs: [x, y] # icons");
     expect(after).toContain("file: c.ttf");
     expect(after).toContain("glyphs: [z]");
+  });
+});
+
+describe("appendSectionToYaml", () => {
+  it("appends a full block after one separator blank line (exact layout)", () => {
+    const yaml = "wifi:\n  ssid: !secret wifi_ssid\n\n\n";
+    const after = appendSectionToYaml(yaml, "api", {
+      encryption: { key: "!secret my_key" },
+    });
+    // Trailing blank lines collapse to the single separator; the !secret
+    // tag emits unquoted.
+    expect(after).toBe(
+      "wifi:\n  ssid: !secret wifi_ssid\n\napi:\n  encryption:\n    key: !secret my_key\n"
+    );
+  });
+
+  it("matches the document's 4-space indent step", () => {
+    const yaml = "wifi:\n    ssid: home\n";
+    const after = appendSectionToYaml(yaml, "api", {
+      encryption: { key: "!secret my_key" },
+    });
+    expect(after).toBe(
+      "wifi:\n    ssid: home\n\napi:\n    encryption:\n        key: !secret my_key\n"
+    );
+  });
+
+  it("returns the input unchanged when every value serializes empty", () => {
+    const yaml = "wifi:\n  ssid: home\n";
+    expect(appendSectionToYaml(yaml, "api", { encryption: { key: "" } })).toBe(yaml);
+  });
+
+  it("emits just the block for an empty document", () => {
+    expect(appendSectionToYaml("", "api", { reboot_timeout: "0s" })).toBe(
+      "api:\n  reboot_timeout: 0s\n"
+    );
   });
 });

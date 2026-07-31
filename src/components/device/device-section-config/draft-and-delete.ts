@@ -118,23 +118,29 @@ export function applySectionValues(
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
+  // Cancel any pending debounced flush on both paths below — a keystroke
+  // inside the debounce window must not race the deliberate apply.
+  if (host._draftTimer !== null) {
+    clearTimeout(host._draftTimer);
+    host._draftTimer = null;
+  }
   // A map-singleton section supplied only by a `packages:` include (api /
   // web_server, reached via the ?section= deep-link) has no local block to
   // splice into, so the flush below would drop the write. Append a fresh
   // top-level block instead; it deep-merges with the package on compile.
-  // Restricted to map singletons: a dotted platform section (ota.esphome) or a
-  // list-bodied one (globals) needs a list shape / list-merge semantics we
-  // can't assume, so those fall through to the flush (unchanged).
+  // Restricted to map singletons: a dotted platform section (ota.esphome),
+  // a list-bodied one (globals), and a bare platform domain (`sensor:`, also
+  // list-bodied) need a list shape / list-merge semantics we can't assume,
+  // so those fall through to the flush (unchanged).
   const mapSingleton =
-    !isPlatformComponentId(host.sectionKey) && !LIST_SECTIONS.has(host.sectionKey);
+    !isPlatformComponentId(host.sectionKey) &&
+    !LIST_SECTIONS.has(host.sectionKey) &&
+    !host._isPlatformDomain;
   const absent =
     resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine) === undefined;
   if (absent && mapSingleton) {
     createSectionBlock(host);
     return;
-  }
-  if (host._draftTimer !== null) {
-    clearTimeout(host._draftTimer);
   }
   flushDraft(host);
 }

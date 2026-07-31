@@ -357,12 +357,34 @@ export function removeSectionFromYaml(
   return lines.join("\n");
 }
 
+/** Indent of the first indented child line under any top-level key — the
+ *  document's own indent step, so an appended block matches a 4-space file.
+ *  Document-level on purpose: the per-section ``_detectSectionChildIndent``
+ *  can't tell its 2-space fallback from a detected 2-space. ``null`` when no
+ *  key has an indented child (empty doc, flat scalars). */
+function _detectDocumentIndentStep(lines: string[]): string | null {
+  let underKey = false;
+  for (const line of lines) {
+    if (TOP_LEVEL_KEY_START_RE.test(line)) {
+      underKey = true;
+      continue;
+    }
+    if (!underKey || line.trim() === "" || isCommentLine(line)) continue;
+    const indent = _leadingIndent(line);
+    if (indent) return indent;
+    underKey = false; // zero-indented body (column-0 dash); wait for the next key
+  }
+  return null;
+}
+
 /**
  * Append a brand-new top-level *sectionKey* block built from *values*, for a
  * section with no local block to splice into (a component supplied only by a
  * ``packages:`` include). The appended block deep-merges with the package on
  * the next compile. Reuses the splice path's serializer, so a ``!secret ...``
- * value round-trips as an unquoted tag rather than a quoted literal.
+ * value round-trips as an unquoted tag rather than a quoted literal; the
+ * indent step follows the document's own. Trailing blank lines collapse to
+ * one separator blank line.
  */
 export function appendSectionToYaml(
   yaml: string,
@@ -370,7 +392,12 @@ export function appendSectionToYaml(
   values: Record<string, unknown>,
   options: SerializeYamlOptions = {}
 ): string {
-  const block = serializeYamlValues({ [sectionKey]: values }, "", options);
+  const indentStep =
+    options.indentStep ?? _detectDocumentIndentStep(yaml.split("\n")) ?? undefined;
+  const block = serializeYamlValues({ [sectionKey]: values }, "", {
+    ...options,
+    indentStep,
+  });
   if (block.length === 0) return yaml;
   const base = yaml.trimEnd();
   const body = block.join("\n");
