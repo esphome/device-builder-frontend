@@ -57,7 +57,7 @@ export function renderEncryptionIcon(
   // with the warning plus the action so neither is lost. Passive while
   // selecting — in select mode the whole card is one toggle target.
   if (visual.actionable && !card.selectMode) {
-    const label = card._localize(visual.actionTooltipKey ?? visual.tooltipKey);
+    const label = card._localize(visual.actionTooltipKey);
     return html`<button
         id="ind-encryption"
         type="button"
