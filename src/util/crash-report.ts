@@ -391,7 +391,12 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // are surfaced inside `problem` instead of set as dead params.
   const version = meta.esphomeVersion || meta.deployedVersion;
   if (version) params.set("version", version);
-  const component = inferComponentName(scrape.decodedFrames);
+  // From the unwound frames, like the title: `component_name` is what routes
+  // the issue to a component's maintainers, so naming one off a scanned word
+  // would move the misattribution from the title to the field they filter on.
+  const component = inferComponentName(
+    unwoundFrames(scrape.excerpt, scrape.decodedFrames)
+  );
   if (component) params.set("component_name", component);
   const platform = issuePlatform(meta.targetPlatform);
   let missing = false;

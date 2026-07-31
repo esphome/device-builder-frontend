@@ -3,6 +3,7 @@ import {
   CRASH_BLOCK,
   CRASH_BLOCK_ESP8266,
   CRASH_BLOCK_NOISE_ONLY,
+  CRASH_BLOCK_REPEATED_ADDRESS,
   CRASH_BLOCK_STACK_SCAN,
   CRASH_BLOCK_TASK_WDT,
   CRASH_BLOCK_UNWOUND,
@@ -178,6 +179,22 @@ describe("crashReason", () => {
     expect(reasonOf("Fault - IllegalInstruction (cause 0)")).toBe("IllegalInstruction");
   });
 
+  it("reads the reason esp8266 replays under its own bare tag", () => {
+    // Pinned against filed issues #17825 / #17955: esp8266 logs the stored
+    // report as `[E][esp8266:186]:`, with no `.crash` segment. Requiring one
+    // dropped every esp8266 reason — including the watchdogs the type/detail
+    // split above was written for.
+    expect(
+      crashReason([
+        "[E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+        "[E][esp8266:186]:   Reason: Soft WDT - Level1Int (exccause=4)",
+      ])
+    ).toBe("Soft WDT");
+    expect(
+      crashReason(["[E][esp8266:186]:   Reason: Exception - LoadProhibit (exccause=28)"])
+    ).toBe("LoadProhibit");
+  });
+
   it("treats an undecoded cause as no reason at all", () => {
     // Titling a crash "Unknown in foo" says less than naming the frame alone.
     expect(reasonOf("Fault - Unknown")).toBe("");
@@ -213,6 +230,15 @@ describe("unwoundFrames", () => {
     expect(crashSymbol(frames)).toBe("Action::play_next_");
     // The button below it is a stack-scan hit, so it is not what gets named.
     expect(frames.join("\n")).not.toContain("Button::press");
+  });
+
+  it("keeps an address the unwinder vouched for, however often it is scanned", () => {
+    // A recursive frame's return address litters the stack, so the scan
+    // re-finds it. Filtering on the address alone dropped both occurrences
+    // and left the recursion the feature exists for with no title at all.
+    const scrape = scrapeCrashData(CRASH_BLOCK_REPEATED_ADDRESS);
+    expect(unwoundFramesOf(scrape)).toHaveLength(2);
+    expect(crashSymbol(unwoundFramesOf(scrape))).toBe("APIServer::loop");
   });
 
   it("keeps every frame when the dump draws no distinction", () => {
@@ -383,6 +409,14 @@ describe("buildIssueUrl", () => {
     const p = params(report({ userTitle: "x".repeat(200) }));
     expect(p.get("title")).toHaveLength(100);
     expect(p.get("title")).toMatch(/\.\.\.$/);
+  });
+
+  it("names the component from the unwound frames, like the title", () => {
+    // component_name routes the issue to a component's maintainers, so a
+    // scanned word naming one would move the misattribution to the field
+    // triagers filter on. Its only esphome frame here is a stack-scan hit.
+    const p = params(report({ scrape: scrapeCrashData(CRASH_BLOCK_STACK_SCAN) }));
+    expect(p.has("component_name")).toBe(false);
   });
 
   it("surfaces platform and installation in problem (dropdowns can't prefill)", () => {

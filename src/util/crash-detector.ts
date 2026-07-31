@@ -115,11 +115,15 @@ export function latchCrashKind(
 // return address in stack memory. A scanned word decodes to whatever symbol
 // owns that address, so it can name a component the crash never entered.
 const STACK_SCAN_RE = /BT\d+:\s*(?:0x)?([0-9a-fA-F]{8})\b.*\(stack scan\)/;
+const BACKTRACE_FRAME_RE = /BT\d+:\s*(?:0x)?([0-9a-fA-F]{8})\b.*\(backtrace\)/;
 
 // The handler's own verdict, `Reason: <type>` or `<type> - <detail>`
 // (`Task wdt`, `Fault - Store access fault`). Two crashes can share a frame
-// and differ entirely in why they got there.
-const CRASH_REASON_RE = /crash:\d+\]:\s*Reason:\s*(.+?)\s*$/;
+// and differ entirely in why they got there. Matched through the shared tag
+// grammar rather than an `esp32.crash` one: esp8266 replays the same report
+// under a bare `[E][esp8266:186]:`, and that is the platform whose watchdog
+// reasons the split below exists for.
+const CRASH_REASON_RE = tagged("\\s*Reason:\\s*(.+?)\\s*$");
 
 // A watchdog exception class, and the raw cause the handler appends to a
 // reason: "(exccause=4)", "(cause 0)".
@@ -149,10 +153,18 @@ export function crashReason(excerpt: string[]): string {
  */
 export function unwoundFrames(excerpt: string[], decodedFrames: string[]): string[] {
   const scanned = new Set<string>();
+  const unwound = new Set<string>();
   for (const line of excerpt) {
-    const match = STACK_SCAN_RE.exec(line);
-    if (match) scanned.add(match[1].toLowerCase());
+    const scan = STACK_SCAN_RE.exec(line);
+    if (scan) scanned.add(scan[1].toLowerCase());
+    const frame = BACKTRACE_FRAME_RE.exec(line);
+    if (frame) unwound.add(frame[1].toLowerCase());
   }
+  // A recursive frame's return address litters the stack, so the scan
+  // re-finds one the unwinder already vouched for. Filtering on the address
+  // alone would then drop both occurrences and leave the crash unnamed —
+  // exactly the recursion the stack-overflow case is made of.
+  for (const address of unwound) scanned.delete(address);
   if (scanned.size === 0) return decodedFrames;
   return decodedFrames.filter((frame) => !scanned.has(decodedFrameAddress(frame)));
 }

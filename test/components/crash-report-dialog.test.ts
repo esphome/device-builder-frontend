@@ -168,10 +168,14 @@ describe("crash-report-dialog", () => {
     // The note must not claim a suggestion in the case it was added for.
     expect(el.shadowRoot!.textContent).toContain("crash_report.title_note_undecoded");
 
-    // A one-word title is no better than the generic one it replaces.
+    // A one-word title is no better than the generic one it replaces, and
+    // it gets its own message: repeating the empty-field wording leaves the
+    // user retyping variations with no hint that length is the problem.
     title_("crash");
     await el.updateComplete;
     expect(button!.disabled).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_too_short");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.title_required");
 
     title_("BLE scan reboots the ESP32");
     await el.updateComplete;

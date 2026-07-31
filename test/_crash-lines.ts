@@ -96,6 +96,18 @@ export const CRASH_BLOCK_TASK_WDT = [
   "Rebooting...",
 ];
 
+// Recursion deep enough that the scan re-finds an address the unwinder
+// already vouched for: 0x4200DF18 is labelled both ways.
+export const CRASH_BLOCK_REPEATED_ADDRESS = [
+  "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+  "[E][esp32.crash:335]:   Reason: Task wdt",
+  "[E][esp32.crash:305]:   BT0: 0x4200DF18  (backtrace)",
+  "WARNING Decoded 0x4200df18: esphome::api::APIServer::loop() at api_server.cpp:180",
+  "[E][esp32.crash:305]:   BT1: 0x4200DF18  (stack scan)",
+  "WARNING Decoded 0x4200df18: esphome::api::APIServer::loop() at api_server.cpp:180",
+  "Rebooting...",
+];
+
 // A `devices/validate` stream (esphome config output): CLI log records
 // interleaved with the sanitized YAML, and the YAML it distills to.
 export const VALIDATE_OUTPUT = [
