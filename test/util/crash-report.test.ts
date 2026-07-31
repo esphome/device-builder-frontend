@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
+import {
+  CRASH_BLOCK,
+  CRASH_BLOCK_NOISE_ONLY,
+  CRASH_BLOCK_STACK_SCAN,
+  VALIDATED_CONFIG_YAML,
+} from "../_crash-lines.js";
 import {
   buildFullReport,
   buildIssueUrl,
@@ -46,6 +51,7 @@ const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   meta: META,
   configYaml: VALIDATED_CONFIG_YAML,
   userDescription: "Pressed the crash button in Home Assistant",
+  userTitle: "",
   ...overrides,
 });
 
@@ -225,6 +231,20 @@ describe("buildFullReport", () => {
     expect(text).toContain("password: <removed>");
   });
 
+  it("heads the download with the user's title, falling back to the device", () => {
+    // The download is the paste fallback for a truncated prefill, so it
+    // must not be the one channel still headed generically.
+    expect(
+      buildFullReport(report({ userTitle: "BLE scan reboots the ESP32" }))
+    ).toContain("# Crash report: BLE scan reboots the ESP32");
+    expect(buildFullReport(report())).toContain("# Crash report: Small Garage");
+    // Trimmed like the issue title is, so a blank-looking title falls back
+    // rather than heading the download with whitespace.
+    expect(buildFullReport(report({ userTitle: "   " }))).toContain(
+      "# Crash report: Small Garage"
+    );
+  });
+
   it("notes an unavailable config instead of a yaml section", () => {
     const text = buildFullReport(report({ configYaml: "" }));
     expect(text).toContain("could not be validated");
@@ -259,13 +279,57 @@ describe("buildIssueUrl", () => {
     expect(p.get("template")).toBe("bug_report.yml");
     expect(p.get("version")).toBe("2026.6.4");
     expect(p.get("component_name")).toBe("wifi");
-    expect(p.get("title")).toContain("Guru Meditation Error");
+    expect(p.get("title")).toBe("ESP32: crash in Application::setup");
     expect(p.get("problem")).toContain("Pressed the crash button in Home Assistant");
     expect(p.get("problem")).toContain("Decoded backtrace:");
     expect(p.get("problem")).toContain("0x400d9150: esphome::Application::setup()");
     expect(p.get("logs")).toContain("Backtrace: 0x400d9150");
     // The whole sanitized config lands in the form's config field.
     expect(p.get("config")).toBe(VALIDATED_CONFIG_YAML);
+  });
+
+  it("reads the reason from the dump, not the log lines kept ahead of it", () => {
+    // The excerpt carries 25 lines of context before the marker; an
+    // ordinary record whose message opens `Reason:` must not outrank the
+    // crash handler's own verdict.
+    const p = params(
+      report({
+        scrape: scrapeCrashData([
+          "[D][ota:100]: Reason: user requested",
+          "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+          "[E][esp32.crash:335]:   Reason: Fault - LoadProhibited",
+          "[E][esp32.crash:305]:   BT0: 0x400d9150  (backtrace)",
+          "WARNING Decoded 0x400d9150: esphome::Application::setup() at application.cpp:59",
+        ]),
+      })
+    );
+    expect(p.get("title")).toBe("ESP32: LoadProhibited in Application::setup");
+  });
+
+  it("prefers the user's title over the derived one", () => {
+    const p = params(report({ userTitle: "  BLE scan reboots the ESP32  " }));
+    expect(p.get("title")).toBe("BLE scan reboots the ESP32");
+  });
+
+  it("never titles an issue with the crash banner", () => {
+    // The banner is byte-identical across every report the crash handler
+    // produces, which is what made these issues indistinguishable.
+    const p = params(report({ scrape: scrapeCrashData(CRASH_BLOCK_NOISE_ONLY) }));
+    expect(p.get("title")).toBe("Device crash on Small Garage");
+  });
+
+  it("clamps a long title to what GitHub accepts", () => {
+    const p = params(report({ userTitle: "x".repeat(200) }));
+    expect(p.get("title")).toHaveLength(100);
+    expect(p.get("title")).toMatch(/\.\.\.$/);
+  });
+
+  it("names the component from the unwound frames, like the title", () => {
+    // component_name routes the issue to a component's maintainers, so a
+    // scanned word naming one would move the misattribution to the field
+    // triagers filter on. Its only esphome frame here is a stack-scan hit.
+    const p = params(report({ scrape: scrapeCrashData(CRASH_BLOCK_STACK_SCAN) }));
+    expect(p.has("component_name")).toBe(false);
   });
 
   it("surfaces platform and installation in problem (dropdowns can't prefill)", () => {

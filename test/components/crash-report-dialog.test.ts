@@ -19,12 +19,14 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
 }));
 
 import {
+  CRASH_BLOCK_NOISE_ONLY,
   CRASH_BLOCK as CRASH_LINES,
   VALIDATE_OUTPUT,
   VALIDATED_CONFIG_YAML,
 } from "../_crash-lines.js";
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
+import { MAX_TITLE_LENGTH } from "../../src/util/crash-report-title.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -70,6 +72,10 @@ describe("crash-report-dialog", () => {
     (el as any)._userDescription = text;
   };
 
+  const title_ = (text: string) => {
+    (el as any)._userTitle = text;
+  };
+
   it("collects, filters CLI log noise out of the config, then goes ready", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await el.updateComplete;
@@ -113,6 +119,97 @@ describe("crash-report-dialog", () => {
     describe_("Pressed the crash button");
     await el.updateComplete;
     expect(button!.disabled).toBe(false);
+  });
+
+  it("seeds the title from the crash location on open", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
+    expect(input!.value).toBe("Device: crash in Application::setup");
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_note");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.title_note_undecoded");
+  });
+
+  it("points the title field at its error while it is rejected", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    finishValidate();
+    await el.updateComplete;
+    const input = () => el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title")!;
+    // A field that only points at its note leaves a screen-reader user with
+    // no way to reach why the confirm button is disabled.
+    expect(input().getAttribute("aria-invalid")).toBe("true");
+    expect(input().getAttribute("aria-describedby")).toBe(
+      "crash-title-note crash-title-error"
+    );
+    expect(el.shadowRoot!.querySelector("#crash-title-error")).not.toBeNull();
+
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+    // aria-invalid stays present and reads "false" — the boolean binding
+    // would drop the attribute entirely.
+    expect(input().getAttribute("aria-invalid")).toBe("false");
+    expect(input().getAttribute("aria-describedby")).toBe("crash-title-note");
+  });
+
+  it("requires a title when no frame decoded to one worth naming", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    finishValidate();
+    describe_("Pressed the crash button");
+    await el.updateComplete;
+    const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      ".actions .btn--confirm"
+    );
+    // Described but untitled: the seed found nothing, so the user types it.
+    expect((el as any)._userTitle).toBe("");
+    expect(button!.disabled).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_required");
+    // The note must not claim a suggestion in the case it was added for.
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_note_undecoded");
+
+    // A one-word title is no better than the generic one it replaces, and
+    // it gets its own message: repeating the empty-field wording leaves the
+    // user retyping variations with no hint that length is the problem.
+    title_("crash");
+    await el.updateComplete;
+    expect(button!.disabled).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain("crash_report.title_too_short");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.title_required");
+
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+    expect(button!.disabled).toBe(false);
+  });
+
+  it("caps the title input at what the issue builder accepts", async () => {
+    // A maxlength above the builder's clamp would silently truncate a title
+    // the user could see themselves typing in full.
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
+    expect(input!.maxLength).toBe(MAX_TITLE_LENGTH);
+  });
+
+  it("carries the edited title into the issue URL", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    describe_("Pressed the crash button");
+    title_("BLE scan reboots the ESP32");
+    await el.updateComplete;
+
+    (el as any)._openIssue();
+    expect(new URL(openedUrls[0]).searchParams.get("title")).toBe(
+      "BLE scan reboots the ESP32"
+    );
+  });
+
+  it("re-seeds the title when a second crash opens the dialog", () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
+    expect((el as any)._userTitle).toBe("");
+    el.open("other.yaml", "Other", CRASH_LINES);
+    expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
   });
 
   it("shows the write-in-English note whether or not a description is entered", async () => {

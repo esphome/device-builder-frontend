@@ -14,6 +14,7 @@ import {
   takeLinesUnderBudget,
   TRIM_MARKER,
 } from "./crash-report-budget.js";
+import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -235,6 +236,8 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
+  /** The user's issue title, seeded from `suggestIssueTitle`. */
+  userTitle: string;
   /** The frames were decoded against a build that no longer matches the
    *  running firmware, so they name the wrong lines. The log viewer's decode
    *  is what knows; scraping it back out of its own warning line would make
@@ -286,7 +289,11 @@ const fence = (lines: string[], language = "text"): string => {
  */
 export function buildFullReport(report: CrashReport): string {
   const { scrape, meta, configYaml } = report;
-  const sections: string[] = [`# Crash report: ${meta.deviceName}`];
+  // The user's title heads the download too — it is the paste fallback for
+  // a truncated prefill, and the device is named in Environment regardless.
+  const sections: string[] = [
+    `# Crash report: ${report.userTitle.trim() || meta.deviceName}`,
+  ];
   if (report.userDescription) {
     // Fence the user's prose so a stray ``` run in it can't close the
     // surrounding markdown and hide the sections below.
@@ -339,12 +346,17 @@ function environmentSection(meta: CrashReportMeta): string {
   ].join("\n");
 }
 
-/** Issue title: the crash banner line when present, else a generic one. */
+/**
+ * Issue title: the user's own, else the crash location, else generic.
+ * The crash banner is deliberately not a fallback — it is identical for
+ * every crash the handler reports.
+ */
 function buildIssueTitle(report: CrashReport): string {
-  const { excerpt, crashIndex } = report.scrape;
-  const banner = crashIndex === -1 ? "" : excerpt[crashIndex];
-  const title = banner ? `Crash: ${banner}` : `Device crash on ${report.meta.deviceName}`;
-  return title.length > 100 ? `${title.slice(0, 97)}...` : title;
+  const title =
+    report.userTitle.trim() ||
+    suggestTitleFor(report.scrape, issuePlatform(report.meta.targetPlatform)) ||
+    `Device crash on ${report.meta.deviceName}`;
+  return clampTitle(title);
 }
 
 export interface IssueUrl {
@@ -373,7 +385,10 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // are surfaced inside `problem` instead of set as dead params.
   const version = meta.esphomeVersion || meta.deployedVersion;
   if (version) params.set("version", version);
-  const component = inferComponentName(scrape.decodedFrames);
+  // From the unwound frames, like the title: `component_name` is what routes
+  // the issue to a component's maintainers, so naming one off a scanned word
+  // would move the misattribution from the title to the field they filter on.
+  const component = inferComponentName(unwoundFramesOf(scrape));
   if (component) params.set("component_name", component);
   const platform = issuePlatform(meta.targetPlatform);
   let missing = false;
