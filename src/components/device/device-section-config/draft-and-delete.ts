@@ -1,13 +1,16 @@
 import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
+import { isPlatformComponentId } from "../../../util/featured-id.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
+  LIST_SECTIONS,
   resolveSectionEntries,
 } from "../../../util/section-entry-overrides.js";
 import {
+  appendSectionToYaml,
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../../util/yaml-section-values.js";
@@ -27,15 +30,7 @@ import { fireSectionEvent, prepareSectionEvent } from "../section-editor.js";
 export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
   host._draftTimer = null;
   if (!host._config) return null;
-
-  const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
-  host._fieldErrors = validateEntries(
-    renderEntries,
-    host._values,
-    host._presentComponents,
-    host.board?.esphome.platform ?? null,
-    host.sectionKey
-  );
+  revalidateFields(host);
 
   const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
@@ -58,10 +53,27 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
     { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) }
   );
 
+  return emitYamlDraft(host, newYaml);
+}
+
+/** Recompute the section's field errors against the render schema. */
+function revalidateFields(host: ESPHomeDeviceSectionConfig): void {
+  if (!host._config) return;
+  host._fieldErrors = validateEntries(
+    resolveSectionEntries(host.sectionKey, host._config.entries),
+    host._values,
+    host._presentComponents,
+    host.board?.esphome.platform ?? null,
+    host.sectionKey
+  );
+}
+
+/** Clear the dirty flag and, when *newYaml* differs from the live buffer,
+ *  publish it as this element's own `yaml-draft` (tagged via
+ *  `_lastSelfWrittenYaml` so the parent's loop-back is ignored). */
+function emitYamlDraft(host: ESPHomeDeviceSectionConfig, newYaml: string): string | null {
   host._setDirty(false);
-
   if (newYaml === host.yaml) return null;
-
   host._lastSelfWrittenYaml = newYaml;
   fireSectionEvent(host, "yaml-draft", {
     configuration: host.configuration,
@@ -110,10 +122,44 @@ export function applySectionValues(
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
+  // Cancel any pending debounced flush on both paths below — a keystroke
+  // inside the debounce window must not race the deliberate apply.
   if (host._draftTimer !== null) {
     clearTimeout(host._draftTimer);
+    host._draftTimer = null;
+  }
+  // A map-singleton section supplied only by a `packages:` include (api /
+  // web_server, reached via the ?section= deep-link) has no local block to
+  // splice into, so the flush below would drop the write. Append a fresh
+  // top-level block instead; it deep-merges with the package on compile.
+  // Restricted to map singletons: a dotted platform section (ota.esphome),
+  // a list-bodied one (globals), and a bare platform domain (`sensor:`, also
+  // list-bodied) need a list shape / list-merge semantics we can't assume,
+  // so those fall through to the flush (unchanged).
+  const mapSingleton =
+    !isPlatformComponentId(host.sectionKey) &&
+    !LIST_SECTIONS.has(host.sectionKey) &&
+    !host._isPlatformDomain;
+  const absent =
+    resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine) === undefined;
+  if (absent && mapSingleton) {
+    createSectionBlock(host);
+    return;
   }
   flushDraft(host);
+}
+
+/** Append a brand-new top-level block for the applied values, surfaced as an
+ *  unsaved draft (the section has no local block, so the splice can't reach it). */
+function createSectionBlock(host: ESPHomeDeviceSectionConfig): void {
+  revalidateFields(host);
+  emitYamlDraft(
+    host,
+    appendSectionToYaml(host.yaml, host.sectionKey, host._values, {
+      // Same serialization semantics as the splice in flushDraft.
+      keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey),
+    })
+  );
 }
 
 /**
