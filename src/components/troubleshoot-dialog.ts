@@ -216,6 +216,25 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         color: var(--esphome-primary);
       }
 
+      .address-label {
+        display: flex;
+        align-items: baseline;
+        gap: var(--wa-space-xs);
+        margin-top: var(--wa-space-s);
+        font-size: var(--wa-font-size-s);
+      }
+
+      .address-label code {
+        font-family: var(--wa-font-family-code, monospace);
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-normal);
+      }
+
+      .address-label span {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+      }
+
       .address-form {
         display: flex;
         gap: var(--wa-space-xs);
@@ -527,13 +546,17 @@ wifi:
     }
     const placeholder = device.ip || this._result?.ping_target || "192.168.1.50";
     return html`
+      <label class="address-label" for="use-address-input">
+        <code>use_address</code>
+        <span>${this._localize("troubleshoot.use_address_label")}</span>
+      </label>
       <div class="address-form">
         <input
+          id="use-address-input"
           type="text"
           class=${this._addressInvalid ? "invalid" : ""}
           .value=${this._addressInput}
           placeholder=${placeholder}
-          aria-label=${this._localize("troubleshoot.use_address_label")}
           @input=${(e: Event) => {
             this._addressInput = (e.target as HTMLInputElement).value;
             this._addressInvalid = false;
