@@ -118,7 +118,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
 
       .summary-note {
         margin-top: var(--wa-space-2xs);
-        color: var(--wa-color-warning-text-quiet);
+        color: var(--wa-color-warning-on-quiet);
       }
     `,
   ];
