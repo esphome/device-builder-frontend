@@ -70,12 +70,29 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   // Indirections aren't credentials — ``!secret <name>`` and
   // ``${some_substitution}`` only carry the *name* of the
   // value, not the value itself. Don't mask them.
-  if (value.startsWith("!secret")) return line;
-  if (value.startsWith("${")) return line;
+  if (value.startsWith("!secret") || value.startsWith("${")) {
+    return maskTrailingComment(prefix, key, value, placeholder) ?? line;
+  }
   // A block-scalar header carries no credential of its own; rewriting it
   // breaks the YAML shape while the scanner masks the body lines.
-  if (BLOCK_SCALAR_HEADER.test(value)) return line;
+  if (BLOCK_SCALAR_HEADER.test(value)) {
+    return maskTrailingComment(prefix, key, value, placeholder) ?? line;
+  }
   return `${prefix}${key}: ${placeholder}`;
+}
+
+// An inline comment beside a preserved value can carry the credential
+// itself ("password: !secret wifi # hunter2"); mask its body. Null when
+// the value has no trailing comment.
+function maskTrailingComment(
+  prefix: string,
+  key: string,
+  value: string,
+  placeholder: string
+): string | null {
+  const hash = value.search(/\s#/);
+  if (hash === -1) return null;
+  return `${prefix}${key}: ${value.slice(0, hash).trimEnd()} # ${placeholder}`;
 }
 
 /**
