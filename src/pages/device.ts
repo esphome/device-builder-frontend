@@ -22,7 +22,6 @@ import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
-import { disableMacSuffixInYaml } from "../components/device/mac-suffix-notice.js";
 import type {
   SectionEditor,
   YamlDraftDetail,
@@ -80,6 +79,7 @@ import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
+import { disableMacSuffixInYaml } from "../util/yaml-mac-suffix.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,

@@ -50,6 +50,36 @@ export function findSectionStart(
 }
 
 /**
+ * 0-indexed line of the last direct-child line under `sectionKey`
+ * matching `keyRe` (tested against the trimmed line), or -1. Duplicate
+ * keys follow YAML's last-key-wins. A line scan, so it works on
+ * mid-edit drafts the full parser rejects; the dedent stop keeps a
+ * list section scoped to its own item.
+ */
+export function findDirectChildLine(
+  lines: string[],
+  sectionKey: string,
+  keyRe: RegExp,
+  fromLine?: number
+): number {
+  const start = findSectionStart(lines, sectionKey, fromLine);
+  if (start < 0) return -1;
+  let childIndent: number | null = null;
+  let found = -1;
+  for (let i = start + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (isBlankOrCommentLine(l)) continue;
+    if (TOP_LEVEL_KEY_START_RE.test(l)) break;
+    const indent = _leadingIndent(l).length;
+    if (childIndent === null) childIndent = indent;
+    if (indent < childIndent) break;
+    if (indent !== childIndent) continue; // deeper-nested key, not a direct child
+    if (keyRe.test(l.trimStart())) found = i;
+  }
+  return found;
+}
+
+/**
  * Parse the values inside a YAML section into a plain object.
  * Walks from `fromLine` (or the first `${sectionKey}:` line) and
  * stops at the next sibling section.

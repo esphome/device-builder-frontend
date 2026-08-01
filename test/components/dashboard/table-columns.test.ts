@@ -10,6 +10,7 @@ import type { CellContext } from "@tanstack/lit-table";
 import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import { clickCollect, identityLocalize, renderInto } from "../../_dom.js";
+import { DeviceState } from "../../../src/api/types/devices.js";
 import {
   createDeviceColumns,
   type DeviceRow,
@@ -86,6 +87,39 @@ describe("device table empty-cell placeholder (#1038)", () => {
     const html = rendered(renderCell("ip", "192.168.1.42"));
     expect(html).toContain("cell-mono");
     expect(html).toContain("192.168.1.42");
+  });
+});
+
+describe("device table status dot with name_add_mac_suffix", () => {
+  const statusCell = (state: DeviceState, nameAddMacSuffix: boolean) => {
+    const info = {
+      getValue: () => state,
+      row: {
+        original: {
+          busy: false,
+          recentJob: null,
+          _device: { name_add_mac_suffix: nameAddMacSuffix },
+        },
+      },
+    } as unknown as CellContext<DeviceRow, unknown>;
+    return rendered(columnByKey("status")(info) as TemplateResult);
+  };
+
+  it("shows the untracked tooltip instead of an offline/unknown verdict", () => {
+    for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {
+      const html = statusCell(state, true);
+      expect(html).toContain("dashboard.status_untracked_tooltip");
+      expect(html).not.toContain("table_status_offline");
+    }
+  });
+
+  it("keeps a real ONLINE verdict and the plain dots without the flag", () => {
+    expect(statusCell(DeviceState.ONLINE, true)).toContain(
+      "dashboard.table_status_online"
+    );
+    expect(statusCell(DeviceState.OFFLINE, false)).toContain(
+      "dashboard.table_status_offline"
+    );
   });
 });
 

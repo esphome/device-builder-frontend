@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
+import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
@@ -114,10 +115,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
-  // OFFLINE/UNKNOWN are meaningless while name_add_mac_suffix is set
-  // (the suffixed broadcast never matches the config); a real ONLINE
-  // verdict (fixed use_address, MQTT) still wins.
-  if (card.nameAddMacSuffix && card.state !== DeviceState.ONLINE) {
+  if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
     return html`<div
         id="status-untracked"

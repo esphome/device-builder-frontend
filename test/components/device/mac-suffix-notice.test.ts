@@ -8,11 +8,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
+import { ESPHomeMacSuffixNotice } from "../../../src/components/device/mac-suffix-notice.js";
 import {
   disableMacSuffixInYaml,
-  ESPHomeMacSuffixNotice,
   findTruthyMacSuffixLine,
-} from "../../../src/components/device/mac-suffix-notice.js";
+} from "../../../src/util/yaml-mac-suffix.js";
 
 const SUFFIXED = "esphome:\n  name: kit\n  name_add_mac_suffix: true\nwifi:\n";
 const ADOPTED = "esphome:\n  name: kit-aabbcc\n  name_add_mac_suffix: false\nwifi:\n";
@@ -50,6 +50,19 @@ describe("findTruthyMacSuffixLine", () => {
     expect(
       findTruthyMacSuffixLine("esphome:\n  project:\n    name_add_mac_suffix: true\n")
     ).toBe(-1);
+  });
+
+  it("follows YAML last-key-wins for duplicate keys mid-edit", () => {
+    expect(
+      findTruthyMacSuffixLine(
+        "esphome:\n  name_add_mac_suffix: true\n  name_add_mac_suffix: false\n"
+      )
+    ).toBe(-1);
+    expect(
+      findTruthyMacSuffixLine(
+        "esphome:\n  name_add_mac_suffix: false\n  name_add_mac_suffix: true\n"
+      )
+    ).toBe(2);
   });
 });
 
