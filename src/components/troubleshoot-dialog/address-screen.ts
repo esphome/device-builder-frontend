@@ -77,13 +77,7 @@ function renderUseAddressForm(
   if (host._saveState === "snippet") {
     const snippet = `${host._snippetSection}:\n  use_address: ${host._addressInput.trim()}`;
     return html`
-      <p>
-        ${host._localize(
-          host._snippetReason === "crlf"
-            ? "troubleshoot.use_address_snippet_crlf"
-            : "troubleshoot.use_address_snippet"
-        )}
-      </p>
+      <p>${host._localize("troubleshoot.use_address_snippet")}</p>
       <pre class="snippet">${snippet}</pre>
       <div class="actions">
         <button
@@ -143,11 +137,7 @@ function renderUseAddressForm(
     ${
       host._saveState === "remove_packaged"
         ? html`<p class="field-error">
-            ${host._localize(
-              host._snippetReason === "crlf"
-                ? "troubleshoot.use_address_remove_crlf"
-                : "troubleshoot.use_address_remove_packaged"
-            )}
+            ${host._localize("troubleshoot.use_address_remove_packaged")}
           </p>`
         : nothing
     }
@@ -193,7 +183,6 @@ async function saveUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     const updated = applyUseAddress(yaml, value);
     if (updated === null) {
       const device = host._devices.find((d) => d.configuration === configuration);
-      host._snippetReason = yaml.includes("\r") ? "crlf" : "packaged";
       host._snippetSection = snippetNetworkSection(
         yaml,
         device?.loaded_integrations ?? []
@@ -219,7 +208,6 @@ async function clearUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     if (configuration !== host._configuration) return;
     const updated = removeUseAddress(yaml);
     if (updated === null) {
-      host._snippetReason = yaml.includes("\r") ? "crlf" : "packaged";
       host._saveState = "remove_packaged";
       return;
     }

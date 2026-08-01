@@ -6,6 +6,7 @@
  * falls back to a copyable snippet in the dialog.
  */
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { updateSectionInYaml } from "./yaml-section-values.js";
 
@@ -20,15 +21,14 @@ const HOSTNAME_RE =
  *  header carrying an inline value (`wifi: !include net.yaml`) is not
  *  spliceable and must not match. */
 const BARE_HEADER_RES = NETWORK_SECTIONS.map(
-  (section) => [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m")] as const
+  // \r? because this scans the raw document; the splice machinery
+  // itself is CRLF-safe (#1602).
+  (section) =>
+    [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?\r?$`, "m")] as const
 );
 
-/** First network block spliceable as a top-level mapping, or null.
-
- *  CRLF documents are refused: the section parser drops keys it can't
- *  read on \r-suffixed lines, so splicing one would lose data. */
+/** First network block spliceable as a top-level mapping, or null. */
 export function findNetworkSection(yaml: string): NetworkSection | null {
-  if (yaml.includes("\r")) return null;
   for (const [section, re] of BARE_HEADER_RES) {
     if (re.test(yaml)) return section;
   }
@@ -43,7 +43,7 @@ export function snippetNetworkSection(
   yaml: string,
   loadedIntegrations: string[]
 ): NetworkSection {
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   for (const section of NETWORK_SECTIONS) {
     if (findSectionStart(lines, section) >= 0) return section;
   }
@@ -57,7 +57,7 @@ export function snippetNetworkSection(
 export function applyUseAddress(yaml: string, value: string): string | null {
   const section = findNetworkSection(yaml);
   if (section === null) return null;
-  const parsed = parseSectionCore(yaml.split("\n"), section);
+  const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
   // Keep the parser's null prototype so a YAML key named __proto__
   // stays inert data (see parseSectionCore).
   const values: Record<string, unknown> = Object.assign(
@@ -73,15 +73,14 @@ export function applyUseAddress(yaml: string, value: string): string | null {
 export function readUseAddress(yaml: string): string | null {
   const section = findNetworkSection(yaml);
   if (section === null) return null;
-  const value = parseSectionCore(yaml.split("\n"), section).values.use_address;
+  const value = parseSectionCore(splitYamlDocLines(yaml), section).values.use_address;
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
 /** The wifi block's `manual_ip.static_ip`, or null. The firmware
  *  already knows its fixed IP; it is the best manual-address prefill. */
 export function readStaticIp(yaml: string): string | null {
-  if (yaml.includes("\r")) return null;
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   if (findSectionStart(lines, "wifi") < 0) return null;
   const manual = parseSectionCore(lines, "wifi").values.manual_ip;
   if (manual === null || typeof manual !== "object") return null;
@@ -94,7 +93,7 @@ export function readStaticIp(yaml: string): string | null {
 export function removeUseAddress(yaml: string): string | null {
   const section = findNetworkSection(yaml);
   if (section === null) return null;
-  const parsed = parseSectionCore(yaml.split("\n"), section);
+  const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
   if (!("use_address" in parsed.values)) return yaml;
   const values: Record<string, unknown> = Object.assign(
     Object.create(null),

@@ -97,7 +97,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   private _subscription: ReachabilitySubscription | null = null;
   _snippetSection: NetworkSection = "wifi";
-  _snippetReason: "packaged" | "crlf" = "packaged";
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
   private _failedGeneration = -1;

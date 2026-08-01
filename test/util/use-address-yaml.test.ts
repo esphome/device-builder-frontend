@@ -26,8 +26,7 @@ describe("findNetworkSection", () => {
     expect(findNetworkSection(WIFI_YAML)).toBe("wifi");
     expect(findNetworkSection("ethernet:\n  type: LAN8720\n")).toBe("ethernet");
     expect(findNetworkSection("openthread:\n")).toBe("openthread");
-    // CRLF is refused: the section parser drops keys on \r lines.
-    expect(findNetworkSection("wifi:\r\n  ssid: net\r\n")).toBeNull();
+    expect(findNetworkSection("wifi:\r\n  ssid: net\r\n")).toBe("wifi");
     expect(
       findNetworkSection("esphome:\n  name: kit\npackages:\n  base: !include x\n")
     ).toBeNull();
@@ -50,9 +49,14 @@ describe("applyUseAddress", () => {
     expect(updated).not.toContain("10.0.0.1");
   });
 
-  it("refuses a CRLF document instead of dropping its keys", () => {
-    expect(applyUseAddress("wifi:\r\n  ssid: net\r\n", "10.0.0.9")).toBeNull();
-    expect(removeUseAddress("wifi:\r\n  use_address: 10.0.0.1\r\n")).toBeNull();
+  it("splices a CRLF document, keeping its keys and line endings", () => {
+    const updated = applyUseAddress("wifi:\r\n  ssid: net\r\n", "10.0.0.9")!;
+    expect(updated).toContain("use_address: 10.0.0.9");
+    expect(updated).toContain("ssid: net");
+    expect(updated).toContain("\r\n");
+    expect(removeUseAddress("wifi:\r\n  use_address: 10.0.0.1\r\n")).not.toContain(
+      "use_address"
+    );
   });
 
   it("targets an ethernet block when there is no wifi", () => {

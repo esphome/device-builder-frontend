@@ -2027,8 +2027,6 @@
     "use_address_copy": "Copy",
     "use_address_copied": "Copied",
     "use_address_copy_failed": "Copying failed; select the text and copy it manually",
-    "use_address_snippet_crlf": "This file uses CRLF (Windows) line endings, which cannot be edited here safely. Add the use_address line under its existing network block in the editor:",
-    "use_address_remove_crlf": "This file uses CRLF (Windows) line endings, which cannot be edited here safely; remove use_address in the editor instead.",
     "use_address_snippet": "This configuration keeps its network settings in a package or include, so it cannot be edited here. Add this to the file that holds the network settings:"
   }
 }
