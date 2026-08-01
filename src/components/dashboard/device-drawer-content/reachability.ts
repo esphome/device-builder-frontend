@@ -58,7 +58,12 @@ export function renderReachabilitySection(
       icon: "access-point-network",
       labelKey: "dashboard.drawer_source_mdns",
       age: mdnsAge,
-      ttlRemaining: mdnsExpiryRemaining(mdnsAge, r.mdns_ptr_ttl_seconds, deviceOffline),
+      ttlRemaining: mdnsExpiryRemaining(
+        mdnsAge,
+        r.mdns_ptr_ttl_seconds,
+        deviceOffline,
+        r.active_source
+      ),
       ttlLifetime: r.mdns_ptr_ttl_seconds,
       txtRecords: r.mdns_txt_records ?? null,
     },
@@ -136,7 +141,7 @@ function renderReachabilityRow(
           }
         </div>
         ${
-          row.source === "mdns" && isActive
+          row.source === "mdns"
             ? renderMdnsExpiry(
                 row.ttlRemaining ?? null,
                 row.ttlLifetime ?? null,

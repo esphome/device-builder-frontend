@@ -64,7 +64,7 @@ export function buildDeviceIssueUrl(
   const url = deviceTargetUrl(target, ctx, device);
   url.searchParams.set(
     DEVICE_TARGETS[target].factsParam,
-    deviceFacts(device, target, ctx)
+    deviceFacts(device, target, ctx, reachability)
   );
   if (target === "status") {
     // Set before the config fit so it counts against the URL budget.
@@ -90,7 +90,10 @@ export function skipDeviceUrl(target: DeviceTarget, ctx: PrefillContext): URL {
 export function deviceFacts(
   device: ConfiguredDevice,
   target: DeviceTarget,
-  ctx: PrefillContext
+  ctx: PrefillContext,
+  /** Status-target snapshot; when present its state and source win, so
+   *  the observed lines agree with the mdns-expiry answer. */
+  reachability?: ReachabilityStateEvent | null
 ): string {
   const platform = issuePlatform(devicePlatform(device));
   return [
@@ -103,8 +106,10 @@ export function deviceFacts(
     ctx.installation && `Installation: ${ctx.installation}`,
     ...(target === "status"
       ? [
-          `State: ${device.runtime_state.state}`,
-          `Reachability source: ${device.runtime_state.active_source}`,
+          `State: ${reachability?.state ?? device.runtime_state.state}`,
+          `Reachability source: ${
+            reachability?.active_source ?? device.runtime_state.active_source
+          }`,
           ipLine(device),
         ]
       : []),
@@ -144,15 +149,17 @@ function mdnsExpirySummary(
   const age = reachability.mdns_last_seen_seconds_ago;
   if (age === null) return "no mDNS row";
   const offline = device.runtime_state.state === DeviceState.OFFLINE;
-  // Mirror the drawer's gate: it renders the countdown only while mDNS
-  // is the active source.
-  const mdnsActive = reachability.active_source === "mdns";
-  const remaining = mdnsActive
-    ? mdnsExpiryRemaining(age, reachability.mdns_ptr_ttl_seconds, offline)
-    : null;
+  const remaining = mdnsExpiryRemaining(
+    age,
+    reachability.mdns_ptr_ttl_seconds,
+    offline,
+    reachability.active_source
+  );
   if (remaining === null) {
     if (offline) return "no expiry countdown (device offline)";
-    if (!mdnsActive) return "no expiry countdown (mDNS not the active source)";
+    if (reachability.active_source !== "mdns") {
+      return "no expiry countdown (mDNS not the active source)";
+    }
     if (reachability.mdns_ptr_ttl_seconds === null) {
       return "no expiry countdown (no PTR TTL)";
     }

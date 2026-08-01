@@ -165,6 +165,16 @@ describe("buildDeviceIssueUrl", () => {
     ).toBe("Expires soon");
   });
 
+  it("lets the snapshot's state and source win the observed lines", () => {
+    const observed = buildDeviceIssueUrl("status", DEVICE, "", CTX, {
+      active_source: "ping",
+      state: "online",
+      mdns_last_seen_seconds_ago: 300,
+      mdns_ptr_ttl_seconds: 4500,
+    } as ReachabilityStateEvent).url.searchParams.get("observed")!;
+    expect(observed).toContain("Reachability source: ping");
+  });
+
   it("blunts every address family in the observed IP line", () => {
     const facts = (runtime: object) =>
       deviceFacts(

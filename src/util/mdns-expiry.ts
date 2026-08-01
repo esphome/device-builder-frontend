@@ -1,3 +1,5 @@
+import type { ReachabilitySource } from "../api/types/reachability.js";
+
 /**
  * The mDNS "Expires in" decisions shared by the device drawer and the
  * status-report prefill, so the report's mDNS line always matches what
@@ -12,16 +14,18 @@ const SHOW_EXPIRES_HINT_AFTER_SECONDS = 120;
 
 /**
  * Remaining seconds for the countdown, or null when no hint should
- * show: no mDNS signal, no PTR TTL, heard too recently, or the device
- * is already OFFLINE (by then the record has expired and the snapshot
- * can be stale).
+ * show: mDNS isn't the active source, no mDNS signal, no PTR TTL,
+ * heard too recently, or the device is already OFFLINE (by then the
+ * record has expired and the snapshot can be stale).
  */
 export function mdnsExpiryRemaining(
   ageSeconds: number | null,
   ptrTtlSeconds: number | null,
-  deviceOffline: boolean
+  deviceOffline: boolean,
+  activeSource: ReachabilitySource
 ): number | null {
   if (
+    activeSource !== "mdns" ||
     deviceOffline ||
     ptrTtlSeconds === null ||
     ageSeconds === null ||
