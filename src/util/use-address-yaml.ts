@@ -103,6 +103,8 @@ export function isValidUseAddress(value: string): boolean {
   if (value.includes(":")) {
     // At most one `::` run; `:::` and `1::2::3` are never valid.
     if (value.includes(":::") || value.split("::").length > 2) return false;
+    // Loopback/unspecified in any compression (0:0:0:0:0:0:0:1, ::0:1).
+    if (/^[0:]+1?$/.test(value)) return false;
     return IPV6_RE.test(value);
   }
   return HOSTNAME_RE.test(value);
