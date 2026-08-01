@@ -27,6 +27,7 @@ import {
   LIST_ITEM_INLINE_KEY_RE,
   LIST_ITEM_START_RE,
   parseBlockScalarHeader,
+  splitYamlDocLines,
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
 import { _blockScalarBodyEnd } from "./yaml-section-list.js";
@@ -100,7 +101,7 @@ export function parseYamlSectionValues(
   sectionKey: string,
   fromLine?: number
 ): Record<string, unknown> {
-  return parseSectionCore(yaml.split("\n"), sectionKey, fromLine).values;
+  return parseSectionCore(splitYamlDocLines(yaml), sectionKey, fromLine).values;
 }
 
 /**

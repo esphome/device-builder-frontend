@@ -15,7 +15,9 @@ import {
   isCommentLine,
   LIST_ITEM_INLINE_KEY_RE,
   LIST_ITEM_START_RE,
+  splitYamlDocLines,
   TOP_LEVEL_KEY_START_RE,
+  yamlDocEol,
 } from "./yaml-section-lexer.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { buildSplicedBody, yamlValueEqual } from "./yaml-section-splice.js";
@@ -31,7 +33,7 @@ const NON_BLANK_RE = /\S/;
 /** Trailing newlines and whitespace-only lines at the document end. Leaves
  *  trailing spaces on the last content line alone (a block scalar's final
  *  line may carry meaningful ones). */
-const TRAILING_BLANK_LINES_RE = /(?:\n[ \t]*)+$/;
+const TRAILING_BLANK_LINES_RE = /(?:\r?\n[ \t]*)+$/;
 
 /**
  * Find the 0-indexed line range [start, end) for a section.
@@ -120,7 +122,8 @@ export function updateSectionInYaml(
   fromLine?: number,
   options: SerializeYamlOptions = {}
 ): string {
-  const lines = yaml.split("\n");
+  const eol = yamlDocEol(yaml);
+  const lines = splitYamlDocLines(yaml);
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
@@ -181,7 +184,7 @@ export function updateSectionInYaml(
       }
     );
     lines.splice(start, spliceEnd - start, ...block);
-    return lines.join("\n");
+    return lines.join(eol);
   }
 
   // Re-parse the original to recover each key's source-line span and
@@ -303,7 +306,7 @@ export function updateSectionInYaml(
     ...buildSplicedBody(lines, parsed, values, inlineKeys, childIndent, serializeOptions),
   ];
   lines.splice(start, spliceEnd - start, ...newLines);
-  return lines.join("\n");
+  return lines.join(eol);
 }
 
 /**
@@ -329,7 +332,8 @@ export function removeSectionFromYaml(
   sectionKey: string,
   fromLine?: number
 ): string {
-  const lines = yaml.split("\n");
+  const eol = yamlDocEol(yaml);
+  const lines = splitYamlDocLines(yaml);
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
@@ -362,7 +366,7 @@ export function removeSectionFromYaml(
     }
   }
 
-  return lines.join("\n");
+  return lines.join(eol);
 }
 
 /** Indent of the first indented child line under any top-level key — the
@@ -402,13 +406,14 @@ export function appendSectionToYaml(
   options: SerializeYamlOptions = {}
 ): string {
   const indentStep =
-    options.indentStep ?? _detectDocumentIndentStep(yaml.split("\n")) ?? undefined;
+    options.indentStep ?? _detectDocumentIndentStep(splitYamlDocLines(yaml)) ?? undefined;
   const block = serializeYamlValues({ [sectionKey]: values }, "", {
     ...options,
     indentStep,
   });
   if (block.length === 0) return yaml;
+  const eol = yamlDocEol(yaml);
   const base = NON_BLANK_RE.test(yaml) ? yaml.replace(TRAILING_BLANK_LINES_RE, "") : "";
-  const body = block.join("\n");
-  return base ? `${base}\n\n${body}\n` : `${body}\n`;
+  const body = block.join(eol);
+  return base ? `${base}${eol}${eol}${body}${eol}` : `${body}${eol}`;
 }
