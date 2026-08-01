@@ -558,6 +558,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // slip the merged draft past the page's identity guard.
     const configuration = this.configuration;
     const baseYaml = this.yaml;
+    // Resolves each member's id below. A board that no longer matches the
+    // one these ids were built from simply won't match in the resolver, so
+    // a swap costs the navigation rather than aiming it somewhere wrong.
+    const board = this.board;
     const fullIds = bundle.component_ids.map((localId) =>
       buildFeaturedId(boardId, localId)
     );
@@ -663,7 +667,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         draft = yaml;
         addedAny = true;
         lastMerged = {
-          componentId: resolveFeaturedComponentId(fullIds[i], this.board),
+          componentId: resolveFeaturedComponentId(fullIds[i], board),
           instanceId: typeof memberId === "string" ? memberId : undefined,
         };
         if (typeof memberId === "string") existingIds.add(memberId);
@@ -679,7 +683,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // guarded shape as the single add: no target, no navigation.
       if (lastMerged) {
         const target = findAddedSection(
-          this.yaml,
+          draft ?? this.yaml,
           lastMerged.componentId,
           lastMerged.instanceId
         );
@@ -794,9 +798,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   private async _submitComponent(fields: Record<string, unknown>, notify = false) {
     if (!this._selected || !this.configuration || this._submitting) return;
-    // Same pre-await target and basis snapshot as the bundle flow.
+    // Same pre-await target and basis snapshot as the bundle flow. `board`
+    // rides along: it resolves the added id below and is a host-owned prop
+    // a device switch mid-round-trip would rebind.
     const configuration = this.configuration;
     const baseYaml = this.yaml;
+    const board = this.board;
     this._submitting = true;
     this._submitError = "";
     // Invalidate any in-flight dep-nav lookup — a late resolve must
@@ -907,7 +914,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // Resolved first: a board-curated entry's catalog id is the
         // synthetic `featured.<board>.<local>`, which matches no section
         // key, so the lookup found nothing and the editor stayed put.
-        const componentId = resolveFeaturedComponentId(this._selected.id, this.board);
+        const componentId = resolveFeaturedComponentId(this._selected.id, board);
         const componentName = this._selected.name;
         const newId = fields["id"];
         const target = findAddedSection(

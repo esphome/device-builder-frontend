@@ -117,17 +117,24 @@ describe("add-component-dialog selects what it added", () => {
   });
 
   it("leaves the selection alone when the added block can't be found", async () => {
-    // Better to stay put than navigate somewhere wrong.
-    const { dialog, d } = makeDialog();
-    d._selected = makeComponentEntry("featured.apollo-esk-1.unknown", {
-      name: "Mystery",
-      category: ComponentCategory.BINARY_SENSOR,
-    });
-    const seen = capture(dialog);
+    // Better to stay put than navigate somewhere wrong. Two distinct ways
+    // to miss: the id never resolves, and it resolves to a section the
+    // merged YAML doesn't hold. Only the second exercises the resolver.
+    for (const id of [
+      "featured.apollo-esk-1.unknown", // not on the board — passes through
+      "featured.apollo-esk-1.led", // resolves to light.binary, absent here
+    ]) {
+      const { dialog, d } = makeDialog();
+      d._selected = makeComponentEntry(id, {
+        name: "Mystery",
+        category: ComponentCategory.BINARY_SENSOR,
+      });
+      const seen = capture(dialog);
 
-    await d._submitComponent({ id: "boot_button" }, true);
+      await d._submitComponent({ id: "boot_button" }, true);
 
-    expect(seen).toEqual([]);
+      expect(seen).toEqual([]);
+    }
   });
 
   it("lands on the last member a bundle merged", async () => {
