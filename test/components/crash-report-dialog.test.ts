@@ -21,24 +21,30 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
 import {
   CRASH_BLOCK_NOISE_ONLY,
   CRASH_BLOCK as CRASH_LINES,
-  VALIDATE_OUTPUT,
-  VALIDATED_CONFIG_YAML,
+  MASKED_CONFIG_YAML,
+  RAW_CONFIG_YAML,
 } from "../_crash-lines.js";
-import type { StreamCallbacks } from "../../src/api/types/streaming.js";
+import { flushMicrotasks } from "../_dom.js";
+import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
 import { MAX_TITLE_LENGTH } from "../../src/util/crash-report-title.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+interface Deferred {
+  resolve: (yaml: string) => void;
+  reject: (err: unknown) => void;
+}
+
 describe("crash-report-dialog", () => {
   let el: ESPHomeCrashReportDialog;
-  let validateCallbacks: StreamCallbacks | null;
+  let reads: Deferred[];
   let openedUrls: string[];
 
   beforeEach(() => {
     copyToClipboard.mockReset();
     downloadBlob.mockReset();
-    validateCallbacks = null;
+    reads = [];
     openedUrls = [];
     vi.stubGlobal(
       "open",
@@ -49,11 +55,12 @@ describe("crash-report-dialog", () => {
     );
     el = new ESPHomeCrashReportDialog();
     (el as any)._api = {
-      validate: (_config: string, callbacks: StreamCallbacks) => {
-        validateCallbacks = callbacks;
-        return "v1";
-      },
-      stopStream: vi.fn(() => Promise.resolve()),
+      getConfig: vi.fn(
+        () =>
+          new Promise<string>((resolve, reject) => {
+            reads.push({ resolve, reject });
+          })
+      ),
     };
     document.body.appendChild(el);
   });
@@ -63,9 +70,25 @@ describe("crash-report-dialog", () => {
     vi.unstubAllGlobals();
   });
 
-  const finishValidate = (lines = VALIDATE_OUTPUT, success = true) => {
-    for (const line of lines) validateCallbacks!.onOutput!(line);
-    validateCallbacks!.onResult!({ success, code: success ? 0 : 1 });
+  // Drain microtask turns until *predicate* holds (capped), so the
+  // helpers don't pin exact hop counts of the recovery util's await
+  // chain — a refactor there must not read as a dialog failure.
+  const settle = async (predicate: () => boolean) => {
+    for (let i = 0; i < 20 && !predicate(); i++) await flushMicrotasks(1);
+  };
+
+  const finishRead = async (yaml = RAW_CONFIG_YAML) => {
+    await settle(() => reads.length > 0);
+    reads[reads.length - 1]!.resolve(yaml);
+    await settle(() => (el as any)._configYaml !== null);
+  };
+
+  const rejectRead = async () => {
+    await settle(() => reads.length > 0);
+    // An APIError is final for the recovery util; a bare transport error
+    // would park in its real-timer retry backoff instead.
+    reads[reads.length - 1]!.reject(new APIError("internal_error", "boom"));
+    await settle(() => (el as any)._configYaml !== null);
   };
 
   const describe_ = (text: string) => {
@@ -76,40 +99,39 @@ describe("crash-report-dialog", () => {
     (el as any)._userTitle = text;
   };
 
-  it("collects, filters CLI log noise out of the config, then goes ready", async () => {
+  it("reads the config, masks its credentials, then goes ready", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".collecting")).not.toBeNull();
 
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
-    expect((el as any)._configYaml).toBe(VALIDATED_CONFIG_YAML);
+    expect((el as any)._configYaml).toBe(MASKED_CONFIG_YAML);
   });
 
-  it("degrades to a config-unavailable note when validation fails", async () => {
+  it("includes the config even when esphome would reject it", async () => {
+    // The raw file read has no validation step, so a config that fails
+    // `esphome config` still lands in the report.
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate(["\\033[31mERROR something\\033[0m"], false);
+    await finishRead("esphome:\n  nam broken [yaml");
     await el.updateComplete;
-    expect((el as any)._configYaml).toBe("");
-    expect((el as any)._configError).toBe("invalid");
-    expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
-    expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
+    expect((el as any)._configYaml).toBe("esphome:\n  nam broken [yaml");
+    expect(el.shadowRoot!.textContent).toContain("crash_report.includes_config");
   });
 
-  it("distinguishes a transport failure from an invalid config", async () => {
+  it("degrades to the no-config path when the read fails", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    validateCallbacks!.onError!("WebSocket not connected");
+    await rejectRead();
     await el.updateComplete;
     expect((el as any)._configYaml).toBe("");
-    expect((el as any)._configError).toBe("transport");
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_capture_failed");
-    expect(el.shadowRoot!.textContent).not.toContain("crash_report.config_unavailable");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.includes_config");
   });
 
   it("requires a description before the report can be opened", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
       ".actions .btn--confirm"
@@ -123,7 +145,7 @@ describe("crash-report-dialog", () => {
 
   it("seeds the title from the crash location on open", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     expect((el as any)._userTitle).toBe("Device: crash in Application::setup");
     const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
@@ -134,7 +156,7 @@ describe("crash-report-dialog", () => {
 
   it("points the title field at its error while it is rejected", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     const input = () => el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title")!;
     // A field that only points at its note leaves a screen-reader user with
@@ -155,7 +177,7 @@ describe("crash-report-dialog", () => {
 
   it("requires a title when no frame decoded to one worth naming", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_BLOCK_NOISE_ONLY);
-    finishValidate();
+    await finishRead();
     describe_("Pressed the crash button");
     await el.updateComplete;
     const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
@@ -186,7 +208,7 @@ describe("crash-report-dialog", () => {
     // A maxlength above the builder's clamp would silently truncate a title
     // the user could see themselves typing in full.
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     const input = el.shadowRoot!.querySelector<HTMLInputElement>("#crash-title");
     expect(input!.maxLength).toBe(MAX_TITLE_LENGTH);
@@ -194,7 +216,7 @@ describe("crash-report-dialog", () => {
 
   it("carries the edited title into the issue URL", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     describe_("Pressed the crash button");
     title_("BLE scan reboots the ESP32");
     await el.updateComplete;
@@ -214,7 +236,7 @@ describe("crash-report-dialog", () => {
 
   it("shows the write-in-English note whether or not a description is entered", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain("crash_report.describe_english");
 
@@ -234,7 +256,7 @@ describe("crash-report-dialog", () => {
       })
     );
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     describe_("Pressed the crash button");
     await el.updateComplete;
 
@@ -245,35 +267,9 @@ describe("crash-report-dialog", () => {
     expect(anchor!.classList.contains("btn--confirm")).toBe(true);
   });
 
-  it("degrades to config-unavailable when the validate stream stalls", async () => {
-    vi.useFakeTimers();
-    try {
-      el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-      expect((el as any)._configYaml).toBeNull();
-      vi.advanceTimersByTime(90_000);
-      expect((el as any)._configYaml).toBe("");
-      // A stall is a transport issue, not an invalid config.
-      expect((el as any)._configError).toBe("transport");
-      expect((el as any)._api.stopStream).toHaveBeenCalledWith("v1");
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("stops an abandoned validate stream on close and on re-open", () => {
-    const stopStream = (el as any)._api.stopStream;
-    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    (el as any)._onAfterHide();
-    expect(stopStream).toHaveBeenCalledWith("v1");
-
-    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    el.open("other.yaml", "Other", CRASH_LINES);
-    expect(stopStream).toHaveBeenCalledTimes(2);
-  });
-
   it("downloads the report, then opens the pre-filled issue", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
+    await finishRead();
     describe_("Pressed the crash button");
     await el.updateComplete;
 
@@ -286,13 +282,14 @@ describe("crash-report-dialog", () => {
     expect(reportText.indexOf("## What happened")).toBeLessThan(
       reportText.indexOf("## Decoded backtrace")
     );
-    expect(reportText).toContain("password: <removed>");
+    expect(reportText).toContain("password: •");
 
     expect(openedUrls).toHaveLength(1);
     const params = new URL(openedUrls[0]).searchParams;
     expect(openedUrls[0]).toContain("github.com/esphome/esphome/issues/new");
     // Config lands in the form's YAML Config box, backtrace in problem.
-    expect(params.get("config")).toContain("password: <removed>");
+    expect(params.get("config")).toContain("password: •");
+    expect(params.get("config")).not.toContain("hunter2");
     expect(params.get("problem")).toContain("Pressed the crash button");
 
     await el.updateComplete;
@@ -307,32 +304,30 @@ describe("crash-report-dialog", () => {
     expect(copyToClipboard).toHaveBeenCalledWith(reportText);
   });
 
-  it("ignores a stale validate result from a previous open", async () => {
-    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    const stale = validateCallbacks!;
-    el.open("other.yaml", "Other", CRASH_LINES);
-    stale.onResult!({ success: false, code: 1 });
-    await el.updateComplete;
-    // Still collecting: the stale stream must not flip this session ready.
-    expect((el as any)._configYaml).toBeNull();
-  });
-
-  it("keeps the new session's stall timer when a stale result arrives", () => {
+  it("gives up on a parked config read after the wall-clock timeout", async () => {
     vi.useFakeTimers();
     try {
       el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-      const stale = validateCallbacks!;
-      el.open("other.yaml", "Other", CRASH_LINES);
-      // A late result from the previous session must not clear the new
-      // session's stall timer (the shared instance-field hazard).
-      stale.onResult!({ success: true, code: 0 });
-      expect((el as any)._configYaml).toBeNull();
-      vi.advanceTimersByTime(90_000);
+      // The read never settles (socket down); the dialog must not stay
+      // on the collecting spinner forever — the report is filable
+      // without config.
+      await vi.advanceTimersByTimeAsync(30_000);
       expect((el as any)._configYaml).toBe("");
-      expect((el as any)._configError).toBe("transport");
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("ignores a stale config read from a previous open", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    await settle(() => reads.length > 0);
+    const stale = reads[0]!;
+    el.open("other.yaml", "Other", CRASH_LINES);
+    stale.resolve("esphome:\n  name: smallgarage");
+    await flushMicrotasks(10);
+    await el.updateComplete;
+    // Still collecting: the stale read must not flip this session ready.
+    expect((el as any)._configYaml).toBeNull();
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

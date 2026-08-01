@@ -28,15 +28,16 @@ import {
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
-  distillValidatedConfig,
   issuePlatform,
   platformFromIntegrations,
   scrapeCrashData,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { maskSensitiveYaml } from "../util/yaml-sensitive-redact.js";
 import { crashReportDialogStyles } from "./crash-report-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -54,13 +55,15 @@ registerMdiIcons({
 const TITLE_ERROR_ID = "crash-title-error";
 const DESCRIBE_ERROR_ID = "crash-description-error";
 
-// The backend caps `esphome config` at 60s; the margin covers WS latency.
-const VALIDATE_TIMEOUT_MS = 90_000;
+// The report is filable without config, so a dead link must not pin the
+// dialog on the collecting spinner (the recovery read parks on
+// ``api.ready`` while the socket is down).
+const CONFIG_READ_TIMEOUT_MS = 30_000;
 
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
- * logs dialog, capture the sanitized config via `devices/validate`,
- * then open a fully pre-filled esphome/esphome issue. The URL prefill
+ * logs dialog, read the device's YAML and mask its credentials, then
+ * open a fully pre-filled esphome/esphome issue. The URL prefill
  * is the sole delivery channel (it survives GitHub's form rehydration;
  * manual pasting does not); truncated content stays available via the
  * downloadable report.
@@ -95,17 +98,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _scrape: CrashScrape = scrapeCrashData([]);
 
-  // null = validate still in flight (collecting phase); "" = config
-  // unavailable (validation failed or empty); else the sanitized YAML.
+  // null = config read still in flight (collecting phase); "" = config
+  // unavailable (read failed); else the masked editor YAML.
   @state()
   private _configYaml: string | null = null;
-
-  // Why the config is unavailable, so a transport failure reads
-  // differently from a genuinely invalid config. "" once config is
-  // present; "invalid" when validation rejected; "transport" when the
-  // stream errored or stalled (a connection issue, not the user's YAML).
-  @state()
-  private _configError: "" | "invalid" | "transport" = "";
 
   // The user's own "what was the device doing" context; required before
   // the report can be sent — a crash report without it isn't actionable.
@@ -141,13 +137,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // The rendered report backing the delivered-state re-copy / download.
   private _reportText = "";
   private _issueUrl = "";
-  // Bumped per open(); a validate stream from a previous open must not
+  // Bumped per open(); a config read from a previous open must not
   // populate this session's config.
   private _session = 0;
-  private _validateStreamId = "";
-  // Handle for the validate-stall timeout, cleared alongside the stream so
-  // a dialog closed/reopened mid-validate doesn't leave the timer to fire.
-  private _validateTimer = 0;
 
   static styles = [espHomeStyles, modalDialogStyles, crashReportDialogStyles];
 
@@ -158,12 +150,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
     lines: string[],
     staleBuild = false
   ): void {
-    this._stopValidateStream();
     this._configuration = configuration;
     this._name = name;
     this._session += 1;
     this._configYaml = null;
-    this._configError = "";
     this._delivered = false;
     this._userDescription = "";
     this._reportText = "";
@@ -176,55 +166,24 @@ export class ESPHomeCrashReportDialog extends LitElement {
     );
     this._titleSuggested = this._userTitle !== "";
     this._dialog.open = true;
-    this._captureConfig(this._session);
+    void this._captureConfig(this._session);
   }
 
-  private _captureConfig(session: number): void {
-    const collected: string[] = [];
-    const finish = (yaml: string, error: "" | "invalid" | "transport") => {
-      // Guard the session first: a stale stream's result must not clear the
-      // timer a newer open() already armed for the current session.
-      if (session !== this._session) return;
-      clearTimeout(this._validateTimer);
-      this._validateTimer = 0;
-      this._validateStreamId = "";
-      if (this._dialog.open) {
-        this._configYaml = yaml;
-        this._configError = error;
-      }
-    };
-    // A stalled stream must not stick the spinner forever; a stall is a
-    // transport issue, not the user's config.
-    this._validateTimer = window.setTimeout(() => {
-      if (session !== this._session) return;
-      this._stopValidateStream();
-      finish("", "transport");
-    }, VALIDATE_TIMEOUT_MS);
-    this._validateStreamId = this._api.validate(this._configuration, {
-      onOutput: (line) => collected.push(line),
-      onResult: (result) =>
-        result.success
-          ? finish(distillValidatedConfig(collected), "")
-          : finish("", "invalid"),
-      onError: (err) => {
-        // A WS/transport failure, distinct from an invalid config; log it
-        // and surface a "capture failed" note rather than "invalid".
-        console.warn("Config validation stream failed", err);
-        finish("", "transport");
-      },
-    });
-  }
-
-  // Kill an in-flight validate so an abandoned session doesn't leave the
-  // backend's esphome config subprocess running to completion.
-  private _stopValidateStream(): void {
-    clearTimeout(this._validateTimer);
-    this._validateTimer = 0;
-    if (!this._validateStreamId) return;
-    void this._api
-      .stopStream(this._validateStreamId)
-      .catch((err) => console.warn("Failed to stop the validate stream", err));
-    this._validateStreamId = "";
+  private async _captureConfig(session: number): Promise<void> {
+    const abandoned = () => session !== this._session || !this._dialog.open;
+    try {
+      const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
+        abandoned,
+        attempts: 4,
+        deadlineMs: CONFIG_READ_TIMEOUT_MS,
+      });
+      if (yaml === null) return;
+      this._configYaml = maskSensitiveYaml(yaml);
+    } catch (err) {
+      console.warn("Reading the config failed", err);
+      if (abandoned()) return;
+      this._configYaml = "";
+    }
   }
 
   private _buildReport(): CrashReport {
@@ -452,11 +411,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
         ${this._renderSummaryRow(
           this._localize(
-            this._configError === "transport"
+            configFailed
               ? "crash_report.config_capture_failed"
-              : configFailed
-                ? "crash_report.config_unavailable"
-                : "crash_report.includes_config"
+              : "crash_report.includes_config"
           ),
           configFailed
         )}
@@ -486,7 +443,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._stopValidateStream();
   };
 
   protected render() {

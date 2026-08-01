@@ -23,6 +23,28 @@ wifi:
     expect(findSensitiveValueRanges(yaml)).toEqual([]);
   });
 
+  it("masks eap key material, inline and block scalar", () => {
+    const yaml = [
+      "wifi:",
+      "  eap:",
+      "    username: alice",
+      "    key: inlinekey",
+      "    certificate: certbody",
+    ].join("\n");
+    expect(valuesAt(yaml, findSensitiveValueRanges(yaml))).toEqual(["inlinekey"]);
+
+    const block = "wifi:\n  eap:\n    key: |\n      pemline";
+    expect(valuesAt(block, findSensitiveValueRanges(block))).toEqual(["pemline"]);
+  });
+
+  it("case-folds keys for the allowlist and parent scoping", () => {
+    const yaml = "api:\n  Encryption:\n    Key: c2VjcmV0\nwifi:\n  Password: hunter2";
+    expect(valuesAt(yaml, findSensitiveValueRanges(yaml))).toEqual([
+      "c2VjcmV0",
+      "hunter2",
+    ]);
+  });
+
   it("masks plain `password:` values regardless of parent", () => {
     const yaml = `api:
   password: hunter2

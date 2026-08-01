@@ -108,17 +108,10 @@ export const CRASH_BLOCK_REPEATED_ADDRESS = [
   "Rebooting...",
 ];
 
-// A `devices/validate` stream (esphome config output): CLI log records
-// interleaved with the sanitized YAML, and the YAML it distills to.
-export const VALIDATE_OUTPUT = [
-  "\\033[32mINFO ESPHome 2026.6.4\\033[0m",
-  "\\033[32mINFO Reading configuration smallgarage.yaml...\\033[0m",
-  "esphome:",
-  "  name: smallgarage",
-  "wifi:",
-  "  password: <removed>",
-  "\\033[32mINFO Configuration is valid!\\033[0m",
-];
+// A device's editor YAML with an inline credential, and the same YAML
+// after `maskSensitiveYaml`.
+export const RAW_CONFIG_YAML =
+  "esphome:\n  name: smallgarage\nwifi:\n  ssid: mynetwork\n  password: hunter2";
 
-export const VALIDATED_CONFIG_YAML =
-  "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>";
+export const MASKED_CONFIG_YAML =
+  "esphome:\n  name: smallgarage\nwifi:\n  ssid: mynetwork\n  password: •";

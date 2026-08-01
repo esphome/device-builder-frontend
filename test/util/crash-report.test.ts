@@ -3,13 +3,12 @@ import {
   CRASH_BLOCK,
   CRASH_BLOCK_NOISE_ONLY,
   CRASH_BLOCK_STACK_SCAN,
-  VALIDATED_CONFIG_YAML,
+  MASKED_CONFIG_YAML,
 } from "../_crash-lines.js";
 import {
   buildFullReport,
   buildIssueUrl,
   type CrashReport,
-  distillValidatedConfig,
   inferComponentName,
   issuePlatform,
   platformFromIntegrations,
@@ -49,7 +48,7 @@ const META = {
 const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   scrape: scrapeCrashData(BUFFER),
   meta: META,
-  configYaml: VALIDATED_CONFIG_YAML,
+  configYaml: MASKED_CONFIG_YAML,
   userDescription: "Pressed the crash button in Home Assistant",
   userTitle: "",
   ...overrides,
@@ -145,20 +144,6 @@ describe("scrapeCrashData", () => {
   });
 });
 
-describe("distillValidatedConfig", () => {
-  it("keeps the YAML and drops CLI log records, timestamped or not", () => {
-    expect(
-      distillValidatedConfig([
-        "\\033[32mINFO ESPHome 2026.6.4\\033[0m",
-        "12:34:56 INFO Reading configuration...",
-        "esphome:",
-        "  name: smallgarage",
-        "\\033[32mINFO Configuration is valid!\\033[0m",
-      ])
-    ).toBe("esphome:\n  name: smallgarage");
-  });
-});
-
 describe("issuePlatform / inferComponentName", () => {
   it("maps target platforms onto the form's dropdown values", () => {
     expect(issuePlatform("ESP32S3")).toBe("ESP32");
@@ -222,13 +207,13 @@ describe("buildFullReport", () => {
       "## Crash log",
       "## Warnings and errors",
       "## Config dump",
-      "## Configuration (secrets redacted)",
+      "## Configuration (known credentials masked)",
       "## Environment",
     ].map((heading) => text.indexOf(heading));
     expect(order.every((index) => index !== -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(text).toContain("Pressed the crash button in Home Assistant");
-    expect(text).toContain("password: <removed>");
+    expect(text).toContain("password: •");
   });
 
   it("heads the download with the user's title, falling back to the device", () => {
@@ -247,7 +232,7 @@ describe("buildFullReport", () => {
 
   it("notes an unavailable config instead of a yaml section", () => {
     const text = buildFullReport(report({ configYaml: "" }));
-    expect(text).toContain("could not be validated");
+    expect(text).toContain("could not be read");
     expect(text).not.toContain("```yaml");
   });
 
@@ -284,8 +269,8 @@ describe("buildIssueUrl", () => {
     expect(p.get("problem")).toContain("Decoded backtrace:");
     expect(p.get("problem")).toContain("0x400d9150: esphome::Application::setup()");
     expect(p.get("logs")).toContain("Backtrace: 0x400d9150");
-    // The whole sanitized config lands in the form's config field.
-    expect(p.get("config")).toBe(VALIDATED_CONFIG_YAML);
+    // The whole masked config lands in the form's config field.
+    expect(p.get("config")).toBe(MASKED_CONFIG_YAML);
   });
 
   it("reads the reason from the dump, not the log lines kept ahead of it", () => {

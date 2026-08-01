@@ -35,6 +35,10 @@ export interface FindSensitiveValueRangesOptions {
    *  for `secrets.yaml`, where the entire file is by definition a
    *  list of credentials and the per-key allowlist doesn't apply. */
   maskAllValues?: boolean;
+  /** Keys the caller additionally treats as sensitive (may overlap the
+   *  built-in allowlists), so wider heuristics (`*_password` suffixes)
+   *  get the scanner's parent-scope and block-scalar handling. */
+  sensitiveKeyPredicate?: (key: string) => boolean;
 }
 
 // Keys whose values are always credentials regardless of where they
@@ -59,10 +63,16 @@ export const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
 // specific parent. `key:` is too generic to mask everywhere —
 // `remote_receiver` and `remote_transmitter` use `key:` for
 // non-sensitive button codes — so we restrict it to the parent blocks
-// ESPHome uses for crypto material.
-const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
-  encryption: new Set(["key"]),
-};
+// ESPHome uses for crypto material. A Map, not a plain object, so an
+// arbitrary user key like `constructor:` can't resolve a prototype
+// member.
+const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
+  ["encryption", new Set(["key"])],
+  // WPA2-Enterprise `key` is the client private key (often a whole PEM
+  // block scalar). Its sibling certificates are public material and stay
+  // visible in UI surfaces; the crash report masks them separately.
+  ["eap", new Set(["key"])],
+]);
 
 // Plain-scalar key matcher. Permits hyphens and dots inside the
 // key so user-defined secret names like `wifi-password:` or
@@ -75,8 +85,14 @@ const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
 // `secrets.yaml` that we accept the limitation.
 const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 // Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
-// optional explicit indentation digit, optional trailing comment.
-const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+// optional explicit indentation digit, optional trailing comment. Exported
+// so the text masker preserves headers whose bodies this scanner masks.
+export const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+
+// A `!secret` tag value — carries only the indirection name. Word-bounded
+// so a literal merely starting with "!secret" doesn't pass. Exported so
+// the text masker preserves exactly the values this scanner skips.
+export const SECRET_TAG_VALUE = /^!secret\b/;
 
 /** Find the closing quote of a YAML scalar starting at `quoteStart`,
  *  honouring the (limited) escapes both quote styles allow:
@@ -136,7 +152,7 @@ export function findSensitiveValueRanges(
   yaml: string | LineSource,
   options: FindSensitiveValueRangesOptions = {}
 ): SensitiveValueRange[] {
-  const { maskAllValues = false } = options;
+  const { maskAllValues = false, sensitiveKeyPredicate } = options;
   const ranges: SensitiveValueRange[] = [];
   let lines: string[];
   if (isLineSource(yaml)) {
@@ -170,6 +186,10 @@ export function findSensitiveValueRanges(
     const key = m[3];
     const sep = m[4];
     const rest = m[5];
+    // Sensitivity checks and ancestor tracking case-fold the key: the
+    // input may be YAML esphome would reject, and a mis-capitalized
+    // `Encryption:` must still scope the `key:` under it.
+    const keyFolded = key.toLowerCase();
 
     // For ancestor tracking, treat `- key:` items as living one level
     // deeper than their leading whitespace — this lets `encryption:`
@@ -185,15 +205,16 @@ export function findSensitiveValueRanges(
     if (maskAllValues) {
       sensitive = true;
     } else {
-      sensitive = ALWAYS_SENSITIVE_KEYS.has(key);
+      sensitive = ALWAYS_SENSITIVE_KEYS.has(keyFolded);
       if (!sensitive && stack.length > 0) {
         const parent = stack[stack.length - 1].key;
-        const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
-        if (allowed && allowed.has(key)) sensitive = true;
+        const allowed = PARENT_SCOPED_SENSITIVE_KEYS.get(parent);
+        if (allowed && allowed.has(keyFolded)) sensitive = true;
       }
+      if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);
     }
 
-    stack.push({ indent, key });
+    stack.push({ indent, key: keyFolded });
 
     if (!sensitive) {
       i++;
@@ -212,7 +233,7 @@ export function findSensitiveValueRanges(
     // `!secret <name>` carries only the indirection name, not the
     // credential itself. Leave it as-is so the user can still see
     // which secret is being referenced.
-    if (/^!secret\b/.test(trimmedRest)) {
+    if (SECRET_TAG_VALUE.test(trimmedRest)) {
       i++;
       continue;
     }
