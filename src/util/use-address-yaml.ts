@@ -102,13 +102,23 @@ export function removeUseAddress(yaml: string): string | null {
   return updateSectionInYaml(yaml, section, values);
 }
 
+/** Loose IPv6 shape: one optional `::` run; without it, exactly 8 hextets. */
+function isIpv6Shape(value: string): boolean {
+  if (value.includes(":::") || value.split("::").length > 2) return false;
+  // A bare leading/trailing colon is only valid as part of `::`.
+  if (value.startsWith(":") && !value.startsWith("::")) return false;
+  if (value.endsWith(":") && !value.endsWith("::")) return false;
+  if (!IPV6_RE.test(value)) return false;
+  return value.includes("::") || value.split(":").length === 8;
+}
+
 /** True for a bare IPv4/IPv6 literal (not a hostname). */
 export function isIpLiteral(value: string): boolean {
   if (/^[\d.]+$/.test(value)) {
     const v4 = IPV4_RE.exec(value);
     return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
   }
-  return value.includes(":") && IPV6_RE.test(value);
+  return value.includes(":") && isIpv6Shape(value);
 }
 
 /** Accept an IPv4/IPv6 literal or an RFC-1123 hostname.
@@ -127,14 +137,9 @@ export function isValidUseAddress(value: string): boolean {
     return isIpLiteral(value);
   }
   if (value.includes(":")) {
-    // At most one `::` run; `:::` and `1::2::3` are never valid.
-    if (value.includes(":::") || value.split("::").length > 2) return false;
-    // A bare leading/trailing colon is only valid as part of `::`.
-    if (value.startsWith(":") && !value.startsWith("::")) return false;
-    if (value.endsWith(":") && !value.endsWith("::")) return false;
     // Loopback/unspecified in any compression (0:0:0:0:0:0:0:1, ::0:1).
     if (/^[0:]+1?$/.test(value)) return false;
-    return IPV6_RE.test(value);
+    return isIpv6Shape(value);
   }
   return HOSTNAME_RE.test(value);
 }
