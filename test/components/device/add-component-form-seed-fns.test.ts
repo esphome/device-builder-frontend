@@ -602,12 +602,14 @@ describe("buildInitialValues", () => {
     expect(values.name).toBe("A02YYUW Waterproof Ultrasonic Sensor");
   });
 
-  it("does not seed a name for an undotted component with a name entry", () => {
-    // Undotted name-carriers (esphome, esp32_ble, sprinkler, ...) use the
-    // key for something other than an entity name.
-    const values = seedWith(
-      nameSeedComponent({ id: "sprinkler", name: "Sprinkler Controller" })
-    );
+  it("seeds a name for an undotted component whose name is a label", () => {
+    const values = seedWith(nameSeedComponent({ id: "ble_client", name: "BLE Client" }));
+    expect(values.name).toBe("BLE Client");
+  });
+
+  it("does not seed a name the firmware derives elsewhere", () => {
+    // esp32_ble's name is the advertised BLE name, defaulted from the node.
+    const values = seedWith(nameSeedComponent({ id: "esp32_ble", name: "ESP32 BLE" }));
     expect(values.name).toBeUndefined();
   });
 
