@@ -15,11 +15,11 @@ import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-wal
 import { renderMdnsExpiry } from "../../../src/components/dashboard/device-drawer-render.js";
 import type { MdnsExpiryPhase } from "../../../src/util/mdns-expiry.js";
 
-const COUNTDOWN: MdnsExpiryPhase = { kind: "countdown", remaining: 4321 };
+const COUNTDOWN: MdnsExpiryPhase = { kind: "countdown", remaining: 4321, ttl: 4500 };
 
 describe("renderMdnsExpiry", () => {
   it("renders a details fold-down for a countdown phase", () => {
-    const result = renderMdnsExpiry(COUNTDOWN, 4500, identityLocalize, "en");
+    const result = renderMdnsExpiry(COUNTDOWN, identityLocalize, "en");
     expect(isTemplateResult(result)).toBe(true);
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
@@ -33,19 +33,14 @@ describe("renderMdnsExpiry", () => {
       { kind: "fresh" },
     ];
     for (const phase of phases) {
-      expect(renderMdnsExpiry(phase, 4500, identityLocalize, "en")).toBe(nothing);
+      expect(renderMdnsExpiry(phase, identityLocalize, "en")).toBe(nothing);
     }
-  });
-
-  it("renders nothing when the lifetime is null (no PTR cached)", () => {
-    expect(renderMdnsExpiry(COUNTDOWN, null, identityLocalize, "en")).toBe(nothing);
   });
 
   it("says 'expires soon' instead of a stuck 0s at the eviction edge", () => {
     const keys: string[] = [];
     renderMdnsExpiry(
-      { kind: "soon" },
-      4500,
+      { kind: "soon", ttl: 4500 },
       (key) => {
         keys.push(key);
         return key;
@@ -60,7 +55,6 @@ describe("renderMdnsExpiry", () => {
     const keys: string[] = [];
     renderMdnsExpiry(
       COUNTDOWN,
-      4500,
       (key) => {
         keys.push(key);
         return key;
@@ -74,8 +68,7 @@ describe("renderMdnsExpiry", () => {
   it("passes the countdown to the summary and the lifetime to the explainer", () => {
     const calls: Array<[string, Record<string, unknown> | undefined]> = [];
     renderMdnsExpiry(
-      { kind: "countdown", remaining: 3600 + 14 * 60 },
-      4500,
+      { kind: "countdown", remaining: 3600 + 14 * 60, ttl: 4500 },
       (key, args) => {
         calls.push([key, args]);
         return key;

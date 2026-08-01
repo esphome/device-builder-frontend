@@ -108,22 +108,19 @@ export function renderMdnsTxtRecords(
  * that record to expire rather than actively re-querying every
  * device, which would load them.
  *
- * Same ``<details>`` chevron idiom as ``renderMdnsTxtRecords``.
- * *lifetimeSeconds* is the device's own announced record lifetime,
- * named in the explainer so it states the real duration rather than
- * a generic figure. Every gate lives in ``mdnsExpiryPhase``; this
- * renders ``nothing`` for any phase but ``soon`` / ``countdown``, and
- * when the lifetime is ``null`` (no PTR record cached), so the row
- * collapses to zero markup.
+ * Same ``<details>`` chevron idiom as ``renderMdnsTxtRecords``. The
+ * phase's ``ttl`` is the device's own announced record lifetime, named
+ * in the explainer so it states the real duration rather than a
+ * generic figure. Every gate lives in ``mdnsExpiryPhase``; this
+ * renders ``nothing`` for any phase but ``soon`` / ``countdown``, so
+ * the row collapses to zero markup.
  */
 export function renderMdnsExpiry(
   phase: MdnsExpiryPhase,
-  lifetimeSeconds: number | null,
   localize: LocalizeFunc,
   language: string | undefined
 ) {
   if (phase.kind !== "soon" && phase.kind !== "countdown") return nothing;
-  if (lifetimeSeconds === null) return nothing;
   const summary =
     phase.kind === "soon"
       ? localize("dashboard.drawer_mdns_expires_soon")
@@ -135,7 +132,7 @@ export function renderMdnsExpiry(
       <summary>${summary}</summary>
       <div class="mdns-expiry-body">
         ${localize("dashboard.drawer_mdns_expires_explainer", {
-          lifetime: formatCountdown(lifetimeSeconds, language),
+          lifetime: formatCountdown(phase.ttl, language),
         })}
       </div>
     </details>

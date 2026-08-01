@@ -6,6 +6,7 @@ describe("mdnsExpiryPhase", () => {
     expect(mdnsExpiryPhase(300, 4500, false, "mdns")).toEqual({
       kind: "countdown",
       remaining: 4200,
+      ttl: 4500,
     });
   });
 
@@ -20,7 +21,13 @@ describe("mdnsExpiryPhase", () => {
   });
 
   it("says soon for an already-elapsed record", () => {
-    expect(mdnsExpiryPhase(4500, 4500, false, "mdns")).toEqual({ kind: "soon" });
-    expect(mdnsExpiryPhase(5000, 4500, false, "mdns")).toEqual({ kind: "soon" });
+    expect(mdnsExpiryPhase(4500, 4500, false, "mdns")).toEqual({
+      kind: "soon",
+      ttl: 4500,
+    });
+    expect(mdnsExpiryPhase(5000, 4500, false, "mdns")).toEqual({
+      kind: "soon",
+      ttl: 4500,
+    });
   });
 });

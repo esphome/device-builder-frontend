@@ -3,11 +3,11 @@
  *
  * ``renderMdnsExpiry`` / ``formatCountdown`` are unit-tested with
  * pre-computed values; this pins the glue in ``renderReachabilitySection``
- * that a real bug would hide in: the ``lifetime - age`` subtraction, the
- * ``mdns_ptr_ttl_seconds === null`` gate, and the render-site gate that
- * only shows the countdown when mDNS is the active source. Asserted via a
- * capturing localize so the countdown / lifetime args are observable
- * without walking the template.
+ * that a real bug would hide in: the section's inputs reaching
+ * ``mdnsExpiryPhase`` (which owns every gate — TTL, active source,
+ * offline, quiet threshold) and the phase reaching the render. Asserted
+ * via a capturing localize so the countdown / lifetime args are
+ * observable without walking the template.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeviceState } from "../../../src/api/types/devices.js";

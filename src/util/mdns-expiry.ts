@@ -19,8 +19,8 @@ export type MdnsExpiryPhase =
   | { kind: "inactive-source" }
   | { kind: "no-ttl" }
   | { kind: "fresh" }
-  | { kind: "soon" }
-  | { kind: "countdown"; remaining: number };
+  | { kind: "soon"; ttl: number }
+  | { kind: "countdown"; remaining: number; ttl: number };
 
 /**
  * Classify the countdown decision. Only ``soon`` and ``countdown``
@@ -43,5 +43,7 @@ export function mdnsExpiryPhase(
   const remaining = Math.max(0, ptrTtlSeconds - ageSeconds);
   // Below 1s the countdown would read "0s", but the record isn't gone
   // yet — zeroconf evicts on a periodic (~10s) sweep.
-  return remaining < 1 ? { kind: "soon" } : { kind: "countdown", remaining };
+  return remaining < 1
+    ? { kind: "soon", ttl: ptrTtlSeconds }
+    : { kind: "countdown", remaining, ttl: ptrTtlSeconds };
 }

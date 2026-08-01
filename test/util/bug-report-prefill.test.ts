@@ -199,6 +199,11 @@ describe("buildDeviceIssueUrl", () => {
       runtime_state: { ...DEVICE.runtime_state, ip_addresses: [] },
     } as unknown as ConfiguredDevice;
     expect(deviceFacts(unrecognised, "status", CTX)).toContain("IP: x");
+    const ported = {
+      ...DEVICE,
+      runtime_state: { ...DEVICE.runtime_state, ip_addresses: ["192.168.1.5:6053"] },
+    } as unknown as ConfiguredDevice;
+    expect(deviceFacts(ported, "status", CTX)).toContain("IP: x");
     const addressless = {
       ...DEVICE,
       ip: "",

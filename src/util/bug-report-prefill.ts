@@ -125,12 +125,18 @@ const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 // Blunt each address for the public issue: enough prefix to tell LAN
 // from Docker-bridge from link-local, never the full host address.
-// Fails closed — anything not a recognised IP literal masks entirely.
+// Fails closed — anything not a recognised IP literal masks entirely,
+// including dotted colon shapes (a ported IPv4, a mapped IPv6) whose
+// leading group would carry a full address.
 const maskIp = (address: string): string => {
-  if (address.includes(":")) return `${address.split(":")[0]}::x`;
-  if (!IPV4_LITERAL.test(address)) return "x";
-  const [a, b] = address.split(".");
-  return `${a}.${b}.x.x`;
+  if (IPV4_LITERAL.test(address)) {
+    const [a, b] = address.split(".");
+    return `${a}.${b}.x.x`;
+  }
+  if (address.includes(":") && !address.includes(".")) {
+    return `${address.split(":")[0]}::x`;
+  }
+  return "x";
 };
 
 const ipLine = (device: ConfiguredDevice): string => {

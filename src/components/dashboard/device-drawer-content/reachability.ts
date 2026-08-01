@@ -26,7 +26,6 @@ interface ReachabilityRowSpec {
   age: number | null;
   rttMs?: number | null;
   ttlPhase?: MdnsExpiryPhase;
-  ttlLifetime?: number | null;
   txtRecords?: Record<string, string> | null;
 }
 
@@ -45,11 +44,12 @@ export function renderReachabilitySection(
   // re-anchors in lockstep with "last seen" (both move off mdnsAge)
   // rather than the PTR's remaining TTL, which the browser refreshes
   // erratically and would drift against the actively-probed A record.
-  // Held back until the device has been quiet a while (see the
-  // threshold) so a healthy device shows no shrinking timer, and never
-  // shown once the device is OFFLINE — by then it has already expired,
-  // and the reachability snapshot can be stale (no push fires on the
-  // mDNS Removed that took it offline), so trust the live device state.
+  // Held back until the device has been quiet a while (the quiet
+  // threshold lives in mdnsExpiryPhase, which owns every gate) so a
+  // healthy device shows no shrinking timer, and never shown once the
+  // device is OFFLINE — by then it has already expired, and the
+  // reachability snapshot can be stale (no push fires on the mDNS
+  // Removed that took it offline), so trust the live device state.
   const mdnsAge = ageOf(r.mdns_last_seen_seconds_ago, anchor, now);
   const deviceOffline = host.device?.runtime_state.state === DeviceState.OFFLINE;
   const rows: ReachabilityRowSpec[] = [
@@ -64,7 +64,6 @@ export function renderReachabilitySection(
         deviceOffline,
         r.active_source
       ),
-      ttlLifetime: r.mdns_ptr_ttl_seconds,
       txtRecords: r.mdns_txt_records ?? null,
     },
     {
@@ -142,7 +141,7 @@ function renderReachabilityRow(
         </div>
         ${
           row.source === "mdns" && row.ttlPhase
-            ? renderMdnsExpiry(row.ttlPhase, row.ttlLifetime ?? null, localize, lang)
+            ? renderMdnsExpiry(row.ttlPhase, localize, lang)
             : nothing
         }
         ${renderMdnsTxtRecords(row.txtRecords, localize)}
