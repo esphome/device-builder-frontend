@@ -8,10 +8,10 @@ import {
   MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
 import {
-  fitConfig,
   fitLines,
   formEncodedLength,
   MAX_ISSUE_URL_LENGTH,
+  setFittedConfigParam,
   TRIM_MARKER,
 } from "./crash-report-budget.js";
 import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
@@ -32,7 +32,8 @@ const CONTEXT_LINES_BEFORE = 25;
 // list always rides in the downloadable report.
 const MAX_PROBLEM_FRAMES = 40;
 
-const ISSUE_URL_BASE =
+/** esphome/esphome's bug form; shared with the feedback dialog's picker. */
+export const ESPHOME_BUG_FORM_URL =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
 // ` (inlined by) ...` continuation lines follow a decoded frame.
@@ -245,6 +246,16 @@ export function platformFromIntegrations(integrations: string[]): string {
   return PLATFORM_INTEGRATIONS.find((platform) => integrations.includes(platform)) ?? "";
 }
 
+/** A device's raw platform: its own field, else the integration list. */
+export function devicePlatform(device: {
+  target_platform?: string;
+  loaded_integrations?: string[];
+}): string {
+  return (
+    device.target_platform || platformFromIntegrations(device.loaded_integrations ?? [])
+  );
+}
+
 /** Component owning the top decoded frame, for the form's component field. */
 export function inferComponentName(decodedFrames: string[]): string {
   for (const frame of decodedFrames) {
@@ -359,7 +370,7 @@ export interface IssueUrl {
  */
 export function buildIssueUrl(report: CrashReport): IssueUrl {
   const { scrape, meta } = report;
-  const url = new URL(ISSUE_URL_BASE);
+  const url = new URL(ESPHOME_BUG_FORM_URL);
   const params = url.searchParams;
   params.set("title", buildIssueTitle(report));
   // Only `input` / `textarea` form fields accept a URL prefill; GitHub
@@ -423,20 +434,9 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
 
   // The masked YAML takes whatever budget the logs left, truncated
   // (with a marker) when it can't fit whole — the full YAML is always in
-  // the downloadable report. Credentials are already masked. Set an empty
-  // `config` param first so the `&config=` key overhead is counted in the
-  // measured budget, keeping the final URL reliably under the cap.
+  // the downloadable report. Credentials are already masked.
   const configYaml = report.configYaml.trimEnd();
-  if (configYaml) {
-    params.set("config", "");
-    const fitted = fitConfig(configYaml, MAX_ISSUE_URL_LENGTH - url.toString().length);
-    if (fitted.text) {
-      params.set("config", fitted.text);
-    } else {
-      params.delete("config");
-    }
-    if (fitted.truncated) missing = true;
-  }
+  if (configYaml && setFittedConfigParam(url, configYaml)) missing = true;
 
   // Pack the supplementary sections into `additional`, whole sections at
   // a time, so the common case needs no manual paste. Only sections that

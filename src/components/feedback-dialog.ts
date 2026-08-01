@@ -26,9 +26,14 @@ import {
   versionContext,
 } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
+import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { fitConfig, MAX_ISSUE_URL_LENGTH } from "../util/crash-report-budget.js";
-import { issuePlatform, platformFromIntegrations } from "../util/crash-report.js";
+import { setFittedConfigParam } from "../util/crash-report-budget.js";
+import {
+  devicePlatform,
+  ESPHOME_BUG_FORM_URL,
+  issuePlatform,
+} from "../util/crash-report.js";
 import { matchesDeviceName } from "../util/device-search.js";
 import { deviceSortKey, sortDevices } from "../util/device-sort.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
@@ -78,7 +83,7 @@ const DEVICE_TARGETS: Record<
     factsParam: "extra",
   },
   esphome: {
-    href: "https://github.com/esphome/esphome/issues/new?template=bug_report.yml",
+    href: ESPHOME_BUG_FORM_URL,
     factsParam: "additional",
   },
 };
@@ -96,24 +101,23 @@ interface FeedbackLinkBase {
   descKey?: string;
 }
 
-// Opens a URL. "versionSource" prefills the destination form's "version" field
-// from the matching context: "dashboard" is our server version, "esphome" is
-// the installed core version.
+// Opens a URL. "versionSource: dashboard" prefills the destination form's
+// "version" field with our server version. (The ESPHome core version flows
+// through the device picker's own URL builder, not here.)
 interface ExternalLink extends FeedbackLinkBase {
   href: string;
-  versionSource?: "dashboard" | "esphome";
+  versionSource?: "dashboard";
   drillTo?: never;
+  deviceTarget?: never;
 }
 
-// Navigates to a second in-dialog screen instead of opening a link; rendered as
-// a button with a chevron rather than an anchor. `deviceTarget` marks the
-// two bug rows that drill into the device picker.
-interface DrillLink extends FeedbackLinkBase {
-  drillTo: DrillScreen | "device";
-  deviceTarget?: DeviceTarget;
-  href?: never;
-  versionSource?: never;
-}
+// Navigates to a second in-dialog screen instead of opening a link; rendered
+// as a button with a chevron rather than an anchor. The device screen must
+// know which bug path it prefills for, so its rows carry a target.
+type DrillLink = FeedbackLinkBase & { href?: never; versionSource?: never } & (
+    | { drillTo: DrillScreen; deviceTarget?: never }
+    | { drillTo: "device"; deviceTarget: DeviceTarget }
+  );
 
 // Discriminated union so a link is always exactly one of the two shapes; a row
 // can never omit both href and drillTo and silently render an empty anchor.
@@ -272,6 +276,10 @@ export class ESPHomeFeedbackDialog extends LitElement {
   // session must not open a form for this one.
   private _captureSession = 0;
 
+  // Sorted copy of the fleet, recomputed only when the devices array is
+  // replaced, so filter keystrokes and device events pay no re-sort.
+  private _sortedDevices: ConfiguredDevice[] = [];
+
   // Base URL for a device-target form with the version param set.
   private _deviceTargetUrl(target: DeviceTarget, device?: ConfiguredDevice): URL {
     const url = new URL(DEVICE_TARGETS[target].href);
@@ -299,9 +307,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
   // The facts the form's dropdowns can't carry (GitHub only prefills
   // input/textarea fields), rendered as a bullet list.
   private _deviceFacts(device: ConfiguredDevice): string {
-    const platform = issuePlatform(
-      device.target_platform || platformFromIntegrations(device.loaded_integrations ?? [])
-    );
+    const platform = issuePlatform(devicePlatform(device));
     const installation = detectInstallation(this._api, this._isHaAddon);
     return [
       `Device: ${deviceSortKey(device)} (${device.configuration})`,
@@ -322,28 +328,27 @@ export class ESPHomeFeedbackDialog extends LitElement {
   private async _pickDevice(device: ConfiguredDevice): Promise<void> {
     if (this._capturing) return;
     const session = ++this._captureSession;
-    const target = this._deviceTarget;
     this._capturing = device.configuration;
     const masked = await captureMaskedConfig(
       this._api,
       device.configuration,
       () => session !== this._captureSession || !this._dialog.open
     );
+    // The session guard also covers _deviceTarget: every path that
+    // changes it bumps the session.
     if (session !== this._captureSession) return;
     this._capturing = "";
     if (masked === null) return;
-    const url = this._deviceTargetUrl(target, device);
-    url.searchParams.set(DEVICE_TARGETS[target].factsParam, this._deviceFacts(device));
+    const url = this._deviceTargetUrl(this._deviceTarget, device);
+    url.searchParams.set(
+      DEVICE_TARGETS[this._deviceTarget].factsParam,
+      this._deviceFacts(device)
+    );
     if (masked === "") {
       // The form still opens with the facts; the config just isn't in it.
       notifyError(this._localize("feedback.device_capture_failed"));
     } else {
-      // Set an empty param first so the `&config=` key overhead counts
-      // against the measured budget.
-      url.searchParams.set("config", "");
-      const fitted = fitConfig(masked, MAX_ISSUE_URL_LENGTH - url.toString().length);
-      if (fitted.text) url.searchParams.set("config", fitted.text);
-      else url.searchParams.delete("config");
+      setFittedConfigParam(url, masked);
     }
     this._openPrefilled(url);
   }
@@ -356,12 +361,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
     if (!link.href) {
       return "";
     }
-    const version =
-      link.versionSource === "esphome"
-        ? this._esphomeVersion
-        : link.versionSource === "dashboard"
-          ? this._serverVersion
-          : "";
+    const version = link.versionSource === "dashboard" ? this._serverVersion : "";
     if (!version) {
       return link.href;
     }
@@ -374,6 +374,8 @@ export class ESPHomeFeedbackDialog extends LitElement {
     espHomeStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
+    // Project-wide native-input look for the device filter.
+    inputStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -516,17 +518,11 @@ export class ESPHomeFeedbackDialog extends LitElement {
         font-weight: var(--wa-font-weight-bold);
       }
 
+      /* Look comes from the shared inputStyles; only layout here. */
       .device-filter {
         width: 100%;
         box-sizing: border-box;
         margin: 0 0 var(--wa-space-s);
-        padding: var(--wa-space-xs) var(--wa-space-s);
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: transparent;
-        color: var(--wa-color-text-normal);
-        font-size: var(--wa-font-size-s);
-        font-family: inherit;
       }
 
       button.link:disabled {
@@ -556,10 +552,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._screen = "main";
-    this._deviceFilter = "";
-    this._capturing = "";
-    this._captureSession += 1;
+    this._goTo("main");
   };
 
   private _goTo(screen: Screen): void {
@@ -570,13 +563,17 @@ export class ESPHomeFeedbackDialog extends LitElement {
   }
 
   private _drill(link: DrillLink): void {
-    if (link.deviceTarget) this._deviceTarget = link.deviceTarget;
+    if (link.drillTo === "device") this._deviceTarget = link.deviceTarget;
     this._goTo(link.drillTo);
   }
 
   // The device screen sits under the bug screen, so Back unwinds one level.
   private _goBack(): void {
     this._goTo(this._screen === "device" ? "bug" : "main");
+  }
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("_devices")) this._sortedDevices = sortDevices(this._devices);
   }
 
   // A screen swap removes the control that had focus (the drill row, or the back
@@ -651,7 +648,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
         @after-hide=${this._onAfterHide}
       >
         ${
-          drill || isDevice
+          this._screen !== "main"
             ? html`<button
                 slot="header-prefix"
                 class="back-button"
@@ -684,7 +681,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   private _renderDeviceScreen() {
     const filter = this._deviceFilter.trim().toLowerCase();
-    const devices = sortDevices(this._devices).filter(
+    const devices = this._sortedDevices.filter(
       (device) => !filter || matchesDeviceName(device, filter)
     );
     return html`

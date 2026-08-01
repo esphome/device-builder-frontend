@@ -21,7 +21,7 @@ import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
 
 interface HrefLink {
   href?: string;
-  versionSource?: "dashboard" | "esphome";
+  versionSource?: "dashboard";
 }
 
 function dialog(serverVersion = "", esphomeVersion = "") {
@@ -42,17 +42,6 @@ describe("feedback-dialog version prefill", () => {
       })
     ).toBe(
       "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml&version=2026.6.0b1"
-    );
-  });
-
-  it("appends the installed core version for the ESPHome link", () => {
-    expect(
-      dialog("2026.6.0b1", "2026.6.0")._hrefFor({
-        href: "https://github.com/esphome/esphome/issues/new?template=bug_report.yml",
-        versionSource: "esphome",
-      })
-    ).toBe(
-      "https://github.com/esphome/esphome/issues/new?template=bug_report.yml&version=2026.6.0"
     );
   });
 
