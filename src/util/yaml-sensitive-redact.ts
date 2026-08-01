@@ -34,6 +34,10 @@ const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
 // Where an inline comment starts within a value.
 const TRAILING_COMMENT = /\s#/;
 
+// A `!secret` tag value; word-bounded so a literal that merely starts
+// with "!secret" isn't mistaken for a reference and preserved.
+const SECRET_TAG_VALUE = /^!secret\b/;
+
 /**
  * True when *key* names a credential whose value must not leave
  * the app in clear text. Combines two sources:
@@ -79,7 +83,7 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   // Indirections aren't credentials — ``!secret <name>`` and
   // ``${some_substitution}`` only carry the *name* of the
   // value, not the value itself. Don't mask them.
-  if (value.startsWith("!secret") || value.startsWith("${")) {
+  if (SECRET_TAG_VALUE.test(value) || value.startsWith("${")) {
     return maskTrailingComment(prefix, key, value, placeholder) ?? line;
   }
   // A block-scalar header carries no credential of its own; rewriting it
@@ -130,7 +134,12 @@ export function maskSensitiveLines(
 ): string[] {
   if (lines.length === 0) return [];
   const out = lines.slice();
-  const ranges = findSensitiveValueRanges(out.join("\n"));
+  // The predicate hands the scanner this module's wider key heuristic, so
+  // heuristic-named keys get its parent-scope and block-scalar handling
+  // (a bare `wifi_password: |` body would otherwise stay clear text).
+  const ranges = findSensitiveValueRanges(out.join("\n"), {
+    sensitiveKeyPredicate: isSensitiveKey,
+  });
   const scannerMaskedLines = new Set<number>();
   for (const range of ranges) {
     const idx = range.line - 1;

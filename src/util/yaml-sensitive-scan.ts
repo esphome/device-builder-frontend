@@ -35,6 +35,10 @@ export interface FindSensitiveValueRangesOptions {
    *  for `secrets.yaml`, where the entire file is by definition a
    *  list of credentials and the per-key allowlist doesn't apply. */
   maskAllValues?: boolean;
+  /** Extra keys to treat as sensitive beyond the built-in allowlists,
+   *  so callers with wider heuristics (`*_password` suffixes) get the
+   *  scanner's parent-scope and block-scalar handling for them. */
+  sensitiveKeyPredicate?: (key: string) => boolean;
 }
 
 // Keys whose values are always credentials regardless of where they
@@ -137,7 +141,7 @@ export function findSensitiveValueRanges(
   yaml: string | LineSource,
   options: FindSensitiveValueRangesOptions = {}
 ): SensitiveValueRange[] {
-  const { maskAllValues = false } = options;
+  const { maskAllValues = false, sensitiveKeyPredicate } = options;
   const ranges: SensitiveValueRange[] = [];
   let lines: string[];
   if (isLineSource(yaml)) {
@@ -192,6 +196,7 @@ export function findSensitiveValueRanges(
         const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
         if (allowed && allowed.has(key)) sensitive = true;
       }
+      if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);
     }
 
     stack.push({ indent, key });

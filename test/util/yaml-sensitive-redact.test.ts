@@ -78,6 +78,19 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: | # •");
   });
 
+  it("masks block-scalar bodies under heuristic-named keys", () => {
+    const yaml = "substitutions:\n  wifi_password: |\n    hunter2\nsensor:";
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  wifi_password: |");
+    expect(masked).toContain("sensor:");
+  });
+
+  it("masks a literal that merely starts with !secret", () => {
+    const masked = maskSensitiveYaml("wifi:\n  password: !secretsauce123");
+    expect(masked).not.toContain("secretsauce123");
+  });
+
   it("masks commented-out block-scalar credential bodies", () => {
     const yaml = [
       "wifi:",
