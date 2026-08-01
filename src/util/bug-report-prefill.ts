@@ -15,27 +15,51 @@ import { formatCountdown } from "./relative-time.js";
 /** The bug paths that carry a device config. */
 export type DeviceTarget = "builder" | "esphome" | "status";
 
+interface DeviceTargetSpec {
+  href: string;
+  factsParam: "additional" | "extra" | "observed";
+  /** `version` param source: the device's compiled version falling back
+   *  to the installed core, or the dashboard's own version. */
+  version: "dashboard" | "device";
+  /** Include the installed ESPHome version in the facts (the esphome
+   *  form already carries it in its `version` param). */
+  esphomeVersionFact: boolean;
+  /** Include the reachability facts and the `mdns-expiry` answer. */
+  reachability: boolean;
+  /** Required fields the skip row fills with the template's sentence. */
+  skipSentinels: readonly string[];
+}
+
 // Field ids come from each repo's issue templates: esphome/esphome's
 // bug form has `config` + `additional`; the builder bug form has
 // `config` + `extra` (config added in esphome/device-builder#2482); the
 // device-status form has `config` + `observed` + `mdns-expiry`
 // (esphome/device-builder#2487). GitHub silently drops unknown params,
 // so these must track the templates.
-const DEVICE_TARGETS: Record<
-  DeviceTarget,
-  { href: string; factsParam: "additional" | "extra" | "observed" }
-> = {
+const DEVICE_TARGETS: Record<DeviceTarget, DeviceTargetSpec> = {
   builder: {
     href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
     factsParam: "extra",
+    version: "dashboard",
+    esphomeVersionFact: true,
+    reachability: false,
+    skipSentinels: ["config"],
   },
   esphome: {
     href: ESPHOME_BUG_FORM_URL,
     factsParam: "additional",
+    version: "device",
+    esphomeVersionFact: false,
+    reachability: false,
+    skipSentinels: [],
   },
   status: {
     href: "https://github.com/esphome/device-builder/issues/new?template=device_status.yml",
     factsParam: "observed",
+    version: "dashboard",
+    esphomeVersionFact: true,
+    reachability: true,
+    skipSentinels: ["config", "mdns-expiry"],
   },
 };
 
@@ -66,7 +90,7 @@ export function buildDeviceIssueUrl(
     DEVICE_TARGETS[target].factsParam,
     deviceFacts(device, target, ctx, reachability)
   );
-  if (target === "status") {
+  if (DEVICE_TARGETS[target].reachability) {
     // Set before the config fit so it counts against the URL budget.
     url.searchParams.set("mdns-expiry", mdnsExpirySummary(reachability ?? null, device));
   }
@@ -74,12 +98,13 @@ export function buildDeviceIssueUrl(
   return { url, truncated };
 }
 
-/** Today's URL for the no-specific-device row; the builder and status
- *  paths fill their required fields with the template's own sentence. */
+/** Today's URL for the no-specific-device row; each target's required
+ *  fields fill with the template's own sentence. */
 export function skipDeviceUrl(target: DeviceTarget, ctx: PrefillContext): URL {
   const url = deviceTargetUrl(target, ctx);
-  if (target !== "esphome") url.searchParams.set("config", NOT_DEVICE_SPECIFIC);
-  if (target === "status") url.searchParams.set("mdns-expiry", NOT_DEVICE_SPECIFIC);
+  for (const param of DEVICE_TARGETS[target].skipSentinels) {
+    url.searchParams.set(param, NOT_DEVICE_SPECIFIC);
+  }
   return url;
 }
 
@@ -97,6 +122,7 @@ export function deviceFacts(
    *  transition. */
   reachability?: ReachabilityStateEvent | null
 ): string {
+  const spec = DEVICE_TARGETS[target];
   const platform = issuePlatform(devicePlatform(device));
   return [
     `Device: ${deviceSortKey(device)} (${device.configuration})`,
@@ -104,9 +130,9 @@ export function deviceFacts(
     platform && `Platform: ${platform}`,
     device.runtime_state.deployed_version &&
       `ESPHome running: ${device.runtime_state.deployed_version}`,
-    target !== "esphome" && ctx.esphomeVersion && `ESPHome: ${ctx.esphomeVersion}`,
+    spec.esphomeVersionFact && ctx.esphomeVersion && `ESPHome: ${ctx.esphomeVersion}`,
     ctx.installation && `Installation: ${ctx.installation}`,
-    ...(target === "status"
+    ...(spec.reachability
       ? [
           `State: ${device.runtime_state.state}`,
           `Reachability source: ${
@@ -179,17 +205,17 @@ function mdnsExpirySummary(
   }
 }
 
-// Base form URL for *target* with the version param set: the builder
-// and status forms take the dashboard version, esphome's the device's
-// compiled version falling back to the installed core version.
+// Base form URL for *target* with the version param set from the
+// table's declared source.
 function deviceTargetUrl(
   target: DeviceTarget,
   ctx: PrefillContext,
   device?: ConfiguredDevice
 ): URL {
-  const url = new URL(DEVICE_TARGETS[target].href);
+  const spec = DEVICE_TARGETS[target];
+  const url = new URL(spec.href);
   const version =
-    target === "esphome"
+    spec.version === "device"
       ? device?.current_version || ctx.esphomeVersion
       : ctx.serverVersion;
   if (version) url.searchParams.set("version", version);
