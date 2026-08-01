@@ -218,6 +218,10 @@ export const deviceCardStyles = [
       cursor: pointer;
     }
 
+    .device-status.clickable {
+      cursor: pointer;
+    }
+
     .device-status.busy wa-spinner {
       font-size: 12px;
       --indicator-color: var(--esphome-primary);

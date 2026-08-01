@@ -1,0 +1,85 @@
+/** Pins the use_address splice: block pick, rewrite, and input validation. */
+import { describe, expect, it } from "vitest";
+
+import {
+  applyUseAddress,
+  findNetworkSection,
+  isValidUseAddress,
+} from "../../src/util/use-address-yaml.js";
+
+const WIFI_YAML = `esphome:
+  name: kitchen
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password # keep
+
+api:
+`;
+
+describe("findNetworkSection", () => {
+  it("picks the network block present in the raw text", () => {
+    expect(findNetworkSection(WIFI_YAML)).toBe("wifi");
+    expect(findNetworkSection("ethernet:\n  type: LAN8720\n")).toBe("ethernet");
+    expect(findNetworkSection("openthread:\n")).toBe("openthread");
+    expect(
+      findNetworkSection("esphome:\n  name: kit\npackages:\n  base: !include x\n")
+    ).toBeNull();
+  });
+});
+
+describe("applyUseAddress", () => {
+  it("adds use_address while keeping secrets and comments byte-for-byte", () => {
+    const updated = applyUseAddress(WIFI_YAML, "10.0.0.42")!;
+    expect(updated).toContain("  use_address: 10.0.0.42");
+    expect(updated).toContain("  ssid: !secret wifi_ssid");
+    expect(updated).toContain("  password: !secret wifi_password # keep");
+    expect(updated).toContain("api:");
+  });
+
+  it("replaces an existing use_address", () => {
+    const yaml = "wifi:\n  ssid: net\n  use_address: 10.0.0.1\n";
+    const updated = applyUseAddress(yaml, "10.0.0.9")!;
+    expect(updated).toContain("use_address: 10.0.0.9");
+    expect(updated).not.toContain("10.0.0.1");
+  });
+
+  it("targets an ethernet block when there is no wifi", () => {
+    const updated = applyUseAddress("ethernet:\n  type: LAN8720\n", "10.0.0.9")!;
+    expect(updated).toContain("  type: LAN8720");
+    expect(updated).toContain("  use_address: 10.0.0.9");
+  });
+
+  it("returns null when the network block lives in a package", () => {
+    expect(
+      applyUseAddress("packages:\n  base: !include common.yaml\n", "1.2.3.4")
+    ).toBeNull();
+  });
+});
+
+describe("isValidUseAddress", () => {
+  it.each([
+    "10.0.0.42",
+    "192.168.001.1",
+    "fe80::1",
+    "2001:db8::42",
+    "device.local",
+    "host.example.com",
+    "kitchen",
+  ])("accepts %s", (value) => {
+    expect(isValidUseAddress(value)).toBe(true);
+  });
+
+  it.each([
+    "",
+    " ",
+    "10.0.0.299",
+    "not valid",
+    "bad_host",
+    "a..b",
+    "-lead.example",
+    "http://x",
+  ])("rejects %s", (value) => {
+    expect(isValidUseAddress(value)).toBe(false);
+  });
+});

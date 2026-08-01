@@ -115,15 +115,45 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
+  // Non-online badges open the troubleshooting dialog. Passive while
+  // selecting — in select mode the whole card is one toggle target.
+  const openTroubleshoot = (e: Event) => {
+    e.stopPropagation();
+    fireEvent(card, "open-troubleshoot", {
+      name: card.name,
+      configuration: card.configuration,
+    });
+  };
+  const troubleshootKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openTroubleshoot(e);
+    }
+  };
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
     const label = card._localize("dashboard.status_untracked");
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
+    if (card.selectMode) {
+      return html`<div
+          id="status-untracked"
+          class="device-status ${DeviceState.UNKNOWN}"
+          role="img"
+          tabindex="0"
+          aria-label="${label}. ${tooltip}"
+        >
+          <wa-icon library="mdi" name="help-network-outline"></wa-icon>
+          ${label}
+        </div>
+        <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
+    }
     return html`<div
         id="status-untracked"
-        class="device-status ${DeviceState.UNKNOWN}"
-        role="img"
+        class="device-status ${DeviceState.UNKNOWN} clickable"
+        role="button"
         tabindex="0"
         aria-label="${label}. ${tooltip}"
+        @click=${openTroubleshoot}
+        @keydown=${troubleshootKeydown}
       >
         <wa-icon library="mdi" name="help-network-outline"></wa-icon>
         ${label}
@@ -139,14 +169,30 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       : card.state === DeviceState.OFFLINE
         ? "network-off-outline"
         : "help-network-outline";
+  const stateLabel =
+    card.state === DeviceState.ONLINE
+      ? card._localize("dashboard.online")
+      : card.state === DeviceState.OFFLINE
+        ? card._localize("dashboard.offline")
+        : card._localize("dashboard.unknown");
+  if (card.state !== DeviceState.ONLINE && !card.selectMode) {
+    const tooltip = card._localize("troubleshoot.open_tooltip");
+    return html`<div
+        id="status-badge"
+        class="device-status ${card.state} clickable"
+        role="button"
+        tabindex="0"
+        aria-label="${stateLabel}. ${tooltip}"
+        @click=${openTroubleshoot}
+        @keydown=${troubleshootKeydown}
+      >
+        <wa-icon library="mdi" name=${stateIcon}></wa-icon>
+        ${stateLabel}
+      </div>
+      <wa-tooltip for="status-badge">${tooltip}</wa-tooltip>`;
+  }
   return html`<div class="device-status ${card.state}">
     <wa-icon library="mdi" name=${stateIcon}></wa-icon>
-    ${
-      card.state === DeviceState.ONLINE
-        ? card._localize("dashboard.online")
-        : card.state === DeviceState.OFFLINE
-          ? card._localize("dashboard.offline")
-          : card._localize("dashboard.unknown")
-    }
+    ${stateLabel}
   </div>`;
 }

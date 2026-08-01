@@ -85,6 +85,7 @@ import type {
   SerialPort,
   UserPreferences,
 } from "./types/system.js";
+import type { DeviceTroubleshootResult } from "./types/troubleshoot.js";
 
 interface AuthLoginResult {
   token: string;
@@ -859,6 +860,13 @@ export class ESPHomeAPI {
         });
       },
     };
+  }
+
+  /** On-demand connectivity probe backing the offline troubleshooting dialog. */
+  async troubleshootDevice(configuration: string): Promise<DeviceTroubleshootResult> {
+    return this.sendCommand<DeviceTroubleshootResult>("devices/troubleshoot", {
+      configuration,
+    });
   }
 
   // ─── Device Commands ──────────────────────────────────────

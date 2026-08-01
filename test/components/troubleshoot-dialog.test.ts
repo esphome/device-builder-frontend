@@ -1,0 +1,177 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins the troubleshoot dialog: auto-check on open, Check again,
+ * section rendering off the decision tree, the use_address save flow
+ * with its snippet fallback, and subscription teardown on close.
+ */
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+
+import { baseDialogSettled, flush, mount } from "../_dom.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
+import type { DeviceTroubleshootResult } from "../../src/api/types/troubleshoot.js";
+import { ESPHomeTroubleshootDialog } from "../../src/components/troubleshoot-dialog.js";
+
+const RESULT: DeviceTroubleshootResult = {
+  configuration: "kitchen.yaml",
+  address: "kitchen.local",
+  icmp_available: true,
+  zeroconf_running: true,
+  dns_resolved: false,
+  dns_addresses: [],
+  dns_had_cached_failure: true,
+  mdns_addresses: [],
+  mdns_has_cached_trace: false,
+  mdns_has_live_anchor_ptr: false,
+  ping_attempted: true,
+  ping_target: "10.0.0.42",
+  ping_rtt_ms: null,
+};
+
+const WIFI_YAML = "wifi:\n  ssid: net\n";
+
+interface ApiStub {
+  troubleshootDevice: ReturnType<typeof vi.fn>;
+  subscribeDeviceReachability: ReturnType<typeof vi.fn>;
+  getConfig: ReturnType<typeof vi.fn>;
+  updateConfig: ReturnType<typeof vi.fn>;
+  serverInfo: { in_docker: boolean } | null;
+}
+
+function makeApi(overrides: Partial<ApiStub> = {}): {
+  api: ApiStub;
+  unsubscribe: ReturnType<typeof vi.fn>;
+} {
+  const unsubscribe = vi.fn();
+  const api: ApiStub = {
+    troubleshootDevice: vi.fn().mockResolvedValue(RESULT),
+    subscribeDeviceReachability: vi.fn().mockResolvedValue({ unsubscribe }),
+    getConfig: vi.fn().mockResolvedValue(WIFI_YAML),
+    updateConfig: vi.fn().mockResolvedValue(undefined),
+    serverInfo: { in_docker: false },
+    ...overrides,
+  };
+  return { api, unsubscribe };
+}
+
+async function openDialog(
+  overrides: Partial<ApiStub> = {},
+  device = makeConfiguredDevice({ ip: "10.0.0.42" })
+) {
+  const { api, unsubscribe } = makeApi(overrides);
+  const el = new ESPHomeTroubleshootDialog();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (el as any)._api = api;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (el as any)._devices = [device];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (el as any)._localize = (key: string) => key;
+  await mount(el);
+  el.open({ name: device.name, configuration: device.configuration });
+  await baseDialogSettled(el);
+  await flush();
+  await el.updateComplete;
+  return { el, api, unsubscribe };
+}
+
+describe("troubleshoot-dialog", () => {
+  it("auto-runs the probe on open and renders the results", async () => {
+    const { el, api } = await openDialog();
+    expect(api.troubleshootDevice).toHaveBeenCalledWith("kitchen.yaml");
+    const text = el.shadowRoot!.textContent!;
+    expect(text).toContain("troubleshoot.result_dns_fail");
+    expect(text).toContain("troubleshoot.result_mdns_silent");
+    expect(text).toContain("troubleshoot.result_ping_fail");
+  });
+
+  it("re-runs the probe from Check again", async () => {
+    const { el, api } = await openDialog();
+    const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>("button")];
+    buttons.find((b) => b.textContent!.includes("troubleshoot.check_again"))!.click();
+    await flush();
+    expect(api.troubleshootDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders sections from the decision tree, ending in use_address", async () => {
+    const { el } = await openDialog();
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).toContain("dns_fail");
+    expect(ids).toContain("dynamic_ip");
+    expect(ids[ids.length - 1]).toBe("use_address");
+  });
+
+  it("shows only the untracked explainer for a mac-suffix config", async () => {
+    const { el } = await openDialog(
+      {},
+      makeConfiguredDevice({ name_add_mac_suffix: true })
+    );
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).toEqual(["untracked"]);
+    expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
+  });
+
+  it("saves a valid use_address through the YAML splice", async () => {
+    const { el, api } = await openDialog();
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "10.0.0.99";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(api.getConfig).toHaveBeenCalledWith("kitchen.yaml");
+    const written = api.updateConfig.mock.calls[0][1] as string;
+    expect(written).toContain("use_address: 10.0.0.99");
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_saved");
+  });
+
+  it("rejects an invalid address without touching the config", async () => {
+    const { el, api } = await openDialog();
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "not valid";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(api.getConfig).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_invalid");
+  });
+
+  it("falls back to a copyable snippet when the network block is packaged", async () => {
+    const { el } = await openDialog({
+      getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
+    });
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "10.0.0.99";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".snippet")!.textContent).toContain(
+      "use_address: 10.0.0.99"
+    );
+  });
+
+  it("unsubscribes the reachability stream on close", async () => {
+    const { el, api, unsubscribe } = await openDialog();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledWith(
+      "kitchen",
+      expect.any(Function)
+    );
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("after-hide")
+    );
+    await el.updateComplete;
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+});

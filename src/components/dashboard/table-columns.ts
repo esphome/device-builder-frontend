@@ -129,11 +129,19 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         }
         const state = info.getValue() as DeviceState;
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
-          return html`<span class="cell-status"
-            ><span
-              class="status-dot untracked"
-              title=${localize("dashboard.status_untracked_tooltip")}
-            ></span
+          return html`<span
+            class="cell-status"
+            role="button"
+            tabindex="0"
+            title=${localize("dashboard.status_untracked_tooltip")}
+            @click=${(e: Event) => dispatchRowEvent(e, "open-troubleshoot", row._device)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                dispatchRowEvent(e, "open-troubleshoot", row._device);
+              }
+            }}
+            ><span class="status-dot untracked"></span
           ></span>`;
         }
         const dotClass =
@@ -148,8 +156,25 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : state === DeviceState.OFFLINE
               ? localize("dashboard.table_status_offline")
               : localize("dashboard.table_status_unknown");
-        return html`<span class="cell-status"
-          ><span class="status-dot ${dotClass}" title="${title}"></span
+        if (state === DeviceState.ONLINE) {
+          return html`<span class="cell-status"
+            ><span class="status-dot ${dotClass}" title="${title}"></span
+          ></span>`;
+        }
+        // Non-online dots open the troubleshooting dialog.
+        return html`<span
+          class="cell-status"
+          role="button"
+          tabindex="0"
+          title="${title}. ${localize("troubleshoot.open_tooltip")}"
+          @click=${(e: Event) => dispatchRowEvent(e, "open-troubleshoot", row._device)}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              dispatchRowEvent(e, "open-troubleshoot", row._device);
+            }
+          }}
+          ><span class="status-dot ${dotClass}"></span
         ></span>`;
       },
       size: 80,
