@@ -46,8 +46,20 @@ describe("dashboard install hard block", () => {
     expect(openReselect).toHaveBeenCalledWith({
       configuration: "stale.yaml",
       yaml: "esp32:\n  variant: esp32s3\n",
+      onApplied: expect.any(Function),
     });
     expect(page._installMethodOpen).toBe(false);
+  });
+
+  it("resumes the blocked install once a pick is applied", async () => {
+    vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
+    const { page, openReselect } = makePage();
+    page._openInstallMethod(DEVICE);
+    await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(1));
+    expect(page._installMethodOpen).toBe(false);
+    const { onApplied } = openReselect.mock.calls[0][0] as { onApplied: () => void };
+    onApplied();
+    await vi.waitFor(() => expect(page._installMethodOpen).toBe(true));
   });
 
   it("blocks the direct update install the same way", async () => {

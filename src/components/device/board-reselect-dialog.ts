@@ -6,9 +6,8 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { applyBoardChange } from "../../util/board-change.js";
+import { applyBoardChange, matchCatalogBoard } from "../../util/board-change.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
-import { canonicalComponentKey } from "../../util/component-presence.js";
 import { debounce } from "../../util/debounce.js";
 import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
@@ -24,6 +23,8 @@ export interface BoardReselectOpenOptions {
   configuration: string;
   /** Saved YAML when the caller already holds it; fetched otherwise. */
   yaml?: string;
+  /** Runs after a pick is applied; carries the caller's pending action. */
+  onApplied?: () => void;
 }
 
 /**
@@ -62,6 +63,8 @@ export class ESPHomeBoardReselectDialog extends LitElement {
 
   private _configuration = "";
 
+  private _onApplied?: () => void;
+
   /** Variant of the paged listing; the search re-query needs it. */
   private _variant: string | null = null;
 
@@ -88,6 +91,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
         return false;
       }
       this._configuration = opts.configuration;
+      this._onApplied = opts.onApplied;
       this._description = this._localize("device.board_reselect_desc", { board: label });
       await this.updateComplete;
       this._dialog.open();
@@ -133,16 +137,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   /** Resolve candidates; true when any exist (state is then populated). */
   private async _loadCandidates(parsed: YamlPlatformBoard | null): Promise<boolean> {
     if (parsed?.board) {
-      const board = parsed.board.toLowerCase();
-      const { boards } = await this._api.getBoards({
-        query: parsed.board,
-        limit: 100,
-      });
-      const match = boards.find(
-        (b) =>
-          b.esphome.board.toLowerCase() === board &&
-          canonicalComponentKey(b.esphome.platform) === parsed.platform
-      );
+      const match = await matchCatalogBoard(this._api, parsed.board, parsed.platform);
       if (match) {
         // The compatible-boards command returns the complete same-target
         // set in one page — the query search alone would cap the list. An
@@ -217,6 +212,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
           composed: true,
         })
       );
+      this._onApplied?.();
     }
   };
 }

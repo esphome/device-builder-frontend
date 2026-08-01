@@ -280,6 +280,53 @@ describe("board-reselect-dialog", () => {
     });
   });
 
+  it("runs onApplied after a successful pick", async () => {
+    const api = {
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
+      updateDevice: vi.fn().mockResolvedValue({}),
+    };
+    const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
+    const onApplied = vi.fn();
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied,
+    });
+    inner().dispatchEvent(
+      new CustomEvent("select-board", {
+        detail: { boardId: "c3-curated" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await vi.waitFor(() => expect(onApplied).toHaveBeenCalledTimes(1));
+  });
+
+  it("skips onApplied when the pick fails to apply", async () => {
+    const api = {
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
+      updateDevice: vi.fn().mockRejectedValue(new Error("boom")),
+    };
+    const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
+    const onApplied = vi.fn();
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied,
+    });
+    inner().dispatchEvent(
+      new CustomEvent("select-board", {
+        detail: { boardId: "c3-curated" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onApplied).not.toHaveBeenCalled();
+  });
+
   it("toasts an error and emits nothing when the update fails", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),

@@ -999,17 +999,26 @@ export class ESPHomePageDashboard extends LitElement {
   };
 
   /** Hard block: force the board fix before a single-device install
-   *  opens. Re-attaching to a running job starts no install, so it
-   *  skips the guard's fetches; bulk update stays ungated (OTA only,
-   *  N pickers can't stack). A picker with nothing to offer falls
-   *  through — the chip check downstream stays the guard, and
-   *  blocking would strand the install with only a toast. */
+   *  opens; a pick resumes the pending install. Re-attaching to a
+   *  running job starts no install, so it skips the guard's fetches;
+   *  bulk update stays ungated (OTA only, N pickers can't stack). A
+   *  picker with nothing to offer falls through — the chip check
+   *  downstream stays the guard, and blocking would strand the
+   *  install with only a toast. */
   _guardBoardThen = async (
     device: ConfiguredDevice,
     proceed: () => void | Promise<void>
   ) => {
-    // Whole body guarded: the void call sites would otherwise turn any
-    // throw into a silent unhandled rejection.
+    // Each stage guarded: the void call sites (and the pick callback)
+    // would otherwise turn any throw into a silent unhandled rejection.
+    const start = async () => {
+      try {
+        await proceed();
+      } catch (err) {
+        console.error("Install entry failed:", err);
+        notifyError(this._localize("device.install_start_failed"));
+      }
+    };
     try {
       if (showJobProgress(this, device)) return;
       const yaml = await findBoardDisagreement(this._api, this._localize, device);
@@ -1018,15 +1027,17 @@ export class ESPHomePageDashboard extends LitElement {
         (await openBoardReselect(this._boardReselectDialog, {
           configuration: device.configuration,
           yaml,
+          onApplied: () => void start(),
         }))
       ) {
         return;
       }
-      await proceed();
     } catch (err) {
       console.error("Install entry failed:", err);
       notifyError(this._localize("device.install_start_failed"));
+      return;
     }
+    await start();
   };
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
     onInstallMethodSelect(this, e);

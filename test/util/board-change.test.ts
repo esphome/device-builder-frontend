@@ -20,6 +20,14 @@ const S3_BOARD = makeSlimBoard("generic-esp32s3", {
   board: "esp32-s3-devkitc-1",
   variant: "esp32s3",
 }) as BoardCatalogEntry;
+const C3_BOARD = makeSlimBoard("generic-esp32c3", {
+  board: "esp32-c3-devkitm-1",
+  variant: "esp32c3",
+}) as BoardCatalogEntry;
+const C3_SIBLING = makeSlimBoard("lolin-c3-mini", {
+  board: "lolin_c3_mini",
+  variant: "esp32c3",
+});
 
 const DEVICE = { configuration: "dev.yaml", board_id: "generic-esp32s3" };
 
@@ -56,6 +64,91 @@ describe("findBoardDisagreement", () => {
       getConfig: vi.fn().mockResolvedValue("esp32:\n  board: esp32-s3-devkitc-1\n"),
     } as unknown as ESPHomeAPI;
     expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBeNull();
+  });
+
+  it("flags a platform mismatch without a catalog lookup", async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
+    const api = {
+      getConfig: vi.fn().mockResolvedValue("esp8266:\n  board: esp01_1m\n"),
+      getBoards: vi.fn(),
+    } as unknown as ESPHomeAPI;
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(
+      "esp8266:\n  board: esp01_1m\n"
+    );
+    expect(api.getBoards).not.toHaveBeenCalled();
+  });
+
+  it("is null for an uncatalogued board string on the same chip", async () => {
+    // No pick could ever satisfy a string test here — a flag would
+    // re-open the picker on every install, permanently blocking it.
+    vi.mocked(fetchBoard).mockResolvedValue(C3_BOARD);
+    const api = {
+      getConfig: vi
+        .fn()
+        .mockResolvedValue("esp32:\n  board: vendor-c3\n  variant: esp32c3\n"),
+      getBoards: vi.fn().mockResolvedValue({ boards: [] }),
+    } as unknown as ESPHomeAPI;
+    expect(
+      await findBoardDisagreement(api, identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "generic-esp32c3",
+      })
+    ).toBeNull();
+  });
+
+  it("is null for an uncatalogued board string with no variant", async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(C3_BOARD);
+    const api = {
+      getConfig: vi.fn().mockResolvedValue("esp32:\n  board: vendor-mystery\n"),
+      getBoards: vi.fn().mockResolvedValue({ boards: [] }),
+    } as unknown as ESPHomeAPI;
+    expect(
+      await findBoardDisagreement(api, identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "generic-esp32c3",
+      })
+    ).toBeNull();
+  });
+
+  it("flags an uncatalogued board string beside a differing variant", async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
+    const api = {
+      getConfig: vi
+        .fn()
+        .mockResolvedValue("esp32:\n  board: vendor-c3\n  variant: esp32c3\n"),
+      getBoards: vi.fn().mockResolvedValue({ boards: [] }),
+    } as unknown as ESPHomeAPI;
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(
+      "esp32:\n  board: vendor-c3\n  variant: esp32c3\n"
+    );
+  });
+
+  it("is null when a resolved board string names the stored chip", async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(C3_BOARD);
+    const api = {
+      getConfig: vi.fn().mockResolvedValue("esp32:\n  board: lolin_c3_mini\n"),
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_SIBLING] }),
+    } as unknown as ESPHomeAPI;
+    expect(
+      await findBoardDisagreement(api, identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "generic-esp32c3",
+      })
+    ).toBeNull();
+  });
+
+  it("flags a resolved board string naming a different chip", async () => {
+    // The resolved string beats a stale explicit variant beside it.
+    vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
+    const api = {
+      getConfig: vi
+        .fn()
+        .mockResolvedValue("esp32:\n  board: lolin_c3_mini\n  variant: esp32s3\n"),
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_SIBLING] }),
+    } as unknown as ESPHomeAPI;
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(
+      "esp32:\n  board: lolin_c3_mini\n  variant: esp32s3\n"
+    );
   });
 
   it("fails open with a warning toast on a fetch failure", async () => {
