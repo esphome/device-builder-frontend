@@ -119,6 +119,12 @@ wifi:
     ).toEqual(["body-one", "no-space-body"]);
   });
 
+  it("normalizes trailing CRs so CRLF input cannot fail open", () => {
+    const yaml = "wifi:\r\n  password: hunter2\r\nsensor:";
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(ranges).toEqual([{ line: 2, valueFrom: 12, valueTo: 19 }]);
+  });
+
   it("masks plain `password:` values regardless of parent", () => {
     const yaml = `api:
   password: hunter2

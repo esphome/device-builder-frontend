@@ -58,14 +58,7 @@ export interface FindSensitiveValueRangesOptions {
 // appear in the document. These names are stable across the ESPHome
 // catalog (api/ota/mqtt/wifi/web_server/http_request all spell their
 // credential fields the same way).
-/**
- * Keys whose values are always credentials regardless of where
- * they appear in the document. Exported so single-line maskers
- * (``yaml-search-helpers.ts``) can share the same source of
- * truth — adding a key here lights it up in every consumer
- * automatically rather than drifting between copies.
- */
-export const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
+const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
   "password",
   "ap_password",
   "ota_password",
@@ -98,14 +91,12 @@ const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
 // `secrets.yaml` that we accept the limitation.
 const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 // Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
-// optional explicit indentation digit, optional trailing comment. Exported
-// so the text masker preserves headers whose bodies this scanner masks.
-export const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+// optional explicit indentation digit, optional trailing comment.
+const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
 
 // A `!secret` tag value — carries only the indirection name. Word-bounded
-// so a literal merely starting with "!secret" doesn't pass. Exported so
-// the text masker preserves exactly the values this scanner skips.
-export const SECRET_TAG_VALUE = /^!secret\b/;
+// so a literal merely starting with "!secret" doesn't pass.
+const SECRET_TAG_VALUE = /^!secret\b/;
 
 // A `${substitution}` reference value — the other indirection shape,
 // skipped only under `skipSubstitutionRefs`.
@@ -191,14 +182,20 @@ export function findSensitiveValueRanges(
     skipSubstitutionRefs = false,
   } = options;
   const ranges: SensitiveValueRange[] = [];
+  // Trailing CRs are stripped at materialization: a line keeping its CR
+  // matches no anchored regex here (JS `.` and `$` treat `\r` as a line
+  // terminator), so CRLF input would silently fail open. Emitted columns
+  // stay valid in the caller's CR-bearing original — the CR is line-final.
   let lines: string[];
   if (isLineSource(yaml)) {
     if (yaml.lines === 0) return ranges;
     lines = new Array<string>(yaml.lines);
-    for (let n = 1; n <= yaml.lines; n++) lines[n - 1] = yaml.line(n).text;
+    for (let n = 1; n <= yaml.lines; n++) {
+      lines[n - 1] = stripTrailingCr(yaml.line(n).text);
+    }
   } else {
     if (!yaml) return ranges;
-    lines = yaml.split("\n");
+    lines = yaml.split("\n").map(stripTrailingCr);
   }
 
   // Stack of (indent, key) entries representing the current ancestor
@@ -206,9 +203,25 @@ export function findSensitiveValueRanges(
   // indent >= N is no longer an ancestor and is popped.
   const stack: Array<{ indent: number; key: string }> = [];
 
-  // 0-indexed line cursor we advance manually so block-scalar bodies
-  // (whose content can contain `:` and would otherwise be misparsed
-  // as keys) are consumed by the block handler, not the outer loop.
+  // Trim trailing whitespace off [from, to) and push the range when
+  // anything remains.
+  const pushTrimmedRange = (lineIdx: number, from: number, to: number) => {
+    const line = lines[lineIdx];
+    while (to > from && WHITESPACE_CHAR.test(line[to - 1])) to--;
+    if (to > from) ranges.push({ line: lineIdx + 1, valueFrom: from, valueTo: to });
+  };
+
+  // Under `emitCommentSpans`, push the content span of the first comment
+  // at or after *from*.
+  const pushCommentSpan = (lineIdx: number, from: number) => {
+    if (!emitCommentSpans) return;
+    const line = lines[lineIdx];
+    const hashIdx = findCommentIdx(line, from);
+    if (hashIdx === -1) return;
+    const span = commentContentSpan(line, hashIdx);
+    if (span) ranges.push({ line: lineIdx + 1, valueFrom: span.from, valueTo: span.to });
+  };
+
   // Inline-value handling shared by the live and commented paths: emit
   // the value range (honouring the indirection skips) and, opted in,
   // the comment-content span. Returns "block" when the value is a
@@ -221,34 +234,23 @@ export function findSensitiveValueRanges(
     trimmedRest: string
   ): "block" | "done" => {
     const line = lines[lineIdx];
-    const pushCommentSpan = (from: number) => {
-      if (!emitCommentSpans) return;
-      const hashIdx = findCommentIdx(line, from);
-      if (hashIdx === -1) return;
-      const span = commentContentSpan(line, hashIdx);
-      if (span)
-        ranges.push({ line: lineIdx + 1, valueFrom: span.from, valueTo: span.to });
-    };
 
-    // Comment-only value: the credential can hide in the comment body.
-    if (trimmedRest === "" || trimmedRest.startsWith("#")) {
-      pushCommentSpan(valueStart);
-      return "done";
-    }
-    // Indirections carry only a name — skip the value, mask any comment.
+    // Value-less shapes share one action — mask only the comment, which
+    // can hide the credential: an empty or comment-only value, an
+    // indirection (it carries only a name), or a block-scalar header
+    // (its credential lives on the body lines).
+    const isBlock = BLOCK_SCALAR_HEADER.test(trimmedRest);
     if (
+      isBlock ||
+      trimmedRest === "" ||
+      trimmedRest.startsWith("#") ||
       SECRET_TAG_VALUE.test(trimmedRest) ||
       (skipSubstitutionRefs && SUBSTITUTION_REF.test(trimmedRest))
     ) {
-      pushCommentSpan(valueStart);
-      return "done";
-    }
-    if (BLOCK_SCALAR_HEADER.test(trimmedRest)) {
-      pushCommentSpan(valueStart);
-      return "block";
+      pushCommentSpan(lineIdx, valueStart);
+      return isBlock ? "block" : "done";
     }
 
-    let valueEnd = line.length;
     // For comment-stripping purposes, a `#` only starts a comment when
     // preceded by whitespace AND outside any quoted scalar. So we
     // skip past a leading quoted string before looking for the `#`.
@@ -261,14 +263,8 @@ export function findSensitiveValueRanges(
       else searchFrom = line.length; // unterminated — treat rest as value
     }
     const commentIdx = findCommentIdx(line, searchFrom);
-    if (commentIdx !== -1) valueEnd = commentIdx;
-    while (valueEnd > valueStart && WHITESPACE_CHAR.test(line[valueEnd - 1])) {
-      valueEnd--;
-    }
-    if (valueEnd > valueStart) {
-      ranges.push({ line: lineIdx + 1, valueFrom: valueStart, valueTo: valueEnd });
-    }
-    if (commentIdx !== -1) pushCommentSpan(commentIdx);
+    pushTrimmedRange(lineIdx, valueStart, commentIdx !== -1 ? commentIdx : line.length);
+    if (commentIdx !== -1) pushCommentSpan(lineIdx, commentIdx);
     return "done";
   };
 
@@ -311,18 +307,15 @@ export function findSensitiveValueRanges(
       }
       const contentColumn = cont.length - cm[2].length;
       if (contentColumn > cm[1].length && contentColumn <= headerColumn) break;
-      let valEnd = cont.length;
-      while (valEnd > contentColumn && WHITESPACE_CHAR.test(cont[valEnd - 1])) {
-        valEnd--;
-      }
-      if (valEnd > contentColumn) {
-        ranges.push({ line: next + 1, valueFrom: contentColumn, valueTo: valEnd });
-      }
+      pushTrimmedRange(next, contentColumn, cont.length);
       next++;
     }
     return next;
   };
 
+  // 0-indexed line cursor we advance manually so block-scalar bodies
+  // (whose content can contain `:` and would otherwise be misparsed
+  // as keys) are consumed by the block handler, not the outer loop.
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -395,7 +388,6 @@ export function findSensitiveValueRanges(
     // block at the next sibling key in the same item (which sits at
     // `leading + dash` columns) instead of greedily eating it as block
     // content.
-    const headerIndent = indent;
     let next = i + 1;
     while (next < lines.length) {
       const cont = lines[next];
@@ -410,18 +402,18 @@ export function findSensitiveValueRanges(
       // spaces-only count would end the block at a tab-led line and
       // leave the credential on it unmasked.
       const contIndent = (cont.match(LEADING_WHITESPACE)?.[1] ?? "").length;
-      if (contIndent <= headerIndent) break;
-      let valEnd = cont.length;
-      while (valEnd > contIndent && WHITESPACE_CHAR.test(cont[valEnd - 1])) valEnd--;
-      if (valEnd > contIndent) {
-        ranges.push({ line: next + 1, valueFrom: contIndent, valueTo: valEnd });
-      }
+      if (contIndent <= indent) break;
+      pushTrimmedRange(next, contIndent, cont.length);
       next++;
     }
     i = next;
   }
 
   return ranges;
+}
+
+function stripTrailingCr(text: string): string {
+  return text.endsWith("\r") ? text.slice(0, -1) : text;
 }
 
 // First `#` at or after *from* that begins a comment (whitespace-preceded).

@@ -75,22 +75,21 @@ export function maskSensitiveLines(
   sensitive: (key: string) => boolean = isSensitiveKey
 ): string[] {
   if (lines.length === 0) return [];
-  // CR-terminated lines match no anchored regex in the scanner and
-  // would fail open; mask the LF form and restore the CRs after.
-  const hadCr = lines.map((l) => l.endsWith("\r"));
-  const out = lines.map((l, i) => (hadCr[i] ? l.slice(0, -1) : l));
+  const out = lines.slice();
   const ranges = findSensitiveValueRanges(
     { lines: out.length, line: (n) => ({ text: out[n - 1] }) },
     { ...REDACT_SCAN_OPTIONS, sensitiveKeyPredicate: sensitive }
   );
   // Right-to-left so a line's earlier range offsets stay valid after a
-  // later range on the same line is replaced.
+  // later range on the same line is replaced. The scanner normalizes
+  // trailing CRs itself, and its columns are valid in the CR-bearing
+  // originals — the CR is line-final and past every range.
   for (let r = ranges.length - 1; r >= 0; r--) {
     const { line, valueFrom, valueTo } = ranges[r];
     const idx = line - 1;
     out[idx] = out[idx].slice(0, valueFrom) + placeholder + out[idx].slice(valueTo);
   }
-  return out.map((l, i) => (hadCr[i] ? `${l}\r` : l));
+  return out;
 }
 
 /** Whole-document masking for YAML leaving the app. */
