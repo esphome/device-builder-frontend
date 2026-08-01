@@ -20,6 +20,8 @@
  * working YAML which may be mid-edit and not parseable.
  */
 
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
+
 export interface SensitiveValueRange {
   /** 1-indexed line number (CodeMirror convention). */
   line: number;
@@ -204,7 +206,7 @@ export function findSensitiveValueRanges(
     }
   } else {
     if (!yaml) return ranges;
-    lines = yaml.split("\n").map(stripTrailingCr);
+    lines = splitYamlDocLines(yaml);
   }
 
   // Stack of (indent, key) entries representing the current ancestor

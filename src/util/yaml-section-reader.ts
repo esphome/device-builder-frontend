@@ -9,6 +9,7 @@
 
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { blockScalarValue } from "./yaml-block-scalar-value.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import {
   parseFlowList,
   parseScalar,
@@ -100,7 +101,7 @@ export function parseYamlSectionValues(
   sectionKey: string,
   fromLine?: number
 ): Record<string, unknown> {
-  return parseSectionCore(yaml.split("\n"), sectionKey, fromLine).values;
+  return parseSectionCore(splitYamlDocLines(yaml), sectionKey, fromLine).values;
 }
 
 /**

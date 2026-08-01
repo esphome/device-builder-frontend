@@ -13,6 +13,7 @@
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isIndexSegment } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import {
@@ -118,7 +119,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   if (_topLevelSectionsKey === yaml && _topLevelSectionsValue) {
     return _topLevelSectionsValue;
   }
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
 
   for (let i = 0; i < lines.length; i++) {
