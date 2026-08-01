@@ -193,6 +193,13 @@ describe("troubleshoot-dialog", () => {
     );
   });
 
+  it("drops the previous stream when reopened", async () => {
+    const { el, unsubscribe } = await openDialog();
+    el.open({ configuration: "kitchen.yaml" });
+    await el.updateComplete;
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
   it("unsubscribes the reachability stream on close", async () => {
     const { el, api, unsubscribe } = await openDialog();
     expect(api.subscribeDeviceReachability).toHaveBeenCalledWith(
