@@ -161,15 +161,25 @@ export function maskSensitiveLines(
     out[i] = maskSensitiveLine(line, placeholder);
     // A commented-out block scalar hides the credential on the following
     // comment lines, which carry no key for the per-line fallback; mask
-    // their bodies until the comment run ends or a commented key starts.
+    // the bodies indented past the header's content column, mirroring how
+    // the scanner terminates a real block scalar.
     if (!isCommentedSensitiveBlockHeader(line)) continue;
+    const headerColumn = commentContentColumn(line);
     for (let j = i + 1; j < out.length; j++) {
       const m = out[j].match(COMMENT_LINE);
-      if (!m || KEY_VALUE_LINE.test(out[j])) break;
-      if (m[2]) out[j] = `${m[1]} ${placeholder}`;
+      if (!m) break;
+      if (!m[2]) continue;
+      if (commentContentColumn(out[j]) <= headerColumn) break;
+      out[j] = `${m[1]} ${placeholder}`;
     }
   }
   return out;
+}
+
+// The column a comment line's content starts at; 0 for a non-comment.
+function commentContentColumn(line: string): number {
+  const m = line.match(COMMENT_LINE);
+  return m ? line.length - m[2].length : 0;
 }
 
 // A trailing comment beside a masked value can carry the credential

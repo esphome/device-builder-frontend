@@ -115,6 +115,22 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("sensor:");
   });
 
+  it("bounds commented block bodies by comment-content indent", () => {
+    const yaml = [
+      "wifi:",
+      "  # password: |",
+      "  #   user: bob",
+      "  #   hunter2",
+      "  # plain note after the block",
+      "sensor:",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("user: bob");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  # plain note after the block");
+    expect(masked).toContain("sensor:");
+  });
+
   it("masks a comment-only value on a credential key", () => {
     const masked = maskSensitiveYaml("wifi:\n  password: # hunter2");
     expect(masked).not.toContain("hunter2");
