@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { makeReachabilityEvent } from "../../_make-reachability-event.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../../src/api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../../../src/api/types/troubleshoot.js";
@@ -38,24 +39,7 @@ const DARK_PROBE: DeviceTroubleshootResult = {
   ping_rtt_ms: null,
 };
 
-function reachability(
-  overrides: Partial<ReachabilityStateEvent> = {}
-): ReachabilityStateEvent {
-  return {
-    device: "kitchen",
-    state: "offline",
-    active_source: "ping",
-    ip: "10.0.0.42",
-    mdns_last_seen_seconds_ago: null,
-    mdns_ttl_remaining_seconds: null,
-    mdns_ptr_ttl_seconds: null,
-    mdns_txt_records: null,
-    ping_last_seen_seconds_ago: 30,
-    mqtt_last_seen_seconds_ago: null,
-    ping_rtt_ms: null,
-    ...overrides,
-  } as ReachabilityStateEvent;
-}
+const reachability = makeReachabilityEvent;
 
 function drawerShowsMdnsRow(r: ReachabilityStateEvent): boolean {
   const keys: string[] = [];

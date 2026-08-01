@@ -8,6 +8,7 @@
  */
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
+import { BARE_MAPPING_KEY_RE } from "./yaml-section-lexer.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { appendSectionToYaml, updateSectionInYaml } from "./yaml-section-values.js";
 
@@ -18,107 +19,73 @@ export type NetworkSection = (typeof NETWORK_SECTIONS)[number];
 const HOSTNAME_RE =
   /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
-/** Bare block header (`wifi:`), optionally with a trailing comment. A
+export type ApplyUseAddressResult = { yaml: string } | { snippet: NetworkSection };
+
+/** First network block spliceable as a top-level mapping, or null. A
  *  header carrying an inline value (`wifi: !include net.yaml`) is not
- *  spliceable and must not match. */
-const BARE_HEADER_RES = NETWORK_SECTIONS.map(
-  // \r? because this scans the raw document; the splice machinery
-  // itself is CRLF-safe (#1602).
-  (section) =>
-    [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?\r?$`, "m")] as const
-);
-
-/** First network block spliceable as a top-level mapping, or null. */
+ *  spliceable. */
 export function findNetworkSection(yaml: string): NetworkSection | null {
-  for (const [section, re] of BARE_HEADER_RES) {
-    if (re.test(yaml)) return section;
-  }
-  return null;
-}
-
-/** Best-guess network key for the copyable snippet when nothing is
- *  spliceable: any mention in the raw text wins (an `!include` header
- *  still names the right block), then the compiled integrations, then
- *  wifi. */
-export function snippetNetworkSection(
-  yaml: string,
-  loadedIntegrations: string[]
-): NetworkSection {
-  const lines = splitYamlDocLines(yaml);
-  for (const section of NETWORK_SECTIONS) {
-    if (findSectionStart(lines, section) >= 0) return section;
-  }
-  for (const section of NETWORK_SECTIONS) {
-    if (loadedIntegrations.includes(section)) return section;
-  }
-  return "wifi";
+  return findSpliceableSection(splitYamlDocLines(yaml));
 }
 
 /**
  * Splice `use_address: value` into the local network block, or append a
  * new block that deep-merges with a `packages:`-supplied one.
 
- * Null only for a `wifi: !include`-style header: a second top-level
- * header beside it would be a duplicate key.
+ * A `wifi: !include`-style header yields `{snippet}` instead: a second
+ * top-level header beside it would be a duplicate key.
  */
 export function applyUseAddress(
   yaml: string,
   value: string,
   loadedIntegrations: string[]
-): string | null {
-  const section = findNetworkSection(yaml);
-  if (section !== null) {
-    const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
-    // Keep the parser's null prototype so a YAML key named __proto__
-    // stays inert data (see parseSectionCore).
-    const values: Record<string, unknown> = Object.assign(
-      Object.create(null),
-      parsed.values
-    );
-    values.use_address = value;
-    return updateSectionInYaml(yaml, section, values);
-  }
+): ApplyUseAddressResult {
   const lines = splitYamlDocLines(yaml);
+  const section = findSpliceableSection(lines);
+  if (section !== null) {
+    const values = cloneSectionValues(lines, section);
+    values.use_address = value;
+    return { yaml: updateSectionInYaml(yaml, section, values) };
+  }
   for (const candidate of NETWORK_SECTIONS) {
-    if (findSectionStart(lines, candidate) >= 0) return null;
+    if (findSectionStart(lines, candidate) >= 0) return { snippet: candidate };
   }
   const target =
     NETWORK_SECTIONS.find((candidate) => loadedIntegrations.includes(candidate)) ??
     "wifi";
-  return appendSectionToYaml(yaml, target, { use_address: value });
+  return { yaml: appendSectionToYaml(yaml, target, { use_address: value }) };
 }
 
-/** Read the network block's `use_address`; null when nothing is
- *  spliceable (packaged config), empty string when the key isn't set. */
-export function readUseAddress(yaml: string): string | null {
-  const section = findNetworkSection(yaml);
-  if (section === null) return null;
-  const value = parseSectionCore(splitYamlDocLines(yaml), section).values.use_address;
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
+/**
+ * One-parse read of the address form's prefill inputs.
 
-/** The wifi block's `manual_ip.static_ip`, or null. The firmware
- *  already knows its fixed IP; it is the best manual-address prefill. */
-export function readStaticIp(yaml: string): string | null {
+ * `useAddress` is null when nothing is spliceable (packaged config) and
+ * empty when the key isn't set; `staticIp` is wifi's
+ * `manual_ip.static_ip` — the firmware already knows its fixed IP, so
+ * it is the best manual-address prefill.
+ */
+export function readAddressPrefill(yaml: string): {
+  useAddress: string | null;
+  staticIp: string | null;
+} {
   const lines = splitYamlDocLines(yaml);
-  if (findSectionStart(lines, "wifi") < 0) return null;
-  const manual = parseSectionCore(lines, "wifi").values.manual_ip;
-  if (manual === null || typeof manual !== "object") return null;
-  const value = (manual as Record<string, unknown>).static_ip;
-  return typeof value === "string" && value.length > 0 ? value : null;
+  const section = findSpliceableSection(lines);
+  if (section === null) return { useAddress: null, staticIp: null };
+  const values = parseSectionCore(lines, section).values;
+  const raw = values.use_address;
+  const useAddress =
+    typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+  return { useAddress, staticIp: section === "wifi" ? staticIpOf(values) : null };
 }
 
 /** Remove `use_address` from the network block; null when nothing is
  *  spliceable, the unchanged YAML when the key isn't set. */
 export function removeUseAddress(yaml: string): string | null {
-  const section = findNetworkSection(yaml);
+  const lines = splitYamlDocLines(yaml);
+  const section = findSpliceableSection(lines);
   if (section === null) return null;
-  const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
-  if (!("use_address" in parsed.values)) return yaml;
-  const values: Record<string, unknown> = Object.assign(
-    Object.create(null),
-    parsed.values
-  );
+  const values = cloneSectionValues(lines, section);
+  if (!("use_address" in values)) return yaml;
   delete values.use_address;
   return updateSectionInYaml(yaml, section, values);
 }
@@ -130,18 +97,41 @@ export function removeUseAddress(yaml: string): string | null {
  *  the device Online forever. */
 export function isValidUseAddress(value: string): boolean {
   if (value.length === 0 || value.length > 253) return false;
-  const lower = value.toLowerCase();
-  if (lower === "localhost" || lower === "::1" || lower === "::") return false;
-  if (/^127\./.test(value) || /^0\.0\.0\.0$/.test(value)) return false;
+  if (value.toLowerCase() === "localhost") return false;
+  if (/^127\./.test(value) || value === "0.0.0.0") return false;
   if (/^[\d.]+$/.test(value)) {
     // All digits and dots is an IPv4 attempt, not a hostname; a typo
     // like 255.42.2.1.3 must not slip through the hostname rule.
     return isIpLiteral(value);
   }
   if (value.includes(":")) {
-    // Loopback/unspecified in any compression (0:0:0:0:0:0:0:1, ::0:1).
+    // Loopback/unspecified in any compression (::1, 0:0:0:0:0:0:0:1).
     if (/^[0:]+1?$/.test(value)) return false;
     return isIpv6Shape(value);
   }
   return HOSTNAME_RE.test(value);
+}
+
+function findSpliceableSection(lines: string[]): NetworkSection | null {
+  for (const section of NETWORK_SECTIONS) {
+    const start = findSectionStart(lines, section);
+    if (start >= 0 && BARE_MAPPING_KEY_RE.test(lines[start])) return section;
+  }
+  return null;
+}
+
+// Keep the parser's null prototype so a YAML key named __proto__ stays
+// inert data (see parseSectionCore).
+function cloneSectionValues(
+  lines: string[],
+  section: NetworkSection
+): Record<string, unknown> {
+  return Object.assign(Object.create(null), parseSectionCore(lines, section).values);
+}
+
+function staticIpOf(values: Record<string, unknown>): string | null {
+  const manual = values.manual_ip;
+  if (manual === null || typeof manual !== "object") return null;
+  const value = (manual as Record<string, unknown>).static_ip;
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

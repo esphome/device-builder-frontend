@@ -38,7 +38,7 @@ export interface TroubleshootInput {
 
 /** The DNS verdict carries evidence: the leg completed and the address
  *  is a name that can fail to resolve, not an IP literal. */
-export function dnsVerdictMeaningful(result: DeviceTroubleshootResult): boolean {
+function dnsVerdictMeaningful(result: DeviceTroubleshootResult): boolean {
   return (
     !result.dns_inconclusive && Boolean(result.address) && !isIpLiteral(result.address)
   );
@@ -52,7 +52,7 @@ export function pingReplyUnverified(result: DeviceTroubleshootResult): boolean {
 
 /** A miss at a last-known address (RAM or sidecar) is evidence about
  *  that address; a miss at a live resolve says nothing about leases. */
-export function pingMissAtKnownAddress(result: DeviceTroubleshootResult): boolean {
+function pingMissAtKnownAddress(result: DeviceTroubleshootResult): boolean {
   return (
     result.ping_attempted &&
     result.ping_rtt_ms === null &&
@@ -135,7 +135,9 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.mqtt_body"],
     });
   }
-  if (result && !result.dns_resolved && dnsVerdictMeaningful(result)) {
+  const dnsFailed =
+    result !== null && !result.dns_resolved && dnsVerdictMeaningful(result);
+  if (dnsFailed) {
     sections.push({
       id: "dns_fail",
       titleKey: "troubleshoot.dns_fail_title",
@@ -148,8 +150,7 @@ export function buildTroubleshootSections(
     // The copy asserts "does not resolve and mDNS is silent"; require
     // both legs to have produced that evidence rather than being
     // inconclusive, disabled, or down.
-    dnsVerdictMeaningful(result) &&
-    !result.dns_resolved &&
+    dnsFailed &&
     result.zeroconf_running &&
     !result.mdns_inconclusive &&
     !device.mdns_disabled &&

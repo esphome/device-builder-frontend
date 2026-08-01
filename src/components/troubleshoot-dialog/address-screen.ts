@@ -12,10 +12,8 @@ import { USE_ADDRESS_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   applyUseAddress,
   isValidUseAddress,
-  readStaticIp,
-  readUseAddress,
+  readAddressPrefill,
   removeUseAddress,
-  snippetNetworkSection,
 } from "../../util/use-address-yaml.js";
 import type { ESPHomeTroubleshootDialog } from "../troubleshoot-dialog.js";
 
@@ -181,14 +179,13 @@ async function saveUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
     const device = host._devices.find((d) => d.configuration === configuration);
-    const integrations = device?.loaded_integrations ?? [];
-    const updated = applyUseAddress(yaml, value, integrations);
-    if (updated === null) {
-      host._snippetSection = snippetNetworkSection(yaml, integrations);
+    const result = applyUseAddress(yaml, value, device?.loaded_integrations ?? []);
+    if ("snippet" in result) {
+      host._snippetSection = result.snippet;
       host._saveState = "snippet";
       return;
     }
-    await host._api.updateConfig(configuration, updated);
+    await host._api.updateConfig(configuration, result.yaml);
     if (configuration !== host._configuration) return;
     // Keep both screens consistent with the write Back can return to.
     host._existingAddress = value;
@@ -228,25 +225,21 @@ export async function loadExistingAddress(
   try {
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
-    const fromYaml = readUseAddress(yaml);
+    const { useAddress, staticIp } = readAddressPrefill(yaml);
     // Only a verified YAML read drives the diagnosis; a packaged
     // network block (null) leaves the prefill hint as just a hint.
-    if (fromYaml !== null && fromYaml !== host._existingAddress) {
+    if (useAddress !== null && useAddress !== host._existingAddress) {
       const inputUntouched =
         host._addressInput === "" || host._addressInput === host._existingAddress;
-      host._existingAddress = fromYaml;
+      host._existingAddress = useAddress;
       // A raw `${substitution}` or `!secret` value would fail the
       // validator the moment the user hits Save; skip the prefill.
-      if (inputUntouched && isValidUseAddress(fromYaml)) {
-        host._addressInput = fromYaml;
+      if (inputUntouched && isValidUseAddress(useAddress)) {
+        host._addressInput = useAddress;
       }
     }
-    if (!host._addressInput) {
-      // The firmware's own manual_ip.static_ip is the best prefill.
-      const staticIp = readStaticIp(yaml);
-      if (staticIp !== null && isValidUseAddress(staticIp)) {
-        host._addressInput = staticIp;
-      }
+    if (!host._addressInput && staticIp !== null && isValidUseAddress(staticIp)) {
+      host._addressInput = staticIp;
     }
   } catch {
     // Keep the heuristic; the save path re-fetches anyway.

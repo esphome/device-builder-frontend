@@ -3,10 +3,10 @@
  * and YAML helpers can share them without pulling each other in.
  */
 
-export const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 // Loose shape check: hex groups and colons; esphome validates properly
 // at compile time.
-export const IPV6_RE = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/i;
+const IPV6_RE = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/i;
 
 /** Loose IPv6 shape: one optional `::` run; without it, exactly 8 hextets. */
 export function isIpv6Shape(value: string): boolean {

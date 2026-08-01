@@ -31,8 +31,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({ "alert-outline": mdiAlertOutline, close: mdiClose });
 
-const DOCS_URL = MAC_SUFFIX_DOCS_URL;
-
 @customElement("esphome-mac-suffix-notice")
 export class ESPHomeMacSuffixNotice extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -83,7 +81,7 @@ export class ESPHomeMacSuffixNotice extends LitElement {
     const base = {
       icon: "alert-outline",
       text: html`${this._localize("device.mac_suffix_notice")}
-        <a href=${DOCS_URL} target="_blank" rel="noopener noreferrer"
+        <a href=${MAC_SUFFIX_DOCS_URL} target="_blank" rel="noopener noreferrer"
           >${this._localize("device.mac_suffix_learn_more")}</a
         >`,
       dismissLabel: this._localize("device.mac_suffix_dismiss"),

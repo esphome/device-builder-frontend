@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeConfiguredDevice } from "../_make-configured-device.js";
-import type { ReachabilityStateEvent } from "../../src/api/types/reachability.js";
+import { makeReachabilityEvent } from "../_make-reachability-event.js";
 import type { DeviceTroubleshootResult } from "../../src/api/types/troubleshoot.js";
 import {
   buildTroubleshootSections,
@@ -31,23 +31,7 @@ function makeResult(
   };
 }
 
-function makeReachability(
-  overrides: Partial<ReachabilityStateEvent> = {}
-): ReachabilityStateEvent {
-  return {
-    device: "kitchen",
-    state: "offline",
-    active_source: "ping",
-    ip: "10.0.0.42",
-    mdns_last_seen_seconds_ago: null,
-    mdns_ttl_remaining_seconds: null,
-    mdns_ptr_ttl_seconds: null,
-    ping_last_seen_seconds_ago: 30,
-    mqtt_last_seen_seconds_ago: null,
-    ping_rtt_ms: null,
-    ...overrides,
-  } as ReachabilityStateEvent;
-}
+const makeReachability = makeReachabilityEvent;
 
 function build(input: Partial<TroubleshootInput> = {}): string[] {
   return buildTroubleshootSections({
