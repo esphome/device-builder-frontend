@@ -174,8 +174,8 @@ export interface ConfiguredDevice {
    *  ``name_add_mac_suffix`` — the suffixed broadcast never matches
    *  this config, so status tracking is unavailable. */
   name_add_mac_suffix: boolean;
-  /** True when the YAML sets ``mdns: disabled: true``; the device never
-   *  broadcasts mDNS by design. */
+  /** True when the YAML sets ``disabled: true`` under ``mdns:``; the
+   *  device never broadcasts mDNS by design. */
   mdns_disabled: boolean;
   /** True when the YAML declares a top-level ``mqtt:`` block. */
   uses_mqtt: boolean;
