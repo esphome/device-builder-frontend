@@ -97,7 +97,7 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.mqtt_body"],
     });
   }
-  if (result && !result.dns_resolved && result.dns_had_cached_failure) {
+  if (result && !result.dns_resolved && result.address) {
     sections.push({
       id: "dns_fail",
       titleKey: "troubleshoot.dns_fail_title",

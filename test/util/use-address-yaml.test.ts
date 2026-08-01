@@ -5,6 +5,7 @@ import {
   applyUseAddress,
   findNetworkSection,
   isValidUseAddress,
+  readUseAddress,
   removeUseAddress,
   snippetNetworkSection,
 } from "../../src/util/use-address-yaml.js";
@@ -62,6 +63,16 @@ describe("applyUseAddress", () => {
     const yaml = "wifi: !include wifi.yaml\napi:\n";
     expect(findNetworkSection(yaml)).toBeNull();
     expect(applyUseAddress(yaml, "10.0.0.9")).toBeNull();
+  });
+});
+
+describe("readUseAddress", () => {
+  it("reads the set value, empty when unset, null when packaged", () => {
+    expect(readUseAddress("wifi:\n  ssid: net\n  use_address: 10.0.0.7\n")).toBe(
+      "10.0.0.7"
+    );
+    expect(readUseAddress("wifi:\n  ssid: net\n")).toBe("");
+    expect(readUseAddress("wifi: !include wifi.yaml\n")).toBeNull();
   });
 });
 

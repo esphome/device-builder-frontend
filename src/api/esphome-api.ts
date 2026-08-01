@@ -862,11 +862,15 @@ export class ESPHomeAPI {
     };
   }
 
-  /** On-demand connectivity probe backing the offline troubleshooting dialog. */
+  /** On-demand connectivity probe backing the offline troubleshooting dialog.
+   *  The backend's probe budgets are generous backstops (~30s worst case),
+   *  so this outlives the default command timeout. */
   async troubleshootDevice(configuration: string): Promise<DeviceTroubleshootResult> {
-    return this.sendCommand<DeviceTroubleshootResult>("devices/troubleshoot", {
-      configuration,
-    });
+    return this.sendCommand<DeviceTroubleshootResult>(
+      "devices/troubleshoot",
+      { configuration },
+      35000
+    );
   }
 
   // ─── Device Commands ──────────────────────────────────────

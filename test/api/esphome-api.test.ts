@@ -169,6 +169,22 @@ describe("ESPHomeAPI — sendCommand", () => {
     await expect(pending).resolves.toEqual({ ok: true });
   });
 
+  it("sends devices/troubleshoot keyed on configuration", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.troubleshootDevice("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("devices/troubleshoot");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+
+    ws.receive({
+      message_id: sent.message_id,
+      result: { configuration: "kitchen.yaml" },
+    });
+    await expect(pending).resolves.toEqual({ configuration: "kitchen.yaml" });
+  });
+
   it("omits args when none are given", async () => {
     const api = makeApi();
     const ws = await connect(api);

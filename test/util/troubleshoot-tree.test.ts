@@ -172,6 +172,12 @@ describe("buildTroubleshootSections", () => {
     expect(ids).not.toContain("generic");
   });
 
+  it("flags a live resolve failure without waiting for the sweep's cache", () => {
+    expect(
+      build({ result: makeResult({ dns_resolved: false, dns_addresses: [] }) })
+    ).toContain("dns_fail");
+  });
+
   it("flags a cached DNS failure and a dead last-known IP", () => {
     const ids = build({
       device: makeConfiguredDevice({ ip: "10.0.0.42" }),

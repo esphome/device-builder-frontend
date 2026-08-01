@@ -51,6 +51,16 @@ export const tableCellStyles = css`
   }
   /* Hollow ring: "no verdict possible", distinct from unknown's
      filled "no verdict yet". */
+  .cell-status[role="button"] {
+    cursor: pointer;
+  }
+
+  .cell-status[role="button"]:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 2px;
+    border-radius: var(--wa-border-radius-s);
+  }
+
   .status-dot.untracked {
     background: transparent;
     border: 2px solid var(--wa-color-text-quiet);

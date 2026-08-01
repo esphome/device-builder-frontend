@@ -63,6 +63,15 @@ export function applyUseAddress(yaml: string, value: string): string | null {
   return updateSectionInYaml(yaml, section, { ...parsed.values, use_address: value });
 }
 
+/** Read the network block's `use_address`; null when nothing is
+ *  spliceable (packaged config), empty string when the key isn't set. */
+export function readUseAddress(yaml: string): string | null {
+  const section = findNetworkSection(yaml);
+  if (section === null) return null;
+  const value = parseSectionCore(yaml.split("\n"), section).values.use_address;
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
 /** Remove `use_address` from the network block; null when nothing is
  *  spliceable, the unchanged YAML when the key isn't set. */
 export function removeUseAddress(yaml: string): string | null {

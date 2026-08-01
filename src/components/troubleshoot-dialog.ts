@@ -38,6 +38,7 @@ import {
   applyUseAddress,
   isIpLiteral,
   isValidUseAddress,
+  readUseAddress,
   removeUseAddress,
   snippetNetworkSection,
 } from "../util/use-address-yaml.js";
@@ -92,6 +93,9 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   private _subscription: ReachabilitySubscription | null = null;
   private _snippetYaml = "";
+  private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
+  private _subscribedGeneration = -1;
+  private _failedGeneration = -1;
 
   static styles = [
     espHomeStyles,
@@ -108,9 +112,10 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._result = null;
     this._checkFailed = false;
     this._reachability = null;
-    // An effective address that isn't the default `<name>.local` is an
-    // existing use_address; surface and prefill it so a stale one gets
-    // updated rather than silently kept.
+    // Heuristic seed: an effective address that isn't the default
+    // `<name>.local` is an existing use_address (StorageJSON echoes it
+    // back). Refined against the actual YAML below, since a custom
+    // wifi `domain:` also shifts the effective address.
     const device = this._devices.find((d) => d.configuration === target.configuration);
     this._name = device?.name ?? "";
     this._existingAddress =
@@ -123,7 +128,8 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._screen = "main";
     this._teardownSubscription();
     this._dialog.open = true;
-    if (this._name) void this._subscribe(this._name);
+    this._startReconcile();
+    void this._loadExistingAddress();
     void this._runCheck();
   }
 
@@ -156,6 +162,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
                 class="back-button"
                 aria-label=${this._localize("troubleshoot.back")}
                 @click=${() => {
+                  this._saveState = "idle";
                   this._screen = "main";
                 }}
               >
@@ -307,6 +314,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
             class="drill"
             data-section=${section.id}
             @click=${() => {
+              this._saveState = "idle";
               this._screen = "address";
             }}
           >
@@ -411,6 +419,7 @@ ${section}:
           @input=${(e: Event) => {
             this._addressInput = (e.target as HTMLInputElement).value;
             this._addressInvalid = false;
+            if (this._saveState === "error") this._saveState = "idle";
           }}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter") void this._saveUseAddress();
@@ -477,7 +486,33 @@ ${section}:
     }
   }
 
-  private async _subscribe(name: string): Promise<void> {
+  // Reconcile the reachability stream once a second while open: the
+  // API clears listeners on a WS drop, so a reconnect (generation bump)
+  // or a failed initial subscribe needs a fresh attempt (same shape as
+  // the drawer's reconcileSubscription).
+  private _startReconcile(): void {
+    this._stopReconcile();
+    this._reconcileTimer = setInterval(() => this._reconcileSubscription(), 1000);
+    this._reconcileSubscription();
+  }
+
+  private _stopReconcile(): void {
+    if (this._reconcileTimer !== null) {
+      clearInterval(this._reconcileTimer);
+      this._reconcileTimer = null;
+    }
+  }
+
+  private _reconcileSubscription(): void {
+    const generation = this._api?.connectionGeneration ?? 0;
+    if (this._subscription !== null && generation === this._subscribedGeneration) return;
+    if (this._subscription === null && generation === this._failedGeneration) return;
+    this._teardownSubscription();
+    if (this._name) void this._subscribe(this._name, generation);
+  }
+
+  private async _subscribe(name: string, generation: number): Promise<void> {
+    this._subscribedGeneration = generation;
     try {
       const subscription = await this._api.subscribeDeviceReachability(name, (event) => {
         if (name === this._name) this._reachability = event;
@@ -487,8 +522,29 @@ ${section}:
         return;
       }
       this._subscription = subscription;
+    } catch (err) {
+      // Advice degrades to device flags + probe result without the
+      // stream; one retry per connection generation.
+      this._failedGeneration = generation;
+      console.warn("subscribeDeviceReachability failed", err);
+    }
+  }
+
+  private async _loadExistingAddress(): Promise<void> {
+    const configuration = this._configuration;
+    try {
+      const yaml = await this._api.getConfig(configuration);
+      if (configuration !== this._configuration) return;
+      const fromYaml = readUseAddress(yaml);
+      // A packaged network block (null) keeps the heuristic seed; a
+      // spliceable one is authoritative either way.
+      if (fromYaml !== null && fromYaml !== this._existingAddress) {
+        const inputUntouched = this._addressInput === this._existingAddress;
+        this._existingAddress = fromYaml;
+        if (inputUntouched) this._addressInput = fromYaml;
+      }
     } catch {
-      // Advice degrades to device flags + probe result without the stream.
+      // Keep the heuristic; the save path re-fetches anyway.
     }
   }
 
@@ -549,6 +605,7 @@ ${section}:
   private _onAfterHide = (): void => {
     this._dialog.open = false;
     this._screen = "main";
+    this._stopReconcile();
     this._teardownSubscription();
   };
 }

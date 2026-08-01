@@ -136,7 +136,14 @@ describe("troubleshoot-dialog", () => {
   });
 
   it("surfaces a set use_address on the main screen and prefills the form", async () => {
-    const { el } = await openDialog({}, makeConfiguredDevice({ address: "10.0.0.7" }));
+    const { el } = await openDialog(
+      {
+        getConfig: vi
+          .fn()
+          .mockResolvedValue("wifi:\n  ssid: net\n  use_address: 10.0.0.7\n"),
+      },
+      makeConfiguredDevice({ address: "10.0.0.7" })
+    );
     const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
       n.getAttribute("data-section")
     );
@@ -165,6 +172,16 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_removed");
   });
 
+  it("clears the heuristic when the YAML has no use_address", async () => {
+    // A custom wifi domain shifts device.address without a use_address;
+    // the exact read must not claim one is set.
+    const { el } = await openDialog({}, makeConfiguredDevice({ address: "kitchen.lan" }));
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).not.toContain("use_address_set");
+  });
+
   it("saves a valid use_address through the YAML splice", async () => {
     const { el, api } = await openDialog();
     await openAddressScreen(el);
@@ -191,7 +208,7 @@ describe("troubleshoot-dialog", () => {
     el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
     await flush();
     await el.updateComplete;
-    expect(api.getConfig).not.toHaveBeenCalled();
+    expect(api.updateConfig).not.toHaveBeenCalled();
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_invalid");
   });
 

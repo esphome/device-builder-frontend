@@ -222,6 +222,11 @@ export const deviceCardStyles = [
       cursor: pointer;
     }
 
+    .device-status.clickable:focus-visible {
+      outline: 2px solid var(--esphome-primary);
+      outline-offset: 2px;
+    }
+
     .device-status.busy wa-spinner {
       font-size: 12px;
       --indicator-color: var(--esphome-primary);
