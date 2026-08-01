@@ -25,6 +25,7 @@ function makeResult(
     mdns_has_live_anchor_ptr: true,
     ping_attempted: true,
     ping_target: "10.0.0.42",
+    ping_target_source: "dns",
     ping_rtt_ms: 4.2,
     ...overrides,
   };
@@ -170,6 +171,23 @@ describe("buildTroubleshootSections", () => {
     expect(ids).not.toContain("mdns_dark");
     expect(ids).not.toContain("dynamic_ip");
     expect(ids).not.toContain("generic");
+  });
+
+  it("flags an unverified reply at the last known address", () => {
+    const ids = build({
+      result: makeResult({
+        dns_resolved: false,
+        dns_addresses: [],
+        mdns_addresses: [],
+        mdns_has_cached_trace: false,
+        ping_target_source: "last_known",
+      }),
+    });
+    expect(ids).toContain("unverified_ping");
+  });
+
+  it("keeps a live-resolved reply unqualified", () => {
+    expect(build({ result: makeResult() })).not.toContain("unverified_ping");
   });
 
   it("flags a live resolve failure without waiting for the sweep's cache", () => {

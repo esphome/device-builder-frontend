@@ -105,6 +105,19 @@ export function buildTroubleshootSections(
     });
   }
   if (
+    result?.ping_attempted &&
+    result.ping_rtt_ms !== null &&
+    result.ping_target_source === "last_known" &&
+    !result.dns_resolved &&
+    result.mdns_addresses.length === 0
+  ) {
+    sections.push({
+      id: "unverified_ping",
+      titleKey: "troubleshoot.unverified_ping_title",
+      bodyKeys: ["troubleshoot.unverified_ping_body"],
+    });
+  }
+  if (
     !existingAddress &&
     result?.ping_attempted &&
     result.ping_rtt_ms === null &&

@@ -29,6 +29,7 @@ const RESULT: DeviceTroubleshootResult = {
   mdns_has_live_anchor_ptr: false,
   ping_attempted: true,
   ping_target: "10.0.0.42",
+  ping_target_source: "last_known",
   ping_rtt_ms: null,
 };
 
