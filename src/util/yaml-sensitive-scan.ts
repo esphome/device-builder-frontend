@@ -63,10 +63,15 @@ export const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
 // specific parent. `key:` is too generic to mask everywhere —
 // `remote_receiver` and `remote_transmitter` use `key:` for
 // non-sensitive button codes — so we restrict it to the parent blocks
-// ESPHome uses for crypto material.
-const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
-  encryption: new Set(["key"]),
-};
+// ESPHome uses for crypto material. A Map, not a plain object, so an
+// arbitrary user key like `constructor:` can't resolve a prototype
+// member.
+const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
+  ["encryption", new Set(["key"])],
+  // WPA2-Enterprise material: `key` is the client private key (often a
+  // whole PEM block scalar); the certificates ride along as over-masking.
+  ["eap", new Set(["key", "certificate", "certificate_authority"])],
+]);
 
 // Plain-scalar key matcher. Permits hyphens and dots inside the
 // key so user-defined secret names like `wifi-password:` or
@@ -202,7 +207,7 @@ export function findSensitiveValueRanges(
       sensitive = ALWAYS_SENSITIVE_KEYS.has(keyFolded);
       if (!sensitive && stack.length > 0) {
         const parent = stack[stack.length - 1].key;
-        const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
+        const allowed = PARENT_SCOPED_SENSITIVE_KEYS.get(parent);
         if (allowed && allowed.has(keyFolded)) sensitive = true;
       }
       if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);

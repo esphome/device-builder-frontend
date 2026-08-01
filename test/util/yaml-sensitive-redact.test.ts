@@ -158,6 +158,29 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("abcdef");
   });
 
+  it("masks eap key material including block-scalar PEMs", () => {
+    const yaml = [
+      "wifi:",
+      "  eap:",
+      "    username: alice",
+      "    password: hunter2",
+      "    key: |",
+      "      -----BEGIN PRIVATE KEY-----",
+      "      pemsecret",
+      "    certificate: certbody",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("pemsecret");
+    expect(masked).not.toContain("certbody");
+    expect(masked).toContain("    username: alice");
+  });
+
+  it("tolerates prototype-colliding parent keys", () => {
+    const yaml = "constructor:\n  foo: bar\ntoString:\n  baz: qux";
+    expect(maskSensitiveYaml(yaml)).toBe(yaml);
+  });
+
   it("masks a parent-scoped key under a mis-capitalized parent", () => {
     const masked = maskSensitiveYaml("api:\n  Encryption:\n    Key: c2VjcmV0a2V5");
     expect(masked).not.toContain("c2VjcmV0a2V5");

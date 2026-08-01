@@ -70,21 +70,25 @@ describe("crash-report-dialog", () => {
     vi.unstubAllGlobals();
   });
 
-  // One hop for the recovery loop's ``await api.ready`` to reach
-  // getConfig, then two for the settled read to flow back through the
-  // recovery util into the dialog's state writes.
+  // Drain microtask turns until *predicate* holds (capped), so the
+  // helpers don't pin exact hop counts of the recovery util's await
+  // chain — a refactor there must not read as a dialog failure.
+  const settle = async (predicate: () => boolean) => {
+    for (let i = 0; i < 20 && !predicate(); i++) await flushMicrotasks(1);
+  };
+
   const finishRead = async (yaml = RAW_CONFIG_YAML) => {
-    await flushMicrotasks(1);
+    await settle(() => reads.length > 0);
     reads[reads.length - 1]!.resolve(yaml);
-    await flushMicrotasks(2);
+    await settle(() => (el as any)._configYaml !== null);
   };
 
   const rejectRead = async () => {
-    await flushMicrotasks(1);
+    await settle(() => reads.length > 0);
     // An APIError is final for the recovery util; a bare transport error
     // would park in its real-timer retry backoff instead.
     reads[reads.length - 1]!.reject(new APIError("internal_error", "boom"));
-    await flushMicrotasks(2);
+    await settle(() => (el as any)._configYaml !== null);
   };
 
   const describe_ = (text: string) => {
@@ -316,11 +320,11 @@ describe("crash-report-dialog", () => {
 
   it("ignores a stale config read from a previous open", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    await flushMicrotasks(1);
+    await settle(() => reads.length > 0);
     const stale = reads[0]!;
     el.open("other.yaml", "Other", CRASH_LINES);
     stale.resolve("esphome:\n  name: smallgarage");
-    await flushMicrotasks(2);
+    await flushMicrotasks(10);
     await el.updateComplete;
     // Still collecting: the stale read must not flip this session ready.
     expect((el as any)._configYaml).toBeNull();
