@@ -159,7 +159,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
       .section h3 {
         margin: 0 0 var(--wa-space-2xs);
-        font-size: var(--wa-font-size-m);
+        font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-semibold);
       }
 
