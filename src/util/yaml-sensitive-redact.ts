@@ -49,7 +49,9 @@ const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
  * leaks a credential.
  */
 function isSensitiveKey(key: string): boolean {
-  if (ALWAYS_SENSITIVE_KEYS.has(key)) return true;
+  // Case-folded: reports include configs esphome would reject, so a
+  // mis-capitalized `Password:` must not slip past the allowlist.
+  if (ALWAYS_SENSITIVE_KEYS.has(key.toLowerCase())) return true;
   return SENSITIVE_KEY_SUFFIX.test(key);
 }
 

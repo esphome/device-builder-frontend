@@ -150,6 +150,14 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  friendly_name: Garage");
   });
 
+  it("masks mis-capitalized credential keys", () => {
+    const masked = maskSensitiveYaml(
+      "wifi:\n  Password: hunter2\n  OTA_PASSWORD: abcdef"
+    );
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("abcdef");
+  });
+
   it("masks hyphen and dot spellings of credential keys", () => {
     const yaml = ["wifi-password: hunter2", "vpn.psk: abcdef"].join("\n");
     const masked = maskSensitiveYaml(yaml);
