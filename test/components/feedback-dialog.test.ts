@@ -17,6 +17,7 @@ vi.mock("sonner-js", () => ({
 
 import { flushMicrotasks, mount } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
+import { ESPHomeFeedbackDevicePicker } from "../../src/components/feedback-device-picker.js";
 import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
 
 interface HrefLink {
@@ -97,7 +98,40 @@ describe("feedback-dialog write-in-English note", () => {
   });
 });
 
-describe("feedback-dialog device picker", () => {
+describe("feedback-dialog device screen wiring", () => {
+  it("drills each bug row into the picker with its target and closes on picker-close", async () => {
+    const el = await mount(new ESPHomeFeedbackDialog());
+    el.open();
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="bug"]'
+    )!.click();
+    await el.updateComplete;
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="device-builder"]'
+    )!.click();
+    await el.updateComplete;
+    let picker = el.shadowRoot!.querySelector("esphome-feedback-device-picker")!;
+    expect(picker.target).toBe("builder");
+
+    // Back unwinds to the bug screen, then the esphome row drills.
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="device-esphome"]'
+    )!.click();
+    await el.updateComplete;
+    picker = el.shadowRoot!.querySelector("esphome-feedback-device-picker")!;
+    expect(picker.target).toBe("esphome");
+
+    picker.dispatchEvent(new Event("picker-close", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
+  });
+});
+
+describe("feedback-device-picker", () => {
   interface Deferred {
     resolve: (yaml: string) => void;
     reject: (err: unknown) => void;
@@ -116,7 +150,7 @@ describe("feedback-dialog device picker", () => {
     runtime_state: { deployed_version: "2026.7.0" },
   };
 
-  let el: ESPHomeFeedbackDialog;
+  let el: ESPHomeFeedbackDevicePicker;
   let reads: Deferred[];
   let openedUrls: string[];
 
@@ -130,7 +164,7 @@ describe("feedback-dialog device picker", () => {
         return null;
       })
     );
-    el = await mount(new ESPHomeFeedbackDialog());
+    el = await mount(new ESPHomeFeedbackDevicePicker());
     Object.assign(el as unknown as Record<string, unknown>, {
       _serverVersion: "1.8.0",
       _esphomeVersion: "2026.7.2",
@@ -145,7 +179,6 @@ describe("feedback-dialog device picker", () => {
         ),
       },
     });
-    el.open();
     await el.updateComplete;
   });
 
@@ -156,20 +189,6 @@ describe("feedback-dialog device picker", () => {
 
   const settle = async (predicate: () => boolean) => {
     for (let i = 0; i < 20 && !predicate(); i++) await flushMicrotasks(1);
-  };
-
-  const drillTo = async (target: "builder" | "esphome") => {
-    el.shadowRoot!.querySelector<HTMLButtonElement>(
-      'button.link[data-drill="bug"]'
-    )!.click();
-    await el.updateComplete;
-    const rows = [
-      ...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(
-        'button.link[data-drill="device"]'
-      ),
-    ];
-    rows[target === "builder" ? 0 : 1].click();
-    await el.updateComplete;
   };
 
   const deviceRow = () =>
@@ -187,10 +206,10 @@ describe("feedback-dialog device picker", () => {
     await settle(() => reads.length > 0);
     reads[0].resolve(yaml);
     await settle(() => openedUrls.length > 0);
+    await el.updateComplete;
   };
 
   it("prefills the builder form with masked config and facts", async () => {
-    await drillTo("builder");
     await pick();
     const url = new URL(openedUrls[0]);
     expect(url.origin + url.pathname).toBe(
@@ -207,11 +226,19 @@ describe("feedback-dialog device picker", () => {
     expect(facts).toContain("ESPHome running: 2026.7.0");
     expect(facts).toContain("ESPHome: 2026.7.2");
     expect(facts).toContain("Installation: Docker");
-    expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
+  });
+
+  it("stays up with the guaranteed link after the auto-open", async () => {
+    // The capture outlives the click's transient activation, so the
+    // auto-open can be popup-blocked; the anchor is the fallback.
+    await pick();
+    const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>("a.link");
+    expect(anchor!.href).toBe(openedUrls[0]);
   });
 
   it("prefills the esphome form with the device's compiled version", async () => {
-    await drillTo("esphome");
+    el.target = "esphome";
+    await el.updateComplete;
     await pick();
     const url = new URL(openedUrls[0]);
     expect(url.origin + url.pathname).toBe(
@@ -223,19 +250,17 @@ describe("feedback-dialog device picker", () => {
   });
 
   it("skip keeps today's URL plus the builder's required config sentinel", async () => {
-    await drillTo("builder");
+    const closed = vi.fn();
+    el.addEventListener("picker-close", closed);
     skipRow().click();
     const builder = new URL(openedUrls[0]);
     expect(builder.searchParams.get("config")).toBe("not device specific");
     expect(builder.searchParams.get("version")).toBe("1.8.0");
     expect(builder.searchParams.get("extra")).toBeNull();
+    expect(closed).toHaveBeenCalledTimes(1);
 
-    // The mocked wa-dialog never fires after-hide, so reset as the real
-    // close lifecycle does before reopening.
-    (el as unknown as { _onAfterHide: () => void })._onAfterHide();
-    el.open();
+    el.target = "esphome";
     await el.updateComplete;
-    await drillTo("esphome");
     skipRow().click();
     const esphome = new URL(openedUrls[1]);
     expect(esphome.searchParams.get("config")).toBeNull();
@@ -243,7 +268,6 @@ describe("feedback-dialog device picker", () => {
   });
 
   it("opens the form without config when the capture fails", async () => {
-    await drillTo("builder");
     deviceRow().click();
     await settle(() => reads.length > 0);
     reads[0].reject(new APIError("internal_error", "boom"));
@@ -258,7 +282,6 @@ describe("feedback-dialog device picker", () => {
       { length: 800 },
       (_, i) => `  line_${i}: value-${i}-abcdefghijklmnop`
     ).join("\n");
-    await drillTo("builder");
     await pick(`esphome:\n${huge}`);
     const url = openedUrls[0];
     expect(url.length).toBeLessThanOrEqual(8000);
@@ -267,13 +290,34 @@ describe("feedback-dialog device picker", () => {
     );
   });
 
-  it("drops a capture that resolves after the dialog closed", async () => {
-    await drillTo("builder");
+  it("drops a capture that resolves after the picker unmounted", async () => {
     deviceRow().click();
     await settle(() => reads.length > 0);
-    (el as unknown as { _onAfterHide: () => void })._onAfterHide();
+    el.remove();
     reads[0].resolve(RAW_YAML);
     await flushMicrotasks(10);
     expect(openedUrls).toHaveLength(0);
+  });
+
+  it("filters devices above the threshold", async () => {
+    const fleet = Array.from({ length: 10 }, (_, i) => ({
+      ...DEVICE,
+      configuration: `dev-${i}.yaml`,
+      name: `dev-${i}`,
+      friendly_name: i === 3 ? "Kitchen Lamp" : `Device ${i}`,
+    }));
+    Object.assign(el as unknown as Record<string, unknown>, { _devices: fleet });
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".device-filter")!;
+    expect(input).not.toBeNull();
+
+    input.value = "kitchen";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    const rows = [
+      ...el.shadowRoot!.querySelectorAll<HTMLButtonElement>("button.link"),
+    ].filter((b) => !b.textContent!.includes("feedback.device_skip"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("Kitchen Lamp");
   });
 });

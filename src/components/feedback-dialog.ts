@@ -14,37 +14,18 @@ import {
 } from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import {
-  apiContext,
-  devicesContext,
-  isHaAddonContext,
-  localizeContext,
-  serverVersionContext,
-  versionContext,
-} from "../context/index.js";
+import { localizeContext, serverVersionContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
-import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { setFittedConfigParam } from "../util/crash-report-budget.js";
-import {
-  devicePlatform,
-  ESPHOME_BUG_FORM_URL,
-  issuePlatform,
-} from "../util/crash-report.js";
-import { matchesDeviceName } from "../util/device-search.js";
-import { deviceSortKey, sortDevices } from "../util/device-sort.js";
+import type { DeviceTarget } from "../util/bug-report-prefill.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { detectInstallation } from "../util/installation.js";
-import { captureMaskedConfig } from "../util/masked-config-capture.js";
-import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { feedbackLinkStyles } from "./feedback-link.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./base-dialog.js";
+import "./feedback-device-picker.js";
 
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
@@ -68,32 +49,6 @@ const SURVEY_LINK = {
 
 type DrillScreen = "browse" | "bug";
 type Screen = "main" | DrillScreen | "device";
-
-// The two bug paths that carry a device config. The templates' field ids
-// differ: esphome's form has `config`/`additional`, the builder's has
-// `config`/`extra`.
-type DeviceTarget = "builder" | "esphome";
-
-const DEVICE_TARGETS: Record<
-  DeviceTarget,
-  { href: string; factsParam: "additional" | "extra" }
-> = {
-  builder: {
-    href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
-    factsParam: "extra",
-  },
-  esphome: {
-    href: ESPHOME_BUG_FORM_URL,
-    factsParam: "additional",
-  },
-};
-
-// The builder template's `config` field is required; its own description
-// tells reporters to write this when no device applies.
-const NOT_DEVICE_SPECIFIC = "not device specific";
-
-// Fleets larger than this get a filter input above the device rows.
-const DEVICE_FILTER_THRESHOLD = 8;
 
 interface FeedbackLinkBase {
   icon: string;
@@ -230,6 +185,11 @@ const SECTIONS: ReadonlyArray<{
   },
 ];
 
+// The focus-restore key for a drill row; device rows key on their target
+// so the two are distinguishable.
+const drillKey = (link: DrillLink): string =>
+  link.drillTo === "device" ? `device-${link.deviceTarget}` : link.drillTo;
+
 @customElement("esphome-feedback-dialog")
 export class ESPHomeFeedbackDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -240,21 +200,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _serverVersion = "";
 
-  @consume({ context: versionContext, subscribe: true })
-  @state()
-  private _esphomeVersion = "";
-
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @consume({ context: devicesContext, subscribe: true })
-  @state()
-  private _devices: ConfiguredDevice[] = [];
-
-  @consume({ context: isHaAddonContext, subscribe: true })
-  @state()
-  private _isHaAddon = false;
-
   private readonly _dialog = new DialogOpenController(this);
 
   @state()
@@ -264,118 +209,11 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _deviceTarget: DeviceTarget = "builder";
 
-  @state()
-  private _deviceFilter = "";
-
-  // The configuration whose config capture is in flight ("" = none);
-  // drives the per-row spinner and blocks double-picks.
-  @state()
-  private _capturing = "";
-
-  // Bumped per open() and screen change; a capture from a previous
-  // session must not open a form for this one.
-  private _captureSession = 0;
-
-  // Sorted copy of the fleet, recomputed only when the devices array is
-  // replaced, so filter keystrokes and device events pay no re-sort.
-  private _sortedDevices: ConfiguredDevice[] = [];
-
-  // Base URL for a device-target form with the version param set.
-  private _deviceTargetUrl(target: DeviceTarget, device?: ConfiguredDevice): URL {
-    const url = new URL(DEVICE_TARGETS[target].href);
-    const version =
-      target === "esphome"
-        ? device?.current_version || this._esphomeVersion
-        : this._serverVersion;
-    if (version) url.searchParams.set("version", version);
-    return url;
-  }
-
-  private _openPrefilled(url: URL): void {
-    window.open(url.toString(), "_blank", "noopener");
-    this.close();
-  }
-
-  private _skipDevice = (): void => {
-    const url = this._deviceTargetUrl(this._deviceTarget);
-    if (this._deviceTarget === "builder") {
-      url.searchParams.set("config", NOT_DEVICE_SPECIFIC);
-    }
-    this._openPrefilled(url);
-  };
-
-  // The facts the form's dropdowns can't carry (GitHub only prefills
-  // input/textarea fields), rendered as a bullet list.
-  private _deviceFacts(device: ConfiguredDevice): string {
-    const platform = issuePlatform(devicePlatform(device));
-    const installation = detectInstallation(this._api, this._isHaAddon);
-    return [
-      `Device: ${deviceSortKey(device)} (${device.configuration})`,
-      device.board_id && `Board: ${device.board_id}`,
-      platform && `Platform: ${platform}`,
-      device.runtime_state.deployed_version &&
-        `ESPHome running: ${device.runtime_state.deployed_version}`,
-      this._deviceTarget === "builder" &&
-        this._esphomeVersion &&
-        `ESPHome: ${this._esphomeVersion}`,
-      installation && `Installation: ${installation}`,
-    ]
-      .filter(Boolean)
-      .map((fact) => `- ${fact}`)
-      .join("\n");
-  }
-
-  private async _pickDevice(device: ConfiguredDevice): Promise<void> {
-    if (this._capturing) return;
-    const session = ++this._captureSession;
-    this._capturing = device.configuration;
-    const masked = await captureMaskedConfig(
-      this._api,
-      device.configuration,
-      () => session !== this._captureSession || !this._dialog.open
-    );
-    // The session guard also covers _deviceTarget: every path that
-    // changes it bumps the session.
-    if (session !== this._captureSession) return;
-    this._capturing = "";
-    if (masked === null) return;
-    const url = this._deviceTargetUrl(this._deviceTarget, device);
-    url.searchParams.set(
-      DEVICE_TARGETS[this._deviceTarget].factsParam,
-      this._deviceFacts(device)
-    );
-    if (masked === "") {
-      // The form still opens with the facts; the config just isn't in it.
-      notifyError(this._localize("feedback.device_capture_failed"));
-    } else {
-      setFittedConfigParam(url, masked);
-    }
-    this._openPrefilled(url);
-  }
-
-  private _onFilterInput = (e: Event): void => {
-    this._deviceFilter = (e.target as HTMLInputElement).value;
-  };
-
-  private _hrefFor(link: FeedbackLink): string {
-    if (!link.href) {
-      return "";
-    }
-    const version = link.versionSource === "dashboard" ? this._serverVersion : "";
-    if (!version) {
-      return link.href;
-    }
-    const url = new URL(link.href);
-    url.searchParams.set("version", version);
-    return url.toString();
-  }
-
   static styles = [
     espHomeStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
-    // Project-wide native-input look for the device filter.
-    inputStyles,
+    feedbackLinkStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -386,19 +224,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
       }
 
-      .description {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-        margin: 0 0 var(--wa-space-m);
-      }
-
-      .links {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
       .section-header {
         margin: var(--wa-space-m) 0 var(--wa-space-2xs);
         font-size: var(--wa-font-size-xs);
@@ -406,62 +231,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--wa-color-text-quiet);
-      }
-
-      .link {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-xs) var(--wa-space-s);
-        border-radius: var(--wa-border-radius-m);
-        /* A faint grey outline at rest gives each row a quiet edge; the brand
-           wash takes over on hover. No glow, no ring. */
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: transparent;
-        color: var(--wa-color-text-normal);
-        font-size: var(--wa-font-size-s);
-        text-decoration: none;
-        transition:
-          background 0.12s,
-          border-color 0.12s;
-      }
-
-      /* The drill row is a button; strip the native chrome so it matches the
-         anchor rows. */
-      button.link {
-        width: 100%;
-        text-align: left;
-        font-family: inherit;
-        cursor: pointer;
-      }
-
-      .link:hover {
-        border-color: transparent;
-        background: var(--esphome-tint);
-      }
-
-      .link:hover .link-external,
-      .link:focus-visible .link-external {
-        opacity: 1;
-      }
-
-      .link-icon {
-        font-size: 20px;
-        color: var(--esphome-primary);
-        flex-shrink: 0;
-      }
-
-      .link-text {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .link-desc {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
       }
 
       .back-button {
@@ -475,76 +244,13 @@ export class ESPHomeFeedbackDialog extends LitElement {
         cursor: pointer;
         font-size: 20px;
       }
-
-      .link-external {
-        font-size: 14px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        opacity: 0;
-        transition: opacity 0.12s;
-      }
-
-      /* The drill chevron is the only cue a row navigates deeper, so it stays
-         visible at rest (unlike the hover-only external-link glyph) for touch
-         users with no hover state. */
-      .link-chevron {
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-      }
-
-      .link.featured {
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-color: var(--esphome-primary);
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .link.featured:hover {
-        border-color: var(--esphome-primary-hover);
-        background: var(--esphome-primary-hover);
-      }
-
-      .link.featured .link-icon,
-      .link.featured .link-external {
-        color: var(--esphome-on-primary);
-      }
-
-      .link.featured .link-external {
-        opacity: 1;
-      }
-
-      .link.featured .link-label {
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      /* Look comes from the shared inputStyles; only layout here. */
-      .device-filter {
-        width: 100%;
-        box-sizing: border-box;
-        margin: 0 0 var(--wa-space-s);
-      }
-
-      button.link:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-
-      .link wa-spinner {
-        font-size: 16px;
-        flex-shrink: 0;
-      }
-
-      .device-list {
-        max-height: 320px;
-        overflow-y: auto;
-      }
     `,
   ];
 
   open() {
     // Reset before showing: a reopen racing the previous close's
-    // after-hide must abandon any in-flight capture.
+    // after-hide must leave no stale screen (the picker abandons its
+    // capture when its screen unmounts).
     this._goTo("main");
     this._dialog.open = true;
   }
@@ -560,9 +266,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   private _goTo(screen: Screen): void {
     this._screen = screen;
-    this._deviceFilter = "";
-    this._capturing = "";
-    this._captureSession += 1;
   }
 
   private _drill(link: DrillLink): void {
@@ -573,10 +276,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
   // The device screen sits under the bug screen, so Back unwinds one level.
   private _goBack(): void {
     this._goTo(this._screen === "device" ? "bug" : "main");
-  }
-
-  protected willUpdate(changed: PropertyValues): void {
-    if (changed.has("_devices")) this._sortedDevices = sortDevices(this._devices);
   }
 
   // A screen swap removes the control that had focus (the drill row, or the back
@@ -590,13 +289,29 @@ export class ESPHomeFeedbackDialog extends LitElement {
     if (previous === undefined) {
       return;
     }
+    // Unwinding focuses the row that drilled here (device rows key on
+    // their target); drilling deeper focuses the back button.
+    const previousKey = previous === "device" ? `device-${this._deviceTarget}` : previous;
     const target =
-      this._screen === "main"
+      this._screen === "main" || previous === "device"
         ? this.renderRoot.querySelector<HTMLElement>(
-            `button.link[data-drill="${previous}"]`
+            `button.link[data-drill="${previousKey}"]`
           )
         : this.renderRoot.querySelector<HTMLElement>(".back-button");
     target?.focus();
+  }
+
+  private _hrefFor(link: FeedbackLink): string {
+    if (!link.href) {
+      return "";
+    }
+    const version = link.versionSource === "dashboard" ? this._serverVersion : "";
+    if (!version) {
+      return link.href;
+    }
+    const url = new URL(link.href);
+    url.searchParams.set("version", version);
+    return url.toString();
   }
 
   private _renderLinkBody(link: FeedbackLink) {
@@ -616,7 +331,11 @@ export class ESPHomeFeedbackDialog extends LitElement {
   private _renderLink(link: FeedbackLink, featured = false) {
     if (link.drillTo) {
       return html`
-        <button class="link" data-drill=${link.drillTo} @click=${() => this._drill(link)}>
+        <button
+          class="link"
+          data-drill=${drillKey(link)}
+          @click=${() => this._drill(link)}
+        >
           ${this._renderLinkBody(link)}
           <wa-icon class="link-chevron" library="mdi" name="chevron-right"></wa-icon>
         </button>
@@ -664,7 +383,10 @@ export class ESPHomeFeedbackDialog extends LitElement {
         }
         ${
           isDevice
-            ? this._renderDeviceScreen()
+            ? html`<esphome-feedback-device-picker
+                .target=${this._deviceTarget}
+                @picker-close=${this.close}
+              ></esphome-feedback-device-picker>`
             : drill
               ? html`
                   ${
@@ -679,63 +401,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
               : this._renderMainScreen()
         }
       </esphome-base-dialog>
-    `;
-  }
-
-  private _renderDeviceScreen() {
-    const filter = this._deviceFilter.trim().toLowerCase();
-    const devices = this._sortedDevices.filter(
-      (device) => !filter || matchesDeviceName(device, filter)
-    );
-    return html`
-      <p class="description">${this._localize("feedback.device_note")}</p>
-      ${
-        this._devices.length > DEVICE_FILTER_THRESHOLD
-          ? html`<input
-              class="device-filter"
-              type="search"
-              placeholder=${this._localize("feedback.device_filter")}
-              .value=${this._deviceFilter}
-              @input=${this._onFilterInput}
-            />`
-          : ""
-      }
-      <div class="links device-list">
-        <button class="link" @click=${this._skipDevice}>
-          <wa-icon class="link-icon" library="mdi" name="bug-outline"></wa-icon>
-          <span class="link-text">
-            <span class="link-label">${this._localize("feedback.device_skip")}</span>
-          </span>
-          <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
-        </button>
-        ${devices.map((device) => this._renderDeviceRow(device))}
-      </div>
-    `;
-  }
-
-  private _renderDeviceRow(device: ConfiguredDevice) {
-    const busy = this._capturing === device.configuration;
-    return html`
-      <button
-        class="link"
-        ?disabled=${this._capturing !== "" && !busy}
-        @click=${() => this._pickDevice(device)}
-      >
-        <wa-icon class="link-icon" library="mdi" name="chip"></wa-icon>
-        <span class="link-text">
-          <span class="link-label">${deviceSortKey(device)}</span>
-          <span class="link-desc">${device.configuration}</span>
-        </span>
-        ${
-          busy
-            ? html`<wa-spinner></wa-spinner>`
-            : html`<wa-icon
-                class="link-external"
-                library="mdi"
-                name="open-in-new"
-              ></wa-icon>`
-        }
-      </button>
     `;
   }
 

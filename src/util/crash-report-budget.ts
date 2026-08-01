@@ -65,10 +65,7 @@ export function setFittedConfigParam(url: URL, yaml: string): boolean {
  * Fit a YAML document under *budget* encoded chars: whole when it fits,
  * else the longest line prefix plus a truncation marker.
  */
-export function fitConfig(
-  yaml: string,
-  budget: number
-): { text: string; truncated: boolean } {
+function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
   if (budget <= 0) return { text: "", truncated: true };
   if (formEncodedLength(yaml) <= budget) return { text: yaml, truncated: false };
   const { kept } = takeLinesUnderBudget(
