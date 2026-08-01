@@ -7,7 +7,7 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
-import { isIpLiteral } from "./use-address-yaml.js";
+import { isIpLiteral } from "./ip-literal.js";
 
 export const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
@@ -173,11 +173,12 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.generic_body"],
     });
   }
+  // Rendered as a drill row (title only); the address screen owns its
+  // own body copy and docs link.
   sections.push({
     id: "use_address",
     titleKey: "troubleshoot.use_address_title",
-    bodyKeys: ["troubleshoot.use_address_body"],
-    docsUrl: USE_ADDRESS_DOCS_URL,
+    bodyKeys: [],
     showUseAddressForm: true,
   });
   return sections;

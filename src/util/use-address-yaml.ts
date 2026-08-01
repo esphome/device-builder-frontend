@@ -5,6 +5,7 @@
  * whose network block lives in a package/include can't be spliced and
  * falls back to a copyable snippet in the dialog.
  */
+import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { updateSectionInYaml } from "./yaml-section-values.js";
 
@@ -12,10 +13,6 @@ import { updateSectionInYaml } from "./yaml-section-values.js";
 export const NETWORK_SECTIONS = ["wifi", "ethernet", "openthread"] as const;
 export type NetworkSection = (typeof NETWORK_SECTIONS)[number];
 
-const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-// Loose shape check: hex groups and colons with at least one colon;
-// esphome validates properly at compile time.
-const IPV6_RE = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/i;
 const HOSTNAME_RE =
   /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
@@ -105,25 +102,6 @@ export function removeUseAddress(yaml: string): string | null {
   );
   delete values.use_address;
   return updateSectionInYaml(yaml, section, values);
-}
-
-/** Loose IPv6 shape: one optional `::` run; without it, exactly 8 hextets. */
-function isIpv6Shape(value: string): boolean {
-  if (value.includes(":::") || value.split("::").length > 2) return false;
-  // A bare leading/trailing colon is only valid as part of `::`.
-  if (value.startsWith(":") && !value.startsWith("::")) return false;
-  if (value.endsWith(":") && !value.endsWith("::")) return false;
-  if (!IPV6_RE.test(value)) return false;
-  return value.includes("::") || value.split(":").length === 8;
-}
-
-/** True for a bare IPv4/IPv6 literal (not a hostname). */
-export function isIpLiteral(value: string): boolean {
-  if (/^[\d.]+$/.test(value)) {
-    const v4 = IPV4_RE.exec(value);
-    return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
-  }
-  return value.includes(":") && isIpv6Shape(value);
 }
 
 /** Accept an IPv4/IPv6 literal or an RFC-1123 hostname.

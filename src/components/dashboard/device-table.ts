@@ -126,19 +126,6 @@ export class ESPHomeDeviceTable extends LitElement {
   @property({ type: Boolean, attribute: "select-mode" })
   selectMode = false;
 
-  constructor() {
-    super();
-    // In select mode the whole row is one toggle target; a status-dot
-    // click must select, not stack the troubleshoot dialog on top.
-    this.addEventListener("open-troubleshoot", (e) => {
-      if (!this.selectMode) return;
-      e.stopPropagation();
-      this._onToggleSelect(
-        (e as CustomEvent<{ configuration: string }>).detail.configuration
-      );
-    });
-  }
-
   @property({ attribute: false })
   selectedDevices = new Set<string>();
 
@@ -265,9 +252,9 @@ export class ESPHomeDeviceTable extends LitElement {
       this._pageIndex = 0;
     }
 
-    if (this._localize !== this._prevLocalize) {
+    if (this._localize !== this._prevLocalize || changed.has("selectMode")) {
       this._prevLocalize = this._localize;
-      this._columns = createDeviceColumns(this._localize);
+      this._columns = createDeviceColumns(this._localize, this.selectMode);
     }
     if (
       changed.has("devices") ||

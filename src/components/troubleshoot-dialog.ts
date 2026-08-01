@@ -29,12 +29,13 @@ import { warningBannerStyles } from "../styles/banners.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { isIpLiteral } from "../util/ip-literal.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   buildTroubleshootSections,
   pingReplyUnverified,
 } from "../util/troubleshoot-tree.js";
-import { isIpLiteral, type NetworkSection } from "../util/use-address-yaml.js";
+import { type NetworkSection } from "../util/use-address-yaml.js";
 import { troubleshootDialogStyles } from "./troubleshoot-dialog.styles.js";
 import {
   loadExistingAddress,

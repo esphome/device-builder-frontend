@@ -90,7 +90,10 @@ const EMPTY_CELL = html`<span class="cell-muted">—</span>`;
 const valueCell = (cls: string, val: string) =>
   val ? html`<span class=${cls}>${val}</span>` : EMPTY_CELL;
 
-export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow>[] {
+export function createDeviceColumns(
+  localize: LocalizeFunc,
+  selectMode = false
+): ColumnDef<DeviceRow>[] {
   return [
     {
       accessorKey: "status",
@@ -150,7 +153,9 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : state === DeviceState.OFFLINE
               ? localize("dashboard.table_status_offline")
               : localize("dashboard.table_status_unknown");
-        if (state === DeviceState.ONLINE) {
+        // Inert while selecting, matching the card badge: in select
+        // mode the whole row is one toggle target.
+        if (state === DeviceState.ONLINE || selectMode) {
           return html`<span class="cell-status"
             ><span class="status-dot ${dotClass}" title="${title}"></span
           ></span>`;
@@ -168,6 +173,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           class="cell-status"
           role="button"
           tabindex="0"
+          title=${cellLabel}
           aria-label=${cellLabel}
           @click=${openTroubleshoot}
           @keydown=${(e: KeyboardEvent) => {

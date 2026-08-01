@@ -223,7 +223,6 @@ export const deviceCardStyles = [
     button.device-status {
       border: none;
       font-family: inherit;
-      letter-spacing: inherit;
     }
 
     .device-status.clickable {
