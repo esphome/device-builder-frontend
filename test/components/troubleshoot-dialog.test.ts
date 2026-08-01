@@ -264,9 +264,12 @@ describe("troubleshoot-dialog", () => {
   });
 
   it("appends a deep-merging block when the network settings are packaged", async () => {
-    const { el, api } = await openDialog({
-      getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
-    });
+    const { el, api } = await openDialog(
+      {
+        getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
+      },
+      makeConfiguredDevice({ ip: "10.0.0.42", loaded_integrations: ["wifi", "api"] })
+    );
     await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
     input.value = "10.0.0.99";
@@ -293,9 +296,44 @@ describe("troubleshoot-dialog", () => {
     await flush();
     await el.updateComplete;
     expect(api.updateConfig).not.toHaveBeenCalled();
-    expect(el.shadowRoot!.querySelector(".snippet")!.textContent).toContain(
+    // Bare key only: the include target is the section's mapping body,
+    // so a section header pasted there would nest a level too deep.
+    expect(el.shadowRoot!.querySelector(".snippet")!.textContent!.trim()).toBe(
       "use_address: 10.0.0.99"
     );
+  });
+
+  it("quotes an IPv6 literal in the copyable snippet", async () => {
+    const { el } = await openDialog({
+      getConfig: vi.fn().mockResolvedValue("wifi: !include wifi.yaml\n"),
+    });
+    await openAddressScreen(el);
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "fe80::1";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".snippet")!.textContent!.trim()).toBe(
+      'use_address: "fe80::1"'
+    );
+  });
+
+  it("refuses a network-less config instead of writing a bare wifi block", async () => {
+    const { el, api } = await openDialog({
+      getConfig: vi.fn().mockResolvedValue("esphome:\n  name: kitchen\napi:\n"),
+    });
+    await openAddressScreen(el);
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "10.0.0.99";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(api.updateConfig).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_no_network");
   });
 
   it("does not double-subscribe while an attempt is in flight", async () => {

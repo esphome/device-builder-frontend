@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyUseAddress,
-  findNetworkSection,
   isValidUseAddress,
   readAddressPrefill,
   removeUseAddress,
@@ -24,18 +23,6 @@ wifi:
 
 api:
 `;
-
-describe("findNetworkSection", () => {
-  it("picks the network block present in the raw text", () => {
-    expect(findNetworkSection(WIFI_YAML)).toBe("wifi");
-    expect(findNetworkSection("ethernet:\n  type: LAN8720\n")).toBe("ethernet");
-    expect(findNetworkSection("openthread:\n")).toBe("openthread");
-    expect(findNetworkSection("wifi:\r\n  ssid: net\r\n")).toBe("wifi");
-    expect(
-      findNetworkSection("esphome:\n  name: kit\npackages:\n  base: !include x\n")
-    ).toBeNull();
-  });
-});
 
 describe("applyUseAddress", () => {
   it("adds use_address while keeping secrets and comments byte-for-byte", () => {
@@ -87,16 +74,21 @@ describe("applyUseAddress", () => {
   });
 
   it("quotes an IPv6 literal in an appended block", () => {
-    const updated = applied("packages:\n  base: !include x.yaml\n", "fe80::1");
+    const updated = applied("packages:\n  base: !include x.yaml\n", "fe80::1", ["wifi"]);
     expect(updated).toContain('use_address: "fe80::1"');
   });
 
   it("names a snippet for an include-valued header instead of duplicating it", () => {
     const yaml = "ethernet: !include net.yaml\napi:\n";
-    expect(findNetworkSection(yaml)).toBeNull();
     expect(applyUseAddress(yaml, "10.0.0.9", ["wifi"])).toEqual({
       snippet: "ethernet",
     });
+  });
+
+  it("refuses a config with no network component instead of guessing wifi", () => {
+    expect(
+      applyUseAddress("esphome:\n  name: kitchen\napi:\n", "10.0.0.9", ["api", "logger"])
+    ).toEqual({ noNetwork: true });
   });
 });
 
@@ -117,6 +109,11 @@ describe("readAddressPrefill", () => {
     ).toBe("10.0.0.50");
     expect(readAddressPrefill("wifi:\n  ssid: net\n").staticIp).toBeNull();
     expect(readAddressPrefill("ethernet:\n  type: LAN8720\n").staticIp).toBeNull();
+    expect(
+      readAddressPrefill(
+        "ethernet:\n  type: LAN8720\n  manual_ip:\n    static_ip: 10.0.0.60\n"
+      ).staticIp
+    ).toBe("10.0.0.60");
   });
 });
 

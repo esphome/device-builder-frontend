@@ -19,21 +19,17 @@ export type NetworkSection = (typeof NETWORK_SECTIONS)[number];
 const HOSTNAME_RE =
   /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
-export type ApplyUseAddressResult = { yaml: string } | { snippet: NetworkSection };
-
-/** First network block spliceable as a top-level mapping, or null. A
- *  header carrying an inline value (`wifi: !include net.yaml`) is not
- *  spliceable. */
-export function findNetworkSection(yaml: string): NetworkSection | null {
-  return findSpliceableSection(splitYamlDocLines(yaml));
-}
+export type ApplyUseAddressResult =
+  { yaml: string } | { snippet: NetworkSection } | { noNetwork: true };
 
 /**
  * Splice `use_address: value` into the local network block, or append a
  * new block that deep-merges with a `packages:`-supplied one.
 
- * A `wifi: !include`-style header yields `{snippet}` instead: a second
- * top-level header beside it would be a duplicate key.
+ * A `wifi: !include`-style header yields `{snippet}` (a second
+ * top-level header beside it would be a duplicate key); a config with
+ * no network component anywhere yields `{noNetwork}` — appending a
+ * bare `wifi:` block to it would not compile.
  */
 export function applyUseAddress(
   yaml: string,
@@ -50,9 +46,10 @@ export function applyUseAddress(
   for (const candidate of NETWORK_SECTIONS) {
     if (findSectionStart(lines, candidate) >= 0) return { snippet: candidate };
   }
-  const target =
-    NETWORK_SECTIONS.find((candidate) => loadedIntegrations.includes(candidate)) ??
-    "wifi";
+  const target = NETWORK_SECTIONS.find((candidate) =>
+    loadedIntegrations.includes(candidate)
+  );
+  if (target === undefined) return { noNetwork: true };
   return { yaml: appendSectionToYaml(yaml, target, { use_address: value }) };
 }
 
@@ -75,7 +72,9 @@ export function readAddressPrefill(yaml: string): {
   const raw = values.use_address;
   const useAddress =
     typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
-  return { useAddress, staticIp: section === "wifi" ? staticIpOf(values) : null };
+  // wifi and ethernet both take manual_ip; openthread has none and
+  // falls out of staticIpOf naturally.
+  return { useAddress, staticIp: staticIpOf(values) };
 }
 
 /** Remove `use_address` from the network block; null when nothing is

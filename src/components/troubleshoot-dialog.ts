@@ -35,7 +35,6 @@ import {
   buildTroubleshootSections,
   pingReplyUnverified,
 } from "../util/troubleshoot-tree.js";
-import { type NetworkSection } from "../util/use-address-yaml.js";
 import { troubleshootDialogStyles } from "./troubleshoot-dialog.styles.js";
 import {
   loadExistingAddress,
@@ -66,7 +65,14 @@ const PROBE_ROW_ICONS = {
 } as const;
 
 type SaveState =
-  "idle" | "saving" | "saved" | "removed" | "remove_packaged" | "snippet" | "error";
+  | "idle"
+  | "saving"
+  | "saved"
+  | "removed"
+  | "remove_packaged"
+  | "snippet"
+  | "no_network"
+  | "error";
 
 @customElement("esphome-troubleshoot-dialog")
 export class ESPHomeTroubleshootDialog extends LitElement {
@@ -96,7 +102,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   @state() _existingAddress = "";
 
   private _subscription: ReachabilitySubscription | null = null;
-  _snippetSection: NetworkSection = "wifi";
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
   private _failedGeneration = -1;

@@ -2022,11 +2022,12 @@
     "use_address_invalid": "Enter a valid IP address or hostname",
     "use_address_error": "Saving failed. Edit the configuration in the editor instead.",
     "back": "Back",
-    "use_address_saved": "Saved. The new address takes effect after the next install; until then the device may still show offline.",
+    "use_address_saved": "Saved. Installs now contact this address directly; until an install completes, the status shown here may still be based on the old address.",
+    "use_address_no_network": "This configuration has no network component (wifi, ethernet, or openthread), so use_address does not apply.",
     "use_address_remove_packaged": "This configuration keeps its network settings in a package or include; remove use_address from that file instead.",
     "use_address_copy": "Copy",
     "use_address_copied": "Copied",
     "use_address_copy_failed": "Copying failed; select the text and copy it manually",
-    "use_address_snippet": "This configuration loads its network settings from an included file, so it cannot be edited here. Add this inside that file:"
+    "use_address_snippet": "This configuration's network block cannot be edited from here. Add this line inside the file that provides the network settings:"
   }
 }

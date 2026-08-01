@@ -73,7 +73,10 @@ function renderUseAddressForm(
   device: ConfiguredDevice
 ): TemplateResult {
   if (host._saveState === "snippet") {
-    const snippet = `${host._snippetSection}:\n  use_address: ${host._addressInput.trim()}`;
+    // Bare key only: the include target is the section's mapping body,
+    // so a `wifi:` header pasted there would nest one level too deep.
+    const value = host._addressInput.trim();
+    const snippet = `use_address: ${value.includes(":") ? `"${value}"` : value}`;
     return html`
       <p>${host._localize("troubleshoot.use_address_snippet")}</p>
       <pre class="snippet">${snippet}</pre>
@@ -133,6 +136,13 @@ function renderUseAddressForm(
         : nothing
     }
     ${
+      host._saveState === "no_network"
+        ? html`<p class="field-error">
+            ${host._localize("troubleshoot.use_address_no_network")}
+          </p>`
+        : nothing
+    }
+    ${
       host._saveState === "remove_packaged"
         ? html`<p class="field-error">
             ${host._localize("troubleshoot.use_address_remove_packaged")}
@@ -181,8 +191,11 @@ async function saveUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     const device = host._devices.find((d) => d.configuration === configuration);
     const result = applyUseAddress(yaml, value, device?.loaded_integrations ?? []);
     if ("snippet" in result) {
-      host._snippetSection = result.snippet;
       host._saveState = "snippet";
+      return;
+    }
+    if ("noNetwork" in result) {
+      host._saveState = "no_network";
       return;
     }
     await host._api.updateConfig(configuration, result.yaml);
