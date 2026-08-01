@@ -42,6 +42,13 @@ const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
 const CERT_MATERIAL_KEY =
   /(^|[_.-])(certificate|certificate_authority|certificates|private_key|client_key)$/i;
 
+// Report-only suffix widening for idiomatic substitution names
+// (`wifi_pass`, `api_token`, `my_secret`): over-masking costs nothing
+// in the report, and the preserved `${...}` reference site would
+// otherwise hide the leak. Deliberately not bare `key` — that would
+// swallow `remote_receiver`'s button codes.
+const REPORT_SENSITIVE_KEY_SUFFIX = /[_.-](pass|secret|token)$/i;
+
 /**
  * True when *key* names a credential whose value must not leave
  * the app in clear text. Combines two sources:
@@ -65,7 +72,11 @@ function isSensitiveKey(key: string): boolean {
 }
 
 function isReportSensitiveKey(key: string): boolean {
-  return isSensitiveKey(key) || CERT_MATERIAL_KEY.test(key);
+  return (
+    isSensitiveKey(key) ||
+    CERT_MATERIAL_KEY.test(key) ||
+    REPORT_SENSITIVE_KEY_SUFFIX.test(key)
+  );
 }
 
 /**

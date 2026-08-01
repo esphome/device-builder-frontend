@@ -225,6 +225,22 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("pembody");
   });
 
+  it("masks idiomatic short credential suffixes in reports only", () => {
+    const yaml = [
+      "substitutions:",
+      "  wifi_pass: hunter2",
+      "  api_token: abcdef",
+      "wifi:",
+      "  password: ${wifi_pass}",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("abcdef");
+    expect(masked).toContain("  password: ${wifi_pass}");
+    // UI surfaces keep the narrower rules.
+    expect(maskSensitiveLine("  wifi_pass: hunter2")).toBe("  wifi_pass: hunter2");
+  });
+
   it("keeps public certificate material visible on UI paths", () => {
     // Only the outbound report widens to certificate blobs; search
     // labels and snippets keep the credential-only rules.
