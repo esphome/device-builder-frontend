@@ -14,7 +14,11 @@ import { exclusiveBusTarget } from "../../util/bus-availability.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
-import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
+import {
+  buildFeaturedId,
+  isFeaturedId,
+  resolveFeaturedComponentId,
+} from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
@@ -566,6 +570,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._depNavSeq++;
     let draft = this.yaml || undefined;
     let lastAdded: { domain: string; id: string } | null = null;
+    // The last member this run actually merged, for the closing select.
+    // A member skipped as already present isn't one the user just added,
+    // so it deliberately doesn't count.
+    let lastMerged: { componentId: string; instanceId?: string } | null = null;
     let addedAny = false;
     // Every exit that merged anything publishes the same draft; the
     // per-exit comments explain why each one publishes.
@@ -654,6 +662,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         );
         draft = yaml;
         addedAny = true;
+        lastMerged = {
+          componentId: resolveFeaturedComponentId(fullIds[i], this.board),
+          instanceId: typeof memberId === "string" ? memberId : undefined,
+        };
         if (typeof memberId === "string") existingIds.add(memberId);
         // Keep `this.yaml` current so the next member's dep check + reference
         // dropdown see what this batch already added; the host draft is
@@ -662,6 +674,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
         lastAdded = this._chainReference(entry, fields);
       }
       publishDraft();
+      // Land on the last member merged, so a bundle leaves the editor on
+      // what it added rather than wherever the user happened to be. Same
+      // guarded shape as the single add: no target, no navigation.
+      if (lastMerged) {
+        const target = findAddedSection(
+          this.yaml,
+          lastMerged.componentId,
+          lastMerged.instanceId
+        );
+        if (target) fireEvent(this, "section-select", target);
+      }
       this._dialog.open = false;
       this._selected = null;
       this._resetDetourState();
@@ -881,7 +904,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // Falls through silently if we can't find it — better to
         // leave the previous selection alone than navigate somewhere
         // wrong.
-        const componentId = this._selected.id;
+        // Resolved first: a board-curated entry's catalog id is the
+        // synthetic `featured.<board>.<local>`, which matches no section
+        // key, so the lookup found nothing and the editor stayed put.
+        const componentId = resolveFeaturedComponentId(this._selected.id, this.board);
         const componentName = this._selected.name;
         const newId = fields["id"];
         const target = findAddedSection(
