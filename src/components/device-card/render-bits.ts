@@ -116,15 +116,17 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     }
   }
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
+    const label = card._localize("dashboard.status_untracked");
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
     return html`<div
         id="status-untracked"
         class="device-status ${DeviceState.UNKNOWN}"
+        role="img"
         tabindex="0"
-        aria-label=${tooltip}
+        aria-label="${label}. ${tooltip}"
       >
         <wa-icon library="mdi" name="help-network-outline"></wa-icon>
-        ${card._localize("dashboard.status_untracked")}
+        ${label}
       </div>
       <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
   }

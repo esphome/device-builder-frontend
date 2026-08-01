@@ -103,6 +103,24 @@ describe("applyFacetFilters", () => {
     expect(out).toEqual([offline]);
   });
 
+  it("state facet buckets a flagged device as untracked, not offline", () => {
+    const flagged = device({
+      name: "f",
+      name_add_mac_suffix: true,
+      runtime_state: { state: DeviceState.OFFLINE },
+    });
+    const offline = device({ name: "o", runtime_state: { state: DeviceState.OFFLINE } });
+    expect(
+      applyFacetFilters([flagged, offline], selection({ selectedStates: ["untracked"] }))
+    ).toEqual([flagged]);
+    expect(
+      applyFacetFilters(
+        [flagged, offline],
+        selection({ selectedStates: [DeviceState.OFFLINE] })
+      )
+    ).toEqual([offline]);
+  });
+
   it("update-status facet is AND across selected buckets", () => {
     const updatable = device({ name: "u", update_available: true });
     const modified = device({ name: "m", has_pending_changes: true });

@@ -131,7 +131,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
           return html`<span class="cell-status"
             ><span
-              class="status-dot unknown"
+              class="status-dot untracked"
               title=${localize("dashboard.status_untracked_tooltip")}
             ></span
           ></span>`;

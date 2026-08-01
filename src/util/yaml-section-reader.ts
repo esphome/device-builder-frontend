@@ -51,10 +51,12 @@ export function findSectionStart(
 
 /**
  * 0-indexed line of the last direct-child line under `sectionKey`
- * matching `keyRe` (tested against the trimmed line), or -1. Duplicate
- * keys follow YAML's last-key-wins. A line scan, so it works on
- * mid-edit drafts the full parser rejects; the dedent stop keeps a
- * list section scoped to its own item.
+ * matching `keyRe` (tested against the trimmed line), or -1. A line
+ * scan, so it works on mid-edit drafts the full parser rejects; the
+ * dedent stop keeps a list section scoped to its own item. Duplicate
+ * matches follow YAML's last-key-wins, but only among lines `keyRe`
+ * matches — a caller whose regex requires a value won't see a later
+ * valueless re-declaration of the same key.
  */
 export function findDirectChildLine(
   lines: string[],

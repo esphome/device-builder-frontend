@@ -105,9 +105,10 @@ describe("device table status dot with name_add_mac_suffix", () => {
     return rendered(columnByKey("status")(info) as TemplateResult);
   };
 
-  it("shows the untracked tooltip instead of an offline/unknown verdict", () => {
+  it("shows the untracked dot instead of an offline/unknown verdict", () => {
     for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {
       const html = statusCell(state, true);
+      expect(html).toContain("status-dot untracked");
       expect(html).toContain("dashboard.status_untracked_tooltip");
       expect(html).not.toContain("table_status_offline");
     }
