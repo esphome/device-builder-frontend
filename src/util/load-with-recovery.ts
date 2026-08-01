@@ -11,6 +11,18 @@ export interface LoadConfigOptions {
   attempts: number;
   /** Overrides the command default, which is short for a large config. */
   timeoutMs?: number;
+  /** Total wall-clock bound across attempts and outages; when exceeded
+   *  the read fails with ``LoadDeadlineError`` instead of parking on
+   *  ``api.ready`` indefinitely. */
+  deadlineMs?: number;
+}
+
+/** The `deadlineMs` bound elapsed before the read settled. */
+export class LoadDeadlineError extends Error {
+  constructor() {
+    super("Config read deadline exceeded");
+    this.name = "LoadDeadlineError";
+  }
 }
 
 /**
@@ -26,6 +38,35 @@ export interface LoadConfigOptions {
  * reply or failure that lands after the caller moved on.
  */
 export async function loadConfigWithRecovery(
+  api: ESPHomeAPI,
+  configuration: string,
+  opts: LoadConfigOptions
+): Promise<string | null> {
+  if (opts.deadlineMs === undefined) return runAttempts(api, configuration, opts);
+  // The expired flag folds into the abandonment predicate so the loop
+  // stops retrying (or exits its api.ready park) after the race settles.
+  let expired = false;
+  const bounded: LoadConfigOptions = {
+    ...opts,
+    abandoned: () => expired || opts.abandoned?.() === true,
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      runAttempts(api, configuration, bounded),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          expired = true;
+          reject(new LoadDeadlineError());
+        }, opts.deadlineMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runAttempts(
   api: ESPHomeAPI,
   configuration: string,
   opts: LoadConfigOptions

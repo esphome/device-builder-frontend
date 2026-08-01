@@ -77,9 +77,6 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   // A comment-only value can still carry the credential
   // (``password: # hunter2``); mask the comment body, keeping the marker.
   if (value.startsWith("#")) return `${prefix}${key}: # ${placeholder}`;
-  // Indirections aren't credentials — ``!secret <name>`` and
-  // ``${some_substitution}`` only carry the *name* of the
-  // value, not the value itself. Don't mask them.
   // Preserve indirections (they carry only a name) and block-scalar
   // headers (no credential of their own; rewriting breaks the YAML shape
   // while the scanner masks the body lines) — but mask any trailing
@@ -89,23 +86,10 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
     value.startsWith("${") ||
     BLOCK_SCALAR_HEADER.test(value)
   ) {
-    return maskTrailingComment(prefix, key, value, placeholder) ?? line;
+    const masked = maskCommentTail(value, placeholder);
+    return masked === value ? line : `${prefix}${key}: ${masked}`;
   }
   return `${prefix}${key}: ${placeholder}`;
-}
-
-// An inline comment beside a preserved value can carry the credential
-// itself ("password: !secret wifi # hunter2"); mask its body. Null when
-// the value has no trailing comment.
-function maskTrailingComment(
-  prefix: string,
-  key: string,
-  value: string,
-  placeholder: string
-): string | null {
-  const hash = value.search(RE_INLINE_COMMENT_BOUNDARY);
-  if (hash === -1) return null;
-  return `${prefix}${key}: ${value.slice(0, hash).trimEnd()} # ${placeholder}`;
 }
 
 /**
@@ -114,9 +98,9 @@ function maskTrailingComment(
  * Runs the parent-aware ``findSensitiveValueRanges`` scanner over
  * the joined block (catching ``key:`` under ``encryption:`` and
  * block-scalar credentials), then falls back to the single-line
- * heuristic for what the scanner doesn't handle: commented-out
- * credentials (``# password: hunter2``) — the scanner's ``KEY_LINE``
- * regex doesn't match leading ``#``.
+ * heuristic for credential text the scanner never sees: commented-out
+ * lines (its ``KEY_LINE`` regex doesn't match leading ``#``) and
+ * comment-carried credential text beside skipped values.
  *
  * Edge case for partial windows (search snippets): a ``key:``
  * line whose ``encryption:`` parent falls outside the block stays
@@ -140,9 +124,7 @@ export function maskSensitiveLines(
   const scannerMaskedLines = new Set<number>();
   for (const range of ranges) {
     const idx = range.line - 1;
-    if (idx < 0 || idx >= out.length) continue;
     const line = out[idx];
-    if (range.valueFrom < 0 || range.valueTo > line.length) continue;
     // ``findSensitiveValueRanges`` skips ``!secret <name>`` (it only
     // carries the indirection name, not the credential) but doesn't
     // skip ``${substitution}`` references — they're the same shape
@@ -171,7 +153,7 @@ export function maskSensitiveLines(
       const m = out[j].match(COMMENT_LINE);
       if (!m) break;
       if (!m[2]) continue;
-      if (commentContentColumn(out[j]) <= headerColumn) break;
+      if (out[j].length - m[2].length <= headerColumn) break;
       out[j] = `${m[1]} ${placeholder}`;
     }
   }
@@ -184,8 +166,9 @@ function commentContentColumn(line: string): number {
   return m ? line.length - m[2].length : 0;
 }
 
-// A trailing comment beside a masked value can carry the credential
-// itself; mask its body, keeping the marker and spacing.
+// A trailing comment beside a masked or preserved value can carry the
+// credential itself; mask its body, keeping the marker and spacing.
+// Returns the input unchanged when it carries no comment.
 function maskCommentTail(tail: string, placeholder: string): string {
   const boundary = tail.search(RE_INLINE_COMMENT_BOUNDARY);
   if (boundary === -1) return tail;

@@ -99,14 +99,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   private _scrape: CrashScrape = scrapeCrashData([]);
 
   // null = config read still in flight (collecting phase); "" = config
-  // unavailable (read failed or empty); else the masked editor YAML.
+  // unavailable (read failed); else the masked editor YAML.
   @state()
   private _configYaml: string | null = null;
-
-  // "" once config is present; "transport" when the read failed (a
-  // connection issue, not the user's YAML).
-  @state()
-  private _configError: "" | "transport" = "";
 
   // The user's own "what was the device doing" context; required before
   // the report can be sent — a crash report without it isn't actionable.
@@ -159,7 +154,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._name = name;
     this._session += 1;
     this._configYaml = null;
-    this._configError = "";
     this._delivered = false;
     this._userDescription = "";
     this._reportText = "";
@@ -176,32 +170,19 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private async _captureConfig(session: number): Promise<void> {
-    // The timed-out flag rides the abandonment predicate so the recovery
-    // loop stops retrying (or exits its api.ready park) once the dialog
-    // has already degraded to the no-config path.
-    let timedOut = false;
-    const abandoned = () => timedOut || session !== this._session || !this._dialog.open;
-    const timer = window.setTimeout(() => {
-      timedOut = true;
-      if (session !== this._session || !this._dialog.open) return;
-      this._configYaml = "";
-      this._configError = "transport";
-    }, CONFIG_READ_TIMEOUT_MS);
+    const abandoned = () => session !== this._session || !this._dialog.open;
     try {
       const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
         abandoned,
         attempts: 4,
+        deadlineMs: CONFIG_READ_TIMEOUT_MS,
       });
       if (yaml === null) return;
       this._configYaml = maskSensitiveYaml(yaml);
-      this._configError = "";
     } catch (err) {
       console.warn("Reading the config failed", err);
       if (abandoned()) return;
       this._configYaml = "";
-      this._configError = "transport";
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -430,11 +411,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
         ${this._renderSummaryRow(
           this._localize(
-            this._configError === "transport"
+            configFailed
               ? "crash_report.config_capture_failed"
-              : configFailed
-                ? "crash_report.config_unavailable"
-                : "crash_report.includes_config"
+              : "crash_report.includes_config"
           ),
           configFailed
         )}

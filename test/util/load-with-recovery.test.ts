@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
-import { loadConfigWithRecovery } from "../../src/util/load-with-recovery.js";
+import {
+  loadConfigWithRecovery,
+  LoadDeadlineError,
+} from "../../src/util/load-with-recovery.js";
 
 /**
  * Pins the flaky-link fetch policy: transport faults retry, server
@@ -121,6 +124,37 @@ describe("loadConfigWithRecovery", () => {
     fail(new APIError("not_found", "gone"));
 
     await expect(result).resolves.toBeNull();
+  });
+
+  it("fails with LoadDeadlineError when the deadline elapses mid-park", async () => {
+    let release!: () => void;
+    const parked = new Promise<void>((resolve) => (release = resolve));
+    const getConfig = vi.fn().mockResolvedValue("yaml");
+    const settled = expect(
+      loadConfigWithRecovery(makeApi(getConfig, parked), "kitchen.yaml", {
+        attempts: 4,
+        deadlineMs: 30_000,
+      })
+    ).rejects.toBeInstanceOf(LoadDeadlineError);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await settled;
+
+    // The loop exits at its next checkpoint instead of issuing the read.
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getConfig).not.toHaveBeenCalled();
+  });
+
+  it("clears the deadline on a fast success", async () => {
+    const getConfig = vi.fn().mockResolvedValue("yaml");
+    await expect(
+      loadConfigWithRecovery(makeApi(getConfig), "kitchen.yaml", {
+        attempts: 4,
+        deadlineMs: 30_000,
+      })
+    ).resolves.toBe("yaml");
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("stops retrying once the caller loses interest", async () => {

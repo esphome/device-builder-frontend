@@ -113,18 +113,16 @@ describe("crash-report-dialog", () => {
     await finishRead("esphome:\n  nam broken [yaml");
     await el.updateComplete;
     expect((el as any)._configYaml).toBe("esphome:\n  nam broken [yaml");
-    expect((el as any)._configError).toBe("");
     expect(el.shadowRoot!.textContent).toContain("crash_report.includes_config");
   });
 
-  it("flags a failed read as a transport issue", async () => {
+  it("degrades to the no-config path when the read fails", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await rejectRead();
     await el.updateComplete;
     expect((el as any)._configYaml).toBe("");
-    expect((el as any)._configError).toBe("transport");
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_capture_failed");
-    expect(el.shadowRoot!.textContent).not.toContain("crash_report.config_unavailable");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.includes_config");
   });
 
   it("requires a description before the report can be opened", async () => {
@@ -311,7 +309,6 @@ describe("crash-report-dialog", () => {
       // without config.
       await vi.advanceTimersByTimeAsync(30_000);
       expect((el as any)._configYaml).toBe("");
-      expect((el as any)._configError).toBe("transport");
     } finally {
       vi.useRealTimers();
     }
