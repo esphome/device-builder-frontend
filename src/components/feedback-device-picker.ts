@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiBugOutline, mdiChip, mdiOpenInNew } from "@mdi/js";
+import { mdiBugOutline, mdiChip, mdiClipboardTextOutline, mdiOpenInNew } from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -35,6 +35,7 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 registerMdiIcons({
   "bug-outline": mdiBugOutline,
   chip: mdiChip,
+  "clipboard-text-outline": mdiClipboardTextOutline,
   "open-in-new": mdiOpenInNew,
 });
 
@@ -115,6 +116,29 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
         max-height: 320px;
         overflow-y: auto;
       }
+
+      /* The what-is-included disclosure, same shape as the crash
+         dialog's summary list. */
+      .summary {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
+        margin: 0 0 var(--wa-space-s);
+        padding: 0;
+        list-style: none;
+        font-size: var(--wa-font-size-s);
+      }
+
+      .summary li {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+      }
+
+      .summary wa-icon {
+        flex-shrink: 0;
+        color: var(--esphome-primary);
+      }
     `,
   ];
 
@@ -148,7 +172,17 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
       (device) => !filter || matchesDeviceName(device, filter)
     );
     return html`
-      <p class="description">${this._localize("feedback.device_note")}</p>
+      <ul class="summary">
+        ${["feedback.device_includes_config", "feedback.device_includes_facts"].map(
+          (key) => html`
+            <li>
+              <wa-icon library="mdi" name="clipboard-text-outline"></wa-icon>
+              <span>${this._localize(key)}</span>
+            </li>
+          `
+        )}
+      </ul>
+      <p class="description">${this._localize("feedback.device_hint")}</p>
       ${
         this._devices.length > DEVICE_FILTER_THRESHOLD
           ? html`<input
