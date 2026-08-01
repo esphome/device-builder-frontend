@@ -16,7 +16,7 @@ import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import {
   buildFeaturedId,
-  isFeaturedId,
+  featuredEntryForId,
   resolveFeaturedComponentId,
 } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -50,6 +50,17 @@ import "./add-component-form.js";
 import type { ESPHomeAddComponentForm } from "./add-component-form.js";
 import "./component-catalog.js";
 import type { ESPHomeComponentCatalog } from "./component-catalog.js";
+
+/** A block just merged into the YAML, for the post-add lookup. */
+interface AddedBlock {
+  /** The YAML the merge returned, pinned so a host re-binding `yaml` can't
+   *  reorder what the lookup reads. */
+  yaml: string;
+  /** Catalog id, still in its raw `featured.<board>.<local>` form when the
+   *  entry is board-curated; `_selectAndClose` resolves it. */
+  componentId: string;
+  instanceId?: string;
+}
 
 registerMdiIcons({
   close: mdiClose,
@@ -424,9 +435,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     entry: ComponentCatalogEntry
   ): { boardId: string; missing: string[]; unresolved: string[] } | null {
     const board = this.board;
-    if (!board || !isFeaturedId(entry.id)) return null;
+    if (!board) return null;
     const featured = board.featured_components ?? [];
-    const fc = featured.find((c) => buildFeaturedId(board.id, c.id) === entry.id);
+    const fc = featuredEntryForId(entry.id, board);
     if (!fc?.requires?.length) return null;
     const existingIds = collectExistingIds(this.yaml);
     const missing: string[] = [];
@@ -574,10 +585,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._depNavSeq++;
     let draft = this.yaml || undefined;
     let lastAdded: { domain: string; id: string } | null = null;
-    // The last member this run actually merged, for the closing select.
-    // A member skipped as already present isn't one the user just added,
-    // so it deliberately doesn't count.
-    let lastMerged: { componentId: string; instanceId?: string } | null = null;
+    // The last member this run actually merged, for the closing select. One
+    // skipped as already present isn't what the user just added, so it
+    // deliberately doesn't count.
+    let lastMerged: AddedBlock | null = null;
     let addedAny = false;
     // Every exit that merged anything publishes the same draft; the
     // per-exit comments explain why each one publishes.
@@ -654,8 +665,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // still be re-added — a rarer path, scoped out alongside the
         // create-wizard ``_applyFullSetup`` follow-up and backstopped by
         // ESPHome's global id uniqueness.
-        const memberId = fields["id"];
-        if (typeof memberId === "string" && existingIds.has(memberId)) {
+        const memberId = typeof fields["id"] === "string" ? fields["id"] : undefined;
+        if (memberId && existingIds.has(memberId)) {
           lastAdded = this._chainReference(entry, fields);
           continue;
         }
@@ -666,11 +677,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         );
         draft = yaml;
         addedAny = true;
-        lastMerged = {
-          componentId: resolveFeaturedComponentId(fullIds[i], board),
-          instanceId: typeof memberId === "string" ? memberId : undefined,
-        };
-        if (typeof memberId === "string") existingIds.add(memberId);
+        lastMerged = { yaml, componentId: fullIds[i], instanceId: memberId };
+        if (memberId) existingIds.add(memberId);
         // Keep `this.yaml` current so the next member's dep check + reference
         // dropdown see what this batch already added; the host draft is
         // published once at the end rather than churning the editor per member.
@@ -678,20 +686,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         lastAdded = this._chainReference(entry, fields);
       }
       publishDraft();
-      // Land on the last member merged, so a bundle leaves the editor on
-      // what it added rather than wherever the user happened to be. Same
-      // guarded shape as the single add: no target, no navigation.
-      if (lastMerged) {
-        const target = findAddedSection(
-          draft ?? this.yaml,
-          lastMerged.componentId,
-          lastMerged.instanceId
-        );
-        if (target) fireEvent(this, "section-select", target);
-      }
-      this._dialog.open = false;
-      this._selected = null;
-      this._resetDetourState();
+      // Land on the last member merged rather than wherever the user was.
+      this._selectAndClose(lastMerged, board);
       // Every member already present is a no-op; don't claim we "Added" it.
       const message = addedAny
         ? this._localize("device.bundle_added", { name: bundle.name })
@@ -711,6 +707,28 @@ export class ESPHomeAddComponentDialog extends LitElement {
     } finally {
       this._submitting = false;
     }
+  }
+
+  /**
+   * Land the editor on the block just added, then close. A board-curated
+   * entry's catalog id is the synthetic `featured.<board>.<local>`, which
+   * matches no section key, so it is resolved before the lookup. Selecting
+   * before the close keeps the event in the tree; an unlocatable block
+   * leaves the previous selection alone rather than navigating somewhere
+   * wrong.
+   */
+  private _selectAndClose(added: AddedBlock | null, board: BoardCatalogEntry | null) {
+    if (added) {
+      const target = findAddedSection(
+        added.yaml,
+        resolveFeaturedComponentId(added.componentId, board),
+        added.instanceId
+      );
+      if (target) fireEvent(this, "section-select", target);
+    }
+    this._dialog.open = false;
+    this._selected = null;
+    this._resetDetourState();
   }
 
   /** Surface the merged YAML as an unsaved editor draft (host saves explicitly). */
@@ -906,28 +924,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._returnValues = null;
         this._selected = nextComponent;
       } else {
-        // Auto-select the just-added component so the navigator
-        // highlights it and the section editor jumps to its block.
-        // Falls through silently if we can't find it — better to
-        // leave the previous selection alone than navigate somewhere
-        // wrong.
-        // Resolved first: a board-curated entry's catalog id is the
-        // synthetic `featured.<board>.<local>`, which matches no section
-        // key, so the lookup found nothing and the editor stayed put.
-        const componentId = resolveFeaturedComponentId(this._selected.id, board);
         const componentName = this._selected.name;
         const newId = fields["id"];
-        const target = findAddedSection(
-          yaml,
-          componentId,
-          typeof newId === "string" ? newId : undefined
+        this._selectAndClose(
+          {
+            yaml,
+            componentId: this._selected.id,
+            instanceId: typeof newId === "string" ? newId : undefined,
+          },
+          board
         );
-        if (target) {
-          fireEvent(this, "section-select", target);
-        }
-        this._dialog.open = false;
-        this._selected = null;
-        this._resetDetourState();
         // Configless add skipped the form, so the close is the only
         // signal the add happened — toast to confirm.
         if (notify) {

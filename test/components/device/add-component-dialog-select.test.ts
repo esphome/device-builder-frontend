@@ -17,9 +17,9 @@ vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import { ComponentCategory } from "../../../src/api/types/components.js";
-import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
+import { makeAddComponentDialogHost } from "./_add-component-dialog-host.js";
 
 // A binary_sensor already in the device, so the added one has to be told
 // apart from it by id rather than just "the only gpio block".
@@ -46,30 +46,14 @@ const BOARD = {
 } as unknown as BoardCatalogEntry;
 
 interface Internals {
-  _dialog: { open: boolean };
   _selected: unknown;
   _fastPathFields: (entry: unknown) => Record<string, unknown> | null;
   _submitComponent: (fields: Record<string, unknown>, notify?: boolean) => Promise<void>;
   _onBundleSelected: (e: CustomEvent) => Promise<void>;
 }
 
-function makeDialog(mergedYaml = MERGED) {
-  const addComponent = vi.fn().mockResolvedValue({ yaml: mergedYaml });
-  const getComponentBodies = vi.fn().mockResolvedValue({});
-  const dialog = new ESPHomeAddComponentDialog();
-  Object.assign(dialog as unknown as Record<string, unknown>, {
-    _api: { addComponent, getComponentBodies },
-  });
-  dialog.configuration = "foo.yaml";
-  dialog.yaml = YAML;
-  dialog.board = BOARD;
-  return {
-    dialog,
-    d: dialog as unknown as Internals,
-    addComponent,
-    getComponentBodies,
-  };
-}
+const makeDialog = () =>
+  makeAddComponentDialogHost<Internals>({ yaml: YAML, mergedYaml: MERGED, board: BOARD });
 
 /** Every `section-select` the dialog dispatches. */
 const capture = (el: EventTarget) => {
@@ -116,25 +100,23 @@ describe("add-component-dialog selects what it added", () => {
     expect(seen).toEqual([{ sectionKey: "binary_sensor.gpio", fromLine: 8 }]);
   });
 
-  it("leaves the selection alone when the added block can't be found", async () => {
-    // Better to stay put than navigate somewhere wrong. Two distinct ways
-    // to miss: the id never resolves, and it resolves to a section the
-    // merged YAML doesn't hold. Only the second exercises the resolver.
-    for (const id of [
-      "featured.apollo-esk-1.unknown", // not on the board — passes through
-      "featured.apollo-esk-1.led", // resolves to light.binary, absent here
-    ]) {
-      const { dialog, d } = makeDialog();
-      d._selected = makeComponentEntry(id, {
-        name: "Mystery",
-        category: ComponentCategory.BINARY_SENSOR,
-      });
-      const seen = capture(dialog);
+  // Better to stay put than navigate somewhere wrong. Two distinct ways to
+  // miss: the id never resolves, and it resolves to a section the merged
+  // YAML doesn't hold — only the second reaches the resolver.
+  it.each([
+    ["an id the board doesn't carry", "featured.apollo-esk-1.unknown"],
+    ["an id resolving to an absent section", "featured.apollo-esk-1.led"],
+  ])("leaves the selection alone for %s", async (_label, id) => {
+    const { dialog, d } = makeDialog();
+    d._selected = makeComponentEntry(id, {
+      name: "Mystery",
+      category: ComponentCategory.BINARY_SENSOR,
+    });
+    const seen = capture(dialog);
 
-      await d._submitComponent({ id: "boot_button" }, true);
+    await d._submitComponent({ id: "boot_button" }, true);
 
-      expect(seen).toEqual([]);
-    }
+    expect(seen).toEqual([]);
   });
 
   it("lands on the last member a bundle merged", async () => {
