@@ -29,8 +29,8 @@ import {
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
+  devicePlatform,
   issuePlatform,
-  platformFromIntegrations,
   scrapeCrashData,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
@@ -202,9 +202,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
       dashboardVersion: this._serverVersion,
       // Plain-ESP32 sidecars can leave target_platform empty; the
       // integration list always names the platform component.
-      targetPlatform:
-        device?.target_platform ||
-        platformFromIntegrations(device?.loaded_integrations ?? []),
+      targetPlatform: device ? devicePlatform(device) : "",
       board: device?.board_id ?? "",
       installation: detectInstallation(this._api, this._isHaAddon),
     };

@@ -330,5 +330,12 @@ describe("feedback-device-picker", () => {
     ].filter((b) => !b.textContent!.includes("feedback.device_skip"));
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain("Kitchen Lamp");
+
+    // A needle matching nothing shows the announced empty state.
+    input.value = "zzz";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    const status = el.shadowRoot!.querySelector('[role="status"]');
+    expect(status!.textContent).toContain("feedback.device_no_matches");
   });
 });

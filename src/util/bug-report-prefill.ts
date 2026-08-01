@@ -16,7 +16,7 @@ export type DeviceTarget = "builder" | "esphome";
 // esphome/esphome's form has `config` + `additional`; the builder form has
 // `config` + `extra` (config added in esphome/device-builder#2482). GitHub
 // silently drops unknown params, so these must track the templates.
-export const DEVICE_TARGETS: Record<
+const DEVICE_TARGETS: Record<
   DeviceTarget,
   { href: string; factsParam: "additional" | "extra" }
 > = {
@@ -32,7 +32,7 @@ export const DEVICE_TARGETS: Record<
 
 // The builder template's `config` field is required; its own description
 // tells reporters to write this when no device applies.
-export const NOT_DEVICE_SPECIFIC = "not device specific";
+const NOT_DEVICE_SPECIFIC = "not device specific";
 
 export interface PrefillContext {
   serverVersion: string;

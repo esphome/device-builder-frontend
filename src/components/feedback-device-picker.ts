@@ -138,10 +138,20 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     if (changed.has("_devices")) this._sortedDevices = sortDevices(this._devices);
   }
 
+  // The ready swap removes the focused device row; move focus to the
+  // anchor so keyboard and screen-reader users aren't dropped to body.
+  protected updated(changed: PropertyValues): void {
+    if (changed.has("_readyUrl") && this._readyUrl) {
+      this.renderRoot.querySelector<HTMLElement>("a.link")?.focus();
+    }
+  }
+
   protected render() {
     if (this._readyUrl) {
       return html`
-        <p class="description">${this._localize("feedback.device_ready")}</p>
+        <p class="description" role="status">
+          ${this._localize("feedback.device_ready")}
+        </p>
         <div class="links">
           <a
             class="link featured"
@@ -196,6 +206,13 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
           </span>
           <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
         </button>
+        ${
+          devices.length === 0 && filter
+            ? html`<p class="description" role="status">
+                ${this._localize("feedback.device_no_matches")}
+              </p>`
+            : ""
+        }
         ${devices.map((device) => this._renderDeviceRow(device))}
       </div>
     `;
@@ -241,7 +258,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     window.open(
       skipDeviceUrl(this.target, this._prefillContext()).toString(),
       "_blank",
-      "noopener"
+      "noopener,noreferrer"
     );
     this._requestClose();
   };
