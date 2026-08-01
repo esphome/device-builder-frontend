@@ -45,6 +45,80 @@ wifi:
     ]);
   });
 
+  it("keeps the options-off contract: no comments, no spans, ${} masked", () => {
+    const yaml = [
+      "wifi:",
+      "  # password: commented",
+      "  password: ${wifi_password}",
+      "  ap_password: hunter2 # note",
+    ].join("\n");
+    expect(valuesAt(yaml, findSensitiveValueRanges(yaml))).toEqual([
+      "${wifi_password}",
+      "hunter2",
+    ]);
+  });
+
+  it("skips ${...} values under skipSubstitutionRefs", () => {
+    const yaml = "wifi:\n  password: ${wifi_password}\n  ap_password: hunter2";
+    expect(
+      valuesAt(yaml, findSensitiveValueRanges(yaml, { skipSubstitutionRefs: true }))
+    ).toEqual(["hunter2"]);
+  });
+
+  it("emits comment spans beside sensitive keys under emitCommentSpans", () => {
+    const yaml = [
+      "wifi:",
+      "  password: hunter2 # old pass",
+      "  ap_password: # comment only",
+      "  psk: !secret the_psk # was abcdef",
+      "mqtt:",
+      "  password: | # block note",
+      "    body",
+      "esphome:",
+      "  name: fine # untouched",
+    ].join("\n");
+    expect(
+      valuesAt(yaml, findSensitiveValueRanges(yaml, { emitCommentSpans: true }))
+    ).toEqual([
+      "hunter2",
+      "old pass",
+      "comment only",
+      "was abcdef",
+      "block note",
+      "body",
+    ]);
+  });
+
+  it("scans commented keys under scanCommented, without parent scope", () => {
+    const yaml = [
+      "wifi:",
+      "  # password: hunter2",
+      "  - # ota_password: abcdef",
+      "  # - psk: qwerty",
+      "api:",
+      "  encryption:",
+      "    # key: scoped-needs-parent",
+      "  # note: not-sensitive",
+    ].join("\n");
+    expect(
+      valuesAt(yaml, findSensitiveValueRanges(yaml, { scanCommented: true }))
+    ).toEqual(["hunter2", "abcdef", "qwerty"]);
+  });
+
+  it("consumes a commented block scalar with the comment-run boundary", () => {
+    const yaml = [
+      "wifi:",
+      "  # password: |",
+      "  #   body-one",
+      "  #no-space-body",
+      "  # note: keep",
+      "sensor:",
+    ].join("\n");
+    expect(
+      valuesAt(yaml, findSensitiveValueRanges(yaml, { scanCommented: true }))
+    ).toEqual(["body-one", "no-space-body"]);
+  });
+
   it("masks plain `password:` values regardless of parent", () => {
     const yaml = `api:
   password: hunter2
