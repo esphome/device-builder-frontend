@@ -85,6 +85,11 @@ export function maskSensitiveLine(
   placeholder = MASK_PLACEHOLDER,
   sensitive: (key: string) => boolean = isSensitiveKey
 ): string {
+  // A line keeping its CR matches no anchored regex here or in the
+  // scanner, so CRLF input would fail open; strip and re-append.
+  if (line.endsWith("\r")) {
+    return `${maskSensitiveLine(line.slice(0, -1), placeholder, sensitive)}\r`;
+  }
   const m = line.match(KEY_VALUE_LINE);
   if (!m) return line;
   const [, prefix, key, valueRaw] = m;
@@ -131,7 +136,10 @@ export function maskSensitiveLines(
   sensitive: (key: string) => boolean = isSensitiveKey
 ): string[] {
   if (lines.length === 0) return [];
-  const out = lines.slice();
+  // CR-terminated lines match no anchored regex here or in the scanner
+  // and would fail open; mask the LF form and restore the CRs after.
+  const hadCr = lines.map((l) => l.endsWith("\r"));
+  const out = lines.map((l, i) => (hadCr[i] ? l.slice(0, -1) : l));
   // The predicate hands the scanner this module's wider key heuristic, so
   // heuristic-named keys get its parent-scope and block-scalar handling
   // (a bare `wifi_password: |` body would otherwise stay clear text).
@@ -175,7 +183,7 @@ export function maskSensitiveLines(
       out[j] = `${m[1]} ${placeholder}`;
     }
   }
-  return out;
+  return out.map((l, i) => (hadCr[i] ? `${l}\r` : l));
 }
 
 // The column a comment line's content starts at; 0 for a non-comment.

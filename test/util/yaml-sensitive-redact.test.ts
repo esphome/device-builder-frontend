@@ -230,6 +230,16 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("vpn.psk: •");
   });
 
+  it("masks CRLF input and preserves the line endings", () => {
+    const masked = maskSensitiveYaml("wifi:\r\n  password: hunter2\r\nsensor:");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  password: \u2022\r");
+    expect(masked.split("\r\n")).toHaveLength(3);
+    expect(maskSensitiveLine("  password: hunter2\r")).toBe(
+      "  password: \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\r"
+    );
+  });
+
   it("leaves non-credential key: fields alone", () => {
     const yaml = "remote_receiver:\n  key: 0x12345678";
     expect(maskSensitiveYaml(yaml)).toBe(yaml);

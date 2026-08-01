@@ -311,7 +311,7 @@ export function buildFullReport(report: CrashReport): string {
   if (scrape.configLines.length > 0) {
     sections.push("## Config dump", fence(scrape.configLines));
   }
-  sections.push("## Configuration (secrets redacted)");
+  sections.push("## Configuration (known credentials masked)");
   sections.push(
     configYaml
       ? fence([configYaml.trimEnd()], "yaml")

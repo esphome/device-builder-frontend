@@ -207,7 +207,7 @@ describe("buildFullReport", () => {
       "## Crash log",
       "## Warnings and errors",
       "## Config dump",
-      "## Configuration (secrets redacted)",
+      "## Configuration (known credentials masked)",
       "## Environment",
     ].map((heading) => text.indexOf(heading));
     expect(order.every((index) => index !== -1)).toBe(true);
