@@ -30,21 +30,13 @@ import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import {
-  buildTroubleshootSections,
-  USE_ADDRESS_DOCS_URL,
-} from "../util/troubleshoot-tree.js";
-import {
-  applyUseAddress,
-  isIpLiteral,
-  isValidUseAddress,
-  type NetworkSection,
-  readStaticIp,
-  readUseAddress,
-  removeUseAddress,
-  snippetNetworkSection,
-} from "../util/use-address-yaml.js";
+import { buildTroubleshootSections } from "../util/troubleshoot-tree.js";
+import { isIpLiteral, type NetworkSection } from "../util/use-address-yaml.js";
 import { troubleshootDialogStyles } from "./troubleshoot-dialog.styles.js";
+import {
+  loadExistingAddress,
+  renderAddressScreen,
+} from "./troubleshoot-dialog/address-screen.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -76,31 +68,31 @@ type SaveState =
 export class ESPHomeTroubleshootDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
-  private _localize: LocalizeFunc = (key) => key;
+  _localize: LocalizeFunc = (key) => key;
 
   @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
+  _api!: ESPHomeAPI;
 
   @consume({ context: devicesContext, subscribe: true })
   @state()
-  private _devices: ConfiguredDevice[] = [];
+  _devices: ConfiguredDevice[] = [];
 
   private readonly _dialog = new DialogOpenController(this);
 
   @state() private _name = "";
-  @state() private _configuration = "";
-  @state() private _result: DeviceTroubleshootResult | null = null;
+  @state() _configuration = "";
+  @state() _result: DeviceTroubleshootResult | null = null;
   @state() private _checking = false;
   @state() private _checkFailed = false;
   @state() private _reachability: ReachabilityStateEvent | null = null;
-  @state() private _addressInput = "";
-  @state() private _addressInvalid = false;
-  @state() private _saveState: SaveState = "idle";
+  @state() _addressInput = "";
+  @state() _addressInvalid = false;
+  @state() _saveState: SaveState = "idle";
   @state() private _screen: "main" | "address" = "main";
-  @state() private _existingAddress = "";
+  @state() _existingAddress = "";
 
   private _subscription: ReachabilitySubscription | null = null;
-  private _snippetSection: NetworkSection = "wifi";
+  _snippetSection: NetworkSection = "wifi";
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
   private _failedGeneration = -1;
@@ -138,7 +130,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._teardownSubscription();
     this._dialog.open = true;
     this._startReconcile();
-    void this._loadExistingAddress();
+    void loadExistingAddress(this);
     void this._runCheck();
   }
 
@@ -183,7 +175,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         }
         ${
           onAddressScreen
-            ? this._renderAddressScreen(device)
+            ? renderAddressScreen(this, device)
             : html`
                 ${this._renderProbeSummary(device)}
                 ${device ? this._renderSections(device) : nothing}
@@ -385,130 +377,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     })}`;
   }
 
-  private _renderAddressScreen(device: ConfiguredDevice | undefined): TemplateResult {
-    if (this._saveState === "saved" || this._saveState === "removed") {
-      return html`
-        <div class="section" data-section="use_address">
-          <div class="saved-panel">
-            <wa-icon library="mdi" name="check-circle"></wa-icon>
-            <p>
-              ${this._localize(
-                this._saveState === "removed"
-                  ? "troubleshoot.use_address_removed"
-                  : "troubleshoot.use_address_saved"
-              )}
-            </p>
-          </div>
-          <div class="actions">
-            <button class="btn btn--confirm" @click=${this.close}>
-              ${this._localize("layout.close")}
-            </button>
-          </div>
-        </div>
-      `;
-    }
-    return html`
-      <div class="section" data-section="use_address">
-        ${
-          this._existingAddress
-            ? html`<p>
-                ${this._localize("troubleshoot.use_address_current", {
-                  address: this._existingAddress,
-                })}
-              </p>`
-            : nothing
-        }
-        <p>
-          ${this._localize("troubleshoot.use_address_body")}
-          <a href=${USE_ADDRESS_DOCS_URL} target="_blank" rel="noopener noreferrer">
-            ${this._localize("troubleshoot.learn_more")}
-            <wa-icon library="mdi" name="open-in-new"></wa-icon>
-          </a>
-        </p>
-        <p class="warning-banner">
-          ${this._localize("troubleshoot.use_address_ownership")}
-        </p>
-        ${device ? this._renderUseAddressForm(device) : nothing}
-      </div>
-    `;
-  }
-
-  private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {
-    if (this._saveState === "snippet") {
-      return html`
-        <p>${this._localize("troubleshoot.use_address_snippet")}</p>
-        <pre class="snippet">
-${this._snippetSection}:
-  use_address: ${this._addressInput.trim()}</pre>
-      `;
-    }
-    const placeholder = device.ip || this._result?.ping_target || "192.168.1.50";
-    return html`
-      <label class="address-label" for="use-address-input">
-        <code>use_address</code>
-        <span>${this._localize("troubleshoot.use_address_label")}</span>
-      </label>
-      <div class="address-form">
-        <input
-          id="use-address-input"
-          type="text"
-          class=${this._addressInvalid ? "invalid" : ""}
-          .value=${this._addressInput}
-          placeholder=${placeholder}
-          @input=${(e: Event) => {
-            this._addressInput = (e.target as HTMLInputElement).value;
-            this._addressInvalid = false;
-            if (this._saveState === "error") this._saveState = "idle";
-          }}
-          @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter") void this._saveUseAddress();
-          }}
-        />
-      </div>
-      ${
-        this._addressInvalid
-          ? html`<p class="field-error">
-              ${this._localize("troubleshoot.use_address_invalid")}
-            </p>`
-          : nothing
-      }
-      ${
-        this._saveState === "error"
-          ? html`<p class="field-error">
-              ${this._localize("troubleshoot.use_address_error")}
-            </p>`
-          : nothing
-      }
-      ${
-        this._saveState === "remove_packaged"
-          ? html`<p class="field-error">
-              ${this._localize("troubleshoot.use_address_remove_packaged")}
-            </p>`
-          : nothing
-      }
-      <div class="actions">
-        ${
-          this._existingAddress
-            ? html`<button
-                class="btn btn--remove"
-                ?disabled=${this._saveState === "saving"}
-                @click=${() => void this._removeUseAddress()}
-              >
-                ${this._localize("troubleshoot.use_address_remove")}
-              </button>`
-            : nothing
-        }
-        <button
-          class="btn btn--confirm"
-          ?disabled=${this._saveState === "saving"}
-          @click=${() => void this._saveUseAddress()}
-        >
-          ${this._localize("troubleshoot.use_address_save")}
-        </button>
-      </div>
-    `;
-  }
-
   private async _runCheck(): Promise<void> {
     const configuration = this._configuration;
     this._checking = true;
@@ -575,81 +443,6 @@ ${this._snippetSection}:
     }
   }
 
-  private async _loadExistingAddress(): Promise<void> {
-    const configuration = this._configuration;
-    try {
-      const yaml = await this._api.getConfig(configuration);
-      if (configuration !== this._configuration) return;
-      const fromYaml = readUseAddress(yaml);
-      // A packaged network block (null) keeps the heuristic seed; a
-      // spliceable one is authoritative either way.
-      if (fromYaml !== null && fromYaml !== this._existingAddress) {
-        const inputUntouched = this._addressInput === this._existingAddress;
-        this._existingAddress = fromYaml;
-        if (inputUntouched) this._addressInput = fromYaml;
-      }
-      if (!this._addressInput) {
-        // The firmware's own manual_ip.static_ip is the best prefill.
-        this._addressInput = readStaticIp(yaml) ?? "";
-      }
-    } catch {
-      // Keep the heuristic; the save path re-fetches anyway.
-    }
-  }
-
-  // Both writers capture the configuration up front and guard every
-  // resumption: a dialog reopened for another device mid-flight must
-  // not write the old device's YAML or state (same shape as _runCheck).
-  private async _removeUseAddress(): Promise<void> {
-    const configuration = this._configuration;
-    this._saveState = "saving";
-    try {
-      const yaml = await this._api.getConfig(configuration);
-      if (configuration !== this._configuration) return;
-      const updated = removeUseAddress(yaml);
-      if (updated === null) {
-        this._saveState = "remove_packaged";
-        return;
-      }
-      if (updated !== yaml) {
-        await this._api.updateConfig(configuration, updated);
-        if (configuration !== this._configuration) return;
-      }
-      this._saveState = "removed";
-    } catch {
-      if (configuration === this._configuration) this._saveState = "error";
-    }
-  }
-
-  private async _saveUseAddress(): Promise<void> {
-    const configuration = this._configuration;
-    const value = this._addressInput.trim();
-    if (!isValidUseAddress(value)) {
-      this._addressInvalid = true;
-      return;
-    }
-    this._saveState = "saving";
-    try {
-      const yaml = await this._api.getConfig(configuration);
-      if (configuration !== this._configuration) return;
-      const updated = applyUseAddress(yaml, value);
-      if (updated === null) {
-        const device = this._devices.find((d) => d.configuration === configuration);
-        this._snippetSection = snippetNetworkSection(
-          yaml,
-          device?.loaded_integrations ?? []
-        );
-        this._saveState = "snippet";
-        return;
-      }
-      await this._api.updateConfig(configuration, updated);
-      if (configuration !== this._configuration) return;
-      this._saveState = "saved";
-    } catch {
-      if (configuration === this._configuration) this._saveState = "error";
-    }
-  }
-
   protected updated(changed: PropertyValues): void {
     if (changed.has("_screen") && this._screen === "address") {
       this.renderRoot.querySelector<HTMLInputElement>(".address-form input")?.focus();
@@ -662,6 +455,12 @@ ${this._snippetSection}:
       this._subscription = null;
       void sub.unsubscribe();
     }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._stopReconcile();
+    this._teardownSubscription();
   }
 
   private _onAfterHide = (): void => {

@@ -88,7 +88,9 @@ export function buildTroubleshootSections(
       titleKey: "troubleshoot.zeroconf_down_title",
       bodyKeys: ["troubleshoot.zeroconf_down_body"],
     });
-  } else if (device.api_enabled && mdnsNeverSeen(reachability, result)) {
+  } else if (mdnsNeverSeen(reachability, result)) {
+    // Applies to non-api devices too: their `_http._tcp` broadcast is
+    // just as mDNS-borne, and the probe's evidence is hostname-level.
     sections.push({
       id: "mdns_dark",
       titleKey: "troubleshoot.mdns_dark_title",
