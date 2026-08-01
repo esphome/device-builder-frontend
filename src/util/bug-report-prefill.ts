@@ -21,10 +21,13 @@ interface DeviceTargetSpec {
   /** `version` param source: the device's compiled version falling back
    *  to the installed core, or the dashboard's own version. */
   version: "dashboard" | "device";
-  /** Include the installed ESPHome version in the facts (the esphome
-   *  form already carries it in its `version` param). */
+  /** Include the installed ESPHome version in the facts. True exactly
+   *  when `version` is "dashboard" — the "device" form's `version`
+   *  param already carries the core version. */
   esphomeVersionFact: boolean;
-  /** Include the reachability facts and the `mdns-expiry` answer. */
+  /** Include the reachability facts and the `mdns-expiry` answer.
+   *  True requires `"mdns-expiry"` in `skipSentinels` — the field is
+   *  required on the form that has it. */
   reachability: boolean;
   /** Required fields the skip row fills with the template's sentence. */
   skipSentinels: readonly ("config" | "mdns-expiry")[];
@@ -36,7 +39,7 @@ interface DeviceTargetSpec {
 // device-status form has `config` + `observed` + `mdns-expiry`
 // (esphome/device-builder#2487). GitHub silently drops unknown params,
 // so these must track the templates.
-const DEVICE_TARGETS: Record<DeviceTarget, DeviceTargetSpec> = {
+export const DEVICE_TARGETS: Record<DeviceTarget, DeviceTargetSpec> = {
   builder: {
     href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
     factsParam: "extra",
