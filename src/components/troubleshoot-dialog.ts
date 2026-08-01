@@ -110,12 +110,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         --width: 520px;
       }
 
-      .subtitle {
-        margin: 0 0 var(--wa-space-m);
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-      }
-
       .probe-rows {
         display: flex;
         flex-direction: column;
@@ -341,12 +335,16 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   protected render() {
     const device = this._devices.find((d) => d.configuration === this._configuration);
     const onAddressScreen = this._screen === "address";
+    const friendly = device?.friendly_name || this._name;
+    const label = onAddressScreen
+      ? this._localize("troubleshoot.use_address_title")
+      : friendly
+        ? this._localize("troubleshoot.title_device", { name: friendly })
+        : this._localize("troubleshoot.title");
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize(
-          onAddressScreen ? "troubleshoot.use_address_title" : "troubleshoot.title"
-        )}
+        .label=${label}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
@@ -364,7 +362,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
               </button>`
             : nothing
         }
-        <p class="subtitle">${device?.friendly_name || this._name}</p>
         ${
           onAddressScreen
             ? this._renderAddressScreen(device)

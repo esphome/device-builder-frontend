@@ -1948,6 +1948,7 @@
   },
   "troubleshoot": {
     "title": "Troubleshoot connectivity",
+    "title_device": "Troubleshoot {name}",
     "open": "Troubleshoot",
     "open_tooltip": "Click to troubleshoot connectivity",
     "check_again": "Check again",
