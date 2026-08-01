@@ -27,7 +27,7 @@ interface DeviceTargetSpec {
   /** Include the reachability facts and the `mdns-expiry` answer. */
   reachability: boolean;
   /** Required fields the skip row fills with the template's sentence. */
-  skipSentinels: readonly string[];
+  skipSentinels: readonly ("config" | "mdns-expiry")[];
 }
 
 // Field ids come from each repo's issue templates: esphome/esphome's
