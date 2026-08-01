@@ -22,8 +22,7 @@ export function isFeaturedId(id: string): boolean {
 /**
  * True for platform-shaped catalog ids ('switch.gpio'). A featured id
  * carries dots but wraps one underlying component, so it never reads
- * as a platform entry. Shared by the id and name seeds so both judge
- * platform-ness identically.
+ * as a platform entry.
  */
 export function isPlatformComponentId(id: string): boolean {
   return isFeaturedId(id) ? false : id.includes(".");
