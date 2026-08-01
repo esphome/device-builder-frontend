@@ -3,7 +3,7 @@ import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import { setFittedConfigParam } from "./crash-report-budget.js";
 import { devicePlatform, ESPHOME_BUG_FORM_URL, issuePlatform } from "./crash-report.js";
 import { deviceSortKey } from "./device-sort.js";
-import { mdnsExpiresSoon, mdnsExpiryRemaining } from "./mdns-expiry.js";
+import { mdnsExpiryPhase } from "./mdns-expiry.js";
 import { formatCountdown } from "./relative-time.js";
 
 /**
@@ -149,28 +149,28 @@ function mdnsExpirySummary(
   device: ConfiguredDevice
 ): string {
   if (reachability === null) return "reachability read failed";
-  const age = reachability.mdns_last_seen_seconds_ago;
-  if (age === null) return "no mDNS row";
-  const offline = device.runtime_state.state === DeviceState.OFFLINE;
-  const remaining = mdnsExpiryRemaining(
-    age,
+  const phase = mdnsExpiryPhase(
+    reachability.mdns_last_seen_seconds_ago,
     reachability.mdns_ptr_ttl_seconds,
-    offline,
+    device.runtime_state.state === DeviceState.OFFLINE,
     reachability.active_source
   );
-  if (remaining === null) {
-    if (offline) return "no expiry countdown (device offline)";
-    if (reachability.active_source !== "mdns") {
+  switch (phase.kind) {
+    case "no-signal":
+      return "no mDNS row";
+    case "offline":
+      return "no expiry countdown (device offline)";
+    case "inactive-source":
       return "no expiry countdown (mDNS not the active source)";
-    }
-    if (reachability.mdns_ptr_ttl_seconds === null) {
+    case "no-ttl":
       return "no expiry countdown (no PTR TTL)";
-    }
-    return "no expiry countdown (heard recently)";
+    case "fresh":
+      return "no expiry countdown (heard recently)";
+    case "soon":
+      return "Expires soon";
+    case "countdown":
+      return `Expires in ${formatCountdown(phase.remaining, "en")}`;
   }
-  return mdnsExpiresSoon(remaining)
-    ? "Expires soon"
-    : `Expires in ${formatCountdown(remaining, "en")}`;
 }
 
 // Base form URL for *target* with the version param set: the builder

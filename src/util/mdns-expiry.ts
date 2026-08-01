@@ -1,9 +1,10 @@
 import type { ReachabilitySource } from "../api/types/reachability.js";
 
 /**
- * The mDNS "Expires in" decisions shared by the device drawer and the
- * status-report prefill, so the report's mDNS line always matches what
- * the drawer shows.
+ * The mDNS "Expires in" decision shared by the device drawer and the
+ * status-report prefill. The classifier owns every gate and threshold;
+ * consumers only translate phases into their surface's wording, so the
+ * report's mDNS line can never diverge from what the drawer shows.
  */
 
 // Only surface the "Expires in" hint once the device has been quiet for
@@ -12,35 +13,35 @@ import type { ReachabilitySource } from "../api/types/reachability.js";
 // any record's TTL.
 const SHOW_EXPIRES_HINT_AFTER_SECONDS = 120;
 
+export type MdnsExpiryPhase =
+  | { kind: "no-signal" }
+  | { kind: "offline" }
+  | { kind: "inactive-source" }
+  | { kind: "no-ttl" }
+  | { kind: "fresh" }
+  | { kind: "soon" }
+  | { kind: "countdown"; remaining: number };
+
 /**
- * Remaining seconds for the countdown, or null when no hint should
- * show: mDNS isn't the active source, no mDNS signal, no PTR TTL,
- * heard too recently, or the device is already OFFLINE (by then the
- * record has expired and the snapshot can be stale).
+ * Classify the countdown decision. Only ``soon`` and ``countdown``
+ * surface a hint; the other phases name why there isn't one, in
+ * priority order: never heard, device already OFFLINE (by then the
+ * record has expired and the snapshot can be stale), mDNS not the
+ * active source, no PTR TTL, heard too recently.
  */
-export function mdnsExpiryRemaining(
+export function mdnsExpiryPhase(
   ageSeconds: number | null,
   ptrTtlSeconds: number | null,
   deviceOffline: boolean,
   activeSource: ReachabilitySource
-): number | null {
-  if (
-    activeSource !== "mdns" ||
-    deviceOffline ||
-    ptrTtlSeconds === null ||
-    ageSeconds === null ||
-    ageSeconds <= SHOW_EXPIRES_HINT_AFTER_SECONDS
-  ) {
-    return null;
-  }
-  return Math.max(0, ptrTtlSeconds - ageSeconds);
-}
-
-/**
- * Whether the countdown should read "soon" instead of a number. Below
- * 1s it would read "0s", but the record isn't gone yet — zeroconf
- * evicts on a periodic (~10s) sweep.
- */
-export function mdnsExpiresSoon(remainingSeconds: number): boolean {
-  return remainingSeconds < 1;
+): MdnsExpiryPhase {
+  if (ageSeconds === null) return { kind: "no-signal" };
+  if (deviceOffline) return { kind: "offline" };
+  if (activeSource !== "mdns") return { kind: "inactive-source" };
+  if (ptrTtlSeconds === null) return { kind: "no-ttl" };
+  if (ageSeconds <= SHOW_EXPIRES_HINT_AFTER_SECONDS) return { kind: "fresh" };
+  const remaining = Math.max(0, ptrTtlSeconds - ageSeconds);
+  // Below 1s the countdown would read "0s", but the record isn't gone
+  // yet — zeroconf evicts on a periodic (~10s) sweep.
+  return remaining < 1 ? { kind: "soon" } : { kind: "countdown", remaining };
 }

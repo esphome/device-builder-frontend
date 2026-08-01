@@ -6,7 +6,7 @@ import type {
   ReachabilityStateEvent,
 } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
-import { mdnsExpiryRemaining } from "../../../util/mdns-expiry.js";
+import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -25,7 +25,7 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
-  ttlRemaining?: number | null;
+  ttlPhase?: MdnsExpiryPhase;
   ttlLifetime?: number | null;
   txtRecords?: Record<string, string> | null;
 }
@@ -58,7 +58,7 @@ export function renderReachabilitySection(
       icon: "access-point-network",
       labelKey: "dashboard.drawer_source_mdns",
       age: mdnsAge,
-      ttlRemaining: mdnsExpiryRemaining(
+      ttlPhase: mdnsExpiryPhase(
         mdnsAge,
         r.mdns_ptr_ttl_seconds,
         deviceOffline,
@@ -141,13 +141,8 @@ function renderReachabilityRow(
           }
         </div>
         ${
-          row.source === "mdns"
-            ? renderMdnsExpiry(
-                row.ttlRemaining ?? null,
-                row.ttlLifetime ?? null,
-                localize,
-                lang
-              )
+          row.source === "mdns" && row.ttlPhase
+            ? renderMdnsExpiry(row.ttlPhase, row.ttlLifetime ?? null, localize, lang)
             : nothing
         }
         ${renderMdnsTxtRecords(row.txtRecords, localize)}

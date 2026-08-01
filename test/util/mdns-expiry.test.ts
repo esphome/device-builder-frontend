@@ -1,28 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { mdnsExpiresSoon, mdnsExpiryRemaining } from "../../src/util/mdns-expiry.js";
+import { mdnsExpiryPhase } from "../../src/util/mdns-expiry.js";
 
-describe("mdnsExpiryRemaining", () => {
+describe("mdnsExpiryPhase", () => {
   it("counts down past the quiet threshold", () => {
-    expect(mdnsExpiryRemaining(300, 4500, false, "mdns")).toBe(4200);
+    expect(mdnsExpiryPhase(300, 4500, false, "mdns")).toEqual({
+      kind: "countdown",
+      remaining: 4200,
+    });
   });
 
-  it("shows no hint when fresh, offline, inactive, or without a TTL", () => {
-    expect(mdnsExpiryRemaining(60, 4500, false, "mdns")).toBeNull();
-    expect(mdnsExpiryRemaining(300, 4500, true, "mdns")).toBeNull();
-    expect(mdnsExpiryRemaining(300, 4500, false, "ping")).toBeNull();
-    expect(mdnsExpiryRemaining(300, null, false, "mdns")).toBeNull();
-    expect(mdnsExpiryRemaining(null, 4500, false, "mdns")).toBeNull();
+  it("names why no hint shows, in priority order", () => {
+    expect(mdnsExpiryPhase(null, 4500, true, "ping")).toEqual({ kind: "no-signal" });
+    expect(mdnsExpiryPhase(300, 4500, true, "ping")).toEqual({ kind: "offline" });
+    expect(mdnsExpiryPhase(300, 4500, false, "ping")).toEqual({
+      kind: "inactive-source",
+    });
+    expect(mdnsExpiryPhase(300, null, false, "mdns")).toEqual({ kind: "no-ttl" });
+    expect(mdnsExpiryPhase(60, 4500, false, "mdns")).toEqual({ kind: "fresh" });
   });
 
-  it("clamps an already-elapsed record to zero", () => {
-    expect(mdnsExpiryRemaining(5000, 4500, false, "mdns")).toBe(0);
-  });
-});
-
-describe("mdnsExpiresSoon", () => {
-  it("cuts at one second", () => {
-    expect(mdnsExpiresSoon(0)).toBe(true);
-    expect(mdnsExpiresSoon(0.9)).toBe(true);
-    expect(mdnsExpiresSoon(1)).toBe(false);
+  it("says soon for an already-elapsed record", () => {
+    expect(mdnsExpiryPhase(4500, 4500, false, "mdns")).toEqual({ kind: "soon" });
+    expect(mdnsExpiryPhase(5000, 4500, false, "mdns")).toEqual({ kind: "soon" });
   });
 });
