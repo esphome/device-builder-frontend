@@ -6,10 +6,10 @@ import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-co
 /**
  * A dialog wired to a stub API so the submit / bundle / detour paths run.
  *
- * Suites type the returned `d` with their own `Internals`, since which
- * privates each one reaches for legitimately differs. Every caller must
- * still `vi.mock` the form, the catalog and sonner-js at module scope —
- * those have to run before the import and so can't live here.
+ * Each suite supplies its own `Internals` type for `d`, because they
+ * legitimately reach for different privates. Callers must still `vi.mock`
+ * the form, the catalog and sonner-js at module scope: those run before
+ * the import, so they can't live here.
  */
 export function makeAddComponentDialogHost<I>(
   options: {

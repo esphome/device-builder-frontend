@@ -17,6 +17,7 @@ import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import {
   buildFeaturedId,
   featuredEntryForId,
+  isFeaturedId,
   resolveFeaturedComponentId,
 } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -719,11 +720,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   private _selectAndClose(added: AddedBlock | null, board: BoardCatalogEntry | null) {
     if (added) {
-      const target = findAddedSection(
-        added.yaml,
-        resolveFeaturedComponentId(added.componentId, board),
-        added.instanceId
-      );
+      const componentId = resolveFeaturedComponentId(added.componentId, board);
+      // A featured id the board can't resolve is a catalog bug in this same
+      // (lockstep) release: it can never match a section key, so the jump
+      // below is skipped with nothing else to show for it.
+      if (isFeaturedId(componentId)) {
+        console.warn(
+          `Board carries no featured entry for '${componentId}'; skipping the post-add jump.`
+        );
+      }
+      const target = findAddedSection(added.yaml, componentId, added.instanceId);
       if (target) {
         const { sectionKey, fromLine, toLine } = target;
         fireEvent(this, "section-select", { sectionKey, fromLine });

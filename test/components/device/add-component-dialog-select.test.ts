@@ -133,6 +133,44 @@ describe("add-component-dialog selects what it added", () => {
     expect(seen).toEqual([{ sectionKey: "binary_sensor.gpio", fromLine: 8 }]);
   });
 
+  it("warns when the board can't resolve a featured id", async () => {
+    // An unresolvable featured id can never match a section key, so the jump
+    // is skipped; without a warning that is indistinguishable in production
+    // from the bug this PR fixes.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { dialog, d } = makeDialog();
+    d._selected = makeComponentEntry("featured.apollo-esk-1.unknown", {
+      name: "Mystery",
+      category: ComponentCategory.BINARY_SENSOR,
+    });
+    const seen = capture(dialog);
+
+    await d._submitComponent({ id: "boot_button" }, true);
+
+    expect(seen).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("featured.apollo-esk-1.unknown")
+    );
+    warn.mockRestore();
+  });
+
+  it("stays quiet when a resolved id simply isn't in the YAML", async () => {
+    // Resolution worked; the section is genuinely absent. Nothing to report.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { dialog, d } = makeDialog();
+    d._selected = makeComponentEntry("featured.apollo-esk-1.led", {
+      name: "LED",
+      category: ComponentCategory.LIGHT,
+    });
+    const seen = capture(dialog);
+
+    await d._submitComponent({ id: "led" }, true);
+
+    expect(seen).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   // Better to stay put than navigate somewhere wrong. Two distinct ways to
   // miss: the id never resolves, and it resolves to a section the merged
   // YAML doesn't hold — only the second reaches the resolver.

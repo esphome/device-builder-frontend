@@ -64,8 +64,8 @@ export function featuredDisplayName(fc: FeaturedComponent, fallback: string): st
   return fallback;
 }
 
-/** The board's featured entry a catalog id names, or null when the id isn't
- *  featured or the board doesn't carry it. */
+/** The featured entry a catalog id refers to; null when the id isn't a
+ *  featured one, or the board doesn't carry it. */
 export function featuredEntryForId<T extends { id: string; component_id: string }>(
   id: string,
   board: { id: string; featured_components?: ReadonlyArray<T> } | null
