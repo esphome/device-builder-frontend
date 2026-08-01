@@ -165,14 +165,19 @@ describe("buildDeviceIssueUrl", () => {
     ).toBe("Expires soon");
   });
 
-  it("lets the snapshot's state and source win the observed lines", () => {
-    const observed = buildDeviceIssueUrl("status", DEVICE, "", CTX, {
+  it("takes the source from the snapshot but keeps the state live", () => {
+    const offlineDevice = {
+      ...DEVICE,
+      runtime_state: { ...DEVICE.runtime_state, state: "offline" },
+    } as unknown as ConfiguredDevice;
+    const observed = buildDeviceIssueUrl("status", offlineDevice, "", CTX, {
       active_source: "ping",
       state: "online",
       mdns_last_seen_seconds_ago: 300,
       mdns_ptr_ttl_seconds: 4500,
     } as ReachabilityStateEvent).url.searchParams.get("observed")!;
     expect(observed).toContain("Reachability source: ping");
+    expect(observed).toContain("State: offline");
   });
 
   it("blunts every address family in the observed IP line", () => {
@@ -188,17 +193,24 @@ describe("buildDeviceIssueUrl", () => {
     expect(facts({ ip_addresses: ["10.0.42.7", "fe80::abcd:12ff:fe34:5678"] })).toContain(
       "IP: 10.0.x.x, fe80::x"
     );
-    const hostnameFallback = {
+    const unrecognised = {
       ...DEVICE,
       ip: "garage.local",
       runtime_state: { ...DEVICE.runtime_state, ip_addresses: [] },
     } as unknown as ConfiguredDevice;
-    expect(deviceFacts(hostnameFallback, "status", CTX)).toContain("IP: garage.local");
+    expect(deviceFacts(unrecognised, "status", CTX)).toContain("IP: x");
+    const addressless = {
+      ...DEVICE,
+      ip: "",
+      runtime_state: { ...DEVICE.runtime_state, ip_addresses: [] },
+    } as unknown as ConfiguredDevice;
+    expect(deviceFacts(addressless, "status", CTX)).toContain("IP: none resolved");
   });
 
-  it("status skip satisfies the required config field", () => {
+  it("status skip satisfies both required fields", () => {
     const url = skipDeviceUrl("status", CTX);
     expect(url.searchParams.get("config")).toBe("not device specific");
+    expect(url.searchParams.get("mdns-expiry")).toBe("not device specific");
     expect(url.searchParams.get("version")).toBe("1.8.0");
   });
 

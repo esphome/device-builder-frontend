@@ -75,11 +75,11 @@ export function buildDeviceIssueUrl(
 }
 
 /** Today's URL for the no-specific-device row; the builder and status
- *  paths fill their required config field with the template's own
- *  sentence. */
+ *  paths fill their required fields with the template's own sentence. */
 export function skipDeviceUrl(target: DeviceTarget, ctx: PrefillContext): URL {
   const url = deviceTargetUrl(target, ctx);
   if (target !== "esphome") url.searchParams.set("config", NOT_DEVICE_SPECIFIC);
+  if (target === "status") url.searchParams.set("mdns-expiry", NOT_DEVICE_SPECIFIC);
   return url;
 }
 
@@ -91,8 +91,10 @@ export function deviceFacts(
   device: ConfiguredDevice,
   target: DeviceTarget,
   ctx: PrefillContext,
-  /** Status-target snapshot; when present its state and source win, so
-   *  the observed lines agree with the mdns-expiry answer. */
+  /** Status-target snapshot; when present its active source wins so the
+   *  observed line agrees with the mdns-expiry answer. State stays on
+   *  the live device — the snapshot can be stale on the OFFLINE
+   *  transition. */
   reachability?: ReachabilityStateEvent | null
 ): string {
   const platform = issuePlatform(devicePlatform(device));
@@ -106,7 +108,7 @@ export function deviceFacts(
     ctx.installation && `Installation: ${ctx.installation}`,
     ...(target === "status"
       ? [
-          `State: ${reachability?.state ?? device.runtime_state.state}`,
+          `State: ${device.runtime_state.state}`,
           `Reachability source: ${
             reachability?.active_source ?? device.runtime_state.active_source
           }`,
@@ -123,9 +125,10 @@ const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 // Blunt each address for the public issue: enough prefix to tell LAN
 // from Docker-bridge from link-local, never the full host address.
+// Fails closed — anything not a recognised IP literal masks entirely.
 const maskIp = (address: string): string => {
   if (address.includes(":")) return `${address.split(":")[0]}::x`;
-  if (!IPV4_LITERAL.test(address)) return address;
+  if (!IPV4_LITERAL.test(address)) return "x";
   const [a, b] = address.split(".");
   return `${a}.${b}.x.x`;
 };
@@ -133,7 +136,7 @@ const maskIp = (address: string): string => {
 const ipLine = (device: ConfiguredDevice): string => {
   const addresses = device.runtime_state.ip_addresses;
   const ips = (addresses.length ? addresses : device.ip ? [device.ip] : []).map(maskIp);
-  return ips.length ? `IP: ${ips.join(", ")}` : "";
+  return `IP: ${ips.length ? ips.join(", ") : "none resolved"}`;
 };
 
 /**

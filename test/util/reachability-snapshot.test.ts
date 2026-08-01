@@ -42,11 +42,14 @@ describe("captureReachabilitySnapshot", () => {
   });
 
   it("resolves null when the subscribe call rejects", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const api = {
       subscribeDeviceReachability: vi
         .fn()
         .mockRejectedValue(new Error("WebSocket not connected")),
     } as unknown as ESPHomeAPI;
     expect(await captureReachabilitySnapshot(api, "garage")).toBeNull();
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 });

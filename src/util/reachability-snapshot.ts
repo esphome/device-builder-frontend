@@ -28,7 +28,8 @@ export async function captureReachabilitySnapshot(
         timer = setTimeout(resolve, timeoutMs, null);
       }),
     ]);
-  } catch {
+  } catch (err) {
+    console.warn("Reading reachability failed", err);
     return null;
   } finally {
     clearTimeout(timer);
