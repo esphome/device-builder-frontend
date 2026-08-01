@@ -171,25 +171,38 @@ export function maskSensitiveLines(
     out[i] = maskSensitiveLine(line, placeholder, sensitive);
     // A commented-out block scalar hides the credential on the following
     // comment lines, which carry no key for the per-line fallback; mask
-    // the bodies indented past the header's content column, mirroring how
-    // the scanner terminates a real block scalar.
-    if (!isCommentedSensitiveBlockHeader(line, sensitive)) continue;
-    const headerColumn = commentContentColumn(line);
+    // the bodies indented past the header's key column, mirroring how the
+    // scanner terminates a real block scalar. Marker-adjacent content
+    // (``#hunter2``, no space) is always treated as body: its column is
+    // ambiguous, and skipping it would leak.
+    const headerColumn = commentedBlockHeaderColumn(line, sensitive);
+    if (headerColumn === -1) continue;
     for (let j = i + 1; j < out.length; j++) {
       const m = out[j].match(COMMENT_LINE);
       if (!m) break;
       if (!m[2]) continue;
-      if (out[j].length - m[2].length <= headerColumn) break;
+      const contentColumn = out[j].length - m[2].length;
+      if (contentColumn > m[1].length && contentColumn <= headerColumn) break;
       out[j] = `${m[1]} ${placeholder}`;
     }
   }
   return out.map((l, i) => (hadCr[i] ? `${l}\r` : l));
 }
 
-// The column a comment line's content starts at; 0 for a non-comment.
-function commentContentColumn(line: string): number {
-  const m = line.match(COMMENT_LINE);
-  return m ? line.length - m[2].length : 0;
+// The key's column within a commented sensitive block-scalar header
+// (dash-tolerant, via the same KEY_VALUE_LINE that recognizes it), or
+// -1 when the line isn't one.
+function commentedBlockHeaderColumn(
+  line: string,
+  sensitive: (key: string) => boolean
+): number {
+  const m = line.match(KEY_VALUE_LINE);
+  return m !== null &&
+    m[1].includes("#") &&
+    sensitive(m[2]) &&
+    BLOCK_SCALAR_HEADER.test(m[3].trim())
+    ? m[1].length
+    : -1;
 }
 
 // A trailing comment beside a masked or preserved value can carry the
@@ -200,19 +213,6 @@ function maskCommentTail(tail: string, placeholder: string): string {
   if (boundary === -1) return tail;
   const hash = tail.indexOf("#", boundary);
   return `${tail.slice(0, hash)}# ${placeholder}`;
-}
-
-function isCommentedSensitiveBlockHeader(
-  line: string,
-  sensitive: (key: string) => boolean
-): boolean {
-  const m = line.match(KEY_VALUE_LINE);
-  return (
-    m !== null &&
-    m[1].includes("#") &&
-    sensitive(m[2]) &&
-    BLOCK_SCALAR_HEADER.test(m[3].trim())
-  );
 }
 
 /** Whole-document masking for YAML leaving the app. */

@@ -142,6 +142,27 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("sensor:");
   });
 
+  it("bounds a dash-prefixed commented block header correctly", () => {
+    const yaml = [
+      "ota:",
+      "  - # password: |",
+      "  #       hunter2",
+      "  # unrelated note",
+      "x: 1",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  # unrelated note");
+    expect(masked).toContain("x: 1");
+  });
+
+  it("masks marker-adjacent body comments and keeps walking", () => {
+    const yaml = ["wifi:", "  # password: |", "  #hunter2", "  #  deeper"].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("deeper");
+  });
+
   it("masks a comment-only value on a credential key", () => {
     const masked = maskSensitiveYaml("wifi:\n  password: # hunter2");
     expect(masked).not.toContain("hunter2");
