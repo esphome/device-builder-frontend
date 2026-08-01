@@ -16,6 +16,7 @@
 
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { matchesDeviceName, matchesMacAddress } from "./device-search.js";
+import { effectiveDeviceState } from "./device-status.js";
 import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "./facets.js";
 
 /** The five facet selections the toolbar tracks. Each is the list
@@ -69,7 +70,7 @@ export function applyFacetFilters(
   }
   if (selectedStates.length > 0) {
     const set = new Set(selectedStates);
-    out = out.filter((d) => set.has(d.runtime_state.state));
+    out = out.filter((d) => set.has(effectiveDeviceState(d)));
   }
   if (selectedUpdateStatus.length > 0) {
     // AND / narrowing: a device must satisfy every selected bucket

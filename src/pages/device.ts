@@ -83,6 +83,7 @@ import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
+import { disableMacSuffixInYaml } from "../util/yaml-mac-suffix.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
@@ -1538,6 +1539,7 @@ export class ESPHomePageDevice extends LitElement {
         @just-created-dismiss=${this._dismissJustCreated}
         @request-install=${this._saveThenInstall}
         @request-migrate-config=${this._onMigrateConfig}
+        @request-disable-mac-suffix=${this._onDisableMacSuffix}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -1994,6 +1996,13 @@ export class ESPHomePageDevice extends LitElement {
     this._setYaml(newYaml);
     this._repinSelection(newYaml);
     notifySuccess(this._localize("device.config_migration_applied"));
+  }
+
+  private _onDisableMacSuffix() {
+    const updated = disableMacSuffixInYaml(this._yaml);
+    if (updated === null) return;
+    this._setYaml(updated);
+    notifySuccess(this._localize("device.mac_suffix_applied"));
   }
 
   private _onSectionSelect(

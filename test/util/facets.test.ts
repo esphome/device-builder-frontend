@@ -8,8 +8,13 @@ import { describe, expect, it } from "vitest";
 
 import { identityLocalize } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { DeviceState } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
-import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
+import {
+  computeStateFacet,
+  computeUpdateFacet,
+  normalizeUpdateBuckets,
+} from "../../src/util/facets.js";
 
 // computeUpdateFacet reads update_available / has_pending_changes, gated
 // through showUpdateAvailable / showPendingChanges. The shared fixture
@@ -21,6 +26,31 @@ const device = makeConfiguredDevice;
 
 // Echo the key so assertions key off the i18n id, not display copy.
 const localize = identityLocalize as unknown as LocalizeFunc;
+
+describe("computeStateFacet", () => {
+  it("counts a flagged non-online device as untracked, not offline", () => {
+    const options = computeStateFacet(
+      [
+        device({
+          name_add_mac_suffix: true,
+          runtime_state: { state: DeviceState.OFFLINE },
+        }),
+        device({ runtime_state: { state: DeviceState.OFFLINE } }),
+      ],
+      identityLocalize
+    );
+    const countById = Object.fromEntries(options.map((o) => [o.id, o.count]));
+    expect(countById.untracked).toBe(1);
+    expect(countById[DeviceState.OFFLINE]).toBe(1);
+  });
+
+  it("surfaces a selected untracked bucket at zero so it stays clearable", () => {
+    const none = computeStateFacet([device()], identityLocalize);
+    expect(none.some((o) => o.id === "untracked")).toBe(false);
+    const selected = computeStateFacet([device()], identityLocalize, ["untracked"]);
+    expect(selected.find((o) => o.id === "untracked")?.count).toBe(0);
+  });
+});
 
 describe("normalizeUpdateBuckets", () => {
   it("keeps known buckets in canonical order, deduped, dropping unknowns", () => {

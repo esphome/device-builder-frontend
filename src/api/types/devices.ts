@@ -170,6 +170,10 @@ export interface ConfiguredDevice {
    * ``devices/get_api_key``.
    */
   api_encrypted: boolean;
+  /** True when the ``esphome:`` block sets a truthy
+   *  ``name_add_mac_suffix`` — the suffixed broadcast never matches
+   *  this config, so status tracking is unavailable. */
+  name_add_mac_suffix: boolean;
   /** Canonical ``XX:XX:XX:XX:XX:XX`` MAC observed in the ``mac`` TXT
    *  record of the device's ``_esphomelib._tcp.local.`` broadcast, or
    *  of ``_http._tcp.local.`` for a device without api: (e.g.

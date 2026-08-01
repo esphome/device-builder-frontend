@@ -59,6 +59,7 @@ const _BASE = {
   update_available: false,
   api_enabled: false,
   api_encrypted: false,
+  name_add_mac_suffix: false,
 } satisfies ConfiguredDevice;
 
 /** Overrides accepted by :func:`makeConfiguredDevice` — flat fields

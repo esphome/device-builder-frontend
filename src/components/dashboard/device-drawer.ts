@@ -16,6 +16,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
+import { isStatusUntracked } from "../../util/device-status.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -304,8 +305,9 @@ export class ESPHomeDeviceDrawer extends LitElement {
     if (!device) return nothing;
 
     const rt = device.runtime_state;
+    const untracked = isStatusUntracked(rt.state, device.name_add_mac_suffix);
     const online = rt.state === DeviceState.ONLINE;
-    const offline = rt.state === DeviceState.OFFLINE;
+    const offline = !untracked && rt.state === DeviceState.OFFLINE;
     const stateClass = online ? "online" : offline ? "offline" : "unknown";
     // Transport-agnostic network icons — wifi/wifi-off implied a
     // wireless link, but plenty of devices on the network are on
@@ -315,11 +317,13 @@ export class ESPHomeDeviceDrawer extends LitElement {
       : offline
         ? "network-off-outline"
         : "help-network-outline";
-    const stateLabel = online
-      ? this._localize("dashboard.drawer_device_online")
-      : offline
-        ? this._localize("dashboard.drawer_device_offline")
-        : this._localize("dashboard.drawer_device_unknown");
+    const stateLabel = untracked
+      ? this._localize("dashboard.status_untracked")
+      : online
+        ? this._localize("dashboard.drawer_device_online")
+        : offline
+          ? this._localize("dashboard.drawer_device_offline")
+          : this._localize("dashboard.drawer_device_unknown");
 
     return html`
       <div class="backdrop" @click=${this._close}></div>
