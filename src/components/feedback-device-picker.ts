@@ -19,6 +19,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { summaryListStyles } from "../styles/summary-list.js";
 import {
   buildDeviceIssueUrl,
+  DEVICE_TARGETS,
   type DeviceTarget,
   type PrefillContext,
   skipDeviceUrl,
@@ -291,12 +292,12 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     this._capturing = device.configuration;
     const abandoned = () =>
       session !== this._session || !this.isConnected || !this.active;
-    // The status form also wants the drawer's mDNS-row answer; fetch the
-    // reachability snapshot alongside the config so neither serializes
+    // A reachability target also wants the drawer's mDNS-row answer;
+    // fetch the snapshot alongside the config so neither serializes
     // the other, and let it degrade to null on a hiccup.
     const [masked, reachability] = await Promise.all([
       captureMaskedConfig(this._api, device.configuration, abandoned),
-      this.target === "status"
+      DEVICE_TARGETS[this.target].reachability
         ? captureReachabilitySnapshot(this._api, device.name)
         : Promise.resolve(null),
     ]);

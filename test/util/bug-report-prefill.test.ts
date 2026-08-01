@@ -85,6 +85,17 @@ describe("buildDeviceIssueUrl", () => {
     expect(esphome.url.searchParams.get("version")).toBe("2026.7.1");
   });
 
+  it("keeps mdns-expiry off the non-status forms", () => {
+    expect(
+      buildDeviceIssueUrl("builder", DEVICE, "", CTX).url.searchParams.get("mdns-expiry")
+    ).toBeNull();
+    expect(
+      buildDeviceIssueUrl("esphome", DEVICE, "", CTX).url.searchParams.get("mdns-expiry")
+    ).toBeNull();
+    expect(skipDeviceUrl("builder", CTX).searchParams.get("mdns-expiry")).toBeNull();
+    expect(skipDeviceUrl("esphome", CTX).searchParams.get("mdns-expiry")).toBeNull();
+  });
+
   it("prefills the status form with observed facts and the mDNS answer", () => {
     const built = buildDeviceIssueUrl("status", DEVICE, "wifi:\n  ssid: x", CTX, {
       active_source: "mdns",
