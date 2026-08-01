@@ -71,6 +71,15 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  friendly_name: Garage");
   });
 
+  it("masks hyphen and dot spellings of credential keys", () => {
+    const yaml = ["wifi-password: hunter2", "vpn.psk: abcdef"].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("abcdef");
+    expect(masked).toContain("wifi-password: •");
+    expect(masked).toContain("vpn.psk: •");
+  });
+
   it("leaves non-credential key: fields alone", () => {
     const yaml = "remote_receiver:\n  key: 0x12345678";
     expect(maskSensitiveYaml(yaml)).toBe(yaml);

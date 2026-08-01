@@ -20,8 +20,9 @@ const COMPACT_MASK_PLACEHOLDER = "•";
 
 // Key/value line with an optional comment prefix — ``# password: hunter2``
 // is just as much a leak as the live form; the captured prefix keeps the
-// comment marker in the masked output.
-const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/;
+// comment marker in the masked output. The key class matches the scanner's
+// ``KEY_LINE`` (hyphens and dots allowed) so ``wifi-password:`` is seen.
+const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:\s*(.+)$/;
 
 /**
  * True when *key* names a credential whose value must not leave
@@ -40,7 +41,7 @@ const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)
  */
 function isSensitiveKey(key: string): boolean {
   if (ALWAYS_SENSITIVE_KEYS.has(key)) return true;
-  return /_(password|psk)$/i.test(key);
+  return /[_.-](password|psk)$/i.test(key);
 }
 
 /**
