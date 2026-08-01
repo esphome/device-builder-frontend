@@ -33,7 +33,12 @@ describe("feedback-device-picker", () => {
     target_platform: "ESP32S3",
     board_id: "esp32dev",
     loaded_integrations: ["esp32", "wifi"],
-    runtime_state: { deployed_version: "2026.7.0" },
+    runtime_state: {
+      deployed_version: "2026.7.0",
+      state: "online",
+      active_source: "mdns",
+      ip_addresses: ["192.168.1.5"],
+    },
   };
 
   let el: ESPHomeFeedbackDevicePicker;
@@ -63,6 +68,14 @@ describe("feedback-device-picker", () => {
               reads.push({ resolve, reject });
             })
         ),
+        subscribeDeviceReachability: vi.fn((_name: string, cb: (s: unknown) => void) => {
+          cb({
+            active_source: "mdns",
+            mdns_last_seen_seconds_ago: 300,
+            mdns_ptr_ttl_seconds: 4500,
+          });
+          return Promise.resolve({ unsubscribe: () => Promise.resolve() });
+        }),
       },
     });
     await el.updateComplete;
@@ -187,6 +200,40 @@ describe("feedback-device-picker", () => {
     await el.updateComplete;
     const status = el.shadowRoot!.querySelector('[role="status"]');
     expect(status!.textContent).toContain("feedback.device_none");
+  });
+
+  it("prefills the status form with the drawer's mDNS answer", async () => {
+    el.target = "status";
+    await el.updateComplete;
+    await pick();
+    const url = new URL(openedUrls[0]);
+    expect(url.searchParams.get("template")).toBe("device_status.yml");
+    expect(url.searchParams.get("mdns-expiry")).toBe("Expires in 1h 10m");
+    expect(url.searchParams.get("observed")).toContain("State:");
+    expect(url.searchParams.get("config")).toContain("password: \u2022");
+  });
+
+  it("opens the status form with an mDNS fallback when reachability stalls", async () => {
+    (
+      el as unknown as {
+        _api: { subscribeDeviceReachability: unknown };
+      }
+    )._api.subscribeDeviceReachability = vi.fn(() => new Promise(() => undefined));
+    el.target = "status";
+    await el.updateComplete;
+    vi.useFakeTimers();
+    try {
+      deviceRow().click();
+      await vi.advanceTimersByTimeAsync(0);
+      reads[0].resolve(RAW_YAML);
+      // The 3s snapshot timeout elapses; the form must still open.
+      await vi.advanceTimersByTimeAsync(3000);
+    } finally {
+      vi.useRealTimers();
+    }
+    await settle(() => openedUrls.length > 0);
+    const url = new URL(openedUrls[0]);
+    expect(url.searchParams.get("mdns-expiry")).toBe("reachability read failed");
   });
 
   it("drops a capture that resolves after the picker unmounted", async () => {
