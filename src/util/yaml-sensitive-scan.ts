@@ -75,8 +75,9 @@ const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
 // `secrets.yaml` that we accept the limitation.
 const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 // Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
-// optional explicit indentation digit, optional trailing comment.
-const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+// optional explicit indentation digit, optional trailing comment. Exported
+// so the text masker preserves headers whose bodies this scanner masks.
+export const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
 
 /** Find the closing quote of a YAML scalar starting at `quoteStart`,
  *  honouring the (limited) escapes both quote styles allow:

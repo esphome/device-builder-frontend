@@ -7,6 +7,7 @@
 
 import {
   ALWAYS_SENSITIVE_KEYS,
+  BLOCK_SCALAR_HEADER,
   findSensitiveValueRanges,
 } from "./yaml-sensitive-scan.js";
 
@@ -71,6 +72,9 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   // value, not the value itself. Don't mask them.
   if (value.startsWith("!secret")) return line;
   if (value.startsWith("${")) return line;
+  // A block-scalar header carries no credential of its own; rewriting it
+  // breaks the YAML shape while the scanner masks the body lines.
+  if (BLOCK_SCALAR_HEADER.test(value)) return line;
   return `${prefix}${key}: ${placeholder}`;
 }
 

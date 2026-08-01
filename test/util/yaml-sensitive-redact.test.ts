@@ -34,11 +34,12 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("    key: •");
   });
 
-  it("masks block-scalar credentials line by line", () => {
+  it("masks block-scalar credentials line by line, keeping the header", () => {
     const yaml = "mqtt:\n  password: |\n    line-one\n    line-two\nsensor:";
     const masked = maskSensitiveYaml(yaml);
     expect(masked).not.toContain("line-one");
     expect(masked).not.toContain("line-two");
+    expect(masked).toContain("  password: |");
     expect(masked).toContain("sensor:");
   });
 
