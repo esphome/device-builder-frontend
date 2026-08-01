@@ -294,6 +294,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     });
     // The device row knows the effective address before the probe answers.
     const address = this._result?.address || device.address;
+    const ip = this._result?.ping_target || device.ip;
     return html`${sections.map((section) => {
       // The manual-address fix is the last resort: a drill row into its
       // own screen, so the diagnosis stays compact on small viewports.
@@ -315,7 +316,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         <div class="section" data-section=${section.id}>
           <h3>${this._localize(section.titleKey)}</h3>
           ${section.bodyKeys.map(
-            (key) => html`<p>${this._localize(key, { address })}</p>`
+            (key) => html`<p>${this._localize(key, { address, ip })}</p>`
           )}
           ${
             section.docsUrl

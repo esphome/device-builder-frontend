@@ -1982,7 +1982,7 @@
     "dns_fail_title": "The device hostname does not resolve",
     "dns_fail_body": "{address} cannot be resolved from the dashboard server. Container images usually cannot resolve .local names; a fixed address below avoids the lookup entirely.",
     "dynamic_ip_title": "The last known IP no longer answers",
-    "dynamic_ip_body": "The device probably received a new DHCP lease. Give it a DHCP reservation or a static IP in your router, or pin the address below.",
+    "dynamic_ip_body": "The device was last seen at {ip}, which no longer answers; it probably received a new DHCP lease. Give it a DHCP reservation or a static IP in your router, or pin the address below.",
     "generic_title": "Check power and network basics",
     "generic_body": "Confirm the device has power and is on the same network as the dashboard. Power-cycling the device often recovers a stuck network stack.",
     "use_address_title": "Set the address manually",
