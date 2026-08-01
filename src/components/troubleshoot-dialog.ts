@@ -146,6 +146,20 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         font-weight: var(--wa-font-weight-semibold);
       }
 
+      details.section summary {
+        cursor: pointer;
+        color: var(--wa-color-text-quiet);
+      }
+
+      details.section summary h3 {
+        display: inline;
+        color: inherit;
+      }
+
+      details.section[open] summary {
+        margin-bottom: var(--wa-space-2xs);
+      }
+
       .section p {
         margin: 0 0 var(--wa-space-2xs);
         font-size: var(--wa-font-size-s);
@@ -348,28 +362,39 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       result: this._result,
       inDocker: this._api?.serverInfo?.in_docker === true,
     });
-    return html`${sections.map(
-      (section) => html`
+    return html`${sections.map((section) => {
+      const body = html`
+        ${section.bodyKeys.map(
+          (key) =>
+            html`<p>${this._localize(key, { address: this._result?.address ?? "" })}</p>`
+        )}
+        ${
+          section.docsUrl
+            ? html`<a href=${section.docsUrl} target="_blank" rel="noopener noreferrer">
+                ${this._localize("troubleshoot.learn_more")}
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing
+        }
+        ${section.showUseAddressForm ? this._renderUseAddressForm(device) : nothing}
+      `;
+      // The manual-address fix is the last resort; keep it folded so the
+      // diagnosis above stays the first thing people act on.
+      if (section.showUseAddressForm) {
+        return html`
+          <details class="section" data-section=${section.id}>
+            <summary><h3>${this._localize(section.titleKey)}</h3></summary>
+            ${body}
+          </details>
+        `;
+      }
+      return html`
         <div class="section" data-section=${section.id}>
           <h3>${this._localize(section.titleKey)}</h3>
-          ${section.bodyKeys.map(
-            (key) =>
-              html`<p>
-                ${this._localize(key, { address: this._result?.address ?? "" })}
-              </p>`
-          )}
-          ${
-            section.docsUrl
-              ? html`<a href=${section.docsUrl} target="_blank" rel="noopener noreferrer">
-                  ${this._localize("troubleshoot.learn_more")}
-                  <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                </a>`
-              : nothing
-          }
-          ${section.showUseAddressForm ? this._renderUseAddressForm(device) : nothing}
+          ${body}
         </div>
-      `
-    )}`;
+      `;
+    })}`;
   }
 
   private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {

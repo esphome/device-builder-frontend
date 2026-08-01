@@ -118,6 +118,15 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
   });
 
+  it("keeps the manual-address fix folded by default", async () => {
+    const { el } = await openDialog();
+    const details = el.shadowRoot!.querySelector<HTMLDetailsElement>(
+      "details[data-section='use_address']"
+    );
+    expect(details).not.toBeNull();
+    expect(details!.open).toBe(false);
+  });
+
   it("saves a valid use_address through the YAML splice", async () => {
     const { el, api } = await openDialog();
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
