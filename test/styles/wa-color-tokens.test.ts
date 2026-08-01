@@ -24,14 +24,13 @@ const KNOWN_PHANTOMS = new Set([
   "--wa-color-warning-quiet",
 ]);
 
-// Dynamic node imports: tsconfig's `types` pin excludes the node
-// ambients, so the static form fails tsc (same shape as
-// test/build-scripts/gen-language-manifest.test.ts).
 async function collectTokens(): Promise<{
   defined: Set<string>;
   referenced: Set<string>;
 }> {
+  // @ts-expect-error — node-only module (see gen-language-manifest.test.ts)
   const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  // @ts-expect-error — node-only module
   const { join } = await import("node:path");
 
   const walk = (dir: string, suffix: string, out: string[] = []): string[] => {
