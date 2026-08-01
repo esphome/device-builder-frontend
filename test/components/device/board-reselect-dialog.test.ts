@@ -103,6 +103,24 @@ describe("board-reselect-dialog", () => {
     expect(inner().hasMore).toBe(false);
   });
 
+  it("lists the YAML's own platform by mcu for an rp2 variant", async () => {
+    // The rp2 catalog facets its chips by mcu, not variant.
+    const pico = makeSlimBoard("rpi-pico", { platform: "rp2", mcu: "rp2040" });
+    const getBoards = vi.fn().mockResolvedValue({ boards: [pico], total: 1 });
+    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "rp2:\n  variant: RP2040\n",
+    });
+    expect(getBoards).toHaveBeenCalledWith({
+      platform: "rp2",
+      mcu: "rp2040",
+      offset: 0,
+      limit: 50,
+    });
+    await vi.waitFor(() => expect(inner().boards).toEqual([pico]));
+  });
+
   it("falls back to same-variant boards when the catalog lacks the board string", async () => {
     const getBoards = vi
       .fn()

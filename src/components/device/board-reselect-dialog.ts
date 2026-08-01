@@ -12,6 +12,7 @@ import { debounce } from "../../util/debounce.js";
 import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { readPlatformBoard, type YamlPlatformBoard } from "../../util/yaml-board.js";
+import { WIZARD_BOARD_PLATFORMS } from "../wizard/wizard-step-board-platforms.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { navItemMatches } from "./navigator-search-match.js";
 
@@ -65,8 +66,10 @@ export class ESPHomeBoardReselectDialog extends LitElement {
 
   private _onApplied?: () => void;
 
-  /** Variant of the paged listing; the search re-query needs it. */
-  private _variant: string | null = null;
+  /** Platform and chip facet of the paged listing; the search re-query needs them. */
+  private _platform = "esp32";
+
+  private _chipFacet: { variant?: string; mcu?: string } = {};
 
   /** Latest raw input value, committed to `_search` by the debounce. */
   private _pendingSearch = "";
@@ -149,11 +152,19 @@ export class ESPHomeBoardReselectDialog extends LitElement {
         }
       }
     }
-    // A variant-only YAML (`esp32.variant:` with no `board:`, or a board
-    // string the catalog doesn't carry) still pins the chip — every board
-    // of that variant is compatible. Anything broader is not offered.
-    if (parsed?.platform === "esp32" && parsed.variant) {
-      this._variant = chipNameToVariant(parsed.variant);
+    // A variant-only YAML (a `variant:` with no `board:`, or a board
+    // string the catalog doesn't carry) still pins the chip — every
+    // board of that chip on the YAML's platform is compatible.
+    // Anything broader is not offered. The catalog facets esp32 by
+    // `variant` and the multi-chip platforms by `mcu`; the wizard's
+    // platform table already records which is which.
+    if (parsed?.variant) {
+      this._platform = parsed.platform;
+      const chip = chipNameToVariant(parsed.variant);
+      const usesMcu = WIZARD_BOARD_PLATFORMS.some(
+        (p) => p.platform === parsed.platform && p.mcu
+      );
+      this._chipFacet = usesMcu ? { mcu: chip } : { variant: chip };
       // Probe page 0 up front so the none-found case toasts instead of
       // opening an empty dialog; the reset serves it without a refetch
       // (offset 0 is only ever the reset's own first fetch).
@@ -170,8 +181,8 @@ export class ESPHomeBoardReselectDialog extends LitElement {
 
   private _fetchVariantPage = async (offset: number, limit: number) => {
     const page = await this._api.getBoards({
-      platform: "esp32",
-      variant: this._variant ?? undefined,
+      platform: this._platform,
+      ...this._chipFacet,
       ...(this._search ? { query: this._search } : {}),
       offset,
       limit,

@@ -45,12 +45,16 @@ export function platformDisagrees(platform: string, board: SlimBoard): boolean {
   return platform !== canonicalComponentKey(board.esphome.platform);
 }
 
-/** Whether *variant* pins a different chip than *board*; unknown sides agree. */
+/** The board's chip identity: esp32-family variant, else the mcu series. */
+export function boardChipToken(board: SlimBoard): string | null {
+  return board.esphome.variant ?? board.esphome.mcu ?? null;
+}
+
+/** Whether the YAML-side chip token pins a different chip than *board*; unknown sides agree. */
 export function variantDisagrees(variant: string | null, board: SlimBoard): boolean {
+  const chip = boardChipToken(board);
   return Boolean(
-    variant &&
-    board.esphome.variant &&
-    chipNameToVariant(variant) !== chipNameToVariant(board.esphome.variant)
+    variant && chip && chipNameToVariant(variant) !== chipNameToVariant(chip)
   );
 }
 

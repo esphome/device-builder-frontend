@@ -153,6 +153,63 @@ describe("findBoardDisagreement", () => {
     ).toBe(yaml);
   });
 
+  it("flags a resolved LibreTiny board on a different mcu series", async () => {
+    // LibreTiny YAMLs carry no variant; the chip rides the board string
+    // and the catalog records it as the mcu series.
+    const bk7231 = makeSlimBoard("cb2s", {
+      platform: "bk72xx",
+      board: "cb2s",
+      mcu: "bk7231",
+    }) as BoardCatalogEntry;
+    const bk7238 = makeSlimBoard("cb3s-38", {
+      platform: "bk72xx",
+      board: "cb3s_38",
+      mcu: "bk7238",
+    });
+    vi.mocked(fetchBoard).mockResolvedValue(bk7231);
+    const yaml = "bk72xx:\n  board: cb3s_38\n";
+    expect(
+      await findBoardDisagreement(makeApi(yaml, [bk7238]), identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "cb2s",
+      })
+    ).toBe(yaml);
+  });
+
+  it("is null for an uncatalogued LibreTiny board string", async () => {
+    const bk7231 = makeSlimBoard("cb2s", {
+      platform: "bk72xx",
+      board: "cb2s",
+      mcu: "bk7231",
+    }) as BoardCatalogEntry;
+    vi.mocked(fetchBoard).mockResolvedValue(bk7231);
+    const yaml = "bk72xx:\n  board: vendor-bk\n";
+    expect(
+      await findBoardDisagreement(makeApi(yaml), identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "cb2s",
+      })
+    ).toBeNull();
+  });
+
+  it("flags an rp2 variant against a different stored mcu series", async () => {
+    const pico = makeSlimBoard("rpi-pico", {
+      platform: "rp2",
+      board: "rpipico",
+      mcu: "rp2040",
+    }) as BoardCatalogEntry;
+    vi.mocked(fetchBoard).mockResolvedValue(pico);
+    const yaml = "rp2:\n  variant: RP2350\n";
+    const api = makeApi(yaml);
+    expect(
+      await findBoardDisagreement(api, identityLocalize, {
+        configuration: "dev.yaml",
+        board_id: "rpi-pico",
+      })
+    ).toBe(yaml);
+    expect(api.getBoards).not.toHaveBeenCalled();
+  });
+
   it("fails open with a warning toast on a fetch failure", async () => {
     // Fail open so install is never blocked on a backend blip, but keep
     // a persistent failure distinguishable from a genuine "agrees".

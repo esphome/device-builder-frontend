@@ -11,6 +11,7 @@ import { canonicalComponentKey } from "./component-presence.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 import { notifyError, notifySuccess, notifyWarning } from "./notify.js";
 import {
+  boardChipToken,
   platformDisagrees,
   readPlatformBoard,
   variantDisagrees,
@@ -101,11 +102,14 @@ export async function chipDisagrees(
 ): Promise<boolean> {
   if (platformDisagrees(parsed.platform, stored)) return true;
   if (parsed.board?.toLowerCase() === stored.esphome.board.toLowerCase()) return false;
-  if (!stored.esphome.variant) return false;
+  if (!boardChipToken(stored)) return false;
   const resolved = parsed.board
     ? await matchCatalogBoard(api, parsed.board, parsed.platform)
     : undefined;
-  return variantDisagrees(resolved?.esphome.variant ?? parsed.variant, stored);
+  const yamlChip = resolved
+    ? (boardChipToken(resolved) ?? parsed.variant)
+    : parsed.variant;
+  return variantDisagrees(yamlChip, stored);
 }
 
 /** Write a device's sidecar `board_id` and toast the outcome; true on success. */
