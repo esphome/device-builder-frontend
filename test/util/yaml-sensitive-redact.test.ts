@@ -265,6 +265,15 @@ describe("maskSensitiveYaml", () => {
     expect(maskSensitiveLine("  wifi_pass: hunter2")).toBe("  wifi_pass: hunter2");
   });
 
+  it("masks and keeps a trailing comment on the label path", () => {
+    expect(maskSensitiveLine("  password: hunter2 # note secret")).toBe(
+      "  password: \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 # \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+    );
+    expect(maskSensitiveLine("  password: 'it''s # here' # c")).toBe(
+      "  password: \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 # \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+    );
+  });
+
   it("keeps public certificate material visible on UI paths", () => {
     // Only the outbound report widens to certificate blobs; search
     // labels and snippets keep the credential-only rules.

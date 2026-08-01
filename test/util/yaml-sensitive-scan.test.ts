@@ -89,7 +89,7 @@ wifi:
     ]);
   });
 
-  it("scans commented keys under scanCommented, without parent scope", () => {
+  it("scans commented keys under scanCommented", () => {
     const yaml = [
       "wifi:",
       "  # password: hunter2",
@@ -97,12 +97,12 @@ wifi:
       "  # - psk: qwerty",
       "api:",
       "  encryption:",
-      "    # key: scoped-needs-parent",
+      "    # key: commented-scoped",
       "  # note: not-sensitive",
     ].join("\n");
     expect(
       valuesAt(yaml, findSensitiveValueRanges(yaml, { scanCommented: true }))
-    ).toEqual(["hunter2", "abcdef", "qwerty"]);
+    ).toEqual(["hunter2", "abcdef", "qwerty", "commented-scoped"]);
   });
 
   it("consumes a commented block scalar with the comment-run boundary", () => {
@@ -123,6 +123,28 @@ wifi:
     const yaml = "wifi:\r\n  password: hunter2\r\nsensor:";
     const ranges = findSensitiveValueRanges(yaml);
     expect(ranges).toEqual([{ line: 2, valueFrom: 12, valueTo: 19 }]);
+  });
+
+  it("emits ranges in ascending (line, valueFrom) order", () => {
+    const yaml = "wifi:\n  password: hunter2 # old pass\n  ap_password: abcdef";
+    const ranges = findSensitiveValueRanges(yaml, { emitCommentSpans: true });
+    const keys = ranges.map((r) => [r.line, r.valueFrom]);
+    const sorted = [...keys].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    expect(keys).toEqual(sorted);
+    expect(ranges).toHaveLength(3);
+  });
+
+  it("scopes a commented key by the live ancestor stack", () => {
+    const yaml = [
+      "api:",
+      "  encryption:",
+      "    # key: commented-scoped",
+      "remote_receiver:",
+      "  # key: still-a-button-code",
+    ].join("\n");
+    expect(
+      valuesAt(yaml, findSensitiveValueRanges(yaml, { scanCommented: true }))
+    ).toEqual(["commented-scoped"]);
   });
 
   it("masks plain `password:` values regardless of parent", () => {

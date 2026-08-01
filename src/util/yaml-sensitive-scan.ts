@@ -174,6 +174,11 @@ function isLineSource(value: string | LineSource): value is LineSource {
   return typeof value !== "string";
 }
 
+/**
+ * Ranges are returned in ascending ``(line, valueFrom)`` order; text
+ * maskers rely on this to apply replacements right-to-left without
+ * invalidating earlier offsets on the same line.
+ */
 export function findSensitiveValueRanges(
   yaml: string | LineSource,
   options: FindSensitiveValueRangesOptions = {}
@@ -292,10 +297,22 @@ export function findSensitiveValueRanges(
     const sm = shadow.match(KEY_LINE);
     if (!sm) return lineIdx + 1;
     const [, sLeading, sDash = "", sKey, sPreColon, sSep, sRest] = sm;
-    // No live parent scope inside a comment — allowlist and predicate only.
+    const sKeyFolded = sKey.toLowerCase();
+    // Parent scope comes from the live ancestor stack, read at the
+    // commented key's column: a `# key:` under a live `encryption:` is
+    // the same leak as its uncommented form. Commented keys never push
+    // onto the stack themselves.
+    const column = markerLen + sLeading.length + sDash.length;
+    let scoped = false;
+    for (let s = stack.length - 1; s >= 0 && !scoped; s--) {
+      if (stack[s].indent >= column) continue;
+      scoped = PARENT_SCOPED_SENSITIVE_KEYS.get(stack[s].key)?.has(sKeyFolded) === true;
+      break;
+    }
     const sensitive =
       maskAllValues ||
-      ALWAYS_SENSITIVE_KEYS.has(sKey.toLowerCase()) ||
+      scoped ||
+      ALWAYS_SENSITIVE_KEYS.has(sKeyFolded) ||
       sensitiveKeyPredicate?.(sKey) === true;
     if (!sensitive) return lineIdx + 1;
 
@@ -316,7 +333,7 @@ export function findSensitiveValueRanges(
     // content (``#hunter2``) is always body — its column is ambiguous,
     // and skipping it would leak; spaced content at or above the header
     // column ends the run.
-    const headerColumn = markerLen + sLeading.length + sDash.length;
+    const headerColumn = column;
     let next = lineIdx + 1;
     while (next < lines.length) {
       const cont = lines[next];
