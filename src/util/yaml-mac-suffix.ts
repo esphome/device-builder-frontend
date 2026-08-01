@@ -16,10 +16,15 @@ export function findTruthyMacSuffixLine(yaml: string): number {
   return truthyLineIn(yaml.split("\n"));
 }
 
-/** Zero-based line index of a direct-child `name_add_mac_suffix:` under
- *  `esphome:` regardless of its value, or -1. */
-export function findMacSuffixLine(yaml: string): number {
-  return findDirectChildLine(yaml.split("\n"), "esphome", KEY_RE);
+/** True when the draft's direct-child `name_add_mac_suffix:` parses to
+ *  an explicit falsy literal; a substituted or unparsable value doesn't
+ *  count. */
+export function macSuffixDisabledInDraft(yaml: string): boolean {
+  const lines = yaml.split("\n");
+  const line = findDirectChildLine(lines, "esphome", KEY_RE);
+  if (line < 0) return false;
+  const match = KEY_VALUE_RE.exec(lines[line]);
+  return match !== null && parseYamlBoolean(stripQuotes(match[2])) === false;
 }
 
 /** Rewrite the truthy flag to `false`, preserving the rest of the line;
