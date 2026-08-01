@@ -95,11 +95,15 @@ const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
 
 // A `!secret` tag value — carries only the indirection name. Word-bounded
-// so a literal merely starting with "!secret" doesn't pass.
+// so a literal merely starting with "!secret" doesn't pass. Deliberately
+// NOT secret-ref.ts's fully anchored SECRET_REF_RE: the scanner must
+// tolerate a trailing comment after the name (whose body it masks).
 const SECRET_TAG_VALUE = /^!secret\b/;
 
 // A `${substitution}` reference value — the other indirection shape,
-// skipped only under `skipSubstitutionRefs`.
+// skipped only under `skipSubstitutionRefs`. Deliberately NOT
+// substitutions.ts's contains-style matchers: a literal merely
+// containing `${...}` must still mask.
 const SUBSTITUTION_REF = /^\$\{/;
 
 // A commented-out line, split into the marker prefix (a list dash may
