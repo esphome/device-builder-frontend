@@ -177,8 +177,9 @@ export const troubleshootDialogStyles = css`
     background: var(--esphome-primary-hover);
   }
 
+  /* Out-specifies .section p so the banner keeps the warning tone. */
   .section p.warning-banner {
-    margin: 0 0 var(--wa-space-s);
+    color: var(--wa-color-warning-on-quiet, #6b4f00);
   }
 
   .saved-panel {

@@ -169,7 +169,6 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           role="button"
           tabindex="0"
           title=${cellLabel}
-          aria-label=${cellLabel}
           @click=${openTroubleshoot}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {

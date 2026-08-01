@@ -49,8 +49,6 @@ export const tableCellStyles = css`
     background: var(--wa-color-text-quiet);
     opacity: 0.5;
   }
-  /* Hollow ring: "no verdict possible", distinct from unknown's
-     filled "no verdict yet". */
   .cell-status[role="button"] {
     cursor: pointer;
   }
@@ -61,6 +59,8 @@ export const tableCellStyles = css`
     border-radius: var(--wa-border-radius-s);
   }
 
+  /* Hollow ring: "no verdict possible", distinct from unknown's
+     filled "no verdict yet". */
   .status-dot.untracked {
     background: transparent;
     border: 2px solid var(--wa-color-text-quiet);

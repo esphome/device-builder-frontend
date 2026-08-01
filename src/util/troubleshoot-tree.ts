@@ -7,6 +7,7 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
+import { isIpLiteral } from "./use-address-yaml.js";
 
 const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
@@ -107,7 +108,13 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.mqtt_body"],
     });
   }
-  if (result && !result.dns_resolved && !result.dns_inconclusive && result.address) {
+  if (
+    result &&
+    !result.dns_resolved &&
+    !result.dns_inconclusive &&
+    result.address &&
+    !isIpLiteral(result.address)
+  ) {
     sections.push({
       id: "dns_fail",
       titleKey: "troubleshoot.dns_fail_title",
@@ -131,6 +138,8 @@ export function buildTroubleshootSections(
     !existingAddress &&
     result?.ping_attempted &&
     result.ping_rtt_ms === null &&
+    (result.ping_target_source === "runtime" ||
+      result.ping_target_source === "persisted") &&
     device.ip
   ) {
     sections.push({

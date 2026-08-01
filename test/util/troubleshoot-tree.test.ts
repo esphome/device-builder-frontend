@@ -216,6 +216,7 @@ describe("buildTroubleshootSections", () => {
         dns_addresses: [],
         dns_had_cached_failure: true,
         dns_inconclusive: false,
+        ping_target_source: "persisted",
         ping_rtt_ms: null,
       }),
     });
