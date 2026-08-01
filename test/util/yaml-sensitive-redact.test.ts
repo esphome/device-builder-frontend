@@ -70,6 +70,16 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("abcdef");
   });
 
+  it("keeps # inside a scalar out of the comment split", () => {
+    const masked = maskSensitiveYaml(
+      'wifi:\n  password: abc#def\n  ap_password: "hunter2 # not a comment"'
+    );
+    expect(masked).not.toContain("abc#def");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("not a comment");
+    expect(masked).toContain("  password: •");
+  });
+
   it("masks a trailing comment beside a masked value", () => {
     const masked = maskSensitiveYaml("wifi:\n  password: hunter2  # old pass swordfish");
     expect(masked).not.toContain("hunter2");
