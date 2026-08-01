@@ -96,6 +96,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
   private _failedGeneration = -1;
+  private _subscribePending = false;
 
   static styles = [
     espHomeStyles,
@@ -522,6 +523,9 @@ ${section}:
   }
 
   private _reconcileSubscription(): void {
+    // An in-flight subscribe must finish before another attempt, or
+    // each 1Hz tick opens a fresh stream while the ack is pending.
+    if (this._subscribePending) return;
     const generation = this._api?.connectionGeneration ?? 0;
     if (this._subscription !== null && generation === this._subscribedGeneration) return;
     if (this._subscription === null && generation === this._failedGeneration) return;
@@ -530,6 +534,7 @@ ${section}:
   }
 
   private async _subscribe(name: string, generation: number): Promise<void> {
+    this._subscribePending = true;
     this._subscribedGeneration = generation;
     try {
       const subscription = await this._api.subscribeDeviceReachability(name, (event) => {
@@ -545,6 +550,8 @@ ${section}:
       // stream; one retry per connection generation.
       this._failedGeneration = generation;
       console.warn("subscribeDeviceReachability failed", err);
+    } finally {
+      this._subscribePending = false;
     }
   }
 

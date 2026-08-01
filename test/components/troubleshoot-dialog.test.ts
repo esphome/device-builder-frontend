@@ -232,6 +232,23 @@ describe("troubleshoot-dialog", () => {
     );
   });
 
+  it("does not double-subscribe while an attempt is in flight", async () => {
+    let resolveSub: (v: { unsubscribe: () => void }) => void;
+    const pending = new Promise<{ unsubscribe: () => void }>((r) => {
+      resolveSub = r;
+    });
+    const { el, api } = await openDialog({
+      subscribeDeviceReachability: vi.fn().mockReturnValue(pending),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._reconcileSubscription();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._reconcileSubscription();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    resolveSub!({ unsubscribe: vi.fn() });
+    await flush();
+  });
+
   it("drops the previous stream when reopened", async () => {
     const { el, unsubscribe } = await openDialog();
     el.open({ configuration: "kitchen.yaml" });
