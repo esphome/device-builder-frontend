@@ -179,6 +179,20 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: # •");
   });
 
+  it("masks a value behind a space-before-colon key", () => {
+    const masked = maskSensitiveYaml(
+      "wifi:\n  password : hunter2\n  # ap_password : abcdef"
+    );
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("abcdef");
+  });
+
+  it("masks a marker-adjacent comment-only value", () => {
+    const masked = maskSensitiveYaml("wifi:\n  password:#hunter2");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  password:#•");
+  });
+
   it("masks user-named *_password / *_psk substitution keys", () => {
     const yaml = [
       "substitutions:",
@@ -249,6 +263,15 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: ${wifi_pass}");
     // UI surfaces keep the narrower rules.
     expect(maskSensitiveLine("  wifi_pass: hunter2")).toBe("  wifi_pass: hunter2");
+  });
+
+  it("masks and keeps a trailing comment on the label path", () => {
+    expect(maskSensitiveLine("  password: hunter2 # note secret")).toBe(
+      "  password: \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 # \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+    );
+    expect(maskSensitiveLine("  password: 'it''s # here' # c")).toBe(
+      "  password: \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 # \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+    );
   });
 
   it("keeps public certificate material visible on UI paths", () => {
