@@ -12,6 +12,7 @@ vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 
+import toast from "sonner-js";
 import { flushMicrotasks, mount } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeFeedbackDevicePicker } from "../../src/components/feedback-device-picker.js";
@@ -153,6 +154,7 @@ describe("feedback-device-picker", () => {
   });
 
   it("opens the form without config when the capture fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     deviceRow().click();
     await settle(() => reads.length > 0);
     reads[0].reject(new APIError("internal_error", "boom"));
@@ -160,6 +162,9 @@ describe("feedback-device-picker", () => {
     const url = new URL(openedUrls[0]);
     expect(url.searchParams.get("config")).toBeNull();
     expect(url.searchParams.get("extra")).toContain("Garage Door (garage.yaml)");
+    // The toast is the only signal the config is missing from the form.
+    expect(toast.error).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("keeps the whole URL under the budget for a huge config", async () => {

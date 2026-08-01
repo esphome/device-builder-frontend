@@ -359,8 +359,12 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   protected render() {
     const isDevice = this._screen === "device";
+    // Inline comparisons: narrowing doesn't survive an alias of a
+    // mutable @state field, and an unnarrowed index widens `drill` to any.
     const drill =
-      this._screen === "main" || isDevice ? null : DRILL_SCREENS[this._screen];
+      this._screen === "main" || this._screen === "device"
+        ? null
+        : DRILL_SCREENS[this._screen];
     const label = isDevice
       ? this._localize("feedback.device_title")
       : this._localize(drill ? drill.titleKey : "feedback.title");
