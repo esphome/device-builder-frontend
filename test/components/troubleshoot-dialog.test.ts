@@ -42,7 +42,7 @@ interface ApiStub {
   subscribeDeviceReachability: ReturnType<typeof vi.fn>;
   getConfig: ReturnType<typeof vi.fn>;
   updateConfig: ReturnType<typeof vi.fn>;
-  serverInfo: { in_docker: boolean } | null;
+  serverInfo: { in_docker: boolean; ha_addon?: boolean } | null;
 }
 
 function makeApi(overrides: Partial<ApiStub> = {}): {
@@ -118,6 +118,16 @@ describe("troubleshoot-dialog", () => {
     buttons.find((b) => b.textContent!.includes("troubleshoot.check_again"))!.click();
     await flush();
     expect(api.troubleshootDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the docker advice off the HA add-on", async () => {
+    const { el } = await openDialog(
+      { serverInfo: { in_docker: true, ha_addon: true } },
+      makeConfiguredDevice({ api_enabled: true, ip: "" })
+    );
+    const text = el.shadowRoot!.textContent!;
+    expect(text).toContain("troubleshoot.mdns_dark_body");
+    expect(text).not.toContain("troubleshoot.mdns_dark_docker_body");
   });
 
   it("renders sections from the decision tree, ending in use_address", async () => {

@@ -339,11 +339,14 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     // stream alone can paint a confident diagnosis the probe then
     // retracts. Re-checks keep the previous sections visible.
     if (this._checking && this._result === null) return html``;
+    // The HA add-on is a Docker container too, but it already runs
+    // host-network; bridge advice there would be wrong and unactionable.
+    const info = this._api?.serverInfo;
     const sections = buildTroubleshootSections({
       device,
       reachability: this._reachability,
       result: this._result,
-      inDocker: this._api?.serverInfo?.in_docker === true,
+      inDocker: info?.in_docker === true && info.ha_addon !== true,
       existingAddress: this._existingAddress,
     });
     // The device row knows the effective address before the probe answers.
