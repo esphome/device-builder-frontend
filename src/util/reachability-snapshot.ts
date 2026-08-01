@@ -25,7 +25,10 @@ export async function captureReachabilitySnapshot(
       firstEvent,
       subscribed.then(() => firstEvent),
       new Promise<null>((resolve) => {
-        timer = setTimeout(resolve, timeoutMs, null);
+        timer = setTimeout(() => {
+          console.warn("Reachability snapshot timed out");
+          resolve(null);
+        }, timeoutMs);
       }),
     ]);
   } catch (err) {

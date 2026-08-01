@@ -29,8 +29,9 @@ describe("captureReachabilitySnapshot", () => {
     await vi.waitFor(() => expect(unsubscribe).toHaveBeenCalledOnce());
   });
 
-  it("resolves null on timeout and still unsubscribes", async () => {
+  it("resolves null on timeout, logs, and still unsubscribes", async () => {
     vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const unsubscribe = vi.fn().mockResolvedValue(undefined);
     const api = {
       subscribeDeviceReachability: vi.fn(async () => ({ unsubscribe })),
@@ -39,6 +40,8 @@ describe("captureReachabilitySnapshot", () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(await result).toBeNull();
     expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 
   it("resolves null when the subscribe call rejects", async () => {
