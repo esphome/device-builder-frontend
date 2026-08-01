@@ -267,7 +267,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     // returns null by spec either way — blocking is undetectable). Keep
     // the screen up with the link as the guaranteed path.
     this._readyUrl = url;
-    window.open(url, "_blank", "noopener");
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   private _onFilterInput = (e: Event): void => {

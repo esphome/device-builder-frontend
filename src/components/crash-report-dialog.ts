@@ -225,7 +225,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = url;
     this._prefillComplete = complete;
     this._downloadReport();
-    window.open(url, "_blank", "noopener");
+    window.open(url, "_blank", "noopener,noreferrer");
     this._delivered = true;
   };
 
