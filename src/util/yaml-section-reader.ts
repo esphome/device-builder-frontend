@@ -77,6 +77,7 @@ export function findDirectChildLine(
     if (childIndent === null) childIndent = indent;
     if (indent < childIndent) break;
     if (indent !== childIndent) continue; // deeper-nested key, not a direct child
+    keyRe.lastIndex = 0; // a caller's g/y regex must not skip lines
     if (keyRe.test(l.trimStart())) found = i;
   }
   return found;

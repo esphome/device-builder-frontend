@@ -18,7 +18,9 @@ export const UNTRACKED_STATE = "untracked";
 
 /** The state bucket for *device*: `untracked` when the flag suppresses
  *  an OFFLINE/UNKNOWN verdict, else the raw runtime state. */
-export const effectiveDeviceState = (device: ConfiguredDevice): string =>
+export const effectiveDeviceState = (
+  device: ConfiguredDevice
+): DeviceState | typeof UNTRACKED_STATE =>
   isStatusUntracked(device.runtime_state.state, device.name_add_mac_suffix)
     ? UNTRACKED_STATE
     : device.runtime_state.state;
