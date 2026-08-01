@@ -77,10 +77,10 @@ describe("yamlHitLabel", () => {
   });
 
   it.each([
-    ["password: hunter2", "password: •"],
-    ["  ap_password: 42dfadc0c2", "ap_password: •"],
-    ["  - ota_password: yellow1@@", "- ota_password: •"],
-    ["psk: 0123456789abcdef", "psk: •"],
+    ["password: hunter2", "password: ••••••••"],
+    ["  ap_password: 42dfadc0c2", "ap_password: ••••••••"],
+    ["  - ota_password: yellow1@@", "- ota_password: ••••••••"],
+    ["psk: 0123456789abcdef", "psk: ••••••••"],
   ])("masks inline credential value in %s", (raw, expectedTrimmed) => {
     expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
       `Kitchen Lamp — ${expectedTrimmed}`
@@ -127,11 +127,11 @@ describe("yamlHitLabel", () => {
     // values when surfaced in search results. Mask the value but
     // preserve the leading ``#`` so the line still reads as a
     // comment.
-    ['# password: "8f0e4ddd4bb7034d1f4165ab30d84b5e"', "# password: •"],
-    ["  # password: hunter2", "# password: •"],
-    ["#password: hunter2", "#password: •"],
-    ["## password: hunter2", "## password: •"],
-    ["# - ap_password: 42dfadc0c2", "# - ap_password: •"],
+    ['# password: "8f0e4ddd4bb7034d1f4165ab30d84b5e"', "# password: ••••••••"],
+    ["  # password: hunter2", "# password: ••••••••"],
+    ["#password: hunter2", "#password: ••••••••"],
+    ["## password: hunter2", "## password: ••••••••"],
+    ["# - ap_password: 42dfadc0c2", "# - ap_password: ••••••••"],
   ])("masks credential value inside a YAML comment (%s)", (raw, expectedTrimmed) => {
     expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
       `Kitchen Lamp — ${expectedTrimmed}`
@@ -143,9 +143,9 @@ describe("yamlHitLabel", () => {
     // wouldn't be in the editor's strict ``ALWAYS_SENSITIVE_KEYS`` list
     // because the user names them. The search-time heuristic catches
     // any ``*_password`` / ``*_psk`` suffix to defend against this.
-    ["wifi_password: yellow1@@", "wifi_password: •"],
-    ["  guest_psk: HFrhVdN37Bb6mTFm", "guest_psk: •"],
-    ['  WiFi_Password: "uppercase-key"', "WiFi_Password: •"],
+    ["wifi_password: yellow1@@", "wifi_password: ••••••••"],
+    ["  guest_psk: HFrhVdN37Bb6mTFm", "guest_psk: ••••••••"],
+    ['  WiFi_Password: "uppercase-key"', "WiFi_Password: ••••••••"],
   ])(
     "masks credential value for user-defined *_password / *_psk keys (%s)",
     (raw, expectedTrimmed) => {
@@ -420,7 +420,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual(["wifi:", "  ssid: home", "  password: •"]);
+    expect(block.lines).toEqual(["wifi:", "  ssid: home", "  password: ••••••••"]);
   });
 
   it("masks the API encryption key when its parent is in the snippet window", () => {
@@ -446,7 +446,7 @@ describe("buildYamlSnippetBlocks", () => {
       "  name: kitchen",
       "api:",
       "  encryption:",
-      "    key: •",
+      "    key: ••••••••",
     ]);
   });
 
@@ -478,7 +478,7 @@ describe("buildYamlSnippetBlocks", () => {
     // ``[valueFrom, valueTo)`` range so the slice replacement
     // keeps any trailing ``# comment`` untouched. The single-line
     // ``maskSensitiveLine`` would clobber it via the wholesale
-    // ``${prefix}${key}: •`` rewrite — pin that the
+    // ``${prefix}${key}: ••••••••`` rewrite — pin that the
     // scanner-driven path is preferred.
     const m = mkMatch({
       line_number: 2,
@@ -489,7 +489,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual(["wifi:", "  password: •  # admin pwd"]);
+    expect(block.lines).toEqual(["wifi:", "  password: ••••••••  # admin pwd"]);
   });
 
   it("falls back to the single-line heuristic for commented credentials", () => {
@@ -505,7 +505,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual(["wifi:", "  # password: •"]);
+    expect(block.lines).toEqual(["wifi:", "  # password: ••••••••"]);
   });
 
   it("keeps ${substitution} indirections visible on context lines", () => {
@@ -532,7 +532,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     expect(block.lines).toEqual([
       "substitutions:",
-      "  wifi_password: •",
+      "  wifi_password: ••••••••",
       "",
       "wifi:",
       "  ssid: home",
@@ -554,7 +554,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual(["substitutions:", "  wifi_password: •"]);
+    expect(block.lines).toEqual(["substitutions:", "  wifi_password: ••••••••"]);
   });
 });
 

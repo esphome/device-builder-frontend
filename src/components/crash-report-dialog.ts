@@ -34,6 +34,7 @@ import {
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
+import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { maskSensitiveYaml } from "../util/yaml-sensitive-redact.js";
@@ -170,18 +171,20 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private async _captureConfig(session: number): Promise<void> {
-    const finish = (yaml: string, error: "" | "transport") => {
-      if (session !== this._session) return;
-      if (this._dialog.open) {
-        this._configYaml = yaml;
-        this._configError = error;
-      }
-    };
+    const abandoned = () => session !== this._session || !this._dialog.open;
     try {
-      finish(maskSensitiveYaml(await this._api.getConfig(this._configuration)), "");
+      const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
+        abandoned,
+        attempts: 4,
+      });
+      if (yaml === null) return;
+      this._configYaml = maskSensitiveYaml(yaml);
+      this._configError = "";
     } catch (err) {
       console.warn("Reading the config failed", err);
-      finish("", "transport");
+      if (abandoned()) return;
+      this._configYaml = "";
+      this._configError = "transport";
     }
   }
 

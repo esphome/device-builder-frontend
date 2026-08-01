@@ -24,6 +24,8 @@ import {
   MASKED_CONFIG_YAML,
   RAW_CONFIG_YAML,
 } from "../_crash-lines.js";
+import { flushMicrotasks } from "../_dom.js";
+import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
 import { MAX_TITLE_LENGTH } from "../../src/util/crash-report-title.js";
 
@@ -68,16 +70,21 @@ describe("crash-report-dialog", () => {
     vi.unstubAllGlobals();
   });
 
+  // One hop for the recovery loop's ``await api.ready`` to reach
+  // getConfig, then two for the settled read to flow back through the
+  // recovery util into the dialog's state writes.
   const finishRead = async (yaml = RAW_CONFIG_YAML) => {
+    await flushMicrotasks(1);
     reads[reads.length - 1]!.resolve(yaml);
-    await Promise.resolve();
+    await flushMicrotasks(2);
   };
 
   const rejectRead = async () => {
-    reads[reads.length - 1]!.reject(new Error("WebSocket not connected"));
-    // Two hops: one for the rejection to reach the catch, one for finish.
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushMicrotasks(1);
+    // An APIError is final for the recovery util; a bare transport error
+    // would park in its real-timer retry backoff instead.
+    reads[reads.length - 1]!.reject(new APIError("internal_error", "boom"));
+    await flushMicrotasks(2);
   };
 
   const describe_ = (text: string) => {
@@ -297,10 +304,11 @@ describe("crash-report-dialog", () => {
 
   it("ignores a stale config read from a previous open", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    await flushMicrotasks(1);
     const stale = reads[0]!;
     el.open("other.yaml", "Other", CRASH_LINES);
     stale.resolve("esphome:\n  name: smallgarage");
-    await Promise.resolve();
+    await flushMicrotasks(2);
     await el.updateComplete;
     // Still collecting: the stale read must not flip this session ready.
     expect((el as any)._configYaml).toBeNull();
