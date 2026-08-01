@@ -36,7 +36,7 @@ export const warningBannerStyles = css`
     padding: var(--wa-space-s) var(--wa-space-m);
     border-radius: var(--wa-border-radius-s);
     background: var(--wa-color-warning-fill-quiet, #fff7e0);
-    color: var(--wa-color-warning-text-quiet, #6b4f00);
+    color: var(--wa-color-warning-on-quiet, #6b4f00);
     border-left: 3px solid var(--wa-color-warning-border-loud, #f0b400);
     font-size: var(--wa-font-size-s);
   }
