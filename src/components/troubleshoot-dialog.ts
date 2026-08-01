@@ -135,7 +135,9 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     const onAddressScreen = this._screen === "address";
     const friendly = device?.friendly_name || this._name;
     const label = onAddressScreen
-      ? this._localize("troubleshoot.use_address_title")
+      ? friendly
+        ? this._localize("troubleshoot.use_address_title_device", { name: friendly })
+        : this._localize("troubleshoot.use_address_title")
       : friendly
         ? this._localize("troubleshoot.title_device", { name: friendly })
         : this._localize("troubleshoot.title");
