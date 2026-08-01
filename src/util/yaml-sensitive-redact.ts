@@ -62,7 +62,10 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   const [, prefix, key, valueRaw] = m;
   if (!isSensitiveKey(key)) return line;
   const value = valueRaw.trim();
-  if (!value || value.startsWith("#")) return line;
+  if (!value) return line;
+  // A comment-only value can still carry the credential
+  // (``password: # hunter2``); mask the comment body, keeping the marker.
+  if (value.startsWith("#")) return `${prefix}${key}: # ${placeholder}`;
   // Indirections aren't credentials — ``!secret <name>`` and
   // ``${some_substitution}`` only carry the *name* of the
   // value, not the value itself. Don't mask them.
