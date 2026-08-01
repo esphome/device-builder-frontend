@@ -1,6 +1,6 @@
 import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
-import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
+import { splitYamlDocLines, TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
   _clearYamlSectionsMemo,
   findFieldLine,
@@ -151,7 +151,7 @@ export function findAddedSection(
   // Disambiguate by the submitted id when multiple instances exist
   // (the common "I added a second sensor.dht" case).
   if (newId) {
-    const lines = yaml.split("\n");
+    const lines = splitYamlDocLines(yaml);
     // The id is form input — escape it so the match is literal.
     const escapedId = newId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const idRe = new RegExp(`^\\s*(?:-\\s+)?id:\\s*["']?${escapedId}["']?\\s*$`);

@@ -19,6 +19,7 @@ import {
   _skipBlankAndCommentLines,
   endsBlockAtIndent,
   LIST_ITEM_START_RE,
+  splitYamlDocLines,
   TOP_LEVEL_KEY_RE,
 } from "./yaml-section-lexer.js";
 
@@ -118,7 +119,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   if (_topLevelSectionsKey === yaml && _topLevelSectionsValue) {
     return _topLevelSectionsValue;
   }
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
 
   for (let i = 0; i < lines.length; i++) {

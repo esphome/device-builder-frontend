@@ -122,10 +122,10 @@ export function updateSectionInYaml(
   fromLine?: number,
   options: SerializeYamlOptions = {}
 ): string {
-  const eol = yamlDocEol(yaml);
   const lines = splitYamlDocLines(yaml);
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
+  const eol = yamlDocEol(yaml);
 
   // List-item vs map shape and the section's child indent drive both
   // the trailing-comment trim below and the serializer's indent step.
@@ -332,10 +332,10 @@ export function removeSectionFromYaml(
   sectionKey: string,
   fromLine?: number
 ): string {
-  const eol = yamlDocEol(yaml);
   const lines = splitYamlDocLines(yaml);
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
+  const eol = yamlDocEol(yaml);
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   lines.splice(start, end - start);

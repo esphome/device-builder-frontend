@@ -5,6 +5,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
+import { parseYamlTopLevelSections } from "../../src/util/yaml-sections-core.js";
 
 const crlf = (...lines: string[]): string => lines.join("\r\n") + "\r\n";
 
@@ -100,9 +101,7 @@ describe("CRLF documents (#1601)", () => {
     >[];
     expect(items).toHaveLength(1);
     const out = updateSectionInYaml(yaml, "globals", { globals: items });
-    expect(parseYamlSectionValues(out, "globals").globals).toEqual(items);
-    expect(out.split("\r\n").length).toBeGreaterThan(1);
-    expect(out).not.toMatch(/[^\r]\n/);
+    expect(out).toBe(yaml);
   });
 
   it("updateSectionInYaml keeps a CRLF block-scalar body byte-for-byte", () => {
@@ -129,6 +128,13 @@ describe("CRLF documents (#1601)", () => {
       use_address: "10.0.0.9",
     });
     expect(out).toBe("wifi:\n  ssid: net\n  use_address: 10.0.0.9\n");
-    expect(out).not.toContain("\r");
+  });
+
+  it("parseYamlTopLevelSections reads names from a CRLF document", () => {
+    const yaml = crlf("sensor:", "  - platform: dht", '    name: "Kitchen Temp"');
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].name).toBe("Kitchen Temp");
+    expect(sections[0].platform).toBe("dht");
   });
 });

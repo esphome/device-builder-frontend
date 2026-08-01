@@ -20,6 +20,7 @@
  * error, not to second-guess configs it can't parse.
  */
 import { hasSubstitutionReference } from "./substitutions.js";
+import { splitYamlDocLines } from "./yaml-section-lexer.js";
 import { parseYamlSectionValues } from "./yaml-section-reader.js";
 import { parseYamlTopLevelSections, type YamlSection } from "./yaml-sections-core.js";
 import { sectionKeyOf } from "./yaml-sections.js";
@@ -97,7 +98,7 @@ export function assessBusHostability(
 ): BusHostability {
   const semantics = BUS_SEMANTICS[busDomain];
   const sections = parseYamlTopLevelSections(yaml);
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const isBus = (s: YamlSection) => (s.parentKey ?? s.key) === busDomain;
   const buses: BusState[] = sections.filter(isBus).map((s) => {
     const values = parseYamlSectionValues(yaml, s.key, s.fromLine);

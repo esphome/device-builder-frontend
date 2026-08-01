@@ -16,12 +16,7 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
  * ending via `yamlDocEol`.
  */
 export function splitYamlDocLines(yaml: string): string[] {
-  const lines = yaml.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.endsWith("\r")) lines[i] = line.slice(0, -1);
-  }
-  return lines;
+  return yaml.split(/\r?\n/);
 }
 
 /**
@@ -31,13 +26,9 @@ export function splitYamlDocLines(yaml: string): string[] {
  * save instead of converting the whole file.
  */
 export function yamlDocEol(yaml: string): "\r\n" | "\n" {
-  let crlf = 0;
-  let lf = 0;
-  for (let i = yaml.indexOf("\n"); i !== -1; i = yaml.indexOf("\n", i + 1)) {
-    if (yaml[i - 1] === "\r") crlf++;
-    else lf++;
-  }
-  return crlf > lf ? "\r\n" : "\n";
+  const crlf = yaml.split("\r\n").length - 1;
+  const bareLf = yaml.split("\n").length - 1 - crlf;
+  return crlf > bareLf ? "\r\n" : "\n";
 }
 
 /**
