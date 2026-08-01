@@ -356,20 +356,11 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       <div class="section" data-section="use_address">
         ${
           this._existingAddress
-            ? html`<div class="current-row">
-                <span>
-                  ${this._localize("troubleshoot.use_address_current", {
-                    address: this._existingAddress,
-                  })}
-                </span>
-                <button
-                  class="btn btn--remove"
-                  ?disabled=${this._saveState === "saving"}
-                  @click=${() => void this._removeUseAddress()}
-                >
-                  ${this._localize("troubleshoot.use_address_remove")}
-                </button>
-              </div>`
+            ? html`<p>
+                ${this._localize("troubleshoot.use_address_current", {
+                  address: this._existingAddress,
+                })}
+              </p>`
             : nothing
         }
         <p>
@@ -437,6 +428,17 @@ ${section}:
           : nothing
       }
       <div class="actions">
+        ${
+          this._existingAddress
+            ? html`<button
+                class="btn btn--remove"
+                ?disabled=${this._saveState === "saving"}
+                @click=${() => void this._removeUseAddress()}
+              >
+                ${this._localize("troubleshoot.use_address_remove")}
+              </button>`
+            : nothing
+        }
         <button
           class="btn btn--confirm"
           ?disabled=${this._saveState === "saving"}

@@ -115,18 +115,6 @@ export const troubleshootDialogStyles = css`
     color: var(--esphome-primary);
   }
 
-  .current-row {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-s);
-    justify-content: space-between;
-    margin: 0 0 var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
-    font-size: var(--wa-font-size-s);
-  }
-
   .btn--remove {
     background: var(--wa-color-surface-lowered);
     color: var(--wa-color-text-normal);
