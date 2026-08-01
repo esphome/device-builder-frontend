@@ -1,5 +1,5 @@
 import { parseCatalogId } from "./config-entry-yaml-scan.js";
-import { isFeaturedId, isPlatformComponentId } from "./featured-id.js";
+import { isFeaturedId } from "./featured-id.js";
 import { collectInstanceScalars } from "./yaml-instance-scalars.js";
 
 /**
@@ -18,9 +18,10 @@ function nameKey(name: string): string {
 /**
  * Undotted components whose top-level 'name' is an identity the firmware
  * derives elsewhere, not a label to seed: the node hostname, and the
- * advertised BLE name (which defaults to that hostname). Every other
- * undotted 'name' in the catalog is a display label — ble_client,
- * esp32_camera (an entity), serial_proxy, sprinkler.
+ * advertised BLE name (which defaults to that hostname). The other undotted
+ * name-carriers in the esphome 2026.7.3 catalog are display labels —
+ * ble_client, esp32_camera (an entity), serial_proxy, sprinkler — so a
+ * later upstream identity field needs adding here.
  */
 const IDENTITY_NAME_COMPONENTS: ReadonlySet<string> = new Set(["esphome", "esp32_ble"]);
 
@@ -44,8 +45,7 @@ export function suggestEntityName(
   yaml: string
 ): string | null {
   if (isFeaturedId(componentId)) return null;
-  if (!isPlatformComponentId(componentId) && IDENTITY_NAME_COMPONENTS.has(componentId))
-    return null;
+  if (IDENTITY_NAME_COMPONENTS.has(componentId)) return null;
   const title = componentTitle.trim();
   if (!title) return null;
 
@@ -69,10 +69,12 @@ export function suggestEntityName(
 
 /**
  * Scan the YAML for every 'name:' line under the *domain* top-level
- * section, matching the scope of esphome's per-platform duplicate
- * check. Still over-collects within the section (nested sub-entity
- * names, sub-device duplicates esphome would allow); the cost of a
- * false hit is an unneeded numeric suffix. The scan is line-based: a
+ * section — esphome's per-platform duplicate scope for a dotted id, the
+ * component's own section for an undotted one, whose entities may well be
+ * named under a different domain. Still over-collects within the section
+ * (nested sub-entity names, sub-device duplicates esphome would allow);
+ * the cost of a false hit is an unneeded numeric suffix, of a miss a
+ * duplicate the user renames. The scan is line-based: a
  * name behind a block scalar or inside a packages/!include file is
  * invisible and can still collide; the user can still edit the seeded
  * value before submitting.
