@@ -212,7 +212,15 @@ export class ESPHomeBoardReselectDialog extends LitElement {
           composed: true,
         })
       );
-      this._onApplied?.();
+      // One-shot, guarded: a throw must not reject this handler, and a
+      // cleared callback can't fire twice or outlive its open.
+      const onApplied = this._onApplied;
+      this._onApplied = undefined;
+      try {
+        onApplied?.();
+      } catch (err) {
+        console.error("Board reselect completion failed:", err);
+      }
     }
   };
 }

@@ -287,6 +287,27 @@ describe("board-reselect-dialog", () => {
     expect(onApplied).toHaveBeenCalledTimes(1);
   });
 
+  it("survives a throwing onApplied without losing the pick", async () => {
+    const api = {
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
+      updateDevice: vi.fn().mockResolvedValue({}),
+    };
+    const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
+    const onChanged = vi.fn();
+    el.addEventListener("board-changed", onChanged as EventListener);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied: () => {
+        throw new Error("boom");
+      },
+    });
+    pickBoard(inner, "c3-curated");
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(toast.success).toHaveBeenCalled();
+  });
+
   it("toasts an error and runs no completions when the update fails", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
