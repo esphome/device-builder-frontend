@@ -6,7 +6,7 @@
  */
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { AutomationLocation } from "../../api/types/automations.js";
-import { splitYamlDocLines } from "../../util/yaml-section-lexer.js";
+import { splitYamlDocLines } from "../../util/yaml-doc-lines.js";
 import { removeSectionFromYaml } from "../../util/yaml-section-values.js";
 import { resolveCurrentSectionLine } from "../../util/yaml-sections.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";

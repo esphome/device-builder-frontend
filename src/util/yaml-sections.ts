@@ -1,6 +1,7 @@
 import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
-import { splitYamlDocLines, TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
+import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
   _clearYamlSectionsMemo,
   findFieldLine,

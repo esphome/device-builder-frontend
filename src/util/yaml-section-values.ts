@@ -9,15 +9,14 @@
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
+import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import {
   _detectSectionChildIndent,
   _leadingIndent,
   isCommentLine,
   LIST_ITEM_INLINE_KEY_RE,
   LIST_ITEM_START_RE,
-  splitYamlDocLines,
   TOP_LEVEL_KEY_START_RE,
-  yamlDocEol,
 } from "./yaml-section-lexer.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { buildSplicedBody, yamlValueEqual } from "./yaml-section-splice.js";
@@ -125,6 +124,9 @@ export function updateSectionInYaml(
   const lines = splitYamlDocLines(yaml);
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
+  // Joining with the majority eol deliberately normalizes the whole
+  // document, so on mixed-ending input the output can differ from the
+  // input byte-wise even when every value is unchanged.
   const eol = yamlDocEol(yaml);
 
   // List-item vs map shape and the section's child indent drive both

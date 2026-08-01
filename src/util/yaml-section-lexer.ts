@@ -8,30 +8,6 @@
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 
 /**
- * Split a document into lines with any trailing CR stripped. CRLF
- * documents must shed the CR before the classifiers run: JS regexes
- * treat CR as a line terminator, so patterns ending `(.*)$` cannot
- * match a line that kept one and every child key silently drops out
- * of the parse (#1601). Callers that rejoin restore the document's
- * ending via `yamlDocEol`.
- */
-export function splitYamlDocLines(yaml: string): string[] {
-  return yaml.split(/\r?\n/);
-}
-
-/**
- * The document's line ending, by majority vote (ties go to LF). A
- * mixed-ending document normalizes toward its dominant ending, so one
- * pasted CRLF line in an LF file costs that line its CR on the next
- * save instead of converting the whole file.
- */
-export function yamlDocEol(yaml: string): "\r\n" | "\n" {
-  const crlf = yaml.split("\r\n").length - 1;
-  const bareLf = yaml.split("\n").length - 1 - crlf;
-  return crlf > bareLf ? "\r\n" : "\n";
-}
-
-/**
  * Identifier alphabet for plain-scalar YAML keys the parser will
  * accept. The leading character stays strict (``[a-zA-Z_]``) so
  * list-item dashes, comment lines, and YAML anchors / aliases

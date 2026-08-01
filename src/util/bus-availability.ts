@@ -20,7 +20,7 @@
  * error, not to second-guess configs it can't parse.
  */
 import { hasSubstitutionReference } from "./substitutions.js";
-import { splitYamlDocLines } from "./yaml-section-lexer.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { parseYamlSectionValues } from "./yaml-section-reader.js";
 import { parseYamlTopLevelSections, type YamlSection } from "./yaml-sections-core.js";
 import { sectionKeyOf } from "./yaml-sections.js";

@@ -20,7 +20,7 @@
  * working YAML which may be mid-edit and not parseable.
  */
 
-import { splitYamlDocLines } from "./yaml-section-lexer.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 
 export interface SensitiveValueRange {
   /** 1-indexed line number (CodeMirror convention). */

@@ -137,6 +137,12 @@ describe("CRLF documents (#1601)", () => {
     expect(out).toBe("wifi:\n  ssid: net\n  use_address: 10.0.0.9\n");
   });
 
+  it("parseYamlSectionValues reads a final line ending in a bare CR", () => {
+    expect(parseYamlSectionValues("wifi:\r\n  password: hunter2\r", "wifi")).toEqual({
+      password: "hunter2",
+    });
+  });
+
   it("parseYamlTopLevelSections reads names from a CRLF document", () => {
     const yaml = crlf("sensor:", "  - platform: dht", '    name: "Kitchen Temp"');
     const sections = parseYamlTopLevelSections(yaml);

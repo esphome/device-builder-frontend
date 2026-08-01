@@ -9,6 +9,7 @@
 
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { blockScalarValue } from "./yaml-block-scalar-value.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import {
   parseFlowList,
   parseScalar,
@@ -27,7 +28,6 @@ import {
   LIST_ITEM_INLINE_KEY_RE,
   LIST_ITEM_START_RE,
   parseBlockScalarHeader,
-  splitYamlDocLines,
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
 import { _blockScalarBodyEnd } from "./yaml-section-list.js";
