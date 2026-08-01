@@ -80,23 +80,24 @@ export class ESPHomeMacSuffixNotice extends LitElement {
           ?.name_add_mac_suffix === true;
       if (findMacSuffixLine(this.yaml) >= 0 || !flagged) return nothing;
     }
-    return renderNoticeBanner({
+    const base = {
       icon: "alert-outline",
       text: html`${this._localize("device.mac_suffix_notice")}
         <a href=${DOCS_URL} target="_blank" rel="noopener noreferrer"
           >${this._localize("device.mac_suffix_learn_more")}</a
         >`,
-      ...(editable
-        ? {
-            ctaLabel: this._localize("device.mac_suffix_disable"),
-            onCta: () => fireEvent(this, "request-disable-mac-suffix"),
-          }
-        : {}),
       dismissLabel: this._localize("device.mac_suffix_dismiss"),
       onDismiss: () => {
         this._dismissed = true;
       },
-    });
+    };
+    return editable
+      ? renderNoticeBanner({
+          ...base,
+          ctaLabel: this._localize("device.mac_suffix_disable"),
+          onCta: () => fireEvent(this, "request-disable-mac-suffix"),
+        })
+      : renderNoticeBanner(base);
   }
 }
 
