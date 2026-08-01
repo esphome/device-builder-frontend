@@ -68,9 +68,10 @@ export const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
 // member.
 const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
   ["encryption", new Set(["key"])],
-  // WPA2-Enterprise material: `key` is the client private key (often a
-  // whole PEM block scalar); the certificates ride along as over-masking.
-  ["eap", new Set(["key", "certificate", "certificate_authority"])],
+  // WPA2-Enterprise `key` is the client private key (often a whole PEM
+  // block scalar). Its sibling certificates are public material and stay
+  // visible in UI surfaces; the crash report masks them separately.
+  ["eap", new Set(["key"])],
 ]);
 
 // Plain-scalar key matcher. Permits hyphens and dots inside the

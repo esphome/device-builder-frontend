@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { maskSensitiveYaml } from "../../src/util/yaml-sensitive-redact.js";
+import {
+  maskSensitiveLine,
+  maskSensitiveYaml,
+} from "../../src/util/yaml-sensitive-redact.js";
 
 describe("maskSensitiveYaml", () => {
   it("masks inline credentials and leaves everything else intact", () => {
@@ -174,6 +177,30 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("pemsecret");
     expect(masked).not.toContain("certbody");
     expect(masked).toContain("    username: alice");
+  });
+
+  it("masks certificate material in reports regardless of parent", () => {
+    // Public or not, a PEM blob swallows the report's URL budget.
+    const yaml = [
+      "mqtt:",
+      "  certificate_authority: |",
+      "    -----BEGIN CERTIFICATE-----",
+      "    cabody",
+      "  client_key: keybody",
+      "http_request:",
+      "  ca_certificate: pembody",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("cabody");
+    expect(masked).not.toContain("keybody");
+    expect(masked).not.toContain("pembody");
+  });
+
+  it("keeps public certificate material visible on UI paths", () => {
+    // Only the outbound report widens to certificate blobs; search
+    // labels and snippets keep the credential-only rules.
+    const line = "  certificate_authority: pembody";
+    expect(maskSensitiveLine(line)).toBe(line);
   });
 
   it("tolerates prototype-colliding parent keys", () => {

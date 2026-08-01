@@ -33,6 +33,12 @@ const COMMENT_LINE = /^(\s*#+)\s*(.*)$/;
 // User-defined credential keys: any separator before the suffix.
 const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
 
+// Certificate/key material masked in outbound reports only: public or
+// not, a PEM blob swallows the size-budgeted issue URL. UI surfaces
+// keep the narrower credential-only rules.
+const CERT_MATERIAL_KEY =
+  /(^|[_.-])(certificate|certificate_authority|certificates|private_key|client_key)$/i;
+
 /**
  * True when *key* names a credential whose value must not leave
  * the app in clear text. Combines two sources:
@@ -55,6 +61,10 @@ function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_SUFFIX.test(key);
 }
 
+function isReportSensitiveKey(key: string): boolean {
+  return isSensitiveKey(key) || CERT_MATERIAL_KEY.test(key);
+}
+
 /**
  * Strip the inline credential value from a single line of YAML.
  *
@@ -67,11 +77,15 @@ function isSensitiveKey(key: string): boolean {
  * matched here because a single line carries no parent context;
  * use ``maskSensitiveLines`` when the surrounding lines exist.
  */
-export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER): string {
+export function maskSensitiveLine(
+  line: string,
+  placeholder = MASK_PLACEHOLDER,
+  sensitive: (key: string) => boolean = isSensitiveKey
+): string {
   const m = line.match(KEY_VALUE_LINE);
   if (!m) return line;
   const [, prefix, key, valueRaw] = m;
-  if (!isSensitiveKey(key)) return line;
+  if (!sensitive(key)) return line;
   const value = valueRaw.trim();
   if (!value) return line;
   // A comment-only value can still carry the credential
@@ -110,7 +124,8 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
  */
 export function maskSensitiveLines(
   lines: readonly string[],
-  placeholder = MASK_PLACEHOLDER
+  placeholder = MASK_PLACEHOLDER,
+  sensitive: (key: string) => boolean = isSensitiveKey
 ): string[] {
   if (lines.length === 0) return [];
   const out = lines.slice();
@@ -119,7 +134,7 @@ export function maskSensitiveLines(
   // (a bare `wifi_password: |` body would otherwise stay clear text).
   const ranges = findSensitiveValueRanges(
     { lines: out.length, line: (n) => ({ text: out[n - 1] }) },
-    { sensitiveKeyPredicate: isSensitiveKey }
+    { sensitiveKeyPredicate: sensitive }
   );
   const scannerMaskedLines = new Set<number>();
   for (const range of ranges) {
@@ -142,12 +157,12 @@ export function maskSensitiveLines(
   for (let i = 0; i < out.length; i++) {
     if (scannerMaskedLines.has(i)) continue;
     const line = out[i];
-    out[i] = maskSensitiveLine(line, placeholder);
+    out[i] = maskSensitiveLine(line, placeholder, sensitive);
     // A commented-out block scalar hides the credential on the following
     // comment lines, which carry no key for the per-line fallback; mask
     // the bodies indented past the header's content column, mirroring how
     // the scanner terminates a real block scalar.
-    if (!isCommentedSensitiveBlockHeader(line)) continue;
+    if (!isCommentedSensitiveBlockHeader(line, sensitive)) continue;
     const headerColumn = commentContentColumn(line);
     for (let j = i + 1; j < out.length; j++) {
       const m = out[j].match(COMMENT_LINE);
@@ -176,17 +191,24 @@ function maskCommentTail(tail: string, placeholder: string): string {
   return `${tail.slice(0, hash)}# ${placeholder}`;
 }
 
-function isCommentedSensitiveBlockHeader(line: string): boolean {
+function isCommentedSensitiveBlockHeader(
+  line: string,
+  sensitive: (key: string) => boolean
+): boolean {
   const m = line.match(KEY_VALUE_LINE);
   return (
     m !== null &&
     m[1].includes("#") &&
-    isSensitiveKey(m[2]) &&
+    sensitive(m[2]) &&
     BLOCK_SCALAR_HEADER.test(m[3].trim())
   );
 }
 
 /** Whole-document masking for YAML leaving the app. */
 export function maskSensitiveYaml(yaml: string): string {
-  return maskSensitiveLines(yaml.split("\n"), COMPACT_MASK_PLACEHOLDER).join("\n");
+  return maskSensitiveLines(
+    yaml.split("\n"),
+    COMPACT_MASK_PLACEHOLDER,
+    isReportSensitiveKey
+  ).join("\n");
 }
