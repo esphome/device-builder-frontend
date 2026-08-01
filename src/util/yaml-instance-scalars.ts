@@ -1,3 +1,4 @@
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 
@@ -49,7 +50,7 @@ export function collectInstanceScalars(
   const values = new Set<string>();
   if (!yaml) return values;
   let inSection = section === undefined;
-  for (const line of yaml.split("\n")) {
+  for (const line of splitYamlDocLines(yaml)) {
     if (!/^\s/.test(line)) {
       const top = line.match(TOP_LEVEL_KEY_RE);
       if (section !== undefined && top) inSection = top[1] === section;

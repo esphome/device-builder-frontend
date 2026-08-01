@@ -26,10 +26,15 @@ export function splitYamlDocLines(yaml: string): string[] {
  * The document's line ending, by majority vote (ties go to LF). A
  * mixed-ending document normalizes toward its dominant ending, so one
  * pasted CRLF line in an LF file costs that line its CR on the next
- * save instead of converting the whole file.
+ * save instead of converting the whole file. An index scan, not a
+ * split: this runs on every debounced section-form keystroke.
  */
 export function yamlDocEol(yaml: string): "\r\n" | "\n" {
-  const crlf = yaml.split("\r\n").length - 1;
-  const bareLf = yaml.split("\n").length - 1 - crlf;
+  let crlf = 0;
+  let bareLf = 0;
+  for (let i = yaml.indexOf("\n"); i !== -1; i = yaml.indexOf("\n", i + 1)) {
+    if (yaml[i - 1] === "\r") crlf++;
+    else bareLf++;
+  }
   return crlf > bareLf ? "\r\n" : "\n";
 }

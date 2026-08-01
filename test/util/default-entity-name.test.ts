@@ -94,6 +94,11 @@ describe("collectExistingNames", () => {
     expect(collectExistingNames("", "switch")).toEqual(new Set());
   });
 
+  it("collects names from a CRLF document", () => {
+    const yaml = 'switch:\r\n  - platform: gpio\r\n    name: "Porch Light"\r\n';
+    expect(collectExistingNames(yaml, "switch")).toEqual(new Set(["Porch Light"]));
+  });
+
   it("picks up multi-word names on indented and list-item lines, peeling quotes", () => {
     const yaml = [
       "sensor:",
