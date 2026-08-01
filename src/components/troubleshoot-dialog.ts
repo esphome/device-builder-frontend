@@ -116,17 +116,19 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._result = null;
     this._checkFailed = false;
     this._reachability = null;
-    // Heuristic seed: an effective address that isn't the default
-    // `<name>.local` is an existing use_address (StorageJSON echoes it
-    // back). Refined against the actual YAML below, since a custom
-    // wifi `domain:` also shifts the effective address.
+    // An effective address that isn't the default `<name>.local` is a
+    // hint (use_address, or a custom wifi `domain:`); it prefills the
+    // form only. The diagnosis-driving `_existingAddress` is set solely
+    // from the verified YAML read below, so a packaged config with a
+    // custom domain can't fake "a manual address is set" and suppress
+    // the real mDNS advice.
     const device = this._devices.find((d) => d.configuration === target.configuration);
     this._name = device?.name ?? "";
-    this._existingAddress =
+    this._existingAddress = "";
+    this._addressInput =
       device && device.address && device.address !== `${device.name}.local`
         ? device.address
         : "";
-    this._addressInput = this._existingAddress;
     this._addressInvalid = false;
     this._saveState = "idle";
     this._screen = "main";

@@ -106,6 +106,7 @@ export function buildTroubleshootSections(
       id: "mdns_disabled",
       titleKey: "troubleshoot.mdns_disabled_title",
       bodyKeys: ["troubleshoot.mdns_disabled_body"],
+      docsUrl: FAQ_MDNS_URL,
     });
   } else if (result && !result.zeroconf_running) {
     sections.push({
@@ -122,7 +123,9 @@ export function buildTroubleshootSections(
       bodyKeys: inDocker
         ? ["troubleshoot.mdns_dark_docker_body", "troubleshoot.mdns_dark_vlan_body"]
         : ["troubleshoot.mdns_dark_body", "troubleshoot.mdns_dark_vlan_body"],
-      docsUrl: inDocker ? FAQ_DOCKER_URL : FAQ_MDNS_URL,
+      // The Docker-reference FAQ note also carries the VLAN/reflector
+      // guidance, so it fits both flavors of network-level darkness.
+      docsUrl: FAQ_DOCKER_URL,
     });
   }
   if (device.uses_mqtt && mqttStale(reachability)) {

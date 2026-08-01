@@ -23,13 +23,15 @@ const HOSTNAME_RE =
  *  header carrying an inline value (`wifi: !include net.yaml`) is not
  *  spliceable and must not match. */
 const BARE_HEADER_RES = NETWORK_SECTIONS.map(
-  // \r? keeps CRLF files spliceable; `$` in m-mode stops before \n only.
-  (section) =>
-    [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?\r?$`, "m")] as const
+  (section) => [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m")] as const
 );
 
-/** First network block spliceable as a top-level mapping, or null. */
+/** First network block spliceable as a top-level mapping, or null.
+
+ *  CRLF documents are refused: the section parser drops keys it can't
+ *  read on \r-suffixed lines, so splicing one would lose data. */
 export function findNetworkSection(yaml: string): NetworkSection | null {
+  if (yaml.includes("\r")) return null;
   for (const [section, re] of BARE_HEADER_RES) {
     if (re.test(yaml)) return section;
   }
@@ -81,6 +83,7 @@ export function readUseAddress(yaml: string): string | null {
 /** The wifi block's `manual_ip.static_ip`, or null. The firmware
  *  already knows its fixed IP; it is the best manual-address prefill. */
 export function readStaticIp(yaml: string): string | null {
+  if (yaml.includes("\r")) return null;
   const lines = yaml.split("\n");
   if (findSectionStart(lines, "wifi") < 0) return null;
   const manual = parseSectionCore(lines, "wifi").values.manual_ip;

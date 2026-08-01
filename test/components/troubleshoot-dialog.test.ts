@@ -199,6 +199,17 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_removed");
   });
 
+  it("a packaged config with a custom domain stays a hint, not a diagnosis", async () => {
+    const { el } = await openDialog(
+      { getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n") },
+      makeConfiguredDevice({ address: "kitchen.lan" })
+    );
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).not.toContain("use_address_set");
+  });
+
   it("clears the heuristic when the YAML has no use_address", async () => {
     // A custom wifi domain shifts device.address without a use_address;
     // the exact read must not claim one is set.

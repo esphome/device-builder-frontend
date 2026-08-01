@@ -219,10 +219,11 @@ export async function loadExistingAddress(
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
     const fromYaml = readUseAddress(yaml);
-    // A packaged network block (null) keeps the heuristic seed; a
-    // spliceable one is authoritative either way.
+    // Only a verified YAML read drives the diagnosis; a packaged
+    // network block (null) leaves the prefill hint as just a hint.
     if (fromYaml !== null && fromYaml !== host._existingAddress) {
-      const inputUntouched = host._addressInput === host._existingAddress;
+      const inputUntouched =
+        host._addressInput === "" || host._addressInput === host._existingAddress;
       host._existingAddress = fromYaml;
       if (inputUntouched) host._addressInput = fromYaml;
     }
