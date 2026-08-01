@@ -298,7 +298,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
             `button.link[data-drill="${previousKey}"]`
           )
         : this.renderRoot.querySelector<HTMLElement>(".back-button");
-    target?.focus();
+    // A device→main jump (close/reopen race) has no device row to
+    // return to; land on the first row rather than document.body.
+    (target ?? this.renderRoot.querySelector<HTMLElement>("button.link"))?.focus();
   }
 
   private _hrefFor(link: FeedbackLink): string {
