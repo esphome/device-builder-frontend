@@ -111,10 +111,10 @@ export function renderMdnsTxtRecords(
  * Same ``<details>`` chevron idiom as ``renderMdnsTxtRecords``.
  * *lifetimeSeconds* is the device's own announced record lifetime,
  * named in the explainer so it states the real duration rather than
- * a generic figure. Returns ``nothing`` when either value is ``null``
- * (no PTR record cached) so the row collapses to zero markup. The
- * caller also gates this on mDNS being the active source, since only
- * then does PTR expiry mean the device goes offline.
+ * a generic figure. Every gate lives in ``mdnsExpiryPhase``; this
+ * renders ``nothing`` for any phase but ``soon`` / ``countdown``, and
+ * when the lifetime is ``null`` (no PTR record cached), so the row
+ * collapses to zero markup.
  */
 export function renderMdnsExpiry(
   phase: MdnsExpiryPhase,
