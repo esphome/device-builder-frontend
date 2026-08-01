@@ -114,6 +114,22 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
+  // OFFLINE/UNKNOWN are meaningless while name_add_mac_suffix is set
+  // (the suffixed broadcast never matches the config); a real ONLINE
+  // verdict (fixed use_address, MQTT) still wins.
+  if (card.nameAddMacSuffix && card.state !== DeviceState.ONLINE) {
+    const tooltip = card._localize("dashboard.status_untracked_tooltip");
+    return html`<div
+        id="status-untracked"
+        class="device-status ${DeviceState.UNKNOWN}"
+        tabindex="0"
+        aria-label=${tooltip}
+      >
+        <wa-icon library="mdi" name="help-network-outline"></wa-icon>
+        ${card._localize("dashboard.status_untracked")}
+      </div>
+      <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
+  }
   // Transport-agnostic icons — wifi/wifi-off implied wireless; plenty of
   // devices on the network are on ethernet. check/off/help-network reads
   // as "online" / "offline" / "unknown" without baking in a link guess.

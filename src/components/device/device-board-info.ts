@@ -25,6 +25,7 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 // Value import registers the custom element.
 import "./config-migration-notice.js";
+import "./mac-suffix-notice.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
@@ -306,6 +307,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .configuration=${this.configuration}
         .yaml=${this.yaml}
       ></esphome-config-migration-notice>
+      <esphome-mac-suffix-notice
+        .configuration=${this.configuration}
+        .yaml=${this.yaml}
+      ></esphome-mac-suffix-notice>
       ${
         this.selectedSection
           ? this._renderSelectedSection()

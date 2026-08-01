@@ -22,6 +22,7 @@ import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
+import { disableMacSuffixInYaml } from "../components/device/mac-suffix-notice.js";
 import type {
   SectionEditor,
   YamlDraftDetail,
@@ -1514,6 +1515,7 @@ export class ESPHomePageDevice extends LitElement {
         @just-created-dismiss=${this._dismissJustCreated}
         @request-install=${this._saveThenInstall}
         @request-migrate-config=${this._onMigrateConfig}
+        @request-disable-mac-suffix=${this._onDisableMacSuffix}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -1970,6 +1972,13 @@ export class ESPHomePageDevice extends LitElement {
     this._setYaml(newYaml);
     this._repinSelection(newYaml);
     notifySuccess(this._localize("device.config_migration_applied"));
+  }
+
+  private _onDisableMacSuffix() {
+    const updated = disableMacSuffixInYaml(this._yaml);
+    if (updated === null) return;
+    this._setYaml(updated);
+    notifySuccess(this._localize("device.mac_suffix_applied"));
   }
 
   private _onSectionSelect(
