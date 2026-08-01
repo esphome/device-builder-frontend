@@ -97,7 +97,7 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.mqtt_body"],
     });
   }
-  if (result && !result.dns_resolved && result.address) {
+  if (result && !result.dns_resolved && !result.dns_inconclusive && result.address) {
     sections.push({
       id: "dns_fail",
       titleKey: "troubleshoot.dns_fail_title",
@@ -155,6 +155,7 @@ function mdnsNeverSeen(
   reachability: ReachabilityStateEvent | null,
   result: DeviceTroubleshootResult | null
 ): boolean {
+  if (result?.mdns_inconclusive) return false;
   if (reachability !== null && reachability.mdns_last_seen_seconds_ago !== null) {
     return false;
   }

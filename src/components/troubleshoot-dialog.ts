@@ -234,16 +234,21 @@ export class ESPHomeTroubleshootDialog extends LitElement {
               )
       }
       ${
-        !r.zeroconf_running
-          ? this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"))
-          : r.mdns_addresses.length > 0
-            ? this._probeRow(
-                "ok",
-                this._localize("troubleshoot.result_mdns_ok", {
-                  ips: list(r.mdns_addresses),
-                })
-              )
-            : this._probeRow("fail", this._localize("troubleshoot.result_mdns_silent"))
+        r.mdns_inconclusive
+          ? this._probeRow(
+              "neutral",
+              this._localize("troubleshoot.result_mdns_inconclusive")
+            )
+          : !r.zeroconf_running
+            ? this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"))
+            : r.mdns_addresses.length > 0
+              ? this._probeRow(
+                  "ok",
+                  this._localize("troubleshoot.result_mdns_ok", {
+                    ips: list(r.mdns_addresses),
+                  })
+                )
+              : this._probeRow("fail", this._localize("troubleshoot.result_mdns_silent"))
       }
       ${this._renderPingRow(r)}
     </div>`;
@@ -561,25 +566,32 @@ ${section}:
     }
   }
 
+  // Both writers capture the configuration up front and guard every
+  // resumption: a dialog reopened for another device mid-flight must
+  // not write the old device's YAML or state (same shape as _runCheck).
   private async _removeUseAddress(): Promise<void> {
+    const configuration = this._configuration;
     this._saveState = "saving";
     try {
-      const yaml = await this._api.getConfig(this._configuration);
+      const yaml = await this._api.getConfig(configuration);
+      if (configuration !== this._configuration) return;
       const updated = removeUseAddress(yaml);
       if (updated === null) {
         this._saveState = "remove_packaged";
         return;
       }
       if (updated !== yaml) {
-        await this._api.updateConfig(this._configuration, updated);
+        await this._api.updateConfig(configuration, updated);
+        if (configuration !== this._configuration) return;
       }
       this._saveState = "removed";
     } catch {
-      this._saveState = "error";
+      if (configuration === this._configuration) this._saveState = "error";
     }
   }
 
   private async _saveUseAddress(): Promise<void> {
+    const configuration = this._configuration;
     const value = this._addressInput.trim();
     if (!isValidUseAddress(value)) {
       this._addressInvalid = true;
@@ -587,17 +599,19 @@ ${section}:
     }
     this._saveState = "saving";
     try {
-      const yaml = await this._api.getConfig(this._configuration);
+      const yaml = await this._api.getConfig(configuration);
+      if (configuration !== this._configuration) return;
       const updated = applyUseAddress(yaml, value);
       if (updated === null) {
         this._snippetYaml = yaml;
         this._saveState = "snippet";
         return;
       }
-      await this._api.updateConfig(this._configuration, updated);
+      await this._api.updateConfig(configuration, updated);
+      if (configuration !== this._configuration) return;
       this._saveState = "saved";
     } catch {
-      this._saveState = "error";
+      if (configuration === this._configuration) this._saveState = "error";
     }
   }
 

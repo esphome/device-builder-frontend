@@ -1960,6 +1960,8 @@
     "result_mdns_off": "mDNS is not running on the dashboard server",
     "result_mdns_ok": "mDNS answered with {ips}",
     "result_mdns_silent": "No mDNS answer for this device",
+    "result_dns_inconclusive": "The DNS check did not complete; check again",
+    "result_mdns_inconclusive": "The mDNS check did not complete; check again",
     "result_ping_ok": "Ping reply from {target} in {rtt} ms",
     "result_ping_ok_last_known": "Reply from the last known address {target} in {rtt} ms; not verified as this device",
     "result_ping_fail": "No ping reply from {target}",
