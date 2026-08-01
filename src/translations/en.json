@@ -1962,7 +1962,7 @@
   },
   "troubleshoot": {
     "title": "Troubleshoot connectivity",
-    "title_device": "Troubleshoot {name}",
+    "title_device": "Troubleshoot {name} connectivity",
     "open": "Troubleshoot",
     "open_tooltip": "Click to troubleshoot connectivity",
     "check_again": "Check again",
