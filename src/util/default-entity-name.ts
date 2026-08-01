@@ -1,5 +1,5 @@
 import { parseCatalogId } from "./config-entry-yaml-scan.js";
-import { isPlatformComponentId } from "./featured-id.js";
+import { isFeaturedId, isPlatformComponentId } from "./featured-id.js";
 import { collectInstanceScalars } from "./yaml-instance-scalars.js";
 
 /**
@@ -16,27 +16,36 @@ function nameKey(name: string): string {
 }
 
 /**
+ * Undotted components whose top-level 'name' is an identity the firmware
+ * derives elsewhere, not a label to seed: the node hostname, and the
+ * advertised BLE name (which defaults to that hostname). Every other
+ * undotted 'name' in the catalog is a display label — ble_client,
+ * esp32_camera (an entity), serial_proxy, sprinkler.
+ */
+const IDENTITY_NAME_COMPONENTS: ReadonlySet<string> = new Set(["esphome", "esp32_ble"]);
+
+/**
  * Suggest a default 'name:' for a component being added via the
  * catalog: the catalog title, suffixed with a counter when the title
  * already names an entity in the YAML. Used by
  * 'esphome-add-component-form' to seed the name field; the user can
  * edit it (or clear it) before submitting.
  *
- * Only platform entries (id contains '.', e.g. 'switch.gpio') are
- * seeded: they are entity platforms, where 'name' becomes the Home
- * Assistant entity name and an unnamed entity stays internal. On the
- * few undotted components with a top-level 'name' field (esphome,
- * esp32_ble, sprinkler, ...) the key means something else, so they
- * return null. Featured wraps also return null: their name presets
- * arrive through seedDefaults, and their display title is a poor
- * entity name.
+ * Platform entries (id contains '.', e.g. 'switch.gpio') are entity
+ * platforms, where 'name' becomes the Home Assistant entity name and an
+ * unnamed entity stays internal. Undotted components are seeded too,
+ * minus 'IDENTITY_NAME_COMPONENTS'. Featured wraps return null: their
+ * name presets arrive through seedDefaults, and their display title is a
+ * poor entity name.
  */
 export function suggestEntityName(
   componentId: string,
   componentTitle: string,
   yaml: string
 ): string | null {
-  if (!isPlatformComponentId(componentId)) return null;
+  if (isFeaturedId(componentId)) return null;
+  if (!isPlatformComponentId(componentId) && IDENTITY_NAME_COMPONENTS.has(componentId))
+    return null;
   const title = componentTitle.trim();
   if (!title) return null;
 

@@ -15,12 +15,25 @@ describe("suggestEntityName", () => {
     expect(suggestEntityName("switch.gpio", "GPIO Switch", "")).toBe("GPIO Switch");
   });
 
-  it("returns null for undotted top-level ids", () => {
-    // On the few undotted components with a top-level name field the key
-    // means something else (the esphome device hostname, the BLE
-    // advertised name, ...), never an entity name.
+  it("seeds undotted components whose name is a display label", () => {
+    expect(suggestEntityName("ble_client", "BLE Client", "")).toBe("BLE Client");
+    expect(suggestEntityName("esp32_camera", "ESP32 Camera", "")).toBe("ESP32 Camera");
+    expect(suggestEntityName("sprinkler", "Sprinkler Controller", "")).toBe(
+      "Sprinkler Controller"
+    );
+    expect(suggestEntityName("serial_proxy", "Serial Proxy", "")).toBe("Serial Proxy");
+  });
+
+  it("returns null for an undotted name the firmware derives elsewhere", () => {
+    // The node hostname and the advertised BLE name (which defaults to it)
+    // are identities, not labels.
     expect(suggestEntityName("esphome", "ESPHome Core", "")).toBe(null);
-    expect(suggestEntityName("sprinkler", "Sprinkler Controller", "")).toBe(null);
+    expect(suggestEntityName("esp32_ble", "ESP32 BLE", "")).toBe(null);
+  });
+
+  it("scopes an undotted collision to its own section", () => {
+    const yaml = ["ble_client:", "  - name: BLE Client", ""].join("\n");
+    expect(suggestEntityName("ble_client", "BLE Client", yaml)).toBe("BLE Client 2");
   });
 
   it("returns null for a featured wrap id", () => {
