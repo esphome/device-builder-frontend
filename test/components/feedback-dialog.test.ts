@@ -299,6 +299,17 @@ describe("feedback-device-picker", () => {
     expect(openedUrls).toHaveLength(0);
   });
 
+  it("drops a capture that resolves while the dialog is hiding", async () => {
+    // Between close() and after-hide the element stays connected; the
+    // active flag is what abandons the capture in that window.
+    deviceRow().click();
+    await settle(() => reads.length > 0);
+    el.active = false;
+    reads[0].resolve(RAW_YAML);
+    await flushMicrotasks(10);
+    expect(openedUrls).toHaveLength(0);
+  });
+
   it("filters devices above the threshold", async () => {
     const fleet = Array.from({ length: 10 }, (_, i) => ({
       ...DEVICE,

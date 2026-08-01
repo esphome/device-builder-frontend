@@ -385,6 +385,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
           isDevice
             ? html`<esphome-feedback-device-picker
                 .target=${this._deviceTarget}
+                .active=${this._dialog.open}
                 @picker-close=${this.close}
               ></esphome-feedback-device-picker>`
             : drill

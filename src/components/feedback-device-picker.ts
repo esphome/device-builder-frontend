@@ -55,6 +55,12 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
   @property({ attribute: false })
   public target: DeviceTarget = "builder";
 
+  /** False once the surrounding dialog started closing, so an in-flight
+   *  capture can't open a tab during the hide animation (the element
+   *  only disconnects at after-hide). */
+  @property({ attribute: false })
+  public active = true;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -244,12 +250,10 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     if (this._capturing) return;
     const session = ++this._session;
     this._capturing = device.configuration;
-    const masked = await captureMaskedConfig(
-      this._api,
-      device.configuration,
-      () => session !== this._session || !this.isConnected
-    );
-    if (session !== this._session || !this.isConnected) return;
+    const abandoned = () =>
+      session !== this._session || !this.isConnected || !this.active;
+    const masked = await captureMaskedConfig(this._api, device.configuration, abandoned);
+    if (abandoned()) return;
     this._capturing = "";
     if (masked === null) return;
     if (masked === "") {
