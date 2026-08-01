@@ -150,29 +150,21 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   if (card.state !== DeviceState.ONLINE && !card.selectMode) {
     // Non-online badges open the troubleshooting dialog. Passive while
     // selecting — in select mode the whole card is one toggle target.
-    const openTroubleshoot = (e: Event) => {
-      e.stopPropagation();
-      fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
-    };
-    const troubleshootKeydown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        openTroubleshoot(e);
-      }
-    };
+    // Native button, like the encryption indicator above.
     const tooltip = card._localize("troubleshoot.open_tooltip");
-    return html`<div
+    return html`<button
         id="status-badge"
+        type="button"
         class="device-status ${card.state} clickable"
-        role="button"
-        tabindex="0"
         aria-label="${stateLabel}. ${tooltip}"
-        @click=${openTroubleshoot}
-        @keydown=${troubleshootKeydown}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
+        }}
       >
         <wa-icon library="mdi" name=${stateIcon}></wa-icon>
         ${stateLabel}
-      </div>
+      </button>
       <wa-tooltip for="status-badge">${tooltip}</wa-tooltip>`;
   }
   return html`<div class="device-status ${card.state}">

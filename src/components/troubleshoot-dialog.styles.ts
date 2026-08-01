@@ -115,16 +115,6 @@ export const troubleshootDialogStyles = css`
     color: var(--esphome-primary);
   }
 
-  .btn--remove {
-    background: var(--wa-color-surface-lowered);
-    color: var(--wa-color-text-normal);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-  }
-
-  .btn--remove:hover {
-    background: var(--wa-color-surface-border);
-  }
-
   .address-label {
     display: flex;
     align-items: baseline;

@@ -191,7 +191,7 @@ describe("troubleshoot-dialog", () => {
     );
     await openAddressScreen(el);
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_current");
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--remove")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--cancel")!.click();
     await flush();
     await el.updateComplete;
     const written = api.updateConfig.mock.calls[0][1] as string;

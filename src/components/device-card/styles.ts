@@ -218,6 +218,14 @@ export const deviceCardStyles = [
       cursor: pointer;
     }
 
+    /* The clickable badge is a native button; reset its chrome so the
+       .device-status classes style it like the passive variant. */
+    button.device-status {
+      border: none;
+      font-family: inherit;
+      letter-spacing: inherit;
+    }
+
     .device-status.clickable {
       cursor: pointer;
     }

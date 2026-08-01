@@ -7,6 +7,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import { USE_ADDRESS_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   applyUseAddress,
@@ -76,10 +77,27 @@ function renderUseAddressForm(
   if (host._saveState === "snippet") {
     const snippet = `${host._snippetSection}:\n  use_address: ${host._addressInput.trim()}`;
     return html`
-      <p>${host._localize("troubleshoot.use_address_snippet")}</p>
+      <p>
+        ${host._localize(
+          host._snippetReason === "crlf"
+            ? "troubleshoot.use_address_snippet_crlf"
+            : "troubleshoot.use_address_snippet"
+        )}
+      </p>
       <pre class="snippet">${snippet}</pre>
       <div class="actions">
-        <button class="btn btn--confirm" @click=${() => void copyToClipboard(snippet)}>
+        <button
+          class="btn btn--confirm"
+          @click=${async () => {
+            // The helper's contract: surface a toast either way; the
+            // execCommand fallback can fail silently on plain HTTP.
+            if (await copyToClipboard(snippet)) {
+              notifySuccess(host._localize("troubleshoot.use_address_copied"));
+            } else {
+              notifyError(host._localize("troubleshoot.use_address_copy_failed"));
+            }
+          }}
+        >
           ${host._localize("troubleshoot.use_address_copy")}
         </button>
       </div>
@@ -125,7 +143,11 @@ function renderUseAddressForm(
     ${
       host._saveState === "remove_packaged"
         ? html`<p class="field-error">
-            ${host._localize("troubleshoot.use_address_remove_packaged")}
+            ${host._localize(
+              host._snippetReason === "crlf"
+                ? "troubleshoot.use_address_remove_crlf"
+                : "troubleshoot.use_address_remove_packaged"
+            )}
           </p>`
         : nothing
     }
@@ -133,7 +155,7 @@ function renderUseAddressForm(
       ${
         host._existingAddress
           ? html`<button
-              class="btn btn--remove"
+              class="btn btn--cancel"
               ?disabled=${host._saveState === "saving"}
               @click=${() => void clearUseAddress(host)}
             >
@@ -171,6 +193,7 @@ async function saveUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     const updated = applyUseAddress(yaml, value);
     if (updated === null) {
       const device = host._devices.find((d) => d.configuration === configuration);
+      host._snippetReason = yaml.includes("\r") ? "crlf" : "packaged";
       host._snippetSection = snippetNetworkSection(
         yaml,
         device?.loaded_integrations ?? []
@@ -196,6 +219,7 @@ async function clearUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
     if (configuration !== host._configuration) return;
     const updated = removeUseAddress(yaml);
     if (updated === null) {
+      host._snippetReason = yaml.includes("\r") ? "crlf" : "packaged";
       host._saveState = "remove_packaged";
       return;
     }
