@@ -1986,10 +1986,13 @@
     "generic_body": "Confirm the device has power and is on the same network as the dashboard. Power-cycling the device often recovers a stuck network stack.",
     "use_address_title": "Set the address manually",
     "use_address_body": "If the device has a fixed IP address or a DNS name, set use_address in its network configuration. The dashboard and the installer then contact that address directly instead of relying on mDNS.",
+    "use_address_ownership": "With use_address set, the dashboard always uses this address. If the device's address changes later, installs and logs fail until you update it here yourself, so pair it with a DHCP reservation or a static IP.",
+    "use_address_current": "use_address is currently set to {address}. If the device's address changed, update it here.",
     "use_address_label": "IP address or hostname",
-    "use_address_save": "Save to configuration",
+    "use_address_save": "Save",
     "use_address_invalid": "Enter a valid IP address or hostname",
     "use_address_error": "Saving failed. Edit the configuration in the editor instead.",
+    "back": "Back",
     "use_address_saved": "Saved. The new address takes effect after the next install; until then the device may still show offline.",
     "use_address_snippet": "This configuration keeps its network settings in a package or include, so it cannot be edited here. Add this to the file that holds the network settings:"
   }

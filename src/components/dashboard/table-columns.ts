@@ -128,20 +128,14 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           }
         }
         const state = info.getValue() as DeviceState;
+        // Untracked stays inert: with name_add_mac_suffix set the
+        // troubleshoot probe can only ever fail.
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
-          return html`<span
-            class="cell-status"
-            role="button"
-            tabindex="0"
-            title=${localize("dashboard.status_untracked_tooltip")}
-            @click=${(e: Event) => dispatchRowEvent(e, "open-troubleshoot", row._device)}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                dispatchRowEvent(e, "open-troubleshoot", row._device);
-              }
-            }}
-            ><span class="status-dot untracked"></span
+          return html`<span class="cell-status"
+            ><span
+              class="status-dot untracked"
+              title=${localize("dashboard.status_untracked_tooltip")}
+            ></span
           ></span>`;
         }
         const dotClass =

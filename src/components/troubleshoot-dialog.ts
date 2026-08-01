@@ -7,12 +7,21 @@
  */
 import { consume } from "@lit/context";
 import {
+  mdiArrowLeft,
   mdiCheckCircle,
+  mdiChevronRight,
   mdiCloseCircle,
   mdiHelpCircleOutline,
   mdiOpenInNew,
 } from "@mdi/js";
-import { css, html, LitElement, nothing, type TemplateResult } from "lit";
+import {
+  css,
+  html,
+  LitElement,
+  nothing,
+  type PropertyValues,
+  type TemplateResult,
+} from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -23,11 +32,15 @@ import type {
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../context/index.js";
+import { warningBannerStyles } from "../styles/banners.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { buildTroubleshootSections } from "../util/troubleshoot-tree.js";
+import {
+  buildTroubleshootSections,
+  USE_ADDRESS_DOCS_URL,
+} from "../util/troubleshoot-tree.js";
 import { applyUseAddress, isValidUseAddress } from "../util/use-address-yaml.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -35,7 +48,9 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./base-dialog.js";
 
 registerMdiIcons({
+  "arrow-left": mdiArrowLeft,
   "check-circle": mdiCheckCircle,
+  "chevron-right": mdiChevronRight,
   "close-circle": mdiCloseCircle,
   "help-circle-outline": mdiHelpCircleOutline,
   "open-in-new": mdiOpenInNew,
@@ -72,12 +87,15 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   @state() private _addressInput = "";
   @state() private _addressInvalid = false;
   @state() private _saveState: SaveState = "idle";
+  @state() private _screen: "main" | "address" = "main";
+  @state() private _existingAddress = "";
 
   private _subscription: ReachabilitySubscription | null = null;
 
   static styles = [
     espHomeStyles,
     modalDialogStyles,
+    warningBannerStyles,
     css`
       :host {
         display: contents;
@@ -146,18 +164,41 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         font-weight: var(--wa-font-weight-semibold);
       }
 
-      details.section summary {
-        cursor: pointer;
+      /* Deliberately quiet: the manual address is the last resort, so
+         this must not read as the recommended action. */
+      .drill {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 0;
+        border: none;
+        background: transparent;
         color: var(--wa-color-text-quiet);
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        cursor: pointer;
       }
 
-      details.section summary h3 {
-        display: inline;
-        color: inherit;
+      .drill:hover {
+        color: var(--wa-color-text-normal);
+        text-decoration: underline;
       }
 
-      details.section[open] summary {
-        margin-bottom: var(--wa-space-2xs);
+      .drill wa-icon {
+        flex-shrink: 0;
+        font-size: 14px;
+      }
+
+      .back-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--wa-space-2xs);
+        border: none;
+        background: transparent;
+        color: var(--wa-color-text-normal);
+        cursor: pointer;
+        font-size: 20px;
       }
 
       .section p {
@@ -200,6 +241,15 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         color: var(--esphome-error);
       }
 
+      .section p.warning-banner {
+        margin: var(--wa-space-2xs) 0 var(--wa-space-s);
+      }
+
+      .current-address {
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-normal);
+      }
+
       .saved-note {
         color: var(--wa-color-text-normal);
       }
@@ -223,9 +273,18 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._result = null;
     this._checkFailed = false;
     this._reachability = null;
-    this._addressInput = "";
+    // An effective address that isn't the default `<name>.local` is an
+    // existing use_address; surface and prefill it so a stale one gets
+    // updated rather than silently kept.
+    const device = this._devices.find((d) => d.configuration === target.configuration);
+    this._existingAddress =
+      device && device.address && device.address !== `${device.name}.local`
+        ? device.address
+        : "";
+    this._addressInput = this._existingAddress;
     this._addressInvalid = false;
     this._saveState = "idle";
+    this._screen = "main";
     this._dialog.open = true;
     void this._subscribe(target.name);
     void this._runCheck();
@@ -237,27 +296,51 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   protected render() {
     const device = this._devices.find((d) => d.configuration === this._configuration);
+    const onAddressScreen = this._screen === "address";
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize("troubleshoot.title")}
+        .label=${this._localize(
+          onAddressScreen ? "troubleshoot.use_address_title" : "troubleshoot.title"
+        )}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
+        ${
+          onAddressScreen
+            ? html`<button
+                slot="header-prefix"
+                class="back-button"
+                aria-label=${this._localize("troubleshoot.back")}
+                @click=${() => {
+                  this._screen = "main";
+                }}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>`
+            : nothing
+        }
         <p class="subtitle">${this._name} &middot; ${this._configuration}</p>
-        ${this._renderProbeSummary()} ${device ? this._renderSections(device) : nothing}
-        <div class="actions">
-          <button class="btn btn--cancel" @click=${this.close}>
-            ${this._localize("layout.close")}
-          </button>
-          <button
-            class="btn btn--confirm"
-            ?disabled=${this._checking}
-            @click=${() => void this._runCheck()}
-          >
-            ${this._localize("troubleshoot.check_again")}
-          </button>
-        </div>
+        ${
+          onAddressScreen
+            ? this._renderAddressScreen(device)
+            : html`
+                ${this._renderProbeSummary()}
+                ${device ? this._renderSections(device) : nothing}
+                <div class="actions">
+                  <button class="btn btn--cancel" @click=${this.close}>
+                    ${this._localize("layout.close")}
+                  </button>
+                  <button
+                    class="btn btn--confirm"
+                    ?disabled=${this._checking}
+                    @click=${() => void this._runCheck()}
+                  >
+                    ${this._localize("troubleshoot.check_again")}
+                  </button>
+                </div>
+              `
+        }
       </esphome-base-dialog>
     `;
   }
@@ -363,38 +446,69 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       inDocker: this._api?.serverInfo?.in_docker === true,
     });
     return html`${sections.map((section) => {
-      const body = html`
-        ${section.bodyKeys.map(
-          (key) =>
-            html`<p>${this._localize(key, { address: this._result?.address ?? "" })}</p>`
-        )}
-        ${
-          section.docsUrl
-            ? html`<a href=${section.docsUrl} target="_blank" rel="noopener noreferrer">
-                ${this._localize("troubleshoot.learn_more")}
-                <wa-icon library="mdi" name="open-in-new"></wa-icon>
-              </a>`
-            : nothing
-        }
-        ${section.showUseAddressForm ? this._renderUseAddressForm(device) : nothing}
-      `;
-      // The manual-address fix is the last resort; keep it folded so the
-      // diagnosis above stays the first thing people act on.
+      // The manual-address fix is the last resort: a drill row into its
+      // own screen, so the diagnosis stays compact on small viewports.
       if (section.showUseAddressForm) {
         return html`
-          <details class="section" data-section=${section.id}>
-            <summary><h3>${this._localize(section.titleKey)}</h3></summary>
-            ${body}
-          </details>
+          <button
+            class="drill"
+            data-section=${section.id}
+            @click=${() => {
+              this._screen = "address";
+            }}
+          >
+            <span>${this._localize(section.titleKey)}</span>
+            <wa-icon library="mdi" name="chevron-right"></wa-icon>
+          </button>
         `;
       }
       return html`
         <div class="section" data-section=${section.id}>
           <h3>${this._localize(section.titleKey)}</h3>
-          ${body}
+          ${section.bodyKeys.map(
+            (key) =>
+              html`<p>
+                ${this._localize(key, { address: this._result?.address ?? "" })}
+              </p>`
+          )}
+          ${
+            section.docsUrl
+              ? html`<a href=${section.docsUrl} target="_blank" rel="noopener noreferrer">
+                  ${this._localize("troubleshoot.learn_more")}
+                  <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                </a>`
+              : nothing
+          }
         </div>
       `;
     })}`;
+  }
+
+  private _renderAddressScreen(device: ConfiguredDevice | undefined): TemplateResult {
+    return html`
+      <div class="section" data-section="use_address">
+        ${
+          this._existingAddress
+            ? html`<p class="current-address">
+                ${this._localize("troubleshoot.use_address_current", {
+                  address: this._existingAddress,
+                })}
+              </p>`
+            : nothing
+        }
+        <p>
+          ${this._localize("troubleshoot.use_address_body")}
+          <a href=${USE_ADDRESS_DOCS_URL} target="_blank" rel="noopener noreferrer">
+            ${this._localize("troubleshoot.learn_more")}
+            <wa-icon library="mdi" name="open-in-new"></wa-icon>
+          </a>
+        </p>
+        <p class="warning-banner">
+          ${this._localize("troubleshoot.use_address_ownership")}
+        </p>
+        ${device ? this._renderUseAddressForm(device) : nothing}
+      </div>
+    `;
   }
 
   private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {
@@ -428,13 +542,6 @@ wifi:
             if (e.key === "Enter") void this._saveUseAddress();
           }}
         />
-        <button
-          class="btn btn--confirm"
-          ?disabled=${this._saveState === "saving"}
-          @click=${() => void this._saveUseAddress()}
-        >
-          ${this._localize("troubleshoot.use_address_save")}
-        </button>
       </div>
       ${
         this._addressInvalid
@@ -450,6 +557,15 @@ wifi:
             </p>`
           : nothing
       }
+      <div class="actions">
+        <button
+          class="btn btn--confirm"
+          ?disabled=${this._saveState === "saving"}
+          @click=${() => void this._saveUseAddress()}
+        >
+          ${this._localize("troubleshoot.use_address_save")}
+        </button>
+      </div>
     `;
   }
 
@@ -505,8 +621,15 @@ wifi:
     }
   }
 
+  protected updated(changed: PropertyValues): void {
+    if (changed.has("_screen") && this._screen === "address") {
+      this.renderRoot.querySelector<HTMLInputElement>(".address-form input")?.focus();
+    }
+  }
+
   private _onAfterHide = (): void => {
     this._dialog.open = false;
+    this._screen = "main";
     if (this._subscription !== null) {
       const sub = this._subscription;
       this._subscription = null;

@@ -360,7 +360,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
           <wa-icon library="mdi" name=${stateIcon}></wa-icon>
           ${stateLabel}
           ${
-            online
+            online || untracked
               ? nothing
               : html`<button
                   class="troubleshoot-btn"

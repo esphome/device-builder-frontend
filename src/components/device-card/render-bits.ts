@@ -130,30 +130,17 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       openTroubleshoot(e);
     }
   };
+  // Untracked stays passive: with name_add_mac_suffix set the probe can
+  // only ever fail, so the dialog would misread as a broken network.
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
     const label = card._localize("dashboard.status_untracked");
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
-    if (card.selectMode) {
-      return html`<div
-          id="status-untracked"
-          class="device-status ${DeviceState.UNKNOWN}"
-          role="img"
-          tabindex="0"
-          aria-label="${label}. ${tooltip}"
-        >
-          <wa-icon library="mdi" name="help-network-outline"></wa-icon>
-          ${label}
-        </div>
-        <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
-    }
     return html`<div
         id="status-untracked"
-        class="device-status ${DeviceState.UNKNOWN} clickable"
-        role="button"
+        class="device-status ${DeviceState.UNKNOWN}"
+        role="img"
         tabindex="0"
         aria-label="${label}. ${tooltip}"
-        @click=${openTroubleshoot}
-        @keydown=${troubleshootKeydown}
       >
         <wa-icon library="mdi" name="help-network-outline"></wa-icon>
         ${label}

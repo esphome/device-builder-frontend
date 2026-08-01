@@ -78,6 +78,13 @@ async function openDialog(
   return { el, api, unsubscribe };
 }
 
+async function openAddressScreen(el: ESPHomeTroubleshootDialog): Promise<void> {
+  el.shadowRoot!.querySelector<HTMLButtonElement>(
+    "button.drill[data-section='use_address']"
+  )!.click();
+  await el.updateComplete;
+}
+
 describe("troubleshoot-dialog", () => {
   it("auto-runs the probe on open and renders the results", async () => {
     const { el, api } = await openDialog();
@@ -118,22 +125,32 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
   });
 
-  it("keeps the manual-address fix folded by default", async () => {
+  it("keeps the manual-address fix on its own screen behind a drill row", async () => {
     const { el } = await openDialog();
-    const details = el.shadowRoot!.querySelector<HTMLDetailsElement>(
-      "details[data-section='use_address']"
-    );
-    expect(details).not.toBeNull();
-    expect(details!.open).toBe(false);
+    expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
+    await openAddressScreen(el);
+    expect(el.shadowRoot!.querySelector(".address-form input")).not.toBeNull();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
+  });
+
+  it("surfaces and prefills an existing use_address", async () => {
+    const { el } = await openDialog({}, makeConfiguredDevice({ address: "10.0.0.7" }));
+    await openAddressScreen(el);
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_current");
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    expect(input.value).toBe("10.0.0.7");
   });
 
   it("saves a valid use_address through the YAML splice", async () => {
     const { el, api } = await openDialog();
+    await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
     input.value = "10.0.0.99";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
     await flush();
     await el.updateComplete;
     expect(api.getConfig).toHaveBeenCalledWith("kitchen.yaml");
@@ -144,11 +161,12 @@ describe("troubleshoot-dialog", () => {
 
   it("rejects an invalid address without touching the config", async () => {
     const { el, api } = await openDialog();
+    await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
     input.value = "not valid";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
     await flush();
     await el.updateComplete;
     expect(api.getConfig).not.toHaveBeenCalled();
@@ -159,11 +177,12 @@ describe("troubleshoot-dialog", () => {
     const { el } = await openDialog({
       getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
     });
+    await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
     input.value = "10.0.0.99";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".address-form button")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
     await flush();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".snippet")!.textContent).toContain(
