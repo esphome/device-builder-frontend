@@ -16,7 +16,6 @@ import {
 } from "./crash-report-budget.js";
 import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
-import { isCliLogLine } from "./validation-log.js";
 
 /**
  * Crash-report assembly: scrape the log buffer the user is already
@@ -134,18 +133,6 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
   };
 }
 
-/**
- * Clean YAML from a `devices/validate` stream: normalize each line and
- * drop the esphome CLI log records interleaved on the merged stream.
- */
-export function distillValidatedConfig(lines: string[]): string {
-  return lines
-    .map(normalizeLogLine)
-    .filter((line) => !isCliLogLine(line))
-    .join("\n")
-    .trim();
-}
-
 function extractCrashExcerpt(lines: string[]): { lines: string[]; crashIndex: number } {
   const start = lines.findIndex((line) => isCrashMarker(line));
   if (start === -1) return { lines: [], crashIndex: -1 };
@@ -232,7 +219,7 @@ function appendFolded(bucket: string[], line: string): void {
 export interface CrashReport {
   scrape: CrashScrape;
   meta: CrashReportMeta;
-  /** Sanitized `esphome config` dump; "" when unavailable. */
+  /** The device's YAML with credentials masked; "" when unavailable. */
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
@@ -328,7 +315,7 @@ export function buildFullReport(report: CrashReport): string {
   sections.push(
     configYaml
       ? fence([configYaml.trimEnd()], "yaml")
-      : "The configuration could not be validated when this report was created."
+      : "The configuration could not be read when this report was created."
   );
   sections.push("## Environment", environmentSection(meta));
   return `${sections.join("\n\n")}\n`;
@@ -439,10 +426,9 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
     if (logLines.length > 0) missing = true;
   }
 
-  // The sanitized YAML takes whatever budget the logs left, truncated
-  // (with a marker) when it can't fit whole — the full dump is always in
-  // the downloadable report, and the config is recoverable from the YAML
-  // regardless. Secrets are already redacted to `<removed>`. Set an empty
+  // The masked YAML takes whatever budget the logs left, truncated
+  // (with a marker) when it can't fit whole — the full YAML is always in
+  // the downloadable report. Credentials are already masked. Set an empty
   // `config` param first so the `&config=` key overhead is counted in the
   // measured budget, keeping the final URL reliably under the cap.
   const configYaml = report.configYaml.trimEnd();
