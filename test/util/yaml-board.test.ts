@@ -109,4 +109,14 @@ describe("boardDisagreesWithYaml", () => {
       boardDisagreesWithYaml(parsed, slimBoard({ board: "esp32dev", variant: "esp32" }))
     ).toBe(false);
   });
+
+  it("compares an rp2 variant against the board's mcu series", () => {
+    // Boards on mcu-faceted platforms carry variant null; the chip
+    // token falls back to the mcu.
+    const parsed = readPlatformBoard("rp2:\n  variant: RP2350\n")!;
+    const pico = slimBoard({ platform: "rp2", board: "rpipico", mcu: "rp2040" });
+    expect(boardDisagreesWithYaml(parsed, pico)).toBe(true);
+    const parsed2040 = readPlatformBoard("rp2:\n  variant: RP2040\n")!;
+    expect(boardDisagreesWithYaml(parsed2040, pico)).toBe(false);
+  });
 });
