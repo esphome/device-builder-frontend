@@ -543,6 +543,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
   ];
 
   open() {
+    // Reset before showing: a reopen racing the previous close's
+    // after-hide must abandon any in-flight capture.
+    this._goTo("main");
     this._dialog.open = true;
   }
 

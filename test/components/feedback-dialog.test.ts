@@ -6,7 +6,7 @@
  * without a source or version are left untouched) and the write-in-English
  * note that only the "Report a new issue" drill screen shows.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -147,6 +147,11 @@ describe("feedback-dialog device picker", () => {
     });
     el.open();
     await el.updateComplete;
+  });
+
+  afterEach(() => {
+    // The stubbed window.open must not leak into other files in this worker.
+    vi.unstubAllGlobals();
   });
 
   const settle = async (predicate: () => boolean) => {
