@@ -260,6 +260,15 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         color: var(--esphome-error);
       }
 
+      .btn--confirm {
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+      }
+
+      .btn--confirm:hover {
+        background: var(--esphome-primary-hover);
+      }
+
       .section p.warning-banner {
         margin: var(--wa-space-2xs) 0 var(--wa-space-s);
       }
