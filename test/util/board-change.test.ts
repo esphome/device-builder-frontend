@@ -74,6 +74,16 @@ describe("findBoardDisagreement", () => {
     ).toBeNull();
   });
 
+  it("is null when the board string matches despite a contradicting variant", async () => {
+    // Every same-string pick shares the chip, so flagging would loop;
+    // the compile surfaces the YAML's own contradiction.
+    vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
+    const yaml = "esp32:\n  board: esp32-s3-devkitc-1\n  variant: esp32c3\n";
+    const api = makeApi(yaml);
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBeNull();
+    expect(api.getBoards).not.toHaveBeenCalled();
+  });
+
   it("flags a platform mismatch without a catalog lookup", async () => {
     vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
     const yaml = "esp8266:\n  board: esp01_1m\n";
