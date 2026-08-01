@@ -37,6 +37,7 @@ import { configurationStem, downloadBlob } from "../util/download-text.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { sleep } from "../util/sleep.js";
 import { maskSensitiveYaml } from "../util/yaml-sensitive-redact.js";
 import { crashReportDialogStyles } from "./crash-report-dialog.styles.js";
 
@@ -54,6 +55,11 @@ registerMdiIcons({
 // aria-describedby can point at the one that belongs to it.
 const TITLE_ERROR_ID = "crash-title-error";
 const DESCRIBE_ERROR_ID = "crash-description-error";
+
+// The report is filable without config, so a dead link must not pin the
+// dialog on the collecting spinner (the recovery read parks on
+// ``api.ready`` while the socket is down).
+const CONFIG_READ_TIMEOUT_MS = 30_000;
 
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
@@ -173,10 +179,15 @@ export class ESPHomeCrashReportDialog extends LitElement {
   private async _captureConfig(session: number): Promise<void> {
     const abandoned = () => session !== this._session || !this._dialog.open;
     try {
-      const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
-        abandoned,
-        attempts: 4,
-      });
+      const yaml = await Promise.race([
+        loadConfigWithRecovery(this._api, this._configuration, {
+          abandoned,
+          attempts: 4,
+        }),
+        sleep(CONFIG_READ_TIMEOUT_MS).then(() => {
+          throw new Error("Config read timed out");
+        }),
+      ]);
       if (yaml === null) return;
       this._configYaml = maskSensitiveYaml(yaml);
       this._configError = "";

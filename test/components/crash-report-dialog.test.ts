@@ -302,6 +302,21 @@ describe("crash-report-dialog", () => {
     expect(copyToClipboard).toHaveBeenCalledWith(reportText);
   });
 
+  it("gives up on a parked config read after the wall-clock timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+      // The read never settles (socket down); the dialog must not stay
+      // on the collecting spinner forever — the report is filable
+      // without config.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((el as any)._configYaml).toBe("");
+      expect((el as any)._configError).toBe("transport");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("ignores a stale config read from a previous open", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await flushMicrotasks(1);
