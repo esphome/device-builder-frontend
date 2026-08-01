@@ -7,12 +7,19 @@ import { stripQuotes } from "./yaml-scalar.js";
 import { findDirectChildLine } from "./yaml-section-reader.js";
 import { parseYamlBoolean } from "./yaml-serialize.js";
 
+const KEY_RE = /^\s*name_add_mac_suffix\s*:/;
 const KEY_VALUE_RE = /^(\s*name_add_mac_suffix\s*:\s*)([^#\s]+)/;
 
 /** Zero-based line index of a truthy direct-child `name_add_mac_suffix:`
  *  under `esphome:`, or -1. */
 export function findTruthyMacSuffixLine(yaml: string): number {
   return truthyLineIn(yaml.split("\n"));
+}
+
+/** Zero-based line index of a direct-child `name_add_mac_suffix:` under
+ *  `esphome:` regardless of its value, or -1. */
+export function findMacSuffixLine(yaml: string): number {
+  return findDirectChildLine(yaml.split("\n"), "esphome", KEY_RE);
 }
 
 /** Rewrite the truthy flag to `false`, preserving the rest of the line;

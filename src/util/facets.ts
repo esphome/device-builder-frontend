@@ -96,16 +96,19 @@ export function computePlatformFacet(devices: ConfiguredDevice[]): FacetOption[]
  *  seeded at zero so the popover reads consistently across reloads
  *  (a freshly-loaded dashboard with no online devices still surfaces
  *  the "Online" bucket at count 0 so the user can click it as the
- *  fleet wakes up); the untracked bucket appears only when a device
- *  occupies it. */
+ *  fleet wakes up); the untracked bucket appears when a device
+ *  occupies it *or* it's currently selected, so a URL-hydrated
+ *  filter stays clearable. */
 export function computeStateFacet(
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  selected: readonly string[] = []
 ): FacetOption[] {
   const counts = new Map<string, number>();
   counts.set(DeviceState.ONLINE, 0);
   counts.set(DeviceState.OFFLINE, 0);
   counts.set(DeviceState.UNKNOWN, 0);
+  if (selected.includes(UNTRACKED_STATE)) counts.set(UNTRACKED_STATE, 0);
   for (const d of devices) {
     const state = effectiveDeviceState(d);
     counts.set(state, (counts.get(state) ?? 0) + 1);

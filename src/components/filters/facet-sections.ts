@@ -65,7 +65,7 @@ export function renderFacetSections(ctx: FacetSectionsContext): TemplateResult {
   const { devices, localize, selection, yamlMode } = ctx;
   const areaOptions = computeAreaFacet(devices);
   const platformOptions = computePlatformFacet(devices);
-  const stateOptions = computeStateFacet(devices, localize);
+  const stateOptions = computeStateFacet(devices, localize, selection.selectedStates);
   const updateOptions = computeUpdateFacet(
     devices,
     localize,

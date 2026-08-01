@@ -43,6 +43,13 @@ describe("computeStateFacet", () => {
     expect(countById.untracked).toBe(1);
     expect(countById[DeviceState.OFFLINE]).toBe(1);
   });
+
+  it("surfaces a selected untracked bucket at zero so it stays clearable", () => {
+    const none = computeStateFacet([device()], identityLocalize);
+    expect(none.some((o) => o.id === "untracked")).toBe(false);
+    const selected = computeStateFacet([device()], identityLocalize, ["untracked"]);
+    expect(selected.find((o) => o.id === "untracked")?.count).toBe(0);
+  });
 });
 
 describe("normalizeUpdateBuckets", () => {

@@ -19,7 +19,10 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { devicesContext, localizeContext } from "../../context/index.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { findTruthyMacSuffixLine } from "../../util/yaml-mac-suffix.js";
+import {
+  findMacSuffixLine,
+  findTruthyMacSuffixLine,
+} from "../../util/yaml-mac-suffix.js";
 import { renderNoticeBanner } from "./notice-banner.js";
 import { noticeBannerStyles, noticeCloseStyles } from "./notice-banner.styles.js";
 
@@ -67,10 +70,16 @@ export class ESPHomeMacSuffixNotice extends LitElement {
   protected render() {
     if (this._dismissed) return nothing;
     const editable = findTruthyMacSuffixLine(this.yaml) >= 0;
-    const flagged =
-      this._devices.find((d) => d.configuration === this.configuration)
-        ?.name_add_mac_suffix === true;
-    if (!editable && !flagged) return nothing;
+    if (!editable) {
+      // A draft that declares the key at all wins over the backend flag,
+      // which lags until save — clicking "Turn off" must clear the
+      // banner immediately. The fallback covers only a flag the scan
+      // can't see (packages, substituted values).
+      const flagged =
+        this._devices.find((d) => d.configuration === this.configuration)
+          ?.name_add_mac_suffix === true;
+      if (findMacSuffixLine(this.yaml) >= 0 || !flagged) return nothing;
+    }
     return renderNoticeBanner({
       icon: "alert-outline",
       text: html`${this._localize("device.mac_suffix_notice")}

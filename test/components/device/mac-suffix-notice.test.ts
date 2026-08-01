@@ -112,6 +112,19 @@ describe("mac-suffix-notice", () => {
     expect(seen).toHaveBeenCalledTimes(1);
   });
 
+  it("clears immediately after Turn off even while the backend flag lags", async () => {
+    const el = new ESPHomeMacSuffixNotice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._localize = (key: string) => key;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._devices = [{ configuration: "kitchen.yaml", name_add_mac_suffix: true }];
+    el.configuration = "kitchen.yaml";
+    el.yaml = ADOPTED;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
+  });
+
   it("falls back to the backend flag without a CTA when the scan can't see it", async () => {
     const el = new ESPHomeMacSuffixNotice();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
