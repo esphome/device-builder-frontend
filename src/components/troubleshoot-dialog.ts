@@ -41,7 +41,11 @@ import {
   buildTroubleshootSections,
   USE_ADDRESS_DOCS_URL,
 } from "../util/troubleshoot-tree.js";
-import { applyUseAddress, isValidUseAddress } from "../util/use-address-yaml.js";
+import {
+  applyUseAddress,
+  isIpLiteral,
+  isValidUseAddress,
+} from "../util/use-address-yaml.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -202,7 +206,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       }
 
       .section p {
-        margin: 0 0 var(--wa-space-2xs);
+        margin: 0 0 var(--wa-space-s);
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
         line-height: 1.5;
@@ -220,7 +224,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         display: flex;
         align-items: baseline;
         gap: var(--wa-space-xs);
-        margin-top: var(--wa-space-s);
+        margin: 0 0 var(--wa-space-2xs);
         font-size: var(--wa-font-size-s);
       }
 
@@ -238,7 +242,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       .address-form {
         display: flex;
         gap: var(--wa-space-xs);
-        margin-top: var(--wa-space-2xs);
       }
 
       .address-form input {
@@ -270,12 +273,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       }
 
       .section p.warning-banner {
-        margin: var(--wa-space-2xs) 0 var(--wa-space-s);
-      }
-
-      .current-address {
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
+        margin: 0 0 var(--wa-space-s);
       }
 
       .saved-panel {
@@ -404,18 +402,25 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     const list = (ips: string[]) => ips.join(", ");
     return html`<div class="probe-rows">
       ${
-        r.dns_resolved
+        isIpLiteral(r.address)
           ? this._probeRow(
-              "ok",
-              this._localize("troubleshoot.result_dns_ok", {
+              "neutral",
+              this._localize("troubleshoot.result_manual_address", {
                 address: r.address,
-                ips: list(r.dns_addresses),
               })
             )
-          : this._probeRow(
-              "fail",
-              this._localize("troubleshoot.result_dns_fail", { address: r.address })
-            )
+          : r.dns_resolved
+            ? this._probeRow(
+                "ok",
+                this._localize("troubleshoot.result_dns_ok", {
+                  address: r.address,
+                  ips: list(r.dns_addresses),
+                })
+              )
+            : this._probeRow(
+                "fail",
+                this._localize("troubleshoot.result_dns_fail", { address: r.address })
+              )
       }
       ${
         !r.zeroconf_running
@@ -486,6 +491,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       reachability: this._reachability,
       result: this._result,
       inDocker: this._api?.serverInfo?.in_docker === true,
+      existingAddress: this._existingAddress,
     });
     return html`${sections.map((section) => {
       // The manual-address fix is the last resort: a drill row into its
@@ -544,15 +550,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     }
     return html`
       <div class="section" data-section="use_address">
-        ${
-          this._existingAddress
-            ? html`<p class="current-address">
-                ${this._localize("troubleshoot.use_address_current", {
-                  address: this._existingAddress,
-                })}
-              </p>`
-            : nothing
-        }
         <p>
           ${this._localize("troubleshoot.use_address_body")}
           <a href=${USE_ADDRESS_DOCS_URL} target="_blank" rel="noopener noreferrer">

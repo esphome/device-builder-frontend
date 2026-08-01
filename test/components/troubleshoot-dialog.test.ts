@@ -135,10 +135,13 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
   });
 
-  it("surfaces and prefills an existing use_address", async () => {
+  it("surfaces a set use_address on the main screen and prefills the form", async () => {
     const { el } = await openDialog({}, makeConfiguredDevice({ address: "10.0.0.7" }));
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).toContain("use_address_set");
     await openAddressScreen(el);
-    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_current");
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
     expect(input.value).toBe("10.0.0.7");
   });

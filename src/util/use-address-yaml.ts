@@ -36,6 +36,15 @@ export function applyUseAddress(yaml: string, value: string): string | null {
   return updateSectionInYaml(yaml, section, { ...parsed.values, use_address: value });
 }
 
+/** True for a bare IPv4/IPv6 literal (not a hostname). */
+export function isIpLiteral(value: string): boolean {
+  if (/^[\d.]+$/.test(value)) {
+    const v4 = IPV4_RE.exec(value);
+    return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
+  }
+  return value.includes(":") && IPV6_RE.test(value);
+}
+
 /** Accept an IPv4/IPv6 literal or an RFC-1123 hostname. */
 export function isValidUseAddress(value: string): boolean {
   if (value.length === 0 || value.length > 253) return false;

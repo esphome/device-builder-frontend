@@ -31,12 +31,14 @@ export interface TroubleshootInput {
   reachability: ReachabilityStateEvent | null;
   result: DeviceTroubleshootResult | null;
   inDocker: boolean;
+  /** The config's current `use_address`, empty when unset. */
+  existingAddress: string;
 }
 
 export function buildTroubleshootSections(
   input: TroubleshootInput
 ): TroubleshootSection[] {
-  const { device, reachability, result, inDocker } = input;
+  const { device, reachability, result, inDocker, existingAddress } = input;
   if (device.name_add_mac_suffix) {
     // No network diagnosis: the broadcast can never match this config.
     return [
@@ -64,7 +66,15 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.icmp_unavailable_body"],
     });
   }
-  if (result && !result.zeroconf_running) {
+  if (existingAddress) {
+    // A manual address sidelines mDNS entirely; diagnosing mDNS
+    // darkness or DHCP churn would point away from the real lever.
+    sections.push({
+      id: "use_address_set",
+      titleKey: "troubleshoot.use_address_set_title",
+      bodyKeys: ["troubleshoot.use_address_set_body"],
+    });
+  } else if (result && !result.zeroconf_running) {
     sections.push({
       id: "zeroconf_down",
       titleKey: "troubleshoot.zeroconf_down_title",
@@ -94,7 +104,12 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.dns_fail_body"],
     });
   }
-  if (result?.ping_attempted && result.ping_rtt_ms === null && device.ip) {
+  if (
+    !existingAddress &&
+    result?.ping_attempted &&
+    result.ping_rtt_ms === null &&
+    device.ip
+  ) {
     sections.push({
       id: "dynamic_ip",
       titleKey: "troubleshoot.dynamic_ip_title",

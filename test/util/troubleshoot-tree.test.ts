@@ -54,6 +54,7 @@ function build(input: Partial<TroubleshootInput> = {}): string[] {
     reachability: null,
     result: null,
     inDocker: false,
+    existingAddress: "",
     ...input,
   }).map((s) => s.id);
 }
@@ -65,6 +66,7 @@ describe("buildTroubleshootSections", () => {
       reachability: null,
       result: makeResult(),
       inDocker: false,
+      existingAddress: "",
     });
     expect(sections.map((s) => s.id)).toEqual(["untracked"]);
     expect(sections[0].showUseAddressForm).toBeUndefined();
@@ -108,6 +110,7 @@ describe("buildTroubleshootSections", () => {
       reachability: makeReachability(),
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: false,
+      existingAddress: "",
     });
     const dark = sections.find((s) => s.id === "mdns_dark");
     expect(dark?.bodyKeys).toEqual([
@@ -122,6 +125,7 @@ describe("buildTroubleshootSections", () => {
       reachability: makeReachability(),
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: true,
+      existingAddress: "",
     });
     const dark = sections.find((s) => s.id === "mdns_dark");
     expect(dark?.bodyKeys[0]).toBe("troubleshoot.mdns_dark_docker_body");
@@ -150,6 +154,22 @@ describe("buildTroubleshootSections", () => {
       })
     ).not.toContain("mqtt");
     expect(build({ reachability: stale })).not.toContain("mqtt");
+  });
+
+  it("a set use_address supersedes the mdns and dynamic-ip diagnoses", () => {
+    const ids = build({
+      device: makeConfiguredDevice({ api_enabled: true, ip: "10.0.0.42" }),
+      result: makeResult({
+        mdns_addresses: [],
+        mdns_has_cached_trace: false,
+        ping_rtt_ms: null,
+      }),
+      existingAddress: "4.4.4.4",
+    });
+    expect(ids).toContain("use_address_set");
+    expect(ids).not.toContain("mdns_dark");
+    expect(ids).not.toContain("dynamic_ip");
+    expect(ids).not.toContain("generic");
   });
 
   it("flags a cached DNS failure and a dead last-known IP", () => {
