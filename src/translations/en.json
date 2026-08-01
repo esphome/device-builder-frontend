@@ -2027,6 +2027,6 @@
     "use_address_copy": "Copy",
     "use_address_copied": "Copied",
     "use_address_copy_failed": "Copying failed; select the text and copy it manually",
-    "use_address_snippet": "This configuration keeps its network settings in a package or include, so it cannot be edited here. Add this to the file that holds the network settings:"
+    "use_address_snippet": "This configuration loads its network settings from an included file, so it cannot be edited here. Add this inside that file:"
   }
 }

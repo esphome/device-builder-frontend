@@ -2,13 +2,14 @@
  * Write `use_address` into a config's network block for the
  * troubleshooting dialog's manual-address fix. Splices through the
  * section machinery so comments and untouched keys survive; a config
- * whose network block lives in a package/include can't be spliced and
- * falls back to a copyable snippet in the dialog.
+ * with no local network block at all (`packages:` include) gets a new
+ * block appended that deep-merges per-device, and only a
+ * `wifi: !include`-style header falls back to a copyable snippet.
  */
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
-import { updateSectionInYaml } from "./yaml-section-values.js";
+import { appendSectionToYaml, updateSectionInYaml } from "./yaml-section-values.js";
 
 /** esphome components that accept `use_address`, in pick order. */
 export const NETWORK_SECTIONS = ["wifi", "ethernet", "openthread"] as const;
@@ -53,19 +54,38 @@ export function snippetNetworkSection(
   return "wifi";
 }
 
-/** Splice `use_address: value` into the network block; null when there is none. */
-export function applyUseAddress(yaml: string, value: string): string | null {
+/**
+ * Splice `use_address: value` into the local network block, or append a
+ * new block that deep-merges with a `packages:`-supplied one.
+
+ * Null only for a `wifi: !include`-style header: a second top-level
+ * header beside it would be a duplicate key.
+ */
+export function applyUseAddress(
+  yaml: string,
+  value: string,
+  loadedIntegrations: string[]
+): string | null {
   const section = findNetworkSection(yaml);
-  if (section === null) return null;
-  const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
-  // Keep the parser's null prototype so a YAML key named __proto__
-  // stays inert data (see parseSectionCore).
-  const values: Record<string, unknown> = Object.assign(
-    Object.create(null),
-    parsed.values
-  );
-  values.use_address = value;
-  return updateSectionInYaml(yaml, section, values);
+  if (section !== null) {
+    const parsed = parseSectionCore(splitYamlDocLines(yaml), section);
+    // Keep the parser's null prototype so a YAML key named __proto__
+    // stays inert data (see parseSectionCore).
+    const values: Record<string, unknown> = Object.assign(
+      Object.create(null),
+      parsed.values
+    );
+    values.use_address = value;
+    return updateSectionInYaml(yaml, section, values);
+  }
+  const lines = splitYamlDocLines(yaml);
+  for (const candidate of NETWORK_SECTIONS) {
+    if (findSectionStart(lines, candidate) >= 0) return null;
+  }
+  const target =
+    NETWORK_SECTIONS.find((candidate) => loadedIntegrations.includes(candidate)) ??
+    "wifi";
+  return appendSectionToYaml(yaml, target, { use_address: value });
 }
 
 /** Read the network block's `use_address`; null when nothing is

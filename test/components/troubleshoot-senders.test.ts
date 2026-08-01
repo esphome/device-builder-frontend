@@ -64,6 +64,20 @@ describe("open-troubleshoot senders", () => {
     }
   });
 
+  it("table dot is inert in select mode", () => {
+    const device = makeConfiguredDevice();
+    const columns = createDeviceColumns(identityLocalize, true);
+    const statusColumn = columns.find(
+      (c) => (c as { accessorKey?: string }).accessorKey === "status"
+    )!;
+    const cell = (statusColumn.cell as (info: unknown) => unknown)({
+      getValue: () => DeviceState.OFFLINE,
+      row: { original: { busy: false, recentJob: null, _device: device } },
+    });
+    const container = renderInto(cell);
+    expect(container.querySelector('[role="button"]')).toBeNull();
+  });
+
   it("table dot sends the configuration", () => {
     const device = makeConfiguredDevice();
     const columns = createDeviceColumns(identityLocalize);

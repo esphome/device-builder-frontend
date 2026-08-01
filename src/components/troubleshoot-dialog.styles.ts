@@ -163,7 +163,7 @@ export const troubleshootDialogStyles = css`
     color: var(--esphome-on-primary);
   }
 
-  .btn--confirm:hover {
+  .btn--confirm:hover:not(:disabled) {
     background: var(--esphome-primary-hover);
   }
 

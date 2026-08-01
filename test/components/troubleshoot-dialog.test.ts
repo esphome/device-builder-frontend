@@ -23,11 +23,9 @@ const RESULT: DeviceTroubleshootResult = {
   zeroconf_running: true,
   dns_resolved: false,
   dns_addresses: [],
-  dns_had_cached_failure: true,
   dns_inconclusive: false,
   mdns_addresses: [],
   mdns_has_cached_trace: false,
-  mdns_has_live_anchor_ptr: false,
   mdns_inconclusive: false,
   ping_attempted: true,
   ping_target: "10.0.0.42",
@@ -180,6 +178,21 @@ describe("troubleshoot-dialog", () => {
     expect(input.value).toBe("10.0.0.7");
   });
 
+  it("never prefills a substitution or secret value the validator would reject", async () => {
+    const { el } = await openDialog({
+      getConfig: vi
+        .fn()
+        .mockResolvedValue(
+          "substitutions:\n  static_ip: 10.0.0.42\n" +
+            "wifi:\n  ssid: net\n  use_address: ${static_ip}\n"
+        ),
+    });
+    await openAddressScreen(el);
+    expect(el._existingAddress).toBe("${static_ip}");
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    expect(input.value).toBe("");
+  });
+
   it("removes an existing use_address from the address screen", async () => {
     const { el, api } = await openDialog(
       {
@@ -250,8 +263,8 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_invalid");
   });
 
-  it("falls back to a copyable snippet when the network block is packaged", async () => {
-    const { el } = await openDialog({
+  it("appends a deep-merging block when the network settings are packaged", async () => {
+    const { el, api } = await openDialog({
       getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
     });
     await openAddressScreen(el);
@@ -262,6 +275,24 @@ describe("troubleshoot-dialog", () => {
     el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
     await flush();
     await el.updateComplete;
+    const written = api.updateConfig.mock.calls[0][1] as string;
+    expect(written).toContain("wifi:\n  use_address: 10.0.0.99");
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_saved");
+  });
+
+  it("falls back to a copyable snippet for an include-valued network header", async () => {
+    const { el, api } = await openDialog({
+      getConfig: vi.fn().mockResolvedValue("wifi: !include wifi.yaml\n"),
+    });
+    await openAddressScreen(el);
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+    input.value = "10.0.0.99";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
+    await flush();
+    await el.updateComplete;
+    expect(api.updateConfig).not.toHaveBeenCalled();
     expect(el.shadowRoot!.querySelector(".snippet")!.textContent).toContain(
       "use_address: 10.0.0.99"
     );

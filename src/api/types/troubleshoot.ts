@@ -16,15 +16,12 @@ export interface DeviceTroubleshootResult {
   zeroconf_running: boolean;
   dns_resolved: boolean;
   dns_addresses: string[];
-  /** The passive sweep's cached DNS verdict from before this probe ran. */
-  dns_had_cached_failure: boolean;
   /** The leg failed internally; its fields prove nothing. */
   dns_inconclusive: boolean;
   /** Zeroconf-cached addresses after the probe's wire mDNS re-query. */
   mdns_addresses: string[];
   /** Any cached mDNS record for the device, expired included. */
   mdns_has_cached_trace: boolean;
-  mdns_has_live_anchor_ptr: boolean;
   mdns_inconclusive: boolean;
   ping_attempted: boolean;
   ping_target: string;

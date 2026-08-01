@@ -35,7 +35,7 @@ describe("findNetworkSection", () => {
 
 describe("applyUseAddress", () => {
   it("adds use_address while keeping secrets and comments byte-for-byte", () => {
-    const updated = applyUseAddress(WIFI_YAML, "10.0.0.42")!;
+    const updated = applyUseAddress(WIFI_YAML, "10.0.0.42", [])!;
     expect(updated).toContain("  use_address: 10.0.0.42");
     expect(updated).toContain("  ssid: !secret wifi_ssid");
     expect(updated).toContain("  password: !secret wifi_password # keep");
@@ -44,13 +44,13 @@ describe("applyUseAddress", () => {
 
   it("replaces an existing use_address", () => {
     const yaml = "wifi:\n  ssid: net\n  use_address: 10.0.0.1\n";
-    const updated = applyUseAddress(yaml, "10.0.0.9")!;
+    const updated = applyUseAddress(yaml, "10.0.0.9", [])!;
     expect(updated).toContain("use_address: 10.0.0.9");
     expect(updated).not.toContain("10.0.0.1");
   });
 
   it("splices a CRLF document, keeping its keys and line endings", () => {
-    const updated = applyUseAddress("wifi:\r\n  ssid: net\r\n", "10.0.0.9")!;
+    const updated = applyUseAddress("wifi:\r\n  ssid: net\r\n", "10.0.0.9", [])!;
     expect(updated).toContain("use_address: 10.0.0.9");
     expect(updated).toContain("ssid: net");
     expect(updated).toContain("\r\n");
@@ -60,21 +60,43 @@ describe("applyUseAddress", () => {
   });
 
   it("targets an ethernet block when there is no wifi", () => {
-    const updated = applyUseAddress("ethernet:\n  type: LAN8720\n", "10.0.0.9")!;
+    const updated = applyUseAddress("ethernet:\n  type: LAN8720\n", "10.0.0.9", [])!;
     expect(updated).toContain("  type: LAN8720");
     expect(updated).toContain("  use_address: 10.0.0.9");
   });
 
-  it("returns null when the network block lives in a package", () => {
-    expect(
-      applyUseAddress("packages:\n  base: !include common.yaml\n", "1.2.3.4")
-    ).toBeNull();
+  it("appends a deep-merging wifi block when the config only has packages", () => {
+    const updated = applyUseAddress(
+      "packages:\n  base: !include common.yaml\n",
+      "1.2.3.4",
+      ["wifi", "api"]
+    )!;
+    expect(updated).toContain("packages:\n  base: !include common.yaml");
+    expect(updated).toContain("wifi:\n  use_address: 1.2.3.4");
   });
 
-  it("refuses an include-valued network header instead of corrupting it", () => {
+  it("appends an ethernet block when the compiled config says ethernet", () => {
+    const updated = applyUseAddress(
+      "packages:\n  base: !include common.yaml\n",
+      "10.0.0.9",
+      ["ethernet", "api"]
+    )!;
+    expect(updated).toContain("ethernet:\n  use_address: 10.0.0.9");
+  });
+
+  it("quotes an IPv6 literal in an appended block", () => {
+    const updated = applyUseAddress(
+      "packages:\n  base: !include x.yaml\n",
+      "fe80::1",
+      []
+    )!;
+    expect(updated).toContain('use_address: "fe80::1"');
+  });
+
+  it("refuses an include-valued network header instead of duplicating it", () => {
     const yaml = "wifi: !include wifi.yaml\napi:\n";
     expect(findNetworkSection(yaml)).toBeNull();
-    expect(applyUseAddress(yaml, "10.0.0.9")).toBeNull();
+    expect(applyUseAddress(yaml, "10.0.0.9", ["wifi"])).toBeNull();
   });
 });
 
@@ -129,7 +151,6 @@ describe("snippetNetworkSection", () => {
 describe("isValidUseAddress", () => {
   it.each([
     "10.0.0.42",
-    "192.168.001.1",
     "fe80::1",
     "1:2:3:4:5:6:7:8",
     "2001:db8::42",
@@ -144,6 +165,10 @@ describe("isValidUseAddress", () => {
     "",
     " ",
     "10.0.0.299",
+    // Zero-padded octets read as octal on glibc (192.168.010.1 is
+    // 192.168.8.1 there) and are rejected outright elsewhere.
+    "192.168.001.1",
+    "192.168.010.1",
     "255.42.2.1.3",
     "1.2.3",
     "127.0.0.1",

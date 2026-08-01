@@ -180,13 +180,11 @@ async function saveUseAddress(host: ESPHomeTroubleshootDialog): Promise<void> {
   try {
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
-    const updated = applyUseAddress(yaml, value);
+    const device = host._devices.find((d) => d.configuration === configuration);
+    const integrations = device?.loaded_integrations ?? [];
+    const updated = applyUseAddress(yaml, value, integrations);
     if (updated === null) {
-      const device = host._devices.find((d) => d.configuration === configuration);
-      host._snippetSection = snippetNetworkSection(
-        yaml,
-        device?.loaded_integrations ?? []
-      );
+      host._snippetSection = snippetNetworkSection(yaml, integrations);
       host._saveState = "snippet";
       return;
     }
@@ -237,11 +235,18 @@ export async function loadExistingAddress(
       const inputUntouched =
         host._addressInput === "" || host._addressInput === host._existingAddress;
       host._existingAddress = fromYaml;
-      if (inputUntouched) host._addressInput = fromYaml;
+      // A raw `${substitution}` or `!secret` value would fail the
+      // validator the moment the user hits Save; skip the prefill.
+      if (inputUntouched && isValidUseAddress(fromYaml)) {
+        host._addressInput = fromYaml;
+      }
     }
     if (!host._addressInput) {
       // The firmware's own manual_ip.static_ip is the best prefill.
-      host._addressInput = readStaticIp(yaml) ?? "";
+      const staticIp = readStaticIp(yaml);
+      if (staticIp !== null && isValidUseAddress(staticIp)) {
+        host._addressInput = staticIp;
+      }
     }
   } catch {
     // Keep the heuristic; the save path re-fetches anyway.

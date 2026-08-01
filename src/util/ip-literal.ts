@@ -22,7 +22,16 @@ export function isIpv6Shape(value: string): boolean {
 export function isIpLiteral(value: string): boolean {
   if (/^[\d.]+$/.test(value)) {
     const v4 = IPV4_RE.exec(value);
-    return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
+    // A zero-padded octet is ambiguous: glibc's inet_aton reads it as
+    // octal (192.168.010.1 -> 192.168.8.1), other stacks reject it.
+    return (
+      v4 !== null &&
+      v4
+        .slice(1)
+        .every(
+          (octet) => Number(octet) <= 255 && (octet.length === 1 || octet[0] !== "0")
+        )
+    );
   }
   return value.includes(":") && isIpv6Shape(value);
 }

@@ -76,6 +76,23 @@ const rowCount = (el: ESPHomeDeviceTable) =>
 const pageSizeAttr = (el: ESPHomeDeviceTable) =>
   el.shadowRoot!.querySelector("esphome-table-pagination")?.getAttribute("page-size");
 
+describe("device-table select mode", () => {
+  it("rebuilds the status cell when selectMode flips", async () => {
+    const el = await mount(3, 25);
+    const dot = () =>
+      el.shadowRoot!.querySelector('tbody tr[data-configuration] [role="button"]');
+    expect(dot()).not.toBeNull();
+
+    el.selectMode = true;
+    await el.updateComplete;
+    expect(dot()).toBeNull();
+
+    el.selectMode = false;
+    await el.updateComplete;
+    expect(dot()).not.toBeNull();
+  });
+});
+
 describe("device-table All rendering", () => {
   it("paginates at a normal page size (25 of 30 rows)", async () => {
     const el = await mount(30, 25);

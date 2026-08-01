@@ -19,11 +19,9 @@ function makeResult(
     zeroconf_running: true,
     dns_resolved: true,
     dns_addresses: ["10.0.0.42"],
-    dns_had_cached_failure: false,
     dns_inconclusive: false,
     mdns_addresses: ["10.0.0.42"],
     mdns_has_cached_trace: true,
-    mdns_has_live_anchor_ptr: true,
     mdns_inconclusive: false,
     ping_attempted: true,
     ping_target: "10.0.0.42",
@@ -230,13 +228,12 @@ describe("buildTroubleshootSections", () => {
     ).toContain("dns_fail");
   });
 
-  it("flags a cached DNS failure and a dead last-known IP", () => {
+  it("flags an unresolvable name and a dead last-known IP together", () => {
     const ids = build({
       device: makeConfiguredDevice({ ip: "10.0.0.42" }),
       result: makeResult({
         dns_resolved: false,
         dns_addresses: [],
-        dns_had_cached_failure: true,
         dns_inconclusive: false,
         ping_target_source: "persisted",
         ping_rtt_ms: null,
