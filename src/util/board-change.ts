@@ -7,10 +7,15 @@ import type {
   ESPHomeBoardReselectDialog,
 } from "../components/device/board-reselect-dialog.js";
 import { fetchBoard } from "./board-body-cache.js";
-import { chipNameToVariant } from "./chip-variant.js";
 import { canonicalComponentKey } from "./component-presence.js";
+import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 import { notifyError, notifySuccess, notifyWarning } from "./notify.js";
-import { readPlatformBoard, type YamlPlatformBoard } from "./yaml-board.js";
+import {
+  platformDisagrees,
+  readPlatformBoard,
+  variantDisagrees,
+  type YamlPlatformBoard,
+} from "./yaml-board.js";
 
 /** Open the reselect picker; a missing dialog is a bug, not "nothing to
  *  offer" — log it loudly and fail open. */
@@ -25,21 +30,31 @@ export function openBoardReselect(
   return dialog.open(opts);
 }
 
-/** The catalog board whose PlatformIO string and platform match, else null. */
-export async function matchCatalogBoard(
+// The catalog is immutable per session, so misses memoise too. Keyed
+// on the api instance so a reconnect (or a test's fresh mock) starts
+// with an empty cache.
+const _matchCaches = new WeakMap<ESPHomeAPI, KeyedPromiseCache<SlimBoard | undefined>>();
+
+/** The catalog board whose PlatformIO string and platform match, memoised per session. */
+export function matchCatalogBoard(
   api: ESPHomeAPI,
   board: string,
   platform: string
-): Promise<SlimBoard | null> {
+): Promise<SlimBoard | undefined> {
+  let cache = _matchCaches.get(api);
+  if (!cache) {
+    cache = new KeyedPromiseCache();
+    _matchCaches.set(api, cache);
+  }
   const target = board.toLowerCase();
-  const { boards } = await api.getBoards({ query: board, limit: 100 });
-  return (
-    boards.find(
+  return cache.fetch(`${platform}\n${target}`, async () => {
+    const { boards } = await api.getBoards({ query: board, limit: 100 });
+    return boards.find(
       (b) =>
         b.esphome.board.toLowerCase() === target &&
         canonicalComponentKey(b.esphome.platform) === platform
-    ) ?? null
-  );
+    );
+  });
 }
 
 /**
@@ -76,30 +91,21 @@ export async function findBoardDisagreement(
 /**
  * Whether the YAML pins a different chip than the stored board.
  *
- * Chip-level only: a board-string mismatch alone never flags. The
- * reselect picker resolves string mismatches by variant, so a string
- * the catalog doesn't carry could otherwise re-block every install
- * with a picker no pick can satisfy.
+ * The install-gating rule: a board-string mismatch alone never flags,
+ * and a resolved board string beats an explicit variant beside it.
  */
-async function chipDisagrees(
+export async function chipDisagrees(
   api: ESPHomeAPI,
   parsed: YamlPlatformBoard,
   stored: SlimBoard
 ): Promise<boolean> {
-  if (parsed.platform !== canonicalComponentKey(stored.esphome.platform)) return true;
-  let yamlVariant = parsed.variant;
-  if (parsed.board) {
-    // The board string pins the hardware; equality settles it, and a
-    // resolved string beats an explicit variant beside it.
-    if (parsed.board.toLowerCase() === stored.esphome.board.toLowerCase()) return false;
-    const resolved = await matchCatalogBoard(api, parsed.board, parsed.platform);
-    if (resolved) yamlVariant = resolved.esphome.variant ?? yamlVariant;
-  }
-  return Boolean(
-    yamlVariant &&
-    stored.esphome.variant &&
-    chipNameToVariant(yamlVariant) !== chipNameToVariant(stored.esphome.variant)
-  );
+  if (platformDisagrees(parsed.platform, stored)) return true;
+  if (parsed.board?.toLowerCase() === stored.esphome.board.toLowerCase()) return false;
+  if (!stored.esphome.variant) return false;
+  const resolved = parsed.board
+    ? await matchCatalogBoard(api, parsed.board, parsed.platform)
+    : undefined;
+  return variantDisagrees(resolved?.esphome.variant ?? parsed.variant, stored);
 }
 
 /** Write a device's sidecar `board_id` and toast the outcome; true on success. */

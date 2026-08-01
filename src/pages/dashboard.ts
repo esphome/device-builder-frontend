@@ -1009,17 +1009,17 @@ export class ESPHomePageDashboard extends LitElement {
     device: ConfiguredDevice,
     proceed: () => void | Promise<void>
   ) => {
-    // Each stage guarded: the void call sites (and the pick callback)
-    // would otherwise turn any throw into a silent unhandled rejection.
-    const start = async () => {
+    // Every path guarded: the void call sites (and the pick callback)
+    // would otherwise turn a throw into a silent unhandled rejection.
+    const run = async (fn: () => void | Promise<void>) => {
       try {
-        await proceed();
+        await fn();
       } catch (err) {
         console.error("Install entry failed:", err);
         notifyError(this._localize("device.install_start_failed"));
       }
     };
-    try {
+    await run(async () => {
       if (showJobProgress(this, device)) return;
       const yaml = await findBoardDisagreement(this._api, this._localize, device);
       if (
@@ -1027,17 +1027,13 @@ export class ESPHomePageDashboard extends LitElement {
         (await openBoardReselect(this._boardReselectDialog, {
           configuration: device.configuration,
           yaml,
-          onApplied: () => void start(),
+          onApplied: () => void run(proceed),
         }))
       ) {
         return;
       }
-    } catch (err) {
-      console.error("Install entry failed:", err);
-      notifyError(this._localize("device.install_start_failed"));
-      return;
-    }
-    await start();
+      await proceed();
+    });
   };
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
     onInstallMethodSelect(this, e);

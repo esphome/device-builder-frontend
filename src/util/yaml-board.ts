@@ -40,23 +40,34 @@ export function readPlatformBoard(yaml: string): YamlPlatformBoard | null {
   return { platform: canonicalComponentKey(section.key), board, variant };
 }
 
+/** Whether *platform* names a different target platform than *board*. */
+export function platformDisagrees(platform: string, board: SlimBoard): boolean {
+  return platform !== canonicalComponentKey(board.esphome.platform);
+}
+
+/** Whether *variant* pins a different chip than *board*; unknown sides agree. */
+export function variantDisagrees(variant: string | null, board: SlimBoard): boolean {
+  return Boolean(
+    variant &&
+    board.esphome.variant &&
+    chipNameToVariant(variant) !== chipNameToVariant(board.esphome.variant)
+  );
+}
+
 /**
- * Whether the YAML names a different chip than the selected catalog board.
+ * Whether the YAML names a different board than the selected catalog board.
  *
- * Curated-vs-generic picks sharing one PlatformIO board string compare
- * equal on every axis and never flag.
+ * String-level, suiting the save-time reselect offer; install gating uses
+ * the chip-level rule in board-change.ts. Curated-vs-generic picks sharing
+ * one PlatformIO board string compare equal on every axis and never flag.
  */
 export function boardDisagreesWithYaml(
   parsed: YamlPlatformBoard,
   board: SlimBoard
 ): boolean {
-  if (parsed.platform !== canonicalComponentKey(board.esphome.platform)) return true;
+  if (platformDisagrees(parsed.platform, board)) return true;
   if (parsed.board && parsed.board.toLowerCase() !== board.esphome.board.toLowerCase()) {
     return true;
   }
-  return Boolean(
-    parsed.variant &&
-    board.esphome.variant &&
-    chipNameToVariant(parsed.variant) !== chipNameToVariant(board.esphome.variant)
-  );
+  return variantDisagrees(parsed.variant, board);
 }
