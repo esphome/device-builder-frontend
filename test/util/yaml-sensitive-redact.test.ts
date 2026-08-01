@@ -179,6 +179,12 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: # •");
   });
 
+  it("masks a marker-adjacent comment-only value", () => {
+    const masked = maskSensitiveYaml("wifi:\n  password:#hunter2");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).toContain("  password:#•");
+  });
+
   it("masks user-named *_password / *_psk substitution keys", () => {
     const yaml = [
       "substitutions:",

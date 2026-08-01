@@ -186,10 +186,10 @@ export function findSensitiveValueRanges(
     skipSubstitutionRefs = false,
   } = options;
   const ranges: SensitiveValueRange[] = [];
-  // Trailing CRs are stripped at materialization: a line keeping its CR
-  // matches no anchored regex here (JS `.` and `$` treat `\r` as a line
-  // terminator), so CRLF input would silently fail open. Emitted columns
-  // stay valid in the caller's CR-bearing original — the CR is line-final.
+  // Trailing CRs are stripped at materialization: `.` excludes line
+  // terminators in JS, so a line keeping its CR cannot satisfy patterns
+  // ending `(.*)$` and would silently fail open. Emitted columns stay
+  // valid in the caller's CR-bearing original — the CR is line-final.
   let lines: string[];
   if (isLineSource(yaml)) {
     if (yaml.lines === 0) return ranges;
@@ -239,15 +239,26 @@ export function findSensitiveValueRanges(
   ): "block" | "done" => {
     const line = lines[lineIdx];
 
+    // A `#`-leading value IS the comment; its marker needs no
+    // whitespace guard (`password:#hunter2` is still a leak), so the
+    // span comes straight off the marker position.
+    if (trimmedRest.startsWith("#")) {
+      if (emitCommentSpans) {
+        const span = commentContentSpan(line, line.indexOf("#", valueStart));
+        if (span) {
+          ranges.push({ line: lineIdx + 1, valueFrom: span.from, valueTo: span.to });
+        }
+      }
+      return "done";
+    }
     // Value-less shapes share one action — mask only the comment, which
-    // can hide the credential: an empty or comment-only value, an
-    // indirection (it carries only a name), or a block-scalar header
-    // (its credential lives on the body lines).
+    // can hide the credential: an empty value, an indirection (it
+    // carries only a name), or a block-scalar header (its credential
+    // lives on the body lines).
     const isBlock = BLOCK_SCALAR_HEADER.test(trimmedRest);
     if (
       isBlock ||
       trimmedRest === "" ||
-      trimmedRest.startsWith("#") ||
       SECRET_TAG_VALUE.test(trimmedRest) ||
       (skipSubstitutionRefs && SUBSTITUTION_REF.test(trimmedRest))
     ) {
