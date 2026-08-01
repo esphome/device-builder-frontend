@@ -38,7 +38,7 @@ function makePage() {
 }
 
 describe("dashboard install hard block", () => {
-  it("blocks the install-method picker and opens the reselect dialog", async () => {
+  it("blocks the install-method picker, then a pick resumes it", async () => {
     vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
     const { page, openReselect } = makePage();
     page._openInstallMethod(DEVICE);
@@ -46,8 +46,12 @@ describe("dashboard install hard block", () => {
     expect(openReselect).toHaveBeenCalledWith({
       configuration: "stale.yaml",
       yaml: "esp32:\n  variant: esp32s3\n",
+      onApplied: expect.any(Function),
     });
     expect(page._installMethodOpen).toBe(false);
+    const { onApplied } = openReselect.mock.calls[0][0] as { onApplied: () => void };
+    onApplied();
+    await vi.waitFor(() => expect(page._installMethodOpen).toBe(true));
   });
 
   it("blocks the direct update install the same way", async () => {

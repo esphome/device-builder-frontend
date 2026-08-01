@@ -13,7 +13,9 @@ export interface BoardEsphomeConfig {
   board: string;
   variant: string | null;
   framework: string | null;
-  // rp2-only chip series ('rp2040' / 'rp2350'); null on other platforms.
+  // Chip series for platforms that lump several chips under one key
+  // ('rp2040' / 'rp2350', LibreTiny 'bk7231' etc.); null where variant
+  // carries the chip or the platform is single-chip.
   mcu: string | null;
 }
 

@@ -42,6 +42,16 @@ async function makeDialog(api: Partial<ESPHomeAPI>) {
   return { el, inner };
 }
 
+function pickBoard(inner: () => ESPHomeChangeBoardDialog, boardId: string) {
+  inner().dispatchEvent(
+    new CustomEvent("select-board", {
+      detail: { boardId },
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
+
 describe("board-reselect-dialog", () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -64,7 +74,11 @@ describe("board-reselect-dialog", () => {
     });
     await el.updateComplete;
     expect(opened).toBe(true);
-    expect(getBoards).toHaveBeenCalledWith({ query: "esp32-c3-devkitm-1", limit: 100 });
+    expect(getBoards).toHaveBeenCalledWith({
+      query: "esp32-c3-devkitm-1",
+      platform: "esp32",
+      limit: 100,
+    });
     expect(getCompatibleBoards).toHaveBeenCalledWith("c3-curated");
     expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
     expect((inner() as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
@@ -91,6 +105,24 @@ describe("board-reselect-dialog", () => {
     });
     await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
     expect(inner().hasMore).toBe(false);
+  });
+
+  it("lists the YAML's own platform by mcu for an rp2 variant", async () => {
+    // The rp2 catalog facets its chips by mcu, not variant.
+    const pico = makeSlimBoard("rpi-pico", { platform: "rp2", mcu: "rp2040" });
+    const getBoards = vi.fn().mockResolvedValue({ boards: [pico], total: 1 });
+    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "rp2:\n  variant: RP2040\n",
+    });
+    expect(getBoards).toHaveBeenCalledWith({
+      platform: "rp2",
+      mcu: "rp2040",
+      offset: 0,
+      limit: 50,
+    });
+    await vi.waitFor(() => expect(inner().boards).toEqual([pico]));
   });
 
   it("falls back to same-variant boards when the catalog lacks the board string", async () => {
@@ -248,7 +280,36 @@ describe("board-reselect-dialog", () => {
     await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
   });
 
-  it("applies the pick via devices/update and emits board-changed", async () => {
+  it("applies the pick via devices/update, emits board-changed, runs onApplied", async () => {
+    const api = {
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
+      updateDevice: vi.fn().mockResolvedValue({}),
+    };
+    const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
+    const onChanged = vi.fn();
+    const onApplied = vi.fn();
+    el.addEventListener("board-changed", onChanged as EventListener);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied,
+    });
+    pickBoard(inner, "c3-curated");
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(api.updateDevice).toHaveBeenCalledWith({
+      configuration: "dev.yaml",
+      board_id: "c3-curated",
+    });
+    expect(toast.success).toHaveBeenCalled();
+    expect((onChanged.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      configuration: "dev.yaml",
+      boardId: "c3-curated",
+    });
+    expect(onApplied).toHaveBeenCalledTimes(1);
+  });
+
+  it("survives a throwing onApplied without losing the pick", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
       getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
@@ -260,27 +321,16 @@ describe("board-reselect-dialog", () => {
     await el.open({
       configuration: "dev.yaml",
       yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied: () => {
+        throw new Error("boom");
+      },
     });
-    inner().dispatchEvent(
-      new CustomEvent("select-board", {
-        detail: { boardId: "c3-curated" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    pickBoard(inner, "c3-curated");
     await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(api.updateDevice).toHaveBeenCalledWith({
-      configuration: "dev.yaml",
-      board_id: "c3-curated",
-    });
     expect(toast.success).toHaveBeenCalled();
-    expect((onChanged.mock.calls[0][0] as CustomEvent).detail).toEqual({
-      configuration: "dev.yaml",
-      boardId: "c3-curated",
-    });
   });
 
-  it("toasts an error and emits nothing when the update fails", async () => {
+  it("toasts an error and runs no completions when the update fails", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
       getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
@@ -288,20 +338,17 @@ describe("board-reselect-dialog", () => {
     };
     const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
     const onChanged = vi.fn();
+    const onApplied = vi.fn();
     el.addEventListener("board-changed", onChanged as EventListener);
     await el.open({
       configuration: "dev.yaml",
       yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+      onApplied,
     });
-    inner().dispatchEvent(
-      new CustomEvent("select-board", {
-        detail: { boardId: "c3-curated" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    pickBoard(inner, "c3-curated");
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(onChanged).not.toHaveBeenCalled();
+    expect(onApplied).not.toHaveBeenCalled();
   });
 
   it("fetches the YAML when the caller passes none", async () => {
@@ -315,6 +362,7 @@ describe("board-reselect-dialog", () => {
     expect(api.getConfig).toHaveBeenCalledWith("dev.yaml");
     expect(api.getBoards).toHaveBeenCalledWith({
       query: "esp32-c3-devkitm-1",
+      platform: "esp32",
       limit: 100,
     });
   });

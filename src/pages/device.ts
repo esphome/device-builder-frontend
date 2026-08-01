@@ -54,14 +54,18 @@ import {
   resolveBackendErrors,
 } from "../util/backend-field-errors.js";
 import { fetchBoard } from "../util/board-body-cache.js";
-import { applyBoardChange, openBoardReselect } from "../util/board-change.js";
+import {
+  applyBoardChange,
+  chipDisagrees,
+  openBoardReselect,
+} from "../util/board-change.js";
 import { ConfigLoadController } from "../util/config-load-controller.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
-import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
+import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "../util/notify.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
@@ -1024,18 +1028,33 @@ export class ESPHomePageDevice extends LitElement {
     return saved;
   };
 
-  /** The parsed YAML platform block when it names a different chip than
-   *  the selected board, else null. */
+  /** The parsed YAML platform block when it names a different board than
+   *  the selected one, else null. */
   private _boardDisagreement() {
     if (!this._board) return null;
     const parsed = readPlatformBoard(this._yaml);
     return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
   }
 
-  private _openBoardReselect(): Promise<boolean> {
+  /** Whether the buffer pins a different chip than the selected board; fails open. */
+  private async _installChipDisagreement(): Promise<boolean> {
+    if (!this._board) return false;
+    const parsed = readPlatformBoard(this._yaml);
+    if (parsed === null) return false;
+    try {
+      return await chipDisagrees(this._api, parsed, this._board);
+    } catch (err) {
+      console.warn("Board disagreement check failed:", err);
+      notifyWarning(this._localize("device.board_check_failed"));
+      return false;
+    }
+  }
+
+  private _openBoardReselect(opts: { onApplied?: () => void } = {}): Promise<boolean> {
     return openBoardReselect(this._boardReselectDialog, {
       configuration: this.id,
       yaml: this._yaml,
+      ...opts,
     });
   }
 
@@ -1154,23 +1173,28 @@ export class ESPHomePageDevice extends LitElement {
       this._suppressBoardPrompt = false;
     }
     if (!saved) return;
-    // Hard block: an unresolved YAML/board disagreement dead-ends the
-    // install chip check, so force the fix before offering install
-    // methods. Dismissing the picker keeps install blocked; the next
-    // click re-prompts. When the picker has nothing to offer (no
-    // catalog candidates, or a transient failure) fall through — the
-    // chip check downstream stays the guard, and blocking here would
-    // strand the install with only a toast.
-    if (this._boardDisagreement() && (await this._openBoardReselect())) {
+    const start = async () => {
+      try {
+        await run();
+      } catch (err) {
+        // Surfaced rather than lost as an unhandled rejection.
+        console.error("Install entry failed:", err);
+        notifyError(this._localize("device.install_start_failed"));
+      }
+    };
+    // Hard block: an unresolved chip disagreement dead-ends the install
+    // chip check, so force the fix before offering install methods; a
+    // pick resumes the install. When the picker has nothing to offer
+    // (no catalog candidates, or a transient failure) fall through —
+    // the chip check downstream stays the guard, and blocking here
+    // would strand the install with only a toast.
+    if (
+      (await this._installChipDisagreement()) &&
+      (await this._openBoardReselect({ onApplied: () => void start() }))
+    ) {
       return;
     }
-    try {
-      await run();
-    } catch (err) {
-      // Surfaced rather than lost as an unhandled rejection.
-      console.error("Install entry failed:", err);
-      notifyError(this._localize("device.install_start_failed"));
-    }
+    await start();
   };
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);
