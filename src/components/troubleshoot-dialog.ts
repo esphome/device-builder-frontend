@@ -195,7 +195,9 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderProbeSummary(): TemplateResult {
-    if (this._checking && this._result === null) {
+    // Also replaces stale rows during a re-check, so Check again
+    // visibly does something.
+    if (this._checking) {
       return html`<div class="checking">
         <wa-spinner></wa-spinner>
         ${this._localize("troubleshoot.checking")}
