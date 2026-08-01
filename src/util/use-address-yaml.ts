@@ -57,7 +57,14 @@ export function applyUseAddress(yaml: string, value: string): string | null {
   const section = findNetworkSection(yaml);
   if (section === null) return null;
   const parsed = parseSectionCore(yaml.split("\n"), section);
-  return updateSectionInYaml(yaml, section, { ...parsed.values, use_address: value });
+  // Keep the parser's null prototype so a YAML key named __proto__
+  // stays inert data (see parseSectionCore).
+  const values: Record<string, unknown> = Object.assign(
+    Object.create(null),
+    parsed.values
+  );
+  values.use_address = value;
+  return updateSectionInYaml(yaml, section, values);
 }
 
 /** Read the network block's `use_address`; null when nothing is
@@ -87,7 +94,10 @@ export function removeUseAddress(yaml: string): string | null {
   if (section === null) return null;
   const parsed = parseSectionCore(yaml.split("\n"), section);
   if (!("use_address" in parsed.values)) return yaml;
-  const values = { ...parsed.values };
+  const values: Record<string, unknown> = Object.assign(
+    Object.create(null),
+    parsed.values
+  );
   delete values.use_address;
   return updateSectionInYaml(yaml, section, values);
 }
