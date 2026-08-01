@@ -100,6 +100,10 @@ export function isValidUseAddress(value: string): boolean {
     const v4 = IPV4_RE.exec(value);
     return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
   }
-  if (value.includes(":")) return IPV6_RE.test(value);
+  if (value.includes(":")) {
+    // At most one `::` run; `:::` and `1::2::3` are never valid.
+    if (value.includes(":::") || value.split("::").length > 2) return false;
+    return IPV6_RE.test(value);
+  }
   return HOSTNAME_RE.test(value);
 }

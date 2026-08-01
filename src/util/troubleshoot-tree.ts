@@ -150,7 +150,8 @@ function mdnsNeverSeen(
 }
 
 function mqttStale(reachability: ReachabilityStateEvent | null): boolean {
-  if (reachability === null) return true;
+  // No snapshot yet is unknown, not evidence of a stale link.
+  if (reachability === null) return false;
   const age = reachability.mqtt_last_seen_seconds_ago;
   return age === null || age > MQTT_STALE_AFTER_SECONDS;
 }

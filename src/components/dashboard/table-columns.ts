@@ -155,17 +155,26 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             ><span class="status-dot ${dotClass}" title="${title}"></span
           ></span>`;
         }
-        // Non-online dots open the troubleshooting dialog.
+        // Non-online dots open the troubleshooting dialog. Same
+        // {configuration} detail shape as the card and drawer senders.
+        const openTroubleshoot = (e: Event) => {
+          e.stopPropagation();
+          fireEvent(e.currentTarget as HTMLElement, "open-troubleshoot", {
+            configuration: row._device.configuration,
+          });
+        };
+        const cellLabel = `${title}. ${localize("troubleshoot.open_tooltip")}`;
         return html`<span
           class="cell-status"
           role="button"
           tabindex="0"
-          title="${title}. ${localize("troubleshoot.open_tooltip")}"
-          @click=${(e: Event) => dispatchRowEvent(e, "open-troubleshoot", row._device)}
+          title=${cellLabel}
+          aria-label=${cellLabel}
+          @click=${openTroubleshoot}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              dispatchRowEvent(e, "open-troubleshoot", row._device);
+              openTroubleshoot(e);
             }
           }}
           ><span class="status-dot ${dotClass}"></span

@@ -114,6 +114,8 @@ describe("isValidUseAddress", () => {
     "localhost",
     "0.0.0.0",
     "::1",
+    ":::",
+    "1::2::3",
     "not valid",
     "bad_host",
     "a..b",

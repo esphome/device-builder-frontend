@@ -60,7 +60,8 @@ export interface TroubleshootTarget {
   configuration: string;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "removed" | "snippet" | "error";
+type SaveState =
+  "idle" | "saving" | "saved" | "removed" | "remove_packaged" | "snippet" | "error";
 
 @customElement("esphome-troubleshoot-dialog")
 export class ESPHomeTroubleshootDialog extends LitElement {
@@ -430,6 +431,13 @@ ${section}:
             </p>`
           : nothing
       }
+      ${
+        this._saveState === "remove_packaged"
+          ? html`<p class="field-error">
+              ${this._localize("troubleshoot.use_address_remove_packaged")}
+            </p>`
+          : nothing
+      }
       <div class="actions">
         ${
           this._existingAddress
@@ -490,8 +498,7 @@ ${section}:
       const yaml = await this._api.getConfig(this._configuration);
       const updated = removeUseAddress(yaml);
       if (updated === null) {
-        this._snippetYaml = yaml;
-        this._saveState = "snippet";
+        this._saveState = "remove_packaged";
         return;
       }
       if (updated !== yaml) {
