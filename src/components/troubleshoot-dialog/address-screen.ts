@@ -6,6 +6,7 @@
  */
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
+import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { USE_ADDRESS_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   applyUseAddress,
@@ -73,11 +74,15 @@ function renderUseAddressForm(
   device: ConfiguredDevice
 ): TemplateResult {
   if (host._saveState === "snippet") {
+    const snippet = `${host._snippetSection}:\n  use_address: ${host._addressInput.trim()}`;
     return html`
       <p>${host._localize("troubleshoot.use_address_snippet")}</p>
-      <pre class="snippet">
-${host._snippetSection}:
-  use_address: ${host._addressInput.trim()}</pre>
+      <pre class="snippet">${snippet}</pre>
+      <div class="actions">
+        <button class="btn btn--confirm" @click=${() => void copyToClipboard(snippet)}>
+          ${host._localize("troubleshoot.use_address_copy")}
+        </button>
+      </div>
     `;
   }
   const placeholder = device.ip || host._result?.ping_target || "192.168.1.50";

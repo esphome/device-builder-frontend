@@ -26,6 +26,7 @@ describe("findNetworkSection", () => {
     expect(findNetworkSection(WIFI_YAML)).toBe("wifi");
     expect(findNetworkSection("ethernet:\n  type: LAN8720\n")).toBe("ethernet");
     expect(findNetworkSection("openthread:\n")).toBe("openthread");
+    expect(findNetworkSection("wifi:\r\n  ssid: net\r\n")).toBe("wifi");
     expect(
       findNetworkSection("esphome:\n  name: kit\npackages:\n  base: !include x\n")
     ).toBeNull();

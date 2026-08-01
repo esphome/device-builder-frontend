@@ -131,6 +131,8 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._saveState = "idle";
     this._screen = "main";
     this._teardownSubscription();
+    // A reopen is an explicit retry; don't carry a failed-subscribe gate.
+    this._failedGeneration = -1;
     this._dialog.open = true;
     this._startReconcile();
     void loadExistingAddress(this);
@@ -333,6 +335,10 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderSections(device: ConfiguredDevice): TemplateResult {
+    // Hold the advice until the first probe lands: the reachability
+    // stream alone can paint a confident diagnosis the probe then
+    // retracts. Re-checks keep the previous sections visible.
+    if (this._checking && this._result === null) return html``;
     const sections = buildTroubleshootSections({
       device,
       reachability: this._reachability,

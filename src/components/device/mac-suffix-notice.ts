@@ -19,6 +19,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { devicesContext, localizeContext } from "../../context/index.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { MAC_SUFFIX_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   findTruthyMacSuffixLine,
   macSuffixDisabledInDraft,
@@ -30,8 +31,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({ "alert-outline": mdiAlertOutline, close: mdiClose });
 
-const DOCS_URL =
-  "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
+const DOCS_URL = MAC_SUFFIX_DOCS_URL;
 
 @customElement("esphome-mac-suffix-notice")
 export class ESPHomeMacSuffixNotice extends LitElement {

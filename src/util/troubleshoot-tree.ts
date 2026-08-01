@@ -9,7 +9,7 @@ import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import { isIpLiteral } from "./use-address-yaml.js";
 
-const MAC_SUFFIX_DOCS_URL =
+export const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
 const FAQ_DOCKER_URL = "https://esphome.io/guides/faq/#docker-reference";
 const FAQ_MDNS_URL = "https://esphome.io/guides/faq/#notes-on-disabling-mdns";

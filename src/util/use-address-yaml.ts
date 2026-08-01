@@ -23,7 +23,9 @@ const HOSTNAME_RE =
  *  header carrying an inline value (`wifi: !include net.yaml`) is not
  *  spliceable and must not match. */
 const BARE_HEADER_RES = NETWORK_SECTIONS.map(
-  (section) => [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m")] as const
+  // \r? keeps CRLF files spliceable; `$` in m-mode stops before \n only.
+  (section) =>
+    [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?\r?$`, "m")] as const
 );
 
 /** First network block spliceable as a top-level mapping, or null. */

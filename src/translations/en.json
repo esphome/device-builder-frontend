@@ -2023,6 +2023,7 @@
     "back": "Back",
     "use_address_saved": "Saved. The new address takes effect after the next install; until then the device may still show offline.",
     "use_address_remove_packaged": "This configuration keeps its network settings in a package or include; remove use_address from that file instead.",
+    "use_address_copy": "Copy",
     "use_address_snippet": "This configuration keeps its network settings in a package or include, so it cannot be edited here. Add this to the file that holds the network settings:"
   }
 }
