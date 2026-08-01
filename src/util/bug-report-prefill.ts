@@ -41,21 +41,22 @@ export interface PrefillContext {
   installation: string;
 }
 
-/** The fully prefilled form URL for a picked device. */
+/** The fully prefilled form URL for a picked device, and whether the
+ *  config had to be truncated to fit the URL budget. */
 export function buildDeviceIssueUrl(
   target: DeviceTarget,
   device: ConfiguredDevice,
   /** Masked YAML; "" opens the form without a config. */
   maskedConfig: string,
   ctx: PrefillContext
-): URL {
+): { url: URL; truncated: boolean } {
   const url = deviceTargetUrl(target, ctx, device);
   url.searchParams.set(
     DEVICE_TARGETS[target].factsParam,
     deviceFacts(device, target, ctx)
   );
-  if (maskedConfig) setFittedConfigParam(url, maskedConfig);
-  return url;
+  const truncated = maskedConfig ? setFittedConfigParam(url, maskedConfig) : false;
+  return { url, truncated };
 }
 
 /** Today's URL for the no-specific-device row; the builder path fills

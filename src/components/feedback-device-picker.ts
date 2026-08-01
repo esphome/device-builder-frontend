@@ -13,6 +13,7 @@ import {
   serverVersionContext,
   versionContext,
 } from "../context/index.js";
+import { emptyStateStyles } from "../styles/empty-state.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { summaryListStyles } from "../styles/summary-list.js";
@@ -97,6 +98,11 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
   @state()
   private _readyUrl = "";
 
+  // Whether the config was cut to fit the URL budget, so the ready
+  // copy can say so instead of silently shipping a partial config.
+  @state()
+  private _readyTruncated = false;
+
   // A capture from a previous pick must not open a form for this one.
   // The element is created fresh per screen entry, so leaving the
   // screen (or closing the dialog) abandons via disconnection.
@@ -108,6 +114,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
 
   static styles = [
     espHomeStyles,
+    emptyStateStyles,
     // Project-wide native-input look for the device filter.
     inputStyles,
     summaryListStyles,
@@ -150,7 +157,11 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     if (this._readyUrl) {
       return html`
         <p class="description" role="status">
-          ${this._localize("feedback.device_ready")}
+          ${this._localize(
+            this._readyTruncated
+              ? "feedback.device_ready_truncated"
+              : "feedback.device_ready"
+          )}
         </p>
         <div class="links">
           <a
@@ -207,11 +218,15 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
           <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
         </button>
         ${
-          devices.length === 0 && filter
-            ? html`<p class="description" role="status">
-                ${this._localize("feedback.device_no_matches")}
+          this._devices.length === 0
+            ? html`<p class="empty-message" role="status">
+                ${this._localize("feedback.device_none")}
               </p>`
-            : ""
+            : devices.length === 0 && filter
+              ? html`<p class="empty-message" role="status">
+                  ${this._localize("feedback.device_no_matches")}
+                </p>`
+              : ""
         }
         ${devices.map((device) => this._renderDeviceRow(device))}
       </div>
@@ -223,6 +238,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     return html`
       <button
         class="link"
+        aria-busy=${busy ? "true" : "false"}
         ?disabled=${this._capturing !== "" && !busy}
         @click=${() => this._pickDevice(device)}
       >
@@ -277,16 +293,18 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
       // The form still opens with the facts; the config just isn't in it.
       notifyError(this._localize("feedback.device_capture_failed"));
     }
-    const url = buildDeviceIssueUrl(
+    const { url: built, truncated } = buildDeviceIssueUrl(
       this.target,
       device,
       masked,
       this._prefillContext()
-    ).toString();
+    );
+    const url = built.toString();
     // The capture can outlive the click's transient activation, so the
     // auto-open may be silently popup-blocked (window.open with noopener
     // returns null by spec either way — blocking is undetectable). Keep
     // the screen up with the link as the guaranteed path.
+    this._readyTruncated = truncated;
     this._readyUrl = url;
     window.open(url, "_blank", "noopener,noreferrer");
   }

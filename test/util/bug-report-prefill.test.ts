@@ -68,13 +68,19 @@ describe("skipDeviceUrl", () => {
 describe("buildDeviceIssueUrl", () => {
   it("targets each repo's field ids and prefers the compiled version", () => {
     const builder = buildDeviceIssueUrl("builder", DEVICE, "wifi:\n  ssid: x", CTX);
-    expect(builder.searchParams.get("extra")).toContain("Garage Door");
-    expect(builder.searchParams.get("config")).toContain("ssid: x");
-    expect(builder.searchParams.get("version")).toBe("1.8.0");
+    expect(builder.url.searchParams.get("extra")).toContain("Garage Door");
+    expect(builder.url.searchParams.get("config")).toContain("ssid: x");
+    expect(builder.url.searchParams.get("version")).toBe("1.8.0");
+    expect(builder.truncated).toBe(false);
 
     const esphome = buildDeviceIssueUrl("esphome", DEVICE, "", CTX);
-    expect(esphome.searchParams.get("additional")).toContain("Garage Door");
-    expect(esphome.searchParams.get("config")).toBeNull();
-    expect(esphome.searchParams.get("version")).toBe("2026.7.1");
+    expect(esphome.url.searchParams.get("additional")).toContain("Garage Door");
+    expect(esphome.url.searchParams.get("config")).toBeNull();
+    expect(esphome.url.searchParams.get("version")).toBe("2026.7.1");
+  });
+
+  it("reports truncation for a config past the budget", () => {
+    const huge = Array.from({ length: 800 }, (_, i) => `line_${i}: v${i}`).join("\n");
+    expect(buildDeviceIssueUrl("builder", DEVICE, huge, CTX).truncated).toBe(true);
   });
 });
