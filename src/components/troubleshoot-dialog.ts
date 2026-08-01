@@ -338,9 +338,11 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderSections(device: ConfiguredDevice): TemplateResult {
-    // Hold the advice until the first probe lands: the reachability
-    // stream alone can paint a confident diagnosis the probe then
-    // retracts. Re-checks keep the previous sections visible.
+    // Hold the advice while the first probe is in flight: the
+    // reachability stream alone can paint a confident diagnosis the
+    // probe then retracts. After a failed probe the stream-derived
+    // advice renders anyway (better than nothing beside the error
+    // row), and re-checks keep the previous sections visible.
     if (this._checking && this._result === null) return html``;
     // The HA add-on is a Docker container too, but it already runs
     // host-network; bridge advice there would be wrong and unactionable.
