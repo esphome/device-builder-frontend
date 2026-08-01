@@ -20,7 +20,12 @@ const DEVICE = {
   target_platform: "ESP32S3",
   board_id: "esp32dev",
   loaded_integrations: ["esp32", "wifi"],
-  runtime_state: { deployed_version: "2026.7.0" },
+  runtime_state: {
+    deployed_version: "2026.7.0",
+    state: "online",
+    active_source: "mdns",
+    ip_addresses: ["192.168.1.5"],
+  },
 } as unknown as ConfiguredDevice;
 
 describe("deviceFacts", () => {
@@ -77,6 +82,29 @@ describe("buildDeviceIssueUrl", () => {
     expect(esphome.url.searchParams.get("additional")).toContain("Garage Door");
     expect(esphome.url.searchParams.get("config")).toBeNull();
     expect(esphome.url.searchParams.get("version")).toBe("2026.7.1");
+  });
+
+  it("prefills the status form with observed facts and extra params", () => {
+    const built = buildDeviceIssueUrl("status", DEVICE, "wifi:\n  ssid: x", CTX, {
+      "mdns-expiry": "Expires in 1h 10m",
+    });
+    expect(built.url.origin + built.url.pathname).toBe(
+      "https://github.com/esphome/device-builder/issues/new"
+    );
+    expect(built.url.searchParams.get("template")).toBe("device_status.yml");
+    expect(built.url.searchParams.get("version")).toBe("1.8.0");
+    expect(built.url.searchParams.get("mdns-expiry")).toBe("Expires in 1h 10m");
+    const observed = built.url.searchParams.get("observed")!;
+    expect(observed).toContain("State: online");
+    expect(observed).toContain("Reachability source: mdns");
+    expect(observed).toContain("IP: 192.168.1.5");
+    expect(observed).toContain("ESPHome: 2026.7.2");
+  });
+
+  it("status skip satisfies the required config field", () => {
+    const url = skipDeviceUrl("status", CTX);
+    expect(url.searchParams.get("config")).toBe("not device specific");
+    expect(url.searchParams.get("version")).toBe("1.8.0");
   });
 
   it("reports truncation for a config past the budget", () => {

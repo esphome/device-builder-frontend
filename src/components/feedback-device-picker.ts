@@ -3,7 +3,7 @@ import { mdiBugOutline, mdiChip, mdiClipboardTextOutline, mdiOpenInNew } from "@
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
+import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
@@ -27,7 +27,9 @@ import { matchesDeviceName } from "../util/device-search.js";
 import { deviceSortKey, sortDevices } from "../util/device-sort.js";
 import { detectInstallation } from "../util/installation.js";
 import { captureMaskedConfig } from "../util/masked-config-capture.js";
+import { mdnsExpirySummary } from "../util/mdns-expiry.js";
 import { notifyError } from "../util/notify.js";
+import { captureReachabilitySnapshot } from "../util/reachability-snapshot.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { feedbackLinkStyles } from "./feedback-link.styles.js";
 
@@ -285,7 +287,15 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     this._capturing = device.configuration;
     const abandoned = () =>
       session !== this._session || !this.isConnected || !this.active;
-    const masked = await captureMaskedConfig(this._api, device.configuration, abandoned);
+    // The status form also wants the drawer's mDNS-row answer; fetch the
+    // reachability snapshot alongside the config so neither serializes
+    // the other, and let it degrade to null on a hiccup.
+    const [masked, reachability] = await Promise.all([
+      captureMaskedConfig(this._api, device.configuration, abandoned),
+      this.target === "status"
+        ? captureReachabilitySnapshot(this._api, device.name)
+        : Promise.resolve(null),
+    ]);
     if (abandoned()) return;
     this._capturing = "";
     if (masked === null) return;
@@ -297,7 +307,16 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
       this.target,
       device,
       masked,
-      this._prefillContext()
+      this._prefillContext(),
+      this.target === "status"
+        ? {
+            "mdns-expiry": mdnsExpirySummary(
+              reachability?.mdns_last_seen_seconds_ago ?? null,
+              reachability?.mdns_ptr_ttl_seconds ?? null,
+              device.runtime_state.state === DeviceState.OFFLINE
+            ),
+          }
+        : undefined
     );
     const url = built.toString();
     // The capture can outlive the click's transient activation, so the

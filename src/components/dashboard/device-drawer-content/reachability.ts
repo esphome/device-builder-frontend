@@ -6,6 +6,7 @@ import type {
   ReachabilityStateEvent,
 } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
+import { mdnsExpiryRemaining } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -28,12 +29,6 @@ interface ReachabilityRowSpec {
   ttlLifetime?: number | null;
   txtRecords?: Record<string, string> | null;
 }
-
-// Only surface the "Expires in" hint once the device has been quiet for
-// longer than this, so a freshly-heard healthy device shows no shrinking
-// timer (which would read as a false alarm). A UI threshold, not tied to
-// any record's TTL.
-const SHOW_EXPIRES_HINT_AFTER_SECONDS = 120;
 
 export function renderReachabilitySection(
   host: ESPHomeDeviceDrawerContent
@@ -63,13 +58,7 @@ export function renderReachabilitySection(
       icon: "access-point-network",
       labelKey: "dashboard.drawer_source_mdns",
       age: mdnsAge,
-      ttlRemaining:
-        deviceOffline ||
-        r.mdns_ptr_ttl_seconds === null ||
-        mdnsAge === null ||
-        mdnsAge <= SHOW_EXPIRES_HINT_AFTER_SECONDS
-          ? null
-          : Math.max(0, r.mdns_ptr_ttl_seconds - mdnsAge),
+      ttlRemaining: mdnsExpiryRemaining(mdnsAge, r.mdns_ptr_ttl_seconds, deviceOffline),
       ttlLifetime: r.mdns_ptr_ttl_seconds,
       txtRecords: r.mdns_txt_records ?? null,
     },
