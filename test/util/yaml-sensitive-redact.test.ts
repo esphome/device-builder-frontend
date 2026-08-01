@@ -78,6 +78,23 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: | # •");
   });
 
+  it("masks commented-out block-scalar credential bodies", () => {
+    const yaml = [
+      "wifi:",
+      "  # password: |",
+      "  #   hunter2",
+      "  #   second-line",
+      "  # note: keep",
+      "sensor:",
+    ].join("\n");
+    const masked = maskSensitiveYaml(yaml);
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("second-line");
+    expect(masked).toContain("  # password: |");
+    expect(masked).toContain("  # note: keep");
+    expect(masked).toContain("sensor:");
+  });
+
   it("masks a comment-only value on a credential key", () => {
     const masked = maskSensitiveYaml("wifi:\n  password: # hunter2");
     expect(masked).not.toContain("hunter2");

@@ -25,6 +25,15 @@ const COMPACT_MASK_PLACEHOLDER = "•";
 // ``KEY_LINE`` (hyphens and dots allowed) so ``wifi-password:`` is seen.
 const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:\s*(.+)$/;
 
+// A comment line, split into marker and content.
+const COMMENT_LINE = /^(\s*#+)\s*(.*)$/;
+
+// User-defined credential keys: any separator before the suffix.
+const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
+
+// Where an inline comment starts within a value.
+const TRAILING_COMMENT = /\s#/;
+
 /**
  * True when *key* names a credential whose value must not leave
  * the app in clear text. Combines two sources:
@@ -42,7 +51,7 @@ const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:\s*(.
  */
 function isSensitiveKey(key: string): boolean {
   if (ALWAYS_SENSITIVE_KEYS.has(key)) return true;
-  return /[_.-](password|psk)$/i.test(key);
+  return SENSITIVE_KEY_SUFFIX.test(key);
 }
 
 /**
@@ -90,7 +99,7 @@ function maskTrailingComment(
   value: string,
   placeholder: string
 ): string | null {
-  const hash = value.search(/\s#/);
+  const hash = value.search(TRAILING_COMMENT);
   if (hash === -1) return null;
   return `${prefix}${key}: ${value.slice(0, hash).trimEnd()} # ${placeholder}`;
 }
@@ -141,9 +150,29 @@ export function maskSensitiveLines(
   }
   for (let i = 0; i < out.length; i++) {
     if (scannerMaskedLines.has(i)) continue;
-    out[i] = maskSensitiveLine(out[i], placeholder);
+    const line = out[i];
+    out[i] = maskSensitiveLine(line, placeholder);
+    // A commented-out block scalar hides the credential on the following
+    // comment lines, which carry no key for the per-line fallback; mask
+    // their bodies until the comment run ends or a commented key starts.
+    if (!isCommentedSensitiveBlockHeader(line)) continue;
+    for (let j = i + 1; j < out.length; j++) {
+      const m = out[j].match(COMMENT_LINE);
+      if (!m || KEY_VALUE_LINE.test(out[j])) break;
+      if (m[2]) out[j] = `${m[1]} ${placeholder}`;
+    }
   }
   return out;
+}
+
+function isCommentedSensitiveBlockHeader(line: string): boolean {
+  const m = line.match(KEY_VALUE_LINE);
+  return (
+    m !== null &&
+    m[1].includes("#") &&
+    isSensitiveKey(m[2]) &&
+    BLOCK_SCALAR_HEADER.test(m[3].trim())
+  );
 }
 
 /** Whole-document masking for YAML leaving the app. */
