@@ -65,7 +65,7 @@ import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
-import { notifyError, notifyInfo, notifySuccess } from "../util/notify.js";
+import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "../util/notify.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
@@ -1036,11 +1036,18 @@ export class ESPHomePageDevice extends LitElement {
     return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
   }
 
-  /** Whether the buffer pins a different chip than the selected board. */
+  /** Whether the buffer pins a different chip than the selected board; fails open. */
   private async _installChipDisagreement(): Promise<boolean> {
     if (!this._board) return false;
     const parsed = readPlatformBoard(this._yaml);
-    return parsed !== null && (await chipDisagrees(this._api, parsed, this._board));
+    if (parsed === null) return false;
+    try {
+      return await chipDisagrees(this._api, parsed, this._board);
+    } catch (err) {
+      console.warn("Board disagreement check failed:", err);
+      notifyWarning(this._localize("device.board_check_failed"));
+      return false;
+    }
   }
 
   private _openBoardReselect(opts: { onApplied?: () => void } = {}): Promise<boolean> {

@@ -147,6 +147,17 @@ describe("install hard block on chip disagreement", () => {
     await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
   });
 
+  it("fails open to the install when the chip check rejects", async () => {
+    const { page, openReselect, run } = makeInstallPage({
+      _api: {
+        getBoards: vi.fn().mockRejectedValue(new Error("boom")),
+      } as unknown as ESPHomeAPI,
+    });
+    await page._installAfterSave(run);
+    expect(openReselect).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it("does not block a same-chip board-string mismatch", async () => {
     // An uncatalogued string on the right chip has no better pick to offer.
     const { page, openReselect, run } = makeInstallPage({

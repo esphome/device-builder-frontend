@@ -32,8 +32,8 @@ export function openBoardReselect(
 }
 
 // The catalog is immutable per session, so misses memoise too. Keyed
-// on the api instance so a reconnect (or a test's fresh mock) starts
-// with an empty cache.
+// on the api instance (one per app-shell lifetime) so a test's fresh
+// mock starts with an empty cache.
 const _matchCaches = new WeakMap<ESPHomeAPI, KeyedPromiseCache<SlimBoard | undefined>>();
 
 /** The catalog board whose PlatformIO string and platform match, memoised per session. */
