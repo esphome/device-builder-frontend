@@ -59,6 +59,13 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  # password: •");
   });
 
+  it("masks a trailing comment beside a masked value", () => {
+    const masked = maskSensitiveYaml("wifi:\n  password: hunter2  # old pass swordfish");
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("swordfish");
+    expect(masked).toContain("  password: •  # •");
+  });
+
   it("masks a trailing comment beside a preserved value", () => {
     const yaml = [
       "wifi:",

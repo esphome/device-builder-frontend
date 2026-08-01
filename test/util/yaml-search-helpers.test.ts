@@ -473,13 +473,10 @@ describe("buildYamlSnippetBlocks", () => {
     ]);
   });
 
-  it("preserves trailing comments when the scanner masks a value", () => {
-    // ``findSensitiveValueRanges`` returns a precise
-    // ``[valueFrom, valueTo)`` range so the slice replacement
-    // keeps any trailing ``# comment`` untouched. The single-line
-    // ``maskSensitiveLine`` would clobber it via the wholesale
-    // ``${prefix}${key}: ••••••••`` rewrite — pin that the
-    // scanner-driven path is preferred.
+  it("masks the trailing comment body beside a scanner-masked value", () => {
+    // A comment beside a credential can carry the credential itself
+    // ("# same as router password"), so its body is masked with the
+    // marker and spacing kept.
     const m = mkMatch({
       line_number: 2,
       line_text: "wifi:",
@@ -489,7 +486,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual(["wifi:", "  password: ••••••••  # admin pwd"]);
+    expect(block.lines).toEqual(["wifi:", "  password: ••••••••  # ••••••••"]);
   });
 
   it("falls back to the single-line heuristic for commented credentials", () => {

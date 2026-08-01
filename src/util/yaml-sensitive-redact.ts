@@ -149,7 +149,10 @@ export function maskSensitiveLines(
     // path agrees on what stays visible.
     const value = line.slice(range.valueFrom, range.valueTo).trim();
     if (value.startsWith("${")) continue;
-    out[idx] = line.slice(0, range.valueFrom) + placeholder + line.slice(range.valueTo);
+    out[idx] =
+      line.slice(0, range.valueFrom) +
+      placeholder +
+      maskCommentTail(line.slice(range.valueTo), placeholder);
     scannerMaskedLines.add(idx);
   }
   for (let i = 0; i < out.length; i++) {
@@ -167,6 +170,15 @@ export function maskSensitiveLines(
     }
   }
   return out;
+}
+
+// A trailing comment beside a masked value can carry the credential
+// itself; mask its body, keeping the marker and spacing.
+function maskCommentTail(tail: string, placeholder: string): string {
+  const boundary = tail.search(RE_INLINE_COMMENT_BOUNDARY);
+  if (boundary === -1) return tail;
+  const hash = tail.indexOf("#", boundary);
+  return `${tail.slice(0, hash)}# ${placeholder}`;
 }
 
 function isCommentedSensitiveBlockHeader(line: string): boolean {
