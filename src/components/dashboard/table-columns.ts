@@ -6,6 +6,7 @@ import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
+import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
@@ -127,6 +128,14 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           }
         }
         const state = info.getValue() as DeviceState;
+        if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
+          return html`<span class="cell-status"
+            ><span
+              class="status-dot untracked"
+              title=${localize("dashboard.status_untracked_tooltip")}
+            ></span
+          ></span>`;
+        }
         const dotClass =
           state === DeviceState.ONLINE
             ? "online"

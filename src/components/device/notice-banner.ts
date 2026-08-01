@@ -28,21 +28,28 @@ export function dispatchApplySectionValues(
   );
 }
 
-/** Shared notice-banner template: icon, body text, CTA, optional dismiss. */
-export function renderNoticeBanner(opts: {
-  icon: string;
-  text: unknown;
-  ctaLabel: unknown;
-  onCta: () => void;
-  dismissLabel?: string;
-  onDismiss?: () => void;
-}): TemplateResult {
+/** Shared notice-banner template: icon, body text, optional CTA
+ *  (label and handler travel together), optional dismiss. */
+export function renderNoticeBanner(
+  opts: {
+    icon: string;
+    text: unknown;
+    dismissLabel?: string;
+    onDismiss?: () => void;
+  } & ({ ctaLabel: unknown; onCta: () => void } | { ctaLabel?: never; onCta?: never })
+): TemplateResult {
   return html`
     <div class="notice" role="note">
       <wa-icon library="mdi" name=${opts.icon}></wa-icon>
       <div class="body">
         <p>${opts.text}</p>
-        <button type="button" class="cta" @click=${opts.onCta}>${opts.ctaLabel}</button>
+        ${
+          opts.onCta
+            ? html`<button type="button" class="cta" @click=${opts.onCta}>
+                ${opts.ctaLabel}
+              </button>`
+            : nothing
+        }
       </div>
       ${
         opts.onDismiss

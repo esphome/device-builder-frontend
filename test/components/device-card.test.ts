@@ -13,6 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { makeFirmwareJob } from "../_make-firmware-job.js";
+import { DeviceState } from "../../src/api/types/devices.js";
 import { JobType } from "../../src/api/types/firmware-jobs.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
 
@@ -27,6 +28,34 @@ describe("device-card encryption indicator uses the raw pending flag", () => {
     });
     expect(el.shadowRoot!.querySelector(".encryption-icon.pending")).not.toBeNull();
     expect(el.shadowRoot!.querySelector(".indicator-dot--modified")).toBeNull();
+  });
+});
+
+describe("device-card status badge with name_add_mac_suffix", () => {
+  it("replaces OFFLINE and UNKNOWN with the untracked badge + tooltip", async () => {
+    for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {
+      const el = await mount({ state, nameAddMacSuffix: true });
+      const badge = el.shadowRoot!.querySelector("#status-untracked")!;
+      expect(badge.textContent).toContain("dashboard.status_untracked");
+      expect(
+        el.shadowRoot!.querySelector("wa-tooltip[for='status-untracked']")?.textContent
+      ).toContain("dashboard.status_untracked_tooltip");
+      el.remove();
+    }
+  });
+
+  it("keeps a real ONLINE verdict and the plain badges without the flag", async () => {
+    const online = await mount({ state: DeviceState.ONLINE, nameAddMacSuffix: true });
+    expect(online.shadowRoot!.querySelector("#status-untracked")).toBeNull();
+    expect(online.shadowRoot!.querySelector(".device-status")!.textContent).toContain(
+      "dashboard.online"
+    );
+    online.remove();
+    const plain = await mount({ state: DeviceState.OFFLINE });
+    expect(plain.shadowRoot!.querySelector("#status-untracked")).toBeNull();
+    expect(plain.shadowRoot!.querySelector(".device-status")!.textContent).toContain(
+      "dashboard.offline"
+    );
   });
 });
 

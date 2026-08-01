@@ -49,6 +49,14 @@ export const tableCellStyles = css`
     background: var(--wa-color-text-quiet);
     opacity: 0.5;
   }
+  /* Hollow ring: "no verdict possible", distinct from unknown's
+     filled "no verdict yet". */
+  .status-dot.untracked {
+    background: transparent;
+    border: 2px solid var(--wa-color-text-quiet);
+    box-sizing: border-box;
+    opacity: 0.5;
+  }
 
   /* Encryption indicator — small lock / lock-open-variant icon next
      to the device name. The 'secure' variant keys off --esphome-success

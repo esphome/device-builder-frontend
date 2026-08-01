@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
+import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
@@ -113,6 +114,21 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
         ${card._localize(RECENT_JOB_LABEL[status])}
       </div>`;
     }
+  }
+  if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
+    const label = card._localize("dashboard.status_untracked");
+    const tooltip = card._localize("dashboard.status_untracked_tooltip");
+    return html`<div
+        id="status-untracked"
+        class="device-status ${DeviceState.UNKNOWN}"
+        role="img"
+        tabindex="0"
+        aria-label="${label}. ${tooltip}"
+      >
+        <wa-icon library="mdi" name="help-network-outline"></wa-icon>
+        ${label}
+      </div>
+      <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
   }
   // Transport-agnostic icons — wifi/wifi-off implied wireless; plenty of
   // devices on the network are on ethernet. check/off/help-network reads

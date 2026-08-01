@@ -30,9 +30,7 @@ import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
-import { indentOf } from "../../util/yaml-line-walker.js";
-import { TOP_LEVEL_KEY_START_RE } from "../../util/yaml-section-lexer.js";
-import { findSectionStart } from "../../util/yaml-section-reader.js";
+import { findDirectChildLine } from "../../util/yaml-section-reader.js";
 import { dispatchApplySectionValues } from "./notice-banner.js";
 import { noticeBannerStyles } from "./notice-banner.styles.js";
 
@@ -182,29 +180,16 @@ export class ESPHomeSecurityNotice extends LitElement {
   /** Whether the section body has the setting's marker as a *direct child*. A
    *  line scan (not the parsed values) because the parser drops a keyless block
    *  (e.g. a keyless `encryption:` that HA auto-provisions) which must NOT
-   *  suppress the nudge. The dedent stop keeps a list section (`ota.esphome`)
-   *  scoped to its own item, and the indent check ignores deeper-nested keys. */
+   *  suppress the nudge. */
   private _markerPresent(): boolean {
     const setting = this._setting;
     if (!setting) return false;
-    const lines = this.yaml.split("\n");
     // `ota.esphome` → scan from the esphome list-item dash (its fromLine).
     const baseKey = this.sectionKey.split(".")[0];
-    const start = findSectionStart(lines, baseKey, this.fromLine);
-    if (start < 0) return false;
     const marker = new RegExp(`^${setting.marker}\\s*:`);
-    let childIndent: number | null = null;
-    for (let i = start + 1; i < lines.length; i++) {
-      const l = lines[i];
-      if (l.trim() === "" || l.trimStart().startsWith("#")) continue;
-      if (TOP_LEVEL_KEY_START_RE.test(l)) break; // next top-level section
-      const indent = indentOf(l);
-      if (childIndent === null) childIndent = indent;
-      if (indent < childIndent) break; // dedent — left this block (e.g. next list item)
-      if (indent !== childIndent) continue; // deeper-nested key, not a direct child
-      if (marker.test(l.trimStart())) return true;
-    }
-    return false;
+    return (
+      findDirectChildLine(this.yaml.split("\n"), baseKey, marker, this.fromLine) >= 0
+    );
   }
 
   private _onCta = (): void => {

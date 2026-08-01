@@ -19,6 +19,7 @@
  */
 import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { effectiveDeviceState, UNTRACKED_STATE } from "./device-status.js";
 import { showPendingChanges, showUpdateAvailable } from "./device-sync.js";
 
 /** One selectable value inside a facet. */
@@ -91,34 +92,35 @@ export function computePlatformFacet(devices: ConfiguredDevice[]): FacetOption[]
 }
 
 /** State facet — one bucket per ``DeviceState`` enum value
- *  (online / offline / unknown). Always returns three options so
- *  the popover reads consistently across reloads (a freshly-
- *  loaded dashboard with no online devices still surfaces the
- *  "Online" bucket at count 0 so the user can click it as the
- *  fleet wakes up). */
+ *  (online / offline / unknown) plus ``untracked``. Buckets are
+ *  seeded at zero so the popover reads consistently across reloads
+ *  (a freshly-loaded dashboard with no online devices still surfaces
+ *  the "Online" bucket at count 0 so the user can click it as the
+ *  fleet wakes up); the untracked bucket appears when a device
+ *  occupies it *or* it's currently selected, so a URL-hydrated
+ *  filter stays clearable. */
 export function computeStateFacet(
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  selected: readonly string[] = []
 ): FacetOption[] {
   const counts = new Map<string, number>();
-  // Seed every enum value at zero so a missing bucket still
-  // shows in the popover. Without this, devices=[] would render
-  // an empty list and the facet would be unusable on a cold
-  // boot.
   counts.set(DeviceState.ONLINE, 0);
   counts.set(DeviceState.OFFLINE, 0);
   counts.set(DeviceState.UNKNOWN, 0);
+  if (selected.includes(UNTRACKED_STATE)) counts.set(UNTRACKED_STATE, 0);
   for (const d of devices) {
-    const state = d.runtime_state.state;
+    const state = effectiveDeviceState(d);
     counts.set(state, (counts.get(state) ?? 0) + 1);
   }
-  const labelKeyByState: Record<DeviceState, string> = {
+  const labelKeyByState: Record<string, string> = {
     [DeviceState.ONLINE]: "dashboard.online",
     [DeviceState.OFFLINE]: "dashboard.offline",
     [DeviceState.UNKNOWN]: "dashboard.unknown",
+    [UNTRACKED_STATE]: "dashboard.status_untracked",
   };
   return tallyToFacet(counts, (raw) =>
-    localize(labelKeyByState[raw as DeviceState] ?? "dashboard.unknown")
+    localize(labelKeyByState[raw] ?? "dashboard.unknown")
   );
 }
 

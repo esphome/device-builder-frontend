@@ -110,24 +110,65 @@ describe("post-save board reselect prompt", () => {
   });
 });
 
-describe("install hard block on board disagreement", () => {
+describe("install hard block on chip disagreement", () => {
+  const C3_CATALOG = {
+    esphome: { platform: "esp32", board: "esp32-c3-devkitm-1", variant: "esp32c3" },
+  };
+
   function makeInstallPage(overrides: Partial<PageView> = {}) {
     const made = makePage({
       _showActiveJobProgress: () => false,
       _saveYaml: async () => true,
+      _api: {
+        getBoards: vi.fn().mockResolvedValue({ boards: [C3_CATALOG] }),
+      } as unknown as ESPHomeAPI,
       ...overrides,
     });
     return { ...made, run: vi.fn() };
   }
 
-  it("blocks install and opens the picker while the YAML disagrees", async () => {
+  it("blocks install and opens the picker while the chips disagree", async () => {
     const { page, openReselect, run } = makeInstallPage();
     await page._installAfterSave(run);
     expect(run).not.toHaveBeenCalled();
     expect(openReselect).toHaveBeenCalledWith({
       configuration: "dev.yaml",
       yaml: C3_YAML,
+      onApplied: expect.any(Function),
     });
+  });
+
+  it("resumes the blocked install once a pick is applied", async () => {
+    const { page, openReselect, run } = makeInstallPage();
+    await page._installAfterSave(run);
+    expect(run).not.toHaveBeenCalled();
+    const { onApplied } = openReselect.mock.calls[0][0] as { onApplied: () => void };
+    onApplied();
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+  });
+
+  it("fails open to the install when the chip check rejects", async () => {
+    const { page, openReselect, run } = makeInstallPage({
+      _api: {
+        getBoards: vi.fn().mockRejectedValue(new Error("boom")),
+      } as unknown as ESPHomeAPI,
+    });
+    await page._installAfterSave(run);
+    expect(openReselect).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block a same-chip board-string mismatch", async () => {
+    // An uncatalogued string on the right chip has no better pick to offer.
+    const { page, openReselect, run } = makeInstallPage({
+      _yaml: "esp32:\n  board: vendor-s3\n  variant: esp32s3\n",
+      _api: {
+        getBoards: vi.fn().mockResolvedValue({ boards: [] }),
+      } as unknown as ESPHomeAPI,
+    });
+    await page._installAfterSave(run);
+    expect(openReselect).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
   });
 
   it("re-prompts on every blocked install click", async () => {
