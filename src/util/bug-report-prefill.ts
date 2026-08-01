@@ -114,10 +114,21 @@ export function deviceFacts(
     .join("\n");
 }
 
+const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+// Blunt each address for the public issue: enough prefix to tell LAN
+// from Docker-bridge from link-local, never the full host address.
+const maskIp = (address: string): string => {
+  if (address.includes(":")) return `${address.split(":")[0]}::x`;
+  if (!IPV4_LITERAL.test(address)) return address;
+  const [a, b] = address.split(".");
+  return `${a}.${b}.x.x`;
+};
+
 const ipLine = (device: ConfiguredDevice): string => {
   const addresses = device.runtime_state.ip_addresses;
-  const ips = addresses.length ? addresses.join(", ") : device.ip;
-  return ips ? `IP: ${ips}` : "";
+  const ips = (addresses.length ? addresses : device.ip ? [device.ip] : []).map(maskIp);
+  return ips.length ? `IP: ${ips.join(", ")}` : "";
 };
 
 /**

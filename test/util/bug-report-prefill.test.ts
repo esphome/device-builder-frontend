@@ -99,7 +99,8 @@ describe("buildDeviceIssueUrl", () => {
     const observed = built.url.searchParams.get("observed")!;
     expect(observed).toContain("State: online");
     expect(observed).toContain("Reachability source: mdns");
-    expect(observed).toContain("IP: 192.168.1.5");
+    expect(observed).toContain("IP: 192.168.x.x");
+    expect(observed).not.toContain("192.168.1.5");
     expect(observed).toContain("ESPHome: 2026.7.2");
   });
 
@@ -132,6 +133,27 @@ describe("buildDeviceIssueUrl", () => {
     expect(expiry({ mdns_last_seen_seconds_ago: 4500, mdns_ptr_ttl_seconds: 4500 })).toBe(
       "Expires soon"
     );
+  });
+
+  it("blunts every address family in the observed IP line", () => {
+    const facts = (runtime: object) =>
+      deviceFacts(
+        {
+          ...DEVICE,
+          runtime_state: { ...DEVICE.runtime_state, ...runtime },
+        } as unknown as ConfiguredDevice,
+        "status",
+        CTX
+      );
+    expect(facts({ ip_addresses: ["10.0.42.7", "fe80::abcd:12ff:fe34:5678"] })).toContain(
+      "IP: 10.0.x.x, fe80::x"
+    );
+    const hostnameFallback = {
+      ...DEVICE,
+      ip: "garage.local",
+      runtime_state: { ...DEVICE.runtime_state, ip_addresses: [] },
+    } as unknown as ConfiguredDevice;
+    expect(deviceFacts(hostnameFallback, "status", CTX)).toContain("IP: garage.local");
   });
 
   it("status skip satisfies the required config field", () => {
