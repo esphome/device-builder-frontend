@@ -724,7 +724,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
         resolveFeaturedComponentId(added.componentId, board),
         added.instanceId
       );
-      if (target) fireEvent(this, "section-select", target);
+      if (target) {
+        const { sectionKey, fromLine, toLine } = target;
+        fireEvent(this, "section-select", { sectionKey, fromLine });
+        // Both events, as a navigator click sends: `section-select` moves
+        // the navigator and the form, and only `yaml-highlight` scrolls the
+        // YAML pane to the block.
+        fireEvent(this, "yaml-highlight", {
+          range: { fromLine, toLine },
+          scroll: true,
+        });
+      }
     }
     this._dialog.open = false;
     this._selected = null;

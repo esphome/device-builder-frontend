@@ -64,6 +64,23 @@ const capture = (el: EventTarget) => {
   return seen;
 };
 
+/** Every `yaml-highlight` the dialog dispatches. */
+const captureHighlight = (el: EventTarget) => {
+  const seen: { range: { fromLine: number; toLine: number } | null; scroll: boolean }[] =
+    [];
+  el.addEventListener("yaml-highlight", (e) =>
+    seen.push(
+      (
+        e as CustomEvent<{
+          range: { fromLine: number; toLine: number } | null;
+          scroll: boolean;
+        }>
+      ).detail
+    )
+  );
+  return seen;
+};
+
 afterEach(() => {
   _clearComponentCache();
   vi.clearAllMocks();
@@ -84,6 +101,22 @@ describe("add-component-dialog selects what it added", () => {
     await d._submitComponent({ id: "boot_button" }, true);
 
     expect(seen).toEqual([{ sectionKey: "binary_sensor.gpio", fromLine: 8 }]);
+  });
+
+  it("scrolls the YAML pane to the block it added", async () => {
+    // `section-select` moves the navigator and the form only; the YAML pane
+    // is driven by `yaml-highlight`, so an add that fires just the first
+    // lands the editor on a block the user still has to scroll to.
+    const { dialog, d } = makeDialog();
+    d._selected = makeComponentEntry("featured.apollo-esk-1.boot_button", {
+      name: "Boot Button",
+      category: ComponentCategory.BINARY_SENSOR,
+    });
+    const highlights = captureHighlight(dialog);
+
+    await d._submitComponent({ id: "boot_button" }, true);
+
+    expect(highlights).toEqual([{ range: { fromLine: 8, toLine: 11 }, scroll: true }]);
   });
 
   it("still selects a plain catalog component", async () => {
@@ -148,6 +181,39 @@ describe("add-component-dialog selects what it added", () => {
     );
 
     // The headline member is the one added last, not the first.
+    expect(seen).toEqual([{ sectionKey: "binary_sensor.gpio", fromLine: 8 }]);
+  });
+
+  it("lands on the last member merged, not the last member listed", async () => {
+    // A member already present is skipped, so "last listed" and "last
+    // actually merged" diverge; the select must follow the merge.
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.apollo-esk-1.boot_button": makeComponentEntry(
+        "featured.apollo-esk-1.boot_button",
+        { category: ComponentCategory.BINARY_SENSOR }
+      ),
+      "featured.apollo-esk-1.led": makeComponentEntry("featured.apollo-esk-1.led", {
+        category: ComponentCategory.LIGHT,
+      }),
+    });
+    addComponent.mockResolvedValueOnce({ yaml: MERGED });
+    d._fastPathFields = vi.fn().mockImplementation((entry: { id: string }) => ({
+      // The second member is already in YAML, so it is skipped.
+      id: entry.id.endsWith("boot_button") ? "boot_button" : "motion_module",
+    }));
+    const seen = capture(dialog);
+
+    await d._onBundleSelected(
+      new CustomEvent("add-bundle", {
+        detail: {
+          bundle: { name: "Full setup", component_ids: ["boot_button", "led"] },
+          boardId: "apollo-esk-1",
+        },
+      })
+    );
+
+    expect(addComponent).toHaveBeenCalledTimes(1);
     expect(seen).toEqual([{ sectionKey: "binary_sensor.gpio", fromLine: 8 }]);
   });
 

@@ -125,14 +125,15 @@ export function findAddedSection(
   yaml: string,
   componentId: string,
   newId: string | undefined
-): { sectionKey: string; fromLine: number } | null {
+): { sectionKey: string; fromLine: number; toLine: number } | null {
   const sections = parseYamlTopLevelSections(yaml);
 
   // Top-level (non-platform) component — match the bare key, e.g.
   // adding "wifi" navigates to the `wifi:` block.
   if (!componentId.includes(".")) {
     const match = _topLevelBlockByKey(sections, componentId);
-    if (match) return { sectionKey: match.key, fromLine: match.fromLine };
+    if (match)
+      return { sectionKey: match.key, fromLine: match.fromLine, toLine: match.toLine };
   }
 
   // Platform-based component — find the list item(s) under the parent
@@ -143,6 +144,7 @@ export function findAddedSection(
     return {
       sectionKey: sectionKeyOf(candidates[0]),
       fromLine: candidates[0].fromLine,
+      toLine: candidates[0].toLine,
     };
   }
 
@@ -156,7 +158,7 @@ export function findAddedSection(
     for (const s of candidates) {
       for (let i = s.fromLine - 1; i < s.toLine && i < lines.length; i++) {
         if (idRe.test(lines[i])) {
-          return { sectionKey: sectionKeyOf(s), fromLine: s.fromLine };
+          return { sectionKey: sectionKeyOf(s), fromLine: s.fromLine, toLine: s.toLine };
         }
       }
     }
@@ -165,7 +167,7 @@ export function findAddedSection(
   // Last resort: pick the candidate that appears latest in the file.
   // The backend typically appends, so the new one is at the bottom.
   const last = candidates[candidates.length - 1];
-  return { sectionKey: sectionKeyOf(last), fromLine: last.fromLine };
+  return { sectionKey: sectionKeyOf(last), fromLine: last.fromLine, toLine: last.toLine };
 }
 
 /**

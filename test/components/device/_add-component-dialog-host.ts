@@ -17,7 +17,6 @@ export function makeAddComponentDialogHost<I>(
     /** What the stubbed `addComponent` resolves to. */
     mergedYaml?: string;
     board?: BoardCatalogEntry | null;
-    open?: boolean;
   } = {}
 ) {
   const addComponent = vi
@@ -31,9 +30,6 @@ export function makeAddComponentDialogHost<I>(
   dialog.configuration = "foo.yaml";
   dialog.yaml = options.yaml ?? "esphome:\n  name: foo\n";
   if (options.board !== undefined) dialog.board = options.board;
-  if (options.open) {
-    (dialog as unknown as { _dialog: { open: boolean } })._dialog.open = true;
-  }
   return {
     dialog,
     d: dialog as unknown as I,
