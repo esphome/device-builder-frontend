@@ -179,6 +179,14 @@ describe("maskSensitiveYaml", () => {
     expect(masked).toContain("  password: # •");
   });
 
+  it("masks a value behind a space-before-colon key", () => {
+    const masked = maskSensitiveYaml(
+      "wifi:\n  password : hunter2\n  # ap_password : abcdef"
+    );
+    expect(masked).not.toContain("hunter2");
+    expect(masked).not.toContain("abcdef");
+  });
+
   it("masks a marker-adjacent comment-only value", () => {
     const masked = maskSensitiveYaml("wifi:\n  password:#hunter2");
     expect(masked).not.toContain("hunter2");

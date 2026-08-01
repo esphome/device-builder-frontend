@@ -89,7 +89,7 @@ const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
 // dashes as keys. Quoted keys (`"my key": …`) are still not
 // matched; they're rare enough in ESPHome configs and
 // `secrets.yaml` that we accept the limitation.
-const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
+const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*)(\s*):(\s*)(.*)$/;
 // Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
 // optional explicit indentation digit, optional trailing comment.
 const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
@@ -291,7 +291,7 @@ export function findSensitiveValueRanges(
     const shadow = line.slice(markerLen);
     const sm = shadow.match(KEY_LINE);
     if (!sm) return lineIdx + 1;
-    const [, sLeading, sDash = "", sKey, sSep, sRest] = sm;
+    const [, sLeading, sDash = "", sKey, sPreColon, sSep, sRest] = sm;
     // No live parent scope inside a comment — allowlist and predicate only.
     const sensitive =
       maskAllValues ||
@@ -300,7 +300,13 @@ export function findSensitiveValueRanges(
     if (!sensitive) return lineIdx + 1;
 
     const valueStart =
-      markerLen + sLeading.length + sDash.length + sKey.length + 1 + sSep.length;
+      markerLen +
+      sLeading.length +
+      sDash.length +
+      sKey.length +
+      sPreColon.length +
+      1 +
+      sSep.length;
     if (emitInlineRanges(lineIdx, valueStart, sRest.trimStart()) !== "block") {
       return lineIdx + 1;
     }
@@ -350,8 +356,9 @@ export function findSensitiveValueRanges(
     const leading = m[1];
     const dash = m[2] ?? "";
     const key = m[3];
-    const sep = m[4];
-    const rest = m[5];
+    const preColon = m[4];
+    const sep = m[5];
+    const rest = m[6];
     // Sensitivity checks and ancestor tracking case-fold the key: the
     // input may be YAML esphome would reject, and a mis-capitalized
     // `Encryption:` must still scope the `key:` under it.
@@ -387,7 +394,8 @@ export function findSensitiveValueRanges(
       continue;
     }
 
-    const valueStart = leading.length + dash.length + key.length + 1 + sep.length;
+    const valueStart =
+      leading.length + dash.length + key.length + preColon.length + 1 + sep.length;
     if (emitInlineRanges(i, valueStart, rest.trimStart()) !== "block") {
       i++;
       continue;
