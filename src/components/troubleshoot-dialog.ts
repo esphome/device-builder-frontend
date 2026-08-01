@@ -30,7 +30,10 @@ import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { buildTroubleshootSections } from "../util/troubleshoot-tree.js";
+import {
+  buildTroubleshootSections,
+  pingReplyUnverified,
+} from "../util/troubleshoot-tree.js";
 import { isIpLiteral, type NetworkSection } from "../util/use-address-yaml.js";
 import { troubleshootDialogStyles } from "./troubleshoot-dialog.styles.js";
 import {
@@ -298,7 +301,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     if (r.ping_rtt_ms !== null) {
       // A reply at the last-known address proves something answers
       // there, not that it is this device; don't paint it green.
-      if (r.ping_target_source === "persisted") {
+      if (pingReplyUnverified(r)) {
         return this._probeRow(
           "neutral",
           this._localize("troubleshoot.result_ping_ok_last_known", {

@@ -36,6 +36,30 @@ export interface TroubleshootInput {
   existingAddress: string;
 }
 
+/** The DNS verdict carries evidence: the leg completed and the address
+ *  is a name that can fail to resolve, not an IP literal. */
+export function dnsVerdictMeaningful(result: DeviceTroubleshootResult): boolean {
+  return (
+    !result.dns_inconclusive && Boolean(result.address) && !isIpLiteral(result.address)
+  );
+}
+
+/** A reply at the sidecar-persisted IP proves reachability of the
+ *  address, not identity. */
+export function pingReplyUnverified(result: DeviceTroubleshootResult): boolean {
+  return result.ping_rtt_ms !== null && result.ping_target_source === "persisted";
+}
+
+/** A miss at a last-known address (RAM or sidecar) is evidence about
+ *  that address; a miss at a live resolve says nothing about leases. */
+export function pingMissAtKnownAddress(result: DeviceTroubleshootResult): boolean {
+  return (
+    result.ping_attempted &&
+    result.ping_rtt_ms === null &&
+    (result.ping_target_source === "runtime" || result.ping_target_source === "persisted")
+  );
+}
+
 export function buildTroubleshootSections(
   input: TroubleshootInput
 ): TroubleshootSection[] {
@@ -108,13 +132,7 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.mqtt_body"],
     });
   }
-  if (
-    result &&
-    !result.dns_resolved &&
-    !result.dns_inconclusive &&
-    result.address &&
-    !isIpLiteral(result.address)
-  ) {
+  if (result && !result.dns_resolved && dnsVerdictMeaningful(result)) {
     sections.push({
       id: "dns_fail",
       titleKey: "troubleshoot.dns_fail_title",
@@ -122,9 +140,8 @@ export function buildTroubleshootSections(
     });
   }
   if (
-    result?.ping_attempted &&
-    result.ping_rtt_ms !== null &&
-    result.ping_target_source === "persisted" &&
+    result &&
+    pingReplyUnverified(result) &&
     !result.dns_resolved &&
     result.mdns_addresses.length === 0
   ) {
@@ -134,14 +151,7 @@ export function buildTroubleshootSections(
       bodyKeys: ["troubleshoot.unverified_ping_body"],
     });
   }
-  if (
-    !existingAddress &&
-    result?.ping_attempted &&
-    result.ping_rtt_ms === null &&
-    (result.ping_target_source === "runtime" ||
-      result.ping_target_source === "persisted") &&
-    device.ip
-  ) {
+  if (!existingAddress && result && pingMissAtKnownAddress(result) && device.ip) {
     sections.push({
       id: "dynamic_ip",
       titleKey: "troubleshoot.dynamic_ip_title",
