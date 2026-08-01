@@ -72,9 +72,16 @@ export function isIpLiteral(value: string): boolean {
   return value.includes(":") && IPV6_RE.test(value);
 }
 
-/** Accept an IPv4/IPv6 literal or an RFC-1123 hostname. */
+/** Accept an IPv4/IPv6 literal or an RFC-1123 hostname.
+
+ *  Loopback and unspecified addresses are rejected: they point at the
+ *  dashboard host itself, and the always-answering ping would latch
+ *  the device Online forever. */
 export function isValidUseAddress(value: string): boolean {
   if (value.length === 0 || value.length > 253) return false;
+  const lower = value.toLowerCase();
+  if (lower === "localhost" || lower === "::1" || lower === "::") return false;
+  if (/^127\./.test(value) || /^0\.0\.0\.0$/.test(value)) return false;
   if (/^[\d.]+$/.test(value)) {
     // All digits and dots is an IPv4 attempt, not a hostname; a typo
     // like 255.42.2.1.3 must not slip through the hostname rule.
