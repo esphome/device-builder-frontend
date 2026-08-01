@@ -47,7 +47,7 @@ export function platformDisagrees(platform: string, board: SlimBoard): boolean {
 
 /** The board's chip identity: esp32-family variant, else the mcu series. */
 export function boardChipToken(board: SlimBoard): string | null {
-  return board.esphome.variant ?? board.esphome.mcu ?? null;
+  return board.esphome.variant || board.esphome.mcu || null;
 }
 
 /** Whether the YAML-side chip token pins a different chip than *board*; unknown sides agree. */
