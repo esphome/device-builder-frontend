@@ -29,7 +29,7 @@ export const constraintClusterStyles = css`
     color: var(--wa-color-text-quiet);
   }
   .constraint-cluster-header.unsatisfied {
-    color: var(--wa-color-warning-text-quiet, currentColor);
+    color: var(--wa-color-warning-on-quiet, currentColor);
   }
   .constraint-cluster-header wa-icon {
     flex-shrink: 0;
