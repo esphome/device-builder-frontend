@@ -8,10 +8,10 @@ import {
   MAX_LINES_AFTER_MARKER,
 } from "./crash-detector.js";
 import {
-  encodedCost,
+  fitConfig,
   fitLines,
   formEncodedLength,
-  takeLinesUnderBudget,
+  MAX_ISSUE_URL_LENGTH,
   TRIM_MARKER,
 } from "./crash-report-budget.js";
 import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
@@ -27,11 +27,6 @@ import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 // Context kept ahead of the first crash marker. How far past it the window
 // runs, and where it closes, are the shared crash grammar.
 const CONTEXT_LINES_BEFORE = 25;
-
-// Total pre-filled URL budget. GitHub's server returns 414 past roughly
-// 8 KB of URL; 8000 keeps a small margin for their redirect/query
-// additions while fitting as much of the report as possible.
-const MAX_ISSUE_URL_LENGTH = 8000;
 
 // Cap on decoded frames placed in the issue's `problem` field; the full
 // list always rides in the downloadable report.
@@ -529,21 +524,6 @@ function fitProblem(
   }
   params.set("problem", `${text.slice(0, Math.max(0, end))}\n…[truncated]`);
   return true;
-}
-
-const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
-
-function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
-  if (budget <= 0) return { text: "", truncated: true };
-  if (formEncodedLength(yaml) <= budget) return { text: yaml, truncated: false };
-  const { kept } = takeLinesUnderBudget(
-    yaml.split("\n"),
-    budget,
-    encodedCost(CONFIG_TRUNCATED_NOTE)
-  );
-  if (kept.length === 0) return { text: "", truncated: true };
-  kept.push(CONFIG_TRUNCATED_NOTE);
-  return { text: kept.join("\n"), truncated: true };
 }
 
 function excerptWithoutDecodeEchoes(
