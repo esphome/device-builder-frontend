@@ -5,6 +5,7 @@ import {
   applyUseAddress,
   findNetworkSection,
   isValidUseAddress,
+  readStaticIp,
   readUseAddress,
   removeUseAddress,
   snippetNetworkSection,
@@ -73,6 +74,18 @@ describe("readUseAddress", () => {
     );
     expect(readUseAddress("wifi:\n  ssid: net\n")).toBe("");
     expect(readUseAddress("wifi: !include wifi.yaml\n")).toBeNull();
+  });
+});
+
+describe("readStaticIp", () => {
+  it("reads wifi manual_ip.static_ip and null otherwise", () => {
+    expect(
+      readStaticIp(
+        "wifi:\n  ssid: net\n  manual_ip:\n    static_ip: 10.0.0.50\n    gateway: 10.0.0.1\n"
+      )
+    ).toBe("10.0.0.50");
+    expect(readStaticIp("wifi:\n  ssid: net\n")).toBeNull();
+    expect(readStaticIp("ethernet:\n  type: LAN8720\n")).toBeNull();
   });
 });
 

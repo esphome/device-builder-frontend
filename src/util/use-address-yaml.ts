@@ -72,6 +72,17 @@ export function readUseAddress(yaml: string): string | null {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
+/** The wifi block's `manual_ip.static_ip`, or null. The firmware
+ *  already knows its fixed IP; it is the best manual-address prefill. */
+export function readStaticIp(yaml: string): string | null {
+  const lines = yaml.split("\n");
+  if (findSectionStart(lines, "wifi") < 0) return null;
+  const manual = parseSectionCore(lines, "wifi").values.manual_ip;
+  if (manual === null || typeof manual !== "object") return null;
+  const value = (manual as Record<string, unknown>).static_ip;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 /** Remove `use_address` from the network block; null when nothing is
  *  spliceable, the unchanged YAML when the key isn't set. */
 export function removeUseAddress(yaml: string): string | null {

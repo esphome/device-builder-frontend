@@ -38,6 +38,7 @@ import {
   applyUseAddress,
   isIpLiteral,
   isValidUseAddress,
+  readStaticIp,
   readUseAddress,
   removeUseAddress,
   snippetNetworkSection,
@@ -175,7 +176,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
           onAddressScreen
             ? this._renderAddressScreen(device)
             : html`
-                ${this._renderProbeSummary()}
+                ${this._renderProbeSummary(device)}
                 ${device ? this._renderSections(device) : nothing}
                 <div class="actions">
                   <button class="btn btn--cancel" @click=${this.close}>
@@ -195,7 +196,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     `;
   }
 
-  private _renderProbeSummary(): TemplateResult {
+  private _renderProbeSummary(device: ConfiguredDevice | undefined): TemplateResult {
     // Also replaces stale rows during a re-check, so Check again
     // visibly does something.
     if (this._checking) {
@@ -240,16 +241,24 @@ export class ESPHomeTroubleshootDialog extends LitElement {
               "neutral",
               this._localize("troubleshoot.result_mdns_inconclusive")
             )
-          : !r.zeroconf_running
-            ? this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"))
-            : r.mdns_addresses.length > 0
-              ? this._probeRow(
-                  "ok",
-                  this._localize("troubleshoot.result_mdns_ok", {
-                    ips: list(r.mdns_addresses),
-                  })
-                )
-              : this._probeRow("fail", this._localize("troubleshoot.result_mdns_silent"))
+          : device?.mdns_disabled
+            ? this._probeRow(
+                "neutral",
+                this._localize("troubleshoot.result_mdns_disabled")
+              )
+            : !r.zeroconf_running
+              ? this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"))
+              : r.mdns_addresses.length > 0
+                ? this._probeRow(
+                    "ok",
+                    this._localize("troubleshoot.result_mdns_ok", {
+                      ips: list(r.mdns_addresses),
+                    })
+                  )
+                : this._probeRow(
+                    "fail",
+                    this._localize("troubleshoot.result_mdns_silent")
+                  )
       }
       ${this._renderPingRow(r)}
     </div>`;
@@ -567,6 +576,10 @@ ${section}:
         const inputUntouched = this._addressInput === this._existingAddress;
         this._existingAddress = fromYaml;
         if (inputUntouched) this._addressInput = fromYaml;
+      }
+      if (!this._addressInput) {
+        // The firmware's own manual_ip.static_ip is the best prefill.
+        this._addressInput = readStaticIp(yaml) ?? "";
       }
     } catch {
       // Keep the heuristic; the save path re-fetches anyway.

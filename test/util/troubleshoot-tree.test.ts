@@ -94,6 +94,16 @@ describe("buildTroubleshootSections", () => {
     );
   });
 
+  it("a config-disabled mdns outranks the network darkness advice", () => {
+    const ids = build({
+      device: makeConfiguredDevice({ api_enabled: true, mdns_disabled: true }),
+      result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
+    });
+    expect(ids).toContain("mdns_disabled");
+    expect(ids).not.toContain("mdns_dark");
+    expect(ids).not.toContain("zeroconf_down");
+  });
+
   it("zeroconf-down suppresses the mdns_dark diagnosis", () => {
     const ids = build({
       device: makeConfiguredDevice({ api_enabled: true }),

@@ -74,6 +74,14 @@ export function buildTroubleshootSections(
       titleKey: "troubleshoot.use_address_set_title",
       bodyKeys: ["troubleshoot.use_address_set_body"],
     });
+  } else if (device.mdns_disabled) {
+    // The config never broadcasts by design; VLAN/reflector advice
+    // would send the user chasing a network problem that isn't there.
+    sections.push({
+      id: "mdns_disabled",
+      titleKey: "troubleshoot.mdns_disabled_title",
+      bodyKeys: ["troubleshoot.mdns_disabled_body"],
+    });
   } else if (result && !result.zeroconf_running) {
     sections.push({
       id: "zeroconf_down",

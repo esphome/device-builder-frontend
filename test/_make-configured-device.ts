@@ -60,6 +60,7 @@ const _BASE = {
   api_enabled: false,
   api_encrypted: false,
   name_add_mac_suffix: false,
+  mdns_disabled: false,
   uses_mqtt: false,
   uses_deep_sleep: false,
 } satisfies ConfiguredDevice;
