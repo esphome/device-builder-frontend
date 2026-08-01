@@ -38,6 +38,7 @@ import {
   applyUseAddress,
   isIpLiteral,
   isValidUseAddress,
+  type NetworkSection,
   readStaticIp,
   readUseAddress,
   removeUseAddress,
@@ -61,6 +62,12 @@ registerMdiIcons({
 export interface TroubleshootTarget {
   configuration: string;
 }
+
+const PROBE_ROW_ICONS = {
+  ok: "check-circle",
+  fail: "close-circle",
+  neutral: "help-circle-outline",
+} as const;
 
 type SaveState =
   "idle" | "saving" | "saved" | "removed" | "remove_packaged" | "snippet" | "error";
@@ -93,7 +100,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   @state() private _existingAddress = "";
 
   private _subscription: ReachabilitySubscription | null = null;
-  private _snippetYaml = "";
+  private _snippetSection: NetworkSection = "wifi";
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
   private _failedGeneration = -1;
@@ -140,7 +147,9 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   protected render() {
-    const device = this._devices.find((d) => d.configuration === this._configuration);
+    const device = this._dialog.open
+      ? this._devices.find((d) => d.configuration === this._configuration)
+      : undefined;
     const onAddressScreen = this._screen === "address";
     const friendly = device?.friendly_name || this._name;
     const label = onAddressScreen
@@ -212,56 +221,67 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     }
     const r = this._result;
     if (r === null) return html``;
-    const list = (ips: string[]) => ips.join(", ");
     return html`<div class="probe-rows">
-      ${
-        isIpLiteral(r.address)
-          ? this._probeRow(
-              "neutral",
-              this._localize("troubleshoot.result_manual_address", {
-                address: r.address,
-              })
-            )
-          : r.dns_resolved
-            ? this._probeRow(
-                "ok",
-                this._localize("troubleshoot.result_dns_ok", {
-                  address: r.address,
-                  ips: list(r.dns_addresses),
-                })
-              )
-            : this._probeRow(
-                "fail",
-                this._localize("troubleshoot.result_dns_fail", { address: r.address })
-              )
-      }
-      ${
-        r.mdns_inconclusive
-          ? this._probeRow(
-              "neutral",
-              this._localize("troubleshoot.result_mdns_inconclusive")
-            )
-          : device?.mdns_disabled
-            ? this._probeRow(
-                "neutral",
-                this._localize("troubleshoot.result_mdns_disabled")
-              )
-            : !r.zeroconf_running
-              ? this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"))
-              : r.mdns_addresses.length > 0
-                ? this._probeRow(
-                    "ok",
-                    this._localize("troubleshoot.result_mdns_ok", {
-                      ips: list(r.mdns_addresses),
-                    })
-                  )
-                : this._probeRow(
-                    "fail",
-                    this._localize("troubleshoot.result_mdns_silent")
-                  )
-      }
-      ${this._renderPingRow(r)}
+      ${this._renderDnsRow(r)} ${this._renderMdnsRow(r, device)} ${this._renderPingRow(r)}
     </div>`;
+  }
+
+  private _renderDnsRow(r: DeviceTroubleshootResult): TemplateResult {
+    if (r.dns_inconclusive) {
+      return this._probeRow(
+        "neutral",
+        this._localize("troubleshoot.result_dns_inconclusive")
+      );
+    }
+    if (isIpLiteral(r.address)) {
+      return this._probeRow(
+        "neutral",
+        this._localize("troubleshoot.result_manual_address", { address: r.address })
+      );
+    }
+    if (r.dns_resolved) {
+      return this._probeRow(
+        "ok",
+        this._localize("troubleshoot.result_dns_ok", {
+          address: r.address,
+          ips: r.dns_addresses.join(", "),
+        })
+      );
+    }
+    return this._probeRow(
+      "fail",
+      this._localize("troubleshoot.result_dns_fail", { address: r.address })
+    );
+  }
+
+  private _renderMdnsRow(
+    r: DeviceTroubleshootResult,
+    device: ConfiguredDevice | undefined
+  ): TemplateResult {
+    if (r.mdns_inconclusive) {
+      return this._probeRow(
+        "neutral",
+        this._localize("troubleshoot.result_mdns_inconclusive")
+      );
+    }
+    if (device?.mdns_disabled) {
+      return this._probeRow(
+        "neutral",
+        this._localize("troubleshoot.result_mdns_disabled")
+      );
+    }
+    if (!r.zeroconf_running) {
+      return this._probeRow("fail", this._localize("troubleshoot.result_mdns_off"));
+    }
+    if (r.mdns_addresses.length > 0) {
+      return this._probeRow(
+        "ok",
+        this._localize("troubleshoot.result_mdns_ok", {
+          ips: r.mdns_addresses.join(", "),
+        })
+      );
+    }
+    return this._probeRow("fail", this._localize("troubleshoot.result_mdns_silent"));
   }
 
   private _renderPingRow(r: DeviceTroubleshootResult): TemplateResult {
@@ -310,12 +330,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _probeRow(kind: "ok" | "fail" | "neutral", text: string): TemplateResult {
-    const icon =
-      kind === "ok"
-        ? "check-circle"
-        : kind === "fail"
-          ? "close-circle"
-          : "help-circle-outline";
+    const icon = PROBE_ROW_ICONS[kind];
     return html`<div class="probe-row ${kind}">
       <wa-icon library="mdi" name=${icon}></wa-icon>
       <span>${text}</span>
@@ -420,14 +435,10 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {
     if (this._saveState === "snippet") {
-      const section = snippetNetworkSection(
-        this._snippetYaml,
-        device.loaded_integrations
-      );
       return html`
         <p>${this._localize("troubleshoot.use_address_snippet")}</p>
         <pre class="snippet">
-${section}:
+${this._snippetSection}:
   use_address: ${this._addressInput.trim()}</pre>
       `;
     }
@@ -623,7 +634,11 @@ ${section}:
       if (configuration !== this._configuration) return;
       const updated = applyUseAddress(yaml, value);
       if (updated === null) {
-        this._snippetYaml = yaml;
+        const device = this._devices.find((d) => d.configuration === configuration);
+        this._snippetSection = snippetNetworkSection(
+          yaml,
+          device?.loaded_integrations ?? []
+        );
         this._saveState = "snippet";
         return;
       }
@@ -651,7 +666,6 @@ ${section}:
 
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._screen = "main";
     this._stopReconcile();
     this._teardownSubscription();
   };

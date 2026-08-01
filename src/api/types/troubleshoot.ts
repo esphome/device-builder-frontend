@@ -4,6 +4,9 @@
  * Part of the src/api/types.ts barrel split.
  */
 
+/** Where the probe found its ping target. */
+export type PingTargetSource = "" | "dns" | "mdns" | "runtime" | "persisted";
+
 export interface DeviceTroubleshootResult {
   configuration: string;
   /** Hostname the backend targets (effective `use_address`, or `<name>.local`). */
@@ -25,11 +28,10 @@ export interface DeviceTroubleshootResult {
   mdns_inconclusive: boolean;
   ping_attempted: boolean;
   ping_target: string;
-  /** "dns" / "mdns" = live resolve; "runtime" = RAM-learned address the
-   *  sweep also pings; "persisted" = sidecar last-known IP, whose reply
-   *  proves reachability of the address, not identity (never applied as
-   *  a verdict backend-side). */
-  ping_target_source: string;
+  /** `persisted` is the sidecar last-known IP: its reply proves
+   *  reachability of the address, not identity, and the backend never
+   *  applies a verdict from it. */
+  ping_target_source: PingTargetSource;
   /** `null` = attempted and unreachable. */
   ping_rtt_ms: number | null;
 }

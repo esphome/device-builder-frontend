@@ -22,17 +22,14 @@ const HOSTNAME_RE =
 /** Bare block header (`wifi:`), optionally with a trailing comment. A
  *  header carrying an inline value (`wifi: !include net.yaml`) is not
  *  spliceable and must not match. */
-const BARE_HEADER_RES = new Map(
-  NETWORK_SECTIONS.map((section) => [
-    section,
-    new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m"),
-  ])
+const BARE_HEADER_RES = NETWORK_SECTIONS.map(
+  (section) => [section, new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m")] as const
 );
 
 /** First network block spliceable as a top-level mapping, or null. */
 export function findNetworkSection(yaml: string): NetworkSection | null {
-  for (const section of NETWORK_SECTIONS) {
-    if (BARE_HEADER_RES.get(section)!.test(yaml)) return section;
+  for (const [section, re] of BARE_HEADER_RES) {
+    if (re.test(yaml)) return section;
   }
   return null;
 }
@@ -117,8 +114,7 @@ export function isValidUseAddress(value: string): boolean {
   if (/^[\d.]+$/.test(value)) {
     // All digits and dots is an IPv4 attempt, not a hostname; a typo
     // like 255.42.2.1.3 must not slip through the hostname rule.
-    const v4 = IPV4_RE.exec(value);
-    return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
+    return isIpLiteral(value);
   }
   if (value.includes(":")) {
     // At most one `::` run; `:::` and `1::2::3` are never valid.

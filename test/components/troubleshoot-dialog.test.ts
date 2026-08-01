@@ -98,6 +98,20 @@ describe("troubleshoot-dialog", () => {
     expect(text).toContain("troubleshoot.result_ping_fail");
   });
 
+  it("renders inconclusive legs as neutral, not as verdicts", async () => {
+    const { el } = await openDialog({
+      troubleshootDevice: vi.fn().mockResolvedValue({
+        ...RESULT,
+        dns_inconclusive: true,
+        mdns_inconclusive: true,
+      }),
+    });
+    const text = el.shadowRoot!.textContent!;
+    expect(text).toContain("troubleshoot.result_dns_inconclusive");
+    expect(text).toContain("troubleshoot.result_mdns_inconclusive");
+    expect(text).not.toContain("troubleshoot.result_dns_fail");
+  });
+
   it("re-runs the probe from Check again", async () => {
     const { el, api } = await openDialog();
     const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>("button")];

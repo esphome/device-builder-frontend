@@ -115,18 +115,6 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
-  // Non-online badges open the troubleshooting dialog. Passive while
-  // selecting — in select mode the whole card is one toggle target.
-  const openTroubleshoot = (e: Event) => {
-    e.stopPropagation();
-    fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
-  };
-  const troubleshootKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openTroubleshoot(e);
-    }
-  };
   // Untracked stays passive: with name_add_mac_suffix set the probe can
   // only ever fail, so the dialog would misread as a broken network.
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
@@ -160,6 +148,18 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
         ? card._localize("dashboard.offline")
         : card._localize("dashboard.unknown");
   if (card.state !== DeviceState.ONLINE && !card.selectMode) {
+    // Non-online badges open the troubleshooting dialog. Passive while
+    // selecting — in select mode the whole card is one toggle target.
+    const openTroubleshoot = (e: Event) => {
+      e.stopPropagation();
+      fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
+    };
+    const troubleshootKeydown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openTroubleshoot(e);
+      }
+    };
     const tooltip = card._localize("troubleshoot.open_tooltip");
     return html`<div
         id="status-badge"
