@@ -5,6 +5,7 @@ import {
   applyUseAddress,
   findNetworkSection,
   isValidUseAddress,
+  removeUseAddress,
   snippetNetworkSection,
 } from "../../src/util/use-address-yaml.js";
 
@@ -61,6 +62,22 @@ describe("applyUseAddress", () => {
     const yaml = "wifi: !include wifi.yaml\napi:\n";
     expect(findNetworkSection(yaml)).toBeNull();
     expect(applyUseAddress(yaml, "10.0.0.9")).toBeNull();
+  });
+});
+
+describe("removeUseAddress", () => {
+  it("strips the key while keeping the rest of the block", () => {
+    const yaml = "wifi:\n  ssid: net # keep\n  use_address: 10.0.0.1\napi:\n";
+    const updated = removeUseAddress(yaml)!;
+    expect(updated).not.toContain("use_address");
+    expect(updated).toContain("  ssid: net # keep");
+    expect(updated).toContain("api:");
+  });
+
+  it("no-ops when the key is absent and refuses an include header", () => {
+    const plain = "wifi:\n  ssid: net\n";
+    expect(removeUseAddress(plain)).toBe(plain);
+    expect(removeUseAddress("wifi: !include wifi.yaml\n")).toBeNull();
   });
 });
 

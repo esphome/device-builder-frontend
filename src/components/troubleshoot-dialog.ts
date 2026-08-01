@@ -38,6 +38,7 @@ import {
   applyUseAddress,
   isIpLiteral,
   isValidUseAddress,
+  removeUseAddress,
   snippetNetworkSection,
 } from "../util/use-address-yaml.js";
 import { troubleshootDialogStyles } from "./troubleshoot-dialog.styles.js";
@@ -59,7 +60,7 @@ export interface TroubleshootTarget {
   configuration: string;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "snippet" | "error";
+type SaveState = "idle" | "saving" | "saved" | "removed" | "snippet" | "error";
 
 @customElement("esphome-troubleshoot-dialog")
 export class ESPHomeTroubleshootDialog extends LitElement {
@@ -330,12 +331,18 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderAddressScreen(device: ConfiguredDevice | undefined): TemplateResult {
-    if (this._saveState === "saved") {
+    if (this._saveState === "saved" || this._saveState === "removed") {
       return html`
         <div class="section" data-section="use_address">
           <div class="saved-panel">
             <wa-icon library="mdi" name="check-circle"></wa-icon>
-            <p>${this._localize("troubleshoot.use_address_saved")}</p>
+            <p>
+              ${this._localize(
+                this._saveState === "removed"
+                  ? "troubleshoot.use_address_removed"
+                  : "troubleshoot.use_address_saved"
+              )}
+            </p>
           </div>
           <div class="actions">
             <button class="btn btn--confirm" @click=${this.close}>
@@ -347,6 +354,24 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     }
     return html`
       <div class="section" data-section="use_address">
+        ${
+          this._existingAddress
+            ? html`<div class="current-row">
+                <span>
+                  ${this._localize("troubleshoot.use_address_current", {
+                    address: this._existingAddress,
+                  })}
+                </span>
+                <button
+                  class="btn btn--remove"
+                  ?disabled=${this._saveState === "saving"}
+                  @click=${() => void this._removeUseAddress()}
+                >
+                  ${this._localize("troubleshoot.use_address_remove")}
+                </button>
+              </div>`
+            : nothing
+        }
         <p>
           ${this._localize("troubleshoot.use_address_body")}
           <a href=${USE_ADDRESS_DOCS_URL} target="_blank" rel="noopener noreferrer">
@@ -451,6 +476,25 @@ ${section}:
       this._subscription = subscription;
     } catch {
       // Advice degrades to device flags + probe result without the stream.
+    }
+  }
+
+  private async _removeUseAddress(): Promise<void> {
+    this._saveState = "saving";
+    try {
+      const yaml = await this._api.getConfig(this._configuration);
+      const updated = removeUseAddress(yaml);
+      if (updated === null) {
+        this._snippetYaml = yaml;
+        this._saveState = "snippet";
+        return;
+      }
+      if (updated !== yaml) {
+        await this._api.updateConfig(this._configuration, updated);
+      }
+      this._saveState = "removed";
+    } catch {
+      this._saveState = "error";
     }
   }
 

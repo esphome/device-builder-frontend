@@ -146,6 +146,25 @@ describe("troubleshoot-dialog", () => {
     expect(input.value).toBe("10.0.0.7");
   });
 
+  it("removes an existing use_address from the address screen", async () => {
+    const { el, api } = await openDialog(
+      {
+        getConfig: vi
+          .fn()
+          .mockResolvedValue("wifi:\n  ssid: net\n  use_address: 10.0.0.7\n"),
+      },
+      makeConfiguredDevice({ address: "10.0.0.7" })
+    );
+    await openAddressScreen(el);
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_current");
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--remove")!.click();
+    await flush();
+    await el.updateComplete;
+    const written = api.updateConfig.mock.calls[0][1] as string;
+    expect(written).not.toContain("use_address");
+    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_removed");
+  });
+
   it("saves a valid use_address through the YAML splice", async () => {
     const { el, api } = await openDialog();
     await openAddressScreen(el);
