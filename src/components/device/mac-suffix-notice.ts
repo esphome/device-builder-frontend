@@ -33,8 +33,8 @@ const TRUTHY_RE = /^(true|yes|on|enable)$/i;
 
 const KEY_VALUE_RE = /^(name_add_mac_suffix\s*:\s*)([^#\s]+)/;
 
-/** Line index of a truthy direct-child `name_add_mac_suffix:` under
- *  `esphome:`, or -1. Line scan, not parsed values, so it works on
+/** Zero-based line index of a truthy direct-child `name_add_mac_suffix:`
+ *  under `esphome:`, or -1. Line scan, not parsed values, so it works on
  *  mid-edit drafts. */
 export function findTruthyMacSuffixLine(yaml: string): number {
   const lines = yaml.split("\n");
