@@ -80,6 +80,9 @@ export async function navigateToDep(
       },
     ];
   }
+  // The suspended level's prefill rides its frame from here; leaving it set
+  // would seed the catalog-fallback pick with the requester's bus values.
+  host._depPrefill = null;
   if (direct) {
     // The requester's bus constraints become the new bus's starting
     // values (ags10 caps i2c at 15kHz, most uart devices pin a baud).
@@ -114,7 +117,11 @@ export function popDetour(host: DetourHost): DetourFrame | null {
   host._detourStack = host._detourStack.slice(0, -1);
   host._selected = frame.component;
   host._returnValues = frame.values;
-  host._depPrefill = frame.prefill;
+  // `prefillFields` is merged after `restoredValues` in the seed, so a restored
+  // level keeps the prefill's required / option constraints but drops its
+  // values — the snapshot already carries them, edits included.
+  host._depPrefill =
+    frame.values && frame.prefill ? { ...frame.prefill, fields: {} } : frame.prefill;
   return frame;
 }
 

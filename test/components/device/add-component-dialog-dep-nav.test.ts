@@ -173,6 +173,22 @@ describe("navigateToDep", () => {
     ]);
   });
 
+  test("hands the requester's prefill to the frame, not to the catalog pick", async () => {
+    // The domain-level fallback leaves the user in the catalog; whatever they
+    // pick must not inherit the requester's bus values.
+    const host = makeHost(respond(null), { filterByDomain: vi.fn() });
+    host._selected = aht20;
+    host._depPrefill = { fields: { frequency: "15kHz" }, required: [] };
+
+    await navigateToDep(host, "output");
+
+    expect(host._depPrefill).toBeNull();
+    expect(host._detourStack[0].prefill).toEqual({
+      fields: { frequency: "15kHz" },
+      required: [],
+    });
+  });
+
   test("pushes nothing when the detour starts from the catalog", async () => {
     const host = makeHost(respond(i2c));
 
@@ -242,8 +258,27 @@ describe("popDetour", () => {
     expect(frame?.component).toBe(anova);
     expect(host._selected).toBe(anova);
     expect(host._returnValues).toEqual({ name: "Cooker" });
-    expect(host._depPrefill).toBe(prefill);
     expect(host._detourStack).toHaveLength(0);
+  });
+
+  test("keeps the frame's prefill constraints but not its values", () => {
+    // The snapshot already carries what the prefill seeded, edits included, and
+    // `prefillFields` is merged after `restoredValues` in the form seed.
+    const host = detourHost([
+      makeDetourFrame(anova, { values: { frequency: "20kHz" }, prefill }),
+    ]);
+
+    popDetour(host);
+
+    expect(host._depPrefill).toEqual({ fields: {}, required: [] });
+  });
+
+  test("keeps the frame's prefill whole when the level had no values", () => {
+    const host = detourHost([makeDetourFrame(anova, { prefill })]);
+
+    popDetour(host);
+
+    expect(host._depPrefill).toBe(prefill);
   });
 
   test("unwinds a nested chain one level per call", () => {

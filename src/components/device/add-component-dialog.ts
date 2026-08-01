@@ -480,7 +480,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._submitError = result.message;
       return false;
     }
-    // Fresh sequence — abandon any in-flight dep-detour state.
+    // Fresh sequence — abandon any in-flight dep-detour state, which for a
+    // nested detour drops every suspended level, not just the innermost.
     this._clearDetourFields();
     this._bundleQueue = rest;
     this._bundleProgress = {
