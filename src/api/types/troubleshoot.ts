@@ -25,8 +25,10 @@ export interface DeviceTroubleshootResult {
   mdns_inconclusive: boolean;
   ping_attempted: boolean;
   ping_target: string;
-  /** "dns" / "mdns" = live resolve; "last_known" = persisted address,
-   *  so a reply proves reachability of the address, not identity. */
+  /** "dns" / "mdns" = live resolve; "runtime" = RAM-learned address the
+   *  sweep also pings; "persisted" = sidecar last-known IP, whose reply
+   *  proves reachability of the address, not identity (never applied as
+   *  a verdict backend-side). */
   ping_target_source: string;
   /** `null` = attempted and unreachable. */
   ping_rtt_ms: number | null;

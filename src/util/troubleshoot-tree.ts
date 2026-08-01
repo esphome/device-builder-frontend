@@ -115,7 +115,7 @@ export function buildTroubleshootSections(
   if (
     result?.ping_attempted &&
     result.ping_rtt_ms !== null &&
-    result.ping_target_source === "last_known" &&
+    result.ping_target_source === "persisted" &&
     !result.dns_resolved &&
     result.mdns_addresses.length === 0
   ) {

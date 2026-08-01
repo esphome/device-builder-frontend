@@ -192,7 +192,7 @@ describe("buildTroubleshootSections", () => {
         dns_addresses: [],
         mdns_addresses: [],
         mdns_has_cached_trace: false,
-        ping_target_source: "last_known",
+        ping_target_source: "persisted",
       }),
     });
     expect(ids).toContain("unverified_ping");

@@ -31,7 +31,7 @@ const RESULT: DeviceTroubleshootResult = {
   mdns_inconclusive: false,
   ping_attempted: true,
   ping_target: "10.0.0.42",
-  ping_target_source: "last_known",
+  ping_target_source: "persisted",
   ping_rtt_ms: null,
 };
 

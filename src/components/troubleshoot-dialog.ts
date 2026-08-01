@@ -286,7 +286,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     if (r.ping_rtt_ms !== null) {
       // A reply at the last-known address proves something answers
       // there, not that it is this device; don't paint it green.
-      if (r.ping_target_source === "last_known") {
+      if (r.ping_target_source === "persisted") {
         return this._probeRow(
           "neutral",
           this._localize("troubleshoot.result_ping_ok_last_known", {
