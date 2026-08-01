@@ -15,6 +15,7 @@ import {
 } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { summaryListStyles } from "../styles/summary-list.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import {
   isFilableTitle,
@@ -136,7 +137,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // populate this session's config.
   private _session = 0;
 
-  static styles = [espHomeStyles, modalDialogStyles, crashReportDialogStyles];
+  static styles = [
+    espHomeStyles,
+    modalDialogStyles,
+    summaryListStyles,
+    crashReportDialogStyles,
+  ];
 
   /** Open with a snapshot of the logs dialog's buffer. */
   public open(

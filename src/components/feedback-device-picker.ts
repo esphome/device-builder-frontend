@@ -15,6 +15,7 @@ import {
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { summaryListStyles } from "../styles/summary-list.js";
 import {
   buildDeviceIssueUrl,
   type DeviceTarget,
@@ -103,6 +104,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     espHomeStyles,
     // Project-wide native-input look for the device filter.
     inputStyles,
+    summaryListStyles,
     feedbackLinkStyles,
     css`
       /* Look comes from the shared inputStyles; only layout here. */
@@ -115,29 +117,6 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
       .device-list {
         max-height: 320px;
         overflow-y: auto;
-      }
-
-      /* The what-is-included disclosure, same shape as the crash
-         dialog's summary list. */
-      .summary {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-        margin: 0 0 var(--wa-space-s);
-        padding: 0;
-        list-style: none;
-        font-size: var(--wa-font-size-s);
-      }
-
-      .summary li {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-      }
-
-      .summary wa-icon {
-        flex-shrink: 0;
-        color: var(--esphome-primary);
       }
     `,
   ];
