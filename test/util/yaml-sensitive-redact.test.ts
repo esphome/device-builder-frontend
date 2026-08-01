@@ -158,6 +158,11 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("abcdef");
   });
 
+  it("masks a parent-scoped key under a mis-capitalized parent", () => {
+    const masked = maskSensitiveYaml("api:\n  Encryption:\n    Key: c2VjcmV0a2V5");
+    expect(masked).not.toContain("c2VjcmV0a2V5");
+  });
+
   it("masks hyphen and dot spellings of credential keys", () => {
     const yaml = ["wifi-password: hunter2", "vpn.psk: abcdef"].join("\n");
     const masked = maskSensitiveYaml(yaml);

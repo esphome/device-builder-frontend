@@ -180,6 +180,10 @@ export function findSensitiveValueRanges(
     const key = m[3];
     const sep = m[4];
     const rest = m[5];
+    // Sensitivity checks and ancestor tracking case-fold the key: the
+    // input may be YAML esphome would reject, and a mis-capitalized
+    // `Encryption:` must still scope the `key:` under it.
+    const keyFolded = key.toLowerCase();
 
     // For ancestor tracking, treat `- key:` items as living one level
     // deeper than their leading whitespace — this lets `encryption:`
@@ -195,16 +199,16 @@ export function findSensitiveValueRanges(
     if (maskAllValues) {
       sensitive = true;
     } else {
-      sensitive = ALWAYS_SENSITIVE_KEYS.has(key);
+      sensitive = ALWAYS_SENSITIVE_KEYS.has(keyFolded);
       if (!sensitive && stack.length > 0) {
         const parent = stack[stack.length - 1].key;
         const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
-        if (allowed && allowed.has(key)) sensitive = true;
+        if (allowed && allowed.has(keyFolded)) sensitive = true;
       }
       if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);
     }
 
-    stack.push({ indent, key });
+    stack.push({ indent, key: keyFolded });
 
     if (!sensitive) {
       i++;
