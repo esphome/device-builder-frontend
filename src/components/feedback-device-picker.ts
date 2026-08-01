@@ -118,6 +118,13 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
         max-height: 320px;
         overflow-y: auto;
       }
+
+      /* The lead-in that anchors the what-is-included rows below it. */
+      .summary-heading {
+        margin: 0 0 var(--wa-space-2xs);
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-normal);
+      }
     `,
   ];
 
@@ -151,6 +158,7 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
       (device) => !filter || matchesDeviceName(device, filter)
     );
     return html`
+      <p class="summary-heading">${this._localize("feedback.device_includes_heading")}</p>
       <ul class="summary">
         ${["feedback.device_includes_config", "feedback.device_includes_facts"].map(
           (key) => html`
