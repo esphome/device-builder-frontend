@@ -140,14 +140,22 @@ function mdnsExpirySummary(
   reachability: ReachabilityStateEvent | null,
   device: ConfiguredDevice
 ): string {
-  const age = reachability?.mdns_last_seen_seconds_ago ?? null;
+  if (reachability === null) return "reachability read failed";
+  const age = reachability.mdns_last_seen_seconds_ago;
   if (age === null) return "no mDNS row";
-  const ttl = reachability?.mdns_ptr_ttl_seconds ?? null;
   const offline = device.runtime_state.state === DeviceState.OFFLINE;
-  const remaining = mdnsExpiryRemaining(age, ttl, offline);
+  // Mirror the drawer's gate: it renders the countdown only while mDNS
+  // is the active source.
+  const mdnsActive = reachability.active_source === "mdns";
+  const remaining = mdnsActive
+    ? mdnsExpiryRemaining(age, reachability.mdns_ptr_ttl_seconds, offline)
+    : null;
   if (remaining === null) {
     if (offline) return "no expiry countdown (device offline)";
-    if (ttl === null) return "no expiry countdown (no PTR TTL)";
+    if (!mdnsActive) return "no expiry countdown (mDNS not the active source)";
+    if (reachability.mdns_ptr_ttl_seconds === null) {
+      return "no expiry countdown (no PTR TTL)";
+    }
     return "no expiry countdown (heard recently)";
   }
   return mdnsExpiresSoon(remaining)

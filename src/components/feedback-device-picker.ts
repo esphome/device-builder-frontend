@@ -188,7 +188,12 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
     return html`
       <p class="summary-heading">${this._localize("feedback.device_includes_heading")}</p>
       <ul class="summary">
-        ${["feedback.device_includes_config", "feedback.device_includes_facts"].map(
+        ${[
+          "feedback.device_includes_config",
+          this.target === "status"
+            ? "feedback.device_includes_facts_status"
+            : "feedback.device_includes_facts",
+        ].map(
           (key) => html`
             <li>
               <wa-icon library="mdi" name="clipboard-text-outline"></wa-icon>

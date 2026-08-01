@@ -87,6 +87,7 @@ describe("buildDeviceIssueUrl", () => {
 
   it("prefills the status form with observed facts and the mDNS answer", () => {
     const built = buildDeviceIssueUrl("status", DEVICE, "wifi:\n  ssid: x", CTX, {
+      active_source: "mdns",
       mdns_last_seen_seconds_ago: 300,
       mdns_ptr_ttl_seconds: 4500,
     } as ReachabilityStateEvent);
@@ -116,23 +117,52 @@ describe("buildDeviceIssueUrl", () => {
         CTX,
         reachability as ReachabilityStateEvent | null
       ).url.searchParams.get("mdns-expiry");
-    expect(expiry(null)).toBe("no mDNS row");
-    expect(expiry({ mdns_last_seen_seconds_ago: 60, mdns_ptr_ttl_seconds: 4500 })).toBe(
-      "no expiry countdown (heard recently)"
+    expect(expiry(null)).toBe("reachability read failed");
+    expect(expiry({ active_source: "ping", mdns_last_seen_seconds_ago: null })).toBe(
+      "no mDNS row"
     );
-    expect(expiry({ mdns_last_seen_seconds_ago: 300, mdns_ptr_ttl_seconds: null })).toBe(
-      "no expiry countdown (no PTR TTL)"
-    );
+    expect(
+      expiry({
+        active_source: "mdns",
+        mdns_last_seen_seconds_ago: 60,
+        mdns_ptr_ttl_seconds: 4500,
+      })
+    ).toBe("no expiry countdown (heard recently)");
+    expect(
+      expiry({
+        active_source: "ping",
+        mdns_last_seen_seconds_ago: 300,
+        mdns_ptr_ttl_seconds: 4500,
+      })
+    ).toBe("no expiry countdown (mDNS not the active source)");
+    expect(
+      expiry({
+        active_source: "mdns",
+        mdns_last_seen_seconds_ago: 300,
+        mdns_ptr_ttl_seconds: null,
+      })
+    ).toBe("no expiry countdown (no PTR TTL)");
     const offline = {
       ...DEVICE,
       runtime_state: { ...DEVICE.runtime_state, state: "offline" },
     } as unknown as ConfiguredDevice;
     expect(
-      expiry({ mdns_last_seen_seconds_ago: 300, mdns_ptr_ttl_seconds: 4500 }, offline)
+      expiry(
+        {
+          active_source: "mdns",
+          mdns_last_seen_seconds_ago: 300,
+          mdns_ptr_ttl_seconds: 4500,
+        },
+        offline
+      )
     ).toBe("no expiry countdown (device offline)");
-    expect(expiry({ mdns_last_seen_seconds_ago: 4500, mdns_ptr_ttl_seconds: 4500 })).toBe(
-      "Expires soon"
-    );
+    expect(
+      expiry({
+        active_source: "mdns",
+        mdns_last_seen_seconds_ago: 4500,
+        mdns_ptr_ttl_seconds: 4500,
+      })
+    ).toBe("Expires soon");
   });
 
   it("blunts every address family in the observed IP line", () => {

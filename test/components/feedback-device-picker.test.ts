@@ -69,7 +69,11 @@ describe("feedback-device-picker", () => {
             })
         ),
         subscribeDeviceReachability: vi.fn((_name: string, cb: (s: unknown) => void) => {
-          cb({ mdns_last_seen_seconds_ago: 300, mdns_ptr_ttl_seconds: 4500 });
+          cb({
+            active_source: "mdns",
+            mdns_last_seen_seconds_ago: 300,
+            mdns_ptr_ttl_seconds: 4500,
+          });
           return Promise.resolve({ unsubscribe: () => Promise.resolve() });
         }),
       },
@@ -229,7 +233,7 @@ describe("feedback-device-picker", () => {
     }
     await settle(() => openedUrls.length > 0);
     const url = new URL(openedUrls[0]);
-    expect(url.searchParams.get("mdns-expiry")).toBe("no mDNS row");
+    expect(url.searchParams.get("mdns-expiry")).toBe("reachability read failed");
   });
 
   it("drops a capture that resolves after the picker unmounted", async () => {
