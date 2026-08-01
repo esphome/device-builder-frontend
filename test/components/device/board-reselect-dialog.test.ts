@@ -74,7 +74,11 @@ describe("board-reselect-dialog", () => {
     });
     await el.updateComplete;
     expect(opened).toBe(true);
-    expect(getBoards).toHaveBeenCalledWith({ query: "esp32-c3-devkitm-1", limit: 100 });
+    expect(getBoards).toHaveBeenCalledWith({
+      query: "esp32-c3-devkitm-1",
+      platform: "esp32",
+      limit: 100,
+    });
     expect(getCompatibleBoards).toHaveBeenCalledWith("c3-curated");
     expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
     expect((inner() as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
@@ -358,6 +362,7 @@ describe("board-reselect-dialog", () => {
     expect(api.getConfig).toHaveBeenCalledWith("dev.yaml");
     expect(api.getBoards).toHaveBeenCalledWith({
       query: "esp32-c3-devkitm-1",
+      platform: "esp32",
       limit: 100,
     });
   });

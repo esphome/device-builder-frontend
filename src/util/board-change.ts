@@ -49,7 +49,7 @@ export function matchCatalogBoard(
   }
   const target = board.toLowerCase();
   return cache.fetch(`${platform}\n${target}`, async () => {
-    const { boards } = await api.getBoards({ query: board, limit: 100 });
+    const { boards } = await api.getBoards({ query: board, platform, limit: 100 });
     return boards.find(
       (b) =>
         b.esphome.board.toLowerCase() === target &&
