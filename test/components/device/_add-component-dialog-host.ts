@@ -37,3 +37,16 @@ export function makeAddComponentDialogHost<I>(
     getComponentBodies,
   };
 }
+
+/** Override the `@query` `_form` getter so a suite can drive `currentValues`. */
+export function setForm(
+  d: unknown,
+  form: { currentValues: Record<string, unknown> } | undefined
+) {
+  Object.defineProperty(d, "_form", { value: form, configurable: true });
+}
+
+/** Fire the form's "+ Add <dep>" event at the dialog. */
+export function navigateToDepEvent(domain: string): CustomEvent {
+  return new CustomEvent("navigate-to-dep", { detail: { domain } });
+}
