@@ -67,12 +67,60 @@ describe("CRLF documents (#1601)", () => {
     );
   });
 
-  it("a mixed-endings document normalizes to CRLF", () => {
-    const out = updateSectionInYaml("wifi:\r\n  ssid: net\nsensor:\n", "wifi", {
+  it("a mostly-LF document normalizes the stray CRLF line to LF", () => {
+    const out = updateSectionInYaml("wifi:\n  ssid: net\r\nsensor:\n  id: s\n", "wifi", {
       ssid: "net",
       use_address: "10.0.0.9",
     });
-    expect(out).toBe(crlf("wifi:", "  ssid: net", "  use_address: 10.0.0.9", "sensor:"));
+    expect(out).toBe("wifi:\n  ssid: net\n  use_address: 10.0.0.9\nsensor:\n  id: s\n");
+  });
+
+  it("a mostly-CRLF document normalizes the stray LF line to CRLF", () => {
+    const out = updateSectionInYaml(
+      "wifi:\r\n  ssid: net\nsensor:\r\n  id: s\r\n",
+      "wifi",
+      { ssid: "net", use_address: "10.0.0.9" }
+    );
+    expect(out).toBe(
+      crlf("wifi:", "  ssid: net", "  use_address: 10.0.0.9", "sensor:", "  id: s")
+    );
+  });
+
+  it("updateSectionInYaml on a CRLF list item keeps the inline key single", () => {
+    const yaml = crlf("sensor:", "  - platform: dht", "    pin: D1");
+    const out = updateSectionInYaml(yaml, "sensor", { platform: "dht", pin: "D2" }, 2);
+    expect(out).toBe(crlf("sensor:", "  - platform: dht", "    pin: D2"));
+  });
+
+  it("updateSectionInYaml on a CRLF globals block keeps every entry", () => {
+    const yaml = crlf("globals:", "  - id: my_int", "    type: int");
+    const items = parseYamlSectionValues(yaml, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(items).toHaveLength(1);
+    const out = updateSectionInYaml(yaml, "globals", { globals: items });
+    expect(parseYamlSectionValues(out, "globals").globals).toEqual(items);
+    expect(out.split("\r\n").length).toBeGreaterThan(1);
+    expect(out).not.toMatch(/[^\r]\n/);
+  });
+
+  it("updateSectionInYaml keeps a CRLF block-scalar body byte-for-byte", () => {
+    const yaml = crlf(
+      "wifi:",
+      "  ssid: net",
+      "  certificate: |-",
+      "    AAA",
+      "    BBB",
+      "sensor:"
+    );
+    const out = updateSectionInYaml(yaml, "wifi", {
+      ...parseYamlSectionValues(yaml, "wifi"),
+      ssid: "other",
+    });
+    expect(out).toBe(
+      crlf("wifi:", "  ssid: other", "  certificate: |-", "    AAA", "    BBB", "sensor:")
+    );
   });
 
   it("an LF document stays LF", () => {

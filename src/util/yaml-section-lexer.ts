@@ -24,9 +24,20 @@ export function splitYamlDocLines(yaml: string): string[] {
   return lines;
 }
 
-/** The document's line ending; a mixed-ending document counts as CRLF. */
+/**
+ * The document's line ending, by majority vote (ties go to LF). A
+ * mixed-ending document normalizes toward its dominant ending, so one
+ * pasted CRLF line in an LF file costs that line its CR on the next
+ * save instead of converting the whole file.
+ */
 export function yamlDocEol(yaml: string): "\r\n" | "\n" {
-  return yaml.includes("\r\n") ? "\r\n" : "\n";
+  let crlf = 0;
+  let lf = 0;
+  for (let i = yaml.indexOf("\n"); i !== -1; i = yaml.indexOf("\n", i + 1)) {
+    if (yaml[i - 1] === "\r") crlf++;
+    else lf++;
+  }
+  return crlf > lf ? "\r\n" : "\n";
 }
 
 /**

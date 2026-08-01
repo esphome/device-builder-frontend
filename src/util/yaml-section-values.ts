@@ -405,15 +405,17 @@ export function appendSectionToYaml(
   values: Record<string, unknown>,
   options: SerializeYamlOptions = {}
 ): string {
-  const indentStep =
-    options.indentStep ?? _detectDocumentIndentStep(splitYamlDocLines(yaml)) ?? undefined;
+  const lines = splitYamlDocLines(yaml);
+  const indentStep = options.indentStep ?? _detectDocumentIndentStep(lines) ?? undefined;
   const block = serializeYamlValues({ [sectionKey]: values }, "", {
     ...options,
     indentStep,
   });
   if (block.length === 0) return yaml;
   const eol = yamlDocEol(yaml);
-  const base = NON_BLANK_RE.test(yaml) ? yaml.replace(TRAILING_BLANK_LINES_RE, "") : "";
+  const base = NON_BLANK_RE.test(yaml)
+    ? lines.join(eol).replace(TRAILING_BLANK_LINES_RE, "")
+    : "";
   const body = block.join(eol);
   return base ? `${base}${eol}${eol}${body}${eol}` : `${body}${eol}`;
 }
