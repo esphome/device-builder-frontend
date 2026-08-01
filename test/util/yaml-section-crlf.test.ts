@@ -68,6 +68,13 @@ describe("CRLF documents (#1601)", () => {
     );
   });
 
+  it("appendSectionToYaml normalizes a mostly-LF body's stray CRLF line", () => {
+    const out = appendSectionToYaml("esphome:\n  name: x\r\n  area: y\n", "wifi", {
+      ssid: "net",
+    });
+    expect(out).toBe("esphome:\n  name: x\n  area: y\n\nwifi:\n  ssid: net\n");
+  });
+
   it("a mostly-LF document normalizes the stray CRLF line to LF", () => {
     const out = updateSectionInYaml("wifi:\n  ssid: net\r\nsensor:\n  id: s\n", "wifi", {
       ssid: "net",

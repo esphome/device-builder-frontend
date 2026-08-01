@@ -6,6 +6,7 @@
  */
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { AutomationLocation } from "../../api/types/automations.js";
+import { splitYamlDocLines } from "../../util/yaml-section-lexer.js";
 import { removeSectionFromYaml } from "../../util/yaml-section-values.js";
 import { resolveCurrentSectionLine } from "../../util/yaml-sections.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";
@@ -78,10 +79,12 @@ export async function applyRemoval(
 }
 
 /** Lines removed going from *before* to *after*, or ``null`` when
- *  the edit is not a pure contiguous removal. */
+ *  the edit is not a pure contiguous removal. Compared CR-stripped:
+ *  the section machinery normalizes a mixed-ending document's line
+ *  endings, and an ending-only difference is not a removal. */
 function removedLines(before: string, after: string): string[] | null {
-  const b = before.split("\n");
-  const a = after.split("\n");
+  const b = splitYamlDocLines(before);
+  const a = splitYamlDocLines(after);
   let start = 0;
   while (start < a.length && b[start] === a[start]) start++;
   let endB = b.length - 1;
