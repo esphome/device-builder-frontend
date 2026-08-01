@@ -6,6 +6,7 @@ import type {
   ReachabilityStateEvent,
 } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
+import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -24,16 +25,9 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
-  ttlRemaining?: number | null;
-  ttlLifetime?: number | null;
+  ttlPhase?: MdnsExpiryPhase;
   txtRecords?: Record<string, string> | null;
 }
-
-// Only surface the "Expires in" hint once the device has been quiet for
-// longer than this, so a freshly-heard healthy device shows no shrinking
-// timer (which would read as a false alarm). A UI threshold, not tied to
-// any record's TTL.
-const SHOW_EXPIRES_HINT_AFTER_SECONDS = 120;
 
 export function renderReachabilitySection(
   host: ESPHomeDeviceDrawerContent
@@ -50,11 +44,12 @@ export function renderReachabilitySection(
   // re-anchors in lockstep with "last seen" (both move off mdnsAge)
   // rather than the PTR's remaining TTL, which the browser refreshes
   // erratically and would drift against the actively-probed A record.
-  // Held back until the device has been quiet a while (see the
-  // threshold) so a healthy device shows no shrinking timer, and never
-  // shown once the device is OFFLINE — by then it has already expired,
-  // and the reachability snapshot can be stale (no push fires on the
-  // mDNS Removed that took it offline), so trust the live device state.
+  // Held back until the device has been quiet a while (the quiet
+  // threshold lives in mdnsExpiryPhase, which owns every gate) so a
+  // healthy device shows no shrinking timer, and never shown once the
+  // device is OFFLINE — by then it has already expired, and the
+  // reachability snapshot can be stale (no push fires on the mDNS
+  // Removed that took it offline), so trust the live device state.
   const mdnsAge = ageOf(r.mdns_last_seen_seconds_ago, anchor, now);
   const deviceOffline = host.device?.runtime_state.state === DeviceState.OFFLINE;
   const rows: ReachabilityRowSpec[] = [
@@ -63,14 +58,12 @@ export function renderReachabilitySection(
       icon: "access-point-network",
       labelKey: "dashboard.drawer_source_mdns",
       age: mdnsAge,
-      ttlRemaining:
-        deviceOffline ||
-        r.mdns_ptr_ttl_seconds === null ||
-        mdnsAge === null ||
-        mdnsAge <= SHOW_EXPIRES_HINT_AFTER_SECONDS
-          ? null
-          : Math.max(0, r.mdns_ptr_ttl_seconds - mdnsAge),
-      ttlLifetime: r.mdns_ptr_ttl_seconds,
+      ttlPhase: mdnsExpiryPhase(
+        mdnsAge,
+        r.mdns_ptr_ttl_seconds,
+        deviceOffline,
+        r.active_source
+      ),
       txtRecords: r.mdns_txt_records ?? null,
     },
     {
@@ -147,13 +140,8 @@ function renderReachabilityRow(
           }
         </div>
         ${
-          row.source === "mdns" && isActive
-            ? renderMdnsExpiry(
-                row.ttlRemaining ?? null,
-                row.ttlLifetime ?? null,
-                localize,
-                lang
-              )
+          row.source === "mdns" && row.ttlPhase
+            ? renderMdnsExpiry(row.ttlPhase, localize, lang)
             : nothing
         }
         ${renderMdnsTxtRecords(row.txtRecords, localize)}

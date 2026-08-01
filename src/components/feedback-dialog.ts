@@ -93,8 +93,8 @@ const BUG_LINKS: ReadonlyArray<FeedbackLink> = [
     icon: "access-point-network",
     labelKey: "feedback.bug_status",
     descKey: "feedback.bug_status_desc",
-    href: "https://github.com/esphome/device-builder/issues/new?template=device_status.yml",
-    versionSource: "dashboard",
+    drillTo: "device",
+    deviceTarget: "status",
   },
   {
     icon: "server-network",

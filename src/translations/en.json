@@ -1287,6 +1287,7 @@
     "device_includes_heading": "Picking a device pre-fills the GitHub report with:",
     "device_includes_config": "Its YAML config, known credentials masked",
     "device_includes_facts": "Device details: name, board, platform, versions, installation",
+    "device_includes_facts_status": "Device details: name, board, platform, versions, installation, online state, reachability source, IP network prefix",
     "device_hint": "Nothing is filed until you review and submit the form.",
     "device_skip": "No specific device",
     "device_filter": "Filter devices",

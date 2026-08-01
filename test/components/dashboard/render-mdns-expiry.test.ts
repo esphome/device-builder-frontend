@@ -5,36 +5,42 @@
  * section mounts under the mDNS row showing "Expires in <countdown>"
  * (the device's record lifetime minus time since last heard) and
  * folding open to explain the passive-mDNS mechanism, naming the
- * device's actual record lifetime. The caller gates it on mDNS being
- * the active source; here we pin the null render and the localize
- * keys / args.
+ * device's actual record lifetime. The phase classifier owns every
+ * gate; here we pin the null render and the localize keys / args.
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
 import { renderMdnsExpiry } from "../../../src/components/dashboard/device-drawer-render.js";
+import type { MdnsExpiryPhase } from "../../../src/util/mdns-expiry.js";
+
+const COUNTDOWN: MdnsExpiryPhase = { kind: "countdown", remaining: 4321, ttl: 4500 };
 
 describe("renderMdnsExpiry", () => {
-  it("renders a details fold-down when remaining + lifetime are present", () => {
-    const result = renderMdnsExpiry(4321, 4500, identityLocalize, "en");
+  it("renders a details fold-down for a countdown phase", () => {
+    const result = renderMdnsExpiry(COUNTDOWN, identityLocalize, "en");
     expect(isTemplateResult(result)).toBe(true);
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
 
-  it("renders nothing when remaining is null (no PTR cached)", () => {
-    expect(renderMdnsExpiry(null, 4500, identityLocalize, "en")).toBe(nothing);
+  it("renders nothing for every no-hint phase", () => {
+    const phases: MdnsExpiryPhase[] = [
+      { kind: "no-signal" },
+      { kind: "offline" },
+      { kind: "inactive-source" },
+      { kind: "no-ttl" },
+      { kind: "fresh" },
+    ];
+    for (const phase of phases) {
+      expect(renderMdnsExpiry(phase, identityLocalize, "en")).toBe(nothing);
+    }
   });
 
-  it("renders nothing when the lifetime is null (no PTR cached)", () => {
-    expect(renderMdnsExpiry(4321, null, identityLocalize, "en")).toBe(nothing);
-  });
-
-  it("says 'expires soon' instead of a stuck 0s once the countdown hits zero", () => {
+  it("says 'expires soon' instead of a stuck 0s at the eviction edge", () => {
     const keys: string[] = [];
     renderMdnsExpiry(
-      0,
-      4500,
+      { kind: "soon", ttl: 4500 },
       (key) => {
         keys.push(key);
         return key;
@@ -48,8 +54,7 @@ describe("renderMdnsExpiry", () => {
   it("uses the summary and explainer localize keys", () => {
     const keys: string[] = [];
     renderMdnsExpiry(
-      4321,
-      4500,
+      COUNTDOWN,
       (key) => {
         keys.push(key);
         return key;
@@ -63,8 +68,7 @@ describe("renderMdnsExpiry", () => {
   it("passes the countdown to the summary and the lifetime to the explainer", () => {
     const calls: Array<[string, Record<string, unknown> | undefined]> = [];
     renderMdnsExpiry(
-      3600 + 14 * 60,
-      4500,
+      { kind: "countdown", remaining: 3600 + 14 * 60, ttl: 4500 },
       (key, args) => {
         calls.push([key, args]);
         return key;

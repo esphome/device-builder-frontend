@@ -12,6 +12,7 @@ import { html, nothing } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../api/types/reachability.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { MdnsExpiryPhase } from "../../util/mdns-expiry.js";
 import { formatCountdown } from "../../util/relative-time.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 
@@ -107,36 +108,31 @@ export function renderMdnsTxtRecords(
  * that record to expire rather than actively re-querying every
  * device, which would load them.
  *
- * Same ``<details>`` chevron idiom as ``renderMdnsTxtRecords``.
- * *lifetimeSeconds* is the device's own announced record lifetime,
- * named in the explainer so it states the real duration rather than
- * a generic figure. Returns ``nothing`` when either value is ``null``
- * (no PTR record cached) so the row collapses to zero markup. The
- * caller also gates this on mDNS being the active source, since only
- * then does PTR expiry mean the device goes offline.
+ * Same ``<details>`` chevron idiom as ``renderMdnsTxtRecords``. The
+ * phase's ``ttl`` is the device's own announced record lifetime, named
+ * in the explainer so it states the real duration rather than a
+ * generic figure. Every gate lives in ``mdnsExpiryPhase``; this
+ * renders ``nothing`` for any phase but ``soon`` / ``countdown``, so
+ * the row collapses to zero markup.
  */
 export function renderMdnsExpiry(
-  remainingSeconds: number | null,
-  lifetimeSeconds: number | null,
+  phase: MdnsExpiryPhase,
   localize: LocalizeFunc,
   language: string | undefined
 ) {
-  if (remainingSeconds === null || lifetimeSeconds === null) return nothing;
-  // Below 1s the countdown would read "0s", but the record isn't gone yet —
-  // zeroconf evicts on a periodic (~10s) sweep — so say "soon" instead of
-  // showing a stuck 0.
+  if (phase.kind !== "soon" && phase.kind !== "countdown") return nothing;
   const summary =
-    remainingSeconds < 1
+    phase.kind === "soon"
       ? localize("dashboard.drawer_mdns_expires_soon")
       : localize("dashboard.drawer_mdns_expires_in", {
-          t: formatCountdown(remainingSeconds, language),
+          t: formatCountdown(phase.remaining, language),
         });
   return html`
     <details class="mdns-expiry-details">
       <summary>${summary}</summary>
       <div class="mdns-expiry-body">
         ${localize("dashboard.drawer_mdns_expires_explainer", {
-          lifetime: formatCountdown(lifetimeSeconds, language),
+          lifetime: formatCountdown(phase.ttl, language),
         })}
       </div>
     </details>
