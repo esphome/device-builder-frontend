@@ -76,6 +76,65 @@ describe("buildTroubleshootSections", () => {
     );
   });
 
+  it("leads with no_network for a compiled config without a network component", () => {
+    const sections = buildTroubleshootSections({
+      device: makeConfiguredDevice({ loaded_integrations: ["api", "logger"] }),
+      reachability: null,
+      result: makeResult(),
+      inDocker: false,
+      existingAddress: "",
+    });
+    expect(sections.map((s) => s.id)).toEqual(["no_network"]);
+  });
+
+  it("keeps network advice for wifi configs and for never-compiled ones", () => {
+    expect(
+      build({
+        device: makeConfiguredDevice({ loaded_integrations: ["wifi", "api"] }),
+        result: makeResult(),
+      })
+    ).not.toContain("no_network");
+    expect(
+      build({
+        device: makeConfiguredDevice({ loaded_integrations: [] }),
+        result: makeResult(),
+      })
+    ).not.toContain("no_network");
+  });
+
+  it("hints never_flashed for a device no channel has ever recorded", () => {
+    const ids = build({
+      result: makeResult({
+        mdns_addresses: [],
+        mdns_has_cached_trace: false,
+        ping_rtt_ms: null,
+      }),
+    });
+    expect(ids).toContain("never_flashed");
+    expect(ids).not.toContain("mdns_dark");
+  });
+
+  it("withholds never_flashed once any channel has seen the device", () => {
+    const dark = {
+      mdns_addresses: [],
+      mdns_has_cached_trace: false,
+      ping_rtt_ms: null,
+    };
+    expect(
+      build({
+        device: makeConfiguredDevice({ mac_address: "AA:BB:CC:DD:EE:FF" }),
+        result: makeResult(dark),
+      })
+    ).not.toContain("never_flashed");
+    expect(
+      build({
+        reachability: makeReachability({ ping_last_seen_seconds_ago: 30 }),
+        result: makeResult(dark),
+      })
+    ).not.toContain("never_flashed");
+    expect(build({ result: makeResult() })).not.toContain("never_flashed");
+  });
+
   it("a config-disabled mdns outranks the network darkness advice", () => {
     const ids = build({
       device: makeConfiguredDevice({ api_enabled: true, mdns_disabled: true }),

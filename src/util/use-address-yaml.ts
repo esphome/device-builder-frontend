@@ -7,14 +7,11 @@
  * `wifi: !include`-style header falls back to a copyable snippet.
  */
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
+import { NETWORK_SECTIONS, type NetworkSection } from "./network-sections.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { BARE_MAPPING_KEY_RE } from "./yaml-section-lexer.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
 import { appendSectionToYaml, updateSectionInYaml } from "./yaml-section-values.js";
-
-/** esphome components that accept `use_address`, in pick order. */
-export const NETWORK_SECTIONS = ["wifi", "ethernet", "openthread"] as const;
-export type NetworkSection = (typeof NETWORK_SECTIONS)[number];
 
 const HOSTNAME_RE =
   /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;

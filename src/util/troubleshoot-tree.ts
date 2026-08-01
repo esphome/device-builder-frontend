@@ -8,6 +8,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import { isIpLiteral } from "./ip-literal.js";
+import { NETWORK_SECTIONS } from "./network-sections.js";
 
 export const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
@@ -76,6 +77,22 @@ export function buildTroubleshootSections(
     ];
   }
 
+  if (
+    device.loaded_integrations.length > 0 &&
+    !NETWORK_SECTIONS.some((s) => device.loaded_integrations.includes(s))
+  ) {
+    // Offline by construction; network advice and the manual-address
+    // drill would both mislead. Empty loaded_integrations stays out:
+    // a never-compiled config proves nothing about its components.
+    return [
+      {
+        id: "no_network",
+        titleKey: "troubleshoot.no_network_title",
+        bodyKeys: ["troubleshoot.no_network_body"],
+      },
+    ];
+  }
+
   const sections: TroubleshootSection[] = [];
   if (device.uses_deep_sleep) {
     sections.push({
@@ -98,6 +115,12 @@ export function buildTroubleshootSections(
       id: "use_address_set",
       titleKey: "troubleshoot.use_address_set_title",
       bodyKeys: ["troubleshoot.use_address_set_body"],
+    });
+  } else if (neverSeen(device, reachability, result)) {
+    sections.push({
+      id: "never_flashed",
+      titleKey: "troubleshoot.never_flashed_title",
+      bodyKeys: ["troubleshoot.never_flashed_body"],
     });
   } else if (device.mdns_disabled) {
     // The config never broadcasts by design; VLAN/reflector advice
@@ -202,6 +225,30 @@ function mdnsNeverSeen(
   }
   if (result === null) return reachability !== null;
   return !result.mdns_has_cached_trace && result.mdns_addresses.length === 0;
+}
+
+/** No identity or address has ever been recorded through any channel
+ *  and the probe heard nothing: a strong hint the hardware was never
+ *  flashed with this configuration. */
+function neverSeen(
+  device: ConfiguredDevice,
+  reachability: ReachabilityStateEvent | null,
+  result: DeviceTroubleshootResult | null
+): boolean {
+  const rt = device.runtime_state;
+  return (
+    device.ip === "" &&
+    device.mac_address === "" &&
+    rt.deployed_version === "" &&
+    rt.deployed_config_hash === "" &&
+    rt.ip_addresses.length === 0 &&
+    (reachability === null ||
+      (reachability.mdns_last_seen_seconds_ago === null &&
+        reachability.ping_last_seen_seconds_ago === null &&
+        reachability.mqtt_last_seen_seconds_ago === null)) &&
+    (result === null ||
+      (result.mdns_addresses.length === 0 && result.ping_rtt_ms === null))
+  );
 }
 
 function mqttStale(reachability: ReachabilityStateEvent | null): boolean {

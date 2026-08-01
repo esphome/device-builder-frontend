@@ -121,7 +121,13 @@ describe("troubleshoot-dialog", () => {
   it("keeps the docker advice off the HA add-on", async () => {
     const { el } = await openDialog(
       { serverInfo: { in_docker: true, ha_addon: true } },
-      makeConfiguredDevice({ api_enabled: true, ip: "" })
+      // The MAC marks the device as previously seen; an all-empty identity
+      // would divert the diagnosis to never_flashed.
+      makeConfiguredDevice({
+        api_enabled: true,
+        ip: "",
+        mac_address: "AA:BB:CC:DD:EE:FF",
+      })
     );
     const text = el.shadowRoot!.textContent!;
     expect(text).toContain("troubleshoot.mdns_dark_body");
