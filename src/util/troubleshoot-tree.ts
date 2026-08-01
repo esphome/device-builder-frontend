@@ -145,7 +145,14 @@ export function buildTroubleshootSections(
   if (
     result &&
     pingReplyUnverified(result) &&
+    // The copy asserts "does not resolve and mDNS is silent"; require
+    // both legs to have produced that evidence rather than being
+    // inconclusive, disabled, or down.
+    dnsVerdictMeaningful(result) &&
     !result.dns_resolved &&
+    result.zeroconf_running &&
+    !result.mdns_inconclusive &&
+    !device.mdns_disabled &&
     result.mdns_addresses.length === 0
   ) {
     sections.push({

@@ -198,6 +198,28 @@ describe("buildTroubleshootSections", () => {
     expect(ids).toContain("unverified_ping");
   });
 
+  it("withholds the unverified-reply warning without meaningful evidence", () => {
+    const base = {
+      dns_resolved: false,
+      dns_addresses: [],
+      mdns_addresses: [],
+      mdns_has_cached_trace: false,
+      ping_target_source: "persisted" as const,
+    };
+    expect(
+      build({ result: makeResult({ ...base, dns_inconclusive: true }) })
+    ).not.toContain("unverified_ping");
+    expect(
+      build({ result: makeResult({ ...base, zeroconf_running: false }) })
+    ).not.toContain("unverified_ping");
+    expect(
+      build({
+        device: makeConfiguredDevice({ mdns_disabled: true }),
+        result: makeResult(base),
+      })
+    ).not.toContain("unverified_ping");
+  });
+
   it("keeps a live-resolved reply unqualified", () => {
     expect(build({ result: makeResult() })).not.toContain("unverified_ping");
   });
