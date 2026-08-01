@@ -19,13 +19,40 @@ const IPV6_RE = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/i;
 const HOSTNAME_RE =
   /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
-/** First network block present as a top-level key in the raw text, or null. */
+/** Bare block header (`wifi:`), optionally with a trailing comment. A
+ *  header carrying an inline value (`wifi: !include net.yaml`) is not
+ *  spliceable and must not match. */
+const BARE_HEADER_RES = new Map(
+  NETWORK_SECTIONS.map((section) => [
+    section,
+    new RegExp(String.raw`^${section}:[ \t]*(#.*)?$`, "m"),
+  ])
+);
+
+/** First network block spliceable as a top-level mapping, or null. */
 export function findNetworkSection(yaml: string): NetworkSection | null {
+  for (const section of NETWORK_SECTIONS) {
+    if (BARE_HEADER_RES.get(section)!.test(yaml)) return section;
+  }
+  return null;
+}
+
+/** Best-guess network key for the copyable snippet when nothing is
+ *  spliceable: any mention in the raw text wins (an `!include` header
+ *  still names the right block), then the compiled integrations, then
+ *  wifi. */
+export function snippetNetworkSection(
+  yaml: string,
+  loadedIntegrations: string[]
+): NetworkSection {
   const lines = yaml.split("\n");
   for (const section of NETWORK_SECTIONS) {
     if (findSectionStart(lines, section) >= 0) return section;
   }
-  return null;
+  for (const section of NETWORK_SECTIONS) {
+    if (loadedIntegrations.includes(section)) return section;
+  }
+  return "wifi";
 }
 
 /** Splice `use_address: value` into the network block; null when there is none. */

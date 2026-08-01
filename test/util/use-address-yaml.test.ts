@@ -5,6 +5,7 @@ import {
   applyUseAddress,
   findNetworkSection,
   isValidUseAddress,
+  snippetNetworkSection,
 } from "../../src/util/use-address-yaml.js";
 
 const WIFI_YAML = `esphome:
@@ -54,6 +55,22 @@ describe("applyUseAddress", () => {
     expect(
       applyUseAddress("packages:\n  base: !include common.yaml\n", "1.2.3.4")
     ).toBeNull();
+  });
+
+  it("refuses an include-valued network header instead of corrupting it", () => {
+    const yaml = "wifi: !include wifi.yaml\napi:\n";
+    expect(findNetworkSection(yaml)).toBeNull();
+    expect(applyUseAddress(yaml, "10.0.0.9")).toBeNull();
+  });
+});
+
+describe("snippetNetworkSection", () => {
+  it("names the block from the raw text, integrations, then wifi", () => {
+    expect(snippetNetworkSection("ethernet: !include net.yaml\n", [])).toBe("ethernet");
+    expect(snippetNetworkSection("packages:\n  a: !include x\n", ["openthread"])).toBe(
+      "openthread"
+    );
+    expect(snippetNetworkSection("packages:\n  a: !include x\n", [])).toBe("wifi");
   });
 });
 

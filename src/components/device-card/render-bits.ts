@@ -119,10 +119,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   // selecting — in select mode the whole card is one toggle target.
   const openTroubleshoot = (e: Event) => {
     e.stopPropagation();
-    fireEvent(card, "open-troubleshoot", {
-      name: card.name,
-      configuration: card.configuration,
-    });
+    fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
   };
   const troubleshootKeydown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {

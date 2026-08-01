@@ -45,6 +45,7 @@ import {
   applyUseAddress,
   isIpLiteral,
   isValidUseAddress,
+  snippetNetworkSection,
 } from "../util/use-address-yaml.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -61,7 +62,6 @@ registerMdiIcons({
 });
 
 export interface TroubleshootTarget {
-  name: string;
   configuration: string;
 }
 
@@ -95,6 +95,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   @state() private _existingAddress = "";
 
   private _subscription: ReachabilitySubscription | null = null;
+  private _snippetYaml = "";
 
   static styles = [
     espHomeStyles,
@@ -308,7 +309,9 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   ];
 
   open(target: TroubleshootTarget): void {
-    this._name = target.name;
+    // Key on the configuration and derive the device name from the
+    // catalog: senders variously hold the friendly name, and the
+    // reachability subscription needs the esphome name.
     this._configuration = target.configuration;
     this._result = null;
     this._checkFailed = false;
@@ -317,6 +320,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     // existing use_address; surface and prefill it so a stale one gets
     // updated rather than silently kept.
     const device = this._devices.find((d) => d.configuration === target.configuration);
+    this._name = device?.name ?? "";
     this._existingAddress =
       device && device.address && device.address !== `${device.name}.local`
         ? device.address
@@ -326,7 +330,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._saveState = "idle";
     this._screen = "main";
     this._dialog.open = true;
-    void this._subscribe(target.name);
+    if (this._name) void this._subscribe(this._name);
     void this._runCheck();
   }
 
@@ -360,7 +364,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
               </button>`
             : nothing
         }
-        <p class="subtitle">${this._name} &middot; ${this._configuration}</p>
+        <p class="subtitle">${device?.friendly_name || this._name}</p>
         ${
           onAddressScreen
             ? this._renderAddressScreen(device)
@@ -493,6 +497,8 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       inDocker: this._api?.serverInfo?.in_docker === true,
       existingAddress: this._existingAddress,
     });
+    // The device row knows the effective address before the probe answers.
+    const address = this._result?.address || device.address;
     return html`${sections.map((section) => {
       // The manual-address fix is the last resort: a drill row into its
       // own screen, so the diagnosis stays compact on small viewports.
@@ -514,10 +520,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         <div class="section" data-section=${section.id}>
           <h3>${this._localize(section.titleKey)}</h3>
           ${section.bodyKeys.map(
-            (key) =>
-              html`<p>
-                ${this._localize(key, { address: this._result?.address ?? "" })}
-              </p>`
+            (key) => html`<p>${this._localize(key, { address })}</p>`
           )}
           ${
             section.docsUrl
@@ -567,10 +570,14 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {
     if (this._saveState === "snippet") {
+      const section = snippetNetworkSection(
+        this._snippetYaml,
+        device.loaded_integrations
+      );
       return html`
         <p>${this._localize("troubleshoot.use_address_snippet")}</p>
         <pre class="snippet">
-wifi:
+${section}:
   use_address: ${this._addressInput.trim()}</pre>
       `;
     }
@@ -664,6 +671,7 @@ wifi:
       const yaml = await this._api.getConfig(this._configuration);
       const updated = applyUseAddress(yaml, value);
       if (updated === null) {
+        this._snippetYaml = yaml;
         this._saveState = "snippet";
         return;
       }

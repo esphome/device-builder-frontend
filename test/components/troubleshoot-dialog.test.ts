@@ -71,7 +71,7 @@ async function openDialog(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._localize = (key: string) => key;
   await mount(el);
-  el.open({ name: device.name, configuration: device.configuration });
+  el.open({ configuration: device.configuration });
   await baseDialogSettled(el);
   await flush();
   await el.updateComplete;

@@ -366,7 +366,6 @@ export class ESPHomeDeviceDrawer extends LitElement {
                   class="troubleshoot-btn"
                   @click=${() =>
                     fireEvent(this, "open-troubleshoot", {
-                      name: device.name,
                       configuration: device.configuration,
                     })}
                 >
