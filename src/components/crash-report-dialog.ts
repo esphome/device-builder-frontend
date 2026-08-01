@@ -37,7 +37,6 @@ import { configurationStem, downloadBlob } from "../util/download-text.js";
 import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { sleep } from "../util/sleep.js";
 import { maskSensitiveYaml } from "../util/yaml-sensitive-redact.js";
 import { crashReportDialogStyles } from "./crash-report-dialog.styles.js";
 
@@ -177,17 +176,22 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private async _captureConfig(session: number): Promise<void> {
-    const abandoned = () => session !== this._session || !this._dialog.open;
+    // The timed-out flag rides the abandonment predicate so the recovery
+    // loop stops retrying (or exits its api.ready park) once the dialog
+    // has already degraded to the no-config path.
+    let timedOut = false;
+    const abandoned = () => timedOut || session !== this._session || !this._dialog.open;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      if (session !== this._session || !this._dialog.open) return;
+      this._configYaml = "";
+      this._configError = "transport";
+    }, CONFIG_READ_TIMEOUT_MS);
     try {
-      const yaml = await Promise.race([
-        loadConfigWithRecovery(this._api, this._configuration, {
-          abandoned,
-          attempts: 4,
-        }),
-        sleep(CONFIG_READ_TIMEOUT_MS).then(() => {
-          throw new Error("Config read timed out");
-        }),
-      ]);
+      const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
+        abandoned,
+        attempts: 4,
+      });
       if (yaml === null) return;
       this._configYaml = maskSensitiveYaml(yaml);
       this._configError = "";
@@ -196,6 +200,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
       if (abandoned()) return;
       this._configYaml = "";
       this._configError = "transport";
+    } finally {
+      clearTimeout(timer);
     }
   }
 

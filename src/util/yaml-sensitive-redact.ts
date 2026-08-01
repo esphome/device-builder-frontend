@@ -5,10 +5,12 @@
  * YAML (search snippets, crash reports, bug submissions).
  */
 
+import { RE_INLINE_COMMENT_BOUNDARY } from "./yaml-line-walker.js";
 import {
   ALWAYS_SENSITIVE_KEYS,
   BLOCK_SCALAR_HEADER,
   findSensitiveValueRanges,
+  SECRET_TAG_VALUE,
 } from "./yaml-sensitive-scan.js";
 
 // UI surfaces (search labels, snippets) show a full row of dots so a
@@ -30,13 +32,6 @@ const COMMENT_LINE = /^(\s*#+)\s*(.*)$/;
 
 // User-defined credential keys: any separator before the suffix.
 const SENSITIVE_KEY_SUFFIX = /[_.-](password|psk)$/i;
-
-// Where an inline comment starts within a value.
-const TRAILING_COMMENT = /\s#/;
-
-// A `!secret` tag value; word-bounded so a literal that merely starts
-// with "!secret" isn't mistaken for a reference and preserved.
-const SECRET_TAG_VALUE = /^!secret\b/;
 
 /**
  * True when *key* names a credential whose value must not leave
@@ -83,12 +78,15 @@ export function maskSensitiveLine(line: string, placeholder = MASK_PLACEHOLDER):
   // Indirections aren't credentials — ``!secret <name>`` and
   // ``${some_substitution}`` only carry the *name* of the
   // value, not the value itself. Don't mask them.
-  if (SECRET_TAG_VALUE.test(value) || value.startsWith("${")) {
-    return maskTrailingComment(prefix, key, value, placeholder) ?? line;
-  }
-  // A block-scalar header carries no credential of its own; rewriting it
-  // breaks the YAML shape while the scanner masks the body lines.
-  if (BLOCK_SCALAR_HEADER.test(value)) {
+  // Preserve indirections (they carry only a name) and block-scalar
+  // headers (no credential of their own; rewriting breaks the YAML shape
+  // while the scanner masks the body lines) — but mask any trailing
+  // comment beside them.
+  if (
+    SECRET_TAG_VALUE.test(value) ||
+    value.startsWith("${") ||
+    BLOCK_SCALAR_HEADER.test(value)
+  ) {
     return maskTrailingComment(prefix, key, value, placeholder) ?? line;
   }
   return `${prefix}${key}: ${placeholder}`;
@@ -103,7 +101,7 @@ function maskTrailingComment(
   value: string,
   placeholder: string
 ): string | null {
-  const hash = value.search(TRAILING_COMMENT);
+  const hash = value.search(RE_INLINE_COMMENT_BOUNDARY);
   if (hash === -1) return null;
   return `${prefix}${key}: ${value.slice(0, hash).trimEnd()} # ${placeholder}`;
 }
@@ -114,13 +112,9 @@ function maskTrailingComment(
  * Runs the parent-aware ``findSensitiveValueRanges`` scanner over
  * the joined block (catching ``key:`` under ``encryption:`` and
  * block-scalar credentials), then falls back to the single-line
- * heuristic for what the scanner doesn't handle:
- *
- * - Commented-out credentials (``# password: hunter2``) — the
- *   scanner's ``KEY_LINE`` regex doesn't match leading ``#``.
- * - User-defined ``*_password`` / ``*_psk`` substitution keys —
- *   not in the scanner's allowlist; the suffix heuristic only
- *   lives in the single-line masker.
+ * heuristic for what the scanner doesn't handle: commented-out
+ * credentials (``# password: hunter2``) — the scanner's ``KEY_LINE``
+ * regex doesn't match leading ``#``.
  *
  * Edge case for partial windows (search snippets): a ``key:``
  * line whose ``encryption:`` parent falls outside the block stays
@@ -137,9 +131,10 @@ export function maskSensitiveLines(
   // The predicate hands the scanner this module's wider key heuristic, so
   // heuristic-named keys get its parent-scope and block-scalar handling
   // (a bare `wifi_password: |` body would otherwise stay clear text).
-  const ranges = findSensitiveValueRanges(out.join("\n"), {
-    sensitiveKeyPredicate: isSensitiveKey,
-  });
+  const ranges = findSensitiveValueRanges(
+    { lines: out.length, line: (n) => ({ text: out[n - 1] }) },
+    { sensitiveKeyPredicate: isSensitiveKey }
+  );
   const scannerMaskedLines = new Set<number>();
   for (const range of ranges) {
     const idx = range.line - 1;

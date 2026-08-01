@@ -35,9 +35,9 @@ export interface FindSensitiveValueRangesOptions {
    *  for `secrets.yaml`, where the entire file is by definition a
    *  list of credentials and the per-key allowlist doesn't apply. */
   maskAllValues?: boolean;
-  /** Extra keys to treat as sensitive beyond the built-in allowlists,
-   *  so callers with wider heuristics (`*_password` suffixes) get the
-   *  scanner's parent-scope and block-scalar handling for them. */
+  /** Keys the caller additionally treats as sensitive (may overlap the
+   *  built-in allowlists), so wider heuristics (`*_password` suffixes)
+   *  get the scanner's parent-scope and block-scalar handling. */
   sensitiveKeyPredicate?: (key: string) => boolean;
 }
 
@@ -82,6 +82,11 @@ const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 // optional explicit indentation digit, optional trailing comment. Exported
 // so the text masker preserves headers whose bodies this scanner masks.
 export const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+
+// A `!secret` tag value — carries only the indirection name. Word-bounded
+// so a literal merely starting with "!secret" doesn't pass. Exported so
+// the text masker preserves exactly the values this scanner skips.
+export const SECRET_TAG_VALUE = /^!secret\b/;
 
 /** Find the closing quote of a YAML scalar starting at `quoteStart`,
  *  honouring the (limited) escapes both quote styles allow:
@@ -218,7 +223,7 @@ export function findSensitiveValueRanges(
     // `!secret <name>` carries only the indirection name, not the
     // credential itself. Leave it as-is so the user can still see
     // which secret is being referenced.
-    if (/^!secret\b/.test(trimmedRest)) {
+    if (SECRET_TAG_VALUE.test(trimmedRest)) {
       i++;
       continue;
     }
