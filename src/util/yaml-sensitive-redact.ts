@@ -23,9 +23,12 @@ const COMPACT_MASK_PLACEHOLDER = "•";
 
 // Key/value line with an optional comment prefix — ``# password: hunter2``
 // is just as much a leak as the live form; the captured prefix keeps the
-// comment marker in the masked output. The key class matches the scanner's
-// ``KEY_LINE`` (hyphens and dots allowed) so ``wifi-password:`` is seen.
-const KEY_VALUE_LINE = /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:\s*(.+)$/;
+// comment marker in the masked output. A list dash may sit on either side
+// of the marker (``- # password:``, ``# - password:``). The key class
+// matches the scanner's ``KEY_LINE`` (hyphens and dots allowed) so
+// ``wifi-password:`` is seen.
+const KEY_VALUE_LINE =
+  /^(\s*(?:-\s+)?(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_.-]*)\s*:\s*(.+)$/;
 
 // A comment line, split into marker and content.
 const COMMENT_LINE = /^(\s*#+)\s*(.*)$/;
