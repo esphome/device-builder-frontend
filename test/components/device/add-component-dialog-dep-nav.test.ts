@@ -8,12 +8,16 @@ import {
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   type DepNavHost,
+  type DetourFrame,
+  type DetourHost,
   matchesDepDomain,
   navigateToDep,
+  popDetour,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import { makeDetourFrame } from "../../util/_make-detour-frame.js";
 
 function makeHost(
   getComponentBodies: (...args: unknown[]) => unknown,
@@ -25,8 +29,8 @@ function makeHost(
     board: { id: "apollo-esk-1" },
     _catalog: catalog,
     _selected: null,
-    _returnTo: null,
-    _depDomain: null,
+    _detourStack: [],
+    _returnValues: null,
     _depPrefill: null,
     _submitError: "",
     _submitting: false,
@@ -45,13 +49,14 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
 
 /** `fetchComponent` routes through `getComponentBodies` and returns
  *  the entry under the requested id (or null when absent). Tests
- *  pass the entry they want returned and this helper wraps it. */
-const respond = (entry: ComponentCatalogEntry | null) =>
-  vi
-    .fn()
-    .mockImplementation((ids: string[]) =>
-      Promise.resolve(entry ? { [ids[0]]: entry } : {})
-    );
+ *  pass the entries they want served, keyed by id. */
+const respond = (...entries: (ComponentCatalogEntry | null)[]) => {
+  const byId = new Map(entries.filter((e) => e !== null).map((e) => [e.id, e]));
+  return vi.fn().mockImplementation((ids: string[]) => {
+    const entry = byId.get(ids[0]);
+    return Promise.resolve(entry ? { [ids[0]]: entry } : {});
+  });
+};
 
 describe("navigateToDep", () => {
   const aht20 = makeComponentEntry("sensor.aht10");
@@ -70,8 +75,9 @@ describe("navigateToDep", () => {
 
     expect(getComponentBodies).toHaveBeenCalledWith(["i2c"], "esp32", "apollo-esk-1");
     expect(host._selected).toBe(i2c);
-    expect(host._returnTo).toBe(aht20);
-    expect(host._depDomain).toBe("i2c");
+    expect(host._detourStack).toHaveLength(1);
+    expect(host._detourStack[0].component).toBe(aht20);
+    expect(host._detourStack[0].depDomain).toBe("i2c");
     expect(filterByDomain).not.toHaveBeenCalled();
   });
 
@@ -85,8 +91,8 @@ describe("navigateToDep", () => {
 
     expect(getComponentBodies).toHaveBeenCalledWith(["output"], "esp32", "apollo-esk-1");
     expect(host._selected).toBeNull();
-    expect(host._returnTo).toBe(aht20);
-    expect(host._depDomain).toBe("output");
+    expect(host._detourStack[0].component).toBe(aht20);
+    expect(host._detourStack[0].depDomain).toBe("output");
     expect(filterByDomain).toHaveBeenCalledWith("output");
   });
 
@@ -115,10 +121,11 @@ describe("navigateToDep", () => {
     await navPromise;
 
     expect(host._selected).toBe(aht20);
+    expect(host._detourStack).toHaveLength(0);
     expect(filterByDomain).not.toHaveBeenCalled();
   });
 
-  test("_returnTo stays null while the exact-id lookup is in flight", async () => {
+  test("the frame is pushed only once the exact-id lookup resolves", async () => {
     // A submit during this window would otherwise be misclassified
     // as completing a dep detour by _onFormSubmit.
     const d = deferred<Record<string, ComponentCatalogEntry>>();
@@ -126,13 +133,52 @@ describe("navigateToDep", () => {
     host._selected = aht20;
 
     const navPromise = navigateToDep(host, "i2c");
-    expect(host._returnTo).toBeNull();
-    expect(host._depDomain).toBeNull();
+    expect(host._detourStack).toHaveLength(0);
 
     d.resolve({ i2c });
     await navPromise;
-    expect(host._returnTo).toBe(aht20);
-    expect(host._depDomain).toBe("i2c");
+    expect(host._detourStack[0].component).toBe(aht20);
+    expect(host._detourStack[0].depDomain).toBe("i2c");
+  });
+
+  test("the frame carries the level's in-progress values and prefill", async () => {
+    const host = makeHost(respond(i2c));
+    host._selected = aht20;
+    host._depPrefill = { fields: { frequency: "15kHz" }, required: [] };
+
+    await navigateToDep(host, "i2c", { name: "Cooker" });
+
+    expect(host._detourStack[0].values).toEqual({ name: "Cooker" });
+    expect(host._detourStack[0].prefill).toEqual({
+      fields: { frequency: "15kHz" },
+      required: [],
+    });
+  });
+
+  test("a dep of a dep pushes a second frame and keeps the first", async () => {
+    const bleClient = makeComponentEntry("ble_client");
+    const tracker = makeComponentEntry("esp32_ble_tracker");
+    const anova = makeComponentEntry("climate.anova");
+    const host = makeHost(respond(bleClient, tracker));
+    host._selected = anova;
+
+    await navigateToDep(host, "ble_client");
+    await navigateToDep(host, "esp32_ble_tracker");
+
+    expect(host._selected).toBe(tracker);
+    expect(host._detourStack.map((f) => f.component)).toEqual([anova, bleClient]);
+    expect(host._detourStack.map((f) => f.depDomain)).toEqual([
+      "ble_client",
+      "esp32_ble_tracker",
+    ]);
+  });
+
+  test("pushes nothing when the detour starts from the catalog", async () => {
+    const host = makeHost(respond(i2c));
+
+    await navigateToDep(host, "i2c");
+
+    expect(host._detourStack).toHaveLength(0);
   });
 
   test("a superseded navigation does not race against the latest one", async () => {
@@ -150,6 +196,8 @@ describe("navigateToDep", () => {
     await Promise.all([firstNav, secondNav]);
 
     expect(host._selected).toBe(uart);
+    expect(host._detourStack).toHaveLength(1);
+    expect(host._detourStack[0].depDomain).toBe("uart");
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
@@ -165,6 +213,54 @@ describe("navigateToDep", () => {
     expect(getComponentBodies).not.toHaveBeenCalled();
     expect(filterByDomain).not.toHaveBeenCalled();
     expect(host._selected).toBe(before);
+  });
+});
+
+describe("popDetour", () => {
+  const anova = makeComponentEntry("climate.anova");
+  const bleClient = makeComponentEntry("ble_client");
+  const prefill = { fields: { frequency: "15kHz" }, required: [] };
+  const detourHost = (stack: DetourFrame[]): DetourHost => ({
+    _selected: null,
+    _detourStack: stack,
+    _returnValues: null,
+    _depPrefill: null,
+  });
+
+  test("restores the top frame's component, values and prefill", () => {
+    const host = detourHost([
+      makeDetourFrame(anova, {
+        depDomain: "ble_client",
+        values: { name: "Cooker" },
+        prefill,
+      }),
+    ]);
+    host._selected = makeComponentEntry("esp32_ble_tracker");
+
+    const frame = popDetour(host);
+
+    expect(frame?.component).toBe(anova);
+    expect(host._selected).toBe(anova);
+    expect(host._returnValues).toEqual({ name: "Cooker" });
+    expect(host._depPrefill).toBe(prefill);
+    expect(host._detourStack).toHaveLength(0);
+  });
+
+  test("unwinds a nested chain one level per call", () => {
+    const host = detourHost([makeDetourFrame(anova), makeDetourFrame(bleClient)]);
+
+    expect(popDetour(host)?.component).toBe(bleClient);
+    expect(host._detourStack).toHaveLength(1);
+    expect(popDetour(host)?.component).toBe(anova);
+    expect(host._detourStack).toHaveLength(0);
+  });
+
+  test("returns null and changes nothing on an empty stack", () => {
+    const host = detourHost([]);
+    host._selected = bleClient;
+
+    expect(popDetour(host)).toBeNull();
+    expect(host._selected).toBe(bleClient);
   });
 });
 

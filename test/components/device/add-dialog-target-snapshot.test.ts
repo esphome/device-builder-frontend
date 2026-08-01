@@ -23,6 +23,7 @@ import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-a
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
 import type { YamlDraftDetail } from "../../../src/components/device/section-editor.js";
+import { makeDetourFrame } from "../../util/_make-detour-frame.js";
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -98,13 +99,12 @@ describe("add dialogs snapshot their target before the await", () => {
   it("add-component keeps the pre-switch target", async () => {
     const dialog = new ESPHomeAddComponentDialog();
     const add = deferred<{ yaml: string }>();
-    // `_returnTo` truthy drives the restore branch, which doesn't
+    // A pending detour frame drives the restore branch, which doesn't
     // touch the wa-dialog query — pure logic, no render.
     Object.assign(dialog as unknown as Record<string, unknown>, {
       _api: { addComponent: vi.fn(() => add.promise) },
       _selected: { id: "i2c" },
-      _returnTo: { id: "orig" },
-      _depDomain: null,
+      _detourStack: [makeDetourFrame({ id: "orig" }, { depDomain: "i2c" })],
     });
     dialog.configuration = "device.yaml";
     dialog.yaml = "esphome:\n";

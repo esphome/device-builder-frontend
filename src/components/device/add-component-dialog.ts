@@ -30,8 +30,11 @@ import { findMissingDependencies } from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   type DepNavHost,
+  type DetourFrame,
+  type DetourHost,
   matchesDepDomain,
   navigateToDep,
+  popDetour,
 } from "./add-component-dialog-dep-nav.js";
 import {
   hydrateForSelection,
@@ -120,19 +123,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @query("esphome-add-component-form")
   private _form?: ESPHomeAddComponentForm;
 
-  /** Snapshot of the form's in-progress values, captured when a "+ Add <dep>"
-   *  detour starts and restored when the original form re-mounts, so a field
-   *  the user already filled survives the round-trip. */
+  /** Values to seed the next form mount with, handed back by a popped detour
+   *  frame. Null while a dep's own form is up, which must not inherit the
+   *  values (and id) of the component that asked for it. */
   @state()
   private _returnValues: Record<string, unknown> | null = null;
-
-  /** Restored values for the mounted form: only the *original* component on
-   *  return (`_returnTo` cleared) gets them; the dep's own form during the
-   *  detour (`_returnTo` set) must not, or the dep would inherit the original's
-   *  id and collide. */
-  private get _restoredValuesForMount(): Record<string, unknown> | null {
-    return this._returnTo ? null : this._returnValues;
-  }
 
   @state()
   private _selected: ComponentCatalogEntry | null = null;
@@ -144,19 +139,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
   private _submitError = "";
 
   /**
-   * Component the user was originally adding when they clicked
-   * "+ Add <dep>" inside the form. After they finish adding the
-   * dependency, we restore this component so they don't have to
-   * re-navigate the catalog and re-fill what they had.
+   * Components suspended by a "+ Add <dep>" detour, innermost last. Each
+   * finished dependency pops one frame and restores that component, so the
+   * user doesn't re-navigate the catalog and re-fill what they had.
+   *
+   * Mutations replace the array; Lit compares by identity.
    */
   @state()
-  private _returnTo: ComponentCatalogEntry | null = null;
-
-  /** Domain the dep detour was started for (e.g. "output"). Used to
-   * locate the matching `references_component` field on the original
-   * form so we can pre-fill it with the just-created component's id. */
-  @state()
-  private _depDomain: string | null = null;
+  private _detourStack: DetourFrame[] = [];
 
   /** Pre-fill payload handed to the restored form on its next mount.
    *  Cleared after the form mounts so it doesn't apply to subsequent
@@ -242,15 +232,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
    *  which abandons the detour but must NOT bump the selection seqs (its
    *  hydrate already validated against the current token). */
   private _clearDetourFields() {
-    this._returnTo = null;
-    this._depDomain = null;
+    this._detourStack = [];
     this._prefillReference = null;
     this._depPrefill = null;
     this._returnValues = null;
   }
 
-  private _resetDetourState() {
-    this._clearDetourFields();
+  /** Drop queued bundle work and invalidate in-flight lookups. */
+  private _cancelPendingWork() {
     this._bundleQueue = [];
     this._bundleProgress = null;
     this._depNavSeq++;
@@ -259,8 +248,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._selectionSeq++;
   }
 
+  private _resetDetourState() {
+    this._clearDetourFields();
+    this._cancelPendingWork();
+  }
+
   protected render() {
     const isForm = this._selected !== null;
+    const returnTo = this._detourStack[this._detourStack.length - 1]?.component ?? null;
     // The same dialog drives both the regular catalog flow and the
     // "Add core configuration" flow — a non-empty
     // `lockedCategories` flips the title text and tells the catalog
@@ -313,10 +308,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
             : nothing
         }
         ${
-          this._returnTo
+          returnTo
             ? html`<div class="return-banner">
                 ${this._localize("device.return_to_after_dep_prefix")}
-                <strong>${this._returnTo.name}</strong>
+                <strong>${returnTo.name}</strong>
                 ${this._localize("device.return_to_after_dep_suffix")}
               </div>`
             : nothing
@@ -349,7 +344,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${chooseExcludeCategories({
             isCoreLocked: isCore,
-            isInDepDetour: this._returnTo !== null,
+            isInDepDetour: returnTo !== null,
           })}
         ></esphome-component-catalog>
         ${
@@ -360,7 +355,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .yaml=${this.yaml}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
-                .restoredValues=${this._restoredValuesForMount}
+                .restoredValues=${this._returnValues}
                 .extraRequired=${this._depPrefill?.required ?? null}
                 .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
                 .submitting=${this._submitting}
@@ -772,19 +767,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _onBack() {
     if (this._submitting) return;
-    // If the user is in the middle of a "go add a dependency" detour
-    // and they hit back, treat it as cancelling the detour: drop them
-    // back at the original component they were filling in, instead of
-    // sending them to the catalog and losing context.
-    if (this._returnTo) {
-      const restore = this._returnTo;
-      // Back out of the detour like a submit-return: keep the snapshot across
-      // the reset so the user's in-progress values survive on the original
-      // form (the binding reads `_returnValues` with `_returnTo` now null).
-      const snapshot = this._returnValues;
-      this._resetDetourState();
-      this._returnValues = snapshot;
-      this._selected = restore;
+    // Back inside a "go add a dependency" detour cancels that one level:
+    // drop the user at the component that asked for it, still filled in,
+    // instead of sending them to the catalog and losing context.
+    if (popDetour(this as unknown as DetourHost)) {
+      this._prefillReference = null;
+      this._cancelPendingWork();
       this._submitError = "";
       return;
     }
@@ -801,10 +789,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
     e.stopPropagation();
-    // Snapshot what the user has filled before `navigateToDep` swaps
-    // `_selected` and unmounts the form, so it's restored on return.
-    this._returnValues = this._form?.currentValues ?? null;
-    return navigateToDep(this as unknown as DepNavHost, e.detail.domain);
+    // Read what the user has filled before `navigateToDep` swaps `_selected`
+    // and unmounts the form, so the suspended frame carries it.
+    const values = this._form?.currentValues ?? null;
+    this._returnValues = null;
+    return navigateToDep(this as unknown as DepNavHost, e.detail.domain, values);
   }
 
   private _onFormSubmit(e: CustomEvent<{ fields: Record<string, unknown> }>) {
@@ -860,19 +849,21 @@ export class ESPHomeAddComponentDialog extends LitElement {
       );
 
       // Surface the merged YAML as an unsaved draft. We dispatch this
-      // BEFORE deciding whether to close — when restoring `_returnTo`
+      // BEFORE deciding whether to close — when a detour frame pops
       // the dialog stays open, but the device still needs the new YAML
       // (so the dependency we just added shows up in the original
       // component's dropdown). `yaml-draft` advances only the working
       // buffer, leaving the dirty flag on so the user saves explicitly.
       this._dispatchDraft({ configuration, yaml, basedOn: baseYaml });
 
-      if (this._returnTo) {
-        // Just finished adding a dependency — restore the original
-        // component's form so the user can continue where they left
-        // off. The form re-mounts fresh and re-reads `this.yaml`,
-        // which now contains the dep, so the ID-reference dropdown
-        // will be populated.
+      // Read before the pop reassigns `_selected`.
+      const added = this._selected;
+      const frame = popDetour(this as unknown as DetourHost);
+      if (frame) {
+        // Just finished adding a dependency — restore the component that
+        // asked for it so the user can continue where they left off. The
+        // form re-mounts fresh and re-reads `this.yaml`, which now contains
+        // the dep, so the ID-reference dropdown will be populated.
         //
         // This branch wins over the bundle-advance branch below: if
         // the user is mid-bundle and detours to add a missing dep,
@@ -881,26 +872,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // The bundle queue stays intact so the bundle step's own
         // submit (the next time around) will fall through to the
         // bundle-advance branch and continue.
-        const restore = this._returnTo;
-        const depDomain = this._depDomain;
+        //
         // Pre-fill the restored form's reference field with the new
         // id when the just-added component matches what the dep-nav
         // asked for (defends against the user picking off-domain in
         // the catalog fallback).
         const newId = fields["id"];
-        if (
-          depDomain &&
-          typeof newId === "string" &&
-          matchesDepDomain(this._selected, depDomain)
-        ) {
-          this._prefillReference = { domain: depDomain, id: newId };
-        } else {
-          this._prefillReference = null;
-        }
-        this._returnTo = null;
-        this._depDomain = null;
-        this._depPrefill = null;
-        this._selected = restore;
+        this._prefillReference =
+          typeof newId === "string" && matchesDepDomain(added, frame.depDomain)
+            ? { domain: frame.depDomain, id: newId }
+            : null;
       } else if (this._bundleQueue.length > 0 && this._bundleProgress) {
         // Bundle in flight — pop the next featured id and refresh the
         // form for it. The just-updated `this.yaml` (carried in via

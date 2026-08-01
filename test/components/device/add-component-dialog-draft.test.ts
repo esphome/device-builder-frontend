@@ -13,18 +13,18 @@ vi.mock("../../../src/components/device/add-component-form.js", () => ({}));
 vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
+import { makeDetourFrame } from "../../util/_make-detour-frame.js";
 
 describe("add-component-dialog preserves the editor draft (#1146)", () => {
   it("merges into this.yaml and dispatches yaml-draft, not yaml-updated", async () => {
     const dialog = new ESPHomeAddComponentDialog();
     const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
-    // `_returnTo` truthy drives the restore branch, which doesn't touch
+    // A pending detour frame drives the restore branch, which doesn't touch
     // the wa-dialog query — keeps this a pure logic test, no render.
     Object.assign(dialog as unknown as Record<string, unknown>, {
       _api: { addComponent },
       _selected: { id: "i2c" },
-      _returnTo: { id: "orig" },
-      _depDomain: null,
+      _detourStack: [makeDetourFrame({ id: "orig" }, { depDomain: "i2c" })],
     });
     dialog.configuration = "foo.yaml";
     dialog.yaml = "esphome:\n  name: foo\n";
@@ -57,8 +57,7 @@ describe("add-component-dialog preserves the editor draft (#1146)", () => {
     Object.assign(dialog as unknown as Record<string, unknown>, {
       _api: { addComponent },
       _selected: { id: "i2c" },
-      _returnTo: { id: "orig" },
-      _depDomain: null,
+      _detourStack: [makeDetourFrame({ id: "orig" }, { depDomain: "i2c" })],
     });
     dialog.configuration = "foo.yaml";
     dialog.yaml = ""; // still loading — must not become the merge base
@@ -78,7 +77,7 @@ describe("add-component-dialog preserves the editor draft (#1146)", () => {
   it("configless direct-add still merges the draft and closes the dialog", async () => {
     const dialog = new ESPHomeAddComponentDialog();
     const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
-    // No `_returnTo` / bundle state → the navigate-and-close branch runs,
+    // No detour frame / bundle state → the navigate-and-close branch runs,
     // exercising the draft-merge of the direct-add path through
     // `_submitComponent`. `notify` defaults false so this stays a pure
     // logic test (the toast is covered in -configless.test.ts).

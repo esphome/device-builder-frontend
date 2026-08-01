@@ -7,16 +7,28 @@ import {
 } from "../../util/bus-constraint-prefill.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 
+/** One suspended level of a "+ Add <dep>" detour. */
+export interface DetourFrame {
+  component: ComponentCatalogEntry;
+  depDomain: string;
+  values: Record<string, unknown> | null;
+  prefill: BusPrefill | null;
+}
+
+/** Slice of ``ESPHomeAddComponentDialog`` state a suspended level restores into. */
+export interface DetourHost {
+  _selected: ComponentCatalogEntry | null;
+  _detourStack: DetourFrame[];
+  _returnValues: Record<string, unknown> | null;
+  _depPrefill: BusPrefill | null;
+}
+
 /** Slice of ``ESPHomeAddComponentDialog`` state ``navigateToDep`` reads / writes. */
-export interface DepNavHost {
+export interface DepNavHost extends DetourHost {
   readonly _api: ESPHomeAPI;
   platform: string;
   board: { id: string; featured_components?: FeaturedComponent[] } | null;
   _catalog: { filterByDomain(domain: string): void } | null;
-  _selected: ComponentCatalogEntry | null;
-  _returnTo: ComponentCatalogEntry | null;
-  _depDomain: string | null;
-  _depPrefill: BusPrefill | null;
   _submitError: string;
   _submitting: boolean;
   _depNavSeq: number;
@@ -29,12 +41,19 @@ export interface DepNavHost {
  * rank every sensor mentioning the bus name above the bus entry.
  * Domain-level deps (``output``, ``sensor``) fall back to the
  * category-filtered catalog where the user picks a variant.
+ *
+ * ``values`` is the requesting form's in-progress input, parked on the
+ * suspended level's frame until it is popped.
  */
-export async function navigateToDep(host: DepNavHost, domain: string): Promise<void> {
+export async function navigateToDep(
+  host: DepNavHost,
+  domain: string,
+  values: Record<string, unknown> | null = null
+): Promise<void> {
   if (host._submitting) return;
   // Snapshot, don't commit, until the lookup resolves: the original
   // form is still rendered + submit-enabled (request-add-component
-  // path), so a set _returnTo would mislead _onFormSubmit.
+  // path), so a pushed frame would mislead _onFormSubmit.
   const previousSelected = host._selected;
   host._submitError = "";
   const seq = ++host._depNavSeq;
@@ -51,8 +70,15 @@ export async function navigateToDep(host: DepNavHost, domain: string): Promise<v
   }
   if (seq !== host._depNavSeq) return;
   if (previousSelected) {
-    host._returnTo = previousSelected;
-    host._depDomain = domain;
+    host._detourStack = [
+      ...host._detourStack,
+      {
+        component: previousSelected,
+        depDomain: domain,
+        values,
+        prefill: host._depPrefill,
+      },
+    ];
   }
   if (direct) {
     // The requester's bus constraints become the new bus's starting
@@ -79,6 +105,17 @@ export async function navigateToDep(host: DepNavHost, domain: string): Promise<v
   await host.updateComplete;
   if (seq !== host._depNavSeq) return;
   host._catalog?.filterByDomain(domain);
+}
+
+/** Unwind one level, restoring its component, values and prefill; null when empty. */
+export function popDetour(host: DetourHost): DetourFrame | null {
+  const frame = host._detourStack[host._detourStack.length - 1];
+  if (!frame) return null;
+  host._detourStack = host._detourStack.slice(0, -1);
+  host._selected = frame.component;
+  host._returnValues = frame.values;
+  host._depPrefill = frame.prefill;
+  return frame;
 }
 
 /**
