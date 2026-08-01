@@ -64,14 +64,24 @@ export function featuredDisplayName(fc: FeaturedComponent, fallback: string): st
   return fallback;
 }
 
+/** The featured entry a catalog id refers to; null when the id isn't a
+ *  featured one, or the board doesn't carry it. */
+export function featuredEntryForId<T extends { id: string; component_id: string }>(
+  id: string,
+  board: { id: string; featured_components?: ReadonlyArray<T> } | null
+): T | null {
+  if (!board || !isFeaturedId(id)) return null;
+  return (
+    (board.featured_components ?? []).find(
+      (c) => buildFeaturedId(board.id, c.id) === id
+    ) ?? null
+  );
+}
+
 /** Resolve a featured catalog id to the component it actually adds; non-featured or unknown ids pass through. */
 export function resolveFeaturedComponentId(
   id: string,
   board: FeaturedIdBoard | null
 ): string {
-  if (!board || !isFeaturedId(id)) return id;
-  const fc = (board.featured_components ?? []).find(
-    (c) => buildFeaturedId(board.id, c.id) === id
-  );
-  return fc?.component_id ?? id;
+  return featuredEntryForId(id, board)?.component_id ?? id;
 }

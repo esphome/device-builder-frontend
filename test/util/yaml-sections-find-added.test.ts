@@ -43,6 +43,7 @@ describe("findAddedSection", () => {
     expect(findAddedSection(yaml, "wifi", undefined)).toEqual({
       sectionKey: "wifi",
       fromLine: 3,
+      toLine: 4,
     });
   });
 
@@ -51,6 +52,7 @@ describe("findAddedSection", () => {
     expect(findAddedSection(yaml, "sensor.dht", undefined)).toEqual({
       sectionKey: "sensor.dht",
       fromLine: 2,
+      toLine: 3,
     });
   });
 

@@ -15,9 +15,9 @@ vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import { ComponentCategory } from "../../../src/api/types/components.js";
-import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
+import { makeAddComponentDialogHost } from "./_add-component-dialog-host.js";
 
 interface Internals {
   _returnTo: unknown;
@@ -34,18 +34,7 @@ interface Internals {
   _resetDetourState: () => void;
 }
 
-/** Dialog wired with a stub API so `_submitComponent`/detour paths run. */
-function makeDialog() {
-  const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
-  const getComponentBodies = vi.fn().mockResolvedValue({});
-  const dialog = new ESPHomeAddComponentDialog();
-  Object.assign(dialog as unknown as Record<string, unknown>, {
-    _api: { addComponent, getComponentBodies },
-  });
-  dialog.configuration = "foo.yaml";
-  dialog.yaml = "esphome:\n  name: foo\n";
-  return { d: dialog as unknown as Internals, addComponent, getComponentBodies };
-}
+const makeDialog = () => makeAddComponentDialogHost<Internals>();
 
 /** Override the `@query` `_form` getter for capture tests. */
 function setForm(
