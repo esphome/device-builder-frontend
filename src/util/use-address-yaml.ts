@@ -39,8 +39,12 @@ export function applyUseAddress(yaml: string, value: string): string | null {
 /** Accept an IPv4/IPv6 literal or an RFC-1123 hostname. */
 export function isValidUseAddress(value: string): boolean {
   if (value.length === 0 || value.length > 253) return false;
-  const v4 = IPV4_RE.exec(value);
-  if (v4 !== null) return v4.slice(1).every((octet) => Number(octet) <= 255);
+  if (/^[\d.]+$/.test(value)) {
+    // All digits and dots is an IPv4 attempt, not a hostname; a typo
+    // like 255.42.2.1.3 must not slip through the hostname rule.
+    const v4 = IPV4_RE.exec(value);
+    return v4 !== null && v4.slice(1).every((octet) => Number(octet) <= 255);
+  }
   if (value.includes(":")) return IPV6_RE.test(value);
   return HOSTNAME_RE.test(value);
 }

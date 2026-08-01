@@ -74,6 +74,8 @@ describe("isValidUseAddress", () => {
     "",
     " ",
     "10.0.0.299",
+    "255.42.2.1.3",
+    "1.2.3",
     "not valid",
     "bad_host",
     "a..b",

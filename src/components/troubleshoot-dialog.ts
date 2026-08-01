@@ -278,7 +278,21 @@ export class ESPHomeTroubleshootDialog extends LitElement {
         color: var(--wa-color-text-normal);
       }
 
-      .saved-note {
+      .saved-panel {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-m) 0;
+      }
+
+      .saved-panel wa-icon {
+        flex-shrink: 0;
+        font-size: 24px;
+        color: var(--esphome-success, #2e7d32);
+      }
+
+      .section .saved-panel p {
+        margin: 0;
         color: var(--wa-color-text-normal);
       }
 
@@ -513,6 +527,21 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderAddressScreen(device: ConfiguredDevice | undefined): TemplateResult {
+    if (this._saveState === "saved") {
+      return html`
+        <div class="section" data-section="use_address">
+          <div class="saved-panel">
+            <wa-icon library="mdi" name="check-circle"></wa-icon>
+            <p>${this._localize("troubleshoot.use_address_saved")}</p>
+          </div>
+          <div class="actions">
+            <button class="btn btn--confirm" @click=${this.close}>
+              ${this._localize("layout.close")}
+            </button>
+          </div>
+        </div>
+      `;
+    }
     return html`
       <div class="section" data-section="use_address">
         ${
@@ -540,11 +569,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   private _renderUseAddressForm(device: ConfiguredDevice): TemplateResult {
-    if (this._saveState === "saved") {
-      return html`<p class="saved-note">
-        ${this._localize("troubleshoot.use_address_saved")}
-      </p>`;
-    }
     if (this._saveState === "snippet") {
       return html`
         <p>${this._localize("troubleshoot.use_address_snippet")}</p>
