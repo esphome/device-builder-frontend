@@ -19,35 +19,6 @@ export const crashReportDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .summary {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-2xs);
-    margin: 0 0 var(--wa-space-m);
-    padding: 0;
-    list-style: none;
-    font-size: var(--wa-font-size-s);
-  }
-
-  .summary li {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
-  }
-
-  .summary wa-icon {
-    flex-shrink: 0;
-    color: var(--esphome-primary);
-  }
-
-  .summary li.degraded {
-    color: var(--wa-color-text-quiet);
-  }
-
-  .summary li.degraded wa-icon {
-    color: var(--wa-color-warning-fill-loud, orange);
-  }
-
   .hint {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);

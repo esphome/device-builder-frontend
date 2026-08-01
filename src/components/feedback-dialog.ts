@@ -15,18 +15,17 @@ import {
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import {
-  localizeContext,
-  serverVersionContext,
-  versionContext,
-} from "../context/index.js";
+import { localizeContext, serverVersionContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
+import type { DeviceTarget } from "../util/bug-report-prefill.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { feedbackLinkStyles } from "./feedback-link.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
+import "./feedback-device-picker.js";
 
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
@@ -49,7 +48,7 @@ const SURVEY_LINK = {
 } as const;
 
 type DrillScreen = "browse" | "bug";
-type Screen = "main" | DrillScreen;
+type Screen = "main" | DrillScreen | "device";
 
 interface FeedbackLinkBase {
   icon: string;
@@ -57,22 +56,23 @@ interface FeedbackLinkBase {
   descKey?: string;
 }
 
-// Opens a URL. "versionSource" prefills the destination form's "version" field
-// from the matching context: "dashboard" is our server version, "esphome" is
-// the installed core version.
+// Opens a URL. "versionSource: dashboard" prefills the destination form's
+// "version" field with our server version. (The ESPHome core version flows
+// through the device picker's own URL builder, not here.)
 interface ExternalLink extends FeedbackLinkBase {
   href: string;
-  versionSource?: "dashboard" | "esphome";
+  versionSource?: "dashboard";
   drillTo?: never;
+  deviceTarget?: never;
 }
 
-// Navigates to a second in-dialog screen instead of opening a link; rendered as
-// a button with a chevron rather than an anchor.
-interface DrillLink extends FeedbackLinkBase {
-  drillTo: DrillScreen;
-  href?: never;
-  versionSource?: never;
-}
+// Navigates to a second in-dialog screen instead of opening a link; rendered
+// as a button with a chevron rather than an anchor. The device screen must
+// know which bug path it prefills for, so its rows carry a target.
+type DrillLink = FeedbackLinkBase & { href?: never; versionSource?: never } & (
+    | { drillTo: DrillScreen; deviceTarget?: never }
+    | { drillTo: "device"; deviceTarget: DeviceTarget }
+  );
 
 // Discriminated union so a link is always exactly one of the two shapes; a row
 // can never omit both href and drillTo and silently render an empty anchor.
@@ -86,8 +86,8 @@ const BUG_LINKS: ReadonlyArray<FeedbackLink> = [
     icon: "bug-outline",
     labelKey: "feedback.bug_builder",
     descKey: "feedback.bug_builder_desc",
-    href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
-    versionSource: "dashboard",
+    drillTo: "device",
+    deviceTarget: "builder",
   },
   {
     icon: "access-point-network",
@@ -107,8 +107,8 @@ const BUG_LINKS: ReadonlyArray<FeedbackLink> = [
     icon: "chip",
     labelKey: "feedback.bug_esphome",
     descKey: "feedback.bug_esphome_desc",
-    href: "https://github.com/esphome/esphome/issues/new?template=bug_report.yml",
-    versionSource: "esphome",
+    drillTo: "device",
+    deviceTarget: "esphome",
   },
 ];
 
@@ -185,6 +185,11 @@ const SECTIONS: ReadonlyArray<{
   },
 ];
 
+// The focus-restore key for a drill row; device rows key on their target
+// so the two are distinguishable.
+const drillKey = (link: DrillLink): string =>
+  link.drillTo === "device" ? `device-${link.deviceTarget}` : link.drillTo;
+
 @customElement("esphome-feedback-dialog")
 export class ESPHomeFeedbackDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -195,37 +200,20 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _serverVersion = "";
 
-  @consume({ context: versionContext, subscribe: true })
-  @state()
-  private _esphomeVersion = "";
-
   private readonly _dialog = new DialogOpenController(this);
 
   @state()
   private _screen: Screen = "main";
 
-  private _hrefFor(link: FeedbackLink): string {
-    if (!link.href) {
-      return "";
-    }
-    const version =
-      link.versionSource === "esphome"
-        ? this._esphomeVersion
-        : link.versionSource === "dashboard"
-          ? this._serverVersion
-          : "";
-    if (!version) {
-      return link.href;
-    }
-    const url = new URL(link.href);
-    url.searchParams.set("version", version);
-    return url.toString();
-  }
+  // Which bug path the device screen prefills for; set when its row drills.
+  @state()
+  private _deviceTarget: DeviceTarget = "builder";
 
   static styles = [
     espHomeStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
+    feedbackLinkStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -236,19 +224,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
       }
 
-      .description {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-        margin: 0 0 var(--wa-space-m);
-      }
-
-      .links {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
       .section-header {
         margin: var(--wa-space-m) 0 var(--wa-space-2xs);
         font-size: var(--wa-font-size-xs);
@@ -256,62 +231,6 @@ export class ESPHomeFeedbackDialog extends LitElement {
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--wa-color-text-quiet);
-      }
-
-      .link {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-xs) var(--wa-space-s);
-        border-radius: var(--wa-border-radius-m);
-        /* A faint grey outline at rest gives each row a quiet edge; the brand
-           wash takes over on hover. No glow, no ring. */
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: transparent;
-        color: var(--wa-color-text-normal);
-        font-size: var(--wa-font-size-s);
-        text-decoration: none;
-        transition:
-          background 0.12s,
-          border-color 0.12s;
-      }
-
-      /* The drill row is a button; strip the native chrome so it matches the
-         anchor rows. */
-      button.link {
-        width: 100%;
-        text-align: left;
-        font-family: inherit;
-        cursor: pointer;
-      }
-
-      .link:hover {
-        border-color: transparent;
-        background: var(--esphome-tint);
-      }
-
-      .link:hover .link-external,
-      .link:focus-visible .link-external {
-        opacity: 1;
-      }
-
-      .link-icon {
-        font-size: 20px;
-        color: var(--esphome-primary);
-        flex-shrink: 0;
-      }
-
-      .link-text {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .link-desc {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
       }
 
       .back-button {
@@ -325,52 +244,14 @@ export class ESPHomeFeedbackDialog extends LitElement {
         cursor: pointer;
         font-size: 20px;
       }
-
-      .link-external {
-        font-size: 14px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        opacity: 0;
-        transition: opacity 0.12s;
-      }
-
-      /* The drill chevron is the only cue a row navigates deeper, so it stays
-         visible at rest (unlike the hover-only external-link glyph) for touch
-         users with no hover state. */
-      .link-chevron {
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-      }
-
-      .link.featured {
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-color: var(--esphome-primary);
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .link.featured:hover {
-        border-color: var(--esphome-primary-hover);
-        background: var(--esphome-primary-hover);
-      }
-
-      .link.featured .link-icon,
-      .link.featured .link-external {
-        color: var(--esphome-on-primary);
-      }
-
-      .link.featured .link-external {
-        opacity: 1;
-      }
-
-      .link.featured .link-label {
-        font-weight: var(--wa-font-weight-bold);
-      }
     `,
   ];
 
   open() {
+    // Reset before showing: a reopen racing the previous close's
+    // after-hide must leave no stale screen (the picker abandons its
+    // capture when its screen unmounts).
+    this._goTo("main");
     this._dialog.open = true;
   }
 
@@ -380,11 +261,21 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._screen = "main";
+    this._goTo("main");
   };
 
   private _goTo(screen: Screen): void {
     this._screen = screen;
+  }
+
+  private _drill(link: DrillLink): void {
+    if (link.drillTo === "device") this._deviceTarget = link.deviceTarget;
+    this._goTo(link.drillTo);
+  }
+
+  // The device screen sits under the bug screen, so Back unwinds one level.
+  private _goBack(): void {
+    this._goTo(this._screen === "device" ? "bug" : "main");
   }
 
   // A screen swap removes the control that had focus (the drill row, or the back
@@ -398,13 +289,31 @@ export class ESPHomeFeedbackDialog extends LitElement {
     if (previous === undefined) {
       return;
     }
+    // Unwinding focuses the row that drilled here (device rows key on
+    // their target); drilling deeper focuses the back button.
+    const previousKey = previous === "device" ? `device-${this._deviceTarget}` : previous;
     const target =
-      this._screen === "main"
+      this._screen === "main" || previous === "device"
         ? this.renderRoot.querySelector<HTMLElement>(
-            `button.link[data-drill="${previous}"]`
+            `button.link[data-drill="${previousKey}"]`
           )
         : this.renderRoot.querySelector<HTMLElement>(".back-button");
-    target?.focus();
+    // A device→main jump (close/reopen race) has no device row to
+    // return to; land on the first row rather than document.body.
+    (target ?? this.renderRoot.querySelector<HTMLElement>("button.link"))?.focus();
+  }
+
+  private _hrefFor(link: FeedbackLink): string {
+    if (!link.href) {
+      return "";
+    }
+    const version = link.versionSource === "dashboard" ? this._serverVersion : "";
+    if (!version) {
+      return link.href;
+    }
+    const url = new URL(link.href);
+    url.searchParams.set("version", version);
+    return url.toString();
   }
 
   private _renderLinkBody(link: FeedbackLink) {
@@ -423,9 +332,12 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   private _renderLink(link: FeedbackLink, featured = false) {
     if (link.drillTo) {
-      const screen = link.drillTo;
       return html`
-        <button class="link" data-drill=${screen} @click=${() => this._goTo(screen)}>
+        <button
+          class="link"
+          data-drill=${drillKey(link)}
+          @click=${() => this._drill(link)}
+        >
           ${this._renderLinkBody(link)}
           <wa-icon class="link-chevron" library="mdi" name="chevron-right"></wa-icon>
         </button>
@@ -446,39 +358,54 @@ export class ESPHomeFeedbackDialog extends LitElement {
   }
 
   protected render() {
-    const drill = this._screen === "main" ? null : DRILL_SCREENS[this._screen];
+    const isDevice = this._screen === "device";
+    // Inline comparisons: narrowing doesn't survive an alias of a
+    // mutable @state field, and an unnarrowed index widens `drill` to any.
+    const drill =
+      this._screen === "main" || this._screen === "device"
+        ? null
+        : DRILL_SCREENS[this._screen];
+    const label = isDevice
+      ? this._localize("feedback.device_title")
+      : this._localize(drill ? drill.titleKey : "feedback.title");
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize(drill ? drill.titleKey : "feedback.title")}
+        .label=${label}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         ${
-          drill
+          this._screen !== "main"
             ? html`<button
                 slot="header-prefix"
                 class="back-button"
                 aria-label=${this._localize("feedback.back")}
-                @click=${() => this._goTo("main")}
+                @click=${() => this._goBack()}
               >
                 <wa-icon library="mdi" name="arrow-left"></wa-icon>
               </button>`
             : ""
         }
         ${
-          drill
-            ? html`
-                ${
-                  drill.noteKey
-                    ? html`<p class="description">${this._localize(drill.noteKey)}</p>`
-                    : ""
-                }
-                <div class="links">
-                  ${drill.links.map((link) => this._renderLink(link))}
-                </div>
-              `
-            : this._renderMainScreen()
+          isDevice
+            ? html`<esphome-feedback-device-picker
+                .target=${this._deviceTarget}
+                .active=${this._dialog.open}
+                @picker-close=${this.close}
+              ></esphome-feedback-device-picker>`
+            : drill
+              ? html`
+                  ${
+                    drill.noteKey
+                      ? html`<p class="description">${this._localize(drill.noteKey)}</p>`
+                      : ""
+                  }
+                  <div class="links">
+                    ${drill.links.map((link) => this._renderLink(link))}
+                  </div>
+                `
+              : this._renderMainScreen()
         }
       </esphome-base-dialog>
     `;

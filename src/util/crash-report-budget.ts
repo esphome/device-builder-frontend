@@ -9,6 +9,13 @@
 
 export const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
 
+// Total pre-filled URL budget. GitHub's server returns 414 past roughly
+// 8 KB of URL; 8000 keeps a small margin for their redirect/query
+// additions while fitting as much of the report as possible.
+export const MAX_ISSUE_URL_LENGTH = 8000;
+
+export const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
+
 // Encoded length of *s* the way the prefilled URL actually serializes it:
 // URLSearchParams uses application/x-www-form-urlencoded, which differs
 // from encodeURIComponent for `! ~ ' ( )` (3 chars vs 1) — and ESPHome
@@ -38,6 +45,37 @@ export function takeLinesUnderBudget(
     spent += cost;
   }
   return { kept, spent, truncated: false };
+}
+
+/**
+ * Set *url*'s `config` param to *yaml* fitted under the total URL
+ * budget, deleting the param when nothing fits. The empty param is set
+ * first so the `&config=` key overhead counts against the measured
+ * budget. Returns whether the config was truncated.
+ */
+export function setFittedConfigParam(url: URL, yaml: string): boolean {
+  url.searchParams.set("config", "");
+  const fitted = fitConfig(yaml, MAX_ISSUE_URL_LENGTH - url.toString().length);
+  if (fitted.text) url.searchParams.set("config", fitted.text);
+  else url.searchParams.delete("config");
+  return fitted.truncated;
+}
+
+/**
+ * Fit a YAML document under *budget* encoded chars: whole when it fits,
+ * else the longest line prefix plus a truncation marker.
+ */
+function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
+  if (budget <= 0) return { text: "", truncated: true };
+  if (formEncodedLength(yaml) <= budget) return { text: yaml, truncated: false };
+  const { kept } = takeLinesUnderBudget(
+    yaml.split("\n"),
+    budget,
+    encodedCost(CONFIG_TRUNCATED_NOTE)
+  );
+  if (kept.length === 0) return { text: "", truncated: true };
+  kept.push(CONFIG_TRUNCATED_NOTE);
+  return { text: kept.join("\n"), truncated: true };
 }
 
 /**

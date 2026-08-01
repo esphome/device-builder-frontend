@@ -10,13 +10,17 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("sonner-js", () => ({
+  default: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 import { mount } from "../_dom.js";
 import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
 
 interface HrefLink {
   href?: string;
-  versionSource?: "dashboard" | "esphome";
+  versionSource?: "dashboard";
 }
 
 function dialog(serverVersion = "", esphomeVersion = "") {
@@ -37,17 +41,6 @@ describe("feedback-dialog version prefill", () => {
       })
     ).toBe(
       "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml&version=2026.6.0b1"
-    );
-  });
-
-  it("appends the installed core version for the ESPHome link", () => {
-    expect(
-      dialog("2026.6.0b1", "2026.6.0")._hrefFor({
-        href: "https://github.com/esphome/esphome/issues/new?template=bug_report.yml",
-        versionSource: "esphome",
-      })
-    ).toBe(
-      "https://github.com/esphome/esphome/issues/new?template=bug_report.yml&version=2026.6.0"
     );
   });
 
@@ -100,5 +93,38 @@ describe("feedback-dialog write-in-English note", () => {
     drill("browse")!.click();
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).not.toContain(NOTE);
+  });
+});
+
+describe("feedback-dialog device screen wiring", () => {
+  it("drills each bug row into the picker with its target and closes on picker-close", async () => {
+    const el = await mount(new ESPHomeFeedbackDialog());
+    el.open();
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="bug"]'
+    )!.click();
+    await el.updateComplete;
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="device-builder"]'
+    )!.click();
+    await el.updateComplete;
+    let picker = el.shadowRoot!.querySelector("esphome-feedback-device-picker")!;
+    expect(picker.target).toBe("builder");
+
+    // Back unwinds to the bug screen, then the esphome row drills.
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      'button.link[data-drill="device-esphome"]'
+    )!.click();
+    await el.updateComplete;
+    picker = el.shadowRoot!.querySelector("esphome-feedback-device-picker")!;
+    expect(picker.target).toBe("esphome");
+
+    picker.dispatchEvent(new Event("picker-close", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
   });
 });

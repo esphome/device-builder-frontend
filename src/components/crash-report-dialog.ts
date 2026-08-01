@@ -15,6 +15,7 @@ import {
 } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { summaryListStyles } from "../styles/summary-list.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import {
   isFilableTitle,
@@ -28,16 +29,16 @@ import {
   type CrashReport,
   type CrashReportMeta,
   type CrashScrape,
+  devicePlatform,
   issuePlatform,
-  platformFromIntegrations,
   scrapeCrashData,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { configurationStem, downloadBlob } from "../util/download-text.js";
-import { loadConfigWithRecovery } from "../util/load-with-recovery.js";
+import { detectInstallation } from "../util/installation.js";
+import { captureMaskedConfig } from "../util/masked-config-capture.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { maskSensitiveYaml } from "../util/yaml-sensitive-redact.js";
 import { crashReportDialogStyles } from "./crash-report-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -54,11 +55,6 @@ registerMdiIcons({
 // aria-describedby can point at the one that belongs to it.
 const TITLE_ERROR_ID = "crash-title-error";
 const DESCRIBE_ERROR_ID = "crash-description-error";
-
-// The report is filable without config, so a dead link must not pin the
-// dialog on the collecting spinner (the recovery read parks on
-// ``api.ready`` while the socket is down).
-const CONFIG_READ_TIMEOUT_MS = 30_000;
 
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
@@ -141,7 +137,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // populate this session's config.
   private _session = 0;
 
-  static styles = [espHomeStyles, modalDialogStyles, crashReportDialogStyles];
+  static styles = [
+    espHomeStyles,
+    modalDialogStyles,
+    summaryListStyles,
+    crashReportDialogStyles,
+  ];
 
   /** Open with a snapshot of the logs dialog's buffer. */
   public open(
@@ -170,20 +171,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private async _captureConfig(session: number): Promise<void> {
-    const abandoned = () => session !== this._session || !this._dialog.open;
-    try {
-      const yaml = await loadConfigWithRecovery(this._api, this._configuration, {
-        abandoned,
-        attempts: 4,
-        deadlineMs: CONFIG_READ_TIMEOUT_MS,
-      });
-      if (yaml === null) return;
-      this._configYaml = maskSensitiveYaml(yaml);
-    } catch (err) {
-      console.warn("Reading the config failed", err);
-      if (abandoned()) return;
-      this._configYaml = "";
-    }
+    const masked = await captureMaskedConfig(
+      this._api,
+      this._configuration,
+      () => session !== this._session || !this._dialog.open
+    );
+    if (masked !== null) this._configYaml = masked;
   }
 
   private _buildReport(): CrashReport {
@@ -209,24 +202,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
       dashboardVersion: this._serverVersion,
       // Plain-ESP32 sidecars can leave target_platform empty; the
       // integration list always names the platform component.
-      targetPlatform:
-        device?.target_platform ||
-        platformFromIntegrations(device?.loaded_integrations ?? []),
+      targetPlatform: device ? devicePlatform(device) : "",
       board: device?.board_id ?? "",
-      installation: this._detectInstallation(),
+      installation: detectInstallation(this._api, this._isHaAddon),
     };
-  }
-
-  // Maps the deployment signals onto the bug form's installation
-  // dropdown. Unknown ("" — the desktop app, or before the handshake
-  // populates serverInfo) omits the fact so the value isn't guessed.
-  private _detectInstallation(): string {
-    if (this._isHaAddon) return "Home Assistant Add-on";
-    const info = this._api.serverInfo;
-    // Unknown (no serverInfo, desktop app, or a backend that predates
-    // in_docker) omits the fact rather than guessing pip vs Docker.
-    if (!info || info.desktop_version || info.in_docker === undefined) return "";
-    return info.in_docker ? "Docker" : "pip";
   }
 
   // Download the full report first — the user always keeps a complete
@@ -244,7 +223,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = url;
     this._prefillComplete = complete;
     this._downloadReport();
-    window.open(url, "_blank", "noopener");
+    window.open(url, "_blank", "noopener,noreferrer");
     this._delivered = true;
   };
 
