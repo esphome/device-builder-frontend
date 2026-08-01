@@ -1,7 +1,10 @@
-import type { ConfiguredDevice } from "../api/types/devices.js";
+import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
+import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import { setFittedConfigParam } from "./crash-report-budget.js";
 import { devicePlatform, ESPHOME_BUG_FORM_URL, issuePlatform } from "./crash-report.js";
 import { deviceSortKey } from "./device-sort.js";
+import { mdnsExpiresSoon, mdnsExpiryRemaining } from "./mdns-expiry.js";
+import { formatCountdown } from "./relative-time.js";
 
 /**
  * Prefill assembly for the report-a-bug device picker: which GitHub
@@ -36,8 +39,8 @@ const DEVICE_TARGETS: Record<
   },
 };
 
-// The builder template's `config` field is required; its own description
-// tells reporters to write this when no device applies.
+// The builder and status templates' `config` fields are required; their
+// own descriptions tell reporters to write this when no device applies.
 const NOT_DEVICE_SPECIFIC = "not device specific";
 
 export interface PrefillContext {
@@ -55,17 +58,17 @@ export function buildDeviceIssueUrl(
   /** Masked YAML; "" opens the form without a config. */
   maskedConfig: string,
   ctx: PrefillContext,
-  /** Target-specific fields (the status form's `mdns-expiry`), set
-   *  before the config fit so they count against the URL budget. */
-  extraParams?: Record<string, string>
+  /** Status-target reachability snapshot; null when the read stalled. */
+  reachability?: ReachabilityStateEvent | null
 ): { url: URL; truncated: boolean } {
   const url = deviceTargetUrl(target, ctx, device);
   url.searchParams.set(
     DEVICE_TARGETS[target].factsParam,
     deviceFacts(device, target, ctx)
   );
-  for (const [key, value] of Object.entries(extraParams ?? {})) {
-    url.searchParams.set(key, value);
+  if (target === "status") {
+    // Set before the config fit so it counts against the URL budget.
+    url.searchParams.set("mdns-expiry", mdnsExpirySummary(reachability ?? null, device));
   }
   const truncated = maskedConfig ? setFittedConfigParam(url, maskedConfig) : false;
   return { url, truncated };
@@ -112,10 +115,34 @@ export function deviceFacts(
 }
 
 const ipLine = (device: ConfiguredDevice): string => {
-  const addresses = device.runtime_state.ip_addresses ?? [];
+  const addresses = device.runtime_state.ip_addresses;
   const ips = addresses.length ? addresses.join(", ") : device.ip;
   return ips ? `IP: ${ips}` : "";
 };
+
+/**
+ * The status form's `mdns-expiry` answer, in English (the form is
+ * English-only): the countdown the drawer would show, else why there
+ * isn't one.
+ */
+function mdnsExpirySummary(
+  reachability: ReachabilityStateEvent | null,
+  device: ConfiguredDevice
+): string {
+  const age = reachability?.mdns_last_seen_seconds_ago ?? null;
+  if (age === null) return "no mDNS row";
+  const ttl = reachability?.mdns_ptr_ttl_seconds ?? null;
+  const offline = device.runtime_state.state === DeviceState.OFFLINE;
+  const remaining = mdnsExpiryRemaining(age, ttl, offline);
+  if (remaining === null) {
+    if (offline) return "no expiry countdown (device offline)";
+    if (ttl === null) return "no expiry countdown (no PTR TTL)";
+    return "no expiry countdown (heard recently)";
+  }
+  return mdnsExpiresSoon(remaining)
+    ? "Expires soon"
+    : `Expires in ${formatCountdown(remaining, "en")}`;
+}
 
 // Base form URL for *target* with the version param set: the builder
 // and status forms take the dashboard version, esphome's the device's

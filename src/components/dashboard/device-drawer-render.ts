@@ -12,6 +12,7 @@ import { html, nothing } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../api/types/reachability.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { mdnsExpiresSoon } from "../../util/mdns-expiry.js";
 import { formatCountdown } from "../../util/relative-time.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 
@@ -122,15 +123,11 @@ export function renderMdnsExpiry(
   language: string | undefined
 ) {
   if (remainingSeconds === null || lifetimeSeconds === null) return nothing;
-  // Below 1s the countdown would read "0s", but the record isn't gone yet —
-  // zeroconf evicts on a periodic (~10s) sweep — so say "soon" instead of
-  // showing a stuck 0.
-  const summary =
-    remainingSeconds < 1
-      ? localize("dashboard.drawer_mdns_expires_soon")
-      : localize("dashboard.drawer_mdns_expires_in", {
-          t: formatCountdown(remainingSeconds, language),
-        });
+  const summary = mdnsExpiresSoon(remainingSeconds)
+    ? localize("dashboard.drawer_mdns_expires_soon")
+    : localize("dashboard.drawer_mdns_expires_in", {
+        t: formatCountdown(remainingSeconds, language),
+      });
   return html`
     <details class="mdns-expiry-details">
       <summary>${summary}</summary>

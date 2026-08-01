@@ -1,8 +1,5 @@
 import type { ESPHomeAPI } from "../api/index.js";
-import type {
-  ReachabilityStateEvent,
-  ReachabilitySubscription,
-} from "../api/types/reachability.js";
+import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 
 /**
  * One-shot reachability snapshot: the per-device subscription pushes its
@@ -10,29 +7,31 @@ import type {
  * unsubscribe. Bounded by *timeoutMs* and resolves null on timeout or
  * error — a report prefill must not stall on a reachability hiccup.
  */
-export function captureReachabilitySnapshot(
+export async function captureReachabilitySnapshot(
   api: ESPHomeAPI,
   deviceName: string,
   timeoutMs = 3000
 ): Promise<ReachabilityStateEvent | null> {
-  return new Promise((resolve) => {
-    let subscription: ReachabilitySubscription | null = null;
-    let done = false;
-    const finish = (state: ReachabilityStateEvent | null) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      void subscription?.unsubscribe().catch(() => undefined);
-      resolve(state);
-    };
-    const timer = setTimeout(() => finish(null), timeoutMs);
-    api
-      .subscribeDeviceReachability(deviceName, (state) => finish(state))
-      .then((sub) => {
-        subscription = sub;
-        // The snapshot may have landed before the subscribe call resolved.
-        if (done) void sub.unsubscribe().catch(() => undefined);
-      })
-      .catch(() => finish(null));
+  let first!: (state: ReachabilityStateEvent) => void;
+  const firstEvent = new Promise<ReachabilityStateEvent>((resolve) => {
+    first = resolve;
   });
+  const subscribed = api.subscribeDeviceReachability(deviceName, (state) => first(state));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      // The event can land before the subscribe call resolves; racing
+      // the chained copy as well surfaces a subscribe rejection.
+      firstEvent,
+      subscribed.then(() => firstEvent),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs, null);
+      }),
+    ]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    void subscribed.then((sub) => sub.unsubscribe()).catch(() => undefined);
+  }
 }

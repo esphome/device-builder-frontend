@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mdnsExpiryRemaining, mdnsExpirySummary } from "../../src/util/mdns-expiry.js";
+import { mdnsExpiresSoon, mdnsExpiryRemaining } from "../../src/util/mdns-expiry.js";
 
 describe("mdnsExpiryRemaining", () => {
   it("counts down past the quiet threshold", () => {
@@ -18,22 +18,10 @@ describe("mdnsExpiryRemaining", () => {
   });
 });
 
-describe("mdnsExpirySummary", () => {
-  it("mirrors the drawer's countdown text", () => {
-    expect(mdnsExpirySummary(300, 4500, false)).toBe("Expires in 1h 10m");
-  });
-
-  it("says soon at the eviction edge", () => {
-    expect(mdnsExpirySummary(4500, 4500, false)).toBe("Expires soon");
-  });
-
-  it("answers the no-row and no-countdown cases", () => {
-    expect(mdnsExpirySummary(null, 4500, false)).toBe("no mDNS row");
-    expect(mdnsExpirySummary(60, 4500, false)).toBe(
-      "no expiry countdown (heard recently)"
-    );
-    expect(mdnsExpirySummary(300, 4500, true)).toBe(
-      "no expiry countdown (device offline)"
-    );
+describe("mdnsExpiresSoon", () => {
+  it("cuts at one second", () => {
+    expect(mdnsExpiresSoon(0)).toBe(true);
+    expect(mdnsExpiresSoon(0.9)).toBe(true);
+    expect(mdnsExpiresSoon(1)).toBe(false);
   });
 });

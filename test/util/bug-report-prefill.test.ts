@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { ReachabilityStateEvent } from "../../src/api/types/reachability.js";
 import {
   buildDeviceIssueUrl,
   deviceFacts,
@@ -84,10 +85,11 @@ describe("buildDeviceIssueUrl", () => {
     expect(esphome.url.searchParams.get("version")).toBe("2026.7.1");
   });
 
-  it("prefills the status form with observed facts and extra params", () => {
+  it("prefills the status form with observed facts and the mDNS answer", () => {
     const built = buildDeviceIssueUrl("status", DEVICE, "wifi:\n  ssid: x", CTX, {
-      "mdns-expiry": "Expires in 1h 10m",
-    });
+      mdns_last_seen_seconds_ago: 300,
+      mdns_ptr_ttl_seconds: 4500,
+    } as ReachabilityStateEvent);
     expect(built.url.origin + built.url.pathname).toBe(
       "https://github.com/esphome/device-builder/issues/new"
     );
@@ -99,6 +101,37 @@ describe("buildDeviceIssueUrl", () => {
     expect(observed).toContain("Reachability source: mdns");
     expect(observed).toContain("IP: 192.168.1.5");
     expect(observed).toContain("ESPHome: 2026.7.2");
+  });
+
+  it("names the reason when no mDNS countdown applies", () => {
+    const expiry = (
+      reachability: Partial<ReachabilityStateEvent> | null,
+      device: ConfiguredDevice = DEVICE
+    ) =>
+      buildDeviceIssueUrl(
+        "status",
+        device,
+        "",
+        CTX,
+        reachability as ReachabilityStateEvent | null
+      ).url.searchParams.get("mdns-expiry");
+    expect(expiry(null)).toBe("no mDNS row");
+    expect(expiry({ mdns_last_seen_seconds_ago: 60, mdns_ptr_ttl_seconds: 4500 })).toBe(
+      "no expiry countdown (heard recently)"
+    );
+    expect(expiry({ mdns_last_seen_seconds_ago: 300, mdns_ptr_ttl_seconds: null })).toBe(
+      "no expiry countdown (no PTR TTL)"
+    );
+    const offline = {
+      ...DEVICE,
+      runtime_state: { ...DEVICE.runtime_state, state: "offline" },
+    } as unknown as ConfiguredDevice;
+    expect(
+      expiry({ mdns_last_seen_seconds_ago: 300, mdns_ptr_ttl_seconds: 4500 }, offline)
+    ).toBe("no expiry countdown (device offline)");
+    expect(expiry({ mdns_last_seen_seconds_ago: 4500, mdns_ptr_ttl_seconds: 4500 })).toBe(
+      "Expires soon"
+    );
   });
 
   it("status skip satisfies the required config field", () => {
