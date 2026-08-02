@@ -90,7 +90,10 @@ const EMPTY_CELL = html`<span class="cell-muted">—</span>`;
 const valueCell = (cls: string, val: string) =>
   val ? html`<span class=${cls}>${val}</span>` : EMPTY_CELL;
 
-export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow>[] {
+export function createDeviceColumns(
+  localize: LocalizeFunc,
+  selectMode = false
+): ColumnDef<DeviceRow>[] {
   return [
     {
       accessorKey: "status",
@@ -128,12 +131,35 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           }
         }
         const state = info.getValue() as DeviceState;
+        // "No status" opens the dialog's untracked explainer; inert
+        // only while selecting, like the other dots.
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
-          return html`<span class="cell-status"
-            ><span
-              class="status-dot untracked"
-              title=${localize("dashboard.status_untracked_tooltip")}
-            ></span
+          const untrackedTitle = localize("dashboard.status_untracked_tooltip");
+          if (selectMode) {
+            return html`<span class="cell-status"
+              ><span class="status-dot untracked" title=${untrackedTitle}></span
+            ></span>`;
+          }
+          const openUntracked = (e: Event) => {
+            e.stopPropagation();
+            fireEvent(e.currentTarget as HTMLElement, "open-troubleshoot", {
+              configuration: row._device.configuration,
+            });
+          };
+          return html`<span
+            class="cell-status"
+            role="button"
+            tabindex="0"
+            title=${untrackedTitle}
+            aria-label=${untrackedTitle}
+            @click=${openUntracked}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openUntracked(e);
+              }
+            }}
+            ><span class="status-dot untracked"></span
           ></span>`;
         }
         const dotClass =
@@ -148,8 +174,36 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : state === DeviceState.OFFLINE
               ? localize("dashboard.table_status_offline")
               : localize("dashboard.table_status_unknown");
-        return html`<span class="cell-status"
-          ><span class="status-dot ${dotClass}" title="${title}"></span
+        // Inert while selecting, matching the card badge: in select
+        // mode the whole row is one toggle target.
+        if (state === DeviceState.ONLINE || selectMode) {
+          return html`<span class="cell-status"
+            ><span class="status-dot ${dotClass}" title="${title}"></span
+          ></span>`;
+        }
+        // Non-online dots open the troubleshooting dialog. Same
+        // {configuration} detail shape as the card and drawer senders.
+        const openTroubleshoot = (e: Event) => {
+          e.stopPropagation();
+          fireEvent(e.currentTarget as HTMLElement, "open-troubleshoot", {
+            configuration: row._device.configuration,
+          });
+        };
+        const cellLabel = `${title}. ${localize("troubleshoot.open_tooltip")}`;
+        return html`<span
+          class="cell-status"
+          role="button"
+          tabindex="0"
+          title=${cellLabel}
+          aria-label=${cellLabel}
+          @click=${openTroubleshoot}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openTroubleshoot(e);
+            }
+          }}
+          ><span class="status-dot ${dotClass}"></span
         ></span>`;
       },
       size: 80,

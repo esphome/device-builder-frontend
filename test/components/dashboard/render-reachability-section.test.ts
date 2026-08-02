@@ -10,6 +10,7 @@
  * observable without walking the template.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeReachabilityEvent } from "../../_make-reachability-event.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../../src/api/types/reachability.js";
 import type { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/device-drawer-content.js";
@@ -28,7 +29,7 @@ const NOW = 1_000_000;
 function reachability(
   overrides: Partial<ReachabilityStateEvent> = {}
 ): ReachabilityStateEvent {
-  return {
+  return makeReachabilityEvent({
     device: "dev",
     state: DeviceState.ONLINE,
     active_source: "mdns",
@@ -36,12 +37,9 @@ function reachability(
     mdns_last_seen_seconds_ago: 300,
     mdns_ttl_remaining_seconds: 110,
     mdns_ptr_ttl_seconds: 4500,
-    mdns_txt_records: null,
     ping_last_seen_seconds_ago: null,
-    mqtt_last_seen_seconds_ago: null,
-    ping_rtt_ms: null,
     ...overrides,
-  };
+  });
 }
 
 // Renders the section against a fake host, returning the localize calls so

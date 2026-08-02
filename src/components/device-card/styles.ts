@@ -218,6 +218,25 @@ export const deviceCardStyles = [
       cursor: pointer;
     }
 
+    /* The clickable badge is a native button; reset its chrome so the
+       .device-status classes style it like the passive variant. The UA
+       sheet pins font-family and line-height at element level, which
+       otherwise beats the inheritance the passive div gets. */
+    button.device-status {
+      border: none;
+      font-family: inherit;
+      line-height: inherit;
+    }
+
+    .device-status.clickable {
+      cursor: pointer;
+    }
+
+    .device-status.clickable:focus-visible {
+      outline: 2px solid var(--esphome-primary);
+      outline-offset: 2px;
+    }
+
     .device-status.busy wa-spinner {
       font-size: 12px;
       --indicator-color: var(--esphome-primary);

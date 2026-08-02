@@ -223,6 +223,19 @@ export class ESPHomeDeviceDrawer extends LitElement {
         opacity: 0.5;
       }
 
+      .troubleshoot-btn {
+        margin-left: auto;
+        padding: var(--wa-space-2xs) var(--wa-space-xs);
+        border: var(--wa-border-width-s) solid currentColor;
+        border-radius: var(--wa-border-radius-m);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+      }
+
       /* ─── Body ─── */
 
       .body {
@@ -346,6 +359,19 @@ export class ESPHomeDeviceDrawer extends LitElement {
           <span class="status-dot ${stateClass}"></span>
           <wa-icon library="mdi" name=${stateIcon}></wa-icon>
           ${stateLabel}
+          ${
+            online || untracked
+              ? nothing
+              : html`<button
+                  class="troubleshoot-btn"
+                  @click=${() =>
+                    fireEvent(this, "open-troubleshoot", {
+                      configuration: device.configuration,
+                    })}
+                >
+                  ${this._localize("troubleshoot.open")}
+                </button>`
+          }
         </div>
 
         <div class="body">

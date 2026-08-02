@@ -266,6 +266,9 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       @drawer-close=${() => {
         host._drawerOpen = false;
       }}
+      @open-troubleshoot=${() => {
+        host._drawerOpen = false;
+      }}
       @edit-device=${(e: CustomEvent) => {
         host._drawerOpen = false;
         editDevice(e.detail);

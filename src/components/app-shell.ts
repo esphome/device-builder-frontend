@@ -124,6 +124,11 @@ import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 import type { Section } from "./settings-dialog/types.js";
+import "./troubleshoot-dialog.js";
+import type {
+  ESPHomeTroubleshootDialog,
+  TroubleshootTarget,
+} from "./troubleshoot-dialog.js";
 import "./update-all-dialog.js";
 import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
@@ -273,6 +278,8 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-firmware-jobs-dialog")
   private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
+  @query("esphome-troubleshoot-dialog")
+  private _troubleshootDialog!: ESPHomeTroubleshootDialog;
   @query("esphome-update-all-dialog")
   private _updateAllDialog!: ESPHomeUpdateAllDialog;
   @query("esphome-desktop-update-dialog")
@@ -583,6 +590,8 @@ export class ESPHomeApp extends LitElement {
         @open-reset-peer-build-env=${(e: CustomEvent<{ pin_sha256: string }>) =>
           this._firmwareJobsDialog?.openResetPeerBuildEnv(e.detail.pin_sha256)}
         @open-feedback=${() => this._feedbackDialog?.open()}
+        @open-troubleshoot=${(e: CustomEvent<TroubleshootTarget>) =>
+          this._troubleshootDialog?.open(e.detail)}
         @open-check-updates=${() => this._desktopUpdateDialog?.open()}
         @open-onboarding-wifi=${this._onOpenOnboarding}
         @open-guided-tour=${this._onOpenGuidedTour}
@@ -631,6 +640,7 @@ export class ESPHomeApp extends LitElement {
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
       ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
+      <esphome-troubleshoot-dialog></esphome-troubleshoot-dialog>
       <esphome-onboarding-wifi-dialog></esphome-onboarding-wifi-dialog>
       <esphome-onboarding-wizard-dialog
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}

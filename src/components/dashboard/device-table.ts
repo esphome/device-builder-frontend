@@ -252,9 +252,9 @@ export class ESPHomeDeviceTable extends LitElement {
       this._pageIndex = 0;
     }
 
-    if (this._localize !== this._prevLocalize) {
+    if (this._localize !== this._prevLocalize || changed.has("selectMode")) {
       this._prevLocalize = this._localize;
-      this._columns = createDeviceColumns(this._localize);
+      this._columns = createDeviceColumns(this._localize, this.selectMode);
     }
     if (
       changed.has("devices") ||

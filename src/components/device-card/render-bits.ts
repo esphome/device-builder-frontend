@@ -115,19 +115,38 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
+  // "No status" is the least self-explanatory state; clicking it opens
+  // the dialog in explainer-only mode (the probe stays suppressed
+  // there — it keys on a name no unit broadcasts).
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
     const label = card._localize("dashboard.status_untracked");
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
-    return html`<div
+    if (card.selectMode) {
+      return html`<div
+          id="status-untracked"
+          class="device-status ${DeviceState.UNKNOWN}"
+          role="img"
+          tabindex="0"
+          aria-label="${label}. ${tooltip}"
+        >
+          <wa-icon library="mdi" name="help-network-outline"></wa-icon>
+          ${label}
+        </div>
+        <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
+    }
+    return html`<button
         id="status-untracked"
-        class="device-status ${DeviceState.UNKNOWN}"
-        role="img"
-        tabindex="0"
+        type="button"
+        class="device-status ${DeviceState.UNKNOWN} clickable"
         aria-label="${label}. ${tooltip}"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
+        }}
       >
         <wa-icon library="mdi" name="help-network-outline"></wa-icon>
         ${label}
-      </div>
+      </button>
       <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
   }
   // Transport-agnostic icons — wifi/wifi-off implied wireless; plenty of
@@ -139,14 +158,34 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       : card.state === DeviceState.OFFLINE
         ? "network-off-outline"
         : "help-network-outline";
+  const stateLabel =
+    card.state === DeviceState.ONLINE
+      ? card._localize("dashboard.online")
+      : card.state === DeviceState.OFFLINE
+        ? card._localize("dashboard.offline")
+        : card._localize("dashboard.unknown");
+  if (card.state !== DeviceState.ONLINE && !card.selectMode) {
+    // Non-online badges open the troubleshooting dialog. Passive while
+    // selecting — in select mode the whole card is one toggle target.
+    // Native button, like the encryption indicator above.
+    const tooltip = card._localize("troubleshoot.open_tooltip");
+    return html`<button
+        id="status-badge"
+        type="button"
+        class="device-status ${card.state} clickable"
+        aria-label="${stateLabel}. ${tooltip}"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
+        }}
+      >
+        <wa-icon library="mdi" name=${stateIcon}></wa-icon>
+        ${stateLabel}
+      </button>
+      <wa-tooltip for="status-badge">${tooltip}</wa-tooltip>`;
+  }
   return html`<div class="device-status ${card.state}">
     <wa-icon library="mdi" name=${stateIcon}></wa-icon>
-    ${
-      card.state === DeviceState.ONLINE
-        ? card._localize("dashboard.online")
-        : card.state === DeviceState.OFFLINE
-          ? card._localize("dashboard.offline")
-          : card._localize("dashboard.unknown")
-    }
+    ${stateLabel}
   </div>`;
 }
