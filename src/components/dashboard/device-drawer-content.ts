@@ -232,8 +232,10 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     `;
   }
 
-  protected updated(changed: Map<string, unknown>) {
-    super.updated?.(changed);
+  // willUpdate, not updated: controllers' hostUpdated (the follower's
+  // reconcile) runs before the host's updated, so a memo cleared there
+  // would miss this cycle and wait out a 1 Hz tick.
+  protected willUpdate(changed: Map<string, unknown>) {
     // The dashboard re-binds device on every DEVICE_UPDATED push (state flap,
     // IP/version change). Only reset state when the drawer is reused for a
     // *different* device — compare configuration so same-device updates

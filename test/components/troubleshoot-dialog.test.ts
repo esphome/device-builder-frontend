@@ -360,8 +360,8 @@ describe("troubleshoot-dialog", () => {
     );
   });
 
-  it("a same-device reopen keeps the last reachability snapshot", async () => {
-    const { el, api } = await openDialog();
+  it("a same-device reopen keeps the stream and the last snapshot", async () => {
+    const { el, api, unsubscribe } = await openDialog();
     const callback = api.subscribeDeviceReachability.mock.calls[0][1] as (
       e: unknown
     ) => void;
@@ -370,8 +370,12 @@ describe("troubleshoot-dialog", () => {
     await el.updateComplete;
     el.open({ configuration: "kitchen.yaml" });
     await el.updateComplete;
-    // The kept stream redelivers nothing; blanking would strand the
-    // section until the device's next signal change.
+    await flush();
+    // The established stream survives (no drop, no resubscribe), and
+    // the snapshot stays: the kept stream redelivers nothing, so
+    // blanking would strand the section until the next signal change.
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._reachability).toBe(event);
   });
