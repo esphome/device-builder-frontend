@@ -1,6 +1,7 @@
 import type { SlimBoard } from "../api/types/boards.js";
 import { chipNameToVariant } from "./chip-variant.js";
 import { canonicalComponentKey, TARGET_PLATFORM_KEYS } from "./component-presence.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { lineIndent, parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
@@ -23,7 +24,7 @@ export function readPlatformBoard(yaml: string): YamlPlatformBoard | null {
     TARGET_PLATFORM_KEYS.has(s.key)
   );
   if (!section) return null;
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   let board: string | null = null;
   let variant: string | null = null;
   let childIndent: number | null = null;
