@@ -8,6 +8,8 @@
  * reach those sources without a backend round-trip.
  */
 
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
+
 /** Strip surrounding quotes / an inline ``# comment`` from a raw scalar. */
 function rawScalar(raw: string): string {
   const v = raw.trim();
@@ -29,7 +31,7 @@ export function parseSubstitutions(yaml: string): Map<string, string> {
   const subs = new Map<string, string>();
   if (!yaml.includes("substitutions:")) return subs;
   let inBlock = false;
-  for (const line of yaml.split("\n")) {
+  for (const line of splitYamlDocLines(yaml)) {
     if (!inBlock) {
       if (/^substitutions:\s*(#.*)?$/.test(line)) inBlock = true;
       continue;

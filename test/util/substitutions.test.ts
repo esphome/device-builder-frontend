@@ -22,6 +22,11 @@ describe("parseSubstitutions", () => {
     expect(subs.get("close_duration")).toBe("34.1sec");
   });
 
+  it("reads a CRLF substitutions block", () => {
+    const subs = parseSubstitutions("substitutions:\r\n  devicename: gate\r\n");
+    expect(subs.get("devicename")).toBe("gate");
+  });
+
   it("returns an empty map when there is no block", () => {
     expect(parseSubstitutions("esphome:\n  name: x\n").size).toBe(0);
   });
