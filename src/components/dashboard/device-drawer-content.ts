@@ -122,17 +122,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   // snapshot.value + (now - anchor) / 1000, advanced by the 1Hz tick.
   @state() _reachabilityAnchorMs = 0;
 
-  // Tick counter the relative-time renderer reads from to force a 1Hz re-render.
-  @state() _tick = 0;
-
   // Collapsed by default — flips when the user clicks the chevron on a
   // multi-IP device (typical when IPv6 is in play).
   @state() _ipExpanded = false;
 
-  private readonly _follower = new ReachabilityFollower(this, {
+  // Registered via addController; drives itself from host updates.
+  readonly _follower = new ReachabilityFollower(this, {
     api: () => this._api,
-    deviceName: () =>
-      this.drawerOpen && this.device && this._api ? this.device.name : null,
+    deviceName: () => (this.drawerOpen && this.device ? this.device.name : null),
     onEvent: (state) => {
       this._reachability = state;
       this._reachabilityAnchorMs = Date.now();
@@ -142,10 +139,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       this._reachabilityAnchorMs = 0;
     },
     // Rendered values (ages, the mDNS-expiry countdown) resolve at
-    // second precision; the tick forces the 1 Hz re-render.
-    onTick: () => {
-      this._tick = (this._tick + 1) % 1000;
-    },
+    // second precision.
+    tickRender: true,
   });
 
   static styles = [espHomeStyles, deviceDrawerContentStyles];
@@ -240,18 +235,15 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   protected updated(changed: Map<string, unknown>) {
     super.updated?.(changed);
     // The dashboard re-binds device on every DEVICE_UPDATED push (state flap,
-    // IP/version change). Only churn subscriptions / reset state when the
-    // drawer is reused for a *different* device — compare configuration so
-    // same-device updates don't reset _ipExpanded or rotate the subscription.
+    // IP/version change). Only reset state when the drawer is reused for a
+    // *different* device — compare configuration so same-device updates
+    // don't reset _ipExpanded. The follower reconciles itself per update.
     const previousDevice = changed.get("device") as ConfiguredDevice | null | undefined;
     const deviceTargetMoved =
       changed.has("device") &&
       (previousDevice?.configuration ?? null) !== (this.device?.configuration ?? null);
     if (deviceTargetMoved) {
       this._ipExpanded = false;
-    }
-    if (deviceTargetMoved || changed.has("drawerOpen") || changed.has("_api")) {
-      this._follower.reconcile();
     }
   }
 }

@@ -126,10 +126,15 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     // Key on the configuration and derive the device name from the
     // catalog: senders variously hold the friendly name, and the
     // reachability subscription needs the esphome name.
+    // A reopen onto the same still-open target keeps the stream, which
+    // redelivers nothing; blanking the snapshot would strand the
+    // section until the device's next signal change.
+    const sameLiveTarget =
+      this._dialog.open && this._configuration === target.configuration;
     this._configuration = target.configuration;
     this._result = null;
     this._checkFailed = false;
-    this._reachability = null;
+    if (!sameLiveTarget) this._reachability = null;
     // An effective address that isn't the default `<name>.local` is a
     // hint (use_address, or a custom wifi `domain:`); it prefills the
     // form only. The diagnosis-driving `_existingAddress` is set solely
@@ -148,12 +153,11 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._saveState = "idle";
     this._screen = "main";
     this._untracked = device?.name_add_mac_suffix === true;
-    // A reopen is an explicit retry; don't carry a failed-subscribe gate.
+    // A reopen is an explicit retry; don't carry a failed-subscribe
+    // gate. The follower reconciles after this update settles — an
+    // untracked target reads as idle there and tears the stream down.
     this._follower.retry();
     this._dialog.open = true;
-    // An untracked target reads as idle above, so reconcile tears the
-    // stream down instead of following it.
-    this._follower.reconcile();
     if (this._untracked) return;
     void loadExistingAddress(this);
     void this._runCheck();

@@ -1,6 +1,8 @@
 /** Pins the shared reachability follower's subscribe lifecycle. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { flush, flushTimers } from "../_dom.js";
+import { FakeHost } from "../_fake-host.js";
 import { makeReachabilityEvent } from "../_make-reachability-event.js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { ReachabilityStateEvent } from "../../src/api/types/reachability.js";
@@ -8,15 +10,6 @@ import {
   ReachabilityFollower,
   type ReachabilityFollowerOptions,
 } from "../../src/util/reachability-follower.js";
-
-function makeHost() {
-  return {
-    addController: vi.fn(),
-    removeController: vi.fn(),
-    requestUpdate: vi.fn(),
-    updateComplete: Promise.resolve(true),
-  };
-}
 
 function makeApi(
   overrides: Record<string, unknown> = {},
@@ -39,28 +32,26 @@ function makeFollower(
 ) {
   const events: ReachabilityStateEvent[] = [];
   const onTeardown = vi.fn();
-  const onTick = vi.fn();
+  const host = new FakeHost();
   let name: string | null = "kitchen";
-  const follower = new ReachabilityFollower(makeHost(), {
+  const follower = new ReachabilityFollower(host, {
     api: () => api,
     deviceName: () => name,
     onEvent: (state) => events.push(state),
     onTeardown,
-    onTick,
+    tickRender: true,
     ...overrides,
   });
   return {
     follower,
     events,
+    host,
     onTeardown,
-    onTick,
     setName: (n: string | null) => {
       name = n;
     },
   };
 }
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("ReachabilityFollower", () => {
   beforeEach(() => {
@@ -176,32 +167,33 @@ describe("ReachabilityFollower", () => {
   it("an idle target tears down, notifies, and disarms the interval", async () => {
     vi.useFakeTimers();
     const { api, unsubscribe } = makeApi();
-    const { follower, onTeardown, onTick, setName } = makeFollower(api);
+    const { follower, host, onTeardown, setName } = makeFollower(api);
     follower.reconcile();
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(onTick).toHaveBeenCalledTimes(2);
+    // tickRender requests a host render each tick.
+    expect(host.updates).toBe(2);
     setName(null);
     follower.reconcile();
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     expect(unsubscribe).toHaveBeenCalledOnce();
     expect(onTeardown).toHaveBeenCalledOnce();
-    onTick.mockClear();
+    const settled = host.updates;
     await vi.advanceTimersByTimeAsync(3000);
-    expect(onTick).not.toHaveBeenCalled();
+    expect(host.updates).toBe(settled);
   });
 
   it("hostDisconnected stops the stream and the tick", async () => {
     vi.useFakeTimers();
     const { api, unsubscribe } = makeApi();
-    const { follower, onTick } = makeFollower(api);
+    const { follower, host } = makeFollower(api);
     follower.reconcile();
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     follower.hostDisconnected();
     expect(unsubscribe).toHaveBeenCalledOnce();
-    onTick.mockClear();
+    const settled = host.updates;
     await vi.advanceTimersByTimeAsync(3000);
-    expect(onTick).not.toHaveBeenCalled();
+    expect(host.updates).toBe(settled);
   });
 
   it("the tick reconciles, recovering from a WS reconnect", async () => {
@@ -210,7 +202,7 @@ describe("ReachabilityFollower", () => {
     const { api } = makeApi({}, generation);
     const { follower } = makeFollower(api);
     follower.reconcile();
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
     generation.value = 2;
     await vi.advanceTimersByTimeAsync(1000);

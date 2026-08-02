@@ -13,6 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 
 import { baseDialogSettled, flush, mount } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { makeReachabilityEvent } from "../_make-reachability-event.js";
 import type { DeviceTroubleshootResult } from "../../src/api/types/troubleshoot.js";
 import { ESPHomeTroubleshootDialog } from "../../src/components/troubleshoot-dialog.js";
 
@@ -359,21 +360,20 @@ describe("troubleshoot-dialog", () => {
     );
   });
 
-  it("does not double-subscribe while an attempt is in flight", async () => {
-    let resolveSub: (v: { unsubscribe: () => void }) => void;
-    const pending = new Promise<{ unsubscribe: () => void }>((r) => {
-      resolveSub = r;
-    });
-    const { el, api } = await openDialog({
-      subscribeDeviceReachability: vi.fn().mockReturnValue(pending),
-    });
+  it("a same-device reopen keeps the last reachability snapshot", async () => {
+    const { el, api } = await openDialog();
+    const callback = api.subscribeDeviceReachability.mock.calls[0][1] as (
+      e: unknown
+    ) => void;
+    const event = makeReachabilityEvent();
+    callback(event);
+    await el.updateComplete;
+    el.open({ configuration: "kitchen.yaml" });
+    await el.updateComplete;
+    // The kept stream redelivers nothing; blanking would strand the
+    // section until the device's next signal change.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._follower.reconcile();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._follower.reconcile();
-    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
-    resolveSub!({ unsubscribe: vi.fn() });
-    await flush();
+    expect((el as any)._reachability).toBe(event);
   });
 
   it("drops the previous stream when reopened onto another device", async () => {

@@ -1,14 +1,13 @@
 /**
  * Shared follower for the per-device reachability stream.
  *
- * Owns the subscribe / reconnect / failure / teardown lifecycle the
- * drawer and the troubleshoot dialog previously each hand-rolled:
+ * Owns the subscribe / reconnect / failure / teardown lifecycle:
  * generation-gated resubscribe across WS reconnects, a per
  * `${name}:${generation}` failure memo with a rate-limited warn, stale
  * attempt discard, and the 1 Hz reconcile tick. Hosts declare what to
- * follow through `deviceName()` (null means idle) and call
- * `reconcile()` from their lifecycle hooks; the interval arms and
- * disarms itself off the same signal.
+ * follow through `deviceName()` (null means idle); reconcile runs
+ * after every host update, and the interval arms and disarms itself
+ * off the same signal.
  */
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
@@ -19,13 +18,14 @@ import type {
 
 export interface ReachabilityFollowerOptions {
   api: () => ESPHomeAPI | undefined;
-  /** Target to follow; null means idle (closed, hidden, untracked). */
+  /** Target to follow; null means idle (closed, hidden, untracked).
+   *  Only consulted while `api()` is defined — no api means idle. */
   deviceName: () => string | null;
   onEvent: (state: ReachabilityStateEvent) => void;
   /** Fired when an active target is torn down. */
   onTeardown?: () => void;
-  /** Fired each 1 Hz interval before reconcile. */
-  onTick?: () => void;
+  /** Request a host render each tick, for second-precision ages. */
+  tickRender?: boolean;
 }
 
 export class ReachabilityFollower implements ReactiveController {
@@ -42,13 +42,20 @@ export class ReachabilityFollower implements ReactiveController {
   private _interval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    host: ReactiveControllerHost,
+    private readonly _host: ReactiveControllerHost,
     private readonly _options: ReachabilityFollowerOptions
   ) {
-    host.addController(this);
+    _host.addController(this);
   }
 
   hostConnected(): void {
+    this.reconcile();
+  }
+
+  hostUpdated(): void {
+    // Idempotent and two reads in the steady state, so following every
+    // host update beats a hand-maintained trigger list that fails
+    // silently when a relevant property is missed.
     this.reconcile();
   }
 
@@ -56,13 +63,8 @@ export class ReachabilityFollower implements ReactiveController {
     this.stop();
   }
 
-  /**
-   * Converge the subscription and the tick on the wanted target.
-
-   * Same-target attempts no-op (the in-flight guard: name and
-   * generation register before the await); a target or generation
-   * change tears down and resubscribes; a null target goes idle.
-   */
+  /** Converge the subscription and the tick on the wanted target;
+   *  same-target attempts no-op, a null target goes idle. */
   reconcile(): void {
     const api = this._options.api();
     const wantName = api !== undefined ? this._options.deviceName() : null;
@@ -153,7 +155,7 @@ export class ReachabilityFollower implements ReactiveController {
   private _syncInterval(want: boolean): void {
     if (want && this._interval === null) {
       this._interval = setInterval(() => {
-        this._options.onTick?.();
+        if (this._options.tickRender) this._host.requestUpdate();
         this.reconcile();
       }, 1000);
     } else if (!want && this._interval !== null) {
