@@ -18,10 +18,7 @@ import { html, LitElement, nothing, type PropertyValues, type TemplateResult } f
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
-import type {
-  ReachabilityStateEvent,
-  ReachabilitySubscription,
-} from "../api/types/reachability.js";
+import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../context/index.js";
@@ -31,6 +28,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { isIpLiteral } from "../util/ip-literal.js";
 import type { NetworkPresence } from "../util/network-sections.js";
+import { ReachabilityFollower } from "../util/reachability-follower.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   buildTroubleshootSections,
@@ -104,11 +102,18 @@ export class ESPHomeTroubleshootDialog extends LitElement {
 
   @state() _networkInYaml: NetworkPresence = "unknown";
 
-  private _subscription: ReachabilitySubscription | null = null;
-  private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
-  private _subscribedGeneration = -1;
-  private _failedGeneration = -1;
-  private _subscribePending = false;
+  // Explainer-only mode (name_add_mac_suffix): the probe keys on a
+  // name no unit broadcasts, so the stream stays idle too.
+  private _untracked = false;
+
+  private readonly _follower = new ReachabilityFollower(this, {
+    api: () => this._api,
+    deviceName: () =>
+      this._dialog.open && this._name && !this._untracked ? this._name : null,
+    onEvent: (state) => {
+      this._reachability = state;
+    },
+  });
 
   static styles = [
     espHomeStyles,
@@ -142,20 +147,14 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._addressInvalid = false;
     this._saveState = "idle";
     this._screen = "main";
-    this._teardownSubscription();
+    this._untracked = device?.name_add_mac_suffix === true;
     // A reopen is an explicit retry; don't carry a failed-subscribe gate.
-    this._failedGeneration = -1;
+    this._follower.retry();
     this._dialog.open = true;
-    // Untracked (name_add_mac_suffix) opens in explainer-only mode:
-    // the probe keys on a name no unit broadcasts, so running it can
-    // only manufacture failures under the explanation. Stop the
-    // reconcile tick too; a reopen from a tracked device would
-    // otherwise leave the old interval resubscribing the stream.
-    if (device?.name_add_mac_suffix) {
-      this._stopReconcile();
-      return;
-    }
-    this._startReconcile();
+    // An untracked target reads as idle above, so reconcile tears the
+    // stream down instead of following it.
+    this._follower.reconcile();
+    if (this._untracked) return;
     void loadExistingAddress(this);
     void this._runCheck();
   }
@@ -433,80 +432,15 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     }
   }
 
-  // Reconcile the reachability stream once a second while open: the
-  // API clears listeners on a WS drop, so a reconnect (generation bump)
-  // or a failed initial subscribe needs a fresh attempt (same shape as
-  // the drawer's reconcileSubscription).
-  private _startReconcile(): void {
-    this._stopReconcile();
-    this._reconcileTimer = setInterval(() => this._reconcileSubscription(), 1000);
-    this._reconcileSubscription();
-  }
-
-  private _stopReconcile(): void {
-    if (this._reconcileTimer !== null) {
-      clearInterval(this._reconcileTimer);
-      this._reconcileTimer = null;
-    }
-  }
-
-  private _reconcileSubscription(): void {
-    // An in-flight subscribe must finish before another attempt, or
-    // each 1Hz tick opens a fresh stream while the ack is pending.
-    if (this._subscribePending) return;
-    const generation = this._api?.connectionGeneration ?? 0;
-    if (this._subscription !== null && generation === this._subscribedGeneration) return;
-    if (this._subscription === null && generation === this._failedGeneration) return;
-    this._teardownSubscription();
-    if (this._name) void this._subscribe(this._name, generation);
-  }
-
-  private async _subscribe(name: string, generation: number): Promise<void> {
-    this._subscribePending = true;
-    this._subscribedGeneration = generation;
-    try {
-      const subscription = await this._api.subscribeDeviceReachability(name, (event) => {
-        if (name === this._name) this._reachability = event;
-      });
-      if (name !== this._name || !this._dialog.open) {
-        void subscription.unsubscribe();
-        return;
-      }
-      this._subscription = subscription;
-    } catch (err) {
-      // Advice degrades to device flags + probe result without the
-      // stream; one retry per connection generation.
-      this._failedGeneration = generation;
-      console.warn("subscribeDeviceReachability failed", err);
-    } finally {
-      this._subscribePending = false;
-    }
-  }
-
   protected updated(changed: PropertyValues): void {
     if (changed.has("_screen") && this._screen === "address") {
       this.renderRoot.querySelector<HTMLInputElement>(".address-form input")?.focus();
     }
   }
 
-  private _teardownSubscription(): void {
-    if (this._subscription !== null) {
-      const sub = this._subscription;
-      this._subscription = null;
-      void sub.unsubscribe();
-    }
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._stopReconcile();
-    this._teardownSubscription();
-  }
-
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._stopReconcile();
-    this._teardownSubscription();
+    this._follower.stop();
   };
 }
 

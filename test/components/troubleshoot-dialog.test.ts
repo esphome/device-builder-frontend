@@ -368,19 +368,31 @@ describe("troubleshoot-dialog", () => {
       subscribeDeviceReachability: vi.fn().mockReturnValue(pending),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._reconcileSubscription();
+    (el as any)._follower.reconcile();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._reconcileSubscription();
+    (el as any)._follower.reconcile();
     expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
     resolveSub!({ unsubscribe: vi.fn() });
     await flush();
   });
 
-  it("drops the previous stream when reopened", async () => {
-    const { el, unsubscribe } = await openDialog();
-    el.open({ configuration: "kitchen.yaml" });
+  it("drops the previous stream when reopened onto another device", async () => {
+    const { el, api, unsubscribe } = await openDialog();
+    const other = makeConfiguredDevice({
+      name: "garage",
+      configuration: "garage.yaml",
+      ip: "10.0.0.43",
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._devices = [...(el as any)._devices, other];
+    el.open({ configuration: "garage.yaml" });
     await el.updateComplete;
+    await flush();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(api.subscribeDeviceReachability).toHaveBeenLastCalledWith(
+      "garage",
+      expect.any(Function)
+    );
   });
 
   it("unsubscribes the reachability stream on close", async () => {

@@ -1,0 +1,227 @@
+/** Pins the shared reachability follower's subscribe lifecycle. */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { makeReachabilityEvent } from "../_make-reachability-event.js";
+import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import type { ReachabilityStateEvent } from "../../src/api/types/reachability.js";
+import {
+  ReachabilityFollower,
+  type ReachabilityFollowerOptions,
+} from "../../src/util/reachability-follower.js";
+
+function makeHost() {
+  return {
+    addController: vi.fn(),
+    removeController: vi.fn(),
+    requestUpdate: vi.fn(),
+    updateComplete: Promise.resolve(true),
+  };
+}
+
+function makeApi(
+  overrides: Record<string, unknown> = {},
+  generation: { value: number } = { value: 1 }
+) {
+  const unsubscribe = vi.fn().mockResolvedValue(undefined);
+  const api = {
+    get connectionGeneration() {
+      return generation.value;
+    },
+    subscribeDeviceReachability: vi.fn().mockResolvedValue({ unsubscribe }),
+    ...overrides,
+  };
+  return { api: api as unknown as ESPHomeAPI, unsubscribe };
+}
+
+function makeFollower(
+  api: ESPHomeAPI | undefined,
+  overrides: Partial<ReachabilityFollowerOptions> = {}
+) {
+  const events: ReachabilityStateEvent[] = [];
+  const onTeardown = vi.fn();
+  const onTick = vi.fn();
+  let name: string | null = "kitchen";
+  const follower = new ReachabilityFollower(makeHost(), {
+    api: () => api,
+    deviceName: () => name,
+    onEvent: (state) => events.push(state),
+    onTeardown,
+    onTick,
+    ...overrides,
+  });
+  return {
+    follower,
+    events,
+    onTeardown,
+    onTick,
+    setName: (n: string | null) => {
+      name = n;
+    },
+  };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe("ReachabilityFollower", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("subscribes on reconcile and delivers events", async () => {
+    const { api } = makeApi();
+    const { follower, events } = makeFollower(api);
+    follower.reconcile();
+    await flush();
+    const sub = api.subscribeDeviceReachability as ReturnType<typeof vi.fn>;
+    expect(sub).toHaveBeenCalledWith("kitchen", expect.any(Function));
+    const callback = sub.mock.calls[0][1];
+    const event = makeReachabilityEvent();
+    callback(event);
+    expect(events).toEqual([event]);
+    follower.stop();
+  });
+
+  it("same-target reconcile no-ops while an attempt is in flight", async () => {
+    let resolveSub!: (v: { unsubscribe: () => Promise<void> }) => void;
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi.fn().mockReturnValue(
+        new Promise((r) => {
+          resolveSub = r;
+        })
+      ),
+    });
+    const { follower } = makeFollower(api);
+    follower.reconcile();
+    follower.reconcile();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    resolveSub({ unsubscribe: vi.fn().mockResolvedValue(undefined) });
+    await flush();
+    follower.reconcile();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    follower.stop();
+  });
+
+  it("a stale resolve unsubscribes itself and drops its events", async () => {
+    let resolveSub!: (v: { unsubscribe: () => Promise<void> }) => void;
+    const staleUnsub = vi.fn().mockResolvedValue(undefined);
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi.fn().mockReturnValue(
+        new Promise((r) => {
+          resolveSub = r;
+        })
+      ),
+    });
+    const { follower, events, setName } = makeFollower(api);
+    follower.reconcile();
+    const callback = (api.subscribeDeviceReachability as ReturnType<typeof vi.fn>).mock
+      .calls[0][1];
+    setName(null);
+    follower.reconcile();
+    resolveSub({ unsubscribe: staleUnsub });
+    await flush();
+    expect(staleUnsub).toHaveBeenCalledOnce();
+    callback(makeReachabilityEvent());
+    expect(events).toEqual([]);
+  });
+
+  it("memoizes a failed (device, generation) and warns once", async () => {
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi.fn().mockRejectedValue(new Error("nope")),
+    });
+    const { follower } = makeFollower(api);
+    follower.reconcile();
+    await flush();
+    follower.reconcile();
+    follower.reconcile();
+    await flush();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    follower.stop();
+  });
+
+  it("a generation bump retries a failed subscribe and rotates the stream", async () => {
+    const generation = { value: 1 };
+    const { api, unsubscribe } = makeApi({}, generation);
+    const { follower } = makeFollower(api);
+    follower.reconcile();
+    await flush();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    generation.value = 2;
+    follower.reconcile();
+    await flush();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(2);
+    follower.stop();
+  });
+
+  it("retry clears the failure memo so reconcile attempts again", async () => {
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi.fn().mockRejectedValue(new Error("nope")),
+    });
+    const { follower } = makeFollower(api);
+    follower.reconcile();
+    await flush();
+    follower.retry();
+    follower.reconcile();
+    await flush();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    follower.stop();
+  });
+
+  it("an idle target tears down, notifies, and disarms the interval", async () => {
+    vi.useFakeTimers();
+    const { api, unsubscribe } = makeApi();
+    const { follower, onTeardown, onTick, setName } = makeFollower(api);
+    follower.reconcile();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(onTick).toHaveBeenCalledTimes(2);
+    setName(null);
+    follower.reconcile();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(onTeardown).toHaveBeenCalledOnce();
+    onTick.mockClear();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(onTick).not.toHaveBeenCalled();
+  });
+
+  it("hostDisconnected stops the stream and the tick", async () => {
+    vi.useFakeTimers();
+    const { api, unsubscribe } = makeApi();
+    const { follower, onTick } = makeFollower(api);
+    follower.reconcile();
+    await vi.advanceTimersByTimeAsync(0);
+    follower.hostDisconnected();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    onTick.mockClear();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(onTick).not.toHaveBeenCalled();
+  });
+
+  it("the tick reconciles, recovering from a WS reconnect", async () => {
+    vi.useFakeTimers();
+    const generation = { value: 1 };
+    const { api } = makeApi({}, generation);
+    const { follower } = makeFollower(api);
+    follower.reconcile();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    generation.value = 2;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(2);
+    follower.stop();
+  });
+
+  it("no api means idle regardless of the wanted name", () => {
+    const { follower } = makeFollower(undefined);
+    follower.reconcile();
+    // Nothing to assert beyond not throwing; no subscribe target exists.
+    follower.stop();
+  });
+});

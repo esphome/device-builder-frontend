@@ -34,10 +34,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { IntegrationDoc } from "../../api/types/components.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
-import type {
-  ReachabilityStateEvent,
-  ReachabilitySubscription,
-} from "../../api/types/reachability.js";
+import type { ReachabilityStateEvent } from "../../api/types/reachability.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
@@ -47,13 +44,9 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
+import { ReachabilityFollower } from "../../util/reachability-follower.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import {
-  reconcileSubscription,
-  renderReachabilitySection,
-  syncTickInterval,
-  teardownSubscription,
-} from "./device-drawer-content/reachability.js";
+import { renderReachabilitySection } from "./device-drawer-content/reachability.js";
 import {
   renderBluetoothMacRow,
   renderBuildSizeRow,
@@ -136,23 +129,24 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   // multi-IP device (typical when IPv6 is in play).
   @state() _ipExpanded = false;
 
-  // Tracked separately from device.configuration so a swap to a new device
-  // cleanly tears down the previous subscription before opening a new one.
-  _subscribedDevice: string | null = null;
-  _subscription: ReachabilitySubscription | null = null;
-
-  // WS connection generation captured when the subscription opened. Compared
-  // against api.connectionGeneration each reconcile — mismatch means the WS
-  // dropped and we need to resubscribe even though the device name didn't change.
-  _subscribedGeneration = 0;
-
-  // "<deviceName>:<generation>" of the last logged failure / failed attempt.
-  // Without these gates the 1Hz tick would log + retry forever during a
-  // WS-down window. Both reset on natural progression (different device,
-  // fresh WS) so transient failures self-heal.
-  _loggedFailureKey: string | null = null;
-  _failedSubscribeKey: string | null = null;
-  _tickInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly _follower = new ReachabilityFollower(this, {
+    api: () => this._api,
+    deviceName: () =>
+      this.drawerOpen && this.device && this._api ? this.device.name : null,
+    onEvent: (state) => {
+      this._reachability = state;
+      this._reachabilityAnchorMs = Date.now();
+    },
+    onTeardown: () => {
+      this._reachability = null;
+      this._reachabilityAnchorMs = 0;
+    },
+    // Rendered values (ages, the mDNS-expiry countdown) resolve at
+    // second precision; the tick forces the 1 Hz re-render.
+    onTick: () => {
+      this._tick = (this._tick + 1) % 1000;
+    },
+  });
 
   static styles = [espHomeStyles, deviceDrawerContentStyles];
 
@@ -257,19 +251,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       this._ipExpanded = false;
     }
     if (deviceTargetMoved || changed.has("drawerOpen") || changed.has("_api")) {
-      reconcileSubscription(this);
-      // Run the tick whenever there's a target, independent of whether the
-      // subscribe succeeded — a failed initial subscribe gets retried at 1Hz.
-      syncTickInterval(this);
-    }
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
-    teardownSubscription(this);
-    if (this._tickInterval !== null) {
-      clearInterval(this._tickInterval);
-      this._tickInterval = null;
+      this._follower.reconcile();
     }
   }
 }
