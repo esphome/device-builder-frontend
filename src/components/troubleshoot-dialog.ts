@@ -148,8 +148,13 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     this._dialog.open = true;
     // Untracked (name_add_mac_suffix) opens in explainer-only mode:
     // the probe keys on a name no unit broadcasts, so running it can
-    // only manufacture failures under the explanation.
-    if (device?.name_add_mac_suffix) return;
+    // only manufacture failures under the explanation. Stop the
+    // reconcile tick too; a reopen from a tracked device would
+    // otherwise leave the old interval resubscribing the stream.
+    if (device?.name_add_mac_suffix) {
+      this._stopReconcile();
+      return;
+    }
     this._startReconcile();
     void loadExistingAddress(this);
     void this._runCheck();

@@ -169,6 +169,27 @@ describe("troubleshoot-dialog", () => {
     expect(el.shadowRoot!.textContent).not.toContain("troubleshoot.check_again");
   });
 
+  it("reopening onto an untracked device stops the previous reconcile tick", async () => {
+    const tracked = makeConfiguredDevice({ ip: "10.0.0.42" });
+    const untracked = makeConfiguredDevice({
+      name: "fleet",
+      configuration: "fleet.yaml",
+      name_add_mac_suffix: true,
+    });
+    const { el, api } = await openDialog({}, tracked);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._devices = [tracked, untracked];
+    api.subscribeDeviceReachability.mockClear();
+    vi.useFakeTimers();
+    try {
+      el.open({ configuration: "fleet.yaml" });
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(api.subscribeDeviceReachability).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows only the untracked explainer for a mac-suffix config", async () => {
     const { el } = await openDialog(
       {},
