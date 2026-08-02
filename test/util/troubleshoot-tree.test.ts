@@ -151,6 +151,17 @@ describe("buildTroubleshootSections", () => {
       })
     ).not.toContain("never_flashed");
     expect(build({ result: makeResult() })).not.toContain("never_flashed");
+    // A cached mDNS trace, expired included, is evidence the device
+    // has been heard.
+    expect(
+      build({
+        result: makeResult({
+          mdns_addresses: [],
+          mdns_has_cached_trace: true,
+          ping_rtt_ms: null,
+        }),
+      })
+    ).not.toContain("never_flashed");
   });
 
   it("a config-disabled mdns outranks the network darkness advice", () => {

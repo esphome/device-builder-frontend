@@ -253,7 +253,9 @@ function neverSeen(
         reachability.ping_last_seen_seconds_ago === null &&
         reachability.mqtt_last_seen_seconds_ago === null)) &&
     (result === null ||
-      (result.mdns_addresses.length === 0 && result.ping_rtt_ms === null))
+      (result.mdns_addresses.length === 0 &&
+        !result.mdns_has_cached_trace &&
+        result.ping_rtt_ms === null))
   );
 }
 

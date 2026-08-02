@@ -3,8 +3,9 @@
  * troubleshooting dialog's manual-address fix. Splices through the
  * section machinery so comments and untouched keys survive; a config
  * with no local network block at all (`packages:` include) gets a new
- * block appended that deep-merges per-device, and only a
- * `wifi: !include`-style header falls back to a copyable snippet.
+ * block appended that deep-merges per-device; a network header that is
+ * not a bare mapping key (`wifi: !include net.yaml`) falls back to a
+ * copyable snippet.
  */
 import { yamlHasMergedSources } from "./config-entry-yaml-scan.js";
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
@@ -28,10 +29,11 @@ export type ApplyUseAddressResult =
  * Splice `use_address: value` into the local network block, or append a
  * new block that deep-merges with a `packages:`-supplied one.
 
- * A `wifi: !include`-style header yields `{snippet}` (a second
- * top-level header beside it would be a duplicate key); a config with
- * no network component anywhere yields `{noNetwork}` — appending a
- * bare `wifi:` block to it would not compile.
+ * A network header that is not a bare mapping key (`wifi: !include
+ * net.yaml`) yields `{snippet}`: a second top-level header beside it
+ * would be a duplicate key. A config with no network component
+ * anywhere yields `{noNetwork}` — appending a bare `wifi:` block to
+ * it would not compile.
  */
 export function applyUseAddress(
   yaml: string,
