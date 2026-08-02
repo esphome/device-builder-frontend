@@ -1,10 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import type { ESPHomeAPI } from "../../../api/esphome-api.js";
 import { DeviceState } from "../../../api/types/devices.js";
-import type {
-  ReachabilitySource,
-  ReachabilityStateEvent,
-} from "../../../api/types/reachability.js";
+import type { ReachabilitySource } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
 import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
@@ -148,101 +144,4 @@ function renderReachabilityRow(
       </div>
     </div>
   `;
-}
-
-// Reconcile (open / close / swap) the per-device subscription against
-// (drawerOpen, device.name, api). Called from updated() and the 1Hz tick
-// (which catches WS reconnects — the API clears event listeners on close so
-// the stale _subscribedDevice would otherwise block resubscribe).
-export function reconcileSubscription(host: ESPHomeDeviceDrawerContent): void {
-  const wantName = host.drawerOpen && host.device && host._api ? host.device.name : null;
-  const currentGeneration = host._api?.connectionGeneration ?? 0;
-  const generationChanged =
-    host._subscribedDevice !== null && currentGeneration !== host._subscribedGeneration;
-  if (wantName === host._subscribedDevice && !generationChanged) return;
-
-  teardownSubscription(host);
-  if (wantName === null || host._api === undefined) return;
-
-  // Skip if we already failed on this exact (device, gen). Permanent errors
-  // (NOT_FOUND, INVALID_ARGS) would otherwise re-fire every tick. The key
-  // resets when device selection changes or WS reconnects.
-  const targetKey = `${wantName}:${currentGeneration}`;
-  if (host._failedSubscribeKey === targetKey) return;
-
-  host._subscribedDevice = wantName;
-  host._subscribedGeneration = currentGeneration;
-  void openSubscription(host, wantName, currentGeneration, targetKey, host._api);
-}
-
-async function openSubscription(
-  host: ESPHomeDeviceDrawerContent,
-  deviceName: string,
-  attemptGeneration: number,
-  attemptKey: string,
-  api: ESPHomeAPI
-): Promise<void> {
-  // A WS reconnect (gen bump) or different-device selection between
-  // subscribe-start and resolve/reject makes this attempt stale; catch
-  // must not mutate state belonging to the newer attempt; success must
-  // unsubscribe the just-created handle.
-  const isCurrent = (): boolean =>
-    host._subscribedDevice === deviceName &&
-    host._subscribedGeneration === attemptGeneration;
-
-  try {
-    const subscription = await api.subscribeDeviceReachability(
-      deviceName,
-      (state: ReachabilityStateEvent) => {
-        if (!isCurrent()) return;
-        host._reachability = state;
-        host._reachabilityAnchorMs = Date.now();
-      }
-    );
-    if (!isCurrent()) {
-      void subscription.unsubscribe();
-      return;
-    }
-    host._subscription = subscription;
-    host._failedSubscribeKey = null;
-  } catch (err) {
-    // Rate-limit the warning — the 1Hz tick retries reconcile, and during
-    // a WS-not-yet-connected window each retry would also log.
-    if (host._loggedFailureKey !== attemptKey) {
-      host._loggedFailureKey = attemptKey;
-      console.warn("subscribeDeviceReachability failed", err);
-    }
-    if (isCurrent()) {
-      host._failedSubscribeKey = attemptKey;
-      host._subscribedDevice = null;
-    }
-  }
-}
-
-export function teardownSubscription(host: ESPHomeDeviceDrawerContent): void {
-  host._subscribedDevice = null;
-  host._reachability = null;
-  host._reachabilityAnchorMs = 0;
-  if (host._subscription !== null) {
-    const sub = host._subscription;
-    host._subscription = null;
-    void sub.unsubscribe();
-  }
-}
-
-// 1Hz tick: rendered values (ages, the mDNS-expiry countdown) resolve at
-// second precision. Also probes for WS reconnect / failed-initial-subscribe
-// via reconcileSubscription on every tick.
-export function syncTickInterval(host: ESPHomeDeviceDrawerContent): void {
-  const wantTick =
-    host.drawerOpen && host.device !== undefined && host._api !== undefined;
-  if (wantTick && host._tickInterval === null) {
-    host._tickInterval = setInterval(() => {
-      host._tick = (host._tick + 1) % 1000;
-      reconcileSubscription(host);
-    }, 1000);
-  } else if (!wantTick && host._tickInterval !== null) {
-    clearInterval(host._tickInterval);
-    host._tickInterval = null;
-  }
 }
