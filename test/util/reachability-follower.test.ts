@@ -210,10 +210,92 @@ describe("ReachabilityFollower", () => {
     follower.stop();
   });
 
-  it("no api means idle regardless of the wanted name", () => {
-    const { follower } = makeFollower(undefined);
+  it("no api means idle: no interval arms and no render is requested", async () => {
+    vi.useFakeTimers();
+    const { follower, host } = makeFollower(undefined);
     follower.reconcile();
-    // Nothing to assert beyond not throwing; no subscribe target exists.
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(host.updates).toBe(0);
+    follower.stop();
+  });
+
+  it("teardown-then-resubscribe onto the same target keeps exactly one stream", async () => {
+    const resolvers: Array<(v: { unsubscribe: () => Promise<void> }) => void> = [];
+    const unsubs = [
+      vi.fn().mockResolvedValue(undefined),
+      vi.fn().mockResolvedValue(undefined),
+    ];
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi.fn().mockImplementation(
+        () =>
+          new Promise((r) => {
+            resolvers.push(r);
+          })
+      ),
+    });
+    const { follower, events, setName } = makeFollower(api);
+    follower.reconcile();
+    const firstCallback = (api.subscribeDeviceReachability as ReturnType<typeof vi.fn>)
+      .mock.calls[0][1];
+    // Same (name, generation) recurs within one round-trip; only the
+    // attempt id tells the two apart.
+    setName(null);
+    follower.reconcile();
+    setName("kitchen");
+    follower.reconcile();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(2);
+    resolvers[0]({ unsubscribe: unsubs[0] });
+    resolvers[1]({ unsubscribe: unsubs[1] });
+    await flush();
+    expect(unsubs[0]).toHaveBeenCalledOnce();
+    expect(unsubs[1]).not.toHaveBeenCalled();
+    firstCallback(makeReachabilityEvent());
+    expect(events).toEqual([]);
+    follower.stop();
+    expect(unsubs[1]).toHaveBeenCalledOnce();
+  });
+
+  it("a stale rejection stays silent and leaves the memos alone", async () => {
+    let reject!: (err: Error) => void;
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise((_r, rej) => {
+              reject = rej;
+            })
+        )
+        .mockRejectedValue(new Error("real failure")),
+    });
+    const { follower, setName } = makeFollower(api);
+    follower.reconcile();
+    setName(null);
+    follower.reconcile();
+    reject(new Error("stale failure"));
+    await flush();
+    expect(console.warn).not.toHaveBeenCalled();
+    // The key is unpoisoned: the same target failing for real warns.
+    setName("kitchen");
+    follower.reconcile();
+    await flush();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    follower.stop();
+  });
+
+  it("hostConnected and hostUpdated drive reconcile without host plumbing", async () => {
+    const { api } = makeApi();
+    const { follower, setName } = makeFollower(api);
+    follower.hostConnected();
+    await flush();
+    expect(api.subscribeDeviceReachability).toHaveBeenCalledTimes(1);
+    setName("garage");
+    follower.hostUpdated();
+    await flush();
+    expect(api.subscribeDeviceReachability).toHaveBeenLastCalledWith(
+      "garage",
+      expect.any(Function)
+    );
     follower.stop();
   });
 });

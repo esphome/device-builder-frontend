@@ -39,6 +39,11 @@ export class ReachabilityFollower implements ReactiveController {
 
   private _loggedKey: string | null = null;
 
+  // Identity of the newest attempt; teardown bumps it so an in-flight
+  // subscribe with the same (name, generation) is still recognisably
+  // stale — the pair alone can recur within one round-trip.
+  private _attemptId = 0;
+
   private _interval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -85,7 +90,7 @@ export class ReachabilityFollower implements ReactiveController {
 
     this._subscribedName = wantName;
     this._subscribedGeneration = generation;
-    void this._open(api, wantName, generation, attemptKey);
+    void this._open(api, wantName, ++this._attemptId, attemptKey);
   }
 
   /** Clear the failure memos; call on an explicit user retry (reopen). */
@@ -103,16 +108,15 @@ export class ReachabilityFollower implements ReactiveController {
   private async _open(
     api: ESPHomeAPI,
     deviceName: string,
-    attemptGeneration: number,
+    attemptId: number,
     attemptKey: string
   ): Promise<void> {
-    // A WS reconnect (generation bump) or a target change between
-    // subscribe-start and resolve makes this attempt stale; catch must
-    // not mutate state belonging to the newer attempt, and a stale
-    // success must unsubscribe the just-created handle.
-    const isCurrent = (): boolean =>
-      this._subscribedName === deviceName &&
-      this._subscribedGeneration === attemptGeneration;
+    // Anything that happens between subscribe-start and resolve — a WS
+    // reconnect, a target change, even a teardown-and-return to the
+    // same target — bumps the attempt id and makes this attempt stale;
+    // catch must not mutate state belonging to the newer attempt, and
+    // a stale success must unsubscribe the just-created handle.
+    const isCurrent = (): boolean => this._attemptId === attemptId;
 
     try {
       const subscription = await api.subscribeDeviceReachability(
@@ -128,20 +132,23 @@ export class ReachabilityFollower implements ReactiveController {
       this._subscription = subscription;
       this._failedKey = null;
     } catch (err) {
+      // A stale failure stays silent and leaves both memos alone — it
+      // would otherwise eat the one warn slot for a key that later
+      // fails for real.
+      if (!isCurrent()) return;
       // Rate-limit the warning: the 1 Hz tick retries reconcile, and a
       // WS-not-yet-connected window would otherwise log every second.
       if (this._loggedKey !== attemptKey) {
         this._loggedKey = attemptKey;
         console.warn("subscribeDeviceReachability failed", err);
       }
-      if (isCurrent()) {
-        this._failedKey = attemptKey;
-        this._subscribedName = null;
-      }
+      this._failedKey = attemptKey;
+      this._subscribedName = null;
     }
   }
 
   private _teardown(): void {
+    this._attemptId += 1;
     const hadTarget = this._subscribedName !== null;
     this._subscribedName = null;
     if (this._subscription !== null) {

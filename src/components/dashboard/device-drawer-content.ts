@@ -127,7 +127,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   @state() _ipExpanded = false;
 
   // Registered via addController; drives itself from host updates.
-  readonly _follower = new ReachabilityFollower(this, {
+  private readonly _follower = new ReachabilityFollower(this, {
     api: () => this._api,
     deviceName: () => (this.drawerOpen && this.device ? this.device.name : null),
     onEvent: (state) => {
@@ -244,6 +244,11 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       (previousDevice?.configuration ?? null) !== (this.device?.configuration ?? null);
     if (deviceTargetMoved) {
       this._ipExpanded = false;
+    }
+    if (deviceTargetMoved || changed.has("drawerOpen")) {
+      // A device switch or drawer reopen is an explicit fresh chance;
+      // don't carry a failed-subscribe memo across it.
+      this._follower.retry();
     }
   }
 }
