@@ -1988,7 +1988,7 @@
     "never_flashed_title": "This device may never have been installed",
     "never_flashed_body": "The dashboard has never seen this device online; no address, version, or identity has ever been recorded. If the hardware has not been flashed with this configuration yet, connect it by USB and run the first install; the network checks below only apply after that.",
     "untracked_title": "Status tracking is off for this configuration",
-    "untracked_body": "name_add_mac_suffix is enabled, so a device flashed from this configuration announces itself with a MAC suffix that never matches it. When such a device is announcing on the network it shows up in the discovered list, where adopting it tracks it under its own name; otherwise turn the option off and give this configuration a unique name.",
+    "untracked_body": "name_add_mac_suffix is enabled, so a device flashed from this configuration announces itself with a MAC suffix that never matches it. Only firmware that also sets dashboard_import appears in the discovered list for adoption; if that is not the case here, turn the option off and give this configuration a unique name.",
     "deep_sleep_title": "This device uses deep sleep",
     "deep_sleep_body": "A sleeping device does not answer on the network, so showing offline between wake windows is normal. Queued updates are delivered on the next wake.",
     "icmp_unavailable_title": "The dashboard cannot ping devices",
