@@ -149,6 +149,33 @@ describe("ReachabilityFollower", () => {
     follower.stop();
   });
 
+  it("a success resets the warn memo for a later genuine re-failure", async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(undefined);
+    const { api } = makeApi({
+      subscribeDeviceReachability: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("first failure"))
+        .mockResolvedValueOnce({ unsubscribe })
+        .mockRejectedValueOnce(new Error("re-failure")),
+    });
+    const { follower, setName } = makeFollower(api);
+    follower.reconcile();
+    await flush();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    follower.retry();
+    follower.reconcile();
+    await flush();
+    setName(null);
+    follower.reconcile();
+    setName("kitchen");
+    follower.reconcile();
+    await flush();
+    // Same name:generation key as the first failure; the success in
+    // between must have released its one warn slot.
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    follower.stop();
+  });
+
   it("retry clears the failure memo so reconcile attempts again", async () => {
     const { api } = makeApi({
       subscribeDeviceReachability: vi.fn().mockRejectedValue(new Error("nope")),

@@ -131,6 +131,9 @@ export class ReachabilityFollower implements ReactiveController {
       }
       this._subscription = subscription;
       this._failedKey = null;
+      // The logged memo resets with it: a later genuine re-failure on
+      // this key deserves its one warn again.
+      this._loggedKey = null;
     } catch (err) {
       // A stale failure stays silent and leaves both memos alone — it
       // would otherwise eat the one warn slot for a key that later
