@@ -2027,6 +2027,7 @@
     "use_address_error": "Saving failed. Edit the configuration in the editor instead.",
     "back": "Back",
     "use_address_saved": "Saved. Installs now contact this address directly; until an install completes, the status shown here may still be based on the old address.",
+    "use_address_network_unknown": "This configuration's network settings come from a package or include and it has not been compiled yet, so the dashboard cannot tell which block to write. Compile or install it once, then set the address here.",
     "use_address_no_network": "This configuration has no network component (wifi, ethernet, or openthread), so use_address does not apply.",
     "use_address_remove_packaged": "This configuration keeps its network settings in a package or include; remove use_address from that file instead.",
     "use_address_copy": "Copy",

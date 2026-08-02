@@ -53,15 +53,46 @@ describe("open-troubleshoot senders", () => {
     expect(seen.detail).toEqual([{ configuration: "kitchen.yaml" }]);
   });
 
-  it("card badge stays inert when online, untracked, or selecting", () => {
+  it("card badge stays inert when online or selecting", () => {
     for (const overrides of [
       { state: DeviceState.ONLINE },
-      { nameAddMacSuffix: true },
       { selectMode: true },
+      { nameAddMacSuffix: true, selectMode: true },
     ]) {
       const container = renderInto(renderStatusBadge(makeCard(overrides)));
       expect(container.querySelector(".device-status.clickable")).toBeNull();
     }
+  });
+
+  it("untracked badge opens the explainer with the configuration", () => {
+    const card = makeCard({ nameAddMacSuffix: true });
+    const seen = collectDetail(card);
+    const container = renderInto(renderStatusBadge(card));
+    container
+      .querySelector<HTMLElement>(".device-status.clickable")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(seen.detail).toEqual([{ configuration: "kitchen.yaml" }]);
+  });
+
+  it("untracked table dot sends the configuration, inert in select mode", () => {
+    const device = makeConfiguredDevice({ name_add_mac_suffix: true });
+    const statusCell = (selectMode: boolean) => {
+      const columns = createDeviceColumns(identityLocalize, selectMode);
+      const statusColumn = columns.find(
+        (c) => (c as { accessorKey?: string }).accessorKey === "status"
+      )!;
+      return (statusColumn.cell as (info: unknown) => unknown)({
+        getValue: () => DeviceState.UNKNOWN,
+        row: { original: { busy: false, recentJob: null, _device: device } },
+      });
+    };
+    const container = renderInto(statusCell(false));
+    const seen = collectDetail(container);
+    container
+      .querySelector<HTMLElement>('[role="button"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(seen.detail).toEqual([{ configuration: "kitchen.yaml" }]);
+    expect(renderInto(statusCell(true)).querySelector('[role="button"]')).toBeNull();
   });
 
   it("table dot is inert in select mode", () => {

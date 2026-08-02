@@ -31,8 +31,6 @@ function makeResult(
   };
 }
 
-const makeReachability = makeReachabilityEvent;
-
 function build(input: Partial<TroubleshootInput> = {}): string[] {
   return buildTroubleshootSections({
     device: makeConfiguredDevice(),
@@ -79,27 +77,22 @@ describe("buildTroubleshootSections", () => {
   });
 
   it("leads with no_network for a compiled config without a network component", () => {
-    const sections = buildTroubleshootSections({
-      device: makeConfiguredDevice({ loaded_integrations: ["api", "logger"] }),
-      reachability: null,
-      result: makeResult(),
-      inDocker: false,
-      existingAddress: "",
-      networkInYaml: "unknown",
-    });
-    expect(sections.map((s) => s.id)).toEqual(["no_network"]);
+    expect(
+      build({
+        device: makeConfiguredDevice({ loaded_integrations: ["api", "logger"] }),
+        result: makeResult(),
+      })
+    ).toEqual(["no_network"]);
   });
 
   it("diagnoses no_network from the YAML alone, even never-compiled", () => {
-    const sections = buildTroubleshootSections({
-      device: makeConfiguredDevice({ loaded_integrations: [] }),
-      reachability: null,
-      result: makeResult(),
-      inDocker: false,
-      existingAddress: "",
-      networkInYaml: "absent",
-    });
-    expect(sections.map((s) => s.id)).toEqual(["no_network"]);
+    expect(
+      build({
+        device: makeConfiguredDevice({ loaded_integrations: [] }),
+        result: makeResult(),
+        networkInYaml: "absent",
+      })
+    ).toEqual(["no_network"]);
   });
 
   it("a network header in the YAML outranks a stale integration list", () => {
@@ -153,7 +146,7 @@ describe("buildTroubleshootSections", () => {
     ).not.toContain("never_flashed");
     expect(
       build({
-        reachability: makeReachability({ ping_last_seen_seconds_ago: 30 }),
+        reachability: makeReachabilityEvent({ ping_last_seen_seconds_ago: 30 }),
         result: makeResult(dark),
       })
     ).not.toContain("never_flashed");
@@ -186,7 +179,7 @@ describe("buildTroubleshootSections", () => {
   it("diagnoses mdns_dark for an api device the browser never heard", () => {
     const sections = buildTroubleshootSections({
       device: makeConfiguredDevice({ api_enabled: true }),
-      reachability: makeReachability(),
+      reachability: makeReachabilityEvent(),
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: false,
       existingAddress: "",
@@ -202,7 +195,7 @@ describe("buildTroubleshootSections", () => {
   it("leads mdns_dark with host networking when in Docker", () => {
     const sections = buildTroubleshootSections({
       device: makeConfiguredDevice({ api_enabled: true }),
-      reachability: makeReachability(),
+      reachability: makeReachabilityEvent(),
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: true,
       existingAddress: "",
@@ -217,21 +210,21 @@ describe("buildTroubleshootSections", () => {
     expect(
       build({
         device: makeConfiguredDevice({ api_enabled: true }),
-        reachability: makeReachability({ mdns_last_seen_seconds_ago: 12 }),
+        reachability: makeReachabilityEvent({ mdns_last_seen_seconds_ago: 12 }),
         result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       })
     ).not.toContain("mdns_dark");
   });
 
   it("flags a stale MQTT link only for mqtt configs", () => {
-    const stale = makeReachability({ mqtt_last_seen_seconds_ago: null });
+    const stale = makeReachabilityEvent({ mqtt_last_seen_seconds_ago: null });
     expect(
       build({ device: makeConfiguredDevice({ uses_mqtt: true }), reachability: stale })
     ).toContain("mqtt");
     expect(
       build({
         device: makeConfiguredDevice({ uses_mqtt: true }),
-        reachability: makeReachability({ mqtt_last_seen_seconds_ago: 5 }),
+        reachability: makeReachabilityEvent({ mqtt_last_seen_seconds_ago: 5 }),
       })
     ).not.toContain("mqtt");
     expect(build({ reachability: stale })).not.toContain("mqtt");
@@ -304,7 +297,6 @@ describe("buildTroubleshootSections", () => {
       result: makeResult({
         dns_resolved: false,
         dns_addresses: [],
-        dns_inconclusive: false,
         ping_target_source: "persisted",
         ping_rtt_ms: null,
       }),

@@ -146,6 +146,10 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     // A reopen is an explicit retry; don't carry a failed-subscribe gate.
     this._failedGeneration = -1;
     this._dialog.open = true;
+    // Untracked (name_add_mac_suffix) opens in explainer-only mode:
+    // the probe keys on a name no unit broadcasts, so running it can
+    // only manufacture failures under the explanation.
+    if (device?.name_add_mac_suffix) return;
     this._startReconcile();
     void loadExistingAddress(this);
     void this._runCheck();
@@ -194,19 +198,23 @@ export class ESPHomeTroubleshootDialog extends LitElement {
           onAddressScreen
             ? renderAddressScreen(this, device)
             : html`
-                ${this._renderProbeSummary(device)}
+                ${device?.name_add_mac_suffix ? nothing : this._renderProbeSummary(device)}
                 ${device ? this._renderSections(device) : nothing}
                 <div class="actions">
                   <button class="btn btn--cancel" @click=${this.close}>
                     ${this._localize("layout.close")}
                   </button>
-                  <button
-                    class="btn btn--confirm"
-                    ?disabled=${this._checking}
-                    @click=${() => void this._runCheck()}
-                  >
-                    ${this._localize("troubleshoot.check_again")}
-                  </button>
+                  ${
+                    device?.name_add_mac_suffix
+                      ? nothing
+                      : html`<button
+                          class="btn btn--confirm"
+                          ?disabled=${this._checking}
+                          @click=${() => void this._runCheck()}
+                        >
+                          ${this._localize("troubleshoot.check_again")}
+                        </button>`
+                  }
                 </div>
               `
         }

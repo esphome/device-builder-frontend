@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import {
   applyUseAddress,
   isValidUseAddress,
-  networkInYaml,
   readAddressPrefill,
   removeUseAddress,
 } from "../../src/util/use-address-yaml.js";
@@ -93,13 +92,17 @@ describe("applyUseAddress", () => {
   });
 });
 
-describe("networkInYaml", () => {
+describe("readAddressPrefill presence", () => {
   it("classifies present, packaged-unknown, merged-unknown, and absent", () => {
-    expect(networkInYaml(WIFI_YAML)).toBe("present");
-    expect(networkInYaml("wifi: !include net.yaml\n")).toBe("present");
-    expect(networkInYaml("packages:\n  base: !include x.yaml\n")).toBe("unknown");
-    expect(networkInYaml("<<: !include base.yaml\napi:\n")).toBe("unknown");
-    expect(networkInYaml("esphome:\n  name: kitchen\napi:\n")).toBe("absent");
+    expect(readAddressPrefill(WIFI_YAML).presence).toBe("present");
+    expect(readAddressPrefill("wifi: !include net.yaml\n").presence).toBe("present");
+    expect(readAddressPrefill("packages:\n  base: !include x.yaml\n").presence).toBe(
+      "unknown"
+    );
+    expect(readAddressPrefill("<<: !include base.yaml\napi:\n").presence).toBe("unknown");
+    expect(readAddressPrefill("esphome:\n  name: kitchen\napi:\n").presence).toBe(
+      "absent"
+    );
   });
 });
 

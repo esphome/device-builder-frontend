@@ -6,6 +6,7 @@
  * block appended that deep-merges per-device, and only a
  * `wifi: !include`-style header falls back to a copyable snippet.
  */
+import { yamlHasMergedSources } from "./config-entry-yaml-scan.js";
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
 import {
   NETWORK_SECTIONS,
@@ -44,9 +45,8 @@ export function applyUseAddress(
     values.use_address = value;
     return { yaml: updateSectionInYaml(yaml, section, values) };
   }
-  for (const candidate of NETWORK_SECTIONS) {
-    if (findSectionStart(lines, candidate) >= 0) return { snippet: candidate };
-  }
+  const header = firstHeaderSection(lines);
+  if (header !== null) return { snippet: header };
   const target = NETWORK_SECTIONS.find((candidate) =>
     loadedIntegrations.includes(candidate)
   );
@@ -55,49 +55,39 @@ export function applyUseAddress(
 }
 
 /**
- * One-parse read of the address form's prefill inputs.
+ * One-parse read of the address form's inputs and the YAML's network
+ * classification.
 
- * `useAddress` is null when nothing is spliceable (packaged config) and
- * empty when the key isn't set; `staticIp` is wifi's
- * `manual_ip.static_ip` — the firmware already knows its fixed IP, so
- * it is the best manual-address prefill.
+ * `presence` is `present` for any network header (inline `!include`
+ * included), `unknown` when merged sources (`packages:` / `<<:`) could
+ * supply one from another file, else the definitive `absent`.
+ * `useAddress` is null when nothing is spliceable and empty when the
+ * key isn't set; `staticIp` is the block's `manual_ip.static_ip` — the
+ * firmware already knows its fixed IP, so it is the best prefill.
  */
 export function readAddressPrefill(yaml: string): {
+  presence: NetworkPresence;
   useAddress: string | null;
   staticIp: string | null;
 } {
   const lines = splitYamlDocLines(yaml);
   const section = findSpliceableSection(lines);
-  if (section === null) return { useAddress: null, staticIp: null };
+  if (section === null) {
+    const presence: NetworkPresence =
+      firstHeaderSection(lines) !== null
+        ? "present"
+        : yamlHasMergedSources(yaml)
+          ? "unknown"
+          : "absent";
+    return { presence, useAddress: null, staticIp: null };
+  }
   const values = parseSectionCore(lines, section).values;
   const raw = values.use_address;
   const useAddress =
     typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
   // wifi and ethernet both take manual_ip; openthread has none and
   // falls out of staticIpOf naturally.
-  return { useAddress, staticIp: staticIpOf(values) };
-}
-
-/** Top-level YAML merge key (`<<: !include base.yaml`): another file
- *  that can carry arbitrary top-level keys, wifi included. */
-const TOP_LEVEL_MERGE_RE = /^<<\s*:/;
-
-/**
- * Classify the raw YAML's network component.
-
- * Any `wifi:`/`ethernet:`/`openthread:` header (inline `!include`
- * included) is `present`; no header is `unknown` when a `packages:`
- * key or a top-level merge include could supply one from another
- * file, and `absent` only when neither can.
- */
-export function networkInYaml(yaml: string): NetworkPresence {
-  const lines = splitYamlDocLines(yaml);
-  for (const section of NETWORK_SECTIONS) {
-    if (findSectionStart(lines, section) >= 0) return "present";
-  }
-  if (findSectionStart(lines, "packages") >= 0) return "unknown";
-  if (lines.some((line) => TOP_LEVEL_MERGE_RE.test(line))) return "unknown";
-  return "absent";
+  return { presence: "present", useAddress, staticIp: staticIpOf(values) };
 }
 
 /** Remove `use_address` from the network block; null when nothing is
@@ -138,6 +128,14 @@ function findSpliceableSection(lines: string[]): NetworkSection | null {
   for (const section of NETWORK_SECTIONS) {
     const start = findSectionStart(lines, section);
     if (start >= 0 && BARE_MAPPING_KEY_RE.test(lines[start])) return section;
+  }
+  return null;
+}
+
+/** First network header in pick order, bare or inline-valued. */
+function firstHeaderSection(lines: string[]): NetworkSection | null {
+  for (const section of NETWORK_SECTIONS) {
+    if (findSectionStart(lines, section) >= 0) return section;
   }
   return null;
 }

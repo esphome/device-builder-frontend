@@ -131,14 +131,35 @@ export function createDeviceColumns(
           }
         }
         const state = info.getValue() as DeviceState;
-        // Untracked stays inert: with name_add_mac_suffix set the
-        // troubleshoot probe can only ever fail.
+        // "No status" opens the dialog's untracked explainer; inert
+        // only while selecting, like the other dots.
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {
-          return html`<span class="cell-status"
-            ><span
-              class="status-dot untracked"
-              title=${localize("dashboard.status_untracked_tooltip")}
-            ></span
+          const untrackedTitle = localize("dashboard.status_untracked_tooltip");
+          if (selectMode) {
+            return html`<span class="cell-status"
+              ><span class="status-dot untracked" title=${untrackedTitle}></span
+            ></span>`;
+          }
+          const openUntracked = (e: Event) => {
+            e.stopPropagation();
+            fireEvent(e.currentTarget as HTMLElement, "open-troubleshoot", {
+              configuration: row._device.configuration,
+            });
+          };
+          return html`<span
+            class="cell-status"
+            role="button"
+            tabindex="0"
+            title=${untrackedTitle}
+            aria-label=${untrackedTitle}
+            @click=${openUntracked}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openUntracked(e);
+              }
+            }}
+            ><span class="status-dot untracked"></span
           ></span>`;
         }
         const dotClass =

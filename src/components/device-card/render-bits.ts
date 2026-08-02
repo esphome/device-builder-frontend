@@ -115,21 +115,38 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       </div>`;
     }
   }
-  // Untracked stays passive: with name_add_mac_suffix set the probe can
-  // only ever fail, so the dialog would misread as a broken network.
+  // "No status" is the least self-explanatory state; clicking it opens
+  // the dialog in explainer-only mode (the probe stays suppressed
+  // there — it keys on a name no unit broadcasts).
   if (isStatusUntracked(card.state, card.nameAddMacSuffix)) {
     const label = card._localize("dashboard.status_untracked");
     const tooltip = card._localize("dashboard.status_untracked_tooltip");
-    return html`<div
+    if (card.selectMode) {
+      return html`<div
+          id="status-untracked"
+          class="device-status ${DeviceState.UNKNOWN}"
+          role="img"
+          tabindex="0"
+          aria-label="${label}. ${tooltip}"
+        >
+          <wa-icon library="mdi" name="help-network-outline"></wa-icon>
+          ${label}
+        </div>
+        <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
+    }
+    return html`<button
         id="status-untracked"
-        class="device-status ${DeviceState.UNKNOWN}"
-        role="img"
-        tabindex="0"
+        type="button"
+        class="device-status ${DeviceState.UNKNOWN} clickable"
         aria-label="${label}. ${tooltip}"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-troubleshoot", { configuration: card.configuration });
+        }}
       >
         <wa-icon library="mdi" name="help-network-outline"></wa-icon>
         ${label}
-      </div>
+      </button>
       <wa-tooltip for="status-untracked">${tooltip}</wa-tooltip>`;
   }
   // Transport-agnostic icons — wifi/wifi-off implied wireless; plenty of

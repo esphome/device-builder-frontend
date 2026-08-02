@@ -39,8 +39,6 @@ const DARK_PROBE: DeviceTroubleshootResult = {
   ping_rtt_ms: null,
 };
 
-const reachability = makeReachabilityEvent;
-
 function drawerShowsMdnsRow(r: ReachabilityStateEvent): boolean {
   const keys: string[] = [];
   const host = {
@@ -78,14 +76,14 @@ describe("drawer mDNS row vs troubleshoot mdns_dark", () => {
       { mdns_last_seen_seconds_ago: 500, mdns_ptr_ttl_seconds: 200 },
       { mdns_last_seen_seconds_ago: 3, active_source: "mdns" as const },
     ]) {
-      const r = reachability(overrides);
+      const r = makeReachabilityEvent(overrides);
       expect(drawerShowsMdnsRow(r)).toBe(true);
       expect(treeSaysDark(r)).toBe(false);
     }
   });
 
   it("diagnoses mdns_dark exactly when the drawer shows no mDNS row", () => {
-    const r = reachability({ mdns_last_seen_seconds_ago: null });
+    const r = makeReachabilityEvent({ mdns_last_seen_seconds_ago: null });
     expect(drawerShowsMdnsRow(r)).toBe(false);
     expect(treeSaysDark(r)).toBe(true);
   });

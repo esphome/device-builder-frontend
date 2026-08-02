@@ -12,10 +12,10 @@ import { USE_ADDRESS_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   applyUseAddress,
   isValidUseAddress,
-  networkInYaml,
   readAddressPrefill,
   removeUseAddress,
 } from "../../util/use-address-yaml.js";
+import { formatYamlScalar } from "../../util/yaml-serialize.js";
 import type { ESPHomeTroubleshootDialog } from "../troubleshoot-dialog.js";
 
 export function renderAddressScreen(
@@ -76,8 +76,7 @@ function renderUseAddressForm(
   if (host._saveState === "snippet") {
     // Bare key only: the include target is the section's mapping body,
     // so a `wifi:` header pasted there would nest one level too deep.
-    const value = host._addressInput.trim();
-    const snippet = `use_address: ${value.includes(":") ? `"${value}"` : value}`;
+    const snippet = `use_address: ${formatYamlScalar(host._addressInput.trim())}`;
     return html`
       <p>${host._localize("troubleshoot.use_address_snippet")}</p>
       <pre class="snippet">${snippet}</pre>
@@ -100,6 +99,18 @@ function renderUseAddressForm(
     `;
   }
   const placeholder = device.ip || host._result?.ping_target || "192.168.1.50";
+  // no_network is definitive only off the verified YAML read; a merged
+  // config that never compiled gets the honest cannot-tell copy.
+  const errorKey = host._addressInvalid
+    ? "troubleshoot.use_address_invalid"
+    : {
+        error: "troubleshoot.use_address_error",
+        no_network:
+          host._networkInYaml === "unknown"
+            ? "troubleshoot.use_address_network_unknown"
+            : "troubleshoot.use_address_no_network",
+        remove_packaged: "troubleshoot.use_address_remove_packaged",
+      }[host._saveState as string];
   return html`
     <label class="address-label" for="use-address-input">
       <code>use_address</code>
@@ -122,34 +133,7 @@ function renderUseAddressForm(
         }}
       />
     </div>
-    ${
-      host._addressInvalid
-        ? html`<p class="field-error">
-            ${host._localize("troubleshoot.use_address_invalid")}
-          </p>`
-        : nothing
-    }
-    ${
-      host._saveState === "error"
-        ? html`<p class="field-error">
-            ${host._localize("troubleshoot.use_address_error")}
-          </p>`
-        : nothing
-    }
-    ${
-      host._saveState === "no_network"
-        ? html`<p class="field-error">
-            ${host._localize("troubleshoot.use_address_no_network")}
-          </p>`
-        : nothing
-    }
-    ${
-      host._saveState === "remove_packaged"
-        ? html`<p class="field-error">
-            ${host._localize("troubleshoot.use_address_remove_packaged")}
-          </p>`
-        : nothing
-    }
+    ${errorKey ? html`<p class="field-error">${host._localize(errorKey)}</p>` : nothing}
     <div class="actions">
       ${
         host._existingAddress
@@ -239,8 +223,8 @@ export async function loadExistingAddress(
   try {
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
-    host._networkInYaml = networkInYaml(yaml);
-    const { useAddress, staticIp } = readAddressPrefill(yaml);
+    const { presence, useAddress, staticIp } = readAddressPrefill(yaml);
+    host._networkInYaml = presence;
     // Only a verified YAML read drives the diagnosis; a packaged
     // network block (null) leaves the prefill hint as just a hint.
     if (useAddress !== null && useAddress !== host._existingAddress) {

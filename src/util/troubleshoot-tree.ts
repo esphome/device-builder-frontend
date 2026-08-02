@@ -9,6 +9,7 @@ import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import { isIpLiteral } from "./ip-literal.js";
 import { NETWORK_SECTIONS, type NetworkPresence } from "./network-sections.js";
+import { isNeverFlashed } from "./never-flashed.js";
 
 export const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
@@ -236,21 +237,17 @@ function mdnsNeverSeen(
   return !result.mdns_has_cached_trace && result.mdns_addresses.length === 0;
 }
 
-/** No identity or address has ever been recorded through any channel
- *  and the probe heard nothing: a strong hint the hardware was never
- *  flashed with this configuration. */
+/** The persisted never-flashed evidence plus live silence: nothing has
+ *  ever been recorded through any channel and the probe heard nothing —
+ *  a strong hint the hardware was never flashed with this config. */
 function neverSeen(
   device: ConfiguredDevice,
   reachability: ReachabilityStateEvent | null,
   result: DeviceTroubleshootResult | null
 ): boolean {
-  const rt = device.runtime_state;
   return (
-    device.ip === "" &&
-    device.mac_address === "" &&
-    rt.deployed_version === "" &&
-    rt.deployed_config_hash === "" &&
-    rt.ip_addresses.length === 0 &&
+    isNeverFlashed(device) &&
+    device.runtime_state.ip_addresses.length === 0 &&
     (reachability === null ||
       (reachability.mdns_last_seen_seconds_ago === null &&
         reachability.ping_last_seen_seconds_ago === null &&

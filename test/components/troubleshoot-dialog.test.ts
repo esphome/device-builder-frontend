@@ -79,6 +79,22 @@ async function openDialog(
   return { el, api, unsubscribe };
 }
 
+function sectionIds(el: ESPHomeTroubleshootDialog): (string | null)[] {
+  return [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+    n.getAttribute("data-section")
+  );
+}
+
+async function enterAndSave(el: ESPHomeTroubleshootDialog, value: string) {
+  const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  await el.updateComplete;
+  el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
+  await flush();
+  await el.updateComplete;
+}
+
 async function openAddressScreen(el: ESPHomeTroubleshootDialog): Promise<void> {
   el.shadowRoot!.querySelector<HTMLButtonElement>(
     "button.drill[data-section='use_address']"
@@ -136,12 +152,21 @@ describe("troubleshoot-dialog", () => {
 
   it("renders sections from the decision tree, ending in use_address", async () => {
     const { el } = await openDialog();
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).toContain("dns_fail");
     expect(ids).toContain("dynamic_ip");
     expect(ids[ids.length - 1]).toBe("use_address");
+  });
+
+  it("untracked opens explainer-only: no probe, no stream, no Check again", async () => {
+    const { el, api } = await openDialog(
+      {},
+      makeConfiguredDevice({ name_add_mac_suffix: true })
+    );
+    expect(api.troubleshootDevice).not.toHaveBeenCalled();
+    expect(api.subscribeDeviceReachability).not.toHaveBeenCalled();
+    expect(sectionIds(el)).toEqual(["untracked"]);
+    expect(el.shadowRoot!.textContent).not.toContain("troubleshoot.check_again");
   });
 
   it("shows only the untracked explainer for a mac-suffix config", async () => {
@@ -149,9 +174,7 @@ describe("troubleshoot-dialog", () => {
       {},
       makeConfiguredDevice({ name_add_mac_suffix: true })
     );
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).toEqual(["untracked"]);
     expect(el.shadowRoot!.querySelector(".address-form")).toBeNull();
   });
@@ -175,9 +198,7 @@ describe("troubleshoot-dialog", () => {
       },
       makeConfiguredDevice({ address: "10.0.0.7" })
     );
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).toContain("use_address_set");
     await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
@@ -223,9 +244,7 @@ describe("troubleshoot-dialog", () => {
       { getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n") },
       makeConfiguredDevice({ address: "kitchen.lan" })
     );
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).not.toContain("use_address_set");
   });
 
@@ -233,22 +252,14 @@ describe("troubleshoot-dialog", () => {
     // A custom wifi domain shifts device.address without a use_address;
     // the exact read must not claim one is set.
     const { el } = await openDialog({}, makeConfiguredDevice({ address: "kitchen.lan" }));
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).not.toContain("use_address_set");
   });
 
   it("saves a valid use_address through the YAML splice", async () => {
     const { el, api } = await openDialog();
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "10.0.0.99";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "10.0.0.99");
     expect(api.getConfig).toHaveBeenCalledWith("kitchen.yaml");
     const written = api.updateConfig.mock.calls[0][1] as string;
     expect(written).toContain("use_address: 10.0.0.99");
@@ -258,13 +269,7 @@ describe("troubleshoot-dialog", () => {
   it("rejects an invalid address without touching the config", async () => {
     const { el, api } = await openDialog();
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "not valid";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "not valid");
     expect(api.updateConfig).not.toHaveBeenCalled();
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_invalid");
   });
@@ -277,13 +282,7 @@ describe("troubleshoot-dialog", () => {
       makeConfiguredDevice({ ip: "10.0.0.42", loaded_integrations: ["wifi", "api"] })
     );
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "10.0.0.99";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "10.0.0.99");
     const written = api.updateConfig.mock.calls[0][1] as string;
     expect(written).toContain("wifi:\n  use_address: 10.0.0.99");
     expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_saved");
@@ -294,13 +293,7 @@ describe("troubleshoot-dialog", () => {
       getConfig: vi.fn().mockResolvedValue("wifi: !include wifi.yaml\n"),
     });
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "10.0.0.99";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "10.0.0.99");
     expect(api.updateConfig).not.toHaveBeenCalled();
     // Bare key only: the include target is the section's mapping body,
     // so a section header pasted there would nest a level too deep.
@@ -314,13 +307,7 @@ describe("troubleshoot-dialog", () => {
       getConfig: vi.fn().mockResolvedValue("wifi: !include wifi.yaml\n"),
     });
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "fe80::1";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "fe80::1");
     expect(el.shadowRoot!.querySelector(".snippet")!.textContent!.trim()).toBe(
       'use_address: "fe80::1"'
     );
@@ -330,9 +317,7 @@ describe("troubleshoot-dialog", () => {
     const { el } = await openDialog({
       getConfig: vi.fn().mockResolvedValue("esphome:\n  name: kitchen\napi:\n"),
     });
-    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
-      n.getAttribute("data-section")
-    );
+    const ids = sectionIds(el);
     expect(ids).toEqual(["no_network"]);
     expect(el.shadowRoot!.querySelector(".drill")).toBeNull();
   });
@@ -344,15 +329,13 @@ describe("troubleshoot-dialog", () => {
       getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
     });
     await openAddressScreen(el);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
-    input.value = "10.0.0.99";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await el.updateComplete;
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--confirm")!.click();
-    await flush();
-    await el.updateComplete;
+    await enterAndSave(el, "10.0.0.99");
     expect(api.updateConfig).not.toHaveBeenCalled();
-    expect(el.shadowRoot!.textContent).toContain("troubleshoot.use_address_no_network");
+    // Merged sources may still carry a network block; the copy must
+    // say cannot-tell, not assert absence.
+    expect(el.shadowRoot!.textContent).toContain(
+      "troubleshoot.use_address_network_unknown"
+    );
   });
 
   it("does not double-subscribe while an attempt is in flight", async () => {
