@@ -21,6 +21,7 @@ import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { hasSubstitutionReference } from "./substitutions.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { indentOf } from "./yaml-line-walker.js";
 import {
@@ -222,7 +223,7 @@ export function findUsedPins(
     // doesn't render its pin selectors until yaml has loaded).
     return used;
   }
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   let currentDomain = "";
   // Indentation of an open free-text block scalar; continuation lines
   // indented deeper than this are prose and skipped. -1 when none is open.
@@ -292,7 +293,7 @@ export function findUsedPins(
  */
 export function sectionEndLine(yaml: string, fromLine?: number): number | undefined {
   if (fromLine === undefined) return undefined;
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line === "") continue;
@@ -399,7 +400,7 @@ export function findComponentsByProviders(
         hasIdPathProvider = true;
         // The interface id is nested (usb_uart channels[].id): collect the
         // ids at those paths, not the section's own (non-interface) id.
-        lines ??= yaml.split("\n");
+        lines ??= splitYamlDocLines(yaml);
         for (const path of p.idPaths) {
           for (const inst of collectIdsAtPath(lines, section, path))
             add(inst.id, inst.name);
@@ -419,7 +420,7 @@ export function findComponentsByProviders(
       } else if (LIST_SECTIONS.has(section.key)) {
         // A LIST_SECTIONS block stays un-expanded (no per-item sections
         // carrying an id), so enumerate its item ids directly.
-        lines ??= yaml.split("\n");
+        lines ??= splitYamlDocLines(yaml);
         for (const inst of collectIdsAtPath(lines, section, ["id"]))
           add(inst.id, inst.name);
       }
@@ -463,7 +464,7 @@ export function domainOccupiesPins(
 ): boolean {
   const keys = Object.keys(lockedPins);
   if (keys.length === 0) return false;
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   for (const section of parseYamlTopLevelSections(yaml)) {
     if ((section.parentKey ?? section.key) !== domain) continue;
     const occupies = keys.every(

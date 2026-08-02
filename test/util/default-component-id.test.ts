@@ -135,6 +135,12 @@ sensor:
   it("ignores top-level keys", () => {
     expect(collectTakenIds("id: something\n")).toEqual(new Set());
   });
+
+  it("collects wildcard id keys from a CRLF document", () => {
+    const yaml =
+      "tca9548a:\r\n  - id: mux\r\n    channels:\r\n      - bus_id: channels_1\r\n";
+    expect(collectTakenIds(yaml)).toEqual(new Set(["mux", "channels_1"]));
+  });
 });
 
 describe("addTakenIdsFromValues", () => {

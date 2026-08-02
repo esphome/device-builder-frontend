@@ -1,5 +1,6 @@
 import { isValidEspHomeId, normalizeEspHomeId } from "./esphome-id.js";
 import { isPlatformComponentId } from "./featured-id.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { collectInstanceScalars, readInstanceScalar } from "./yaml-instance-scalars.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
@@ -73,7 +74,7 @@ export function collectExistingIds(yaml: string): Set<string> {
  */
 export function collectTakenIds(yaml: string): Set<string> {
   const taken = new Set<string>();
-  for (const line of yaml.split("\n")) {
+  for (const line of splitYamlDocLines(yaml)) {
     const key = line.match(ID_NAMING_LINE_RE)?.[1];
     if (key === undefined) continue;
     const value = readInstanceScalar(line, key);

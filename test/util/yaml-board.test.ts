@@ -17,6 +17,15 @@ describe("readPlatformBoard", () => {
     });
   });
 
+  it("reads board and variant from a CRLF document", () => {
+    const yaml = "esp32:\r\n  board: esp32-s3-devkitc-1\r\n  variant: ESP32S3\r\n";
+    expect(readPlatformBoard(yaml)).toEqual({
+      platform: "esp32",
+      board: "esp32-s3-devkitc-1",
+      variant: "ESP32S3",
+    });
+  });
+
   it("reads an esp8266 section with no variant", () => {
     const yaml = "esp8266:\n  board: d1_mini\n";
     expect(readPlatformBoard(yaml)).toEqual({
