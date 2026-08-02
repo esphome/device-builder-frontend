@@ -76,6 +76,25 @@ describe("parseYamlAutomations — component triggers", () => {
     expect(press?.eventKey).toBe("on_press");
   });
 
+  it("resolves a sub-entity's name identically from a CRLF document", () => {
+    const doc = (eol: string) =>
+      [
+        "sensor:",
+        "  - platform: aht10",
+        "    id: my_aht",
+        "    temperature:",
+        "      id: temp_1",
+        "      name: Temp One",
+        "      on_value:",
+        "        then:",
+        "          - logger.log: hi",
+        "",
+      ].join(eol);
+    const lfRows = parseYamlAutomations(doc("\n"));
+    expect(JSON.stringify(lfRows)).toContain("Temp One");
+    expect(parseYamlAutomations(doc("\r\n"))).toEqual(lfRows);
+  });
+
   it("splits a list-form on_time into one indexed row per cron entry", () => {
     const yaml = [
       "time:",

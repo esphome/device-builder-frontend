@@ -355,6 +355,13 @@ describe("domainOccupiesPins", () => {
     expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);
   });
 
+  it("reads a long-form pin block in a CRLF document", () => {
+    const yaml =
+      "switch:\r\n  - platform: gpio\r\n    pin:\r\n" +
+      "      number: GPIO5\r\n      inverted: true\r\n";
+    expect(findUsedPins(yaml).get(5)).toBe("switch");
+  });
+
   it("canonicalizes the existing GPIO form before comparing", () => {
     const yaml = "i2c:\n  - scl: GPIO0\n    sda: GPIO1\n    id: i2c_1\n";
     expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);

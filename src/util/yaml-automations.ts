@@ -6,6 +6,7 @@
  */
 
 import { joinActionFieldPath } from "./action-field-path.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import {
@@ -88,7 +89,7 @@ let _automationsKey: string | undefined;
 let _automationsValue: YamlSection[] | undefined;
 
 function _parseYamlAutomations(yaml: string): YamlSection[] {
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   // `parseYamlTopLevelSections` has its own memo, so resolving an
   // id-less host's positional id is free when the caller already
   // parsed sections this render.
