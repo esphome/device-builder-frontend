@@ -8,7 +8,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
 import { isIpLiteral } from "./ip-literal.js";
-import { NETWORK_SECTIONS } from "./network-sections.js";
+import { NETWORK_SECTIONS, type NetworkPresence } from "./network-sections.js";
 
 export const MAC_SUFFIX_DOCS_URL =
   "https://github.com/esphome/device-builder#device-status-and-name_add_mac_suffix";
@@ -35,6 +35,9 @@ export interface TroubleshootInput {
   inDocker: boolean;
   /** The config's current `use_address`, empty when unset. */
   existingAddress: string;
+  /** Verified YAML read; `unknown` until the fetch lands (or when a
+   *  `packages:` include may supply the network block). */
+  networkInYaml: NetworkPresence;
 }
 
 /** The DNS verdict carries evidence: the leg completed and the address
@@ -77,13 +80,19 @@ export function buildTroubleshootSections(
     ];
   }
 
-  if (
-    device.loaded_integrations.length > 0 &&
-    !NETWORK_SECTIONS.some((s) => device.loaded_integrations.includes(s))
-  ) {
+  // The YAML is the current truth: a definitive absence diagnoses even
+  // a never-compiled config, and a present header outranks a stale
+  // integration list from before the section was added. Only when the
+  // YAML is inconclusive (packages, fetch pending) do the compiled
+  // integrations decide; empty ones prove nothing.
+  const noNetwork =
+    input.networkInYaml === "absent" ||
+    (input.networkInYaml === "unknown" &&
+      device.loaded_integrations.length > 0 &&
+      !NETWORK_SECTIONS.some((s) => device.loaded_integrations.includes(s)));
+  if (noNetwork) {
     // Offline by construction; network advice and the manual-address
-    // drill would both mislead. Empty loaded_integrations stays out:
-    // a never-compiled config proves nothing about its components.
+    // drill would both mislead.
     return [
       {
         id: "no_network",

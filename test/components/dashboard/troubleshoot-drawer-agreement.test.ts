@@ -63,6 +63,7 @@ function treeSaysDark(r: ReachabilityStateEvent): boolean {
     result: DARK_PROBE,
     inDocker: false,
     existingAddress: "",
+    networkInYaml: "unknown",
   }).some((s) => s.id === "mdns_dark");
 }
 

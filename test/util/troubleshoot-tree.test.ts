@@ -40,6 +40,7 @@ function build(input: Partial<TroubleshootInput> = {}): string[] {
     result: null,
     inDocker: false,
     existingAddress: "",
+    networkInYaml: "unknown",
     ...input,
   }).map((s) => s.id);
 }
@@ -52,6 +53,7 @@ describe("buildTroubleshootSections", () => {
       result: makeResult(),
       inDocker: false,
       existingAddress: "",
+      networkInYaml: "unknown",
     });
     expect(sections.map((s) => s.id)).toEqual(["untracked"]);
     expect(sections[0].showUseAddressForm).toBeUndefined();
@@ -83,8 +85,31 @@ describe("buildTroubleshootSections", () => {
       result: makeResult(),
       inDocker: false,
       existingAddress: "",
+      networkInYaml: "unknown",
     });
     expect(sections.map((s) => s.id)).toEqual(["no_network"]);
+  });
+
+  it("diagnoses no_network from the YAML alone, even never-compiled", () => {
+    const sections = buildTroubleshootSections({
+      device: makeConfiguredDevice({ loaded_integrations: [] }),
+      reachability: null,
+      result: makeResult(),
+      inDocker: false,
+      existingAddress: "",
+      networkInYaml: "absent",
+    });
+    expect(sections.map((s) => s.id)).toEqual(["no_network"]);
+  });
+
+  it("a network header in the YAML outranks a stale integration list", () => {
+    expect(
+      build({
+        device: makeConfiguredDevice({ loaded_integrations: ["api", "logger"] }),
+        result: makeResult(),
+        networkInYaml: "present",
+      })
+    ).not.toContain("no_network");
   });
 
   it("keeps network advice for wifi configs and for never-compiled ones", () => {
@@ -165,6 +190,7 @@ describe("buildTroubleshootSections", () => {
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: false,
       existingAddress: "",
+      networkInYaml: "unknown",
     });
     const dark = sections.find((s) => s.id === "mdns_dark");
     expect(dark?.bodyKeys).toEqual([
@@ -180,6 +206,7 @@ describe("buildTroubleshootSections", () => {
       result: makeResult({ mdns_addresses: [], mdns_has_cached_trace: false }),
       inDocker: true,
       existingAddress: "",
+      networkInYaml: "unknown",
     });
     const dark = sections.find((s) => s.id === "mdns_dark");
     expect(dark?.bodyKeys[0]).toBe("troubleshoot.mdns_dark_docker_body");

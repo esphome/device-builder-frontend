@@ -3,3 +3,7 @@
  *  share it without pulling each other in. */
 export const NETWORK_SECTIONS = ["wifi", "ethernet", "openthread"] as const;
 export type NetworkSection = (typeof NETWORK_SECTIONS)[number];
+
+/** What the raw YAML proves about a network component: `absent` is
+ *  definitive (no header and no `packages:` to hide one in). */
+export type NetworkPresence = "present" | "absent" | "unknown";

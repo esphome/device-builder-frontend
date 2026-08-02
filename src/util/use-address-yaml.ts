@@ -7,7 +7,11 @@
  * `wifi: !include`-style header falls back to a copyable snippet.
  */
 import { isIpLiteral, isIpv6Shape } from "./ip-literal.js";
-import { NETWORK_SECTIONS, type NetworkSection } from "./network-sections.js";
+import {
+  NETWORK_SECTIONS,
+  type NetworkPresence,
+  type NetworkSection,
+} from "./network-sections.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { BARE_MAPPING_KEY_RE } from "./yaml-section-lexer.js";
 import { findSectionStart, parseSectionCore } from "./yaml-section-reader.js";
@@ -72,6 +76,28 @@ export function readAddressPrefill(yaml: string): {
   // wifi and ethernet both take manual_ip; openthread has none and
   // falls out of staticIpOf naturally.
   return { useAddress, staticIp: staticIpOf(values) };
+}
+
+/** Top-level YAML merge key (`<<: !include base.yaml`): another file
+ *  that can carry arbitrary top-level keys, wifi included. */
+const TOP_LEVEL_MERGE_RE = /^<<\s*:/;
+
+/**
+ * Classify the raw YAML's network component.
+
+ * Any `wifi:`/`ethernet:`/`openthread:` header (inline `!include`
+ * included) is `present`; no header is `unknown` when a `packages:`
+ * key or a top-level merge include could supply one from another
+ * file, and `absent` only when neither can.
+ */
+export function networkInYaml(yaml: string): NetworkPresence {
+  const lines = splitYamlDocLines(yaml);
+  for (const section of NETWORK_SECTIONS) {
+    if (findSectionStart(lines, section) >= 0) return "present";
+  }
+  if (findSectionStart(lines, "packages") >= 0) return "unknown";
+  if (lines.some((line) => TOP_LEVEL_MERGE_RE.test(line))) return "unknown";
+  return "absent";
 }
 
 /** Remove `use_address` from the network block; null when nothing is

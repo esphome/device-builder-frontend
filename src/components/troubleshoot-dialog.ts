@@ -30,6 +30,7 @@ import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { isIpLiteral } from "../util/ip-literal.js";
+import type { NetworkPresence } from "../util/network-sections.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   buildTroubleshootSections,
@@ -101,6 +102,8 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   @state() private _screen: "main" | "address" = "main";
   @state() _existingAddress = "";
 
+  @state() _networkInYaml: NetworkPresence = "unknown";
+
   private _subscription: ReachabilitySubscription | null = null;
   private _reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedGeneration = -1;
@@ -131,6 +134,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
     const device = this._devices.find((d) => d.configuration === target.configuration);
     this._name = device?.name ?? "";
     this._existingAddress = "";
+    this._networkInYaml = "unknown";
     this._addressInput =
       device && device.address && device.address !== `${device.name}.local`
         ? device.address
@@ -358,6 +362,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       result: this._result,
       inDocker: info?.in_docker === true && info.ha_addon !== true,
       existingAddress: this._existingAddress,
+      networkInYaml: this._networkInYaml,
     });
     // The device row knows the effective address before the probe answers.
     const address = this._result?.address || device.address;

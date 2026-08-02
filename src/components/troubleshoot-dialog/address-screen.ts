@@ -12,6 +12,7 @@ import { USE_ADDRESS_DOCS_URL } from "../../util/troubleshoot-tree.js";
 import {
   applyUseAddress,
   isValidUseAddress,
+  networkInYaml,
   readAddressPrefill,
   removeUseAddress,
 } from "../../util/use-address-yaml.js";
@@ -238,6 +239,7 @@ export async function loadExistingAddress(
   try {
     const yaml = await host._api.getConfig(configuration);
     if (configuration !== host._configuration) return;
+    host._networkInYaml = networkInYaml(yaml);
     const { useAddress, staticIp } = readAddressPrefill(yaml);
     // Only a verified YAML read drives the diagnosis; a packaged
     // network block (null) leaves the prefill hint as just a hint.

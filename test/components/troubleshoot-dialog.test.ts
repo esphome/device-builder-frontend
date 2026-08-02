@@ -326,9 +326,22 @@ describe("troubleshoot-dialog", () => {
     );
   });
 
-  it("refuses a network-less config instead of writing a bare wifi block", async () => {
-    const { el, api } = await openDialog({
+  it("diagnoses a network-less YAML up front with no address drill", async () => {
+    const { el } = await openDialog({
       getConfig: vi.fn().mockResolvedValue("esphome:\n  name: kitchen\napi:\n"),
+    });
+    const ids = [...el.shadowRoot!.querySelectorAll("[data-section]")].map((n) =>
+      n.getAttribute("data-section")
+    );
+    expect(ids).toEqual(["no_network"]);
+    expect(el.shadowRoot!.querySelector(".drill")).toBeNull();
+  });
+
+  it("refuses to guess a section when neither YAML nor compile shows one", async () => {
+    // Packaged YAML keeps the tree inconclusive (the drill renders);
+    // empty loaded_integrations then blocks the write at Save.
+    const { el, api } = await openDialog({
+      getConfig: vi.fn().mockResolvedValue("packages:\n  base: !include x.yaml\n"),
     });
     await openAddressScreen(el);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>(".address-form input")!;
