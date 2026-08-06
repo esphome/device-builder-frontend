@@ -18,8 +18,10 @@ const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.RENAME]: "rename",
 };
 
-// The flash tail a compile head chains into.
+// The flash tail a compile head chains into — the only job types that ever
+// carry depends_on.
 const CHAIN_FLASH_TYPES: readonly JobType[] = [JobType.UPLOAD, JobType.RENAME];
+const UPLOAD_TYPES: readonly JobType[] = [JobType.UPLOAD];
 
 // A live COMPILE with a held dependent is a chain head — attach in the
 // chain's command mode so success reflects the flash, not just the build.
@@ -50,7 +52,7 @@ export function findDependentUpload(
   job: FirmwareJob
 ): FirmwareJob | undefined {
   if (job.job_type !== JobType.COMPILE) return undefined;
-  return findDependent(jobs, job.job_id, [JobType.UPLOAD]);
+  return findDependent(jobs, job.job_id, UPLOAD_TYPES);
 }
 
 // First job held behind *jobId* with one of *types* — the chain's dependent tail.
