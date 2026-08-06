@@ -1,12 +1,13 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
-import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { isTerminalJob, isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
+import { OTA_PORT } from "../logs-session.js";
 
 const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.COMPILE]: "compile",
@@ -79,6 +80,16 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._failedDuringValidate = false;
   host._compileMissingDependent = false;
   host._connectionInterrupted = false;
+  host._awaitingWakeAfter = "";
+}
+
+// Clear the followed-job binding: ids, primed snapshots, and timer clocks.
+export function resetJobBinding(host: ESPHomeCommandDialog): void {
+  host._jobId = "";
+  host._timerJobId = "";
+  host._jobStatus = null;
+  host._primedSource = null;
+  host._timer.reset();
 }
 
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
@@ -228,6 +239,13 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       // before chaining into a dependent flash — a converted chain's
       // upload is already cancelled.
       if (result.queued_update_armed) {
+        host._jobId = "";
+        // Arm the wake watcher only for a live interactive install — same
+        // predicate as the logs flip below; a reattach is a review path.
+        if (wasLiveAtAttach && host._commandType === "install") {
+          host._awaitingWakeAfter = jobId;
+          if (maybeFollowWakeUpload(host)) return; // wake flash already live
+        }
         host._state = "success";
         // A never-flashed device can't come online by itself, so
         // "installs when it comes back online" would be a dead promise
@@ -238,7 +256,6 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
             ? "dashboard.queued_first_install"
             : "dashboard.queued_successfully"
         );
-        host._jobId = "";
         return;
       }
 
@@ -322,6 +339,39 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       });
     },
   });
+}
+
+// A queued update's wake flash is a brand-new standalone OTA UPLOAD (no
+// depends_on — the deferral's held upload was cancelled), so no chain link
+// reaches it; re-follow it off the jobs context and report whether a follow
+// started. The armed job id is excluded: its result frame can outrun the
+// terminal event on the context, and a re-slept device's failed flash must
+// not chase its own stale entry.
+export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): boolean {
+  if (!host._awaitingWakeAfter || !host._open || host._jobId || host._streamId) {
+    return false;
+  }
+  for (const j of host._jobs.values()) {
+    if (
+      j.job_type === JobType.UPLOAD &&
+      j.depends_on === "" &&
+      j.configuration === host.configuration &&
+      j.job_id !== host._awaitingWakeAfter &&
+      j.port === OTA_PORT &&
+      !isTerminalJob(j)
+    ) {
+      // Fresh buffer on purpose (unlike the in-chain hand-off): the build
+      // output can be hours stale by wake time, and the follow replays only
+      // the upload's own history.
+      resetRunState(host);
+      resetJobBinding(host);
+      host._closeTimerDetail();
+      host._resetAnsiLogScroll();
+      primeAndFollow(host, j);
+      return true;
+    }
+  }
+  return false;
 }
 
 // Terminal interruption state; the message and the hint-suppressing
@@ -409,12 +459,10 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
     // attempt and reset the run state (the public followJob did this), then
-    // re-attach via primeAndFollow. The timer restarts with the fresh compile —
-    // clear its id so primeAndFollow re-points it, and drop the old clocks.
+    // re-attach via primeAndFollow with a fresh timer.
     await detachStream(host);
     resetRunState(host);
-    host._timerJobId = "";
-    host._timer.reset();
+    resetJobBinding(host);
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";

@@ -50,7 +50,9 @@ import {
   detachStream,
   findDependentUpload,
   followJob,
+  maybeFollowWakeUpload,
   onForceLocalClick,
+  resetJobBinding,
   resetRunState,
   startCommand,
   stopCommand,
@@ -222,6 +224,9 @@ export class ESPHomeCommandDialog extends LitElement {
   // survives the stream ending, so the detail popover can still read the job's
   // started_at/completed_at for the total run time after an install's flash.
   _timerJobId = "";
+  // Finished job id armed by a queued-update outcome. Plain field — the
+  // _jobs context updates already schedule the render.
+  _awaitingWakeAfter = "";
 
   // Build run/compile clocks.
   _timer = new RunTimerController(this, {
@@ -294,6 +299,9 @@ export class ESPHomeCommandDialog extends LitElement {
         this._resetAnsiLogScroll();
       }
     }
+    if (changedProperties.has("_jobs")) {
+      maybeFollowWakeUpload(this);
+    }
   }
 
   /** Point the dialog at *device* and open — the shared host entry point. */
@@ -314,11 +322,8 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = null;
     this._log.reset();
     this._statusMessage = "";
-    this._jobId = "";
-    this._timerJobId = "";
-    this._jobStatus = null;
-    this._primedSource = null;
-    this._timer.reset();
+    this._awaitingWakeAfter = "";
+    resetJobBinding(this);
     this._closeTimerDetail();
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
@@ -381,6 +386,7 @@ export class ESPHomeCommandDialog extends LitElement {
   public close = () => {
     void detachStream(this);
     this._closeTimerDetail();
+    this._awaitingWakeAfter = "";
     this._open = false;
   };
 
@@ -396,6 +402,10 @@ export class ESPHomeCommandDialog extends LitElement {
   public reopen() {
     this._open = true;
     this._resetAnsiLogScroll();
+    // An armed dialog revived here may have missed the wake upload's
+    // job_queued while hidden — re-check instead of waiting for the next
+    // jobs-context update.
+    maybeFollowWakeUpload(this);
   }
 
   // Successful-install hand-off: ask the host to open the logs dialog
