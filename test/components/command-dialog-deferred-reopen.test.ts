@@ -51,6 +51,39 @@ describe("command-dialog reopen of a deferred install", () => {
   });
 });
 
+describe("command-dialog wake re-follow wiring", () => {
+  it("re-follows off a jobs context update through willUpdate", async () => {
+    const compile = makeFirmwareJob({
+      job_id: "c1",
+      job_type: JobType.COMPILE,
+      status: JobStatus.RUNNING,
+    });
+    const { el, follows } = mount([compile]);
+    document.body.appendChild(el);
+    try {
+      el.followJob(compile, "kitchen", "install");
+      follows.c1.onResult({
+        status: JobStatus.COMPLETED,
+        exit_code: 0,
+        queued_update_armed: true,
+      });
+      expect(el._awaitingWakeAfter).toBe("c1");
+
+      el._jobs = new Map([
+        ["c1", { ...compile, status: JobStatus.COMPLETED }],
+        ["u2", makeFirmwareJob({ job_id: "u2", job_type: JobType.UPLOAD })],
+      ]);
+      await el.updateComplete;
+
+      expect(follows.u2).toBeDefined();
+      expect(el._jobId).toBe("u2");
+      expect(el._awaitingWakeAfter).toBe("");
+    } finally {
+      el.remove();
+    }
+  });
+});
+
 describe("deriveFollowCommandType for deferred installs", () => {
   it("derives offline_compile for a terminal deferred compile", () => {
     const compile = makeFirmwareJob({

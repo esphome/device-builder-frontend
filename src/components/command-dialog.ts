@@ -323,6 +323,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._statusMessage = "";
     this._jobId = "";
     this._timerJobId = "";
+    this._awaitingWakeAfter = "";
     this._jobStatus = null;
     this._primedSource = null;
     this._timer.reset();
@@ -388,6 +389,7 @@ export class ESPHomeCommandDialog extends LitElement {
   public close = () => {
     void detachStream(this);
     this._closeTimerDetail();
+    this._awaitingWakeAfter = "";
     this._open = false;
   };
 
