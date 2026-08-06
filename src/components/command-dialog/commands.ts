@@ -83,6 +83,15 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._awaitingWakeAfter = "";
 }
 
+// Clear the followed-job binding: ids, primed snapshots, and timer clocks.
+export function resetJobBinding(host: ESPHomeCommandDialog): void {
+  host._jobId = "";
+  host._timerJobId = "";
+  host._jobStatus = null;
+  host._primedSource = null;
+  host._timer.reset();
+}
+
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   await detachStream(host);
   host._jobId = "";
@@ -350,7 +359,7 @@ export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
       !isTerminalJob(j)
     ) {
       resetRunState(host);
-      host._timer.reset();
+      resetJobBinding(host);
       host._closeTimerDetail();
       host._resetAnsiLogScroll();
       primeAndFollow(host, j);
@@ -444,12 +453,10 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
     // attempt and reset the run state (the public followJob did this), then
-    // re-attach via primeAndFollow. The timer restarts with the fresh compile —
-    // clear its id so primeAndFollow re-points it, and drop the old clocks.
+    // re-attach via primeAndFollow with a fresh timer.
     await detachStream(host);
     resetRunState(host);
-    host._timerJobId = "";
-    host._timer.reset();
+    resetJobBinding(host);
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";

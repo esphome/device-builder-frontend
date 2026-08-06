@@ -52,6 +52,7 @@ import {
   followJob,
   maybeFollowWakeUpload,
   onForceLocalClick,
+  resetJobBinding,
   resetRunState,
   startCommand,
   stopCommand,
@@ -321,12 +322,8 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = null;
     this._log.reset();
     this._statusMessage = "";
-    this._jobId = "";
-    this._timerJobId = "";
     this._awaitingWakeAfter = "";
-    this._jobStatus = null;
-    this._primedSource = null;
-    this._timer.reset();
+    resetJobBinding(this);
     this._closeTimerDetail();
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
