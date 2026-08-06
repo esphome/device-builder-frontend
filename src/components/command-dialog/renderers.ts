@@ -1,5 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
+import {
+  type FirmwareJob,
+  JobSource,
+  JobStatus,
+  JobType,
+} from "../../api/types/firmware-jobs.js";
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
@@ -146,6 +151,15 @@ export function renderResetSuggestion(
     host._commandType !== "compile" &&
     host._commandType !== "offline_compile"
   ) {
+    return nothing;
+  }
+  // The run's head job tells whether the *build* is what failed: a failed
+  // standalone UPLOAD, or a chain whose COMPILE head completed, died at the
+  // flash — cleaning or resetting the build environment can't help a
+  // network-layer failure.
+  const head = host._timerJobId ? host._jobs.get(host._timerJobId) : undefined;
+  if (head?.job_type === JobType.UPLOAD) return nothing;
+  if (head?.job_type === JobType.COMPILE && head.status === JobStatus.COMPLETED) {
     return nothing;
   }
   return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));

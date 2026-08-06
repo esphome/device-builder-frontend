@@ -44,6 +44,7 @@ interface Host {
   _failedDuringValidate: boolean;
   _compileMissingDependent: boolean;
   _jobId: string;
+  _timerJobId: string;
   _jobs: Map<string, FirmwareJob>;
   _primedSource: {
     source: JobSource;
@@ -64,6 +65,7 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _failedDuringValidate: false,
     _compileMissingDependent: false,
     _jobId: "job-1",
+    _timerJobId: "",
     _jobs: new Map(),
     _primedSource: null,
     _tryCleanBuild: () => {},
@@ -96,6 +98,43 @@ describe("renderResetSuggestion — local build", () => {
     // The compile was fine; clean/reset wouldn't help a missing dependent flash.
     const host = baseHost({ _compileMissingDependent: true });
     expectNoSuggestion(render(host));
+  });
+});
+
+describe("renderResetSuggestion — flash failures", () => {
+  it("renders nothing when a standalone upload failed", () => {
+    const host = baseHost({
+      _timerJobId: "u1",
+      _jobs: new Map([["u1", fakeJob({ job_id: "u1", job_type: JobType.UPLOAD })]]),
+    });
+    expectNoSuggestion(render(host));
+  });
+
+  it("renders nothing when the chain's compile completed and the flash failed", () => {
+    const host = baseHost({
+      _timerJobId: "c1",
+      _jobs: new Map([
+        [
+          "c1",
+          fakeJob({
+            job_id: "c1",
+            job_type: JobType.COMPILE,
+            status: JobStatus.COMPLETED,
+          }),
+        ],
+        ["u1", fakeJob({ job_id: "u1", job_type: JobType.UPLOAD, depends_on: "c1" })],
+      ]),
+    });
+    expectNoSuggestion(render(host));
+  });
+
+  it("keeps the hint for a failed compile head", () => {
+    const host = baseHost({
+      _timerJobId: "c1",
+      _jobId: "",
+      _jobs: new Map([["c1", fakeJob({ job_id: "c1", job_type: JobType.COMPILE })]]),
+    });
+    expectFallbackToLocal(render(host), host);
   });
 });
 
