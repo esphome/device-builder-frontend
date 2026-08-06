@@ -18,6 +18,9 @@ const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.RENAME]: "rename",
 };
 
+// The flash tail a compile head chains into.
+const CHAIN_FLASH_TYPES: readonly JobType[] = [JobType.UPLOAD, JobType.RENAME];
+
 // A live COMPILE with a held dependent is a chain head — attach in the
 // chain's command mode so success reflects the flash, not just the build.
 // Terminal reattach keeps plain compile mode: it's a log-review path and
@@ -32,9 +35,8 @@ export function deriveFollowCommandType(
     return "offline_compile";
   }
   if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {
-    const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
-    if (dependent?.job_type === JobType.RENAME) return "rename";
-    if (dependent?.job_type === JobType.UPLOAD) return "install";
+    const dependent = findDependent(jobs, job.job_id, CHAIN_FLASH_TYPES);
+    if (dependent) return JOB_TYPE_TO_COMMAND[dependent.job_type];
   }
   return JOB_TYPE_TO_COMMAND[job.job_type];
 }
@@ -48,8 +50,17 @@ export function findDependentUpload(
   job: FirmwareJob
 ): FirmwareJob | undefined {
   if (job.job_type !== JobType.COMPILE) return undefined;
+  return findDependent(jobs, job.job_id, [JobType.UPLOAD]);
+}
+
+// First job held behind *jobId* with one of *types* — the chain's dependent tail.
+function findDependent(
+  jobs: Map<string, FirmwareJob>,
+  jobId: string,
+  types: readonly JobType[]
+): FirmwareJob | undefined {
   for (const j of jobs.values()) {
-    if (j.depends_on === job.job_id && j.job_type === JobType.UPLOAD) return j;
+    if (j.depends_on === jobId && types.includes(j.job_type)) return j;
   }
   return undefined;
 }
@@ -272,11 +283,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         // The held dependent is created with the chain; its job_queued is
         // ordered ahead of this compile's job_completed on the shared WS, so it
         // is normally already in _jobs. A miss is therefore a real backend gap.
-        const flash = [...host._jobs.values()].find(
-          (j) =>
-            j.depends_on === jobId &&
-            (j.job_type === JobType.UPLOAD || j.job_type === JobType.RENAME)
-        );
+        const flash = findDependent(host._jobs, jobId, CHAIN_FLASH_TYPES);
         if (flash) {
           // primeAndFollow re-primes the source snapshot from the flash (local)
           // so the remote-builder sub-line doesn't linger on the compile's
