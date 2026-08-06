@@ -1,12 +1,13 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
-import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { isTerminalJob, isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
+import { OTA_PORT } from "../logs-session.js";
 
 const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.COMPILE]: "compile",
@@ -79,6 +80,7 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._failedDuringValidate = false;
   host._compileMissingDependent = false;
   host._connectionInterrupted = false;
+  host._awaitingWakeAfter = "";
 }
 
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
@@ -239,6 +241,12 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
             : "dashboard.queued_successfully"
         );
         host._jobId = "";
+        // Arm the wake watcher only for the interactive install flow — a
+        // firmware-tasks reattach (offline_compile) is a log-review path.
+        if (host._commandType === "install") {
+          host._awaitingWakeAfter = jobId;
+          maybeFollowWakeUpload(host);
+        }
         return;
       }
 
@@ -322,6 +330,33 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       });
     },
   });
+}
+
+// A queued update's wake flash is a brand-new standalone OTA UPLOAD (no
+// depends_on — the deferral's held upload was cancelled), so no chain link
+// reaches it; re-follow it off the jobs context. The armed job id is excluded:
+// its result frame can outrun the terminal event on the context, and a
+// re-slept device's failed flash must not chase its own stale entry.
+export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
+  if (!host._awaitingWakeAfter || !host._open || host._jobId || host._streamId) return;
+  for (const j of host._jobs.values()) {
+    if (
+      j.job_type === JobType.UPLOAD &&
+      j.depends_on === "" &&
+      j.configuration === host.configuration &&
+      j.job_id !== host._awaitingWakeAfter &&
+      j.port === OTA_PORT &&
+      !isTerminalJob(j)
+    ) {
+      host._awaitingWakeAfter = "";
+      resetRunState(host);
+      host._timer.reset();
+      host._closeTimerDetail();
+      host._resetAnsiLogScroll();
+      primeAndFollow(host, j);
+      return;
+    }
+  }
 }
 
 // Terminal interruption state; the message and the hint-suppressing

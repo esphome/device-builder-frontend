@@ -50,6 +50,7 @@ import {
   detachStream,
   findDependentUpload,
   followJob,
+  maybeFollowWakeUpload,
   onForceLocalClick,
   resetRunState,
   startCommand,
@@ -222,6 +223,10 @@ export class ESPHomeCommandDialog extends LitElement {
   // survives the stream ending, so the detail popover can still read the job's
   // started_at/completed_at for the total run time after an install's flash.
   _timerJobId = "";
+  // Armed by the queued-update outcome (holds the finished job's id);
+  // willUpdate re-follows the wake flash off _jobs. Plain field — renders
+  // are already scheduled by the _jobs context updates.
+  _awaitingWakeAfter = "";
 
   // Build run/compile clocks.
   _timer = new RunTimerController(this, {
@@ -293,6 +298,9 @@ export class ESPHomeCommandDialog extends LitElement {
       if (prev === "running" && (this._state === "success" || this._state === "error")) {
         this._resetAnsiLogScroll();
       }
+    }
+    if (changedProperties.has("_jobs")) {
+      maybeFollowWakeUpload(this);
     }
   }
 
