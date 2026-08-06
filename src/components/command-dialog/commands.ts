@@ -358,6 +358,9 @@ export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
       j.port === OTA_PORT &&
       !isTerminalJob(j)
     ) {
+      // Fresh buffer on purpose (unlike the in-chain hand-off): the build
+      // output can be hours stale by wake time, and the follow replays only
+      // the upload's own history.
       resetRunState(host);
       resetJobBinding(host);
       host._closeTimerDetail();
