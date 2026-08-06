@@ -19,7 +19,7 @@ const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
 };
 
 // The flash tail a compile head chains into — the only job types that ever
-// carry depends_on.
+// hold a non-empty depends_on.
 const CHAIN_FLASH_TYPES: readonly JobType[] = [JobType.UPLOAD, JobType.RENAME];
 const UPLOAD_TYPES: readonly JobType[] = [JobType.UPLOAD];
 
