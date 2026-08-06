@@ -75,7 +75,7 @@ describe("command-dialog deferred install follow", () => {
   });
 
   it("reports queued for an OTA upload that failed against an offline device", () => {
-    const upload = makeJob({ job_id: "u1", job_type: JobType.UPLOAD, port: "OTA" });
+    const upload = makeJob({ job_id: "u1", job_type: JobType.UPLOAD });
     const { host, follows } = makeHost(new Map([["u1", upload]]));
     host._jobId = "u1";
     followJob(host, "u1");
@@ -87,6 +87,10 @@ describe("command-dialog deferred install follow", () => {
 
     expect(host._state).toBe("success");
     expect(host._statusMessage).toBe("dashboard.queued_successfully");
+    // Armed against its own stale jobs-context entry, not re-followed.
+    expect(host._awaitingWakeAfter).toBe("u1");
+    expect(host._jobId).toBe("");
+    expect(host._streamId).toBe("");
   });
 
   it("tells a never-flashed device's owner to plug in via USB", () => {
@@ -141,12 +145,12 @@ describe("command-dialog wake re-follow", () => {
       ...overrides,
     });
 
-  function queuedHost({ commandType = "install", seedUpload = false } = {}) {
+  function queuedHost(opts: { commandType?: CommandType; seedUpload?: boolean } = {}) {
     const bundle = lonelyCompileHost();
-    bundle.host._commandType = commandType as CommandType;
+    bundle.host._commandType = opts.commandType ?? "install";
     bundle.host._jobId = "c1";
     followJob(bundle.host, "c1");
-    if (seedUpload) bundle.host._jobs.set("u2", wakeUpload());
+    if (opts.seedUpload) bundle.host._jobs.set("u2", wakeUpload());
     bundle.follows.c1.onResult({
       status: JobStatus.COMPLETED,
       exit_code: 0,
@@ -155,12 +159,20 @@ describe("command-dialog wake re-follow", () => {
     return bundle;
   }
 
+  const arrive = (
+    host: ReturnType<typeof queuedHost>["host"],
+    overrides: Partial<FirmwareJob> = {}
+  ) => {
+    const job = wakeUpload(overrides);
+    host._jobs.set(job.job_id, job);
+    maybeFollowWakeUpload(host);
+  };
+
   it("re-follows the wake flash and flips to logs on its success", () => {
     const { host, follows, flipped } = queuedHost();
     expect(host._awaitingWakeAfter).toBe("c1");
 
-    host._jobs.set("u2", wakeUpload());
-    maybeFollowWakeUpload(host);
+    arrive(host);
 
     expect(host._awaitingWakeAfter).toBe("");
     expect(host._state).toBe("running");
@@ -181,37 +193,44 @@ describe("command-dialog wake re-follow", () => {
     ["a serial upload", { port: "/dev/ttyUSB0" }],
   ])("ignores %s", (_name, overrides) => {
     const { host, follows } = queuedHost();
-    host._jobs.set("u2", wakeUpload(overrides));
-    maybeFollowWakeUpload(host);
+    arrive(host, overrides);
 
     expect(host._awaitingWakeAfter).toBe("c1");
-    expect(host._state).toBe("success");
     expect(follows.u2).toBeUndefined();
   });
 
   it("does nothing once the dialog is closed", () => {
     const { host, follows } = queuedHost();
     host._open = false;
-    host._jobs.set("u2", wakeUpload());
-    maybeFollowWakeUpload(host);
+    arrive(host);
 
     expect(follows.u2).toBeUndefined();
   });
 
   it("never arms on a firmware-tasks reattach (offline_compile)", () => {
-    const { host, follows } = queuedHost({ commandType: "offline_compile" });
+    const { host } = queuedHost({ commandType: "offline_compile" });
 
     expect(host._awaitingWakeAfter).toBe("");
-    host._jobs.set("u2", wakeUpload());
-    maybeFollowWakeUpload(host);
-    expect(host._state).toBe("success");
-    expect(follows.u2).toBeUndefined();
+  });
+
+  it("never arms on a reattach to an already-terminal job", () => {
+    const { host, follows } = lonelyCompileHost();
+    host._jobStatus = JobStatus.COMPLETED;
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({
+      status: JobStatus.COMPLETED,
+      exit_code: 0,
+      queued_update_armed: true,
+    });
+
+    expect(host._awaitingWakeAfter).toBe("");
+    expect(host._statusMessage).toBe("dashboard.queued_successfully");
   });
 
   it("re-arms when the wake flash fails against a re-slept device", () => {
     const { host, follows } = queuedHost();
-    host._jobs.set("u2", wakeUpload());
-    maybeFollowWakeUpload(host);
+    arrive(host);
 
     follows.u2.onResult({
       status: JobStatus.FAILED,
@@ -221,25 +240,6 @@ describe("command-dialog wake re-follow", () => {
     expect(host._state).toBe("success");
     expect(host._statusMessage).toBe("dashboard.queued_successfully");
     expect(host._awaitingWakeAfter).toBe("u2");
-  });
-
-  it("skips the job whose queued result just landed", () => {
-    // The result frame can outrun the terminal event on the jobs context;
-    // the armed job's own stale entry must not be chased.
-    const upload = makeJob({ job_id: "u1", job_type: JobType.UPLOAD });
-    const { host, follows } = makeHost(new Map([["u1", upload]]));
-    host._jobId = "u1";
-    followJob(host, "u1");
-    follows.u1.onResult({
-      status: JobStatus.FAILED,
-      exit_code: 1,
-      queued_update_armed: true,
-    });
-
-    expect(host._state).toBe("success");
-    expect(host._streamId).toBe("");
-    expect(host._jobId).toBe("");
-    expect(host._awaitingWakeAfter).toBe("u1");
   });
 
   it("follows an upload already live when the queued result lands", () => {

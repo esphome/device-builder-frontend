@@ -223,9 +223,8 @@ export class ESPHomeCommandDialog extends LitElement {
   // survives the stream ending, so the detail popover can still read the job's
   // started_at/completed_at for the total run time after an install's flash.
   _timerJobId = "";
-  // Armed by the queued-update outcome (holds the finished job's id);
-  // willUpdate re-follows the wake flash off _jobs. Plain field — renders
-  // are already scheduled by the _jobs context updates.
+  // Finished job id armed by a queued-update outcome. Plain field — the
+  // _jobs context updates already schedule the render.
   _awaitingWakeAfter = "";
 
   // Build run/compile clocks.

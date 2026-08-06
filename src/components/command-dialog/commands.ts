@@ -230,6 +230,14 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       // before chaining into a dependent flash — a converted chain's
       // upload is already cancelled.
       if (result.queued_update_armed) {
+        host._jobId = "";
+        // Arm the wake watcher only for a live interactive install — same
+        // predicate as the logs flip below; a reattach is a review path.
+        if (wasLiveAtAttach && host._commandType === "install") {
+          host._awaitingWakeAfter = jobId;
+          maybeFollowWakeUpload(host);
+          if (!host._awaitingWakeAfter) return; // wake flash already live
+        }
         host._state = "success";
         // A never-flashed device can't come online by itself, so
         // "installs when it comes back online" would be a dead promise
@@ -240,13 +248,6 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
             ? "dashboard.queued_first_install"
             : "dashboard.queued_successfully"
         );
-        host._jobId = "";
-        // Arm the wake watcher only for the interactive install flow — a
-        // firmware-tasks reattach (offline_compile) is a log-review path.
-        if (host._commandType === "install") {
-          host._awaitingWakeAfter = jobId;
-          maybeFollowWakeUpload(host);
-        }
         return;
       }
 
@@ -348,7 +349,6 @@ export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
       j.port === OTA_PORT &&
       !isTerminalJob(j)
     ) {
-      host._awaitingWakeAfter = "";
       resetRunState(host);
       host._timer.reset();
       host._closeTimerDetail();
