@@ -223,6 +223,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // The job the timer reports on — the followed (compile) job. Unlike _jobId it
   // survives the stream ending, so the detail popover can still read the job's
   // started_at/completed_at for the total run time after an install's flash.
+  // Doubles as the run's head job for renderResetSuggestion's phase gate.
   _timerJobId = "";
   // Finished job id armed by a queued-update outcome. Plain field — the
   // _jobs context updates already schedule the render.

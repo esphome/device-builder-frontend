@@ -136,6 +136,27 @@ describe("renderResetSuggestion — flash failures", () => {
     });
     expectFallbackToLocal(render(host), host);
   });
+
+  it("keeps the hint for an in-flight compile head", () => {
+    const host = baseHost({
+      _timerJobId: "c1",
+      _jobId: "",
+      _jobs: new Map([
+        [
+          "c1",
+          fakeJob({ job_id: "c1", job_type: JobType.COMPILE, status: JobStatus.RUNNING }),
+        ],
+      ]),
+    });
+    expectFallbackToLocal(render(host), host);
+  });
+
+  it("keeps the hint when the head job left the jobs context", () => {
+    // Clear-history pruning while the failed dialog is open; degrade to the
+    // pre-gate behavior rather than guessing the phase.
+    const host = baseHost({ _timerJobId: "u1", _jobId: "", _jobs: new Map() });
+    expectFallbackToLocal(render(host), host);
+  });
 });
 
 describe("renderResetSuggestion — remote build", () => {

@@ -156,7 +156,9 @@ export function renderResetSuggestion(
   // The run's head job tells whether the *build* is what failed: a failed
   // standalone UPLOAD, or a chain whose COMPILE head completed, died at the
   // flash — cleaning or resetting the build environment can't help a
-  // network-layer failure.
+  // network-layer failure. A combined INSTALL head can't be attributed to a
+  // phase, and a head evicted from the jobs context can't be read — both
+  // conservatively keep the hint.
   const head = host._timerJobId ? host._jobs.get(host._timerJobId) : undefined;
   if (head?.job_type === JobType.UPLOAD) return nothing;
   if (head?.job_type === JobType.COMPILE && head.status === JobStatus.COMPLETED) {
