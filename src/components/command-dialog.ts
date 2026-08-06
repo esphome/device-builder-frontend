@@ -402,6 +402,10 @@ export class ESPHomeCommandDialog extends LitElement {
   public reopen() {
     this._open = true;
     this._resetAnsiLogScroll();
+    // An armed dialog revived here may have missed the wake upload's
+    // job_queued while hidden — re-check instead of waiting for the next
+    // jobs-context update.
+    maybeFollowWakeUpload(this);
   }
 
   // Successful-install hand-off: ask the host to open the logs dialog

@@ -7,7 +7,7 @@
  * is_deferred_install — it must reopen as an Offline Compile and finish with the
  * queued-update message, not "Compilation complete!".
  */
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
@@ -52,6 +52,44 @@ describe("command-dialog reopen of a deferred install", () => {
 });
 
 describe("command-dialog wake re-follow wiring", () => {
+  beforeAll(() => {
+    // happy-dom lacks getAnimations; wa-dialog's show/hide animation calls it
+    // when ?open flips on a connected element.
+    Element.prototype.getAnimations ??= () => [];
+  });
+
+  it("re-checks on reopen for a wake upload that landed while hidden", async () => {
+    const compile = makeFirmwareJob({
+      job_id: "c1",
+      job_type: JobType.COMPILE,
+      status: JobStatus.RUNNING,
+    });
+    const { el, follows } = mount([compile]);
+    document.body.appendChild(el);
+    try {
+      el.followJob(compile, "kitchen", "install");
+      follows.c1.onResult({
+        status: JobStatus.COMPLETED,
+        exit_code: 0,
+        queued_update_armed: true,
+      });
+      el._open = false;
+      el._jobs = new Map([
+        ["c1", { ...compile, status: JobStatus.COMPLETED }],
+        ["u2", makeFirmwareJob({ job_id: "u2", job_type: JobType.UPLOAD })],
+      ]);
+      await el.updateComplete;
+      expect(follows.u2).toBeUndefined();
+
+      el.reopen();
+
+      expect(follows.u2).toBeDefined();
+      expect(el._jobId).toBe("u2");
+    } finally {
+      el.remove();
+    }
+  });
+
   it("re-follows off a jobs context update through willUpdate", async () => {
     const compile = makeFirmwareJob({
       job_id: "c1",

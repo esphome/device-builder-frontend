@@ -244,8 +244,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         // predicate as the logs flip below; a reattach is a review path.
         if (wasLiveAtAttach && host._commandType === "install") {
           host._awaitingWakeAfter = jobId;
-          maybeFollowWakeUpload(host);
-          if (!host._awaitingWakeAfter) return; // wake flash already live
+          if (maybeFollowWakeUpload(host)) return; // wake flash already live
         }
         host._state = "success";
         // A never-flashed device can't come online by itself, so
@@ -344,11 +343,14 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
 
 // A queued update's wake flash is a brand-new standalone OTA UPLOAD (no
 // depends_on — the deferral's held upload was cancelled), so no chain link
-// reaches it; re-follow it off the jobs context. The armed job id is excluded:
-// its result frame can outrun the terminal event on the context, and a
-// re-slept device's failed flash must not chase its own stale entry.
-export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
-  if (!host._awaitingWakeAfter || !host._open || host._jobId || host._streamId) return;
+// reaches it; re-follow it off the jobs context and report whether a follow
+// started. The armed job id is excluded: its result frame can outrun the
+// terminal event on the context, and a re-slept device's failed flash must
+// not chase its own stale entry.
+export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): boolean {
+  if (!host._awaitingWakeAfter || !host._open || host._jobId || host._streamId) {
+    return false;
+  }
   for (const j of host._jobs.values()) {
     if (
       j.job_type === JobType.UPLOAD &&
@@ -366,9 +368,10 @@ export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): void {
       host._closeTimerDetail();
       host._resetAnsiLogScroll();
       primeAndFollow(host, j);
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 // Terminal interruption state; the message and the hint-suppressing
