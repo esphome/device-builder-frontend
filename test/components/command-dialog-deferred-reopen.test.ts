@@ -7,7 +7,7 @@
  * is_deferred_install — it must reopen as an Offline Compile and finish with the
  * queued-update message, not "Compilation complete!".
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
@@ -52,10 +52,19 @@ describe("command-dialog reopen of a deferred install", () => {
 });
 
 describe("command-dialog wake re-follow wiring", () => {
+  const originalGetAnimations = Element.prototype.getAnimations;
   beforeAll(() => {
     // happy-dom lacks getAnimations; wa-dialog's show/hide animation calls it
     // when ?open flips on a connected element.
     Element.prototype.getAnimations ??= () => [];
+  });
+  afterAll(() => {
+    // Conditional: wa-dialog's queued animation callbacks can still fire
+    // after the suite, so the stub must outlive it when there was no real
+    // implementation to give back (the happy-dom env is per-file anyway).
+    if (originalGetAnimations) {
+      Element.prototype.getAnimations = originalGetAnimations;
+    }
   });
 
   it("re-checks on reopen for a wake upload that landed while hidden", async () => {
