@@ -1,7 +1,7 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
-import { OTA_PORT } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
+import { OTA_PORT } from "../../api/types/streaming.js";
 import { isTerminalJob, isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { resumeFollowOnReady } from "../../util/resume-follow.js";

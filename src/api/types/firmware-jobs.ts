@@ -39,9 +39,6 @@ export enum JobSource {
   REMOTE_PENDING = "remote_pending",
 }
 
-/** Sentinel port for the network / OTA path, vs. a server serial device path. */
-export const OTA_PORT = "OTA";
-
 export interface FirmwareJob {
   job_id: string;
   configuration: string;

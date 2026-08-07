@@ -1,4 +1,4 @@
-import { OTA_PORT } from "../api/types/firmware-jobs.js";
+import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";

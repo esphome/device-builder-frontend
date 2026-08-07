@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OTA_PORT } from "../../src/api/types/firmware-jobs.js";
+import { OTA_PORT } from "../../src/api/types/streaming.js";
 import {
   hasSerialPort,
   isOtaNetwork,

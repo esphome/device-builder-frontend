@@ -53,11 +53,10 @@ import type {
   EventSubscriptionCallback,
   VersionMatchPolicy,
 } from "./types/event-subscription.js";
-import {
-  type FirmwareBinary,
-  type FirmwareJob,
-  type FirmwareJobResult,
-  OTA_PORT,
+import type {
+  FirmwareBinary,
+  FirmwareJob,
+  FirmwareJobResult,
 } from "./types/firmware-jobs.js";
 import type {
   CommandMessage,
@@ -77,7 +76,7 @@ import type {
   PairingWindowState,
   RemoteBuildSettings,
 } from "./types/remote-build.js";
-import type { StreamCallbacks } from "./types/streaming.js";
+import { OTA_PORT, type StreamCallbacks } from "./types/streaming.js";
 import type {
   ArchivedDevice,
   BulkActionResult,

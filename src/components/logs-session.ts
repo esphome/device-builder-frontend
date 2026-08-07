@@ -1,5 +1,3 @@
-import { OTA_PORT } from "../api/types/firmware-jobs.js";
-
 /**
  * State machine for the logs dialog's active session.
  *
@@ -27,6 +25,7 @@ import { OTA_PORT } from "../api/types/firmware-jobs.js";
  * - ``dead``         a Web Serial reopen failed; the port is gone. Start runs
  *                    the reconnect hook (the #636 "click Start to reconnect").
  */
+import { OTA_PORT } from "../api/types/streaming.js";
 export type LogsSession =
   | { readonly kind: "idle" }
   | {
