@@ -171,6 +171,10 @@ describe("command-dialog wake re-follow", () => {
   it("re-follows the wake flash and flips to logs on its success", () => {
     const { host, follows, flipped } = queuedHost();
     expect(host._awaitingWakeAfter).toBe("c1");
+    let timerDetailClosed = false;
+    host._closeTimerDetail = () => {
+      timerDetailClosed = true;
+    };
 
     arrive(host);
 
@@ -179,6 +183,8 @@ describe("command-dialog wake re-follow", () => {
     expect(host._jobId).toBe("u2");
     expect(host._timerJobId).toBe("u2");
     expect(follows.u2).toBeDefined();
+    // The restart closes a timer-detail popover left open on the compile.
+    expect(timerDetailClosed).toBe(true);
 
     follows.u2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
     expect(host._state).toBe("success");
