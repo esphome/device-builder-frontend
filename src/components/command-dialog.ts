@@ -18,6 +18,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { JobSource, JobStatus } from "../api/types/firmware-jobs.js";
+import { OTA_PORT } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
@@ -69,7 +70,6 @@ import {
   showRunTimer,
 } from "./command-dialog/renderers.js";
 import { commandDialogStyles } from "./command-dialog/styles.js";
-import { OTA_PORT } from "./logs-session.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
 import {
   fillTerminalOnMobile,

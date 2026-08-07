@@ -1,3 +1,5 @@
+import { OTA_PORT } from "../api/types/firmware-jobs.js";
+
 /**
  * State machine for the logs dialog's active session.
  *
@@ -44,12 +46,6 @@ export type LogsSession =
       readonly paused: boolean;
     }
   | { readonly kind: "dead" };
-
-/** Sentinel ``ota`` port for the network / OTA log source (as opposed to a
- *  server serial device path like ``/dev/cu.usbserial-110``). Both run through
- *  the backend ``logs`` WS subscription and so share the ``ota`` session kind;
- *  the port is what tells them apart. */
-export const OTA_PORT = "OTA";
 
 /** Whether the streaming dot / Stop button should show (vs. the Start button). */
 export const isStreaming = (s: LogsSession): boolean =>

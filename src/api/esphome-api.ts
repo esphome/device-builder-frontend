@@ -53,10 +53,11 @@ import type {
   EventSubscriptionCallback,
   VersionMatchPolicy,
 } from "./types/event-subscription.js";
-import type {
-  FirmwareBinary,
-  FirmwareJob,
-  FirmwareJobResult,
+import {
+  type FirmwareBinary,
+  type FirmwareJob,
+  type FirmwareJobResult,
+  OTA_PORT,
 } from "./types/firmware-jobs.js";
 import type {
   CommandMessage,
@@ -1426,7 +1427,7 @@ export class ESPHomeAPI {
    *  targets only, refused while the device is offline. */
   async firmwareInstall(
     configuration: string,
-    port = "OTA",
+    port = OTA_PORT,
     forceLocal = false,
     bootloader = false
   ): Promise<FirmwareJob> {
@@ -1456,7 +1457,7 @@ export class ESPHomeAPI {
   /** Queue install for multiple devices. */
   async firmwareInstallBulk(
     configurations: string[],
-    port = "OTA"
+    port = OTA_PORT
   ): Promise<FirmwareJob[]> {
     return this.sendCommand<FirmwareJob[]>("firmware/install_bulk", {
       configurations,

@@ -1,3 +1,4 @@
+import { OTA_PORT } from "../../api/types/firmware-jobs.js";
 /**
  * The logs dialog's log source and its lifecycle.
  *
@@ -6,7 +7,7 @@
  */
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { isPassive, isStreaming, OTA_PORT } from "../logs-session.js";
+import { isPassive, isStreaming } from "../logs-session.js";
 
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(

@@ -14,6 +14,7 @@ import {
 import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { OTA_PORT } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiConnectedContext,
@@ -56,7 +57,6 @@ import {
   isPassive,
   isStreaming,
   type LogsSession,
-  OTA_PORT,
 } from "./logs-session.js";
 import {
   crashCalloutStyles,

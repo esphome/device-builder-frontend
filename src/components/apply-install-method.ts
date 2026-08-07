@@ -1,6 +1,6 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import { OTA_PORT } from "../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
-import { OTA_PORT } from "./logs-session.js";
 
 export interface InstallMethodHandlers {
   device: ConfiguredDevice;
