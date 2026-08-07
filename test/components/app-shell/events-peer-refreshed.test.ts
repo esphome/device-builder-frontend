@@ -8,7 +8,8 @@ import { handleEvent } from "../../../src/components/app-shell/events.js";
 function makePeer(dashboard_id: string): PeerSummary {
   return {
     dashboard_id,
-    pin_sha256: "a".repeat(64),
+    // Distinct per row so a widened match predicate can't hide.
+    pin_sha256: dashboard_id[0].repeat(64),
     label: "old-label",
     paired_at: 1,
     status: "approved",
@@ -56,7 +57,19 @@ describe("handleEvent REMOTE_BUILD_PEER_REFRESHED", () => {
     expect(row.connected).toBe(true);
   });
 
-  it("leaves other rows untouched and no-ops on an unknown dashboard_id", () => {
+  it("leaves other rows untouched while patching the match", () => {
+    const alpha = makePeer("alpha");
+    const beta = makePeer("beta");
+    const host: Host = { _buildServerPeers: [alpha, beta] };
+
+    dispatch(host, refreshed("alpha"));
+
+    const [patched, untouched] = host._buildServerPeers ?? [];
+    expect(patched.label).toBe("renamed");
+    expect(untouched).toEqual(beta);
+  });
+
+  it("no-ops on an unknown dashboard_id", () => {
     const other = makePeer("beta");
     const host: Host = { _buildServerPeers: [other] };
 

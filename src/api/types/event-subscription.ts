@@ -179,6 +179,7 @@ export interface InitialStateEventData {
    *  Accept / Reject) and APPROVED (persisted) rows. Live updates
    *  flow through the same ``subscribe_events`` stream as
    *  ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` (upsert),
+   *  ``REMOTE_BUILD_PEER_REFRESHED`` (introduction-field patch),
    *  ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` (status flip / row
    *  drop) events. Optional for the same reason as
    *  ``pairings`` — absent controller, omitted field. */
