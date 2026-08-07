@@ -15,7 +15,8 @@ import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { fireEvent } from "../util/fire-event.js";
-import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
+import { trimTrailingDot } from "../util/hostname.js";
+import { offloaderSelfLabel } from "../util/pairing-display-name.js";
 import { pairingDisplayNameForPin } from "../util/pairing-display-name.js";
 import { formatPinSha256 } from "../util/pin-format.js";
 import {
@@ -217,10 +218,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     // rejects on mismatch -- which is how the wizard's
     // verification cryptographically binds to the eventual
     // stored pairing.
-    const args = buildReauthPairRequest(
-      alert,
-      friendlyHostname(window.location.hostname)
-    );
+    const args = buildReauthPairRequest(alert, offloaderSelfLabel(this._api.serverInfo));
     this._busy = true;
     this._errorKey = null;
     let summary: PairingSummary;

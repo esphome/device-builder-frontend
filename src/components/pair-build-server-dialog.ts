@@ -19,6 +19,7 @@ import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { friendlyHostname, parsePortInput } from "../util/hostname.js";
+import { offloaderSelfLabel } from "../util/pairing-display-name.js";
 import "./base-dialog.js";
 import {
   onConfirmSubmit,
@@ -88,7 +89,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
 
   // Mirrors _receiverLabelTouched for the offloader-label field. An
   // untouched prefill is sent as offloader_label_auto so the receiver's
-  // UI may replace it with this dashboard's advertised friendly name.
+  // display keeps tracking this dashboard's advertised name; the prefill
+  // already shows that same resolution.
   @state() _offloaderLabelTouched = false;
 
   // True when the confirm step was reached by auto-preview (mDNS-discovered
@@ -151,12 +153,13 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._port = prefill?.port !== undefined ? String(prefill.port) : "6055";
     this._previewedPin = "";
     // Pre-fill the receiver label from the caller-supplied friendly_name,
-    // falling back to one derived from the hostname. The offloader label is
-    // sourced from window.location.hostname and doesn't auto-update afterwards.
+    // falling back to one derived from the hostname. The offloader label
+    // prefill is the same resolution the receiver applies to a still-auto
+    // label, so the field shows what the receiver will display.
     this._receiverLabel =
       prefill?.receiverLabel?.trim() || friendlyHostname(this._hostname);
     this._receiverLabelTouched = false;
-    this._offloaderLabel = friendlyHostname(window.location.hostname);
+    this._offloaderLabel = offloaderSelfLabel(this._api?.serverInfo);
     this._offloaderLabelTouched = false;
     this._pairingKey = "";
     this._pairingKeyRequired = false;

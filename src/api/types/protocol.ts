@@ -39,6 +39,9 @@ export interface ServerInfoMessage {
   esphome_version: string;
   port: number;
   ha_addon: boolean;
+  /** The dashboard's advertised display name (mDNS TXT / pairing
+   * handshake); absent on older backends. */
+  friendly_name?: string;
   /** True only when served through HA Supervisor ingress (the panel
    * iframe). Distinct from ha_addon, which is also true when the add-on
    * is reached directly on its exposed port. Drives the slim header. */

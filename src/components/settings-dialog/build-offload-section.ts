@@ -403,8 +403,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       {
         hostname: peer.hostname,
         port: peer.remote_build_port > 0 ? peer.remote_build_port : undefined,
-        // Seed the receiver label from the friendly_name.
-        receiverLabel: peer.friendly_name || undefined,
+        // Seed the receiver label as the discovery row displays it, so the
+        // prefill matches what the pairings list will later show.
+        receiverLabel: remoteBuildPeerName(peer),
       },
       // Host + peer-link port are known from mDNS — skip the manual entry step
       // and preview the fingerprint straight away.
