@@ -1,4 +1,5 @@
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import type { ServerInfoMessage } from "../api/types/protocol.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import { friendlyHostname } from "./hostname.js";
 import { remoteBuildPeerName } from "./remote-build-peer-name.js";
@@ -11,7 +12,7 @@ import { remoteBuildPeerName } from "./remote-build-peer-name.js";
  * the reauth re-pair's offloader_label.
  */
 export function offloaderSelfLabel(
-  serverInfo: { friendly_name?: string; ha_addon?: boolean } | null | undefined
+  serverInfo: Pick<ServerInfoMessage, "friendly_name" | "ha_addon"> | null | undefined
 ): string {
   const host = typeof window === "undefined" ? "" : window.location.hostname;
   return remoteBuildPeerName({

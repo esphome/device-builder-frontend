@@ -16,8 +16,10 @@ import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { fireEvent } from "../util/fire-event.js";
 import { trimTrailingDot } from "../util/hostname.js";
-import { offloaderSelfLabel } from "../util/pairing-display-name.js";
-import { pairingDisplayNameForPin } from "../util/pairing-display-name.js";
+import {
+  offloaderSelfLabel,
+  pairingDisplayNameForPin,
+} from "../util/pairing-display-name.js";
 import { formatPinSha256 } from "../util/pin-format.js";
 import {
   buildReauthPairRequest,

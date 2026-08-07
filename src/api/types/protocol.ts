@@ -40,8 +40,9 @@ export interface ServerInfoMessage {
   port: number;
   ha_addon: boolean;
   /** The dashboard's advertised display name (mDNS TXT / pairing
-   * handshake); absent on older backends. */
-  friendly_name?: string;
+   * handshake); "" on a connection that still needs the in-band
+   * auth handshake. */
+  friendly_name: string;
   /** True only when served through HA Supervisor ingress (the panel
    * iframe). Distinct from ha_addon, which is also true when the add-on
    * is reached directly on its exposed port. Drives the slim header. */
