@@ -39,6 +39,16 @@ export interface RemoteBuildPairRequestReceivedEventData {
 }
 
 /**
+ * Data payload for the ``remote_build_peer_refreshed`` event.
+ *
+ * Receiver-side. A re-pair against an existing APPROVED row
+ * refreshed its introduction fields; carries the full refreshed
+ * row so the peers list patches from the event alone, leaving
+ * ``status`` and ``connected`` as they were.
+ */
+export type RemoteBuildPeerRefreshedEventData = RemoteBuildPairRequestReceivedEventData;
+
+/**
  * Data payload for the ``remote_build_pair_status_changed`` event.
  *
  * Receiver-side. Fires from three paths: ``approve_peer``

@@ -29,6 +29,7 @@ import type {
   RemoteBuildPairingWindowChangedEventData,
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
+  RemoteBuildPeerRefreshedEventData,
 } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { type RemoteBuildJobState } from "../../context/index.js";
@@ -230,6 +231,25 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         idx === -1
           ? [...current, incoming]
           : [...current.slice(0, idx), incoming, ...current.slice(idx + 1)];
+      break;
+    }
+    case DeviceEventType.REMOTE_BUILD_PEER_REFRESHED: {
+      if (host._buildServerPeers === null) break;
+      const evt = data as RemoteBuildPeerRefreshedEventData;
+      host._buildServerPeers = host._buildServerPeers.map((p) =>
+        p.dashboard_id === evt.dashboard_id
+          ? {
+              ...p,
+              pin_sha256: evt.pin_sha256,
+              label: evt.label,
+              peer_ip: evt.peer_ip,
+              paired_at: evt.paired_at,
+              friendly_name: evt.friendly_name,
+              ha_addon: evt.ha_addon,
+              label_auto: evt.label_auto,
+            }
+          : p
+      );
       break;
     }
     case DeviceEventType.REMOTE_BUILD_PAIR_STATUS_CHANGED: {
