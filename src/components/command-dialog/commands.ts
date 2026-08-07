@@ -92,6 +92,7 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._userStopped = false;
   host._failedDuringValidate = false;
   host._compileMissingDependent = false;
+  host._failedDuringFlash = false;
   host._connectionInterrupted = false;
   host._awaitingWakeAfter = "";
 }
@@ -310,6 +311,10 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           ? `command.${host._commandType}_success`
           : `command.${host._commandType}_failed`
       );
+      // Latched here, where the outcome is known — a render-time read of the
+      // jobs context would degrade when history pruning evicts the job. A
+      // combined INSTALL job can't be attributed to a phase and stays false.
+      host._failedDuringFlash = !success && finished?.job_type === JobType.UPLOAD;
       host._jobId = "";
       if (
         success &&

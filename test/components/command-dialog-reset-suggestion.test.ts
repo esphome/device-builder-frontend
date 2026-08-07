@@ -43,8 +43,8 @@ interface Host {
   _commandType: string;
   _failedDuringValidate: boolean;
   _compileMissingDependent: boolean;
+  _failedDuringFlash: boolean;
   _jobId: string;
-  _timerJobId: string;
   _jobs: Map<string, FirmwareJob>;
   _primedSource: {
     source: JobSource;
@@ -64,8 +64,8 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _commandType: "install",
     _failedDuringValidate: false,
     _compileMissingDependent: false,
+    _failedDuringFlash: false,
     _jobId: "job-1",
-    _timerJobId: "",
     _jobs: new Map(),
     _primedSource: null,
     _tryCleanBuild: () => {},
@@ -102,60 +102,9 @@ describe("renderResetSuggestion — local build", () => {
 });
 
 describe("renderResetSuggestion — flash failures", () => {
-  it("renders nothing when a standalone upload failed", () => {
-    const host = baseHost({
-      _timerJobId: "u1",
-      _jobs: new Map([["u1", fakeJob({ job_id: "u1", job_type: JobType.UPLOAD })]]),
-    });
+  it("renders nothing when the flash failed", () => {
+    const host = baseHost({ _failedDuringFlash: true, _jobId: "" });
     expectNoSuggestion(render(host));
-  });
-
-  it("renders nothing when the chain's compile completed and the flash failed", () => {
-    const host = baseHost({
-      _timerJobId: "c1",
-      _jobs: new Map([
-        [
-          "c1",
-          fakeJob({
-            job_id: "c1",
-            job_type: JobType.COMPILE,
-            status: JobStatus.COMPLETED,
-          }),
-        ],
-        ["u1", fakeJob({ job_id: "u1", job_type: JobType.UPLOAD, depends_on: "c1" })],
-      ]),
-    });
-    expectNoSuggestion(render(host));
-  });
-
-  it("keeps the hint for a failed compile head", () => {
-    const host = baseHost({
-      _timerJobId: "c1",
-      _jobId: "",
-      _jobs: new Map([["c1", fakeJob({ job_id: "c1", job_type: JobType.COMPILE })]]),
-    });
-    expectFallbackToLocal(render(host), host);
-  });
-
-  it("keeps the hint for an in-flight compile head", () => {
-    const host = baseHost({
-      _timerJobId: "c1",
-      _jobId: "",
-      _jobs: new Map([
-        [
-          "c1",
-          fakeJob({ job_id: "c1", job_type: JobType.COMPILE, status: JobStatus.RUNNING }),
-        ],
-      ]),
-    });
-    expectFallbackToLocal(render(host), host);
-  });
-
-  it("keeps the hint when the head job left the jobs context", () => {
-    // Clear-history pruning while the failed dialog is open; degrade to the
-    // pre-gate behavior rather than guessing the phase.
-    const host = baseHost({ _timerJobId: "u1", _jobId: "", _jobs: new Map() });
-    expectFallbackToLocal(render(host), host);
   });
 });
 

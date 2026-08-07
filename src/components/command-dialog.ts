@@ -189,6 +189,10 @@ export class ESPHomeCommandDialog extends LitElement {
   // missing — the build itself was fine, so the clean/reset hint is suppressed.
   @state() _compileMissingDependent = false;
 
+  // Flips true when the failed job was the flash, not the build — cleaning or
+  // resetting the build environment can't help a network-layer failure.
+  @state() _failedDuringFlash = false;
+
   // Run ended on a lost connection; suppresses the failure hints.
   @state() _connectionInterrupted = false;
 
@@ -223,7 +227,6 @@ export class ESPHomeCommandDialog extends LitElement {
   // The job the timer reports on — the followed (compile) job. Unlike _jobId it
   // survives the stream ending, so the detail popover can still read the job's
   // started_at/completed_at for the total run time after an install's flash.
-  // Doubles as the run's head job for renderResetSuggestion's phase gate.
   _timerJobId = "";
   // Finished job id armed by a queued-update outcome. Plain field — the
   // _jobs context updates already schedule the render.
