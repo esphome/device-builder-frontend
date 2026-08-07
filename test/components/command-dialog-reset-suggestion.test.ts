@@ -43,6 +43,7 @@ interface Host {
   _commandType: string;
   _failedDuringValidate: boolean;
   _compileMissingDependent: boolean;
+  _failedDuringFlash: boolean;
   _jobId: string;
   _jobs: Map<string, FirmwareJob>;
   _primedSource: {
@@ -63,6 +64,7 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _commandType: "install",
     _failedDuringValidate: false,
     _compileMissingDependent: false,
+    _failedDuringFlash: false,
     _jobId: "job-1",
     _jobs: new Map(),
     _primedSource: null,
@@ -95,6 +97,13 @@ describe("renderResetSuggestion — local build", () => {
   it("renders nothing when a compile succeeded but had no dependent flash", () => {
     // The compile was fine; clean/reset wouldn't help a missing dependent flash.
     const host = baseHost({ _compileMissingDependent: true });
+    expectNoSuggestion(render(host));
+  });
+});
+
+describe("renderResetSuggestion — flash failures", () => {
+  it("renders nothing when the flash failed", () => {
+    const host = baseHost({ _failedDuringFlash: true, _jobId: "" });
     expectNoSuggestion(render(host));
   });
 });

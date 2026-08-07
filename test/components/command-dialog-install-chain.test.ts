@@ -130,6 +130,32 @@ describe("command-dialog install chain follow", () => {
     expect(host._jobId).toBe("");
     expect(follows.u1).toBeUndefined();
     expect(flipped()).toBe(false);
+    // A build failure keeps the clean/reset hint.
+    expect(host._failedDuringFlash).toBe(false);
+  });
+
+  it("latches the flash failure when the chain's upload fails", () => {
+    const { host, follows } = installChainHost();
+
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
+    follows.u1.onResult({ status: JobStatus.FAILED, exit_code: 1 });
+
+    expect(host._state).toBe("error");
+    expect(host._failedDuringFlash).toBe(true);
+  });
+
+  it("latches the flash failure on a reattached standalone upload", () => {
+    const upload = makeJob({ job_id: "u1", job_type: JobType.UPLOAD });
+    const { host, follows } = makeHost(new Map([["u1", upload]]));
+
+    host._jobId = "u1";
+    followJob(host, "u1");
+    follows.u1.onResult({ status: JobStatus.FAILED, exit_code: 1 });
+
+    expect(host._state).toBe("error");
+    expect(host._failedDuringFlash).toBe(true);
   });
 
   it("build-locally stays in install mode and follows the new compile into its upload", async () => {

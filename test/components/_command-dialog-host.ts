@@ -80,6 +80,7 @@ export function makeCommandDialogHost(
     _userStopped: false,
     _failedDuringValidate: false,
     _compileMissingDependent: false,
+    _failedDuringFlash: false,
     _localize: (key: string) => key,
     _resetAnsiLogScroll: () => {},
     _flipToLogs: () => {

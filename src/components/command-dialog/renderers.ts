@@ -148,6 +148,8 @@ export function renderResetSuggestion(
   ) {
     return nothing;
   }
+  // The flash failed, not the build — clean/reset can't help.
+  if (host._failedDuringFlash) return nothing;
   return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
 }
 

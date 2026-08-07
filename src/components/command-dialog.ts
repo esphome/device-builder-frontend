@@ -189,6 +189,10 @@ export class ESPHomeCommandDialog extends LitElement {
   // missing — the build itself was fine, so the clean/reset hint is suppressed.
   @state() _compileMissingDependent = false;
 
+  // Flips true when the failed job was the flash, not the build — cleaning or
+  // resetting the build environment can't help a network-layer failure.
+  @state() _failedDuringFlash = false;
+
   // Run ended on a lost connection; suppresses the failure hints.
   @state() _connectionInterrupted = false;
 
