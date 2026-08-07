@@ -76,7 +76,7 @@ import type {
   PairingWindowState,
   RemoteBuildSettings,
 } from "./types/remote-build.js";
-import type { StreamCallbacks } from "./types/streaming.js";
+import { OTA_PORT, type StreamCallbacks } from "./types/streaming.js";
 import type {
   ArchivedDevice,
   BulkActionResult,
@@ -1426,7 +1426,7 @@ export class ESPHomeAPI {
    *  targets only, refused while the device is offline. */
   async firmwareInstall(
     configuration: string,
-    port = "OTA",
+    port = OTA_PORT,
     forceLocal = false,
     bootloader = false
   ): Promise<FirmwareJob> {
@@ -1456,7 +1456,7 @@ export class ESPHomeAPI {
   /** Queue install for multiple devices. */
   async firmwareInstallBulk(
     configurations: string[],
-    port = "OTA"
+    port = OTA_PORT
   ): Promise<FirmwareJob[]> {
     return this.sendCommand<FirmwareJob[]>("firmware/install_bulk", {
       configurations,

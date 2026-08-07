@@ -1,13 +1,13 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
+import { OTA_PORT } from "../../api/types/streaming.js";
 import { isTerminalJob, isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
-import { OTA_PORT } from "../logs-session.js";
 
 const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.COMPILE]: "compile",

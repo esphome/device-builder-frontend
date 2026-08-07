@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { OTA_PORT } from "../../src/api/types/streaming.js";
 import {
   hasSerialPort,
   isOtaNetwork,
   isPassive,
   isStreaming,
   type LogsSession,
-  OTA_PORT,
 } from "../../src/components/logs-session.js";
 
 const fakePort = {} as SerialPort;

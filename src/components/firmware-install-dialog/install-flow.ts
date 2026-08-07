@@ -3,6 +3,7 @@ import {
   JobSource,
   JobStatus,
 } from "../../api/types/firmware-jobs.js";
+import { OTA_PORT } from "../../api/types/streaming.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
@@ -23,7 +24,6 @@ import {
   UnsupportedChipError,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { OTA_PORT } from "../logs-session.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();

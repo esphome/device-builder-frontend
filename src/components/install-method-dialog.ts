@@ -16,6 +16,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { DeviceState } from "../api/types/devices.js";
+import { OTA_PORT } from "../api/types/streaming.js";
 import { esphomeWebUrl } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
@@ -47,7 +48,6 @@ import {
   renderServerSerialOption,
 } from "./install-method-dialog-rows.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
-import { OTA_PORT } from "./logs-session.js";
 import { renderDisclosure } from "./shared/disclosure.js";
 import {
   renderSerialPortBadges,

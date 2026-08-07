@@ -4,9 +4,10 @@
  * Every transition of ``host._session`` lives here; the element renders it and
  * owns nothing about how a stream is started, paused, or torn down.
  */
+import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { isPassive, isStreaming, OTA_PORT } from "../logs-session.js";
+import { isPassive, isStreaming } from "../logs-session.js";
 
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(
