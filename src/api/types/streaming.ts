@@ -1,8 +1,13 @@
 /**
- * Streaming command callbacks.
+ * Streaming command callbacks and the shared OTA port sentinel.
  *
  * Part of the src/api/types.ts barrel split.
  */
+
+/** Sentinel port for the network / OTA path (vs. a server serial device path
+ *  like ``/dev/cu.usbserial-110``), carried by ``firmware/install*`` and the
+ *  ``devices/logs`` stream. */
+export const OTA_PORT = "OTA";
 
 // ─── Streaming Commands ──────────────────────────────────────
 
@@ -17,8 +22,3 @@ export interface StreamCallbacks<TResult = { success: boolean; code: number }> {
    *  stop from a command error without parsing the message. */
   onConnectionLost?: () => void;
 }
-
-/** Sentinel port for the network / OTA path (vs. a server serial device path
- *  like ``/dev/cu.usbserial-110``), carried by ``firmware/install*`` and the
- *  ``devices/logs`` stream. */
-export const OTA_PORT = "OTA";
