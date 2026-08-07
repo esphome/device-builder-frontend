@@ -49,10 +49,9 @@ export enum DeviceEventType {
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
   REMOTE_BUILD_LISTENER_CHANGED = "remote_build_listener_changed",
   REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
-  // Re-pair against an APPROVED row refreshed its introduction fields.
-  REMOTE_BUILD_PEER_REFRESHED = "remote_build_peer_refreshed",
   REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
   REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",
+  REMOTE_BUILD_PEER_REFRESHED = "remote_build_peer_refreshed",
   // Offloader-side counterpart to ``REMOTE_BUILD_PAIR_STATUS_CHANGED``;
   // fires from the offloader's pair-status listener task and from
   // ``remote_build/unpair``.

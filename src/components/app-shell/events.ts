@@ -233,25 +233,6 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
           : [...current.slice(0, idx), incoming, ...current.slice(idx + 1)];
       break;
     }
-    case DeviceEventType.REMOTE_BUILD_PEER_REFRESHED: {
-      if (host._buildServerPeers === null) break;
-      const evt = data as RemoteBuildPeerRefreshedEventData;
-      host._buildServerPeers = host._buildServerPeers.map((p) =>
-        p.dashboard_id === evt.dashboard_id
-          ? {
-              ...p,
-              pin_sha256: evt.pin_sha256,
-              label: evt.label,
-              peer_ip: evt.peer_ip,
-              paired_at: evt.paired_at,
-              friendly_name: evt.friendly_name,
-              ha_addon: evt.ha_addon,
-              label_auto: evt.label_auto,
-            }
-          : p
-      );
-      break;
-    }
     case DeviceEventType.REMOTE_BUILD_PAIR_STATUS_CHANGED: {
       const evt = data as RemoteBuildPairStatusChangedEventData;
       const current = host._buildServerPeers ?? [];
@@ -264,6 +245,17 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
           p.dashboard_id === evt.dashboard_id ? { ...p, status: "approved" as const } : p
         );
       }
+      break;
+    }
+    case DeviceEventType.REMOTE_BUILD_PEER_REFRESHED: {
+      // The payload is the row minus status/connected, so the spread patches
+      // exactly the introduction fields (pin_sha256 rides along unchanged —
+      // a differing pin is refused before this event fires).
+      if (host._buildServerPeers === null) break;
+      const evt = data as RemoteBuildPeerRefreshedEventData;
+      host._buildServerPeers = host._buildServerPeers.map((p) =>
+        p.dashboard_id === evt.dashboard_id ? { ...p, ...evt } : p
+      );
       break;
     }
     case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED: {
