@@ -133,4 +133,10 @@ describe("pair dialog open() auto-preview orchestration", () => {
     d.open();
     expect(d._offloaderLabel).toBe(friendlyHostname(window.location.hostname));
   });
+
+  it("falls back to the browser host when the backend withheld the name", () => {
+    const d = makeDialog(makeApi({ friendly_name: "", ha_addon: false }));
+    d.open();
+    expect(d._offloaderLabel).toBe(friendlyHostname(window.location.hostname));
+  });
 });

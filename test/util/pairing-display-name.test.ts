@@ -120,6 +120,12 @@ describe("offloaderSelfLabel", () => {
     expect(offloaderSelfLabel({ friendly_name: "nas", ha_addon: false })).toBe("nas");
   });
 
+  it("maps a withheld name on an add-on to the app label", () => {
+    expect(offloaderSelfLabel({ friendly_name: "", ha_addon: true })).toBe(
+      "Home Assistant App"
+    );
+  });
+
   it("maps the HA add-on container hostname, flavors included", () => {
     expect(
       offloaderSelfLabel({ friendly_name: "a1b2c3d4-esphome", ha_addon: true })

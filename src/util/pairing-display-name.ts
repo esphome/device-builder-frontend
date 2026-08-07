@@ -6,10 +6,11 @@ import { remoteBuildPeerName } from "./remote-build-peer-name.js";
 
 /**
  * This dashboard's own display name, as a receiver shows it: the
- * advertised friendly name resolved like a still-auto peer label,
- * falling back to the browser URL host when the backend withheld
- * the name (pre-auth connection). Prefills "How this dashboard
- * introduces itself" and the reauth re-pair's offloader_label.
+ * advertised friendly name resolved like a still-auto peer label;
+ * when the backend withheld the name (pre-auth connection) it falls
+ * back to the ha_addon mapping, then the browser URL host. Prefills
+ * "How this dashboard introduces itself" and the reauth re-pair's
+ * offloader_label.
  */
 export function offloaderSelfLabel(
   serverInfo: Pick<ServerInfoMessage, "friendly_name" | "ha_addon"> | null | undefined
