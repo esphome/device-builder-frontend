@@ -24,7 +24,7 @@ function makePeer(dashboard_id: string): PeerSummary {
 function refreshed(dashboard_id: string): RemoteBuildPeerRefreshedEventData {
   return {
     dashboard_id,
-    pin_sha256: "a".repeat(64),
+    pin_sha256: dashboard_id[0].repeat(64),
     label: "renamed",
     peer_ip: "10.0.0.9",
     paired_at: 2,
