@@ -352,6 +352,8 @@ export class ESPHomeCommandDialog extends LitElement {
   // ``commandType`` overrides the derivation when the caller knows the
   // command before the jobs context does (a just-queued rename's COMPILE
   // head); reattach paths omit it and derive from the chain shape.
+  // Deliberately not restartRunOn: a reattach restores the job's real clock
+  // via _timer.attach, where a restart resets it.
   public followJob(job: FirmwareJob, displayName: string, commandType?: CommandType) {
     this.configuration = job.configuration;
     this.name = displayName;

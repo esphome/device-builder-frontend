@@ -224,11 +224,11 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
   primeAndFollow(host, job);
 }
 
-// Prime status + source so the overlay paints on the first frame, then follow.
-// Leaves _commandType to the caller (the install chain relies on it).
 // The creation-time source snapshot the overlay paints from before the jobs
 // context catches up.
-export function primedSourceOf(job: FirmwareJob): ESPHomeCommandDialog["_primedSource"] {
+export function primedSourceOf(
+  job: FirmwareJob
+): NonNullable<ESPHomeCommandDialog["_primedSource"]> {
   return {
     source: job.source,
     source_label: job.source_label,
@@ -237,6 +237,8 @@ export function primedSourceOf(job: FirmwareJob): ESPHomeCommandDialog["_primedS
   };
 }
 
+// Prime status + source so the overlay paints on the first frame, then follow.
+// Leaves _commandType to the caller (the install chain relies on it).
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
   // Chaining from the compile head into its dependent flash keeps the timer
