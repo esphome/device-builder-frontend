@@ -106,9 +106,8 @@ export function resetJobBinding(host: ESPHomeCommandDialog): void {
   host._timer.reset();
 }
 
-// Restart the dialog onto *job*: fresh run state and binding, closed timer
-// popover, re-pinned scroll, then prime + follow. The cleared binding is what
-// makes the prime take the fresh timer rather than inherit the chain's.
+// Restart the dialog onto *job*. The cleared binding is what makes the prime
+// take the fresh timer rather than inherit the chain's.
 function restartRunOn(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   resetRunState(host);
   resetJobBinding(host);

@@ -183,7 +183,6 @@ describe("command-dialog wake re-follow", () => {
     expect(host._jobId).toBe("u2");
     expect(host._timerJobId).toBe("u2");
     expect(follows.u2).toBeDefined();
-    // The restart closes a timer-detail popover left open on the compile.
     expect(timerDetailClosed).toBe(true);
 
     follows.u2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });

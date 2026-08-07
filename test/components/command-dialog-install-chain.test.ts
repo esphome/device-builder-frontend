@@ -201,8 +201,6 @@ describe("command-dialog install chain follow", () => {
     expect(host._commandType).toBe("install");
     expect(host._jobId).toBe("c2");
     expect(follows.c2).toBeDefined();
-    // The restart closes a timer-detail popover still open on the cancelled
-    // compile's clocks and re-pins the log scroll for the fresh buffer.
     expect(timerDetailClosed).toBe(true);
     expect(scrollRePinned).toBe(true);
     // The new local run starts clean — stale flags can't mis-route its hint.
