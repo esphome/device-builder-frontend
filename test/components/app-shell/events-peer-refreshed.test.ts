@@ -27,6 +27,8 @@ function refreshed(dashboard_id: string): RemoteBuildPeerRefreshedEventData {
     pin_sha256: dashboard_id[0].repeat(64),
     label: "renamed",
     peer_ip: "10.0.0.9",
+    // A real payload always carries the original pair time; the bump
+    // just proves the field is inside the spread's write set.
     paired_at: 2,
     friendly_name: "Office-PC",
     ha_addon: true,
