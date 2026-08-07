@@ -1,6 +1,27 @@
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import type { ServerInfoMessage } from "../api/types/protocol.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
+import { friendlyHostname } from "./hostname.js";
 import { remoteBuildPeerName } from "./remote-build-peer-name.js";
+
+/**
+ * This dashboard's own display name, as a receiver shows it: the
+ * advertised friendly name resolved like a still-auto peer label;
+ * when the backend withheld the name (pre-auth connection) it falls
+ * back to the ha_addon mapping, then the browser URL host. Prefills
+ * "How this dashboard introduces itself" and the reauth re-pair's
+ * offloader_label.
+ */
+export function offloaderSelfLabel(
+  serverInfo: Pick<ServerInfoMessage, "friendly_name" | "ha_addon"> | null | undefined
+): string {
+  const host = typeof window === "undefined" ? "" : window.location.hostname;
+  return remoteBuildPeerName({
+    friendly_name: serverInfo?.friendly_name,
+    name: friendlyHostname(host),
+    ha_addon: serverInfo?.ha_addon,
+  });
+}
 
 /**
  * Display name for a paired build server (offloader side).

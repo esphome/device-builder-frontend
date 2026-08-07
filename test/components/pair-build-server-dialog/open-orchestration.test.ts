@@ -12,9 +12,11 @@ import "../../_mock-webawesome.js";
 
 import { identityLocalize } from "../../_dom.js";
 import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
+import { friendlyHostname } from "../../../src/util/hostname.js";
 
-function makeApi() {
+function makeApi(serverInfo?: { friendly_name?: string; ha_addon?: boolean }) {
   return {
+    serverInfo,
     getRemoteBuildIdentity: vi.fn(async () => ({
       dashboard_id: "x",
       pin_sha256: "p",
@@ -115,5 +117,26 @@ describe("pair dialog open() auto-preview orchestration", () => {
     const d = makeDialog(api);
     d.open({ hostname: "buildbox.local", port: 6055 });
     expect(d._receiverLabel).toBe("buildbox");
+  });
+
+  // The offloader-label prefill mirrors the receiver's still-auto-label
+  // resolution: what the field shows is what the receiver displays.
+  it("prefills the offloader label from the advertised friendly name", () => {
+    const d = makeDialog(makeApi({ friendly_name: "nas", ha_addon: false }));
+    d.open();
+    expect(d._offloaderLabel).toBe("nas");
+    expect(d._offloaderLabelTouched).toBe(false);
+  });
+
+  it("falls back to the browser host for the offloader label without serverInfo", () => {
+    const d = makeDialog(makeApi());
+    d.open();
+    expect(d._offloaderLabel).toBe(friendlyHostname(window.location.hostname));
+  });
+
+  it("falls back to the browser host when the backend withheld the name", () => {
+    const d = makeDialog(makeApi({ friendly_name: "", ha_addon: false }));
+    d.open();
+    expect(d._offloaderLabel).toBe(friendlyHostname(window.location.hostname));
   });
 });

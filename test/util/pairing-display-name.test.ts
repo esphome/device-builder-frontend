@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PairingSummary, PeerSummary } from "../../src/api/types/remote-build.js";
 import {
   jobPeerDisplayName,
+  offloaderSelfLabel,
   pairingDisplayName,
   pairingDisplayNameForPin,
   peerDisplayName,
@@ -111,6 +112,30 @@ describe("peerDisplayName", () => {
 
   it("keeps the label when no friendly name arrived", () => {
     expect(peerDisplayName(peer({ label_auto: true }))).toBe("localhost");
+  });
+});
+
+describe("offloaderSelfLabel", () => {
+  it("resolves the advertised friendly name", () => {
+    expect(offloaderSelfLabel({ friendly_name: "nas", ha_addon: false })).toBe("nas");
+  });
+
+  it("maps a withheld name on an add-on to the app label", () => {
+    expect(offloaderSelfLabel({ friendly_name: "", ha_addon: true })).toBe(
+      "Home Assistant App"
+    );
+  });
+
+  it("maps the HA add-on container hostname, flavors included", () => {
+    expect(
+      offloaderSelfLabel({ friendly_name: "a1b2c3d4-esphome", ha_addon: true })
+    ).toBe("Home Assistant App");
+    expect(
+      offloaderSelfLabel({ friendly_name: "a1b2c3d4-esphome-beta", ha_addon: true })
+    ).toBe("Home Assistant App (Beta)");
+    expect(offloaderSelfLabel({ friendly_name: "renamed-host", ha_addon: true })).toBe(
+      "Home Assistant App"
+    );
   });
 });
 
