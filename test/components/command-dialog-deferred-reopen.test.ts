@@ -51,6 +51,29 @@ describe("command-dialog reopen of a deferred install", () => {
   });
 });
 
+describe("command-dialog reopen primed source", () => {
+  it("primes the source snapshot from the followed job", () => {
+    const compile = makeFirmwareJob({
+      job_id: "c1",
+      job_type: JobType.COMPILE,
+      status: JobStatus.RUNNING,
+      source_label: "builder",
+      source_esphome_version: "2026.7.3",
+      source_pin_sha256: "abc123",
+    });
+    const { el } = mount([compile]);
+
+    el.followJob(compile, "gen8266");
+
+    expect(el._primedSource).toEqual({
+      source: compile.source,
+      source_label: "builder",
+      source_esphome_version: "2026.7.3",
+      source_pin_sha256: "abc123",
+    });
+  });
+});
+
 describe("command-dialog wake re-follow wiring", () => {
   const originalGetAnimations = Element.prototype.getAnimations;
   beforeAll(() => {

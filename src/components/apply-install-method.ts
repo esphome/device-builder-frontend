@@ -1,5 +1,6 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
+import { OTA_PORT } from "./logs-session.js";
 
 export interface InstallMethodHandlers {
   device: ConfiguredDevice;
@@ -23,7 +24,7 @@ export function applyInstallMethod(
     case "ota":
       // ``port`` is the user-typed address override from the OTA option's
       // expanded form; the "OTA" sentinel is the default-address path.
-      h.openInstall(port ?? "OTA");
+      h.openInstall(port ?? OTA_PORT);
       break;
     case "server-serial":
       // server-serial always carries the chosen port; guard rather than assert
@@ -31,7 +32,7 @@ export function applyInstallMethod(
       if (port) h.openInstall(port);
       break;
     case "bootloader":
-      h.openInstall("OTA", { bootloader: true });
+      h.openInstall(OTA_PORT, { bootloader: true });
       break;
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);
