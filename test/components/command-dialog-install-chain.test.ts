@@ -182,6 +182,10 @@ describe("command-dialog install chain follow", () => {
         return newCompile;
       },
     });
+    let timerDetailClosed = false;
+    host._closeTimerDetail = () => {
+      timerDetailClosed = true;
+    };
     host._jobId = "c1"; // the remote compile being cancelled
     // Stale per-session flags from the cancelled remote attempt.
     host._userStopped = true;
@@ -193,6 +197,9 @@ describe("command-dialog install chain follow", () => {
     expect(host._commandType).toBe("install");
     expect(host._jobId).toBe("c2");
     expect(follows.c2).toBeDefined();
+    // The restart closes a timer-detail popover still open on the cancelled
+    // compile's clocks.
+    expect(timerDetailClosed).toBe(true);
     // The new local run starts clean — stale flags can't mis-route its hint.
     expect(host._userStopped).toBe(false);
     expect(host._failedDuringValidate).toBe(false);

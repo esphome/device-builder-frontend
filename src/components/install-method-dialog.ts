@@ -47,6 +47,7 @@ import {
   renderServerSerialOption,
 } from "./install-method-dialog-rows.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
+import { OTA_PORT } from "./logs-session.js";
 import { renderDisclosure } from "./shared/disclosure.js";
 import {
   renderSerialPortBadges,
@@ -450,7 +451,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderOtaAddressCard() {
     const expanded = this._otaAddressCardExpanded;
     const trimmed = this._otaAddressValue.trim();
-    const canSubmit = trimmed.length > 0 && trimmed !== "OTA";
+    const canSubmit = trimmed.length > 0 && trimmed !== OTA_PORT;
     return html`
       <div class="option-collapsible">
         <button
@@ -527,7 +528,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   private _submitOtaAddress = () => {
     const port = this._otaAddressValue.trim();
-    if (!port || port === "OTA") return;
+    if (!port || port === OTA_PORT) return;
     this._selectMethod("ota", port);
   };
 

@@ -52,6 +52,7 @@ import {
   followJob,
   maybeFollowWakeUpload,
   onForceLocalClick,
+  primedSourceOf,
   resetJobBinding,
   resetRunState,
   startCommand,
@@ -68,6 +69,7 @@ import {
   showRunTimer,
 } from "./command-dialog/renderers.js";
 import { commandDialogStyles } from "./command-dialog/styles.js";
+import { OTA_PORT } from "./logs-session.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
 import {
   fillTerminalOnMobile,
@@ -218,7 +220,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // Stream id (validate streaming or follow_job streaming).
   _streamId = "";
   // Install target — "OTA" for network, an actual port for server-serial.
-  _port = "OTA";
+  _port = OTA_PORT;
   // Install flashes the bootloader image instead of the app (OTA-only).
   _bootloader = false;
   // Active job id (cancel target). Empty for validate. Cleared when the stream
@@ -321,7 +323,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   public open(type: CommandType, options?: { port?: string; bootloader?: boolean }) {
     this._commandType = type;
-    this._port = options?.port ?? "OTA";
+    this._port = options?.port ?? OTA_PORT;
     this._bootloader = options?.bootloader ?? false;
     this._state = null;
     this._log.reset();
@@ -358,7 +360,7 @@ export class ESPHomeCommandDialog extends LitElement {
     // "Build locally instead" retry keeps the target address and keeps
     // flashing the bootloader.
     const dependent = findDependentUpload(this._jobs, job);
-    this._port = dependent?.port || job.port || "OTA";
+    this._port = dependent?.port || job.port || OTA_PORT;
     this._bootloader = (dependent ?? job).flash_bootloader === true;
     resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior
@@ -368,12 +370,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = job.job_id;
     this._timerJobId = job.job_id;
     this._jobStatus = job.status;
-    this._primedSource = {
-      source: job.source,
-      source_label: job.source_label,
-      source_esphome_version: job.source_esphome_version,
-      source_pin_sha256: job.source_pin_sha256,
-    };
+    this._primedSource = primedSourceOf(job);
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
     this._timer.attach(job);

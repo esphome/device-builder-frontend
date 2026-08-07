@@ -106,6 +106,17 @@ export function resetJobBinding(host: ESPHomeCommandDialog): void {
   host._timer.reset();
 }
 
+// Restart the dialog onto *job*: fresh run state and binding, closed timer
+// popover, re-pinned scroll, then prime + follow. The cleared binding is what
+// makes the prime take the fresh timer rather than inherit the chain's.
+function restartRunOn(host: ESPHomeCommandDialog, job: FirmwareJob): void {
+  resetRunState(host);
+  resetJobBinding(host);
+  host._closeTimerDetail();
+  host._resetAnsiLogScroll();
+  primeAndFollow(host, job);
+}
+
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   await detachStream(host);
   host._jobId = "";
@@ -215,6 +226,17 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
 
 // Prime status + source so the overlay paints on the first frame, then follow.
 // Leaves _commandType to the caller (the install chain relies on it).
+// The creation-time source snapshot the overlay paints from before the jobs
+// context catches up.
+export function primedSourceOf(job: FirmwareJob): ESPHomeCommandDialog["_primedSource"] {
+  return {
+    source: job.source,
+    source_label: job.source_label,
+    source_esphome_version: job.source_esphome_version,
+    source_pin_sha256: job.source_pin_sha256,
+  };
+}
+
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
   // Chaining from the compile head into its dependent flash keeps the timer
@@ -225,12 +247,7 @@ function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
     host._timerJobId = job.job_id;
   }
   host._jobStatus = job.status;
-  host._primedSource = {
-    source: job.source,
-    source_label: job.source_label,
-    source_esphome_version: job.source_esphome_version,
-    source_pin_sha256: job.source_pin_sha256,
-  };
+  host._primedSource = primedSourceOf(job);
   followJob(host, job.job_id);
 }
 
@@ -377,11 +394,7 @@ export function maybeFollowWakeUpload(host: ESPHomeCommandDialog): boolean {
       // Fresh buffer on purpose (unlike the in-chain hand-off): the build
       // output can be hours stale by wake time, and the follow replays only
       // the upload's own history.
-      resetRunState(host);
-      resetJobBinding(host);
-      host._closeTimerDetail();
-      host._resetAnsiLogScroll();
-      primeAndFollow(host, j);
+      restartRunOn(host, j);
       return true;
     }
   }
@@ -471,13 +484,10 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
       host._bootloader
     );
     // Keep _commandType "install": the public followJob would derive "compile"
-    // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
-    // attempt and reset the run state (the public followJob did this), then
-    // re-attach via primeAndFollow with a fresh timer.
+    // from the returned COMPILE (#1131) and skip the chain. Clear the
+    // cancelled attempt, then restart onto the fresh compile.
     await detachStream(host);
-    resetRunState(host);
-    resetJobBinding(host);
-    primeAndFollow(host, job);
+    restartRunOn(host, job);
   } catch (err) {
     host._state = "error";
     host._statusMessage = host._localize("command.force_local_failed");
