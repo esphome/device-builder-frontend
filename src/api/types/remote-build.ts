@@ -55,6 +55,7 @@ export interface PeerSummary {
   dashboard_id: string;
   pin_sha256: string;
   label: string;
+  /** Original pair time; a re-pair never changes it. */
   paired_at: number;
   status: PeerStatus;
   peer_ip: string;

@@ -45,6 +45,7 @@ export interface RemoteBuildPairRequestReceivedEventData {
  * refreshed its introduction fields; carries the refreshed row
  * minus ``status``/``connected``, so the peers list patches
  * from the event alone with both left as they were.
+ * ``paired_at`` is always the original pair time.
  */
 export type RemoteBuildPeerRefreshedEventData = RemoteBuildPairRequestReceivedEventData;
 
