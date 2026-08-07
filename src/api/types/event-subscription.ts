@@ -51,6 +51,7 @@ export enum DeviceEventType {
   REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
   REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
   REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",
+  REMOTE_BUILD_PEER_REFRESHED = "remote_build_peer_refreshed",
   // Offloader-side counterpart to ``REMOTE_BUILD_PAIR_STATUS_CHANGED``;
   // fires from the offloader's pair-status listener task and from
   // ``remote_build/unpair``.
@@ -178,6 +179,7 @@ export interface InitialStateEventData {
    *  Accept / Reject) and APPROVED (persisted) rows. Live updates
    *  flow through the same ``subscribe_events`` stream as
    *  ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` (upsert),
+   *  ``REMOTE_BUILD_PEER_REFRESHED`` (introduction-field patch),
    *  ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` (status flip / row
    *  drop) events. Optional for the same reason as
    *  ``pairings`` — absent controller, omitted field. */

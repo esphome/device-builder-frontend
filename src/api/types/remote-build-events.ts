@@ -8,6 +8,7 @@ import { JobStatus } from "./firmware-jobs.js";
 import type {
   PairingSummary,
   PairingWindowState,
+  PeerSummary,
   RemoteBuildPeer,
 } from "./remote-build.js";
 
@@ -37,6 +38,19 @@ export interface RemoteBuildPairRequestReceivedEventData {
   ha_addon: boolean;
   label_auto: boolean;
 }
+
+/**
+ * Data payload for the ``remote_build_peer_refreshed`` event.
+ *
+ * Receiver-side. A re-pair against an existing APPROVED row
+ * refreshed its introduction fields; carries the refreshed row
+ * minus ``status``/``connected``, so the peers list patches
+ * from the event alone with both left as they were.
+ * ``paired_at`` is always the original pair time. Declared off
+ * the row shape so the handler's spread can't silently widen
+ * with another event's payload.
+ */
+export type RemoteBuildPeerRefreshedEventData = Omit<PeerSummary, "status" | "connected">;
 
 /**
  * Data payload for the ``remote_build_pair_status_changed`` event.

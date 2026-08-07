@@ -29,6 +29,7 @@ import type {
   RemoteBuildPairingWindowChangedEventData,
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
+  RemoteBuildPeerRefreshedEventData,
 } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { type RemoteBuildJobState } from "../../context/index.js";
@@ -244,6 +245,17 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
           p.dashboard_id === evt.dashboard_id ? { ...p, status: "approved" as const } : p
         );
       }
+      break;
+    }
+    case DeviceEventType.REMOTE_BUILD_PEER_REFRESHED: {
+      // The payload is the row minus status/connected, so the spread patches
+      // exactly the introduction fields (pin_sha256 rides along unchanged —
+      // a differing pin is refused before this event fires).
+      if (host._buildServerPeers === null) break;
+      const evt = data as RemoteBuildPeerRefreshedEventData;
+      host._buildServerPeers = host._buildServerPeers.map((p) =>
+        p.dashboard_id === evt.dashboard_id ? { ...p, ...evt } : p
+      );
       break;
     }
     case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED: {

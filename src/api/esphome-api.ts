@@ -2148,6 +2148,7 @@ export class ESPHomeAPI {
   // ``subscribe_events``'s ``initial_state.peers`` field at
   // subscribe time + the three live events
   // (``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` /
+  // ``REMOTE_BUILD_PEER_REFRESHED`` /
   // ``REMOTE_BUILD_PAIR_STATUS_CHANGED``) drive every mutation.
   // A separate ``list_peers`` snapshot read would be a redundant
   // round-trip on the WS the frontend already has open.
