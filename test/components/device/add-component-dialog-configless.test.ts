@@ -143,6 +143,61 @@ describe("add-component-dialog skips the form for configless components", () => 
     );
   });
 
+  it("opens the form when a package-resolved component reveals a required field", async () => {
+    // The gated `port` is hidden by the literal scan but visible in the
+    // form once `web_server` resolves from the package (#1632); the gate
+    // must not fast-path past a field the user would have seen.
+    const entry = makeComponentEntry("thing", {
+      name: "Thing",
+      config_entries: [
+        makeConfigEntry({
+          key: "port",
+          required: true,
+          depends_on_component: "web_server",
+        }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _resolvedComponents: ["web_server"],
+    });
+
+    await select(dialog, "thing");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
+  });
+
+  it("fast-paths the same gated field on a plain config (dep stays hidden)", async () => {
+    const entry = makeComponentEntry("thing", {
+      name: "Thing",
+      config_entries: [
+        makeConfigEntry({
+          key: "port",
+          required: true,
+          depends_on_component: "web_server",
+        }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _resolvedComponents: ["web_server"],
+    });
+
+    await select(dialog, "thing");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "thing", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
+  });
+
   it("opens the form (no direct add) when the component has a required field", async () => {
     const entry = makeComponentEntry("wifi", {
       name: "WiFi",

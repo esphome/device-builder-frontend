@@ -26,6 +26,7 @@ import {
 } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
@@ -556,9 +557,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
-        // Literal scan on purpose: depends_on_component field visibility is
-        // presence-for-rendering, not dependency satisfaction.
-        present
+        // Widened to match the form's render (#1632): a field gated on a
+        // package-resolved component is visible there, so the fast-path
+        // must not skip it.
+        withMergedSourcePresence(present, this.yaml, this._resolvedComponents)
       )
     )
       return null;

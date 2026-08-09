@@ -41,7 +41,7 @@ export interface RenderCtx {
   showAdvanced: boolean;
   /** Top-level component keys present in the YAML — for the
    *  ``depends_on_component`` visibility predicate when filtering directly. */
-  presentComponents: Set<string>;
+  presentComponents: ReadonlySet<string>;
   /** Top-level keys whose backend constraint prose the form replaces with a
    *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``
    *  members). ``_fieldDescription`` strips the baked prose only for these, so

@@ -62,7 +62,7 @@ function revalidateFields(host: ESPHomeDeviceSectionConfig): void {
   host._fieldErrors = validateEntries(
     resolveSectionEntries(host.sectionKey, host._config.entries),
     host._values,
-    host._presentComponents,
+    host._effectivePresentComponents,
     host.board?.esphome.platform ?? null,
     host.sectionKey
   );

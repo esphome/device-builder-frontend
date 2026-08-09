@@ -259,6 +259,16 @@ export class ESPHomeAddComponentForm extends LitElement {
     }
   }
 
+  /** Literal scan widened by package-resolved components, for
+   *  `depends_on_component` visibility and validation. */
+  private _visibilityPresence(): ReadonlySet<string> {
+    return withMergedSourcePresence(
+      parseTopLevelComponents(this.yaml),
+      this.yaml,
+      this.resolvedComponents
+    );
+  }
+
   /** Net-missing deps driving the banner and submit gate: the literal-name
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
@@ -361,7 +371,7 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   protected render() {
     const disabled = this.submitting;
-    const presentComponents = parseTopLevelComponents(this.yaml);
+    const presentComponents = this._visibilityPresence();
     // Dependencies the catalog entry declares as required but the YAML
     // doesn't satisfy yet — a top-level block (`output:`, `i2c:`) or a
     // configured platform for hub-style deps (`atm90e32` under
@@ -550,7 +560,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
-    presentComponents: Set<string>
+    presentComponents: ReadonlySet<string>
   ): boolean {
     // The caller (``_onSubmit``) only enters this branch when
     // ``errors.size > 0``, but we keep the guard so the helper is
@@ -639,7 +649,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // alongside a fresh result. Both bail paths below set their
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
-    const presentComponents = parseTopLevelComponents(this.yaml);
+    const presentComponents = this._visibilityPresence();
     // Block submit when a declared dependency isn't satisfied. The Add
     // button is disabled in that case, but Enter (requestSubmit) still
     // lands here.
