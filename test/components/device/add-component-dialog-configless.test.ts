@@ -96,6 +96,49 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
+  it("opens the form for a bus-constrained component on a packages config", async () => {
+    // resolvedComponents satisfies the uart dep, but the package may carry
+    // several buses the scan can't see; the form must open so the bus
+    // verdict (which fails open to the picker on merged sources) can run.
+    const entry = makeComponentEntry("sensor.ld2450", {
+      name: "LD2450",
+      config_entries: [],
+      dependencies: ["uart"],
+      bus_constraints: { uart: { baud_rate: 256000, require_rx: true } },
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
+    dialog.resolvedComponents = ["uart", "esp32"];
+
+    await select(dialog, "sensor.ld2450");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
+  });
+
+  it("adds a configless component directly when a package satisfies its deps", async () => {
+    const entry = makeComponentEntry("bluetooth_proxy", {
+      name: "Bluetooth Proxy",
+      config_entries: [],
+      dependencies: ["api", "esp32"],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
+    dialog.resolvedComponents = ["api", "esp32", "wifi"];
+
+    await select(dialog, "bluetooth_proxy");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "bluetooth_proxy", fields: {} },
+      "packages:\n  base: github://acme/base.yaml\n"
+    );
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
+  });
+
   it("opens the form (no direct add) when the component has a required field", async () => {
     const entry = makeComponentEntry("wifi", {
       name: "WiFi",
