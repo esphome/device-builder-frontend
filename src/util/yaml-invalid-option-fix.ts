@@ -11,6 +11,7 @@
  * offered — the gate fails closed, so packages / `!extend` / unknown
  * components simply get no fix rather than a wrong one.
  */
+import { arraysEqual } from "./set-equal.js";
 import { getKeyPath, getPlatformValue } from "./yaml-ast.js";
 import { loadCatalog, resolveAvailableEntries } from "./yaml-completion-catalog.js";
 import {
@@ -86,8 +87,7 @@ async function gateCandidate(
     (!nest && blamedPath.length < 3) ||
     blamedPath[blamedPath.length - 1] !== parsed.key ||
     parsed.parent !== blamedPath[blamedPath.length - 2] ||
-    openerPath.length !== expectedOpener.length ||
-    openerPath.some((k, i) => expectedOpener[i] !== k)
+    !arraysEqual(openerPath, expectedOpener)
   ) {
     return null;
   }
