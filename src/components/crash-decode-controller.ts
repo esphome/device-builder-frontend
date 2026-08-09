@@ -8,6 +8,7 @@ import {
   interleaveDecoded,
 } from "../util/crash-decode.js";
 import type { LogBuffer } from "../util/log-buffer.js";
+import { arraysEqual } from "../util/set-equal.js";
 
 /** Read lazily so the host can construct this alongside its buffer. */
 export interface CrashDecodeHost {
@@ -80,7 +81,7 @@ export class CrashDecodeController {
   private _paint(region: CrashRegion): CrashRegion | null {
     const buffer = this.host.buffer();
     const raw = colorizeCrash(region.raw);
-    if (raw.every((line, i) => line === region.raw[i])) {
+    if (arraysEqual(raw, region.raw)) {
       // An OTA crash arrives red from the device's logger, so there is nothing
       // to replace. It still has to be present to be worth decoding.
       return buffer.indexOf(region.startIndex, region.raw) === null ? null : region;

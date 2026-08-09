@@ -10,6 +10,7 @@
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject, isPrimitiveOrNullish } from "./nested-values.js";
+import { arraysEqual } from "./set-equal.js";
 import type { ListItemSource } from "./yaml-section-list.js";
 import {
   formatYamlFlowList,
@@ -79,17 +80,11 @@ export function yamlValueEqual(a: unknown, b: unknown): boolean {
       a instanceof YamlRawValue &&
       b instanceof YamlRawValue &&
       a.inlineHeader === b.inlineHeader &&
-      a.lines.length === b.lines.length &&
-      a.lines.every((line, i) => line === b.lines[i])
+      arraysEqual(a.lines, b.lines)
     );
   }
   if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((item, i) => yamlValueEqual(item, b[i]))
-    );
+    return Array.isArray(a) && Array.isArray(b) && arraysEqual(a, b, yamlValueEqual);
   }
   if (isPlainObject(a) && isPlainObject(b)) {
     const ak = Object.keys(a);

@@ -1,4 +1,5 @@
 import type { PropertyValues } from "lit";
+import { arraysEqual } from "../../util/set-equal.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { flashHighlight } from "./field-highlight.js";
 
@@ -187,7 +188,7 @@ export class FieldScrollController {
   private _find(root: ParentNode, path: string[]): HTMLElement | null {
     for (const el of root.querySelectorAll<HTMLElement>("[data-field-key]")) {
       const p = parseFieldKey(el.getAttribute("data-field-key") ?? "");
-      if (p.length === path.length && p.every((k, i) => k === path[i])) return el;
+      if (arraysEqual(p, path)) return el;
     }
     // Only custom elements (hyphenated tag) carry a shadow root, so skip the
     // plain-element subtree and recurse just into those.

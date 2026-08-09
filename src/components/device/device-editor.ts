@@ -26,6 +26,7 @@ import { fireEvent } from "../../util/fire-event.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
+import { arraysEqual } from "../../util/set-equal.js";
 import {
   clampSplitRatio,
   loadSplitRatio,
@@ -522,18 +523,17 @@ export class ESPHomeDeviceEditor extends LitElement {
     // Compare the fix too: its payload can change (or appear/disappear) while
     // a localized message stays the same, and it drives the auto-fix button.
     if (
-      next.length === this._liveErrors.length &&
-      next.every((err, i) => {
-        const prev = this._liveErrors[i];
-        return (
+      arraysEqual(
+        next,
+        this._liveErrors,
+        (err, prev) =>
           err.message === prev.message &&
           err.line === prev.line &&
           err.kind === prev.kind &&
           err.fix?.line === prev.fix?.line &&
           err.fix?.indent === prev.fix?.indent &&
           err.fix?.key === prev.fix?.key
-        );
-      })
+      )
     ) {
       return;
     }

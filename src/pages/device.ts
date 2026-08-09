@@ -70,6 +70,7 @@ import { notifyError, notifyInfo, notifySuccess, notifyWarning } from "../util/n
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
+import { arraysEqual } from "../util/set-equal.js";
 import { isTypingTarget } from "../util/typing-target.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import {
@@ -203,7 +204,7 @@ export class ESPHomePageDevice extends LitElement {
         ? [...device.loaded_integrations, device.target_platform]
         : device.loaded_integrations;
     const prev = this._providedResolvedComponents;
-    if (next.length !== prev.length || next.some((id, i) => id !== prev[i])) {
+    if (!arraysEqual(next, prev)) {
       this._providedResolvedComponents = next;
     }
   }
