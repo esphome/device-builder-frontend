@@ -59,4 +59,30 @@ describe("add-component-form package-resolved dependency", () => {
     const el = await mountForm(PACKAGES_YAML, ["api", "esp8266", "wifi"]);
     expect(depsBanner(el)).not.toBeNull();
   });
+
+  it("clears the banner when the resolved platforms satisfy a dotted dep", async () => {
+    const el = await mountAddComponentForm({
+      component: makeComponentEntry("wake_on_lan", {
+        name: "Wake on LAN",
+        dependencies: ["ota.esphome"],
+      }),
+      yaml: PACKAGES_YAML,
+      resolvedComponents: ["api", "esp32", "wifi"],
+      resolvedPlatforms: ["ota.esphome", "time.sntp"],
+    });
+    expect(depsBanner(el)).toBeNull();
+  });
+
+  it("keeps the banner when the resolved platforms lack the dotted dep", async () => {
+    const el = await mountAddComponentForm({
+      component: makeComponentEntry("wake_on_lan", {
+        name: "Wake on LAN",
+        dependencies: ["ota.esphome"],
+      }),
+      yaml: PACKAGES_YAML,
+      resolvedComponents: ["api", "esp32", "wifi"],
+      resolvedPlatforms: ["time.sntp"],
+    });
+    expect(depsBanner(el)).not.toBeNull();
+  });
 });

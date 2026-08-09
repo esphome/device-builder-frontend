@@ -73,6 +73,11 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property({ attribute: false })
   resolvedComponents: readonly string[] = [];
 
+  /** Backend-resolved dotted `domain.platform` pairs; see
+   *  resolvedPlatformsContext. */
+  @property({ attribute: false })
+  resolvedPlatforms: readonly string[] = [];
+
   /**
    * Optional initial value for an ID-reference field. Used by the
    * dialog after a "+ Add <domain>" detour finishes — we pre-fill the
@@ -251,7 +256,11 @@ export class ESPHomeAddComponentForm extends LitElement {
       changedProperties.has("component") ||
       changedProperties.has("yaml") ||
       changedProperties.has("board");
-    if (scopeChanged || changedProperties.has("resolvedComponents")) {
+    if (
+      scopeChanged ||
+      changedProperties.has("resolvedComponents") ||
+      changedProperties.has("resolvedPlatforms")
+    ) {
       void this._resolveProvidedDeps();
     }
     if (scopeChanged) {
@@ -276,7 +285,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
-      present
+      present,
+      this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
     const blocked = this._busBlockedDep;
     return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
@@ -297,7 +307,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Common dep-free case: nothing to resolve, so skip the YAML parse too.
     if (!api || deps.length === 0) return;
     const present = this._visibilityPresence();
-    const missing = findMissingDependencies(deps, this.yaml, present);
+    const missing = findMissingDependencies(
+      deps,
+      this.yaml,
+      present,
+      this.resolvedPlatforms
+    );
     if (missing.length === 0) return;
     try {
       const satisfied = await depsSatisfiedByProvides(api, missing, present, {

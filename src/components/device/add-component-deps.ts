@@ -1,6 +1,7 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import { ComponentCategory } from "../../api/types/components.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
   parseConfiguredPlatforms,
@@ -18,27 +19,32 @@ const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCat
  *
  * A dependency is satisfied when any of:
  *  - the presence set carries it (`ld2410:`, `i2c:`);
- *  - a dotted dep (`ota.http_request`) matches a configured platform;
+ *  - a dotted dep (`ota.http_request`) matches a configured platform —
+ *    from the YAML scan, or from `resolvedPlatforms` on a merged-source
+ *    config;
  *  - a configured platform's stem equals the dep and the dep isn't a
  *    platform domain — platform-style hubs (`atm90e32`) live under a
  *    domain (`sensor: - platform: atm90e32`), not at the top level.
  *
  * `presentComponents` is the caller's effective presence — the literal scan
- * widened via `withMergedSourcePresence` on merged-source configs. Widening
- * satisfies bare deps only: matching a dotted dep by stem would
- * false-satisfy (`ota.esphome` vs the always-loaded `esphome` core key), so
- * dotted deps stay on the configured-platform scan. Omitted, the literal
- * scan of *yaml* is used.
+ * widened via `withMergedSourcePresence` on merged-source configs; it
+ * satisfies bare deps only (a bare stem must never match a dotted dep:
+ * `ota.esphome` vs the always-loaded `esphome` core key). Omitted, the
+ * literal scan of *yaml* is used. `resolvedPlatforms` is the dotted
+ * counterpart (`loaded_platforms`), widened here rather than by callers —
+ * the configured-platform scan is internal, so no caller can pre-widen it.
  */
 export function findMissingDependencies(
   dependencies: readonly string[],
   yaml: string,
-  presentComponents?: ReadonlySet<string>
+  presentComponents?: ReadonlySet<string>,
+  resolvedPlatforms: readonly string[] = []
 ): string[] {
   // Most components declare no dependencies — skip the YAML scans.
   if (dependencies.length === 0) return [];
   const present = presentComponents ?? parseTopLevelComponents(yaml);
   const configured = parseConfiguredPlatforms(yaml);
+  const platforms = withMergedSourcePresence(configured, yaml, resolvedPlatforms);
   const platformStems = new Set<string>();
   for (const id of configured) {
     const dot = id.indexOf(".");
@@ -46,7 +52,7 @@ export function findMissingDependencies(
   }
   return dependencies.filter((dep) => {
     if (hasComponentKey(present, dep)) return false;
-    if (dep.includes(".")) return !configured.has(dep);
+    if (dep.includes(".")) return !platforms.has(dep);
     if (!PLATFORM_DOMAINS.has(dep) && platformStems.has(dep)) return false;
     return true;
   });

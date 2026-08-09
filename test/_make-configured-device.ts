@@ -37,6 +37,7 @@ const _BASE = {
   logger_interface: null,
   current_version: "",
   loaded_integrations: [],
+  loaded_platforms: [],
   runtime_state: {
     state: DeviceState.UNKNOWN,
     // Live mDNS source so an api-enabled test device shows its out-of-sync /

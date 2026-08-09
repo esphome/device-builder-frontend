@@ -13,6 +13,7 @@ export interface AddComponentFormOptions {
   yaml?: string;
   board?: BoardCatalogEntry | null;
   resolvedComponents?: readonly string[];
+  resolvedPlatforms?: readonly string[];
 }
 
 /** An API whose catalog and `provides` queries answer empty. */
@@ -45,6 +46,8 @@ export function makeAddComponentForm(
   if (options.board !== undefined) el.board = options.board;
   if (options.resolvedComponents !== undefined)
     el.resolvedComponents = options.resolvedComponents;
+  if (options.resolvedPlatforms !== undefined)
+    el.resolvedPlatforms = options.resolvedPlatforms;
   Object.assign(el as unknown as Record<string, unknown>, {
     _api: options.api ?? emptyCatalogApi(),
   });

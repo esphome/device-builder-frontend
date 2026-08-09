@@ -35,6 +35,7 @@ export {
   remoteBuildEnabledContext,
   remoteComputeOnlyContext,
   resolvedComponentsContext,
+  resolvedPlatformsContext,
   serverVersionContext,
   versionContext,
   versionHistoryEnabledContext,

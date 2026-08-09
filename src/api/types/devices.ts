@@ -104,6 +104,9 @@ export interface ConfiguredDevice {
   logger_interface: string | null;
   current_version: string;
   loaded_integrations: string[];
+  /** Dotted `domain.platform` pairs (`ota.esphome`) from the last
+   *  compile's StorageJSON; empty until first compile. */
+  loaded_platforms: string[];
   /**
    * Subset of ``loaded_integrations`` the user directly wrote in
    * YAML — top-level keys (``api:``, ``wifi:``, ``sensor:``) plus

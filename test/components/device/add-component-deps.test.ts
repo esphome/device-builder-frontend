@@ -97,6 +97,28 @@ describe("findMissingDependencies", () => {
     expect(findMissingDependencies(["rp2"], yaml, widened(yaml, ["rp2040"]))).toEqual([]);
   });
 
+  it("satisfies a dotted dep from the resolved platforms when the YAML merges packages", () => {
+    const yaml = "packages:\n  base: github://acme/base.yaml\n";
+    expect(
+      findMissingDependencies(["ota.esphome"], yaml, undefined, ["ota.esphome"])
+    ).toEqual([]);
+  });
+
+  it("ignores the resolved platforms for a plain config", () => {
+    expect(
+      findMissingDependencies(["ota.esphome"], "api:\n", undefined, ["ota.esphome"])
+    ).toEqual(["ota.esphome"]);
+  });
+
+  it("does not let a resolved bare component stem-satisfy a dotted dep", () => {
+    // `esphome` is always loaded, so a bare resolved name must never
+    // pass for the `ota.esphome` pair.
+    const yaml = "packages:\n  base: github://acme/base.yaml\n";
+    expect(
+      findMissingDependencies(["ota.esphome"], yaml, widened(yaml, ["esphome"]))
+    ).toEqual(["ota.esphome"]);
+  });
+
   it("treats an empty dependency list as satisfied", () => {
     expect(findMissingDependencies([], "")).toEqual([]);
   });
