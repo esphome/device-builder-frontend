@@ -71,6 +71,17 @@ describe("findMissingDependencies", () => {
     ]);
   });
 
+  it("satisfies a dep from the resolved components when the YAML merges packages", () => {
+    const yaml = "packages:\n  base: github://acme/base.yaml\n";
+    expect(findMissingDependencies(["esp32"], yaml, undefined, ["esp32"])).toEqual([]);
+  });
+
+  it("ignores the resolved components for a plain config", () => {
+    expect(findMissingDependencies(["esp32"], "api:\n", undefined, ["esp32"])).toEqual([
+      "esp32",
+    ]);
+  });
+
   it("treats an empty dependency list as satisfied", () => {
     expect(findMissingDependencies([], "")).toEqual([]);
   });

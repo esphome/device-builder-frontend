@@ -17,6 +17,7 @@ import {
 import { platformSupported } from "../../../util/config-validation.js";
 import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
+import { withMergedSourcePresence } from "../../../util/merged-source-presence.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -32,6 +33,7 @@ import { navItemMatches } from "../navigator-search-match.js";
 const memoPresent = memoizeOne(parseTopLevelComponents);
 const memoPlatforms = memoizeOne(parseConfiguredPlatforms);
 const memoIds = memoizeOne(collectExistingIds);
+const memoDepPresent = memoizeOne(withMergedSourcePresence);
 
 // Three filters applied client-side:
 //  1. Platform gate: drop components incompatible with the device's
@@ -80,6 +82,12 @@ export function visibleComponents(
   const present = memoPresent(host.yaml);
   const presentPlatforms = memoPlatforms(host.yaml);
   const lockedToCore = host.lockedCategories.length > 0;
+  // Dependency satisfaction only — the single-instance hiding below stays
+  // on the literal scan, so a local override block on top of a packages:
+  // source keeps its catalog card addable.
+  const depPresent = lockedToCore
+    ? memoDepPresent(present, host.yaml, host.resolvedComponents)
+    : present;
   const platformCompatible = host._components.filter((c) =>
     platformSupported(c.supported_platforms, host.platform)
   );
@@ -110,7 +118,7 @@ export function visibleComponents(
     }
     if (coreCompatible && c.id.includes(".") && c.dependencies.length > 0) {
       const allSatisfied = c.dependencies.every(
-        (dep) => coreCompatible.has(dep) || present.has(dep)
+        (dep) => coreCompatible.has(dep) || depPresent.has(dep)
       );
       if (!allSatisfied) return false;
     }

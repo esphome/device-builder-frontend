@@ -23,6 +23,7 @@ import {
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -67,6 +68,11 @@ export class ESPHomeAddComponentForm extends LitElement {
    * reference dropdowns and used here for the dependency check. */
   @property()
   yaml = "";
+
+  /** Backend-resolved components (loaded_integrations plus target
+   *  platform); see withMergedSourcePresence. */
+  @property({ attribute: false })
+  resolvedComponents: readonly string[] = [];
 
   /**
    * Optional initial value for an ID-reference field. Used by the
@@ -244,7 +250,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     if (
       changedProperties.has("component") ||
       changedProperties.has("yaml") ||
-      changedProperties.has("board")
+      changedProperties.has("board") ||
+      changedProperties.has("resolvedComponents")
     ) {
       void this._resolveProvidedDeps();
       void this._resolveBusHostability();
@@ -258,7 +265,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
-      present
+      present,
+      this.resolvedComponents
     ).filter((d) => !this._providedDeps.has(d));
     const blocked = this._busBlockedDep;
     return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
@@ -278,7 +286,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     const deps = this.component?.dependencies ?? [];
     // Common dep-free case: nothing to resolve, so skip the YAML parse too.
     if (!api || deps.length === 0) return;
-    const present = parseTopLevelComponents(this.yaml);
+    // Widened here (not just inside findMissingDependencies) because the
+    // provides membership check below reads the same set.
+    const present = withMergedSourcePresence(
+      parseTopLevelComponents(this.yaml),
+      this.yaml,
+      this.resolvedComponents
+    );
     const missing = findMissingDependencies(deps, this.yaml, present);
     if (missing.length === 0) return;
     try {

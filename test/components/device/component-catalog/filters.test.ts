@@ -31,10 +31,12 @@ function host(
     lockedCategories = [],
     yaml = "",
     board = null,
+    resolvedComponents = [],
   }: {
     lockedCategories?: string[];
     yaml?: string;
     board?: BoardCatalogEntry | null;
+    resolvedComponents?: string[];
   } = {}
 ): ESPHomeComponentCatalog {
   return {
@@ -42,6 +44,7 @@ function host(
     _search: "",
     platform,
     yaml,
+    resolvedComponents,
     lockedCategories,
     board,
   } as unknown as ESPHomeComponentCatalog;
@@ -90,6 +93,18 @@ describe("visibleComponents platform gate", () => {
       host(locked, "esp32", { lockedCategories: ["core"] })
     ).map((c) => c.id);
     expect(ids).toEqual([]);
+  });
+
+  it("counts a package-resolved dep as satisfied when core-locked", () => {
+    const locked = [entry("time.foo", [], ["esp32"])];
+    const ids = visibleComponents(
+      host(locked, "", {
+        lockedCategories: ["core"],
+        yaml: "packages:\n  base: github://acme/base.yaml\n",
+        resolvedComponents: ["esp32"],
+      })
+    ).map((c) => c.id);
+    expect(ids).toEqual(["time.foo"]);
   });
 });
 

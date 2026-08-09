@@ -103,6 +103,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @property()
   yaml = "";
 
+  /** Backend-resolved components (loaded_integrations plus target
+   *  platform); see withMergedSourcePresence. */
+  @property({ attribute: false })
+  resolvedComponents: readonly string[] = [];
+
   /** When non-empty, the dialog locks the catalog to those
    *  categories, hides the category sidebar, and switches its title
    *  to the core-config localization keys. The "Add core
@@ -341,6 +346,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .boardId=${this.board?.id ?? ""}
           .board=${this.board}
           .yaml=${this.yaml}
+          .resolvedComponents=${this.resolvedComponents}
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${chooseExcludeCategories({
             isCoreLocked: isCore,
@@ -353,6 +359,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .component=${this._selected!}
                 .board=${this.board}
                 .yaml=${this.yaml}
+                .resolvedComponents=${this.resolvedComponents}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._returnValues}
@@ -516,13 +523,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // constrained on an exclusive-claim bus always gets the form so the
     // verdict can gate the add.
     if (exclusiveBusTarget(entry)) return null;
-    const present = parseTopLevelComponents(this.yaml);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this
     // stays stricter, only keeping the form a touch more often.
-    if (findMissingDependencies(entry.dependencies ?? [], this.yaml, present).length > 0)
-      return null;
+    const missing = findMissingDependencies(
+      entry.dependencies ?? [],
+      this.yaml,
+      undefined,
+      this.resolvedComponents
+    );
+    if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
       component: entry,
@@ -539,7 +550,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
-        present
+        parseTopLevelComponents(this.yaml)
       )
     )
       return null;

@@ -74,6 +74,10 @@ export class ESPHomeComponentCatalog extends LitElement {
   // Current YAML — used to hide single-instance components already configured.
   @property() yaml = "";
 
+  // Backend-resolved components (loaded_integrations plus target platform);
+  // see withMergedSourcePresence.
+  @property({ attribute: false }) resolvedComponents: readonly string[] = [];
+
   // When non-empty, locks the catalog to these categories and hides the
   // sidebar. The core-config dialog passes CORE_CATEGORIES.
   @property({ attribute: false }) lockedCategories: string[] = [];

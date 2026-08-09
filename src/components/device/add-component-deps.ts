@@ -1,6 +1,7 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import { ComponentCategory } from "../../api/types/components.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
   parseConfiguredPlatforms,
@@ -18,10 +19,12 @@ const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCat
  *
  * A dependency is satisfied when any of:
  *  - a top-level block of that name exists (`ld2410:`, `i2c:`);
- *  - a dotted dep (`ota.http_request`) matches a configured platform; or
+ *  - a dotted dep (`ota.http_request`) matches a configured platform;
  *  - a configured platform's stem equals the dep and the dep isn't a
  *    platform domain — platform-style hubs (`atm90e32`) live under a
- *    domain (`sensor: - platform: atm90e32`), not at the top level.
+ *    domain (`sensor: - platform: atm90e32`), not at the top level; or
+ *  - `resolvedComponents` (the device's backend-resolved list) carries it
+ *    and the YAML root-merges other sources — see `withMergedSourcePresence`.
  *
  * `presentComponents` may be passed precomputed to avoid re-parsing
  * the top-level blocks when the caller already has them.
@@ -29,11 +32,16 @@ const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCat
 export function findMissingDependencies(
   dependencies: readonly string[],
   yaml: string,
-  presentComponents?: ReadonlySet<string>
+  presentComponents?: ReadonlySet<string>,
+  resolvedComponents: readonly string[] = []
 ): string[] {
   // Most components declare no dependencies — skip the YAML scans.
   if (dependencies.length === 0) return [];
-  const present = presentComponents ?? parseTopLevelComponents(yaml);
+  const present = withMergedSourcePresence(
+    presentComponents ?? parseTopLevelComponents(yaml),
+    yaml,
+    resolvedComponents
+  );
   const configured = parseConfiguredPlatforms(yaml);
   const platformStems = new Set<string>();
   for (const id of configured) {

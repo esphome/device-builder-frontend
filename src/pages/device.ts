@@ -183,6 +183,20 @@ export class ESPHomePageDevice extends LitElement {
     return this._devices.find((d) => d.configuration === this.id) ?? null;
   }
 
+  /** Compile-time component set for the dependency gate. Memoised on the
+   *  field contents, not the row: device events rebuild the row object,
+   *  and an unstable prop identity would re-fire the add-component form's
+   *  async dep resolution on every reachability flip. */
+  private readonly _resolvedComponents = memoizeOne(
+    (loaded: readonly string[], targetPlatform: string): readonly string[] =>
+      targetPlatform ? [...loaded, targetPlatform] : loaded,
+    ([loadedA, platformA], [loadedB, platformB]) =>
+      platformA === platformB &&
+      (loadedA === loadedB ||
+        (loadedA.length === loadedB.length &&
+          loadedA.every((id, i) => id === loadedB[i])))
+  );
+
   /** Catalog entry for the current device's board. Loaded lazily when
    *  the device's `board_id` resolves — see `_loadBoard`. */
   @state()
@@ -1502,6 +1516,10 @@ export class ESPHomePageDevice extends LitElement {
       .tourAnchorId=${isVisibleTourNavigator ? "nav" : undefined}
       .openSections=${this._openSections}
       .yaml=${this._yaml}
+      .resolvedComponents=${this._resolvedComponents(
+        this._device?.loaded_integrations ?? [],
+        this._device?.target_platform ?? ""
+      )}
       .board=${this._board}
       .boardName=${this._board?.name ?? ""}
       .configuration=${this.id}
