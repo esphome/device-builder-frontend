@@ -34,6 +34,7 @@ export {
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
   remoteComputeOnlyContext,
+  resolvedComponentsContext,
   serverVersionContext,
   versionContext,
   versionHistoryEnabledContext,

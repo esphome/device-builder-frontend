@@ -8,7 +8,11 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  resolvedComponentsContext,
+} from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -70,7 +74,8 @@ export class ESPHomeAddComponentForm extends LitElement {
   yaml = "";
 
   /** Backend-resolved components (loaded_integrations plus target
-   *  platform); see withMergedSourcePresence. */
+   *  platform) from the device page; see withMergedSourcePresence. */
+  @consume({ context: resolvedComponentsContext, subscribe: true })
   @property({ attribute: false })
   resolvedComponents: readonly string[] = [];
 

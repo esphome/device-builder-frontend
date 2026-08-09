@@ -6,7 +6,11 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  resolvedComponentsContext,
+} from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -104,7 +108,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
   yaml = "";
 
   /** Backend-resolved components (loaded_integrations plus target
-   *  platform); see withMergedSourcePresence. */
+   *  platform) from the device page; see withMergedSourcePresence. */
+  @consume({ context: resolvedComponentsContext, subscribe: true })
   @property({ attribute: false })
   resolvedComponents: readonly string[] = [];
 
@@ -346,7 +351,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .boardId=${this.board?.id ?? ""}
           .board=${this.board}
           .yaml=${this.yaml}
-          .resolvedComponents=${this.resolvedComponents}
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${chooseExcludeCategories({
             isCoreLocked: isCore,
@@ -359,7 +363,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .component=${this._selected!}
                 .board=${this.board}
                 .yaml=${this.yaml}
-                .resolvedComponents=${this.resolvedComponents}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._returnValues}

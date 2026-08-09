@@ -26,6 +26,11 @@ const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCat
  *  - `resolvedComponents` (the device's backend-resolved list) carries it
  *    and the YAML root-merges other sources — see `withMergedSourcePresence`.
  *
+ * `resolvedComponents` satisfies bare deps only: it is a flat list of bare
+ * names, and matching a dotted dep by stem would false-satisfy (`ota.esphome`
+ * vs the always-loaded `esphome` core key), so dotted deps stay on the
+ * configured-platform scan even for merged-source configs.
+ *
  * `presentComponents` may be passed precomputed to avoid re-parsing
  * the top-level blocks when the caller already has them.
  */

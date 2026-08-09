@@ -117,11 +117,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property({ attribute: false })
   yaml = "";
 
-  /** Backend-resolved components (loaded_integrations plus target
-   *  platform); see withMergedSourcePresence. */
-  @property({ attribute: false })
-  resolvedComponents: readonly string[] = [];
-
   /** Memoised on the YAML source so the parse pipeline runs once per
    *  edit, not per render. See {@link deriveNavigatorBuckets}. */
   private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
@@ -409,7 +404,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
           .platform=${this.platform}
           .board=${this.board}
           .yaml=${this.yaml}
-          .resolvedComponents=${this.resolvedComponents}
         ></esphome-add-component-dialog>
         <esphome-add-automation-dialog
           .boardName=${this.boardName}

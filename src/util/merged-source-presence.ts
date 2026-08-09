@@ -7,7 +7,9 @@ import { yamlHasMergedSources } from "./config-entry-yaml-scan.js";
  *
  * For a plain config the scan is complete and live, so the resolved set is
  * deliberately ignored: deleting a block in the buffer must re-flag its
- * dependents immediately.
+ * dependents immediately. On a merged config the mirror-image staleness is
+ * accepted: a just-deleted local block stays satisfied until the backend
+ * re-resolves on save, where validation is the final arbiter.
  */
 export function withMergedSourcePresence(
   present: ReadonlySet<string>,
