@@ -263,10 +263,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property()
   configuration = "";
 
-  /** Top-level component keys present in the YAML — drives the
-   *  `depends_on_component` visibility predicate. */
+  /** Effective top-level component presence (literal scan, widened via
+   *  `withMergedSourcePresence`) — drives `depends_on_component` visibility. */
   @property({ attribute: false })
-  presentComponents: Set<string> = new Set();
+  presentComponents: ReadonlySet<string> = new Set();
 
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })

@@ -13,7 +13,11 @@ import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  resolvedComponentsContext,
+} from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -25,6 +29,7 @@ import {
 import type { ValidationError } from "../../util/config-validation.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
@@ -49,6 +54,7 @@ import {
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
+  revalidateFields,
   settleOwnDraft,
 } from "./device-section-config/draft-and-delete.js";
 import {
@@ -103,6 +109,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state()
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
+
+  @consume({ context: resolvedComponentsContext, subscribe: true })
+  @state()
+  _resolvedComponents: readonly string[] = [];
 
   @property() configuration = "";
   @property() sectionKey = "";
@@ -175,6 +185,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   // Per-section so switching components doesn't bleed state.
   @state() _advancedShownSections = new Set<string>();
   @state() _presentComponents: Set<string> = new Set();
+
+  private _widenPresence = memoizeOne(withMergedSourcePresence);
+
+  /** Literal scan widened by package-resolved components; identity-stable. */
+  get _effectivePresentComponents(): ReadonlySet<string> {
+    return this._widenPresence(
+      this._presentComponents,
+      this.yaml,
+      this._resolvedComponents
+    );
+  }
 
   // Sections whose advanced fields we've auto-revealed for caret-follow once.
   // Not reactive — bookkeeping so a later deliberate collapse isn't reopened.
@@ -264,6 +285,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // suppressions so still-broken fields regain their error.
     if (changedProperties.has("backendErrors") && this._clearedBackendPaths.size) {
       this._clearedBackendPaths = new Set();
+    }
+    // A late-arriving device row can reveal dep-gated fields; refresh an
+    // existing error map so a revealed required field surfaces immediately.
+    // Deliberately gated on a non-empty map: errors appear on edit, and a
+    // context arrival the user didn't cause must not flag a pristine section.
+    if (
+      changedProperties.has("_resolvedComponents") &&
+      this._config &&
+      this._fieldErrors.size
+    ) {
+      revalidateFields(this);
     }
     // loadConfig synchronously flips _loading/_config/_error; running it in
     // willUpdate folds those into the in-progress render rather than

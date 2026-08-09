@@ -95,7 +95,7 @@ export function renderStructuredFormBranch(
       .sectionKey=${host.sectionKey}
       .configuration=${host.configuration}
       .focusFieldPath=${host.focusFieldPath}
-      .presentComponents=${host._presentComponents}
+      .presentComponents=${host._effectivePresentComponents}
       advanced-section
       gate-advanced
       ?show-advanced=${host._showAdvanced}

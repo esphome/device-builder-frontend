@@ -57,12 +57,12 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): string | null {
 }
 
 /** Recompute the section's field errors against the render schema. */
-function revalidateFields(host: ESPHomeDeviceSectionConfig): void {
+export function revalidateFields(host: ESPHomeDeviceSectionConfig): void {
   if (!host._config) return;
   host._fieldErrors = validateEntries(
     resolveSectionEntries(host.sectionKey, host._config.entries),
     host._values,
-    host._presentComponents,
+    host._effectivePresentComponents,
     host.board?.esphome.platform ?? null,
     host.sectionKey
   );

@@ -26,6 +26,7 @@ import {
 } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
@@ -528,17 +529,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // constrained on an exclusive-claim bus always gets the form so the
     // verdict can gate the add.
     if (exclusiveBusTarget(entry)) return null;
-    const present = parseTopLevelComponents(this.yaml);
+    // Widened to match the form's render (#1632).
+    const present = withMergedSourcePresence(
+      parseTopLevelComponents(this.yaml),
+      this.yaml,
+      this._resolvedComponents
+    );
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this
     // stays stricter, only keeping the form a touch more often.
-    const missing = findMissingDependencies(
-      entry.dependencies ?? [],
-      this.yaml,
-      present,
-      this._resolvedComponents
-    );
+    const missing = findMissingDependencies(entry.dependencies ?? [], this.yaml, present);
     if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
@@ -556,8 +557,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
-        // Literal scan on purpose: depends_on_component field visibility is
-        // presence-for-rendering, not dependency satisfaction.
         present
       )
     )
