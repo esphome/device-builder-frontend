@@ -5,11 +5,16 @@ export function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
   return true;
 }
 
-/** Same items in the same order. */
+/** Same items in the same order; `===` per item unless `equals` is given. */
 export function arraysEqual<T>(
   a: readonly T[],
   b: readonly T[],
-  equals: (x: T, y: T) => boolean = (x, y) => x === y
+  equals?: (x: T, y: T) => boolean
 ): boolean {
-  return a.length === b.length && a.every((v, i) => equals(v, b[i]));
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (equals ? !equals(a[i], b[i]) : a[i] !== b[i]) return false;
+  }
+  return true;
 }
