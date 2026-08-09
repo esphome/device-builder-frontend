@@ -39,8 +39,9 @@ export interface RenderCtx {
    *  ``renderChildEntries({ includeAdvanced })`` so an exclusive-group's
    *  chosen member can reveal all its fields regardless of the toggle. */
   showAdvanced: boolean;
-  /** Top-level component keys present in the YAML — for the
-   *  ``depends_on_component`` visibility predicate when filtering directly. */
+  /** Effective top-level component presence (literal scan, widened via
+   *  ``withMergedSourcePresence``) — for the ``depends_on_component``
+   *  visibility predicate when filtering directly. */
   presentComponents: ReadonlySet<string>;
   /** Top-level keys whose backend constraint prose the form replaces with a
    *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``

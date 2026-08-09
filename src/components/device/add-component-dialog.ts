@@ -529,17 +529,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // constrained on an exclusive-claim bus always gets the form so the
     // verdict can gate the add.
     if (exclusiveBusTarget(entry)) return null;
-    const present = parseTopLevelComponents(this.yaml);
+    // Widened to match the form's render (#1632).
+    const present = withMergedSourcePresence(
+      parseTopLevelComponents(this.yaml),
+      this.yaml,
+      this._resolvedComponents
+    );
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this
     // stays stricter, only keeping the form a touch more often.
-    const missing = findMissingDependencies(
-      entry.dependencies ?? [],
-      this.yaml,
-      present,
-      this._resolvedComponents
-    );
+    const missing = findMissingDependencies(entry.dependencies ?? [], this.yaml, present);
     if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
@@ -557,10 +557,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
-        // Widened to match the form's render (#1632): a field gated on a
-        // package-resolved component is visible there, so the fast-path
-        // must not skip it.
-        withMergedSourcePresence(present, this.yaml, this._resolvedComponents)
+        present
       )
     )
       return null;

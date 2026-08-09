@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 import { flushMicrotasks, mount } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
@@ -6,11 +8,25 @@ import { ESPHomeAddComponentForm } from "../../../src/components/device/add-comp
 
 export interface AddComponentFormOptions {
   component: ComponentCatalogEntry;
-  /** Stub API injected as the form's `_api`. */
-  api: ESPHomeAPI;
+  /** Stub API injected as the form's `_api`; defaults to an empty catalog. */
+  api?: ESPHomeAPI;
   yaml?: string;
   board?: BoardCatalogEntry | null;
   resolvedComponents?: readonly string[];
+}
+
+/** An API whose catalog and `provides` queries answer empty. */
+export function emptyCatalogApi(): ESPHomeAPI {
+  return {
+    getComponents: vi.fn(async () => ({
+      components: [],
+      categories: [],
+      total: 0,
+      offset: 0,
+      limit: 200,
+    })),
+    getComponentBodies: vi.fn(async () => ({})),
+  } as unknown as ESPHomeAPI;
 }
 
 /**
@@ -29,7 +45,9 @@ export function makeAddComponentForm(
   if (options.board !== undefined) el.board = options.board;
   if (options.resolvedComponents !== undefined)
     el.resolvedComponents = options.resolvedComponents;
-  Object.assign(el as unknown as Record<string, unknown>, { _api: options.api });
+  Object.assign(el as unknown as Record<string, unknown>, {
+    _api: options.api ?? emptyCatalogApi(),
+  });
   return el;
 }
 

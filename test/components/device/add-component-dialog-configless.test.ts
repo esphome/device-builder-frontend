@@ -143,11 +143,9 @@ describe("add-component-dialog skips the form for configless components", () => 
     );
   });
 
-  it("opens the form when a package-resolved component reveals a required field", async () => {
-    // The gated `port` is hidden by the literal scan but visible in the
-    // form once `web_server` resolves from the package (#1632); the gate
-    // must not fast-path past a field the user would have seen.
-    const entry = makeComponentEntry("thing", {
+  // A required field the literal scan hides behind `depends_on_component`.
+  const gatedEntry = () =>
+    makeComponentEntry("thing", {
       name: "Thing",
       config_entries: [
         makeConfigEntry({
@@ -157,6 +155,11 @@ describe("add-component-dialog skips the form for configless components", () => 
         }),
       ],
     });
+
+  it("opens the form when a package-resolved component reveals a required field", async () => {
+    // `port` is visible in the form once `web_server` resolves from the
+    // package (#1632); the gate must not fast-path past it.
+    const entry = gatedEntry();
     const { dialog, addComponent } = makeDialog(entry);
     dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
     Object.assign(dialog as unknown as Record<string, unknown>, {
@@ -171,17 +174,7 @@ describe("add-component-dialog skips the form for configless components", () => 
   });
 
   it("fast-paths the same gated field on a plain config (dep stays hidden)", async () => {
-    const entry = makeComponentEntry("thing", {
-      name: "Thing",
-      config_entries: [
-        makeConfigEntry({
-          key: "port",
-          required: true,
-          depends_on_component: "web_server",
-        }),
-      ],
-    });
-    const { dialog, addComponent } = makeDialog(entry);
+    const { dialog, addComponent } = makeDialog(gatedEntry());
     Object.assign(dialog as unknown as Record<string, unknown>, {
       _resolvedComponents: ["web_server"],
     });

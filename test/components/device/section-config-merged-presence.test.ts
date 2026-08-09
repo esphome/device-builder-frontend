@@ -1,12 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the visual editor's packages-aware `depends_on_component`
- * visibility (#1632): the section form's `presentComponents` binding is
- * the literal scan widened by the backend-resolved components on a
- * merged-source config — reacting to a late-arriving device row,
- * identity-stable across no-op renders, and feeding validation the same
- * set so a revealed required field is enforced in lockstep.
+ * Pins the section editor's packages-aware `depends_on_component`
+ * presence wiring (#1632).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,6 +13,7 @@ vi.mock("../../../src/components/device/config-entry-form.js", () => ({}));
 
 import "../../_mock-webawesome.js";
 
+import { identityLocalize, mount } from "../../_dom.js";
 import { type ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { flushDraft } from "../../../src/components/device/device-section-config/draft-and-delete.js";
@@ -33,7 +30,7 @@ function makeHost(yaml: string, entries: ConfigEntry[]) {
   const inner = c as any;
   inner.sectionKey = "wifi";
   inner.yaml = yaml;
-  inner._localize = (key: string) => key;
+  inner._localize = identityLocalize;
   inner._config = { title: "wifi", entries };
   inner._presentComponents = new Set<string>(["wifi", "esphome"]);
   return { c, inner };
@@ -49,8 +46,7 @@ describe("section-config merged-source presence", () => {
   it("widens the form's presentComponents with resolved components on a packages config", async () => {
     const { c, inner } = makeHost(PACKAGES_YAML, [makeConfigEntry({ key: "ssid" })]);
     inner._resolvedComponents = ["web_server", "esp32"];
-    document.body.appendChild(c);
-    await c.updateComplete;
+    await mount(c);
 
     const present = formPresence(c);
     expect(present.has("web_server")).toBe(true);
@@ -59,8 +55,7 @@ describe("section-config merged-source presence", () => {
 
   it("widens after a late-arriving device row", async () => {
     const { c, inner } = makeHost(PACKAGES_YAML, [makeConfigEntry({ key: "ssid" })]);
-    document.body.appendChild(c);
-    await c.updateComplete;
+    await mount(c);
     expect(formPresence(c).has("web_server")).toBe(false);
 
     inner._resolvedComponents = ["web_server"];
@@ -71,8 +66,7 @@ describe("section-config merged-source presence", () => {
   it("keeps the widened set identity-stable across no-op renders", async () => {
     const { c, inner } = makeHost(PACKAGES_YAML, [makeConfigEntry({ key: "ssid" })]);
     inner._resolvedComponents = ["web_server"];
-    document.body.appendChild(c);
-    await c.updateComplete;
+    await mount(c);
 
     const first = formPresence(c);
     c.requestUpdate();
@@ -83,8 +77,7 @@ describe("section-config merged-source presence", () => {
   it("passes the literal set through unchanged on a plain config", async () => {
     const { c, inner } = makeHost(PLAIN_YAML, [makeConfigEntry({ key: "ssid" })]);
     inner._resolvedComponents = ["web_server"];
-    document.body.appendChild(c);
-    await c.updateComplete;
+    await mount(c);
 
     expect(formPresence(c)).toBe(inner._presentComponents);
   });

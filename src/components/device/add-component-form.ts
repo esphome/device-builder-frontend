@@ -259,25 +259,24 @@ export class ESPHomeAddComponentForm extends LitElement {
     }
   }
 
+  private _widenPresence = memoizeOne((yaml: string, resolved: readonly string[]) =>
+    withMergedSourcePresence(parseTopLevelComponents(yaml), yaml, resolved)
+  );
+
   /** Literal scan widened by package-resolved components, for
-   *  `depends_on_component` visibility and validation. */
+   *  `depends_on_component` visibility and validation; identity-stable. */
   private _visibilityPresence(): ReadonlySet<string> {
-    return withMergedSourcePresence(
-      parseTopLevelComponents(this.yaml),
-      this.yaml,
-      this.resolvedComponents
-    );
+    return this._widenPresence(this.yaml, this.resolvedComponents);
   }
 
-  /** Net-missing deps driving the banner and submit gate: the literal-name
+  /** Net-missing deps driving the banner and submit gate: the widened
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
     const missing = findMissingDependencies(
       this.component.dependencies ?? [],
       this.yaml,
-      present,
-      this.resolvedComponents
+      present
     ).filter((d) => !this._providedDeps.has(d));
     const blocked = this._busBlockedDep;
     return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
@@ -297,13 +296,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     const deps = this.component?.dependencies ?? [];
     // Common dep-free case: nothing to resolve, so skip the YAML parse too.
     if (!api || deps.length === 0) return;
-    // Widened here (not just inside findMissingDependencies) because the
-    // provides membership check below reads the same set.
-    const present = withMergedSourcePresence(
-      parseTopLevelComponents(this.yaml),
-      this.yaml,
-      this.resolvedComponents
-    );
+    const present = this._visibilityPresence();
     const missing = findMissingDependencies(deps, this.yaml, present);
     if (missing.length === 0) return;
     try {
