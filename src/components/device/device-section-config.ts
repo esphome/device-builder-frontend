@@ -54,6 +54,7 @@ import {
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
+  revalidateFields,
   settleOwnDraft,
 } from "./device-section-config/draft-and-delete.js";
 import {
@@ -284,6 +285,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // suppressions so still-broken fields regain their error.
     if (changedProperties.has("backendErrors") && this._clearedBackendPaths.size) {
       this._clearedBackendPaths = new Set();
+    }
+    // A late-arriving device row can reveal dep-gated fields; refresh an
+    // existing error map so a revealed required field surfaces immediately.
+    if (
+      changedProperties.has("_resolvedComponents") &&
+      this._config &&
+      this._fieldErrors.size
+    ) {
+      revalidateFields(this);
     }
     // loadConfig synchronously flips _loading/_config/_error; running it in
     // willUpdate folds those into the in-progress render rather than

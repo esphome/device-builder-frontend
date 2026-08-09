@@ -103,6 +103,32 @@ describe("add-component-form requestSubmit (#2400)", () => {
     expect(message).toContain("device.add_component_hidden_validation_error");
   });
 
+  it("routes a package-revealed field's error to the inline branch (#1632)", () => {
+    // The literal scan hides `port`, which would send its error to the
+    // hidden-validation block message; the widened presence renders the
+    // field, so the error must surface inline instead.
+    const gated = {
+      id: "thing",
+      config_entries: [
+        makeConfigEntry({
+          key: "port",
+          type: ConfigEntryType.INTEGER,
+          required: true,
+          depends_on_component: "web_server",
+        }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(gated);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internals = form as any;
+    internals.yaml = "packages:\n  base: github://acme/base.yaml\n";
+    internals.resolvedComponents = ["web_server"];
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    expect((internals._errors as Map<string, unknown>).has("port")).toBe(true);
+    expect(internals._localBlockMessage).toBe("");
+  });
+
   it("ignores a request while a submit is in flight", () => {
     const { form, submits } = makeForm();
     const onSubmit = vi.fn();

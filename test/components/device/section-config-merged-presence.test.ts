@@ -105,4 +105,27 @@ describe("section-config merged-source presence", () => {
     flushDraft(c);
     expect(inner._fieldErrors.has("port")).toBe(true);
   });
+
+  it("refreshes an existing error map when the device row arrives late", async () => {
+    const entries = [
+      makeConfigEntry({ key: "ssid", required: true }),
+      makeConfigEntry({
+        key: "port",
+        required: true,
+        depends_on_component: "web_server",
+      }),
+    ];
+    // `configuration` stays unset: mounting must not kick loadConfig, and
+    // flushDraft's revalidate runs before its fromLine resolution.
+    const { c, inner } = makeHost(PACKAGES_YAML, entries);
+    inner._values = {};
+    await mount(c);
+    flushDraft(c);
+    expect(inner._fieldErrors.has("ssid")).toBe(true);
+    expect(inner._fieldErrors.has("port")).toBe(false);
+
+    inner._resolvedComponents = ["web_server"];
+    await c.updateComplete;
+    expect(inner._fieldErrors.has("port")).toBe(true);
+  });
 });
