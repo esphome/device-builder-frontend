@@ -82,6 +82,11 @@ describe("findMissingDependencies", () => {
     ]);
   });
 
+  it("matches a resolved platform against its alias-spelled dep", () => {
+    const yaml = "packages:\n  base: github://acme/base.yaml\n";
+    expect(findMissingDependencies(["rp2"], yaml, undefined, ["rp2040"])).toEqual([]);
+  });
+
   it("treats an empty dependency list as satisfied", () => {
     expect(findMissingDependencies([], "")).toEqual([]);
   });
