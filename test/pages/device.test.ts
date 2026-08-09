@@ -361,10 +361,11 @@ describe("esphome-page-device install while a job is running", () => {
 });
 
 describe("esphome-page-device resolved-components provider", () => {
-  const row = (loaded: string[]): ConfiguredDevice =>
+  const row = (loaded: string[], platforms: string[] = []): ConfiguredDevice =>
     ({
       configuration: "foo.yaml",
       loaded_integrations: loaded,
+      loaded_platforms: platforms,
       target_platform: "esp32",
     }) as unknown as ConfiguredDevice;
 
@@ -377,29 +378,34 @@ describe("esphome-page-device resolved-components provider", () => {
     return page as ESPHomePageDevice & {
       willUpdate(changed: Map<PropertyKey, unknown>): void;
       _providedResolvedComponents: readonly string[];
+      _providedResolvedPlatforms: readonly string[];
     };
   }
 
   test("derives the provided list from the matching device row", () => {
-    const page = makeProviderPage([row(["api", "wifi"])]);
+    const page = makeProviderPage([row(["api", "wifi"], ["ota.esphome"])]);
     page.willUpdate(new Map([["_devices", undefined]]));
     expect(page._providedResolvedComponents).toEqual(["api", "wifi", "esp32"]);
+    expect(page._providedResolvedPlatforms).toEqual(["ota.esphome"]);
   });
 
   test("keeps identity when a rebuilt row carries identical contents", () => {
-    const page = makeProviderPage([row(["api", "wifi"])]);
+    const page = makeProviderPage([row(["api", "wifi"], ["ota.esphome"])]);
     page.willUpdate(new Map([["_devices", undefined]]));
     const first = page._providedResolvedComponents;
+    const firstPlatforms = page._providedResolvedPlatforms;
     Object.assign(page as unknown as Record<string, unknown>, {
-      _devices: [row(["api", "wifi"])],
+      _devices: [row(["api", "wifi"], ["ota.esphome"])],
     });
     page.willUpdate(new Map([["_devices", undefined]]));
     expect(page._providedResolvedComponents).toBe(first);
+    expect(page._providedResolvedPlatforms).toBe(firstPlatforms);
   });
 
   test("skips the recompute when unrelated properties change", () => {
-    const page = makeProviderPage([row(["api", "wifi"])]);
+    const page = makeProviderPage([row(["api", "wifi"], ["ota.esphome"])]);
     page.willUpdate(new Map([["_layout", undefined]]));
     expect(page._providedResolvedComponents).toEqual([]);
+    expect(page._providedResolvedPlatforms).toEqual([]);
   });
 });

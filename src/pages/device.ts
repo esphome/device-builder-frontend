@@ -43,6 +43,7 @@ import {
   devicesLoadedContext,
   localizeContext,
   resolvedComponentsContext,
+  resolvedPlatformsContext,
 } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -194,6 +195,11 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   _providedResolvedComponents: readonly string[] = [];
 
+  /** Dotted `domain.platform` pairs, same identity contract as above. */
+  @provide({ context: resolvedPlatformsContext })
+  @state()
+  _providedResolvedPlatforms: readonly string[] = [];
+
   protected willUpdate(changedProperties: PropertyValues): void {
     super.willUpdate(changedProperties);
     if (!changedProperties.has("_devices") && !changedProperties.has("id")) return;
@@ -206,6 +212,10 @@ export class ESPHomePageDevice extends LitElement {
     const prev = this._providedResolvedComponents;
     if (!arraysEqual(next, prev)) {
       this._providedResolvedComponents = next;
+    }
+    const nextPlatforms = device?.loaded_platforms ?? [];
+    if (!arraysEqual(nextPlatforms, this._providedResolvedPlatforms)) {
+      this._providedResolvedPlatforms = nextPlatforms;
     }
   }
 

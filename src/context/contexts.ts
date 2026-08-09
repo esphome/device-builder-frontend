@@ -40,6 +40,13 @@ export const resolvedComponentsContext = createContext<readonly string[]>(
   Symbol("esphome-resolved-components")
 );
 
+/** Context for the current device's backend-resolved dotted
+ *  `domain.platform` pairs (loaded_platforms), provided by the device
+ *  page; see withMergedSourcePresence. */
+export const resolvedPlatformsContext = createContext<readonly string[]>(
+  Symbol("esphome-resolved-platforms")
+);
+
 /** Context for the ESPHome version string. */
 export const versionContext = createContext<string>(Symbol("esphome-version"));
 

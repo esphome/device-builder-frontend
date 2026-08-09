@@ -17,7 +17,10 @@ import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import "../../../src/components/device/add-config-dialog.js";
 import type { ESPHomeComponentCatalog } from "../../../src/components/device/component-catalog.js";
-import { resolvedComponentsContext } from "../../../src/context/index.js";
+import {
+  resolvedComponentsContext,
+  resolvedPlatformsContext,
+} from "../../../src/context/index.js";
 
 @customElement("test-resolved-components-provider")
 class TestResolvedComponentsProvider extends LitElement {
@@ -25,14 +28,22 @@ class TestResolvedComponentsProvider extends LitElement {
   @state()
   resolved: readonly string[] = [];
 
+  @provide({ context: resolvedPlatformsContext })
+  @state()
+  resolvedPlatforms: readonly string[] = [];
+
   protected render() {
     return html`<esphome-add-config-dialog></esphome-add-config-dialog>`;
   }
 }
 
-async function mountChain(resolved: readonly string[]) {
+async function mountChain(
+  resolved: readonly string[],
+  platforms: readonly string[] = []
+) {
   const provider = new TestResolvedComponentsProvider();
   provider.resolved = resolved;
+  provider.resolvedPlatforms = platforms;
   document.body.appendChild(provider);
   await provider.updateComplete;
   const configDialog = provider.shadowRoot!.querySelector("esphome-add-config-dialog")!;
@@ -62,6 +73,18 @@ describe("resolvedComponentsContext wiring", () => {
     await addDialog.updateComplete;
     await catalog.updateComplete;
     expect(catalog.resolvedComponents).toEqual(["api", "esp32", "wifi"]);
+    provider.remove();
+  });
+
+  it("delivers the provided platform pairs to the nested add dialog", async () => {
+    const { provider, addDialog } = await mountChain(["api"], ["ota.esphome"]);
+    const internals = addDialog as unknown as { _resolvedPlatforms: readonly string[] };
+    expect(internals._resolvedPlatforms).toEqual(["ota.esphome"]);
+
+    provider.resolvedPlatforms = ["ota.esphome", "time.sntp"];
+    await provider.updateComplete;
+    await addDialog.updateComplete;
+    expect(internals._resolvedPlatforms).toEqual(["ota.esphome", "time.sntp"]);
     provider.remove();
   });
 });

@@ -10,6 +10,7 @@ import {
   apiContext,
   localizeContext,
   resolvedComponentsContext,
+  resolvedPlatformsContext,
 } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
@@ -113,6 +114,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @consume({ context: resolvedComponentsContext, subscribe: true })
   @state()
   private _resolvedComponents: readonly string[] = [];
+
+  /** Backend-resolved dotted `domain.platform` pairs; forwarded to the
+   *  form. See resolvedPlatformsContext. */
+  @consume({ context: resolvedPlatformsContext, subscribe: true })
+  @state()
+  private _resolvedPlatforms: readonly string[] = [];
 
   /** When non-empty, the dialog locks the catalog to those
    *  categories, hides the category sidebar, and switches its title
@@ -366,6 +373,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .board=${this.board}
                 .yaml=${this.yaml}
                 .resolvedComponents=${this._resolvedComponents}
+                .resolvedPlatforms=${this._resolvedPlatforms}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._returnValues}
@@ -539,7 +547,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this
     // stays stricter, only keeping the form a touch more often.
-    const missing = findMissingDependencies(entry.dependencies ?? [], this.yaml, present);
+    const missing = findMissingDependencies(
+      entry.dependencies ?? [],
+      this.yaml,
+      present,
+      this._resolvedPlatforms
+    );
     if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
