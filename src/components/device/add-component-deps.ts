@@ -45,6 +45,8 @@ export function findMissingDependencies(
   const present = presentComponents ?? parseTopLevelComponents(yaml);
   const configured = parseConfiguredPlatforms(yaml);
   const platforms = withMergedSourcePresence(configured, yaml, resolvedPlatforms);
+  // Stems stay on the literal scan: a package-supplied bare dep is already
+  // covered by the widened presentComponents.
   const platformStems = new Set<string>();
   for (const id of configured) {
     const dot = id.indexOf(".");
