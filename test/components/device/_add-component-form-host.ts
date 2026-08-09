@@ -1,4 +1,4 @@
-import { flushMicrotasks } from "../../_dom.js";
+import { flushMicrotasks, mount } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
@@ -37,12 +37,11 @@ export function makeAddComponentForm(
 export async function mountAddComponentForm(
   options: AddComponentFormOptions
 ): Promise<ESPHomeAddComponentForm> {
-  const el = makeAddComponentForm(options);
-  document.body.appendChild(el);
-  // The first paint shows the literal-missing banner; once the async
-  // provides lookup settles (a few microtask hops through the cache), a
-  // re-render clears it. Flush generously, then await the final update.
-  await el.updateComplete;
+  // The first paint renders from the synchronous literal-name scan; the
+  // async dependency resolution (provides lookup, bus verdict,
+  // package-resolved components) lands a few microtask hops later through
+  // the caches and re-renders. Flush generously, then await the final update.
+  const el = await mount(makeAddComponentForm(options));
   await flushMicrotasks(10);
   await el.updateComplete;
   return el;
