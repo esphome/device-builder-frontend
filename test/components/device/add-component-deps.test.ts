@@ -5,7 +5,9 @@ import {
   depsSatisfiedByProvides,
   findMissingDependencies,
 } from "../../../src/components/device/add-component-deps.js";
+import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
+import { parseTopLevelComponents } from "../../../src/util/yaml-serialize.js";
 
 function providersResponse(ids: string[]) {
   return {
@@ -71,20 +73,28 @@ describe("findMissingDependencies", () => {
     ]);
   });
 
-  it("satisfies a dep from the resolved components when the YAML merges packages", () => {
+  // Callers own the merged-source widening; these pin the widened set
+  // flowing through the dep check the way production passes it.
+  function widened(yaml: string, resolved: readonly string[]): ReadonlySet<string> {
+    return withMergedSourcePresence(parseTopLevelComponents(yaml), yaml, resolved);
+  }
+
+  it("satisfies a dep from the widened presence when the YAML merges packages", () => {
     const yaml = "packages:\n  base: github://acme/base.yaml\n";
-    expect(findMissingDependencies(["esp32"], yaml, undefined, ["esp32"])).toEqual([]);
+    expect(findMissingDependencies(["esp32"], yaml, widened(yaml, ["esp32"]))).toEqual(
+      []
+    );
   });
 
   it("ignores the resolved components for a plain config", () => {
-    expect(findMissingDependencies(["esp32"], "api:\n", undefined, ["esp32"])).toEqual([
-      "esp32",
-    ]);
+    expect(
+      findMissingDependencies(["esp32"], "api:\n", widened("api:\n", ["esp32"]))
+    ).toEqual(["esp32"]);
   });
 
   it("matches a resolved platform against its alias-spelled dep", () => {
     const yaml = "packages:\n  base: github://acme/base.yaml\n";
-    expect(findMissingDependencies(["rp2"], yaml, undefined, ["rp2040"])).toEqual([]);
+    expect(findMissingDependencies(["rp2"], yaml, widened(yaml, ["rp2040"]))).toEqual([]);
   });
 
   it("treats an empty dependency list as satisfied", () => {

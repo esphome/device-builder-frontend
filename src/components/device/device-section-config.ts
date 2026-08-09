@@ -288,6 +288,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
     // A late-arriving device row can reveal dep-gated fields; refresh an
     // existing error map so a revealed required field surfaces immediately.
+    // Deliberately gated on a non-empty map: errors appear on edit, and a
+    // context arrival the user didn't cause must not flag a pristine section.
     if (
       changedProperties.has("_resolvedComponents") &&
       this._config &&
