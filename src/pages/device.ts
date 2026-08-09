@@ -183,8 +183,8 @@ export class ESPHomePageDevice extends LitElement {
     return this._devices.find((d) => d.configuration === this.id) ?? null;
   }
 
-  /** Compile-time component set for the dependency gate. Memoised on the
-   *  field contents, not the row: device events rebuild the row object,
+  /** Backend-resolved component list for the dependency gate. Memoised on
+   *  the field contents, not the row: device events rebuild the row object,
    *  and an unstable prop identity would re-fire the add-component form's
    *  async dep resolution on every reachability flip. */
   private readonly _resolvedComponents = memoizeOne(
