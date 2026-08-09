@@ -9,7 +9,7 @@ import {
   ComponentCategory,
 } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { isComponentPresent } from "../../../util/component-presence.js";
+import { hasComponentKey, isComponentPresent } from "../../../util/component-presence.js";
 import {
   domainOccupiesPins,
   parseCatalogId,
@@ -33,7 +33,6 @@ import { navItemMatches } from "../navigator-search-match.js";
 const memoPresent = memoizeOne(parseTopLevelComponents);
 const memoPlatforms = memoizeOne(parseConfiguredPlatforms);
 const memoIds = memoizeOne(collectExistingIds);
-const memoDepPresent = memoizeOne(withMergedSourcePresence);
 
 // Three filters applied client-side:
 //  1. Platform gate: drop components incompatible with the device's
@@ -86,7 +85,7 @@ export function visibleComponents(
   // on the literal scan, so a local override block on top of a packages:
   // source keeps its catalog card addable.
   const depPresent = lockedToCore
-    ? memoDepPresent(present, host.yaml, host.resolvedComponents)
+    ? withMergedSourcePresence(present, host.yaml, host.resolvedComponents)
     : present;
   const platformCompatible = host._components.filter((c) =>
     platformSupported(c.supported_platforms, host.platform)
@@ -118,7 +117,7 @@ export function visibleComponents(
     }
     if (coreCompatible && c.id.includes(".") && c.dependencies.length > 0) {
       const allSatisfied = c.dependencies.every(
-        (dep) => coreCompatible.has(dep) || depPresent.has(dep)
+        (dep) => coreCompatible.has(dep) || hasComponentKey(depPresent, dep)
       );
       if (!allSatisfied) return false;
     }

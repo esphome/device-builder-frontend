@@ -186,29 +186,26 @@ export class ESPHomePageDevice extends LitElement {
 
   /** Backend-resolved component list for the dependency gate, provided as
    *  context so every add-component dialog mount sees it without prop
-   *  threading. Memoised on the field contents, not the row: device events
+   *  threading. Reassigned only when the contents change: device events
    *  rebuild the row object, and an unstable identity would re-fire the
    *  add-component form's async dep resolution on every reachability flip. */
   @provide({ context: resolvedComponentsContext })
   @state()
   _providedResolvedComponents: readonly string[] = [];
 
-  private readonly _resolvedComponents = memoizeOne(
-    (loaded: readonly string[], targetPlatform: string): readonly string[] =>
-      targetPlatform ? [...loaded, targetPlatform] : loaded,
-    ([loadedA, platformA], [loadedB, platformB]) =>
-      platformA === platformB &&
-      (loadedA === loadedB ||
-        (loadedA.length === loadedB.length &&
-          loadedA.every((id, i) => id === loadedB[i])))
-  );
-
   protected willUpdate(changedProperties: PropertyValues): void {
     super.willUpdate(changedProperties);
-    this._providedResolvedComponents = this._resolvedComponents(
-      this._device?.loaded_integrations ?? [],
-      this._device?.target_platform ?? ""
-    );
+    if (!changedProperties.has("_devices") && !changedProperties.has("id")) return;
+    const device = this._device;
+    const next = !device
+      ? []
+      : device.target_platform
+        ? [...device.loaded_integrations, device.target_platform]
+        : device.loaded_integrations;
+    const prev = this._providedResolvedComponents;
+    if (next.length !== prev.length || next.some((id, i) => id !== prev[i])) {
+      this._providedResolvedComponents = next;
+    }
   }
 
   /** Catalog entry for the current device's board. Loaded lazily when

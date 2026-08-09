@@ -108,7 +108,9 @@ describe("add-component-dialog skips the form for configless components", () => 
     });
     const { dialog, addComponent } = makeDialog(entry);
     dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
-    dialog.resolvedComponents = ["uart", "esp32"];
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _resolvedComponents: ["uart", "esp32"],
+    });
 
     await select(dialog, "sensor.ld2450");
 
@@ -125,7 +127,9 @@ describe("add-component-dialog skips the form for configless components", () => 
     });
     const { dialog, addComponent } = makeDialog(entry);
     dialog.yaml = "packages:\n  base: github://acme/base.yaml\n";
-    dialog.resolvedComponents = ["api", "esp32", "wifi"];
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _resolvedComponents: ["api", "esp32", "wifi"],
+    });
 
     await select(dialog, "bluetooth_proxy");
 

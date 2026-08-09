@@ -1,4 +1,3 @@
-import { componentKeySpellings } from "./component-presence.js";
 import { yamlHasMergedSources } from "./config-entry-yaml-scan.js";
 
 /**
@@ -18,9 +17,6 @@ export function withMergedSourcePresence(
 ): ReadonlySet<string> {
   if (resolvedComponents.length === 0 || !yamlHasMergedSources(yaml)) return present;
   const widened = new Set(present);
-  // Both alias spellings, so consumers doing a plain Set.has stay alias-safe.
-  for (const id of resolvedComponents) {
-    for (const spelling of componentKeySpellings(id)) widened.add(spelling);
-  }
+  for (const id of resolvedComponents) widened.add(id);
   return widened;
 }

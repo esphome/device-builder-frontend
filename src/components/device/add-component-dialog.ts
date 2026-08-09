@@ -107,11 +107,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @property()
   yaml = "";
 
-  /** Backend-resolved components (loaded_integrations plus target
-   *  platform) from the device page; see withMergedSourcePresence. */
+  /** Backend-resolved components from the device page; forwarded to the
+   *  catalog and form. See resolvedComponentsContext. */
   @consume({ context: resolvedComponentsContext, subscribe: true })
-  @property({ attribute: false })
-  resolvedComponents: readonly string[] = [];
+  @state()
+  private _resolvedComponents: readonly string[] = [];
 
   /** When non-empty, the dialog locks the catalog to those
    *  categories, hides the category sidebar, and switches its title
@@ -351,6 +351,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .boardId=${this.board?.id ?? ""}
           .board=${this.board}
           .yaml=${this.yaml}
+          .resolvedComponents=${this._resolvedComponents}
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${chooseExcludeCategories({
             isCoreLocked: isCore,
@@ -363,6 +364,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .component=${this._selected!}
                 .board=${this.board}
                 .yaml=${this.yaml}
+                .resolvedComponents=${this._resolvedComponents}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._returnValues}
@@ -535,7 +537,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       entry.dependencies ?? [],
       this.yaml,
       present,
-      this.resolvedComponents
+      this._resolvedComponents
     );
     if (missing.length > 0) return null;
     const seeded = buildInitialValues({
@@ -554,6 +556,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
+        // Literal scan on purpose: depends_on_component field visibility is
+        // presence-for-rendering, not dependency satisfaction.
         present
       )
     )

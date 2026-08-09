@@ -16,14 +16,6 @@ describe("withMergedSourcePresence", () => {
     expect(present.has("esp32")).toBe(false);
   });
 
-  it("widens with both alias spellings of a platform key", () => {
-    const widened = withMergedSourcePresence(new Set(), "packages:\n  base: x.yaml\n", [
-      "rp2",
-    ]);
-    expect(widened.has("rp2")).toBe(true);
-    expect(widened.has("rp2040")).toBe(true);
-  });
-
   it("returns the set unchanged for a plain config", () => {
     const present = new Set(["api"]);
     expect(withMergedSourcePresence(present, "api:\nesphome:\n", RESOLVED)).toBe(present);

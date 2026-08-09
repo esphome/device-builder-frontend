@@ -31,12 +31,6 @@ export function hasComponentKey(present: ReadonlySet<string>, id: string): boole
   return alias !== undefined && present.has(alias);
 }
 
-/** All accepted spellings of a component key: itself, plus its alias. */
-export function componentKeySpellings(id: string): readonly string[] {
-  const alias = PLATFORM_KEY_ALIAS[id];
-  return alias === undefined ? [id] : [id, alias];
-}
-
 /**
  * Whether a component id is already configured in the YAML's present set.
  *

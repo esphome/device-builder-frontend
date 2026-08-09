@@ -14,11 +14,7 @@ import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.j
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import { ComponentCategory } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  apiContext,
-  localizeContext,
-  resolvedComponentsContext,
-} from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -78,9 +74,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   // Current YAML — used to hide single-instance components already configured.
   @property() yaml = "";
 
-  // Backend-resolved components (loaded_integrations plus target platform)
-  // from the device page; see withMergedSourcePresence.
-  @consume({ context: resolvedComponentsContext, subscribe: true })
+  // Backend-resolved components; see resolvedComponentsContext.
   @property({ attribute: false })
   resolvedComponents: readonly string[] = [];
 

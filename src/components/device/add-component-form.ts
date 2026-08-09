@@ -8,11 +8,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  apiContext,
-  localizeContext,
-  resolvedComponentsContext,
-} from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -73,9 +69,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property()
   yaml = "";
 
-  /** Backend-resolved components (loaded_integrations plus target
-   *  platform) from the device page; see withMergedSourcePresence. */
-  @consume({ context: resolvedComponentsContext, subscribe: true })
+  /** Backend-resolved components; see resolvedComponentsContext. */
   @property({ attribute: false })
   resolvedComponents: readonly string[] = [];
 
@@ -251,14 +245,16 @@ export class ESPHomeAddComponentForm extends LitElement {
       }
     }
     // Re-resolve when the present components shift (YAML) or the query scope
-    // shifts (component deps, or a late/changed board platform/id).
-    if (
+    // shifts (component deps, or a late/changed board platform/id). The bus
+    // verdict never reads resolvedComponents, so that change skips it.
+    const scopeChanged =
       changedProperties.has("component") ||
       changedProperties.has("yaml") ||
-      changedProperties.has("board") ||
-      changedProperties.has("resolvedComponents")
-    ) {
+      changedProperties.has("board");
+    if (scopeChanged || changedProperties.has("resolvedComponents")) {
       void this._resolveProvidedDeps();
+    }
+    if (scopeChanged) {
       void this._resolveBusHostability();
     }
   }
