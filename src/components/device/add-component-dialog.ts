@@ -6,7 +6,11 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  resolvedComponentsContext,
+} from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -102,6 +106,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * `dependencies` list, and ID-reference dropdowns. */
   @property()
   yaml = "";
+
+  /** Backend-resolved components from the device page; forwarded to the
+   *  catalog and form. See resolvedComponentsContext. */
+  @consume({ context: resolvedComponentsContext, subscribe: true })
+  @state()
+  private _resolvedComponents: readonly string[] = [];
 
   /** When non-empty, the dialog locks the catalog to those
    *  categories, hides the category sidebar, and switches its title
@@ -341,6 +351,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .boardId=${this.board?.id ?? ""}
           .board=${this.board}
           .yaml=${this.yaml}
+          .resolvedComponents=${this._resolvedComponents}
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${chooseExcludeCategories({
             isCoreLocked: isCore,
@@ -353,6 +364,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 .component=${this._selected!}
                 .board=${this.board}
                 .yaml=${this.yaml}
+                .resolvedComponents=${this._resolvedComponents}
                 .prefillReference=${this._prefillReference}
                 .prefillFields=${this._depPrefill?.fields ?? null}
                 .restoredValues=${this._returnValues}
@@ -521,8 +533,13 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this
     // stays stricter, only keeping the form a touch more often.
-    if (findMissingDependencies(entry.dependencies ?? [], this.yaml, present).length > 0)
-      return null;
+    const missing = findMissingDependencies(
+      entry.dependencies ?? [],
+      this.yaml,
+      present,
+      this._resolvedComponents
+    );
+    if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
       component: entry,
@@ -539,6 +556,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         seeded,
         entry.required_groups ?? [],
         this.board,
+        // Literal scan on purpose: depends_on_component field visibility is
+        // presence-for-rendering, not dependency satisfaction.
         present
       )
     )

@@ -508,7 +508,11 @@ const MERGE_KEY_RE = /^\s*<<\s*:/m;
  */
 export function yamlHasMergedSources(yaml: string): boolean {
   if (!yaml) return false;
-  return MERGED_SOURCE_RE.test(yaml);
+  const hit = mergedMemo.get(yaml);
+  if (hit !== undefined) return hit;
+  const result = MERGED_SOURCE_RE.test(yaml);
+  mergedMemo.set(yaml, result);
+  return result;
 }
 
 /**
@@ -531,6 +535,7 @@ export function yamlHasExternalIdSources(yaml: string): boolean {
   return result;
 }
 
+const mergedMemo = createScanMemo<string, boolean>((a, b) => a === b);
 const externalMemo = createScanMemo<string, boolean>((a, b) => a === b);
 
 /**
@@ -576,5 +581,6 @@ export function resolveSoleCandidate(
 export function _clearScanMemos(): void {
   pinMemo.clear();
   providerMemo.clear();
+  mergedMemo.clear();
   externalMemo.clear();
 }

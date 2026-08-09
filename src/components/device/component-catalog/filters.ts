@@ -9,7 +9,7 @@ import {
   ComponentCategory,
 } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { isComponentPresent } from "../../../util/component-presence.js";
+import { hasComponentKey, isComponentPresent } from "../../../util/component-presence.js";
 import {
   domainOccupiesPins,
   parseCatalogId,
@@ -17,6 +17,7 @@ import {
 import { platformSupported } from "../../../util/config-validation.js";
 import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
+import { withMergedSourcePresence } from "../../../util/merged-source-presence.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -80,6 +81,12 @@ export function visibleComponents(
   const present = memoPresent(host.yaml);
   const presentPlatforms = memoPlatforms(host.yaml);
   const lockedToCore = host.lockedCategories.length > 0;
+  // Dependency satisfaction only — the single-instance hiding below stays
+  // on the literal scan, so a local override block on top of a packages:
+  // source keeps its catalog card addable.
+  const depPresent = lockedToCore
+    ? withMergedSourcePresence(present, host.yaml, host.resolvedComponents)
+    : present;
   const platformCompatible = host._components.filter((c) =>
     platformSupported(c.supported_platforms, host.platform)
   );
@@ -110,7 +117,7 @@ export function visibleComponents(
     }
     if (coreCompatible && c.id.includes(".") && c.dependencies.length > 0) {
       const allSatisfied = c.dependencies.every(
-        (dep) => coreCompatible.has(dep) || present.has(dep)
+        (dep) => coreCompatible.has(dep) || hasComponentKey(depPresent, dep)
       );
       if (!allSatisfied) return false;
     }

@@ -1,6 +1,6 @@
-import { consume } from "@lit/context";
+import { consume, provide } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { cache } from "lit/directives/cache.js";
 import { classMap } from "lit/directives/class-map.js";
@@ -42,6 +42,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   localizeContext,
+  resolvedComponentsContext,
 } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -181,6 +182,30 @@ export class ESPHomePageDevice extends LitElement {
 
   private get _device(): ConfiguredDevice | null {
     return this._devices.find((d) => d.configuration === this.id) ?? null;
+  }
+
+  /** Backend-resolved component list for the dependency gate, provided as
+   *  context so every add-component dialog mount sees it without prop
+   *  threading. Reassigned only when the contents change: device events
+   *  rebuild the row object, and an unstable identity would re-fire the
+   *  add-component form's async dep resolution on every reachability flip. */
+  @provide({ context: resolvedComponentsContext })
+  @state()
+  _providedResolvedComponents: readonly string[] = [];
+
+  protected willUpdate(changedProperties: PropertyValues): void {
+    super.willUpdate(changedProperties);
+    if (!changedProperties.has("_devices") && !changedProperties.has("id")) return;
+    const device = this._device;
+    const next = !device
+      ? []
+      : device.target_platform
+        ? [...device.loaded_integrations, device.target_platform]
+        : device.loaded_integrations;
+    const prev = this._providedResolvedComponents;
+    if (next.length !== prev.length || next.some((id, i) => id !== prev[i])) {
+      this._providedResolvedComponents = next;
+    }
   }
 
   /** Catalog entry for the current device's board. Loaded lazily when

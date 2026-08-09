@@ -7,6 +7,7 @@ vi.mock("sonner-js", () => ({
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import type { DeviceLayoutMode } from "../../src/components/device/device-editor.js";
@@ -356,5 +357,49 @@ describe("esphome-page-device install while a job is running", () => {
     expect(followJob).not.toHaveBeenCalled();
     expect(saveYaml).toHaveBeenCalledTimes(1);
     expect(onInstall).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("esphome-page-device resolved-components provider", () => {
+  const row = (loaded: string[]): ConfiguredDevice =>
+    ({
+      configuration: "foo.yaml",
+      loaded_integrations: loaded,
+      target_platform: "esp32",
+    }) as unknown as ConfiguredDevice;
+
+  function makeProviderPage(devices: ConfiguredDevice[]) {
+    const page = new ESPHomePageDevice();
+    Object.assign(page as unknown as Record<string, unknown>, {
+      id: "foo.yaml",
+      _devices: devices,
+    });
+    return page as ESPHomePageDevice & {
+      willUpdate(changed: Map<PropertyKey, unknown>): void;
+      _providedResolvedComponents: readonly string[];
+    };
+  }
+
+  test("derives the provided list from the matching device row", () => {
+    const page = makeProviderPage([row(["api", "wifi"])]);
+    page.willUpdate(new Map([["_devices", undefined]]));
+    expect(page._providedResolvedComponents).toEqual(["api", "wifi", "esp32"]);
+  });
+
+  test("keeps identity when a rebuilt row carries identical contents", () => {
+    const page = makeProviderPage([row(["api", "wifi"])]);
+    page.willUpdate(new Map([["_devices", undefined]]));
+    const first = page._providedResolvedComponents;
+    Object.assign(page as unknown as Record<string, unknown>, {
+      _devices: [row(["api", "wifi"])],
+    });
+    page.willUpdate(new Map([["_devices", undefined]]));
+    expect(page._providedResolvedComponents).toBe(first);
+  });
+
+  test("skips the recompute when unrelated properties change", () => {
+    const page = makeProviderPage([row(["api", "wifi"])]);
+    page.willUpdate(new Map([["_layout", undefined]]));
+    expect(page._providedResolvedComponents).toEqual([]);
   });
 });

@@ -33,6 +33,13 @@ export const importableDevicesContext = createContext<AdoptableDevice[]>(
   Symbol("esphome-importable-devices")
 );
 
+/** Context for the current device's backend-resolved components
+ *  (loaded_integrations plus target platform), provided by the device
+ *  page; see withMergedSourcePresence. */
+export const resolvedComponentsContext = createContext<readonly string[]>(
+  Symbol("esphome-resolved-components")
+);
+
 /** Context for the ESPHome version string. */
 export const versionContext = createContext<string>(Symbol("esphome-version"));
 
