@@ -14,18 +14,22 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // submit gate, and values, so an inert unknown element suffices.
 vi.mock("../../../src/components/device/config-entry-form.js", () => ({}));
 
-import { flushMicrotasks } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import type { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { _clearCatalogCache } from "../../../src/util/yaml-completion-catalog.js";
 import { _clearYamlSectionsMemo } from "../../../src/util/yaml-sections-core.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import {
+  depsBanner,
+  mountAddComponentForm,
+  submitButton,
+} from "./_add-component-form-host.js";
 
 const RX_9600 = { baud_rate: 9600, require_rx: true };
 
@@ -70,23 +74,11 @@ const CLAIMED_BUS =
   "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    tx_pin: 43\n    id: uart_1\n" +
   "sensor:\n  - platform: a02yyuw\n    name: Level\n    uart_id: uart_1\n";
 
-async function mountForm(
+function mountForm(
   yaml: string,
   api: ESPHomeAPI = makeApi()
 ): Promise<ESPHomeAddComponentForm> {
-  const el = new ESPHomeAddComponentForm();
-  el.component = a01nyub;
-  el.yaml = yaml;
-  Object.assign(el as unknown as Record<string, unknown>, { _api: api });
-  document.body.appendChild(el);
-  await el.updateComplete;
-  await flushMicrotasks(10);
-  await el.updateComplete;
-  return el;
-}
-
-function banner(el: ESPHomeAddComponentForm): Element | null {
-  return el.shadowRoot!.querySelector(".deps-warning");
+  return mountAddComponentForm({ component: a01nyub, yaml, api });
 }
 
 describe("add-component-form bus hostability", () => {
@@ -100,18 +92,17 @@ describe("add-component-form bus hostability", () => {
 
   it("flags the dep missing with the bus copy when the sole bus is claimed", async () => {
     const el = await mountForm(CLAIMED_BUS);
-    const warn = banner(el)!;
+    const warn = depsBanner(el)!;
     expect(warn.textContent).toContain("device.bus_dependency_in_use_body");
     expect(warn.textContent).not.toContain("device.missing_dependencies_body");
-    const submit = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
-    expect(submit.disabled).toBe(true);
+    expect(submitButton(el).disabled).toBe(true);
   });
 
   it("seeds uart_id with the sole compatible bus", async () => {
     const el = await mountForm(
       "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    id: uart_1\n"
     );
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(el.currentValues.uart_id).toBe("uart_1");
   });
 
@@ -121,7 +112,7 @@ describe("add-component-form bus hostability", () => {
         "  - baud_rate: 9600\n    rx_pin: 6\n    id: uart_2\n" +
         "sensor:\n  - platform: a02yyuw\n    name: Level\n    uart_id: uart_1\n"
     );
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(el.currentValues.uart_id).toBe("uart_2");
   });
 
@@ -130,7 +121,7 @@ describe("add-component-form bus hostability", () => {
       "uart:\n  - baud_rate: 9600\n    rx_pin: 44\n    id: uart_1\n" +
         "  - baud_rate: 9600\n    rx_pin: 6\n    id: uart_2\n"
     );
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(el.currentValues.uart_id).toBeUndefined();
     const entries = (el as unknown as { _entries: ConfigEntry[] })._entries;
     expect(entries.find((e) => e.key === "uart_id")?.required).toBe(true);
@@ -138,7 +129,7 @@ describe("add-component-form bus hostability", () => {
 
   it("fails open when a configured provider can host the component", async () => {
     const el = await mountForm("usb_uart:\n  id: hub\n" + CLAIMED_BUS);
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
   });
 
   it("treats an anchor-merged unclaimed bus as hostable, not pinless", async () => {
@@ -146,13 +137,13 @@ describe("add-component-form bus hostability", () => {
       ".base: &base\n  rx_pin: 44\n" +
         "uart:\n  - <<: *base\n    baud_rate: 9600\n    id: uart_1\n"
     );
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(el.currentValues.uart_id).toBe("uart_1");
   });
 
   it("fails open entirely when the YAML pulls in external sources", async () => {
     const el = await mountForm("packages:\n  base: !include common.yaml\n" + CLAIMED_BUS);
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
   });
 
   it("issues no verdict when the catalog index is unavailable", async () => {
@@ -163,7 +154,7 @@ describe("add-component-form bus hostability", () => {
       getComponentBodies: vi.fn(async () => ({})),
     } as unknown as ESPHomeAPI;
     const el = await mountForm(CLAIMED_BUS, down);
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(el.currentValues.uart_id).toBeUndefined();
   });
 
@@ -173,7 +164,7 @@ describe("add-component-form bus hostability", () => {
         "  - baud_rate: 9600\n    rx_pin: 6\n" +
         "sensor:\n  - platform: a02yyuw\n    name: Level\n    uart_id: uart_1\n"
     );
-    expect(banner(el)).not.toBeNull();
+    expect(depsBanner(el)).not.toBeNull();
     expect(el.currentValues.uart_id).toBeUndefined();
   });
 });

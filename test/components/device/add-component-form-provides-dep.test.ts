@@ -14,10 +14,16 @@ import { flushMicrotasks } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
-import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import type { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
+import {
+  depsBanner,
+  makeAddComponentForm,
+  mountAddComponentForm,
+  submitButton,
+} from "./_add-component-form-host.js";
 
 function providersResponse(ids: string[]) {
   return {
@@ -40,33 +46,16 @@ const libretinyPwm = makeComponentEntry("output.libretiny_pwm", {
   dependencies: ["libretiny"],
 });
 
-async function mountForm(
+function mountForm(
   getComponents: ReturnType<typeof vi.fn>,
   yaml: string
 ): Promise<ESPHomeAddComponentForm> {
-  const el = new ESPHomeAddComponentForm();
-  el.component = libretinyPwm;
-  el.board = bk72xxBoard;
-  el.yaml = yaml;
-  Object.assign(el as unknown as Record<string, unknown>, {
-    _api: { getComponents } as unknown as ESPHomeAPI,
+  return mountAddComponentForm({
+    component: libretinyPwm,
+    board: bk72xxBoard,
+    yaml,
+    api: { getComponents } as unknown as ESPHomeAPI,
   });
-  document.body.appendChild(el);
-  // The first paint shows the literal-missing banner; once the async
-  // provides lookup settles (a few microtask hops through the cache), a
-  // re-render clears it. Flush generously, then await the final update.
-  await el.updateComplete;
-  await flushMicrotasks(10);
-  await el.updateComplete;
-  return el;
-}
-
-function banner(el: ESPHomeAddComponentForm): Element | null {
-  return el.shadowRoot!.querySelector(".deps-warning");
-}
-
-function submitButton(el: ESPHomeAddComponentForm): HTMLButtonElement {
-  return el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
 }
 
 describe("add-component-form provides-satisfied dependency", () => {
@@ -84,7 +73,7 @@ describe("add-component-form provides-satisfied dependency", () => {
     expect(getComponents).toHaveBeenCalledWith(
       expect.objectContaining({ provides: "libretiny" })
     );
-    expect(banner(el)).toBeNull();
+    expect(depsBanner(el)).toBeNull();
     expect(submitButton(el).disabled).toBe(false);
   });
 
@@ -93,7 +82,7 @@ describe("add-component-form provides-satisfied dependency", () => {
     const getComponents = vi.fn().mockResolvedValue(providersResponse(["bk72xx"]));
     const el = await mountForm(getComponents, "esp32:\n");
 
-    expect(banner(el)).not.toBeNull();
+    expect(depsBanner(el)).not.toBeNull();
     expect(submitButton(el).disabled).toBe(true);
   });
 
@@ -104,7 +93,7 @@ describe("add-component-form provides-satisfied dependency", () => {
     const getComponents = vi.fn().mockRejectedValue(new Error("ws down"));
     const el = await mountForm(getComponents, "bk72xx:\n");
 
-    expect(banner(el)).not.toBeNull();
+    expect(depsBanner(el)).not.toBeNull();
     expect(submitButton(el).disabled).toBe(true);
     expect(warn).toHaveBeenCalledWith(
       "[add-component-form] provides lookup failed",
@@ -121,12 +110,11 @@ describe("add-component-form provides-satisfied dependency", () => {
       resolveA = r;
     });
     const getComponents = vi.fn().mockReturnValue(pending);
-    const el = new ESPHomeAddComponentForm();
-    el.component = libretinyPwm;
-    el.board = bk72xxBoard;
-    el.yaml = "bk72xx:\n";
-    Object.assign(el as unknown as Record<string, unknown>, {
-      _api: { getComponents } as unknown as ESPHomeAPI,
+    const el = makeAddComponentForm({
+      component: libretinyPwm,
+      board: bk72xxBoard,
+      yaml: "bk72xx:\n",
+      api: { getComponents } as unknown as ESPHomeAPI,
     });
     document.body.appendChild(el);
     await el.updateComplete; // resolution A kicked off, awaiting getComponents
@@ -150,12 +138,11 @@ describe("add-component-form provides-satisfied dependency", () => {
     // empty Set would only flip identity and force an identical re-render on
     // every YAML change.
     const getComponents = vi.fn().mockResolvedValue(providersResponse(["bk72xx"]));
-    const el = new ESPHomeAddComponentForm();
-    el.component = libretinyPwm;
-    el.board = bk72xxBoard;
-    el.yaml = "esp32:\n";
-    Object.assign(el as unknown as Record<string, unknown>, {
-      _api: { getComponents } as unknown as ESPHomeAPI,
+    const el = makeAddComponentForm({
+      component: libretinyPwm,
+      board: bk72xxBoard,
+      yaml: "esp32:\n",
+      api: { getComponents } as unknown as ESPHomeAPI,
     });
 
     let renders = 0;
@@ -181,6 +168,6 @@ describe("add-component-form provides-satisfied dependency", () => {
     expect(getComponents).toHaveBeenCalled(); // the lookup did run
     expect(renders).toBe(rendersAfterPaint); // …but produced no extra render
     expect(inst._providedDeps).toBe(providedRef); // same Set, never reassigned
-    expect(banner(el)).not.toBeNull(); // and the dep is still correctly flagged
+    expect(depsBanner(el)).not.toBeNull(); // and the dep is still correctly flagged
   });
 });
