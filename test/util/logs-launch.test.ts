@@ -160,12 +160,18 @@ describe("launchLogs", () => {
 });
 
 describe("launchLogsWithMethod", () => {
-  it("routes ota to a portless open()", async () => {
+  it("routes ota without a port to the OTA sentinel", async () => {
     const host = makeHost(async () => []);
     await launchLogsWithMethod(host, makeDevice(), "ota");
-    expect(host.logsDialog.open).toHaveBeenCalledWith();
+    expect(host.logsDialog.open).toHaveBeenCalledWith("OTA");
     expect(host.logsDialog.configuration).toBe("kitchen.yaml");
     expect(host.logsDialog.name).toBe("Kitchen");
+  });
+
+  it("routes ota with an address override to open(port)", async () => {
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ota", "192.168.5.243");
+    expect(host.logsDialog.open).toHaveBeenCalledWith("192.168.5.243");
   });
 
   it("routes server-serial to open(port)", async () => {

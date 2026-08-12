@@ -1,5 +1,6 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
@@ -74,7 +75,10 @@ export async function launchLogsWithMethod(
   if (method === "ota") {
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
-    host.logsDialog.open();
+    // 'port' carries the user-typed address override from the picker's
+    // expanded form; without it the OTA sentinel targets the default
+    // address (mirrors applyInstallMethod's ota case).
+    host.logsDialog.open(port ?? OTA_PORT);
   } else if (method === "server-serial") {
     // server-serial always carries the chosen port; guard rather than let a
     // missing one fall through to open()'s OTA-sentinel default and silently
