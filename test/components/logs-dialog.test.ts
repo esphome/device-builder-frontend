@@ -79,6 +79,29 @@ describe("logs-dialog states-toggle restart", () => {
     expect(stopStream).toHaveBeenCalledTimes(1);
     expect(session(el)).toMatchObject({ kind: "ota", streamId: "stream-2" });
   });
+
+  it("respawns a typed-address session against the same target", async () => {
+    el.open("192.168.5.243");
+    expect(logs).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "192.168.5.243",
+      expect.anything(),
+      expect.anything()
+    );
+
+    const restart = call(el, "_toggleShowStates");
+    stop.resolve();
+    await restart;
+
+    expect(logs).toHaveBeenCalledTimes(2);
+    expect(logs).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "192.168.5.243",
+      expect.anything(),
+      expect.anything()
+    );
+    expect(session(el)).toMatchObject({ kind: "ota", port: "192.168.5.243" });
+  });
 });
 
 describe("logs-dialog OTA stale-callback guard", () => {
