@@ -25,7 +25,6 @@
  * - ``dead``         a Web Serial reopen failed; the port is gone. Start runs
  *                    the reconnect hook (the #636 "click Start to reconnect").
  */
-import { OTA_PORT } from "../api/types/streaming.js";
 export type LogsSession =
   | { readonly kind: "idle" }
   | {
@@ -60,10 +59,15 @@ export const isPassive = (s: LogsSession): boolean =>
  *  and the port can be torn down. */
 export const hasSerialPort = (s: LogsSession): boolean => s.kind === "serial";
 
+/** A server serial device path (/dev/..., COMn) vs a network address. */
+export const isServerSerialPath = (port: string): boolean =>
+  port.startsWith("/") || /^COM\d+$/i.test(port);
+
 /** Whether the States toggle applies. Device states arrive only over the API /
  *  network connection, so the toggle (which sets the backend ``--no-states``
  *  flag) is meaningful only for the OTA source. Server serial shares the
- *  ``ota`` kind but carries a device path instead of the ``OTA`` sentinel, so
- *  it's excluded — toggling states there is a no-op (#539). */
+ *  ``ota`` kind but carries a device path, so it's excluded — toggling states
+ *  there is a no-op (#539). A typed address override counts as network: the
+ *  stream still runs over the API, only the target changes. */
 export const isOtaNetwork = (s: LogsSession): boolean =>
-  s.kind === "ota" && s.port === OTA_PORT;
+  s.kind === "ota" && !isServerSerialPath(s.port);
