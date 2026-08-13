@@ -60,7 +60,7 @@
     "@rspack/core": "2.1.7",
     "@rspack/dev-server": "2.2.0",
     "@swc/helpers": "0.5.23",
-    "@types/node": "26.1.2",
+    "@types/node": "26.2.0",
     "@types/w3c-web-serial": "^1.0.8",
     "eslint": "^10.8.1",
     "eslint-plugin-perfectionist": "^5.10.0",
