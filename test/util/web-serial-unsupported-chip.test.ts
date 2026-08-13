@@ -36,6 +36,8 @@ vi.mock("esptool-js", () => {
 
     constructor(public options: unknown) {}
 
+    debug(_str: string) {}
+
     async command(op: number): Promise<[number, Uint8Array]> {
       state.commandOps.push(op);
       return state.securityInfo();

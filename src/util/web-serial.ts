@@ -7,6 +7,7 @@
  */
 import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 
+import { getErrorMessage } from "./error-message.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
@@ -39,6 +40,9 @@ export interface FlashProgress {
 }
 
 export type LogCallback = (line: string) => void;
+
+/** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
+const DEBUG_TAIL_LINES = 80;
 
 /** Why Web Serial can or can't be used here. */
 export type WebSerialAvailability = "available" | "insecure-context" | "unsupported";
@@ -198,6 +202,19 @@ export async function connectToPort(
       : undefined,
   });
 
+  // esptool-js reports its per-attempt connect diagnostics (boot mode, sync
+  // errors) only through debug() and throws a generic connect error; hold a
+  // bounded tail of them to replay into the log when detection fails (#2553).
+  const debugTail: string[] = [];
+  const originalDebug = loader.debug;
+  if (onLog) {
+    loader.debug = (str: string, withNewline?: boolean) => {
+      debugTail.push(str);
+      if (debugTail.length > DEBUG_TAIL_LINES) debugTail.shift();
+      originalDebug.call(loader, str, withNewline);
+    };
+  }
+
   try {
     // main() has no hook between magic-register chip detection and the stub
     // upload, so wrap runStub to cross-check the chip id first. Remove when
@@ -210,6 +227,14 @@ export async function connectToPort(
     const chipName = await loader.main();
     return { chipName, port, transport, loader };
   } catch (error) {
+    if (onLog) {
+      // An unsupported chip means the handshake succeeded; the tail would
+      // just be 80 lines of healthy connect chatter.
+      if (!(error instanceof UnsupportedChipError)) {
+        for (const line of debugTail) onLog(line);
+      }
+      onLog(`Error: ${getErrorMessage(error)}`);
+    }
     try {
       await transport.disconnect();
     } catch {
@@ -220,6 +245,8 @@ export async function connectToPort(
       }
     }
     throw error;
+  } finally {
+    if (onLog) loader.debug = originalDebug;
   }
 }
 
