@@ -47,7 +47,7 @@
     "@replit/codemirror-indentation-markers": "^6.5.3",
     "@tanstack/lit-table": "^8.21.3",
     "codemirror": "^6.0.2",
-    "esptool-js": "^0.6.0",
+    "esptool-js": "^0.6.1",
     "improv-wifi-serial-sdk": "^2.8.1",
     "intl-messageformat": "^11.2.13",
     "lit": "3.3.3",
