@@ -13,6 +13,7 @@ interface TerminalLike {
 }
 
 interface FakeLoaderApi {
+  options: { terminal?: TerminalLike; debugLogging?: boolean };
   info: (str: string, withNewline?: boolean) => void;
   debug: (str: string, withNewline?: boolean) => void;
 }
@@ -60,7 +61,7 @@ vi.mock("esptool-js", () => {
   return { ESPLoader, Transport, UsbJtagSerialReset };
 });
 
-import { connectToPort } from "../../src/util/web-serial.js";
+import { connectToPort, UnsupportedChipError } from "../../src/util/web-serial.js";
 
 const fakePort = { close: vi.fn().mockResolvedValue(undefined) } as unknown as SerialPort;
 
@@ -81,9 +82,7 @@ describe("connectToPort failure log", () => {
       "Failed to connect with the device"
     );
     expect(logs).toContain("Sync err Error: Timeout");
-    expect(logs[logs.length - 1]).toBe(
-      "Failed to connect: Failed to connect with the device"
-    );
+    expect(logs[logs.length - 1]).toBe("Error: Failed to connect with the device");
     // Debug lines are held back until the failure, after live output.
     expect(logs.indexOf("_connect_attempt default_reset")).toBeGreaterThan(
       logs.indexOf("Connecting...")
@@ -102,9 +101,9 @@ describe("connectToPort failure log", () => {
     expect(detected.chipName).toBe("ESP8266EX");
     expect(logs).toContain("Detecting chip type... ESP8266");
     expect(logs).not.toContain("_connect_attempt default_reset");
-    // Capture is disarmed after success: later debug calls are inert again.
-    detected.loader.debug("post-connect line");
-    expect(logs).not.toContain("post-connect line");
+    // Capture is removed after main() settles.
+    const { ESPLoader } = await import("esptool-js");
+    expect(detected.loader.debug).toBe(ESPLoader.prototype.debug);
   });
 
   it("bounds the replayed debug tail to the most recent lines", async () => {
@@ -120,14 +119,36 @@ describe("connectToPort failure log", () => {
     expect(debugLines[debugLines.length - 1]).toBe("line 199");
   });
 
-  it("leaves debug alone without a log callback", async () => {
-    let captured: unknown;
+  it("skips the tail replay for an unsupported chip but still logs the error", async () => {
     state.main = async (loader) => {
-      captured = loader.debug;
-      return "ESP8266EX";
+      loader.debug("healthy handshake line");
+      throw new UnsupportedChipError("ESP32-S31");
     };
-    await connectToPort(fakePort);
+    const logs: string[] = [];
+    await expect(connectToPort(fakePort, (line) => logs.push(line))).rejects.toThrow(
+      UnsupportedChipError
+    );
+    expect(logs).not.toContain("healthy handshake line");
+    expect(logs[logs.length - 1]).toMatch(/^Error: ESP32-S31 is not supported/);
+  });
+
+  it("delegates captured debug lines to the original debug", async () => {
+    state.main = async (loader) => {
+      loader.options.debugLogging = true;
+      loader.debug("verbose line");
+      throw new Error("Failed to connect with the device");
+    };
+    const logs: string[] = [];
+    await expect(connectToPort(fakePort, (line) => logs.push(line))).rejects.toThrow();
+    // Live via the original debug() and replayed raw from the tail.
+    expect(logs).toContain("Debug: verbose line");
+    expect(logs).toContain("verbose line");
+  });
+
+  it("leaves debug alone without a log callback", async () => {
+    state.main = async () => "ESP8266EX";
+    const detected = await connectToPort(fakePort);
     const { ESPLoader } = await import("esptool-js");
-    expect(captured).toBe(ESPLoader.prototype.debug);
+    expect(detected.loader.debug).toBe(ESPLoader.prototype.debug);
   });
 });

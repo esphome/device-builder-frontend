@@ -206,11 +206,12 @@ export async function connectToPort(
   // errors) only through debug() and throws a generic connect error; hold a
   // bounded tail of them to replay into the log when detection fails (#2553).
   const debugTail: string[] = [];
-  const originalDebug = loader.debug.bind(loader);
+  const originalDebug = loader.debug;
   if (onLog) {
-    loader.debug = (str: string) => {
+    loader.debug = (str: string, withNewline?: boolean) => {
       debugTail.push(str);
       if (debugTail.length > DEBUG_TAIL_LINES) debugTail.shift();
+      originalDebug.call(loader, str, withNewline);
     };
   }
 
@@ -224,12 +225,15 @@ export async function connectToPort(
       return runStub();
     };
     const chipName = await loader.main();
-    loader.debug = originalDebug;
     return { chipName, port, transport, loader };
   } catch (error) {
     if (onLog) {
-      for (const line of debugTail) onLog(line);
-      onLog(`Failed to connect: ${getErrorMessage(error)}`);
+      // An unsupported chip means the handshake succeeded; the tail would
+      // just be 80 lines of healthy connect chatter.
+      if (!(error instanceof UnsupportedChipError)) {
+        for (const line of debugTail) onLog(line);
+      }
+      onLog(`Error: ${getErrorMessage(error)}`);
     }
     try {
       await transport.disconnect();
@@ -241,6 +245,8 @@ export async function connectToPort(
       }
     }
     throw error;
+  } finally {
+    if (onLog) loader.debug = originalDebug;
   }
 }
 
