@@ -7,6 +7,7 @@
  */
 import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 
+import { getErrorMessage } from "./error-message.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
@@ -39,6 +40,9 @@ export interface FlashProgress {
 }
 
 export type LogCallback = (line: string) => void;
+
+/** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
+const DEBUG_TAIL_LINES = 80;
 
 /** Why Web Serial can or can't be used here. */
 export type WebSerialAvailability = "available" | "insecure-context" | "unsupported";
@@ -198,6 +202,18 @@ export async function connectToPort(
       : undefined,
   });
 
+  // esptool-js reports its per-attempt connect diagnostics (boot mode, sync
+  // errors) only through debug() and throws a generic connect error; hold a
+  // bounded tail of them to replay into the log when detection fails (#2553).
+  const debugTail: string[] = [];
+  const originalDebug = loader.debug.bind(loader);
+  if (onLog) {
+    loader.debug = (str: string) => {
+      debugTail.push(str);
+      if (debugTail.length > DEBUG_TAIL_LINES) debugTail.shift();
+    };
+  }
+
   try {
     // main() has no hook between magic-register chip detection and the stub
     // upload, so wrap runStub to cross-check the chip id first. Remove when
@@ -208,8 +224,13 @@ export async function connectToPort(
       return runStub();
     };
     const chipName = await loader.main();
+    loader.debug = originalDebug;
     return { chipName, port, transport, loader };
   } catch (error) {
+    if (onLog) {
+      for (const line of debugTail) onLog(line);
+      onLog(`Failed to connect: ${getErrorMessage(error)}`);
+    }
     try {
       await transport.disconnect();
     } catch {
