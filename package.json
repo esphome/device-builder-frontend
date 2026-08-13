@@ -45,7 +45,7 @@
     "@lit/reactive-element": "2.1.2",
     "@mdi/js": "7.4.47",
     "@replit/codemirror-indentation-markers": "^6.5.3",
-    "@tanstack/lit-table": "^8.21.3",
+    "@tanstack/lit-table": "^9.1.2",
     "codemirror": "^6.0.2",
     "esptool-js": "^0.6.1",
     "improv-wifi-serial-sdk": "^2.8.1",
