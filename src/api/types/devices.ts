@@ -159,8 +159,9 @@ export interface ConfiguredDevice {
    * True when the raw main-file YAML carries a legacy spelling the
    * backend migration fold would respell (``editor/migrate_config``
    * would return a non-null diff). Main file only — packages /
-   * ``!include`` contents are not scanned. Optional: absent means
-   * false (the backend omits default-false fields). The editor's
+   * ``!include`` contents are not scanned. Optional only because a
+   * backend predating the field never sends it; current backends
+   * always serialize it (``false`` when clean). The editor's
    * ``config-migration-notice`` answers the same question for the
    * unsaved draft via a dry-run; this flag tracks the saved file, so
    * the two can briefly disagree until a migrated draft is saved.
