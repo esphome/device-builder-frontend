@@ -135,6 +135,7 @@ export function renderCardGrid(
             ?has-pending-changes=${device.has_pending_changes === true}
             ?show-modified=${showPendingChanges(device)}
             ?show-update=${showUpdateAvailable(device)}
+            ?migration-available=${device.migration_available === true}
             .installedVersion=${rt.deployed_version}
             .availableVersion=${device.current_version}
             ?api-enabled=${device.api_enabled === true}

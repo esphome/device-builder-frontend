@@ -58,6 +58,7 @@ const _BASE = {
   expected_config_hash: "",
   has_pending_changes: false,
   update_available: false,
+  migration_available: false,
   api_enabled: false,
   api_encrypted: false,
   name_add_mac_suffix: false,

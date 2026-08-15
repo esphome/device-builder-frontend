@@ -360,6 +360,7 @@
     "context_select": "Select",
     "status_modified": "Modified",
     "status_update_available": "Update available",
+    "status_migration_available": "Config migration available",
     "status_installing": "Installing…",
     "status_compiling": "Compiling…",
     "status_renaming": "Renaming…",

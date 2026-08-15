@@ -156,6 +156,17 @@ export interface ConfiguredDevice {
   /** True if compiled with older ESPHome version */
   update_available: boolean;
   /**
+   * True when the raw main-file YAML carries a legacy spelling the
+   * backend migration fold would respell (``editor/migrate_config``
+   * would return a non-null diff). Main file only — packages /
+   * ``!include`` contents are not scanned. Always serialized
+   * (``false`` when clean). The editor's
+   * ``config-migration-notice`` answers the same question for the
+   * unsaved draft via a dry-run; this flag tracks the saved file, so
+   * the two can briefly disagree until a migrated draft is saved.
+   */
+  migration_available: boolean;
+  /**
    * True when the resolved YAML carries a top-level ``api:`` block
    * (the device exposes the Native API at all). Gates the lock-icon
    * indicator next to the device name in the table + card views and
