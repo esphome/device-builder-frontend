@@ -11,34 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/components/labels/device-labels-editor.js", () => ({}));
 
-import { flush, identityLocalize } from "../../_dom.js";
+import { flush } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeReachabilityEvent } from "../../_make-reachability-event.js";
-import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
-import { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/device-drawer-content.js";
-
-function makeApi() {
-  const unsubscribe = vi.fn().mockResolvedValue(undefined);
-  const api = {
-    connectionGeneration: 1,
-    subscribeDeviceReachability: vi.fn().mockResolvedValue({ unsubscribe }),
-  };
-  return { api: api as unknown as ESPHomeAPI, unsubscribe };
-}
-
-async function mountDrawer() {
-  const { api, unsubscribe } = makeApi();
-  const el = new ESPHomeDeviceDrawerContent();
-  el.device = makeConfiguredDevice();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._api = api;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._localize = identityLocalize;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  await flush();
-  return { el, api, unsubscribe };
-}
+import { mountDrawerContent as mountDrawer } from "./_drawer-content.js";
 
 describe("drawer follower wiring", () => {
   it("closing the drawer clears the snapshot and unsubscribes", async () => {

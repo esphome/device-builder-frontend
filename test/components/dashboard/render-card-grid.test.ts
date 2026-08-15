@@ -71,6 +71,13 @@ describe("renderCardGrid", () => {
     expect(card.hasAttribute("show-update")).toBe(true);
   });
 
+  it("binds the raw migration flag onto the card, ungated", () => {
+    const shown = renderCard(makeConfiguredDevice({ migration_available: true }));
+    expect(shown.hasAttribute("migration-available")).toBe(true);
+    const hidden = renderCard(makeConfiguredDevice());
+    expect(hidden.hasAttribute("migration-available")).toBe(false);
+  });
+
   it("hides the update indicator when an api device's mDNS is dark", () => {
     const device = makeConfiguredDevice({
       update_available: true,
