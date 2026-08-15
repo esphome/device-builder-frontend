@@ -139,6 +139,11 @@ export const deviceCardStyles = [
       box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-primary), transparent 50%);
     }
 
+    .indicator-dot--migration {
+      background: var(--esphome-migration);
+      box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-migration), transparent 50%);
+    }
+
     /* 4-state encryption icon — secure / insecure / pending / mismatch. */
     .encryption-icon {
       font-size: 14px;

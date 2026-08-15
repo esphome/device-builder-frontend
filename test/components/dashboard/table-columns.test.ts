@@ -224,6 +224,19 @@ function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
   return col.cell(info) as TemplateResult;
 }
 
+describe("name-cell migration dot", () => {
+  it("renders from the raw device flag and hides by default", () => {
+    const shown = renderInto(
+      renderNameCell({
+        _device: { web_port: null, migration_available: true },
+      } as unknown as Partial<DeviceRow>)
+    );
+    expect(shown.querySelector(".cell-indicator--migration")).not.toBeNull();
+    const hidden = renderInto(renderNameCell());
+    expect(hidden.querySelector(".cell-indicator--migration")).toBeNull();
+  });
+});
+
 // The encryption lock reads the raw has_pending_changes, the modified dot reads
 // the mDNS-gated flag — so for an mDNS-dark, hash-pending, encrypted device the
 // table agrees with the drawer's raw-flag badge instead of diverging (#1037).

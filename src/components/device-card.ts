@@ -92,6 +92,9 @@ export class ESPHomeDeviceCard extends LitElement {
   // modified / update affordances (dot + install / update button).
   @property({ type: Boolean, attribute: "show-modified" }) showModified = false;
   @property({ type: Boolean, attribute: "show-update" }) showUpdate = false;
+  // Raw device truth — drives the migration dot only, never mDNS-gated.
+  @property({ type: Boolean, attribute: "migration-available" }) migrationAvailable =
+    false;
   @property({ type: Boolean, attribute: "queued-update" }) queuedUpdate = false;
 
   // Installed + target ESPHome versions for the Update hover.
@@ -215,6 +218,20 @@ export class ESPHomeDeviceCard extends LitElement {
                       ></span>
                       <wa-tooltip for="ind-update">
                         ${this._localize("dashboard.status_update_available")}
+                      </wa-tooltip>`
+                  : nothing
+              }
+              ${
+                this.migrationAvailable
+                  ? html`<span
+                        id="ind-migration"
+                        class="indicator-dot indicator-dot--migration"
+                        tabindex="0"
+                        role="img"
+                        aria-label=${this._localize("dashboard.status_migration_available")}
+                      ></span>
+                      <wa-tooltip for="ind-migration">
+                        ${this._localize("dashboard.status_migration_available")}
                       </wa-tooltip>`
                   : nothing
               }

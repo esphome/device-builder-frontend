@@ -7,7 +7,9 @@
  * options, and one typed mid-session waits for the next load — then
  * re-checks (debounced; each check is a WS round-trip) only while the
  * nudge is visible so a completed migration clears it. The CTA asks
- * the page to run the same command on the draft.
+ * the page to run the same command on the draft. The dashboard's
+ * per-device ``migration_available`` flag answers the same question
+ * for the saved main file; this notice sees the unsaved draft.
  */
 import { consume } from "@lit/context";
 import { mdiClose, mdiUpdate } from "@mdi/js";

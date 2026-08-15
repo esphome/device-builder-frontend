@@ -94,6 +94,13 @@ export function createDeviceColumns(
   localize: LocalizeFunc,
   selectMode = false
 ): ColumnDef<DeviceRow>[] {
+  const indicatorDot = (show: boolean, variant: string, labelKey: string) =>
+    show
+      ? html`<span
+          class="cell-indicator cell-indicator--${variant}"
+          title=${localize(labelKey)}
+        ></span>`
+      : nothing;
   return [
     {
       accessorKey: "status",
@@ -234,22 +241,13 @@ export function createDeviceColumns(
           : "";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
-          ${
-            row.showModified
-              ? html`<span
-                  class="cell-indicator cell-indicator--modified"
-                  title=${localize("dashboard.status_modified")}
-                ></span>`
-              : nothing
-          }
-          ${
-            row.showUpdate
-              ? html`<span
-                  class="cell-indicator cell-indicator--update"
-                  title=${localize("dashboard.status_update_available")}
-                ></span>`
-              : nothing
-          }
+          ${indicatorDot(row.showModified, "modified", "dashboard.status_modified")}
+          ${indicatorDot(row.showUpdate, "update", "dashboard.status_update_available")}
+          ${indicatorDot(
+            row._device.migration_available === true,
+            "migration",
+            "dashboard.status_migration_available"
+          )}
           ${
             row.hasQueuedUpdate
               ? html`<wa-icon

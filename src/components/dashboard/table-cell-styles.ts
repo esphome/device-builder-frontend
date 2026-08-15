@@ -180,6 +180,11 @@ export const tableCellStyles = css`
     box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-primary), transparent 50%);
   }
 
+  .cell-indicator--migration {
+    background: var(--esphome-migration);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-migration), transparent 50%);
+  }
+
   .cell-indicator-queued {
     font-size: 14px;
     flex-shrink: 0;

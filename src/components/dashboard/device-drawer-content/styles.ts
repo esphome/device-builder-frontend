@@ -315,6 +315,11 @@ export const deviceDrawerContentStyles = css`
     color: var(--esphome-primary);
   }
 
+  .status-badge--migration {
+    background: color-mix(in srgb, var(--esphome-migration), transparent 85%);
+    color: var(--esphome-migration);
+  }
+
   .status-badge--encrypted {
     background: color-mix(in srgb, var(--esphome-success), transparent 88%);
     color: var(--esphome-success);

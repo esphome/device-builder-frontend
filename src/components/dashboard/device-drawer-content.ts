@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiAccessPointNetwork,
   mdiAlertCircleOutline,
+  mdiAutoFix,
   mdiBluetooth,
   mdiBroom,
   mdiCheckCircleOutline,
@@ -69,6 +70,7 @@ import "../labels/device-labels-editor.js";
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
   "alert-circle-outline": mdiAlertCircleOutline,
+  "auto-fix": mdiAutoFix,
   bluetooth: mdiBluetooth,
   broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
@@ -159,7 +161,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       has_pending_changes: d.has_pending_changes,
     });
     const apiEnabled = encState !== "none";
-    const showAnyBadge = showModified || showUpdate || apiEnabled;
+    const migrationAvailable = d.migration_available === true;
+    const showAnyBadge = showModified || showUpdate || migrationAvailable || apiEnabled;
 
     return html`
       ${
@@ -178,6 +181,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
                   ? html`<span class="status-badge status-badge--update">
                       <wa-icon library="mdi" name="update"></wa-icon>
                       ${this._localize("dashboard.status_update_available")}
+                    </span>`
+                  : nothing
+              }
+              ${
+                migrationAvailable
+                  ? html`<span class="status-badge status-badge--migration">
+                      <wa-icon library="mdi" name="auto-fix"></wa-icon>
+                      ${this._localize("dashboard.status_migration_available")}
                     </span>`
                   : nothing
               }
