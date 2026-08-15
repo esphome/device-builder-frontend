@@ -185,6 +185,18 @@ export const tableCellStyles = css`
     box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-migration), transparent 50%);
   }
 
+  /* The migration dot deep-links to the editor; reset the native chrome
+     so it matches the passive dots. */
+  button.cell-indicator {
+    padding: 0;
+    border: none;
+    cursor: pointer;
+  }
+  button.cell-indicator:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 2px;
+  }
+
   .cell-indicator-queued {
     font-size: 14px;
     flex-shrink: 0;

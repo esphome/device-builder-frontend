@@ -36,6 +36,7 @@ import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js"
 import {
   renderEncryptionIcon,
   renderLabels,
+  renderMigrationDot,
   renderStatusBadge,
 } from "./device-card/render-bits.js";
 import { deviceCardStyles } from "./device-card/styles.js";
@@ -221,20 +222,7 @@ export class ESPHomeDeviceCard extends LitElement {
                       </wa-tooltip>`
                   : nothing
               }
-              ${
-                this.migrationAvailable
-                  ? html`<span
-                        id="ind-migration"
-                        class="indicator-dot indicator-dot--migration"
-                        tabindex="0"
-                        role="img"
-                        aria-label=${this._localize("dashboard.status_migration_available")}
-                      ></span>
-                      <wa-tooltip for="ind-migration">
-                        ${this._localize("dashboard.status_migration_available")}
-                      </wa-tooltip>`
-                  : nothing
-              }
+              ${renderMigrationDot(this)}
               ${
                 this.queuedUpdate
                   ? html`<wa-icon

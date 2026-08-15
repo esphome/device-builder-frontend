@@ -1,7 +1,8 @@
 /**
- * Shared styles for the inline notice banners shown above a section's form
- * the warning
- * `.notice` box, its `.body` column, and the `.cta` button.
+ * Shared styles for the inline notice banners shown above a section's form:
+ * the `.notice` box, its `.body` column, and the `.cta` button.
+ * Accent color is `--notice-accent`, defaulting to the warning color; set
+ * it on `:host` to retheme (the migration notice sets the migration purple).
  */
 import { css } from "lit";
 
@@ -12,8 +13,13 @@ export const noticeBannerStyles = css`
     gap: var(--wa-space-s);
     margin-bottom: var(--wa-space-m);
     padding: var(--wa-space-s) var(--wa-space-m);
-    border: var(--wa-border-width-s) solid var(--esphome-warning, #f59e0b);
-    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 90%);
+    border: var(--wa-border-width-s) solid
+      var(--notice-accent, var(--esphome-warning, #f59e0b));
+    background: color-mix(
+      in srgb,
+      var(--notice-accent, var(--esphome-warning, #f59e0b)),
+      transparent 90%
+    );
     border-radius: var(--wa-border-radius-m);
     color: var(--wa-color-text-normal);
     font-size: var(--wa-font-size-s);
@@ -23,7 +29,7 @@ export const noticeBannerStyles = css`
   .notice wa-icon {
     flex-shrink: 0;
     font-size: 20px;
-    color: var(--esphome-warning, #f59e0b);
+    color: var(--notice-accent, var(--esphome-warning, #f59e0b));
   }
 
   .body {

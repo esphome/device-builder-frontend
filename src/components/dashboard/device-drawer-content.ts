@@ -45,6 +45,7 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { ReachabilityFollower } from "../../util/reachability-follower.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderReachabilitySection } from "./device-drawer-content/reachability.js";
@@ -186,10 +187,15 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               }
               ${
                 migrationAvailable
-                  ? html`<span class="status-badge status-badge--migration">
+                  ? html`<button
+                      type="button"
+                      class="status-badge status-badge--migration"
+                      title=${this._localize("dashboard.status_migration_available_action")}
+                      @click=${() => fireEvent(this, "open-config-migration", d)}
+                    >
                       <wa-icon library="mdi" name="auto-fix"></wa-icon>
                       ${this._localize("dashboard.status_migration_available")}
-                    </span>`
+                    </button>`
                   : nothing
               }
               ${apiEnabled ? renderEncryptionBadge(this, d, encState) : nothing}

@@ -20,8 +20,12 @@ import {
 } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
-export function editDevice(device: ConfiguredDevice) {
-  void navigate(`/device/${encodeURIComponent(device.configuration)}`);
+/** ``reveal`` opts into the one-shot ``reveal=1`` intent: show the visual
+ *  pane even in a YAML-only or mobile layout (e.g. so the migration nudge
+ *  a dashboard indicator promised is actually on screen). */
+export function editDevice(device: ConfiguredDevice, opts: { reveal?: boolean } = {}) {
+  const reveal = opts.reveal ? "?reveal=1" : "";
+  void navigate(`/device/${encodeURIComponent(device.configuration)}${reveal}`);
 }
 
 /** Open the editor deep-linked to a component section (e.g. ``api`` for the

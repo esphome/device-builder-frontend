@@ -239,15 +239,27 @@ export function createDeviceColumns(
               encVisual.actionable ? encVisual.actionTooltipKey : encVisual.tooltipKey
             )
           : "";
+        const migrationTitle = localize("dashboard.status_migration_available_action");
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${indicatorDot(row.showModified, "modified", "dashboard.status_modified")}
           ${indicatorDot(row.showUpdate, "update", "dashboard.status_update_available")}
-          ${indicatorDot(
-            row._device.migration_available === true,
-            "migration",
-            "dashboard.status_migration_available"
-          )}
+          ${
+            row._device.migration_available === true && !selectMode
+              ? html`<button
+                  type="button"
+                  class="cell-indicator cell-indicator--migration"
+                  title=${migrationTitle}
+                  aria-label=${migrationTitle}
+                  @click=${(e: Event) =>
+                    dispatchRowEvent(e, "open-config-migration", row._device)}
+                ></button>`
+              : indicatorDot(
+                  row._device.migration_available === true,
+                  "migration",
+                  "dashboard.status_migration_available"
+                )
+          }
           ${
             row.hasQueuedUpdate
               ? html`<wa-icon

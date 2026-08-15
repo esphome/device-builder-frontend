@@ -225,13 +225,52 @@ function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
 }
 
 describe("name-cell migration dot", () => {
-  it("renders from the raw device flag and hides by default", () => {
-    const shown = renderInto(
-      renderNameCell({
-        _device: { web_port: null, migration_available: true },
-      } as unknown as Partial<DeviceRow>)
+  it("deep-links to the editor and stops the row click", () => {
+    const device = { web_port: null, migration_available: true };
+    const container = renderInto(
+      renderNameCell({ _device: device } as unknown as Partial<DeviceRow>)
     );
-    expect(shown.querySelector(".cell-indicator--migration")).not.toBeNull();
+    const btn = container.querySelector<HTMLButtonElement>(
+      "button.cell-indicator--migration"
+    );
+    expect(btn).not.toBeNull();
+    let detail: unknown;
+    let rowClicked = false;
+    container.addEventListener("open-config-migration", (e) => {
+      detail = (e as CustomEvent).detail;
+    });
+    container.addEventListener("click", () => {
+      rowClicked = true;
+    });
+    btn!.click();
+    expect(detail).toBe(device);
+    expect(rowClicked).toBe(false);
+  });
+
+  it("renders passive while selecting", () => {
+    const selectColumns = createDeviceColumns(identityLocalize, true);
+    const col = selectColumns.find((c) => "accessorKey" in c && c.accessorKey === "name");
+    if (!col?.cell || typeof col.cell !== "function") {
+      throw new Error("no cell renderer for name column");
+    }
+    const row = {
+      name: "kitchen",
+      friendly_name: "Kitchen",
+      showModified: false,
+      showUpdate: false,
+      hasPendingChanges: false,
+      api_enabled: false,
+      api_encrypted: false,
+      api_encryption_active: null,
+      _device: { web_port: null, migration_available: true },
+    } as unknown as DeviceRow;
+    const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+    const container = renderInto(col.cell(info) as TemplateResult);
+    expect(container.querySelector("button.cell-indicator--migration")).toBeNull();
+    expect(container.querySelector("span.cell-indicator--migration")).not.toBeNull();
+  });
+
+  it("hides by default", () => {
     const hidden = renderInto(renderNameCell());
     expect(hidden.querySelector(".cell-indicator--migration")).toBeNull();
   });
