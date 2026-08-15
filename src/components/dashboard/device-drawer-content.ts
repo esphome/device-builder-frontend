@@ -191,6 +191,9 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
                       type="button"
                       class="status-badge status-badge--migration"
                       title=${this._localize("dashboard.status_migration_available_action")}
+                      aria-label=${this._localize(
+                        "dashboard.status_migration_available_action"
+                      )}
                       @click=${() => fireEvent(this, "open-config-migration", d)}
                     >
                       <wa-icon library="mdi" name="auto-fix"></wa-icon>
