@@ -147,9 +147,17 @@ export const deviceCardStyles = [
     /* The migration dot is a button that opens the editor; reset the
        native chrome so it matches the passive dots. */
     button.indicator-dot {
+      position: relative;
       padding: 0;
       border: none;
       cursor: pointer;
+    }
+    /* Invisible hit-area extender — the 8px dot alone is too small a
+       touch target (24px minimum). */
+    button.indicator-dot::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
     }
     button.indicator-dot:focus-visible {
       outline: 2px solid var(--esphome-primary);

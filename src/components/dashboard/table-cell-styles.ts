@@ -188,9 +188,17 @@ export const tableCellStyles = css`
   /* The migration dot deep-links to the editor; reset the native chrome
      so it matches the passive dots. */
   button.cell-indicator {
+    position: relative;
     padding: 0;
     border: none;
     cursor: pointer;
+  }
+  /* Invisible hit-area extender — the 8px dot alone is too small a
+     touch target (24px minimum). */
+  button.cell-indicator::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
   }
   button.cell-indicator:focus-visible {
     outline: 2px solid var(--esphome-primary);
