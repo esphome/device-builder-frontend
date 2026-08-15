@@ -203,8 +203,12 @@ describe("device table busy install/update actions", () => {
   });
 });
 
-function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
-  const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "name");
+function renderNameCell(
+  rowOverrides: Partial<DeviceRow> = {},
+  selectMode = false
+): TemplateResult {
+  const cols = selectMode ? createDeviceColumns(identityLocalize, true) : columns;
+  const col = cols.find((c) => "accessorKey" in c && c.accessorKey === "name");
   if (!col?.cell || typeof col.cell !== "function") {
     throw new Error("no cell renderer for name column");
   }
@@ -248,24 +252,14 @@ describe("name-cell migration dot", () => {
   });
 
   it("renders passive while selecting", () => {
-    const selectColumns = createDeviceColumns(identityLocalize, true);
-    const col = selectColumns.find((c) => "accessorKey" in c && c.accessorKey === "name");
-    if (!col?.cell || typeof col.cell !== "function") {
-      throw new Error("no cell renderer for name column");
-    }
-    const row = {
-      name: "kitchen",
-      friendly_name: "Kitchen",
-      showModified: false,
-      showUpdate: false,
-      hasPendingChanges: false,
-      api_enabled: false,
-      api_encrypted: false,
-      api_encryption_active: null,
-      _device: { web_port: null, migration_available: true },
-    } as unknown as DeviceRow;
-    const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
-    const container = renderInto(col.cell(info) as TemplateResult);
+    const container = renderInto(
+      renderNameCell(
+        {
+          _device: { web_port: null, migration_available: true },
+        } as unknown as Partial<DeviceRow>,
+        true
+      )
+    );
     expect(container.querySelector("button.cell-indicator--migration")).toBeNull();
     expect(container.querySelector("span.cell-indicator--migration")).not.toBeNull();
   });

@@ -20,27 +20,31 @@ import {
 } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
-/** ``reveal`` opts into the one-shot ``reveal=1`` intent: show the visual
- *  pane even in a YAML-only or mobile layout (e.g. so the migration nudge
- *  a dashboard indicator promised is actually on screen). */
-export function editDevice(device: ConfiguredDevice, opts: { reveal?: boolean } = {}) {
-  const reveal = opts.reveal ? "?reveal=1" : "";
-  void navigate(`/device/${encodeURIComponent(device.configuration)}${reveal}`);
+/** Open the editor. ``section`` deep-links a component section (read from
+ *  ``?section=`` on load); ``reveal`` opts into the one-shot ``reveal=1``
+ *  intent — show the visual pane even in a YAML-only or mobile layout,
+ *  consumed and stripped on arrival so a reload keeps the saved layout. */
+export function editDevice(
+  device: ConfiguredDevice,
+  opts: { section?: string; reveal?: boolean } = {}
+) {
+  const params = new URLSearchParams();
+  if (opts.section) params.set("section", opts.section);
+  if (opts.reveal) params.set("reveal", "1");
+  const query = params.toString();
+  void navigate(
+    `/device/${encodeURIComponent(device.configuration)}${query ? `?${query}` : ""}`
+  );
 }
 
 /** Open the editor deep-linked to a component section (e.g. ``api`` for the
- *  encryption affordance); the section is read from ``?section=`` on load.
- *  ``reveal`` opts into the one-shot ``reveal=1`` intent: show the visual
- *  pane even in a YAML-only or mobile layout — consumed and stripped on
- *  arrival, so a reload keeps the user's saved layout. */
+ *  encryption affordance); see {@link editDevice} for the opts semantics. */
 export function editDeviceSection(
   device: ConfiguredDevice,
   section: string,
   opts: { reveal?: boolean } = {}
 ) {
-  const path = `/device/${encodeURIComponent(device.configuration)}`;
-  const reveal = opts.reveal ? "&reveal=1" : "";
-  void navigate(`${path}?section=${encodeURIComponent(section)}${reveal}`);
+  editDevice(device, { ...opts, section });
 }
 
 /**
