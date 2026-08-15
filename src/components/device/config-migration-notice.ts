@@ -84,6 +84,8 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
     css`
       :host {
         display: block;
+        /* Migration identity color — matches the dashboard dot and badge. */
+        --notice-accent: var(--esphome-migration);
       }
       :host([hidden]) {
         display: none;

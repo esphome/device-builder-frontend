@@ -41,6 +41,37 @@ export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof n
   </div>`;
 }
 
+export function renderMigrationDot(
+  card: ESPHomeDeviceCard
+): TemplateResult | typeof nothing {
+  if (!card.migrationAvailable) return nothing;
+  // Actionable except while selecting — in select mode the whole card is
+  // one toggle target, same rule as the encryption button below.
+  if (!card.selectMode) {
+    const label = card._localize("dashboard.status_migration_available_action");
+    return html`<button
+        id="ind-migration"
+        type="button"
+        class="indicator-dot indicator-dot--migration"
+        aria-label=${label}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          fireEvent(card, "open-config-migration");
+        }}
+      ></button>
+      <wa-tooltip for="ind-migration">${label}</wa-tooltip>`;
+  }
+  const tooltip = card._localize("dashboard.status_migration_available");
+  return html`<span
+      id="ind-migration"
+      class="indicator-dot indicator-dot--migration"
+      tabindex="0"
+      role="img"
+      aria-label=${tooltip}
+    ></span>
+    <wa-tooltip for="ind-migration">${tooltip}</wa-tooltip>`;
+}
+
 // Compact view: no lock for encrypted devices, only the attention
 // states (plaintext / pending / mismatch) get an icon.
 export function renderEncryptionIcon(
