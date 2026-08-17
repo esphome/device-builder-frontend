@@ -112,6 +112,9 @@ function boardPinsForSection(
   path: string[]
 ): { lockedGpios: Set<number>; gpios: Set<number>; tokens: Set<string> } {
   const fieldKey = path.join(".");
+  // The field's preset lives at ``fields[<head>].value[<rest…>]`` — for a
+  // nested pin (ethernet's ``clk.pin``) inside the parent's mapping value.
+  const presetPath = [path[0], "value", ...path.slice(1)];
   const lockedGpios = new Set<number>();
   const gpios = new Set<number>();
   const tokens = new Set<string>();
@@ -128,14 +131,7 @@ function boardPinsForSection(
         tokens.add(pin);
       }
     }
-    // A nested pin's preset lives inside the parent field's mapping
-    // value (ethernet's ``clk: {pin, mode}`` under ``fields.clk``).
-    const fieldPreset = fc.fields?.[path[0]]?.value;
-    const preset = isPlainObject(fieldPreset)
-      ? getIn(fieldPreset, path.slice(1))
-      : path.length === 1
-        ? fieldPreset
-        : undefined;
+    const preset = getIn(fc.fields ?? {}, presetPath);
     if (preset == null) continue;
     // ``parsePinGpio`` so an object-form expander preset
     // (``{pcf8574: hub, number: 0}``) yields its channel token instead

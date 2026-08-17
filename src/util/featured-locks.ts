@@ -20,11 +20,11 @@ import { featuredEntryForInstance } from "./featured-id.js";
 import { isPlainObject } from "./nested-values.js";
 
 // Stable locked copies so re-renders hand the form identical entry
-// references (same rationale as the pin wiring's lock cache). Nested
-// copies are keyed on which children locked, so a child moving off its
-// preset rebuilds the parent copy exactly once.
+// references (same rationale as the pin wiring's lock cache). A nested
+// copy stays valid while its children are identical, which the child
+// caches make an identity check.
 const lockedCopies = new WeakMap<ConfigEntry, ConfigEntry>();
-const nestedCopies = new WeakMap<ConfigEntry, { sig: string; copy: ConfigEntry }>();
+const nestedCopies = new WeakMap<ConfigEntry, ConfigEntry>();
 
 export function overlayBoardLockedPresets(
   entries: ConfigEntry[],
@@ -34,11 +34,15 @@ export function overlayBoardLockedPresets(
 ): ConfigEntry[] {
   const fc = featuredEntryForInstance(board, sectionKey, values.id);
   if (!fc) return entries;
-  return entries.map((entry) => {
+  let changed = false;
+  const mapped = entries.map((entry) => {
     const preset = fc.fields[entry.key];
     if (!preset?.locked) return entry;
-    return overlayEntry(entry, preset.value, values[entry.key]);
+    const out = overlayEntry(entry, preset.value, values[entry.key]);
+    if (out !== entry) changed = true;
+    return out;
   });
+  return changed ? mapped : entries;
 }
 
 /** Locked copy of *entry* while *current* still sits on the locked
@@ -57,13 +61,14 @@ function overlayEntry(
   if (isPlainObject(preset)) {
     const children = entry.config_entries;
     if (!children || !isPlainObject(current)) return entry;
-    const mapped = children.map((child) =>
-      child.key in preset
-        ? overlayEntry(child, preset[child.key], current[child.key])
-        : child
-    );
-    if (mapped.every((child, i) => child === children[i])) return entry;
-    return nestedCopy(entry, mapped);
+    let changed = false;
+    const mapped = children.map((child) => {
+      if (!(child.key in preset)) return child;
+      const out = overlayEntry(child, preset[child.key], current[child.key]);
+      if (out !== child) changed = true;
+      return out;
+    });
+    return changed ? nestedCopy(entry, mapped) : entry;
   }
   return presetValueMatches(current, preset) ? lockedCopy(entry) : entry;
 }
@@ -82,14 +87,12 @@ function lockedCopy(entry: ConfigEntry): ConfigEntry {
 }
 
 function nestedCopy(entry: ConfigEntry, children: ConfigEntry[]): ConfigEntry {
-  const sig = children
-    .filter((child, i) => child !== entry.config_entries?.[i])
-    .map((child) => child.key)
-    .join(",");
   const hit = nestedCopies.get(entry);
-  if (hit && hit.sig === sig) return hit.copy;
+  if (hit && children.every((child, i) => child === hit.config_entries![i])) {
+    return hit;
+  }
   const copy = { ...entry, config_entries: children };
-  nestedCopies.set(entry, { sig, copy });
+  nestedCopies.set(entry, copy);
   return copy;
 }
 

@@ -83,4 +83,16 @@ describe("featuredEntryForInstance", () => {
     expect(featuredEntryForInstance(board, "wifi", undefined)).toBeNull();
     expect(featuredEntryForInstance(null, "ethernet", undefined)).toBeNull();
   });
+
+  it("prefers an exact id match over an id-less sibling", () => {
+    const mixed = {
+      id: "board",
+      featured_components: [
+        { id: "generic", component_id: "spi", fields: {} },
+        { id: "lcd_spi", component_id: "spi", fields: { id: preset("lcd_spi") } },
+      ],
+    } as unknown as BoardCatalogEntry;
+    expect(featuredEntryForInstance(mixed, "spi", "lcd_spi")?.id).toBe("lcd_spi");
+    expect(featuredEntryForInstance(mixed, "spi", "other")?.id).toBe("generic");
+  });
 });
