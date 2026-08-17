@@ -25,6 +25,8 @@ import { isPlainObject } from "./nested-values.js";
 // caches make an identity check.
 const lockedCopies = new WeakMap<ConfigEntry, ConfigEntry>();
 const nestedCopies = new WeakMap<ConfigEntry, ConfigEntry>();
+// Catalog-drift warnings fire once per schema entry, not per render.
+const warnedDrift = new WeakSet<ConfigEntry>();
 
 export function overlayBoardLockedPresets(
   entries: ConfigEntry[],
@@ -60,7 +62,19 @@ function overlayEntry(
   if (entry.locked || entry.type === ConfigEntryType.PIN) return entry;
   if (isPlainObject(preset)) {
     const children = entry.config_entries;
-    if (!children || !isPlainObject(current)) return entry;
+    if (!children) {
+      // A mapping preset over a leaf entry is catalog/schema drift: the
+      // board's lock can't apply, so surface it instead of silently
+      // rendering the field editable.
+      if (!warnedDrift.has(entry)) {
+        warnedDrift.add(entry);
+        console.warn(
+          `Board mapping preset for '${entry.key}' has no nested schema entries; lock not applied`
+        );
+      }
+      return entry;
+    }
+    if (!isPlainObject(current)) return entry;
     let changed = false;
     const mapped = children.map((child) => {
       if (!(child.key in preset)) return child;

@@ -59,6 +59,7 @@ describe("featuredEntryForInstance", () => {
       {
         id: "onboard_ethernet",
         component_id: "ethernet",
+        multi_conf: false,
         fields: { type: preset("LAN8720") },
       },
     ],
@@ -70,7 +71,7 @@ describe("featuredEntryForInstance", () => {
     expect(featuredEntryForInstance(board, "spi", undefined)).toBeNull();
   });
 
-  it("matches an id-less entry by section alone", () => {
+  it("matches an id-less singleton entry by section alone", () => {
     expect(featuredEntryForInstance(board, "ethernet", undefined)?.id).toBe(
       "onboard_ethernet"
     );
@@ -79,20 +80,31 @@ describe("featuredEntryForInstance", () => {
     );
   });
 
+  it("never falls back to an id-less entry of a repeatable section", () => {
+    // multi_conf is absent (repeatable) — a hand-added instance must not
+    // borrow the entry's presets.
+    const repeatable = {
+      id: "board",
+      featured_components: [{ id: "generic", component_id: "spi", fields: {} }],
+    } as unknown as BoardCatalogEntry;
+    expect(featuredEntryForInstance(repeatable, "spi", undefined)).toBeNull();
+    expect(featuredEntryForInstance(repeatable, "spi", "my_own_spi")).toBeNull();
+  });
+
   it("returns null outside the section or without a board", () => {
     expect(featuredEntryForInstance(board, "wifi", undefined)).toBeNull();
     expect(featuredEntryForInstance(null, "ethernet", undefined)).toBeNull();
   });
 
-  it("prefers an exact id match over an id-less sibling", () => {
+  it("prefers an exact id match over an id-less singleton sibling", () => {
     const mixed = {
       id: "board",
       featured_components: [
-        { id: "generic", component_id: "spi", fields: {} },
-        { id: "lcd_spi", component_id: "spi", fields: { id: preset("lcd_spi") } },
+        { id: "generic", component_id: "i2s", multi_conf: false, fields: {} },
+        { id: "amp_i2s", component_id: "i2s", fields: { id: preset("amp_i2s") } },
       ],
     } as unknown as BoardCatalogEntry;
-    expect(featuredEntryForInstance(mixed, "spi", "lcd_spi")?.id).toBe("lcd_spi");
-    expect(featuredEntryForInstance(mixed, "spi", "other")?.id).toBe("generic");
+    expect(featuredEntryForInstance(mixed, "i2s", "amp_i2s")?.id).toBe("amp_i2s");
+    expect(featuredEntryForInstance(mixed, "i2s", undefined)?.id).toBe("generic");
   });
 });

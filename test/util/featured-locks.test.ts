@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
@@ -111,6 +111,7 @@ describe("overlayBoardLockedPresets nested presets", () => {
       {
         id: "onboard_ethernet",
         component_id: "ethernet",
+        multi_conf: false,
         fields: {
           type: preset("LAN8720"),
           clk: preset({ pin: "GPIO17", mode: "CLK_OUT" }),
@@ -173,5 +174,18 @@ describe("overlayBoardLockedPresets nested presets", () => {
     const a = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
     const b = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
     expect(a.find((e) => e.key === "clk")).toBe(b.find((e) => e.key === "clk"));
+  });
+
+  it("warns once on a mapping preset over a leaf entry (catalog drift)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // The schema renders clk as a plain string field while the board
+    // preset is a mapping — the lock can't apply.
+    const drifted = [makeConfigEntry({ key: "clk", type: ConfigEntryType.STRING })];
+    const out = overlayBoardLockedPresets(drifted, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(out).toBe(drifted);
+    expect(warn).toHaveBeenCalledTimes(1);
+    overlayBoardLockedPresets(drifted, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });
