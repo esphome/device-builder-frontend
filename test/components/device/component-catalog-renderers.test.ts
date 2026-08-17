@@ -158,6 +158,7 @@ describe("renderCard", () => {
     const link = container.querySelector("a.more-info");
     expect(link?.getAttribute("href")).toBe("https://example.test/docs");
     expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
   });
 });
 

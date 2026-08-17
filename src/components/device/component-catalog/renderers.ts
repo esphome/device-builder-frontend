@@ -217,7 +217,7 @@ export function renderCard(
                 class="more-info"
                 href=${component.docs_url}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
               >
                 ${localize("device.more_info")}
                 <wa-icon library="mdi" name="open-in-new"></wa-icon>
