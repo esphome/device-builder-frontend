@@ -432,16 +432,20 @@ export function findComponentsByProviders(
 
 // An instance's GPIO for a pin field, handling both the bare scalar
 // (`scl: 0`) and the expanded block (`scl:\n  number: GPIO0`) forms; null
-// when the field is absent or its value isn't a parseable pin.
+// when the field is absent or its value isn't a parseable pin. The key is
+// the schema's dotted pin path (`mdc_pin`, ethernet's nested `clk.pin`).
 function readInstancePinGpio(
   yaml: string,
   lines: string[],
   section: YamlSection,
   key: string
 ): number | string | null {
-  const lineNo = findFieldLine(yaml, section, [key]);
+  const path = key.split(".");
+  const lineNo = findFieldLine(yaml, section, path);
   if (lineNo === null) return null;
-  const scalar = parsePinGpio(readInstanceScalar(lines[lineNo - 1], key));
+  const scalar = parsePinGpio(
+    readInstanceScalar(lines[lineNo - 1], path[path.length - 1])
+  );
   if (scalar !== null) return scalar;
   // Expanded form: read the long-form block (board GPIO, or the
   // `provider:hub_id:channel` token when the pin sits on an I/O expander).

@@ -389,6 +389,23 @@ describe("domainOccupiesPins", () => {
     expect(domainOccupiesPins(yaml, "binary_sensor", { pin: 0 })).toBe(false);
   });
 
+  it("matches a nested pin keyed by its dotted path", () => {
+    // ethernet's ``locked_pins`` keys the nested clk pin as ``clk.pin``.
+    const yaml = [
+      "ethernet:",
+      "  type: LAN8720",
+      "  mdc_pin: GPIO23",
+      "  clk:",
+      "    mode: CLK_OUT",
+      "    pin: GPIO17",
+      "",
+    ].join("\n");
+    expect(domainOccupiesPins(yaml, "ethernet", { "clk.pin": 17, mdc_pin: 23 })).toBe(
+      true
+    );
+    expect(domainOccupiesPins(yaml, "ethernet", { "clk.pin": 0 })).toBe(false);
+  });
+
   it("is false when the pins are split across two instances", () => {
     const yaml =
       "i2c:\n  - scl: 0\n    sda: 9\n    id: a\n  - scl: 8\n    sda: 1\n    id: b\n";
