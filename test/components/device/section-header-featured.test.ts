@@ -109,3 +109,58 @@ describe("section header featured presentation", () => {
     expect(out).not.toContain("section-subtitle");
   });
 });
+
+describe("section header id-less featured presentation", () => {
+  // The ethernet shape: a singleton featured entry with no id preset
+  // matches its section's one instance by section alone.
+  const ethBoard = (multiConf: boolean | undefined) =>
+    makeTestBoard({
+      overrides: {
+        id: "esp32-poe-iso",
+        featured_components: [
+          {
+            id: "onboard_ethernet",
+            component_id: "ethernet",
+            name: "Onboard Ethernet",
+            description: "Built-in Ethernet PHY.",
+            ...(multiConf === undefined ? {} : { multi_conf: multiConf }),
+            fields: { type: { value: "LAN8720", locked: true } },
+          },
+        ],
+      } as never,
+    });
+
+  const ethConfig = {
+    section_key: "ethernet",
+    title: "Ethernet Component",
+    description: "Generic ethernet description.",
+    docs_url: "",
+    image_url: "https://cdn.example/ethernet.png",
+  } as SectionConfigResponse;
+
+  const ethHost = (multiConf: boolean | undefined) =>
+    ({
+      _isUnknown: false,
+      _isPlatformDomain: false,
+      _localize: (key: string) => key,
+      board: ethBoard(multiConf),
+      sectionKey: "ethernet",
+      _values: { type: "LAN8720" },
+    }) as unknown as ESPHomeDeviceSectionConfig;
+
+  it("adopts the singleton entry's presentation without an instance id", () => {
+    const tpl = renderSectionHeader(ethHost(false), ethConfig, []);
+    const out = serialize(tpl);
+    expect(out).toContain("Ethernet Component");
+    expect(out).toContain("section-subtitle");
+    expect(out).toContain("Onboard Ethernet");
+    expect(out).toContain("Built-in Ethernet PHY.");
+  });
+
+  it("keeps the catalog presentation for a repeatable id-less entry", () => {
+    const tpl = renderSectionHeader(ethHost(undefined), ethConfig, []);
+    const out = serialize(tpl);
+    expect(out).toContain("Generic ethernet description.");
+    expect(out).not.toContain("section-subtitle");
+  });
+});

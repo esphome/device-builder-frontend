@@ -33,18 +33,29 @@ export function isPlatformComponentId(id: string): boolean {
 
  * Matches by section (``component_id``) plus the instance's emitted
  * ``id`` against the entry's ``id`` preset — the per-instance
- * counterpart to the pin guard's physical per-GPIO matching.
+ * counterpart to the pin guard's physical per-GPIO matching. An entry
+ * without an ``id`` preset matches by section alone, but only for a
+ * single-instance component (ethernet's singleton wiring) — a
+ * repeatable section's instance must match an ``id`` preset exactly,
+ * or a hand-added sibling would borrow the entry's presets.
  */
 export function featuredEntryForInstance(
   board: BoardCatalogEntry | null,
   sectionKey: string,
   instanceId: unknown
 ): FeaturedComponent | null {
-  if (!board || !sectionKey || typeof instanceId !== "string") return null;
+  if (!board || !sectionKey) return null;
+  const inSection =
+    board.featured_components?.filter((fc) => fc.component_id === sectionKey) ?? [];
   return (
-    board.featured_components?.find(
-      (fc) => fc.component_id === sectionKey && fc.fields.id?.value === instanceId
-    ) ?? null
+    inSection.find(
+      (fc) =>
+        fc.fields.id !== undefined &&
+        typeof instanceId === "string" &&
+        fc.fields.id.value === instanceId
+    ) ??
+    inSection.find((fc) => fc.fields.id === undefined && fc.multi_conf === false) ??
+    null
   );
 }
 

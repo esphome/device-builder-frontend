@@ -424,6 +424,36 @@ describe("renderPinField reserved pins locked to the edited component", () => {
     // GPIO6 (flash) isn't in ethernet's locked_pins — stays disabled.
     expect(optionFor(result, "GPIO6")?.["?disabled"]).toBe(true);
   });
+
+  it("arms the wiring guard on a nested pin matching its dotted designation", () => {
+    // ``locked_pins`` keys the nested clk pin as ``clk.pin``; the guard
+    // must match the field's dotted path, not the leaf key.
+    const ctx = makeRenderCtx(
+      { clk: { pin: "GPIO0" } },
+      { board: ethBoard(), overrides: { sectionKey: "ethernet" } }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin" }),
+      ["clk", "pin"],
+      ctx
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(String(select.id)).toContain("pin-guard-tip");
+  });
+
+  it("leaves a nested pin moved off the designation unguarded", () => {
+    const ctx = makeRenderCtx(
+      { clk: { pin: "GPIO2" } },
+      { board: ethBoard(), overrides: { sectionKey: "ethernet" } }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin" }),
+      ["clk", "pin"],
+      ctx
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(String(select.id)).not.toContain("pin-guard-tip");
+  });
 });
 
 describe("renderPinField suggestion narrowing", () => {

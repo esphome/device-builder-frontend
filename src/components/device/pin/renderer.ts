@@ -10,7 +10,11 @@ import type { BoardPin } from "../../../api/types/boards.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { PinFeature, PinMode } from "../../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../../util/config-entry-yaml-scan.js";
-import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
+import {
+  getIn,
+  isPlainObject,
+  isPrimitiveOrNullish,
+} from "../../../util/nested-values.js";
 import {
   formatPinValue,
   isExpanderPinValue,
@@ -94,14 +98,23 @@ function boardGpioOf(value: unknown, pins: BoardPin[]): number | null {
  *    pins under ``ethernet:``); flash/PSRAM pins and other components'
  *    locks remain disabled.
  *  - ``gpios`` — the wider board-defined set (locked plus field presets
- *    keyed by *entryKey*, like the RGB header pin a board pre-fills
- *    without locking); a current value here gets the wiring guard.
+ *    keyed by the field's dotted path, like the RGB header pin a board
+ *    pre-fills without locking); a current value here gets the wiring
+ *    guard.
  *  - ``tokens`` — expander-channel ``provider:hub:channel`` identities,
- *    the non-GPIO half of the same guard. */
+ *    the non-GPIO half of the same guard.
+ *
+ *  Matching is on the field's dotted *path* (``mdc_pin``, ``clk.pin``),
+ *  the same form ``locked_pins`` keys use, so a nested pin (ethernet's
+ *  ``clk.pin``) guards like a top-level one. */
 function boardPinsForSection(
   ctx: RenderCtx,
-  entryKey: string
+  path: string[]
 ): { lockedGpios: Set<number>; gpios: Set<number>; tokens: Set<string> } {
+  const fieldKey = path.join(".");
+  // The field's preset lives at ``fields[<head>].value[<rest…>]`` — for a
+  // nested pin (ethernet's ``clk.pin``) inside the parent's mapping value.
+  const presetPath = [path[0], "value", ...path.slice(1)];
   const lockedGpios = new Set<number>();
   const gpios = new Set<number>();
   const tokens = new Set<string>();
@@ -113,12 +126,12 @@ function boardPinsForSection(
       // (ethernet's clk vs miso) doesn't read-only this field's wiring.
       if (typeof pin === "number") {
         lockedGpios.add(pin);
-        if (key === entryKey) gpios.add(pin);
-      } else if (typeof pin === "string" && key === entryKey) {
+        if (key === fieldKey) gpios.add(pin);
+      } else if (typeof pin === "string" && key === fieldKey) {
         tokens.add(pin);
       }
     }
-    const preset = fc.fields?.[entryKey]?.value;
+    const preset = getIn(fc.fields ?? {}, presetPath);
     if (preset == null) continue;
     // ``parsePinGpio`` so an object-form expander preset
     // (``{pcf8574: hub, number: 0}``) yields its channel token instead
@@ -341,7 +354,7 @@ export function renderPinField(
       identity,
       rawValue,
       suggestedTokens ||
-        designationMatches(boardPinsForSection(ctx, entry.key).tokens, identity)
+        designationMatches(boardPinsForSection(ctx, path).tokens, identity)
     );
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
@@ -421,7 +434,7 @@ export function renderPinField(
     ctx.fromLine,
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
-  const boardPins = boardPinsForSection(ctx, entry.key);
+  const boardPins = boardPinsForSection(ctx, path);
   const ownLockedGpios = boardPins.lockedGpios;
   // The current pin sitting on a board-defined GPIO for this section
   // (locked, field preset, or suggestion) means the wiring is the
@@ -543,7 +556,7 @@ function renderSubstitutionPin(
   const resolved =
     parsePinGpio(longForm ? { ...longForm, number: resolvedNumber } : resolvedNumber) ??
     (isExpanderPinValue(rawValue) ? null : gpioFromAlias(resolvedNumber, pins));
-  const boardPins = boardPinsForSection(ctx, entry.key);
+  const boardPins = boardPinsForSection(ctx, path);
   const boardPreset =
     resolved !== null &&
     (typeof resolved === "number"

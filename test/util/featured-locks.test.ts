@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { overlayBoardLockedPresets } from "../../src/util/featured-locks.js";
-import { makeConfigEntry } from "./_make-config-entry.js";
+import { makeConfigEntry, makeNestedEntry } from "./_make-config-entry.js";
 
 const preset = (value: unknown, locked = true) => ({ value, locked, suggestions: null });
 
@@ -99,5 +99,93 @@ describe("overlayBoardLockedPresets", () => {
     const a = overlayBoardLockedPresets(ENTRIES, BOARD, SECTION, VALUES);
     const b = overlayBoardLockedPresets(ENTRIES, BOARD, SECTION, VALUES);
     expect(a.find((e) => e.key === "chipset")).toBe(b.find((e) => e.key === "chipset"));
+  });
+});
+
+// The ethernet shape: an id-less featured entry with a mapping preset
+// (nested `clk: {pin, mode}`) whose leaves lock individually.
+describe("overlayBoardLockedPresets nested presets", () => {
+  const ETH_BOARD = {
+    id: "esp32-poe-iso",
+    featured_components: [
+      {
+        id: "onboard_ethernet",
+        component_id: "ethernet",
+        multi_conf: false,
+        fields: {
+          type: preset("LAN8720"),
+          clk: preset({ pin: "GPIO17", mode: "CLK_OUT" }),
+        },
+      },
+    ],
+  } as unknown as BoardCatalogEntry;
+
+  const ETH_ENTRIES = [
+    makeConfigEntry({ key: "type", type: ConfigEntryType.STRING }),
+    makeNestedEntry("clk", [
+      makeConfigEntry({ key: "pin", type: ConfigEntryType.PIN }),
+      makeConfigEntry({ key: "mode", type: ConfigEntryType.STRING }),
+    ]),
+  ];
+
+  const ETH_VALUES = {
+    type: "LAN8720",
+    clk: { pin: "GPIO17", mode: "CLK_OUT" },
+  };
+
+  const clkChild = (out: ReturnType<typeof overlayBoardLockedPresets>, key: string) =>
+    out.find((e) => e.key === "clk")!.config_entries!.find((e) => e.key === key)!;
+
+  it("matches an id-less featured entry by section alone", () => {
+    const out = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(out.find((e) => e.key === "type")!.locked).toBe(true);
+  });
+
+  it("locks a nested leaf still on its preset value", () => {
+    const out = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
+    const mode = clkChild(out, "mode");
+    expect(mode.locked).toBe(true);
+    expect((mode as { locked_reason_key?: string }).locked_reason_key).toBe(
+      "device.pin_wiring_guard_tooltip"
+    );
+  });
+
+  it("never stamps a nested PIN leaf (the picker guard owns pins)", () => {
+    const out = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(clkChild(out, "pin").locked).toBeFalsy();
+  });
+
+  it("releases a nested leaf the user moved off the preset", () => {
+    const out = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", {
+      ...ETH_VALUES,
+      clk: { pin: 0, mode: "CLK_EXT_IN" },
+    });
+    expect(out.find((e) => e.key === "clk")).toBe(ETH_ENTRIES[1]);
+  });
+
+  it("leaves the nested group untouched when the block is absent", () => {
+    const out = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", {
+      type: "LAN8720",
+    });
+    expect(out.find((e) => e.key === "clk")).toBe(ETH_ENTRIES[1]);
+  });
+
+  it("hands back stable nested copies across renders", () => {
+    const a = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
+    const b = overlayBoardLockedPresets(ETH_ENTRIES, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(a.find((e) => e.key === "clk")).toBe(b.find((e) => e.key === "clk"));
+  });
+
+  it("warns once on a mapping preset over a leaf entry (catalog drift)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // The schema renders clk as a plain string field while the board
+    // preset is a mapping — the lock can't apply.
+    const drifted = [makeConfigEntry({ key: "clk", type: ConfigEntryType.STRING })];
+    const out = overlayBoardLockedPresets(drifted, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(out).toBe(drifted);
+    expect(warn).toHaveBeenCalledTimes(1);
+    overlayBoardLockedPresets(drifted, ETH_BOARD, "ethernet", ETH_VALUES);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });
