@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import type { FeaturedBundle } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { renderMarkdown } from "../../../util/markdown.js";
+import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import {
   categoryChipLabel,
   platformLabel,
@@ -211,10 +211,19 @@ export function renderCard(
         ${renderMarkdown(component.description)}
       </p>
       <div class="card-footer">
-        <a class="more-info" href=${component.docs_url} target="_blank" rel="noreferrer">
-          ${localize("device.more_info")}
-          <wa-icon library="mdi" name="open-in-new"></wa-icon>
-        </a>
+        ${
+          isSafeLinkHref(component.docs_url)
+            ? html`<a
+                class="more-info"
+                href=${component.docs_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                ${localize("device.more_info")}
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing
+        }
         <button
           class="select-component"
           type="button"
