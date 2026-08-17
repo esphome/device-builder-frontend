@@ -140,6 +140,26 @@ describe("renderCard", () => {
     expect(description?.dataset.componentId).toBe("spi");
     expect(description?.classList.contains("component-description--clamp")).toBe(true);
   });
+
+  it("omits the More info link when the entry has no docs_url", () => {
+    // The backend ships an empty docs_url for components without a docs
+    // page; an unguarded anchor would link the dashboard page itself.
+    const container = document.createElement("div");
+    render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
+    expect(container.querySelector(".more-info")).toBeNull();
+    // The spacer keeps the space-between footer pushing Add to the right.
+    expect(container.querySelector(".card-footer span")).not.toBeNull();
+  });
+
+  it("renders the More info link for a safe docs_url", () => {
+    const container = document.createElement("div");
+    const entry = makeEntry({ docs_url: "https://example.test/docs" });
+    render(renderCard(makeHost(), entry, false, false, localize), container);
+    const link = container.querySelector("a.more-info");
+    expect(link?.getAttribute("href")).toBe("https://example.test/docs");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
 });
 
 describe("renderBundleCard", () => {
