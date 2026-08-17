@@ -142,11 +142,13 @@ describe("renderCard", () => {
   });
 
   it("omits the More info link when the entry has no docs_url", () => {
-    // The backend ships an empty docs_url for components no docs page
-    // covers; an unguarded anchor would link the dashboard page itself.
+    // The backend ships an empty docs_url for components without a docs
+    // page; an unguarded anchor would link the dashboard page itself.
     const container = document.createElement("div");
     render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
     expect(container.querySelector(".more-info")).toBeNull();
+    // The spacer keeps the space-between footer pushing Add to the right.
+    expect(container.querySelector(".card-footer span")).not.toBeNull();
   });
 
   it("renders the More info link for a safe docs_url", () => {

@@ -222,7 +222,7 @@ export function renderCard(
                 ${localize("device.more_info")}
                 <wa-icon library="mdi" name="open-in-new"></wa-icon>
               </a>`
-            : nothing
+            : html`<span></span>`
         }
         <button
           class="select-component"
