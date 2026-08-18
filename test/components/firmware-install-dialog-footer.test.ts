@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { identityLocalize } from "../_dom.js";
-import { findTemplatesByAnchor } from "../_lit-template-walker.js";
+import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";
 import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
@@ -89,5 +89,22 @@ describe("firmware-install-dialog footer", () => {
     expect(values).toContain(host._tryChangeBoard);
     expect(values).toContain(host._close);
     expect(values).not.toContain(host._retry);
+  });
+
+  it("offers only Close on an unsupported-browser decline (web-flash)", () => {
+    // Retry would recompile and re-open a tab that declines again for the
+    // same reason; a widening of canRetry's failureKind check would silently
+    // restore that no-op loop. The default footer nests Close inside a
+    // ternary sub-template, so collect values recursively.
+    const host = footerHost("error");
+    host._installer = "web-flash";
+    host._failureKind = "unsupported-browser";
+    const values: unknown[] = [];
+    visitTemplates(renderFooter(host as unknown as ESPHomeFirmwareInstallDialog), (t) =>
+      values.push(...t.values)
+    );
+    expect(values).toContain(host._close);
+    expect(values).not.toContain(host._retry);
+    expect(values).not.toContain(host._tryChangeBoard);
   });
 });

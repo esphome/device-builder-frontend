@@ -91,7 +91,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           // Advertised on the ready frame so the dashboard can decline the
           // hand-off up front (e.g. Safari: this https origin CAN feature-
           // detect Web Serial, unlike the dashboard's plain-http origin).
-          webSerial: webSerialAvailability() === "available",
+          // Derived from the same one-time read that drives render()'s
+          // unsupported card, so the two can never disagree.
+          webSerial: !this._unsupported,
         },
         {
           onFirmware: (msg) => this._onFirmware(msg),
