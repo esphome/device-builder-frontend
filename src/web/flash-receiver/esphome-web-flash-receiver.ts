@@ -9,9 +9,10 @@ import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
+import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import "../dashboard/esphome-web-card.js";
+import "../dashboard/esphome-web-unsupported-card.js";
 import { runFlash } from "../install/run-flash.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
 import type { FlashPart } from "../util/esphome-web-firmware.js";
@@ -63,6 +64,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
 
   private _handshake?: FlashHandshake;
   private _hasOpener = false;
+  // Computed once: Web Serial support doesn't change over the page's life.
+  // The dashboard always hands off through this component (opener + nonce),
+  // so unlike <esphome-web-dashboard> this is the only place that ever tells
+  // a Safari (or insecure-context) user their browser can't do this at all.
+  private readonly _serialAvailability = webSerialAvailability();
+  private readonly _unsupported = this._serialAvailability !== "available";
   // Supersedes a pending boot-log acquisition (a second manual flash during
   // the re-enumeration wait, or an unmount mid-await).
   private _bootLogsGen = 0;
@@ -101,6 +108,20 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   private _onFirmware(msg: FirmwareMessage): void {
+    if (this._unsupported) {
+      // The tab already shows <esphome-web-unsupported-card> (see render());
+      // relay it as an error too so the dashboard — now handed off — doesn't
+      // just sit waiting up to its own timeout for a tab that can never flash.
+      // Bail before retaining the firmware or retitling the tab "Flashing …":
+      // nothing below applies to a page that can't flash.
+      this._setState(
+        "error",
+        this._serialAvailability === "insecure-context"
+          ? this._localize("web.unsupported.insecure")
+          : this._localize("web.unsupported.browser")
+      );
+      return;
+    }
     this._firmware = msg;
     // Name the tab + card after the device so several concurrent flash tabs are
     // distinguishable (legacy did the same with the transmitted device name).
@@ -404,6 +425,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   protected render() {
+    if (this._unsupported) {
+      return html`<div class="wrap">
+        <esphome-web-unsupported-card></esphome-web-unsupported-card>
+      </div>`;
+    }
     return html`
       <div class="wrap">
         <esphome-web-card status=${this._localize("web.flash.status")} variant="neutral">
