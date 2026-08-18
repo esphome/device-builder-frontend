@@ -15,6 +15,7 @@ import {
   createDeviceColumns,
   type DeviceRow,
 } from "../../../src/components/dashboard/table-columns.js";
+import type { DeviceTableFeatures } from "../../../src/components/dashboard/table-features.js";
 
 const columns = createDeviceColumns(identityLocalize);
 
@@ -29,7 +30,11 @@ function columnByKey(key: string) {
 function renderCell(key: string, value: unknown): TemplateResult {
   const cell = columnByKey(key);
   // The data columns only read info.getValue(); a minimal stub suffices.
-  const info = { getValue: () => value } as unknown as CellContext<DeviceRow, unknown>;
+  const info = { getValue: () => value } as unknown as CellContext<
+    DeviceTableFeatures,
+    DeviceRow,
+    unknown
+  >;
   return cell(info) as TemplateResult;
 }
 
@@ -59,7 +64,11 @@ function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResul
     },
     ...rowOverrides,
   } as unknown as DeviceRow;
-  const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+  const info = { row: { original: row } } as unknown as CellContext<
+    DeviceTableFeatures,
+    DeviceRow,
+    unknown
+  >;
   return col.cell(info) as TemplateResult;
 }
 
@@ -101,7 +110,7 @@ describe("device table status dot with name_add_mac_suffix", () => {
           _device: { name_add_mac_suffix: nameAddMacSuffix },
         },
       },
-    } as unknown as CellContext<DeviceRow, unknown>;
+    } as unknown as CellContext<DeviceTableFeatures, DeviceRow, unknown>;
     return rendered(columnByKey("status")(info) as TemplateResult);
   };
 
@@ -224,7 +233,11 @@ function renderNameCell(
     _device: { web_port: null },
     ...rowOverrides,
   } as unknown as DeviceRow;
-  const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+  const info = { row: { original: row } } as unknown as CellContext<
+    DeviceTableFeatures,
+    DeviceRow,
+    unknown
+  >;
   return col.cell(info) as TemplateResult;
 }
 

@@ -14,6 +14,7 @@ import { renderLabelChips } from "../../util/label-chip-template.js";
 import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
+import type { DeviceTableFeatures } from "./table-features.js";
 
 export interface DeviceRow {
   status: DeviceState;
@@ -93,7 +94,7 @@ const valueCell = (cls: string, val: string) =>
 export function createDeviceColumns(
   localize: LocalizeFunc,
   selectMode = false
-): ColumnDef<DeviceRow>[] {
+): ColumnDef<DeviceTableFeatures, DeviceRow>[] {
   const indicatorDot = (show: boolean, variant: string, labelKey: string) =>
     show
       ? html`<span
@@ -292,7 +293,7 @@ export function createDeviceColumns(
           }
         </span>`;
       },
-      sortingFn: (rowA, rowB) =>
+      sortFn: (rowA, rowB) =>
         DEVICE_SORT_COLLATOR.compare(
           deviceSortKey(rowA.original),
           deviceSortKey(rowB.original)
@@ -357,7 +358,7 @@ export function createDeviceColumns(
         if (!labels || labels.length === 0) return EMPTY_CELL;
         return renderLabelChips(labels, { max: 3 });
       },
-      sortingFn: (rowA, rowB) => {
+      sortFn: (rowA, rowB) => {
         const a = rowA.original.labels.map((l) => l.name).join(",");
         const b = rowB.original.labels.map((l) => l.name).join(",");
         return a.localeCompare(b);
@@ -389,7 +390,7 @@ export function createDeviceColumns(
       // but "16777216" vs "2097152" puts the smaller value
       // above the larger one). Explicit ``a - b`` is the
       // canonical numeric sort and removes the ambiguity.
-      sortingFn: (rowA, rowB) =>
+      sortFn: (rowA, rowB) =>
         rowA.original.build_size_bytes - rowB.original.build_size_bytes,
       size: 120,
       enableHiding: true,

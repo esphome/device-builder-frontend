@@ -21,14 +21,10 @@ import {
 } from "@mdi/js";
 import {
   type ColumnDef,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
+  type ColumnVisibilityState,
   type PaginationState,
   type SortingState,
   TableController,
-  type VisibilityState,
 } from "@tanstack/lit-table";
 import type { Row, Table } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
@@ -59,6 +55,7 @@ import {
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
+import { deviceTableFeatures, type DeviceTableFeatures } from "./table-features.js";
 import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -89,12 +86,7 @@ registerMdiIcons({
   upload: mdiUpload,
 });
 
-const coreRowModel = getCoreRowModel<DeviceRow>();
-const sortedRowModel = getSortedRowModel<DeviceRow>();
-const filteredRowModel = getFilteredRowModel<DeviceRow>();
-const paginatedRowModel = getPaginationRowModel<DeviceRow>();
-
-const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
+const DEFAULT_HIDDEN_COLUMNS: ColumnVisibilityState = {
   comment: false,
   area: false,
   labels: false,
@@ -147,7 +139,7 @@ export class ESPHomeDeviceTable extends LitElement {
 
   /** Column visibility from preferences — the host mirrors saves back, so a remount reseeds it. */
   @property({ attribute: false })
-  initialColumnVisibility: VisibilityState | null = null;
+  initialColumnVisibility: ColumnVisibilityState | null = null;
 
   /** Page size from preferences — the host mirrors saves back, so a remount reseeds it. */
   @property({ type: Number, attribute: "initial-page-size" })
@@ -157,7 +149,7 @@ export class ESPHomeDeviceTable extends LitElement {
   private _sorting: SortingState = [];
 
   @state()
-  private _columnVisibility: VisibilityState = { ...DEFAULT_HIDDEN_COLUMNS };
+  private _columnVisibility: ColumnVisibilityState = { ...DEFAULT_HIDDEN_COLUMNS };
 
   @state()
   private _pageSize = 25;
@@ -181,10 +173,10 @@ export class ESPHomeDeviceTable extends LitElement {
   @query(".table-scroll")
   private _scrollContainer!: HTMLDivElement;
 
-  private _tableController = new TableController<DeviceRow>(this);
+  private _tableController = new TableController<DeviceTableFeatures, DeviceRow>(this);
   private _rows: DeviceRow[] = [];
   private _visibleConfigs: string[] = [];
-  private _columns: ColumnDef<DeviceRow>[] = [];
+  private _columns: ColumnDef<DeviceTableFeatures, DeviceRow>[] = [];
   private _prevLocalize: LocalizeFunc | null = null;
 
   // ─── Stable callbacks ───
@@ -197,7 +189,8 @@ export class ESPHomeDeviceTable extends LitElement {
   };
 
   private _handleVisibilityChange = (
-    updater: VisibilityState | ((old: VisibilityState) => VisibilityState)
+    updater:
+      ColumnVisibilityState | ((old: ColumnVisibilityState) => ColumnVisibilityState)
   ) => {
     this._columnVisibility =
       typeof updater === "function" ? updater(this._columnVisibility) : updater;
@@ -218,7 +211,7 @@ export class ESPHomeDeviceTable extends LitElement {
   };
 
   private _globalFilterFn = (
-    row: Row<DeviceRow>,
+    row: Row<DeviceTableFeatures, DeviceRow>,
     _columnId: string,
     filterValue: unknown
   ): boolean => {
@@ -284,7 +277,7 @@ export class ESPHomeDeviceTable extends LitElement {
           comment: d.comment || "",
           area: d.area || "",
           // Resolve labels here once per render rather than from the
-          // cell renderer — TanStack's sortingFn / filterFn read the
+          // cell renderer — TanStack's sortFn / filterFn read the
           // accessor value, so they need the resolved objects rather
           // than opaque ids.
           labels: resolveLabelIds(d.labels, this._labelCatalog),
@@ -327,10 +320,7 @@ export class ESPHomeDeviceTable extends LitElement {
       onSortingChange: this._handleSortingChange,
       onColumnVisibilityChange: this._handleVisibilityChange,
       onPaginationChange: this._handlePaginationChange,
-      getCoreRowModel: coreRowModel,
-      getSortedRowModel: sortedRowModel,
-      getFilteredRowModel: filteredRowModel,
-      getPaginationRowModel: paginatedRowModel,
+      features: deviceTableFeatures,
       globalFilterFn: this._globalFilterFn,
     });
 
@@ -342,7 +332,6 @@ export class ESPHomeDeviceTable extends LitElement {
     );
     const rows = table.getRowModel().rows;
     this._visibleConfigs = table.getFilteredRowModel().rows.map((r) => r.original.config);
-    const pgState = table.getState().pagination;
     const toggleCols: ToggleableColumn[] = table
       .getAllColumns()
       .filter((c) => c.getCanHide())
@@ -380,7 +369,7 @@ export class ESPHomeDeviceTable extends LitElement {
           </table>
         </div>
         <esphome-table-pagination
-          page-index=${pgState.pageIndex}
+          page-index=${effectivePageIndex}
           page-count=${table.getPageCount()}
           page-size=${this._pageSize}
           total-rows=${table.getFilteredRowModel().rows.length}
@@ -476,7 +465,10 @@ export class ESPHomeDeviceTable extends LitElement {
     `;
   }
 
-  private _renderControls(table: Table<DeviceRow>, toggleCols: ToggleableColumn[]) {
+  private _renderControls(
+    table: Table<DeviceTableFeatures, DeviceRow>,
+    toggleCols: ToggleableColumn[]
+  ) {
     return html`
       <div class="controls">
         <slot name="toolbar"></slot>

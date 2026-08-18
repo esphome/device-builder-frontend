@@ -11,7 +11,7 @@ import {
   mdiViewGrid,
   mdiWeb,
 } from "@mdi/js";
-import type { SortingState, VisibilityState } from "@tanstack/lit-table";
+import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { html, LitElement, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
@@ -305,7 +305,7 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _view: DashboardView = DashboardView.CARDS;
   @state() _tablePageSize = 25;
   @state() _tableSorting: SortingState | null = null;
-  @state() _tableColumnVisibility: VisibilityState | null = null;
+  @state() _tableColumnVisibility: ColumnVisibilityState | null = null;
 
   private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   _pendingAdoptScroll: string | null = null;
