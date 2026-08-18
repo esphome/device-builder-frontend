@@ -135,6 +135,17 @@ describe("feedback-device-picker", () => {
     expect(anchor!.href).toBe(openedUrls[0]);
   });
 
+  it("keeps the picker open when the guaranteed link is clicked", async () => {
+    // A signed-out reporter signs in to GitHub and clicks again.
+    await pick();
+    const closed = vi.fn();
+    el.addEventListener("picker-close", closed);
+    const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>("a.link");
+    anchor!.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(closed).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector("a.link")).not.toBeNull();
+  });
+
   it("prefills the esphome form with the device's compiled version", async () => {
     el.target = "esphome";
     await el.updateComplete;

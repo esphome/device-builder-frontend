@@ -50,7 +50,8 @@ const DEVICE_FILTER_THRESHOLD = 8;
  * The feedback dialog's device screen: pick the device a bug report is
  * about and open the target GitHub form prefilled with its masked
  * config. Fires ``picker-close`` when the dialog should close (the
- * skip row and the ready-state link, both inside a click gesture).
+ * skip row, inside its click gesture). The ready-state link keeps the
+ * screen up so a signed-out reporter can sign in and click it again.
  */
 @customElement("esphome-feedback-device-picker")
 export class ESPHomeFeedbackDevicePicker extends LitElement {
@@ -171,7 +172,6 @@ export class ESPHomeFeedbackDevicePicker extends LitElement {
             href=${this._readyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            @click=${this._requestClose}
           >
             <wa-icon class="link-icon" library="mdi" name="open-in-new"></wa-icon>
             <span class="link-text">
