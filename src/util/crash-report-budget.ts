@@ -11,7 +11,10 @@ export const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached repo
 
 // Total pre-filled URL budget. GitHub's server returns 414 past roughly
 // 8 KB of URL; 8000 keeps a small margin for their redirect/query
-// additions while fitting as much of the report as possible.
+// additions while fitting as much of the report as possible. Signed-out
+// requests fail earlier (500 past ~7 KB of URL plus headers, and the
+// login redirect drops return_to past ~8 KB), so the budget targets a
+// signed-in reporter and the picker copy says to sign in first.
 export const MAX_ISSUE_URL_LENGTH = 8000;
 
 export const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
