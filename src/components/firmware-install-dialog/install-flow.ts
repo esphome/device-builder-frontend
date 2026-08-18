@@ -512,6 +512,13 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
         host._localize("firmware.usb_window_closed")
       );
     },
+    onUnsupported: () => {
+      host._usbFlashTeardown = null;
+      host._fail(
+        host._localize("firmware.usb_failed"),
+        host._localize("firmware.usb_unsupported_browser")
+      );
+    },
   });
   if (!teardown) {
     // Pop-up blocked: stay on download-ready with the firmware still in hand so

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
+  webSerialAvailability: vi.fn(() => "available"),
 }));
 vi.mock("../../src/web/install/run-flash.js", () => ({ runFlash: vi.fn() }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));

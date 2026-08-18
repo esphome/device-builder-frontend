@@ -7,6 +7,7 @@ function makeCallbacks(): FlasherCallbacks & {
   progress: number[];
   states: Array<{ state: string; detail: string }>;
   lost: number;
+  unsupported: number;
   statuses: string[];
 } {
   const rec = {
@@ -14,6 +15,7 @@ function makeCallbacks(): FlasherCallbacks & {
     states: [] as Array<{ state: string; detail: string }>,
     statuses: [] as string[],
     lost: 0,
+    unsupported: 0,
     onProgress(pct: number) {
       this.progress.push(pct);
     },
@@ -25,6 +27,9 @@ function makeCallbacks(): FlasherCallbacks & {
     },
     onLost() {
       this.lost += 1;
+    },
+    onUnsupported() {
+      this.unsupported += 1;
     },
   };
   return rec;
@@ -84,6 +89,35 @@ describe("openFlasher", () => {
 
     emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
     expect(cb.states).toEqual([{ state: "done", detail: "" }]);
+  });
+
+  it("declines the hand-off when ready advertises webSerial: false", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1, webSerial: false });
+    expect(cb.unsupported).toBe(1);
+    // No firmware was transferred to a tab that can never flash it.
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+    // Terminal: the session is finished, so neither the close poll (the tab
+    // stays open showing its unsupported card) nor the watchdog fires onLost.
+    fakeWin.closed = true;
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1000);
+    expect(cb.lost).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("hands off when ready omits webSerial (older receiver)", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1 });
+    expect(fakeWin.postMessage).toHaveBeenCalledTimes(1);
+    expect(cb.unsupported).toBe(0);
+    teardown();
   });
 
   it("surfaces a flasher error with its detail", () => {

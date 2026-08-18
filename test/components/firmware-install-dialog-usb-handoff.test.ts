@@ -69,6 +69,24 @@ describe("handOffToFlasher", () => {
     expect(host._statusMessage).toBe("firmware.usb_flashing");
     expect(host._flashPercent).toBe(10);
   });
+
+  it("fails with the unsupported-browser message when the hand-off is declined", () => {
+    let cbs: FlasherCallbacks | undefined;
+    openFlasher.mockImplementation(
+      (_fw: ArrayBuffer, _n: string, _d: string, callbacks: FlasherCallbacks) => {
+        cbs = callbacks;
+        return () => {};
+      }
+    );
+    const host = makeHost();
+    handOffToFlasher(asHost(host));
+    cbs!.onUnsupported();
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.usb_failed");
+    expect(host._errorMessage).toBe("firmware.usb_unsupported_browser");
+    // Terminal: the session already tore itself down.
+    expect(host._usbFlashTeardown).toBeNull();
+  });
 });
 
 describe("download-ready detail (web-flash)", () => {

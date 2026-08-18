@@ -6,7 +6,7 @@ import {
   parseFlasherParams,
 } from "../../src/web/flash-receiver/flash-handshake.js";
 
-function makeEnv(origin: string | null = null, nonce = "n1") {
+function makeEnv(origin: string | null = null, nonce = "n1", webSerial = true) {
   const opener = { postMessage: vi.fn() };
   const target = new EventTarget();
   return {
@@ -16,6 +16,7 @@ function makeEnv(origin: string | null = null, nonce = "n1") {
       opener: opener as unknown as Window,
       params: { nonce, origin },
       messageTarget: target,
+      webSerial,
     },
   };
 }
@@ -72,8 +73,18 @@ describe("FlashHandshake", () => {
     new FlashHandshake(env, { onFirmware: vi.fn(), onMalformed: vi.fn() }).start();
     const ready = readyFrames(opener);
     expect(ready.length).toBeGreaterThan(0);
-    expect(ready[0][0]).toEqual({ type: "esphome-web-flash:ready", version: 1 });
+    expect(ready[0][0]).toEqual({
+      type: "esphome-web-flash:ready",
+      version: 1,
+      webSerial: true,
+    });
     expect("nonce" in (ready[0][0] as object)).toBe(false);
+  });
+
+  it("advertises webSerial: false on ready when the page can't flash", () => {
+    const { opener, env } = makeEnv(null, "n1", false);
+    new FlashHandshake(env, { onFirmware: vi.fn(), onMalformed: vi.fn() }).start();
+    expect(readyFrames(opener)[0][0]).toMatchObject({ webSerial: false });
   });
 
   it("re-announces ready until firmware arrives", () => {

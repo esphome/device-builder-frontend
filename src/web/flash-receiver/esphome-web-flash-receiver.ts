@@ -9,7 +9,7 @@ import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
+import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import "../dashboard/esphome-web-card.js";
 import { runFlash } from "../install/run-flash.js";
@@ -77,7 +77,15 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._hasOpener = window.opener != null;
     if (params && window.opener) {
       this._handshake = new FlashHandshake(
-        { opener: window.opener, params, messageTarget: window },
+        {
+          opener: window.opener,
+          params,
+          messageTarget: window,
+          // Advertised on the ready frame so the dashboard can decline the
+          // hand-off up front (e.g. Safari: this https origin CAN feature-
+          // detect Web Serial, unlike the dashboard's plain-http origin).
+          webSerial: webSerialAvailability() === "available",
+        },
         {
           onFirmware: (msg) => this._onFirmware(msg),
           onMalformed: () =>
