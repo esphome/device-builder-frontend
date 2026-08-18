@@ -102,7 +102,8 @@ describe("openFlasher", () => {
     // No firmware was transferred to a tab that can never flash it.
     expect(fakeWin.postMessage).not.toHaveBeenCalled();
     // Terminal: the session is finished, so neither the close poll (the tab
-    // stays open showing its unsupported card) nor the watchdog fires onLost.
+    // is left open, closing it is the user's call) nor the watchdog fires
+    // onLost.
     fakeWin.closed = true;
     vi.advanceTimersByTime(10 * 60 * 1000 + 1000);
     expect(cb.lost).toBe(0);

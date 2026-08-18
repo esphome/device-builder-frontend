@@ -89,7 +89,8 @@ export type InstallStep =
 
 export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
 
-export type InstallFailureKind = "compile" | "validate" | "chip-mismatch" | null;
+export type InstallFailureKind =
+  "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {

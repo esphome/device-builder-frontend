@@ -31,7 +31,7 @@ export interface FlasherCallbacks {
   /**
    * The flasher tab loaded but its browser can't flash (no Web Serial —
    * e.g. Safari), advertised on its ready frame. The firmware was never
-   * handed off; the tab itself shows an unsupported-browser explanation.
+   * handed off; the dialog owns the messaging for this failure.
    */
   onUnsupported: () => void;
 }

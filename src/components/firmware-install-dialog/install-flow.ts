@@ -514,6 +514,9 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     },
     onUnsupported: () => {
       host._usbFlashTeardown = null;
+      // Retrying would recompile and re-open a tab that declines again for the
+      // same reason; suppress the Retry footer (mirrors chip-mismatch).
+      host._failureKind = "unsupported-browser";
       host._fail(
         host._localize("firmware.usb_failed"),
         host._localize("firmware.usb_unsupported_browser")

@@ -374,7 +374,8 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   // A failed Web Serial or USB (web-flash) flash can be retried in place: re-run
   // the install (web-flash re-opens the external flasher). Excludes compile /
   // validate failures, which surface the reset-build hint (renderResetSuggestion)
-  // instead; re-flashing wouldn't address those.
+  // instead, and the unsupported-browser decline, which no retry can fix;
+  // re-flashing wouldn't address those.
   const canRetry =
     host._step === "error" &&
     (host._installer === "web-serial" || host._installer === "web-flash") &&

@@ -283,7 +283,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * http) ``webSerialAvailability()`` returns ``insecure-context`` for every
    * browser, since ``navigator.serial`` is hidden regardless of support — so a
    * Web-Serial-incapable browser there still gets the enabled external-flasher
-   * row, and the flasher tab itself surfaces the "no Web Serial" error.
+   * row. The flasher tab (a secure origin) then feature-detects for real and
+   * advertises the result on its ready frame, and the dashboard declines the
+   * hand-off with an unsupported-browser error (see ``util/usb-flasher.ts``).
    */
   private _renderUsbOption(availability: WebSerialAvailability) {
     const title = this._localize("dashboard.install_method_usb_local");

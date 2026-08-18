@@ -14,6 +14,7 @@ import type { FlasherCallbacks } from "../../src/util/usb-flasher.js";
 
 function makeHost() {
   const host = {
+    _failureKind: null as string | null,
     _usbFirmware: new ArrayBuffer(16) as ArrayBuffer | null,
     _usbFirmwareName: "firmware.factory.bin",
     _device: { name: "dev", friendly_name: "Dev" },
@@ -84,6 +85,8 @@ describe("handOffToFlasher", () => {
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.usb_failed");
     expect(host._errorMessage).toBe("firmware.usb_unsupported_browser");
+    // Suppresses the Retry footer: retrying recompiles into the same decline.
+    expect(host._failureKind).toBe("unsupported-browser");
     // Terminal: the session already tore itself down.
     expect(host._usbFlashTeardown).toBeNull();
   });
