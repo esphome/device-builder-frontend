@@ -1,4 +1,3 @@
-import type { ColumnDef } from "@tanstack/lit-table";
 import { html, nothing } from "lit";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import { DeviceState } from "../../api/types/devices.js";
@@ -14,7 +13,7 @@ import { renderLabelChips } from "../../util/label-chip-template.js";
 import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
-import type { DeviceTableFeatures } from "./table-features.js";
+import type { DeviceColumnDef } from "./table-features.js";
 
 export interface DeviceRow {
   status: DeviceState;
@@ -94,7 +93,7 @@ const valueCell = (cls: string, val: string) =>
 export function createDeviceColumns(
   localize: LocalizeFunc,
   selectMode = false
-): ColumnDef<DeviceTableFeatures, DeviceRow>[] {
+): DeviceColumnDef[] {
   const indicatorDot = (show: boolean, variant: string, labelKey: string) =>
     show
       ? html`<span

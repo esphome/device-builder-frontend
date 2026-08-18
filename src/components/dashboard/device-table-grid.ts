@@ -1,5 +1,4 @@
 import { flexRender } from "@tanstack/lit-table";
-import type { Cell, Header, HeaderGroup, Row, Table } from "@tanstack/lit-table";
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -7,19 +6,18 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
-import type { DeviceRow } from "./table-columns.js";
-import type { DeviceTableFeatures } from "./table-features.js";
+import type { DeviceTable, DeviceTableRow } from "./table-features.js";
 
 export interface DeviceTableHeadProps {
-  table: Table<DeviceTableFeatures, DeviceRow>;
+  table: DeviceTable;
   selectMode: boolean;
   allSelected: boolean;
   onToggleAll: () => void;
 }
 
 export interface DeviceTableBodyProps {
-  table: Table<DeviceTableFeatures, DeviceRow>;
-  rows: Row<DeviceTableFeatures, DeviceRow>[];
+  table: DeviceTable;
+  rows: DeviceTableRow[];
   selectMode: boolean;
   selectedDevices: Set<string>;
   highlightConfiguration: string | null;
@@ -41,7 +39,7 @@ export function renderDeviceTableHead(p: DeviceTableHeadProps): TemplateResult {
   return html`
     <thead>
       ${p.table.getHeaderGroups().map(
-        (hg: HeaderGroup<DeviceTableFeatures, DeviceRow>) => html`
+        (hg) => html`
           <tr role="row">
             ${
               p.selectMode
@@ -55,55 +53,50 @@ export function renderDeviceTableHead(p: DeviceTableHeadProps): TemplateResult {
                   </th>`
                 : nothing
             }
-            ${hg.headers.map(
-              (header: Header<DeviceTableFeatures, DeviceRow, unknown>) => {
-                const sorted = header.column.getIsSorted();
-                const canSort = header.column.getCanSort();
-                const ariaSort =
-                  sorted === "asc"
-                    ? "ascending"
-                    : sorted === "desc"
-                      ? "descending"
-                      : "none";
-                const sortIcon =
-                  sorted === "asc"
-                    ? "chevron-up"
-                    : sorted === "desc"
-                      ? "chevron-down"
-                      : "unfold-more-horizontal";
-                return html`
-                  <th
-                    role="columnheader"
-                    aria-sort=${ariaSort}
-                    class="${canSort ? "sortable" : ""} ${
-                      sorted ? "sorted" : ""
-                    } col-${header.column.id}"
-                    style="width:${header.getSize()}px"
-                    @click=${canSort ? () => header.column.toggleSorting() : nothing}
-                  >
-                    <span class="th-content">
-                      ${
-                        header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )
-                      }
-                      ${
-                        canSort
-                          ? html`<wa-icon
-                              class="sort-icon"
-                              library="mdi"
-                              name=${sortIcon}
-                            ></wa-icon>`
-                          : nothing
-                      }
-                    </span>
-                  </th>
-                `;
-              }
-            )}
+            ${hg.headers.map((header) => {
+              const sorted = header.column.getIsSorted();
+              const canSort = header.column.getCanSort();
+              const ariaSort =
+                sorted === "asc"
+                  ? "ascending"
+                  : sorted === "desc"
+                    ? "descending"
+                    : "none";
+              const sortIcon =
+                sorted === "asc"
+                  ? "chevron-up"
+                  : sorted === "desc"
+                    ? "chevron-down"
+                    : "unfold-more-horizontal";
+              return html`
+                <th
+                  role="columnheader"
+                  aria-sort=${ariaSort}
+                  class="${canSort ? "sortable" : ""} ${
+                    sorted ? "sorted" : ""
+                  } col-${header.column.id}"
+                  style="width:${header.getSize()}px"
+                  @click=${canSort ? () => header.column.toggleSorting() : nothing}
+                >
+                  <span class="th-content">
+                    ${
+                      header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())
+                    }
+                    ${
+                      canSort
+                        ? html`<wa-icon
+                            class="sort-icon"
+                            library="mdi"
+                            name=${sortIcon}
+                          ></wa-icon>`
+                        : nothing
+                    }
+                  </span>
+                </th>
+              `;
+            })}
             <th class="actions-col"></th>
           </tr>
         `
@@ -167,34 +160,32 @@ export function renderDeviceTableBody(p: DeviceTableBodyProps): TemplateResult {
                         </td>`
                       : nothing
                   }
-                  ${row
-                    .getVisibleCells()
-                    .map((cell: Cell<DeviceTableFeatures, DeviceRow, unknown>) => {
-                      // The stacked mobile layout (table-styles.ts) shows each
-                      // cell's column header as a field label. It's a real
-                      // span (not a CSS ::before) so screen readers announce
-                      // it on mobile, where the <thead> is hidden; the span is
-                      // display:none on desktop, so it stays out of the a11y
-                      // tree there (the column header already provides context).
-                      // Name is the card title and actions is a button row, so
-                      // neither gets a label. Only string headers can be used as
-                      // a label; a future flexRender (template/function) header
-                      // would stringify to "[object Object]", so skip it.
-                      const id = cell.column.id;
-                      const header = cell.column.columnDef.header;
-                      const label =
-                        id !== "name" && id !== "actions" && typeof header === "string"
-                          ? header
-                          : null;
-                      return html`<td role="gridcell" class="col-${id}">
-                        ${
-                          label !== null
-                            ? html`<span class="cell-stack-label">${label}</span>`
-                            : nothing
-                        }
-                        ${flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>`;
-                    })}
+                  ${row.getVisibleCells().map((cell) => {
+                    // The stacked mobile layout (table-styles.ts) shows each
+                    // cell's column header as a field label. It's a real
+                    // span (not a CSS ::before) so screen readers announce
+                    // it on mobile, where the <thead> is hidden; the span is
+                    // display:none on desktop, so it stays out of the a11y
+                    // tree there (the column header already provides context).
+                    // Name is the card title and actions is a button row, so
+                    // neither gets a label. Only string headers can be used as
+                    // a label; a future flexRender (template/function) header
+                    // would stringify to "[object Object]", so skip it.
+                    const id = cell.column.id;
+                    const header = cell.column.columnDef.header;
+                    const label =
+                      id !== "name" && id !== "actions" && typeof header === "string"
+                        ? header
+                        : null;
+                    return html`<td role="gridcell" class="col-${id}">
+                      ${
+                        label !== null
+                          ? html`<span class="cell-stack-label">${label}</span>`
+                          : nothing
+                      }
+                      ${flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>`;
+                  })}
                   <td role="gridcell" class="actions-col">
                     <button
                       class="actions-btn"

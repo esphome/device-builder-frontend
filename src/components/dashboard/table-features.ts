@@ -1,3 +1,4 @@
+import type { CellContext, ColumnDef, Row, Table } from "@tanstack/lit-table";
 import {
   columnFilteringFeature,
   columnSizingFeature,
@@ -8,9 +9,11 @@ import {
   globalFilteringFeature,
   rowPaginationFeature,
   rowSortingFeature,
-  sortFns,
+  sortFn_alphanumeric,
+  sortFn_text,
   tableFeatures,
 } from "@tanstack/lit-table";
+import type { DeviceRow } from "./table-columns.js";
 
 /**
  * The TanStack Table v9 feature set for the device table. v9 tree-shakes
@@ -18,9 +21,10 @@ import {
  * registered here — the search box needs global filtering (whose row
  * model lives in the column-filtering feature), the column defs set
  * ``size`` (column sizing), and the header/pagination controls need
- * sorting, visibility, and pagination. ``sortFns`` registers the
- * built-in sorting functions so the ``auto`` sort of string columns
- * keeps v8's alphanumeric behavior.
+ * sorting, visibility, and pagination. The ``sortFns`` registry lists
+ * only the comparators ``auto`` can resolve for this table's string
+ * columns, keeping v8's alphanumeric behavior without shipping the
+ * full built-in set.
  */
 export const deviceTableFeatures = tableFeatures({
   columnFilteringFeature,
@@ -32,7 +36,14 @@ export const deviceTableFeatures = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
   sortedRowModel: createSortedRowModel(),
-  sortFns,
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
 });
 
 export type DeviceTableFeatures = typeof deviceTableFeatures;
+
+// Composed aliases so consumers don't restate the
+// ``<DeviceTableFeatures, DeviceRow>`` pairing at every site.
+export type DeviceTable = Table<DeviceTableFeatures, DeviceRow>;
+export type DeviceTableRow = Row<DeviceTableFeatures, DeviceRow>;
+export type DeviceColumnDef = ColumnDef<DeviceTableFeatures, DeviceRow>;
+export type DeviceCellContext = CellContext<DeviceTableFeatures, DeviceRow, unknown>;

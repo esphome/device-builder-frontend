@@ -20,13 +20,13 @@ import {
   mdiUpload,
 } from "@mdi/js";
 import {
-  type ColumnDef,
   type ColumnVisibilityState,
+  functionalUpdate,
   type PaginationState,
   type SortingState,
   TableController,
+  type Updater,
 } from "@tanstack/lit-table";
-import type { Row, Table } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
 import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -55,7 +55,13 @@ import {
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
-import { deviceTableFeatures, type DeviceTableFeatures } from "./table-features.js";
+import {
+  type DeviceColumnDef,
+  type DeviceTable,
+  deviceTableFeatures,
+  type DeviceTableFeatures,
+  type DeviceTableRow,
+} from "./table-features.js";
 import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -176,32 +182,24 @@ export class ESPHomeDeviceTable extends LitElement {
   private _tableController = new TableController<DeviceTableFeatures, DeviceRow>(this);
   private _rows: DeviceRow[] = [];
   private _visibleConfigs: string[] = [];
-  private _columns: ColumnDef<DeviceTableFeatures, DeviceRow>[] = [];
+  private _columns: DeviceColumnDef[] = [];
   private _prevLocalize: LocalizeFunc | null = null;
 
   // ─── Stable callbacks ───
 
-  private _handleSortingChange = (
-    updater: SortingState | ((old: SortingState) => SortingState)
-  ) => {
-    this._sorting = typeof updater === "function" ? updater(this._sorting) : updater;
+  private _handleSortingChange = (updater: Updater<SortingState>) => {
+    this._sorting = functionalUpdate(updater, this._sorting);
     fireEvent(this, "table-sort-change", this._sorting);
   };
 
-  private _handleVisibilityChange = (
-    updater:
-      ColumnVisibilityState | ((old: ColumnVisibilityState) => ColumnVisibilityState)
-  ) => {
-    this._columnVisibility =
-      typeof updater === "function" ? updater(this._columnVisibility) : updater;
+  private _handleVisibilityChange = (updater: Updater<ColumnVisibilityState>) => {
+    this._columnVisibility = functionalUpdate(updater, this._columnVisibility);
     fireEvent(this, "table-visibility-change", this._columnVisibility);
   };
 
-  private _handlePaginationChange = (
-    updater: PaginationState | ((old: PaginationState) => PaginationState)
-  ) => {
+  private _handlePaginationChange = (updater: Updater<PaginationState>) => {
     const current = { pageSize: this._pageSize, pageIndex: this._pageIndex };
-    const next = typeof updater === "function" ? updater(current) : updater;
+    const next = functionalUpdate(updater, current);
     const pageSizeChanged = next.pageSize !== this._pageSize;
     this._pageSize = next.pageSize;
     this._pageIndex = next.pageIndex;
@@ -211,7 +209,7 @@ export class ESPHomeDeviceTable extends LitElement {
   };
 
   private _globalFilterFn = (
-    row: Row<DeviceTableFeatures, DeviceRow>,
+    row: DeviceTableRow,
     _columnId: string,
     filterValue: unknown
   ): boolean => {
@@ -220,7 +218,7 @@ export class ESPHomeDeviceTable extends LitElement {
     // dashboard's select-all scoping helper matches the same rows
     // this filter makes visible (single source of truth).
     const q = (filterValue as string).trim().toLowerCase();
-    return matchesDeviceRow(row.original as DeviceRow, q);
+    return matchesDeviceRow(row.original, q);
   };
 
   // ─── Lifecycle ───
@@ -465,10 +463,7 @@ export class ESPHomeDeviceTable extends LitElement {
     `;
   }
 
-  private _renderControls(
-    table: Table<DeviceTableFeatures, DeviceRow>,
-    toggleCols: ToggleableColumn[]
-  ) {
+  private _renderControls(table: DeviceTable, toggleCols: ToggleableColumn[]) {
     return html`
       <div class="controls">
         <slot name="toolbar"></slot>

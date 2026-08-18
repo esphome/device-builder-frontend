@@ -6,7 +6,6 @@
  * column's value font where monospace made it render as a narrow,
  * hyphen-looking glyph. Populated cells keep their own font.
  */
-import type { CellContext } from "@tanstack/lit-table";
 import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import { clickCollect, identityLocalize, renderInto } from "../../_dom.js";
@@ -15,7 +14,7 @@ import {
   createDeviceColumns,
   type DeviceRow,
 } from "../../../src/components/dashboard/table-columns.js";
-import type { DeviceTableFeatures } from "../../../src/components/dashboard/table-features.js";
+import type { DeviceCellContext } from "../../../src/components/dashboard/table-features.js";
 
 const columns = createDeviceColumns(identityLocalize);
 
@@ -30,11 +29,7 @@ function columnByKey(key: string) {
 function renderCell(key: string, value: unknown): TemplateResult {
   const cell = columnByKey(key);
   // The data columns only read info.getValue(); a minimal stub suffices.
-  const info = { getValue: () => value } as unknown as CellContext<
-    DeviceTableFeatures,
-    DeviceRow,
-    unknown
-  >;
+  const info = { getValue: () => value } as unknown as DeviceCellContext;
   return cell(info) as TemplateResult;
 }
 
@@ -64,11 +59,7 @@ function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResul
     },
     ...rowOverrides,
   } as unknown as DeviceRow;
-  const info = { row: { original: row } } as unknown as CellContext<
-    DeviceTableFeatures,
-    DeviceRow,
-    unknown
-  >;
+  const info = { row: { original: row } } as unknown as DeviceCellContext;
   return col.cell(info) as TemplateResult;
 }
 
@@ -110,7 +101,7 @@ describe("device table status dot with name_add_mac_suffix", () => {
           _device: { name_add_mac_suffix: nameAddMacSuffix },
         },
       },
-    } as unknown as CellContext<DeviceTableFeatures, DeviceRow, unknown>;
+    } as unknown as DeviceCellContext;
     return rendered(columnByKey("status")(info) as TemplateResult);
   };
 
@@ -233,11 +224,7 @@ function renderNameCell(
     _device: { web_port: null },
     ...rowOverrides,
   } as unknown as DeviceRow;
-  const info = { row: { original: row } } as unknown as CellContext<
-    DeviceTableFeatures,
-    DeviceRow,
-    unknown
-  >;
+  const info = { row: { original: row } } as unknown as DeviceCellContext;
   return col.cell(info) as TemplateResult;
 }
 
