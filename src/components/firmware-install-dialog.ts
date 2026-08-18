@@ -38,11 +38,9 @@ import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
-  handOffToFlasher,
   showOtaLogs,
   startArtifactDownload,
   startDownload,
-  startUsbFlash,
   startWebSerialInstall,
   waitForRunningJob,
 } from "./firmware-install-dialog/install-flow.js";
@@ -57,6 +55,10 @@ import {
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import {
+  handOffToFlasher,
+  startUsbFlash,
+} from "./firmware-install-dialog/usb-handoff.js";
 import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

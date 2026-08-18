@@ -8,8 +8,8 @@ import { identityLocalize } from "../_dom.js";
 import { FLASHER_HOST } from "../../src/common/docs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { handOffToFlasher } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { cardStatusDetail } from "../../src/components/firmware-install-dialog/renderers.js";
+import { handOffToFlasher } from "../../src/components/firmware-install-dialog/usb-handoff.js";
 import type { FlasherCallbacks } from "../../src/util/usb-flasher.js";
 
 function makeHost() {
