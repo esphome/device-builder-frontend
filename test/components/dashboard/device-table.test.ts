@@ -168,6 +168,32 @@ describe("device-table auto sort registry", () => {
     ).map((span) => span.textContent!.trim());
     expect(order).toEqual(["BK72XX", "esp32", "esp32-c3", "host2", "host10", "rp2040"]);
   });
+
+  // Digit-free strings resolve through the registry's ``text`` entry.
+  // ``basic`` is case-sensitive ("Bedroom" before "attic"), so this order
+  // only holds while ``text`` stays registered.
+  it("sorts a digit-free column case-insensitively via the text entry", async () => {
+    const comments = ["kitchen", "Bedroom", "attic"];
+    const el = new ESPHomeDeviceTable();
+    el.devices = comments.map((comment, i) =>
+      makeConfiguredDevice({
+        name: `dev-${i}`,
+        friendly_name: `Dev ${i}`,
+        configuration: `dev-${i}.yaml`,
+        comment,
+      })
+    );
+    el.initialColumnVisibility = { comment: true };
+    el.initialSorting = [{ id: "comment", desc: false }];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await el.updateComplete;
+
+    const order = Array.from(
+      el.shadowRoot!.querySelectorAll("tbody td.col-comment span:not(.cell-stack-label)")
+    ).map((span) => span.textContent!.trim());
+    expect(order).toEqual(["attic", "Bedroom", "kitchen"]);
+  });
 });
 
 describe("device-table Version column identity gating", () => {
