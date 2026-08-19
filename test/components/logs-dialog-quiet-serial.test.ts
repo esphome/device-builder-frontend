@@ -65,15 +65,20 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
   });
 
+  it("Start after a Stop keeps a proven console proven", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    call(el, "_onStop");
+    await el.updateComplete;
+    call(el, "_onStart");
+    await el.updateComplete;
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
   it.each([
-    [
-      "Start after a Stop",
-      async () => {
-        call(el, "_onStop");
-        await el.updateComplete;
-        call(el, "_onStart");
-      },
-    ],
     ["Reset Device", () => call(el, "_onResetDevice")],
     [
       "a fresh attach after a reopen failure",
@@ -100,12 +105,29 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
   });
 
+  it("a line delivered before the reset pulse lands does not retire the watchdog", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    // The reader keeps draining during the two setSignals awaits; a stale
+    // pre-reset line must not count as the boot output.
+    vi.mocked(port.setSignals).mockImplementationOnce(() => {
+      call(el, "_noteSerialActivity");
+      return Promise.resolve();
+    });
+    await call(el, "_onResetDevice");
+    await el.updateComplete;
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
+  });
+
   it("Reset Device with the banner up restarts the window", async () => {
     await startSerial();
     vi.advanceTimersByTime(5000);
     await el.updateComplete;
     expect(banner(el)).not.toBeNull();
-    call(el, "_onResetDevice");
+    await call(el, "_onResetDevice");
     await el.updateComplete;
     expect(banner(el)).toBeNull();
     vi.advanceTimersByTime(4999);

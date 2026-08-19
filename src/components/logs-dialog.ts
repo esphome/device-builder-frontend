@@ -40,13 +40,13 @@ import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   abortSerialReconnect,
+  expectSerialOutput,
   markSerialOutput,
   onStart,
   onStop,
   openOta,
   openPassive,
   resumeAfterReconnect,
-  resumeSerial,
   setSerialOpenFailed,
   setSerialStream,
   switchToOtaLogs,
@@ -538,10 +538,14 @@ export class ESPHomeLogsDialog extends LitElement {
   private _onResetDevice = async () => {
     const s = this._session;
     if (s.kind !== "serial") return;
-    resumeSerial(this);
+    this._session = { ...s, paused: false };
     try {
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      // Boot output can't precede the pulse; expecting it only once the pulse
+      // has landed keeps a stale pre-reset line from retiring the watchdog
+      // for a reset that never took.
+      expectSerialOutput(this);
     } catch {
       // setSignals fails if the cable was pulled; tell the user the reset didn't
       // land rather than letting them assume the device rebooted.

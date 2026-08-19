@@ -23,10 +23,10 @@
  *                    draining either way, so resuming needn't reopen the port
  *                    and pulse DTR/RTS — #526). ``outputSeen`` flips on the
  *                    first displayed line and retires the quiet-serial
- *                    watchdog; a fresh attach, Start after a Stop, and Reset
- *                    Device expect output afresh and clear it, so a quiet
- *                    device (bursty logging at INFO) never re-trips the
- *                    banner.
+ *                    watchdog; only a fresh attach and Reset Device expect
+ *                    output afresh and clear it, so a quiet device (bursty
+ *                    logging at INFO) never re-trips the banner, a Stop/Start
+ *                    included.
  * - ``dead``         a Web Serial reopen failed; the port is gone. Start runs
  *                    the reconnect hook (the #636 "click Start to reconnect").
  */

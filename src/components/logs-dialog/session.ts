@@ -175,8 +175,6 @@ export function onStart(host: ESPHomeLogsDialog): void {
       startOtaStream(host);
       break;
     case "serial":
-      resumeSerial(host);
-      break;
     case "reconnecting":
       host._session = { ...s, paused: false };
       break;
@@ -186,15 +184,15 @@ export function onStart(host: ESPHomeLogsDialog): void {
   }
 }
 
-/** Resume display on a Web Serial session and expect its output afresh
- *  (Start after a Stop, Reset Device). */
-export function resumeSerial(host: ESPHomeLogsDialog): void {
+/** Expect a Web Serial session's output afresh (the device was just reset):
+ *  the quiet-serial watchdog opens a new window. */
+export function expectSerialOutput(host: ESPHomeLogsDialog): void {
   const s = host._session;
   if (s.kind !== "serial") return;
   // A banner already up (the watchdog fired) counts as armed, so drop it
   // first and let willUpdate open a fresh window off the rebuilt session.
   host._quietSerial.disarm();
-  host._session = { ...s, paused: false, outputSeen: false };
+  host._session = { ...s, outputSeen: false };
 }
 
 /** Record that the Web Serial reader has shown a line; a no-op once seen. */
