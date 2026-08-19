@@ -76,7 +76,7 @@ export function setSerialStream(
   // reader (defensive — `reconnecting` holds none).
   const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
   if (host._session.kind === "serial") host._session.cancel();
-  host._session = { kind: "serial", port, cancel, paused };
+  host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
 }
 
 /**
@@ -182,6 +182,24 @@ export function onStart(host: ESPHomeLogsDialog): void {
       reconnectSerial(host);
       break;
   }
+}
+
+/** Expect a Web Serial session's output afresh (the device was just reset):
+ *  the quiet-serial watchdog opens a new window. */
+export function expectSerialOutput(host: ESPHomeLogsDialog): void {
+  const s = host._session;
+  if (s.kind !== "serial") return;
+  // A banner already up (the watchdog fired) counts as armed, so drop it
+  // first and let willUpdate open a fresh window off the rebuilt session.
+  host._quietSerial.disarm();
+  host._session = { ...s, outputSeen: false };
+}
+
+/** Record that the Web Serial reader has shown a line; a no-op once seen. */
+export function markSerialOutput(host: ESPHomeLogsDialog): void {
+  const s = host._session;
+  if (s.kind !== "serial" || s.outputSeen) return;
+  host._session = { ...s, outputSeen: true };
 }
 
 // Stop button. OTA kills the subprocess (Start respawns it); a Web Serial

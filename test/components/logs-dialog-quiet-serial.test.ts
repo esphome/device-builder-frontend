@@ -50,17 +50,7 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
   });
 
-  it("stays hidden while serial lines keep arriving", async () => {
-    await startSerial();
-    for (let i = 0; i < 5; i++) {
-      vi.advanceTimersByTime(3000);
-      call(el, "_noteSerialActivity");
-    }
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-  });
-
-  it("hides again when lines resume after going quiet", async () => {
+  it("the first line retires the watchdog for the rest of the session", async () => {
     await startSerial();
     vi.advanceTimersByTime(5000);
     await el.updateComplete;
@@ -68,6 +58,84 @@ describe("logs-dialog quiet-serial banner", () => {
     call(el, "_noteSerialActivity");
     await el.updateComplete;
     expect(banner(el)).toBeNull();
+    // A quiet device (bursty logging) must not re-trip it: the console is
+    // proven.
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it("Start after a Stop keeps a proven console proven", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    call(el, "_onStop");
+    await el.updateComplete;
+    call(el, "_onStart");
+    await el.updateComplete;
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it.each([
+    ["Reset Device", () => call(el, "_onResetDevice")],
+    [
+      "a fresh attach after a reopen failure",
+      async () => {
+        el.setSerialOpenFailed("reopen failed");
+        await el.updateComplete;
+        call(el, "_onStart");
+        await el.updateComplete;
+        el.setSerialStream(port, cancel as unknown as () => void);
+      },
+    ],
+  ])("%s expects output afresh and watches again", async (_label, rearm) => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    await rearm();
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it("a line delivered before the reset pulse lands does not retire the watchdog", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    // The reader keeps draining during the two setSignals awaits; a stale
+    // pre-reset line must not count as the boot output.
+    vi.mocked(port.setSignals).mockImplementationOnce(() => {
+      call(el, "_noteSerialActivity");
+      return Promise.resolve();
+    });
+    await call(el, "_onResetDevice");
+    await el.updateComplete;
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
+  });
+
+  it("Reset Device with the banner up restarts the window", async () => {
+    await startSerial();
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+    await call(el, "_onResetDevice");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(4999);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
   });
 
   it("a deliberate Stop (pause) never counts as silence", async () => {

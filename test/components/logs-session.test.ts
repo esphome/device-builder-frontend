@@ -11,6 +11,13 @@ import {
 
 const fakePort = {} as SerialPort;
 const noop = () => {};
+const serial = (paused = false): LogsSession => ({
+  kind: "serial",
+  port: fakePort,
+  cancel: noop,
+  paused,
+  outputSeen: false,
+});
 
 describe("logs-session selectors", () => {
   it("isStreaming: ota streams only with a live streamId", () => {
@@ -19,12 +26,8 @@ describe("logs-session selectors", () => {
   });
 
   it("isStreaming: serial/reconnecting stream unless paused", () => {
-    expect(
-      isStreaming({ kind: "serial", port: fakePort, cancel: noop, paused: false })
-    ).toBe(true);
-    expect(
-      isStreaming({ kind: "serial", port: fakePort, cancel: noop, paused: true })
-    ).toBe(false);
+    expect(isStreaming(serial())).toBe(true);
+    expect(isStreaming(serial(true))).toBe(false);
     expect(isStreaming({ kind: "reconnecting", paused: false })).toBe(true);
     expect(isStreaming({ kind: "reconnecting", paused: true })).toBe(false);
   });
@@ -36,7 +39,7 @@ describe("logs-session selectors", () => {
 
   it("isPassive: every Web Serial phase, never OTA/idle", () => {
     const passive: LogsSession[] = [
-      { kind: "serial", port: fakePort, cancel: noop, paused: false },
+      serial(),
       { kind: "reconnecting", paused: false },
       { kind: "dead" },
     ];
@@ -46,9 +49,7 @@ describe("logs-session selectors", () => {
   });
 
   it("hasSerialPort: only the serial state holds a live port", () => {
-    expect(
-      hasSerialPort({ kind: "serial", port: fakePort, cancel: noop, paused: true })
-    ).toBe(true);
+    expect(hasSerialPort(serial(true))).toBe(true);
     for (const s of [
       { kind: "reconnecting", paused: false },
       { kind: "dead" },
@@ -74,7 +75,7 @@ describe("logs-session selectors", () => {
       expect(isOtaNetwork({ kind: "ota", port, streamId: "s1" })).toBe(false);
     }
     for (const s of [
-      { kind: "serial", port: fakePort, cancel: noop, paused: false },
+      serial(),
       { kind: "reconnecting", paused: false },
       { kind: "dead" },
       { kind: "idle" },

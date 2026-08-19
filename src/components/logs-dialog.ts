@@ -40,6 +40,8 @@ import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   abortSerialReconnect,
+  expectSerialOutput,
+  markSerialOutput,
   onStart,
   onStop,
   openOta,
@@ -96,10 +98,10 @@ registerMdiIcons({
 // DOM grow until the tab locks up. Trimmed to the newest on every flush.
 const MAX_LOG_LINES = 5000;
 
-// How long a Web Serial session may show nothing before the dialog offers
-// network logs instead. Long enough for a normal boot's first line; short
-// enough that a dead-end console (uart: on the console pins, #1430) doesn't
-// strand the user staring at the placeholder.
+// How long a freshly attached Web Serial reader may show nothing before the
+// dialog offers network logs instead. Long enough for a normal boot's first
+// line; short enough that a dead-end console (uart: on the console pins,
+// #1430) doesn't strand the user staring at the placeholder.
 const QUIET_SERIAL_TIMEOUT_MS = 5000;
 
 @customElement("esphome-logs-dialog")
@@ -161,10 +163,11 @@ export class ESPHomeLogsDialog extends LitElement {
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
 
-  // Watchdog for a Web Serial session that shows nothing (uart: repurposed
+  // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
-  // willUpdate; fed displayed lines via _noteSerialActivity. When it goes
-  // quiet the toolbar area offers switching to network logs (#1430).
+  // willUpdate; a fired banner counts as armed, so expectSerialOutput drops
+  // it before rebuilding the session. When it goes quiet the toolbar area
+  // offers switching to network logs (#1430).
   _quietSerial = new QuietTimerController(this, QUIET_SERIAL_TIMEOUT_MS);
 
   // The visible log, its cap, and the stream-position map inline decoding
@@ -229,14 +232,14 @@ export class ESPHomeLogsDialog extends LitElement {
     if (changedProperties.has("_session") || changedProperties.has("_open")) {
       // Every session transition flows through logs-dialog/session.ts and
       // replaces _session, so keying here covers open/attach/pause/teardown
-      // without touching each transition. Only a live reader arms: the
-      // reconnecting phase is the settle delay + reopen retries (several
-      // seconds on a re-enumerating native-USB chip), which isn't silence —
-      // and a failed reopen lands in dead, which offers the banner anyway.
-      // A deliberate Stop (pause, #526) disarms rather than counting as
-      // silence.
+      // without touching each transition. Only a live reader that has yet
+      // to show a line arms: the reconnecting phase is the settle delay +
+      // reopen retries (several seconds on a re-enumerating native-USB
+      // chip), which isn't silence — and a failed reopen lands in dead,
+      // which offers the banner anyway. A deliberate Stop (pause, #526)
+      // disarms rather than counting as silence.
       const s = this._session;
-      const watching = this._open && s.kind === "serial" && !s.paused;
+      const watching = this._open && s.kind === "serial" && !s.paused && !s.outputSeen;
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
@@ -501,10 +504,9 @@ export class ESPHomeLogsDialog extends LitElement {
     this._log.enqueue(line);
   }
 
-  // Called by `streamSerialToDialog` for every displayed serial line; feeds
-  // the quiet-serial watchdog so a healthy stream never trips the banner.
+  // Called by `streamSerialToDialog` for every displayed serial line.
   _noteSerialActivity(): void {
-    this._quietSerial.activity();
+    markSerialOutput(this);
   }
 
   // Every line the buffer takes on, batched or direct, passes through here.
@@ -541,6 +543,10 @@ export class ESPHomeLogsDialog extends LitElement {
     try {
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      // Boot output can't precede the pulse; expecting it only once the pulse
+      // has landed keeps a stale pre-reset line from retiring the watchdog
+      // for a reset that never took.
+      expectSerialOutput(this);
     } catch {
       // setSignals fails if the cable was pulled; tell the user the reset didn't
       // land rather than letting them assume the device rebooted.
