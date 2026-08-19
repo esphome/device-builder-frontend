@@ -109,8 +109,23 @@ describe("config-migration-notice", () => {
       makeApi(() => Promise.resolve({ yaml_diff: DIFF, changes: [] }))
     );
     expect(el.shadowRoot!.querySelector(".notice")?.textContent).toContain(
-      "device.config_migration_notice"
+      "device.config_migration_notice_generic"
     );
+  });
+
+  it("lists a required change first so it never collapses into the overflow", async () => {
+    const changes = Array.from({ length: 12 }, (_, i) => ({
+      ...API_CHANGE,
+      scope: `s${i}`,
+    }));
+    changes.push({ ...API_CHANGE, scope: "last", required: true });
+    const [el] = await mount(
+      LEGACY,
+      makeApi(() => Promise.resolve({ yaml_diff: DIFF, changes }))
+    );
+    const first = el.shadowRoot!.querySelector(".notice li");
+    expect(first?.textContent).toContain("device.config_migration_change_required");
+    expect(first?.textContent).toContain("last");
   });
 
   it("holds the preview while a re-check is pending", async () => {
