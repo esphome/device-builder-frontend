@@ -50,16 +50,6 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
   });
 
-  it("stays hidden while serial lines keep arriving", async () => {
-    await startSerial();
-    for (let i = 0; i < 5; i++) {
-      vi.advanceTimersByTime(3000);
-      call(el, "_noteSerialActivity");
-    }
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-  });
-
   it("the first line retires the watchdog for the rest of the session", async () => {
     await startSerial();
     vi.advanceTimersByTime(5000);
@@ -75,59 +65,39 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
   });
 
-  it("Start after a Stop expects output afresh and watches again", async () => {
+  it.each([
+    [
+      "Start after a Stop",
+      async () => {
+        call(el, "_onStop");
+        await el.updateComplete;
+        call(el, "_onStart");
+      },
+    ],
+    ["Reset Device", () => call(el, "_onResetDevice")],
+    [
+      "a fresh attach after a reopen failure",
+      async () => {
+        el.setSerialOpenFailed("reopen failed");
+        await el.updateComplete;
+        call(el, "_onStart");
+        await el.updateComplete;
+        el.setSerialStream(port, cancel as unknown as () => void);
+      },
+    ],
+  ])("%s expects output afresh and watches again", async (_label, rearm) => {
     await startSerial();
     call(el, "_noteSerialActivity");
     await el.updateComplete;
-    call(el, "_onStop");
-    await el.updateComplete;
-    vi.advanceTimersByTime(60_000);
+    await rearm();
     await el.updateComplete;
     expect(banner(el)).toBeNull();
-    call(el, "_onStart");
-    await el.updateComplete;
-    vi.advanceTimersByTime(4999);
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-    vi.advanceTimersByTime(1);
-    await el.updateComplete;
-    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
-    call(el, "_noteSerialActivity");
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-  });
-
-  it("Reset Device expects the boot output afresh and watches again", async () => {
-    await startSerial();
-    call(el, "_noteSerialActivity");
-    await el.updateComplete;
-    vi.advanceTimersByTime(60_000);
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-    call(el, "_onResetDevice");
-    await el.updateComplete;
     vi.advanceTimersByTime(5000);
     await el.updateComplete;
     expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
     call(el, "_noteSerialActivity");
     await el.updateComplete;
     expect(banner(el)).toBeNull();
-  });
-
-  it("a fresh attach after a reopen failure watches again", async () => {
-    await startSerial();
-    call(el, "_noteSerialActivity");
-    await el.updateComplete;
-    el.setSerialOpenFailed("reopen failed");
-    await el.updateComplete;
-    call(el, "_onStart");
-    await el.updateComplete;
-    el.setSerialStream(port, cancel as unknown as () => void);
-    await el.updateComplete;
-    expect(banner(el)).toBeNull();
-    vi.advanceTimersByTime(5000);
-    await el.updateComplete;
-    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
   });
 
   it("a deliberate Stop (pause) never counts as silence", async () => {

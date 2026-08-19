@@ -27,15 +27,10 @@ export class QuietTimerController implements ReactiveController {
     return this._quiet;
   }
 
-  // Armed means a window is pending or has already gone quiet; disarmed is
-  // the only state with neither.
-  private get _armed(): boolean {
-    return this._handle !== null || this._quiet;
-  }
-
-  /** Arm if not already armed; an armed window keeps its current deadline. */
+  /** Arm if not already armed (a window pending or already quiet); an armed
+   *  window keeps its current deadline. */
   ensureArmed(): void {
-    if (this._armed) return;
+    if (this._handle !== null || this._quiet) return;
     this._handle = setTimeout(() => {
       this._handle = null;
       this._setQuiet(true);

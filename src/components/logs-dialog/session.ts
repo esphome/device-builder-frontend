@@ -175,8 +175,7 @@ export function onStart(host: ESPHomeLogsDialog): void {
       startOtaStream(host);
       break;
     case "serial":
-      // Output is expected afresh: the quiet-serial watchdog watches again.
-      host._session = { ...s, paused: false, outputSeen: false };
+      resumeSerial(host);
       break;
     case "reconnecting":
       host._session = { ...s, paused: false };
@@ -185,6 +184,21 @@ export function onStart(host: ESPHomeLogsDialog): void {
       reconnectSerial(host);
       break;
   }
+}
+
+/** Resume display on a Web Serial session and expect its output afresh
+ *  (Start after a Stop, Reset Device). */
+export function resumeSerial(host: ESPHomeLogsDialog): void {
+  const s = host._session;
+  if (s.kind !== "serial") return;
+  host._session = { ...s, paused: false, outputSeen: false };
+}
+
+/** Record that the Web Serial reader has shown a line; a no-op once seen. */
+export function markSerialOutput(host: ESPHomeLogsDialog): void {
+  const s = host._session;
+  if (s.kind !== "serial" || s.outputSeen) return;
+  host._session = { ...s, outputSeen: true };
 }
 
 // Stop button. OTA kills the subprocess (Start respawns it); a Web Serial
