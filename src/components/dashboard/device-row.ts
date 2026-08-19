@@ -1,5 +1,4 @@
-import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
-import type { DeviceState } from "../../api/types/devices.js";
+import type { ConfiguredDevice, DeviceState, Label } from "../../api/types/devices.js";
 import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 
 /** One row of the device table, derived from a ``ConfiguredDevice``
