@@ -2113,9 +2113,9 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
 
     ws.receive({
       message_id: ws.sentAs<{ message_id: string }>(0).message_id,
-      result: { yaml_diff: null },
+      result: { yaml_diff: null, changes: [] },
     });
-    await expect(pending).resolves.toEqual({ yaml_diff: null });
+    await expect(pending).resolves.toEqual({ yaml_diff: null, changes: [] });
   });
 
   it("propagates backend INVALID_ARGS as an APIError so the editor can surface a typed parse error", async () => {

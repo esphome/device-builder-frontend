@@ -4,6 +4,7 @@ import {
   classifyNoCompatiblePeerReason,
   classifyVersionMismatch,
   isPinnableVersion,
+  releaseLine,
 } from "../../src/util/version-mismatch.js";
 
 function pairing(overrides: Partial<PairingSummary>): PairingSummary {
@@ -137,5 +138,16 @@ describe("isPinnableVersion", () => {
     expect(isPinnableVersion("2026.7.0-dev")).toBe(false);
     expect(isPinnableVersion("1.0.0+local")).toBe(false);
     expect(isPinnableVersion("")).toBe(false);
+  });
+});
+
+describe("releaseLine", () => {
+  it.each([
+    ["2026.8.0b5", "2026.8"],
+    ["2026.8.0", "2026.8"],
+    ["2026.9.0-dev", "2026.9"],
+    ["garbage", "garbage"],
+  ])("%s -> %s", (version, expected) => {
+    expect(releaseLine(version)).toBe(expected);
   });
 });

@@ -29,25 +29,46 @@ export function dispatchApplySectionValues(
 }
 
 /** Shared notice-banner template: icon, body text, optional CTA
- *  (label and handler travel together), optional dismiss. */
+ *  (label and handler travel together) with an optional secondary
+ *  action beside it, optional dismiss. */
 export function renderNoticeBanner(
   opts: {
     icon: string;
     text: unknown;
     dismissLabel?: string;
     onDismiss?: () => void;
-  } & ({ ctaLabel: unknown; onCta: () => void } | { ctaLabel?: never; onCta?: never })
+  } & (
+    | {
+        ctaLabel: unknown;
+        onCta: () => void;
+        secondary?: { label: unknown; onClick: () => void };
+      }
+    | { ctaLabel?: never; onCta?: never; secondary?: never }
+  )
 ): TemplateResult {
   return html`
     <div class="notice" role="note">
       <wa-icon library="mdi" name=${opts.icon}></wa-icon>
       <div class="body">
-        <p>${opts.text}</p>
+        <div class="text">${opts.text}</div>
         ${
           opts.onCta
-            ? html`<button type="button" class="cta" @click=${opts.onCta}>
-                ${opts.ctaLabel}
-              </button>`
+            ? html`<div class="cta-row">
+                <button type="button" class="cta" @click=${opts.onCta}>
+                  ${opts.ctaLabel}
+                </button>
+                ${
+                  opts.secondary
+                    ? html`<button
+                        type="button"
+                        class="cta cta--secondary"
+                        @click=${opts.secondary.onClick}
+                      >
+                        ${opts.secondary.label}
+                      </button>`
+                    : nothing
+                }
+              </div>`
             : nothing
         }
       </div>

@@ -48,7 +48,7 @@ import type {
   WizardResponse,
   YamlSearchHit,
 } from "./types/devices.js";
-import type { EditorValidateResponse } from "./types/editor.js";
+import type { EditorValidateResponse, MigrateConfigResponse } from "./types/editor.js";
 import type {
   EventSubscriptionCallback,
   VersionMatchPolicy,
@@ -1921,12 +1921,11 @@ export class ESPHomeAPI {
     });
   }
 
-  /** Apply every known migration to ``content`` in one splice: renamed
-   *  api and homeassistant spellings plus the ethernet ``clk_mode``
-   *  conversion. ``yaml_diff`` is ``null`` when nothing needed
-   *  migrating. */
-  async migrateConfig(content: string): Promise<{ yaml_diff: YamlDiff | null }> {
-    return this.sendCommand<{ yaml_diff: YamlDiff | null }>("editor/migrate_config", {
+  /** Apply every migration the installed ESPHome accepts to ``content``
+   *  in one splice. ``yaml_diff`` is ``null`` and ``changes`` empty when
+   *  nothing needed migrating. */
+  async migrateConfig(content: string): Promise<MigrateConfigResponse> {
+    return this.sendCommand<MigrateConfigResponse>("editor/migrate_config", {
       content,
     });
   }
