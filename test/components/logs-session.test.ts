@@ -20,10 +20,22 @@ describe("logs-session selectors", () => {
 
   it("isStreaming: serial/reconnecting stream unless paused", () => {
     expect(
-      isStreaming({ kind: "serial", port: fakePort, cancel: noop, paused: false })
+      isStreaming({
+        kind: "serial",
+        port: fakePort,
+        cancel: noop,
+        paused: false,
+        outputSeen: false,
+      })
     ).toBe(true);
     expect(
-      isStreaming({ kind: "serial", port: fakePort, cancel: noop, paused: true })
+      isStreaming({
+        kind: "serial",
+        port: fakePort,
+        cancel: noop,
+        paused: true,
+        outputSeen: false,
+      })
     ).toBe(false);
     expect(isStreaming({ kind: "reconnecting", paused: false })).toBe(true);
     expect(isStreaming({ kind: "reconnecting", paused: true })).toBe(false);
@@ -36,7 +48,7 @@ describe("logs-session selectors", () => {
 
   it("isPassive: every Web Serial phase, never OTA/idle", () => {
     const passive: LogsSession[] = [
-      { kind: "serial", port: fakePort, cancel: noop, paused: false },
+      { kind: "serial", port: fakePort, cancel: noop, paused: false, outputSeen: false },
       { kind: "reconnecting", paused: false },
       { kind: "dead" },
     ];
@@ -47,7 +59,13 @@ describe("logs-session selectors", () => {
 
   it("hasSerialPort: only the serial state holds a live port", () => {
     expect(
-      hasSerialPort({ kind: "serial", port: fakePort, cancel: noop, paused: true })
+      hasSerialPort({
+        kind: "serial",
+        port: fakePort,
+        cancel: noop,
+        paused: true,
+        outputSeen: false,
+      })
     ).toBe(true);
     for (const s of [
       { kind: "reconnecting", paused: false },
@@ -74,7 +92,7 @@ describe("logs-session selectors", () => {
       expect(isOtaNetwork({ kind: "ota", port, streamId: "s1" })).toBe(false);
     }
     for (const s of [
-      { kind: "serial", port: fakePort, cancel: noop, paused: false },
+      { kind: "serial", port: fakePort, cancel: noop, paused: false, outputSeen: false },
       { kind: "reconnecting", paused: false },
       { kind: "dead" },
       { kind: "idle" },

@@ -76,7 +76,7 @@ export function setSerialStream(
   // reader (defensive — `reconnecting` holds none).
   const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
   if (host._session.kind === "serial") host._session.cancel();
-  host._session = { kind: "serial", port, cancel, paused };
+  host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
 }
 
 /**
@@ -175,6 +175,9 @@ export function onStart(host: ESPHomeLogsDialog): void {
       startOtaStream(host);
       break;
     case "serial":
+      // Output is expected afresh: the quiet-serial watchdog watches again.
+      host._session = { ...s, paused: false, outputSeen: false };
+      break;
     case "reconnecting":
       host._session = { ...s, paused: false };
       break;

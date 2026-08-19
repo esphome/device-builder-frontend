@@ -96,10 +96,10 @@ registerMdiIcons({
 // DOM grow until the tab locks up. Trimmed to the newest on every flush.
 const MAX_LOG_LINES = 5000;
 
-// How long a Web Serial session may show nothing before the dialog offers
-// network logs instead. Long enough for a normal boot's first line; short
-// enough that a dead-end console (uart: on the console pins, #1430) doesn't
-// strand the user staring at the placeholder.
+// How long a freshly attached Web Serial reader may show nothing before the
+// dialog offers network logs instead. Long enough for a normal boot's first
+// line; short enough that a dead-end console (uart: on the console pins,
+// #1430) doesn't strand the user staring at the placeholder.
 const QUIET_SERIAL_TIMEOUT_MS = 5000;
 
 @customElement("esphome-logs-dialog")
@@ -161,10 +161,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
 
-  // Watchdog for a Web Serial session that shows nothing (uart: repurposed
+  // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
-  // willUpdate; fed displayed lines via _noteSerialActivity. When it goes
-  // quiet the toolbar area offers switching to network logs (#1430).
+  // willUpdate; the first displayed line (_noteSerialActivity) retires it
+  // until output is expected afresh (a new attach, Start, Reset Device).
+  // When it goes quiet the toolbar area offers switching to network logs
+  // (#1430).
   _quietSerial = new QuietTimerController(this, QUIET_SERIAL_TIMEOUT_MS);
 
   // The visible log, its cap, and the stream-position map inline decoding
@@ -229,14 +231,17 @@ export class ESPHomeLogsDialog extends LitElement {
     if (changedProperties.has("_session") || changedProperties.has("_open")) {
       // Every session transition flows through logs-dialog/session.ts and
       // replaces _session, so keying here covers open/attach/pause/teardown
-      // without touching each transition. Only a live reader arms: the
-      // reconnecting phase is the settle delay + reopen retries (several
-      // seconds on a re-enumerating native-USB chip), which isn't silence —
-      // and a failed reopen lands in dead, which offers the banner anyway.
-      // A deliberate Stop (pause, #526) disarms rather than counting as
-      // silence.
+      // without touching each transition. Only a live reader that has yet
+      // to show a line arms: the reconnecting phase is the settle delay +
+      // reopen retries (several seconds on a re-enumerating native-USB
+      // chip), which isn't silence — and a failed reopen lands in dead,
+      // which offers the banner anyway. A deliberate Stop (pause, #526)
+      // disarms rather than counting as silence. Once output has landed the
+      // console is proven and a quiet device (bursty logging at INFO) must
+      // not re-trip the banner; a fresh attach, Start after a Stop, and
+      // Reset Device each expect output anew and watch again.
       const s = this._session;
-      const watching = this._open && s.kind === "serial" && !s.paused;
+      const watching = this._open && s.kind === "serial" && !s.paused && !s.outputSeen;
       if (watching) this._quietSerial.ensureArmed();
       else this._quietSerial.disarm();
     }
@@ -501,10 +506,13 @@ export class ESPHomeLogsDialog extends LitElement {
     this._log.enqueue(line);
   }
 
-  // Called by `streamSerialToDialog` for every displayed serial line; feeds
-  // the quiet-serial watchdog so a healthy stream never trips the banner.
+  // Called by `streamSerialToDialog` for every displayed serial line; the
+  // first one marks the reader as producing output, which retires the
+  // quiet-serial watchdog for this session (willUpdate disarms it).
   _noteSerialActivity(): void {
-    this._quietSerial.activity();
+    const s = this._session;
+    if (s.kind !== "serial" || s.outputSeen) return;
+    this._session = { ...s, outputSeen: true };
   }
 
   // Every line the buffer takes on, batched or direct, passes through here.
@@ -533,11 +541,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
   // standard auto-reset circuit) to reboot the device, like the old dashboard's
   // console; the reader stays attached so the boot log follows. Resumes display
-  // first so a Stopped log shows the boot output instead of dropping it.
+  // first so a Stopped log shows the boot output instead of dropping it, and
+  // expects the boot output afresh (the quiet-serial watchdog watches again).
   private _onResetDevice = async () => {
     const s = this._session;
     if (s.kind !== "serial") return;
-    this._session = { ...s, paused: false };
+    this._session = { ...s, paused: false, outputSeen: false };
     try {
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });

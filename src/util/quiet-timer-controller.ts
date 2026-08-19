@@ -1,21 +1,15 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
 /**
- * Inactivity watchdog: flags ``quiet`` when no activity lands for
- * *timeoutMs* while armed.
+ * One-shot silence watchdog: flags ``quiet`` when *timeoutMs* elapses
+ * after arming.
  *
- * The host arms it around the stream it watches and reports each unit of
- * activity; the window restarts on every report, so a healthy stream never
- * goes quiet. When the window elapses ``quiet`` flips true with a host
- * update. Disarmed, activity is ignored and ``quiet`` is false.
- *
- * activity() is hot-path safe: it only stamps a timestamp. The single
- * pending timeout re-checks the stamp when it fires and re-arms for the
- * remainder, so a line flood costs no timer churn.
+ * The host arms it when the stream it watches starts and disarms it once
+ * the stream has proven itself (or ends). When the window elapses ``quiet``
+ * flips true with a host update. Disarmed, ``quiet`` is false.
  */
 export class QuietTimerController implements ReactiveController {
   private _handle: ReturnType<typeof setTimeout> | null = null;
-  private _lastActivity = 0;
   private _quiet = false;
 
   constructor(
@@ -42,40 +36,18 @@ export class QuietTimerController implements ReactiveController {
   /** Arm if not already armed; an armed window keeps its current deadline. */
   ensureArmed(): void {
     if (this._armed) return;
-    this._lastActivity = Date.now();
-    this._schedule(this._timeoutMs);
-  }
-
-  /** Restart the window and clear ``quiet``. No-op while disarmed. */
-  activity(): void {
-    if (!this._armed) return;
-    this._lastActivity = Date.now();
-    if (this._handle === null) this._schedule(this._timeoutMs);
-    this._setQuiet(false);
+    this._handle = setTimeout(() => {
+      this._handle = null;
+      this._setQuiet(true);
+    }, this._timeoutMs);
   }
 
   disarm(): void {
-    this._clear();
-    this._setQuiet(false);
-  }
-
-  private _schedule(delayMs: number): void {
-    this._handle = setTimeout(() => {
-      const remaining = this._lastActivity + this._timeoutMs - Date.now();
-      if (remaining > 0) {
-        this._schedule(remaining);
-        return;
-      }
-      this._handle = null;
-      this._setQuiet(true);
-    }, delayMs);
-  }
-
-  private _clear(): void {
     if (this._handle !== null) {
       clearTimeout(this._handle);
       this._handle = null;
     }
+    this._setQuiet(false);
   }
 
   private _setQuiet(quiet: boolean): void {

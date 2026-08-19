@@ -60,7 +60,7 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
   });
 
-  it("hides again when lines resume after going quiet", async () => {
+  it("the first line retires the watchdog for the rest of the session", async () => {
     await startSerial();
     vi.advanceTimersByTime(5000);
     await el.updateComplete;
@@ -68,6 +68,66 @@ describe("logs-dialog quiet-serial banner", () => {
     call(el, "_noteSerialActivity");
     await el.updateComplete;
     expect(banner(el)).toBeNull();
+    // A quiet device (bursty logging) must not re-trip it: the console is
+    // proven.
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it("Start after a Stop expects output afresh and watches again", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    call(el, "_onStop");
+    await el.updateComplete;
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    call(el, "_onStart");
+    await el.updateComplete;
+    vi.advanceTimersByTime(4999);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it("Reset Device expects the boot output afresh and watches again", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    call(el, "_onResetDevice");
+    await el.updateComplete;
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
+  it("a fresh attach after a reopen failure watches again", async () => {
+    await startSerial();
+    call(el, "_noteSerialActivity");
+    await el.updateComplete;
+    el.setSerialOpenFailed("reopen failed");
+    await el.updateComplete;
+    call(el, "_onStart");
+    await el.updateComplete;
+    el.setSerialStream(port, cancel as unknown as () => void);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)!.textContent).toContain("dashboard.logs_no_serial_output");
   });
 
   it("a deliberate Stop (pause) never counts as silence", async () => {

@@ -41,27 +41,6 @@ describe("QuietTimerController", () => {
     expect(host.requestUpdate).toHaveBeenCalled();
   });
 
-  it("activity restarts the window and clears quiet", () => {
-    timer.ensureArmed();
-    vi.advanceTimersByTime(5000);
-    expect(timer.quiet).toBe(true);
-    timer.activity();
-    expect(timer.quiet).toBe(false);
-    vi.advanceTimersByTime(4999);
-    expect(timer.quiet).toBe(false);
-    vi.advanceTimersByTime(1);
-    expect(timer.quiet).toBe(true);
-  });
-
-  it("a steady stream of activity never goes quiet", () => {
-    timer.ensureArmed();
-    for (let i = 0; i < 10; i++) {
-      vi.advanceTimersByTime(3000);
-      timer.activity();
-    }
-    expect(timer.quiet).toBe(false);
-  });
-
   it("ensureArmed while armed keeps the current deadline", () => {
     timer.ensureArmed();
     vi.advanceTimersByTime(4000);
@@ -84,12 +63,6 @@ describe("QuietTimerController", () => {
     timer.disarm();
     expect(timer.quiet).toBe(false);
     expect(host.requestUpdate).toHaveBeenCalledTimes(2);
-  });
-
-  it("activity while disarmed does not arm", () => {
-    timer.activity();
-    vi.advanceTimersByTime(10_000);
-    expect(timer.quiet).toBe(false);
   });
 
   it("hostDisconnected disarms", () => {

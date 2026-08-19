@@ -21,7 +21,9 @@
  * - ``serial``       a Web Serial reader is attached and draining the open
  *                    port. ``paused`` gates the on-screen log (the reader keeps
  *                    draining either way, so resuming needn't reopen the port
- *                    and pulse DTR/RTS — #526).
+ *                    and pulse DTR/RTS — #526). ``outputSeen`` flips on the
+ *                    first displayed line; the quiet-serial watchdog watches
+ *                    only until then.
  * - ``dead``         a Web Serial reopen failed; the port is gone. Start runs
  *                    the reconnect hook (the #636 "click Start to reconnect").
  */
@@ -42,6 +44,7 @@ export type LogsSession =
       readonly port: SerialPort;
       readonly cancel: () => void;
       readonly paused: boolean;
+      readonly outputSeen: boolean;
     }
   | { readonly kind: "dead" };
 
