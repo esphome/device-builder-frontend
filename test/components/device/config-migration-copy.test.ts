@@ -22,6 +22,14 @@ const base: MigrationChange = {
 };
 
 describe("migrationChangeSegments", () => {
+  it.each(["key", "field", "fold", "convert", "action"] as const)(
+    "%s uses its own sentence key",
+    (kind) => {
+      const [first] = migrationChangeSegments(localize, { ...base, kind });
+      expect(first).toBe(`device.config_migration_change_${kind}`);
+    }
+  );
+
   it("phrases by kind with the spellings as code runs", () => {
     expect(migrationChangeSegments(localize, base)).toEqual([
       "device.config_migration_change_field",
