@@ -19,23 +19,27 @@ export function migrationChangeSegments(
   change: MigrationChange
 ): MigrationCopySegment[] {
   const code = (value: string) => `${CODE_OPEN}${value}${CODE_CLOSE}`;
-  const values = {
+  let sentence = localize(`device.config_migration_change_${change.kind}`, {
     old: code(change.old),
     new: code(change.new),
     scope: code(change.scope),
-  };
-  let sentence = change.since
-    ? localize(`device.config_migration_change_${change.kind}`, {
-        ...values,
-        version: releaseLine(change.since),
-      })
-    : localize(`device.config_migration_change_${change.kind}_unversioned`, values);
+  });
+  const since = change.since ? releaseLine(change.since) : null;
+  const removedIn = change.removed_in ? releaseLine(change.removed_in) : null;
+  if (since !== null && removedIn !== null && !change.required) {
+    sentence += ` ${localize("device.config_migration_change_since_removed_in", {
+      version: since,
+      removed_in: removedIn,
+    })}`;
+  } else if (since !== null) {
+    sentence += ` ${localize("device.config_migration_change_since", { version: since })}`;
+  } else if (removedIn !== null && !change.required) {
+    sentence += ` ${localize("device.config_migration_change_removed_in", {
+      removed_in: removedIn,
+    })}`;
+  }
   if (change.required) {
     sentence += ` ${localize("device.config_migration_change_required")}`;
-  } else if (change.removed_in) {
-    sentence += ` ${localize("device.config_migration_change_removed_in", {
-      removed_in: releaseLine(change.removed_in),
-    })}`;
   }
   const segments: MigrationCopySegment[] = [];
   let last = 0;
