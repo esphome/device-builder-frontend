@@ -137,10 +137,15 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
           text: this._renderChanges(detection.changes),
           ctaLabel: this._localize("device.config_migration_migrate"),
           onCta: () => fireEvent(this, "request-migrate-config"),
-          secondary: {
-            label: this._localize("device.config_migration_preview"),
-            onClick: () => this._preview?.open(),
-          },
+          // A re-check is pending once the draft moved on; the preview would
+          // show the previous dry run, so hold it until the next lands.
+          secondary:
+            detection.yaml === this.yaml
+              ? {
+                  label: this._localize("device.config_migration_preview"),
+                  onClick: () => this._preview?.open(),
+                }
+              : undefined,
           dismissLabel: this._localize("device.config_migration_dismiss"),
           onDismiss: () => {
             this._dismissed = true;
@@ -157,6 +162,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
   }
 
   private _renderChanges(changes: MigrationChange[]) {
+    if (changes.length === 0) return this._localize("device.config_migration_notice");
     const listed = changes.slice(0, MAX_LISTED_CHANGES);
     const more = changes.length - listed.length;
     return html`

@@ -19,13 +19,17 @@ export function migrationChangeSegments(
   change: MigrationChange
 ): MigrationCopySegment[] {
   const code = (value: string) => `${CODE_OPEN}${value}${CODE_CLOSE}`;
-  const esphome = change.since ? `ESPHome ${releaseLine(change.since)}` : "ESPHome";
-  let sentence = localize(`device.config_migration_change_${change.kind}`, {
-    esphome,
+  const values = {
     old: code(change.old),
     new: code(change.new),
     scope: code(change.scope),
-  });
+  };
+  let sentence = change.since
+    ? localize(`device.config_migration_change_${change.kind}`, {
+        ...values,
+        version: releaseLine(change.since),
+      })
+    : localize(`device.config_migration_change_${change.kind}_unversioned`, values);
   if (change.required) {
     sentence += ` ${localize("device.config_migration_change_required")}`;
   } else if (change.removed_in) {

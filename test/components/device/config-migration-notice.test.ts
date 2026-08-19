@@ -102,6 +102,27 @@ describe("config-migration-notice", () => {
     expect(el.shadowRoot!.querySelector(".required")).toBeNull();
   });
 
+  it("falls back to the generic sentence when no change is named", async () => {
+    const [el] = await mount(
+      LEGACY,
+      makeApi(() => Promise.resolve({ yaml_diff: DIFF, changes: [] }))
+    );
+    expect(el.shadowRoot!.querySelector(".notice")?.textContent).toContain(
+      "device.config_migration_notice"
+    );
+  });
+
+  it("holds the preview while a re-check is pending", async () => {
+    const [el] = await mount(LEGACY);
+    expect(el.shadowRoot!.querySelector(".cta--secondary")).not.toBeNull();
+    el.yaml = `${LEGACY}# edited\n`;
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".cta--secondary")).toBeNull();
+    await vi.runAllTimersAsync();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".cta--secondary")).not.toBeNull();
+  });
+
   it("flags a change the installed ESPHome already rejects", async () => {
     const [el] = await mount(
       LEGACY,
