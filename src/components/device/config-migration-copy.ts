@@ -1,11 +1,21 @@
 /** Phrasing for the config-migration nudge: one sentence per ``MigrationChange``. */
 import { html, type TemplateResult } from "lit";
-import type { MigrationChange } from "../../api/types/editor.js";
+import type { MigrationChange, MigrationChangeKind } from "../../api/types/editor.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { releaseLine } from "../../util/version-mismatch.js";
 
 /** A run of a sentence: plain prose, or a config spelling to set in code. */
 export type MigrationCopySegment = string | { code: string };
+
+// Spelled out per kind (not built from the kind) so each key is greppable
+// from en.json; a kind the backend adds must be given a sentence here.
+const CHANGE_SENTENCE_KEYS: Record<MigrationChangeKind, string> = {
+  key: "device.config_migration_change_key",
+  field: "device.config_migration_change_field",
+  fold: "device.config_migration_change_fold",
+  convert: "device.config_migration_change_convert",
+  action: "device.config_migration_change_action",
+};
 
 // Markers wrapped around each config spelling before localisation, so the
 // translated sentence can be split back into prose and code runs.
@@ -19,7 +29,7 @@ export function migrationChangeSegments(
   change: MigrationChange
 ): MigrationCopySegment[] {
   const code = (value: string) => `${CODE_OPEN}${value}${CODE_CLOSE}`;
-  let sentence = localize(`device.config_migration_change_${change.kind}`, {
+  let sentence = localize(CHANGE_SENTENCE_KEYS[change.kind], {
     old: code(change.old),
     new: code(change.new),
     scope: code(change.scope),
