@@ -1,4 +1,4 @@
-import type { SortingState, VisibilityState } from "@tanstack/lit-table";
+import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
 import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
@@ -193,7 +193,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       .selectedDevices=${host._selectedDevices}
       .highlightConfiguration=${host._recentlyAdopted}
       @table-sort-change=${(e: CustomEvent<SortingState>) => host._saveTablePreference(e)}
-      @table-visibility-change=${(e: CustomEvent<VisibilityState>) =>
+      @table-visibility-change=${(e: CustomEvent<ColumnVisibilityState>) =>
         host._saveTablePreference(e)}
       @table-page-size-change=${(e: CustomEvent<number>) => host._saveTablePreference(e)}
       @row-click=${(e: CustomEvent<ConfiguredDevice>) =>

@@ -4,7 +4,7 @@
  * saveTablePreference mirrors each change onto the host fields that
  * seed a remounted table.
  */
-import type { VisibilityState } from "@tanstack/lit-table";
+import type { ColumnVisibilityState } from "@tanstack/lit-table";
 import { describe, expect, it, vi } from "vitest";
 import { SortDirection } from "../../../src/api/types/system.js";
 import { saveTablePreference } from "../../../src/components/dashboard/prefs.js";
@@ -33,7 +33,7 @@ describe("saveTablePreference", () => {
 
   it("mirrors a column-visibility change onto the host and persists it", () => {
     const { host, updatePreferences } = makeHost();
-    const visibility: VisibilityState = { comment: true, ip: false };
+    const visibility: ColumnVisibilityState = { comment: true, ip: false };
     saveTablePreference(host, event("table-visibility-change", visibility));
     expect(host._tableColumnVisibility).toBe(visibility);
     expect(updatePreferences).toHaveBeenCalledWith({

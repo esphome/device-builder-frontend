@@ -1,4 +1,4 @@
-import type { SortingState, VisibilityState } from "@tanstack/lit-table";
+import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import type { UserPreferences } from "../../api/types/system.js";
 import { SortDirection } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
@@ -41,7 +41,7 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
         : null,
     };
   } else if (type === "table-visibility-change") {
-    const visibility = (e as CustomEvent<VisibilityState>).detail;
+    const visibility = (e as CustomEvent<ColumnVisibilityState>).detail;
     host._tableColumnVisibility = visibility;
     patch = { table_column_visibility: visibility };
   } else if (type === "table-page-size-change") {
