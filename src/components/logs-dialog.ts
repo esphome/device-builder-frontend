@@ -165,8 +165,9 @@ export class ESPHomeLogsDialog extends LitElement {
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
-  // willUpdate. When it goes quiet the toolbar area offers switching to
-  // network logs (#1430).
+  // willUpdate; a fired banner counts as armed, so expectSerialOutput drops
+  // it before rebuilding the session. When it goes quiet the toolbar area
+  // offers switching to network logs (#1430).
   _quietSerial = new QuietTimerController(this, QUIET_SERIAL_TIMEOUT_MS);
 
   // The visible log, its cap, and the stream-position map inline decoding

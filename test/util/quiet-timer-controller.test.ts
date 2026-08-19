@@ -65,6 +65,21 @@ describe("QuietTimerController", () => {
     expect(host.requestUpdate).toHaveBeenCalledTimes(2);
   });
 
+  it("disarm after quiet lets ensureArmed open a fresh full window", () => {
+    timer.ensureArmed();
+    vi.advanceTimersByTime(5000);
+    expect(timer.quiet).toBe(true);
+    // Quiet counts as armed, so a re-arm must disarm first.
+    timer.ensureArmed();
+    expect(timer.quiet).toBe(true);
+    timer.disarm();
+    timer.ensureArmed();
+    vi.advanceTimersByTime(4999);
+    expect(timer.quiet).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(timer.quiet).toBe(true);
+  });
+
   it("hostDisconnected disarms", () => {
     timer.ensureArmed();
     timer.hostDisconnected();
