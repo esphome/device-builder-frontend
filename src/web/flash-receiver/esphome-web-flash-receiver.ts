@@ -84,7 +84,17 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._hasOpener = window.opener != null;
     if (params && window.opener) {
       this._handshake = new FlashHandshake(
-        { opener: window.opener, params, messageTarget: window },
+        {
+          opener: window.opener,
+          params,
+          messageTarget: window,
+          // Advertised on the ready frame so the dashboard can decline the
+          // hand-off up front (e.g. Safari: this https origin CAN feature-
+          // detect Web Serial, unlike the dashboard's plain-http origin).
+          // Derived from the same one-time read that drives render()'s
+          // unsupported card, so the two can never disagree.
+          webSerial: !this._unsupported,
+        },
         {
           onFirmware: (msg) => this._onFirmware(msg),
           onMalformed: () =>

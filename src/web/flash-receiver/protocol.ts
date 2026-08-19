@@ -18,6 +18,21 @@ export const MSG_FIRMWARE = "esphome-web-flash:firmware";
 export const MSG_STATE = "esphome-web-flash:state";
 export const MSG_PROGRESS = "esphome-web-flash:progress";
 
+/**
+ * Receiver → opener: announced (and re-announced) until firmware arrives.
+ *
+ * ``webSerial`` is additive in v1: whether this receiver's browser can
+ * actually flash (Web Serial present). Older receivers omit it, so the
+ * sender only declines the hand-off on an explicit ``false`` — an absent
+ * field falls back to handing off and letting the receiver surface the
+ * error after the fact.
+ */
+export interface ReadyMessage {
+  type: typeof MSG_READY;
+  version: number;
+  webSerial?: boolean;
+}
+
 /** One image to write, bytes riding as a transferable ArrayBuffer. */
 export interface FlashPartMessage {
   address: number;

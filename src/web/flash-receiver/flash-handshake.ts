@@ -7,6 +7,7 @@ import {
   MSG_READY,
   MSG_STATE,
   PROTOCOL_VERSION,
+  type ReadyMessage,
 } from "./protocol.js";
 
 /** Hash params the receiver reads. ``nonce`` is required to activate. */
@@ -43,6 +44,12 @@ export interface FlashHandshakeEnv {
   params: FlasherParams;
   /** Where to listen for ``message`` events (``window``). Injected for tests. */
   messageTarget: Pick<EventTarget, "addEventListener" | "removeEventListener">;
+  /**
+   * Whether this page can actually flash (Web Serial present). Advertised on
+   * every ``ready`` frame so the sender can decline the hand-off up front
+   * instead of transferring firmware to a tab that can never use it.
+   */
+  webSerial: boolean;
 }
 
 /** How long to keep re-announcing ``ready`` before giving up (ms). */
@@ -109,7 +116,12 @@ export class FlashHandshake {
   }
 
   private _sendReady(): void {
-    this._post({ type: MSG_READY, version: PROTOCOL_VERSION });
+    const msg: ReadyMessage = {
+      type: MSG_READY,
+      version: PROTOCOL_VERSION,
+      webSerial: this.env.webSerial,
+    };
+    this._post(msg);
   }
 
   private _stopReadyRetry(): void {

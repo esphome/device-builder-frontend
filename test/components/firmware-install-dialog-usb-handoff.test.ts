@@ -8,12 +8,13 @@ import { identityLocalize } from "../_dom.js";
 import { FLASHER_HOST } from "../../src/common/docs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { handOffToFlasher } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { cardStatusDetail } from "../../src/components/firmware-install-dialog/renderers.js";
+import { handOffToFlasher } from "../../src/components/firmware-install-dialog/usb-handoff.js";
 import type { FlasherCallbacks } from "../../src/util/usb-flasher.js";
 
 function makeHost() {
   const host = {
+    _failureKind: null as string | null,
     _usbFirmware: new ArrayBuffer(16) as ArrayBuffer | null,
     _usbFirmwareName: "firmware.factory.bin",
     _device: { name: "dev", friendly_name: "Dev" },
@@ -68,6 +69,26 @@ describe("handOffToFlasher", () => {
     expect(host._errorMessage).toBe("");
     expect(host._statusMessage).toBe("firmware.usb_flashing");
     expect(host._flashPercent).toBe(10);
+  });
+
+  it("fails with the unsupported-browser message when the hand-off is declined", () => {
+    let cbs: FlasherCallbacks | undefined;
+    openFlasher.mockImplementation(
+      (_fw: ArrayBuffer, _n: string, _d: string, callbacks: FlasherCallbacks) => {
+        cbs = callbacks;
+        return () => {};
+      }
+    );
+    const host = makeHost();
+    handOffToFlasher(asHost(host));
+    cbs!.onUnsupported();
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.usb_failed");
+    expect(host._errorMessage).toBe("firmware.usb_unsupported_browser");
+    // Suppresses the Retry footer: retrying recompiles into the same decline.
+    expect(host._failureKind).toBe("unsupported-browser");
+    // Terminal: the session already tore itself down.
+    expect(host._usbFlashTeardown).toBeNull();
   });
 });
 

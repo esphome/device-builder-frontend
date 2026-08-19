@@ -6,11 +6,11 @@ import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { showOtaLogs } from "../../src/components/firmware-install-dialog/install-flow.js";
 import {
   pickFactoryBinary,
-  showOtaLogs,
   startUsbFlash,
-} from "../../src/components/firmware-install-dialog/install-flow.js";
+} from "../../src/components/firmware-install-dialog/usb-handoff.js";
 
 const bin = (file: string): FirmwareBinary => ({ file, title: file });
 

@@ -28,6 +28,12 @@ export interface FlasherCallbacks {
   onState: (state: "done" | "error", detail: string) => void;
   /** The flasher tab closed / crashed / went silent before a result. */
   onLost: () => void;
+  /**
+   * The flasher tab loaded but its browser can't flash (no Web Serial —
+   * e.g. Safari), advertised on its ready frame. The firmware was never
+   * handed off; the dialog owns the messaging for this failure.
+   */
+  onUnsupported: () => void;
 }
 
 /**
@@ -89,11 +95,23 @@ export function openFlasher(
       detail?: string;
       pct?: number;
       version?: number;
+      webSerial?: boolean;
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
       clearTimeout(readyTimer);
       if (handedOff || !bytes) return;
+      // The receiver can feature-detect Web Serial (it runs on a secure
+      // origin, unlike this dashboard over plain http), and advertises the
+      // result on the ready frame. Decline the hand-off instead of
+      // transferring firmware to a tab that can never flash. Only an
+      // explicit false counts: an older receiver omits the field, and there
+      // the hand-off proceeds and the receiver reports the error itself.
+      if (data.webSerial === false) {
+        finish();
+        cb.onUnsupported();
+        return;
+      }
       // Forward-compat: a flasher advertising a newer protocol still gets our
       // v1 frame (additive fields are ignored); just note the mismatch. When a
       // breaking change lands, branch on data.version here.

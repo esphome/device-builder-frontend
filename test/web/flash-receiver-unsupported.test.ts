@@ -17,7 +17,7 @@ vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
 
 import { webSerialAvailability } from "../../src/util/web-serial.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
-import { MSG_FIRMWARE } from "../../src/web/flash-receiver/protocol.js";
+import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -26,6 +26,30 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.mocked(webSerialAvailability).mockReturnValue("unsupported");
 });
+
+// Mounts a receiver with a fake opener + nonce hash (a hand-off page) and
+// returns the ready frames it announced to the opener.
+async function mountAndCollectReady() {
+  const openerPost = vi.fn();
+  Object.defineProperty(window, "opener", {
+    value: { postMessage: openerPost },
+    configurable: true,
+  });
+  const origHash = window.location.hash;
+  window.location.hash = "#nonce=n1";
+  try {
+    const el = new ESPHomeWebFlashReceiver();
+    (el as any)._localize = (k: string) => k;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return openerPost.mock.calls
+      .map((args) => args[0] as { type?: string; webSerial?: boolean })
+      .filter((msg) => msg.type === MSG_READY);
+  } finally {
+    window.location.hash = origHash;
+    delete (window as any).opener;
+  }
+}
 
 // Mounts a receiver with a fake opener and delivers one firmware frame to it,
 // exactly as the dashboard would after the nonce handshake.
@@ -106,5 +130,23 @@ describe("esphome-web-flash-receiver on an unsupported browser", () => {
       window.location.hash = origHash;
       delete (window as any).opener;
     }
+  });
+});
+
+// Covers the component→handshake wiring itself: a broken translation of the
+// availability read into the env boolean would pass the handshake and sender
+// unit tests while silently advertising the wrong capability.
+describe("esphome-web-flash-receiver ready capability", () => {
+  it("advertises webSerial: false when the browser can't flash", async () => {
+    const ready = await mountAndCollectReady();
+    expect(ready.length).toBeGreaterThan(0);
+    expect(ready[0].webSerial).toBe(false);
+  });
+
+  it("advertises webSerial: true when Web Serial is available", async () => {
+    vi.mocked(webSerialAvailability).mockReturnValue("available");
+    const ready = await mountAndCollectReady();
+    expect(ready.length).toBeGreaterThan(0);
+    expect(ready[0].webSerial).toBe(true);
   });
 });

@@ -516,6 +516,7 @@
     "usb_failed": "USB install failed",
     "usb_popup_blocked": "Allow pop-ups for this site to open the USB flasher",
     "usb_window_closed": "Lost contact with the flasher tab before flashing finished",
+    "usb_unsupported_browser": "This browser doesn't support Web Serial. Open the dashboard in Chrome, Edge, or Firefox 151+ to install over USB.",
     "binary_download_done_title": "Firmware binary downloaded",
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
     "elf_download_done_title": "Debug symbols downloaded",
