@@ -115,6 +115,9 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
       .required {
         --notice-accent: var(--esphome-error);
       }
+      p {
+        margin: 0 0 var(--wa-space-2xs);
+      }
       ul {
         margin: 0;
         padding-left: 1.2em;
@@ -162,10 +165,12 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
   }
 
   private _renderChanges(changes: MigrationChange[]) {
-    if (changes.length === 0) return this._localize("device.config_migration_notice");
+    const lead = this._localize("device.config_migration_notice");
+    if (changes.length === 0) return lead;
     const listed = changes.slice(0, MAX_LISTED_CHANGES);
     const more = changes.length - listed.length;
     return html`
+      <p>${lead}</p>
       <ul>
         ${listed.map((change) => html`<li>${describeMigrationChange(this._localize, change)}</li>`)}
         ${
