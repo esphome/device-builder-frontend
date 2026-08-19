@@ -1,7 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import { DeviceState } from "../../api/types/devices.js";
-import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
@@ -15,39 +14,7 @@ import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import type { DeviceColumnDef } from "./table-features.js";
 
-export interface DeviceRow {
-  status: DeviceState;
-  name: string;
-  friendly_name: string;
-  address: string;
-  ip: string;
-  ip_addresses: string[];
-  mac_address: string;
-  platform: string;
-  version: string;
-  comment: string;
-  area: string;
-  /** Resolved label objects (catalog joined against
-   *  ``device.labels``) so the cell renderer doesn't need access to
-   *  the catalog itself. ``device-table`` performs the resolve when
-   *  building rows. */
-  labels: Label[];
-  config: string;
-  build_size_bytes: number;
-  // Raw has_pending_changes (device truth) — drives the encryption lock only.
-  hasPendingChanges: boolean;
-  // mDNS-gated display flags (see util/device-sync.ts): modified dot + install
-  // button, update column + update button.
-  showModified: boolean;
-  showUpdate: boolean;
-  hasQueuedUpdate: boolean;
-  api_enabled: boolean;
-  api_encrypted: boolean;
-  api_encryption_active: string | null;
-  busy: boolean;
-  recentJob: FirmwareJob | null;
-  _device: ConfiguredDevice;
-}
+export type { DeviceRow } from "./device-row.js";
 
 const RECENT_ICON: Record<JobStatus, string | null> = {
   [JobStatus.QUEUED]: null,

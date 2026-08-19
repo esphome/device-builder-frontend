@@ -139,6 +139,37 @@ describe("device-table All rendering", () => {
   });
 });
 
+describe("device-table auto sort registry", () => {
+  // Pins the order the slim v9 ``sortFns`` registry produces for a
+  // string column resolved through ``auto`` (alphanumeric). A registry
+  // miss falls back to ``basic`` silently in production builds, so this
+  // is the only signal if the registry is slimmed further.
+  it("sorts the platform column alphanumerically via auto resolution", async () => {
+    // host10/host2 and the uppercase entry make the assertion fail under a
+    // plain lexicographic (``basic``) compare, so the fallback can't pass.
+    const platforms = ["esp32", "rp2040", "host10", "BK72XX", "esp32-c3", "host2"];
+    const el = new ESPHomeDeviceTable();
+    el.devices = platforms.map((platform, i) =>
+      makeConfiguredDevice({
+        name: `dev-${i}`,
+        friendly_name: `Dev ${i}`,
+        configuration: `dev-${i}.yaml`,
+        target_platform: platform,
+      })
+    );
+    el.initialSorting = [{ id: "platform", desc: false }];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await el.updateComplete;
+
+    // Skip the mobile stack label span; the value span carries the platform.
+    const order = Array.from(
+      el.shadowRoot!.querySelectorAll("tbody td.col-platform span:not(.cell-stack-label)")
+    ).map((span) => span.textContent!.trim());
+    expect(order).toEqual(["BK72XX", "esp32", "esp32-c3", "host2", "host10", "rp2040"]);
+  });
+});
+
 describe("device-table Version column identity gating", () => {
   async function mountWithVersionColumn(
     device: ConfiguredDevice

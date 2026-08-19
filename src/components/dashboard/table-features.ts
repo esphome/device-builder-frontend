@@ -13,7 +13,7 @@ import {
   sortFn_text,
   tableFeatures,
 } from "@tanstack/lit-table";
-import type { DeviceRow } from "./table-columns.js";
+import type { DeviceRow } from "./device-row.js";
 
 /**
  * The TanStack Table v9 feature set for the device table. v9 tree-shakes
@@ -22,9 +22,12 @@ import type { DeviceRow } from "./table-columns.js";
  * model lives in the column-filtering feature), the column defs set
  * ``size`` (column sizing), and the header/pagination controls need
  * sorting, visibility, and pagination. The ``sortFns`` registry lists
- * only the comparators ``auto`` can resolve for this table's string
- * columns, keeping v8's alphanumeric behavior without shipping the
- * full built-in set.
+ * only the comparators ``auto`` resolves for this table's string
+ * columns (keeping v8's alphanumeric behavior without shipping the
+ * full built-in set); ``datetime`` and ``basic`` are deliberately
+ * unregistered — a registry miss falls back to ``basic`` silently in
+ * production builds, so a future Date-valued column must add
+ * ``sortFn_datetime`` here.
  */
 export const deviceTableFeatures = tableFeatures({
   columnFilteringFeature,
