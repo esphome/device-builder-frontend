@@ -7,9 +7,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import "../../_mock-webawesome.js";
 
 import type { YamlDiff } from "../../../src/api/types/automations.js";
+import type {
+  MigrateConfigResponse,
+  MigrationChange,
+} from "../../../src/api/types/editor.js";
 import { ESPHomeConfigMigrationNotice } from "../../../src/components/device/config-migration-notice.js";
 
 const LEGACY = "api:\n  services:\n    - service: pause\n      then: []\n";
@@ -17,12 +21,25 @@ const CANONICAL = "api:\n  actions:\n    - action: pause\n      then: []\n";
 
 const DIFF: YamlDiff = { fromLine: 2, toLine: 3, replacement: "  actions:\n" };
 
-function makeApi(impl?: (content: string) => Promise<{ yaml_diff: YamlDiff | null }>) {
+const API_CHANGE: MigrationChange = {
+  kind: "field",
+  scope: "api",
+  old: "services",
+  new: "actions",
+  since: "2024.8.0",
+  removed_in: null,
+  required: false,
+};
+
+const MIGRATED: MigrateConfigResponse = { yaml_diff: DIFF, changes: [API_CHANGE] };
+const CLEAN: MigrateConfigResponse = { yaml_diff: null, changes: [] };
+
+function makeApi(impl?: (content: string) => Promise<MigrateConfigResponse>) {
   // Legacy-spelling stub standing in for the backend's real rule fold.
   const migrateConfig = vi.fn(
     impl ??
       ((content: string) =>
-        Promise.resolve({ yaml_diff: content.includes("services:") ? DIFF : null }))
+        Promise.resolve(content.includes("services:") ? MIGRATED : CLEAN))
   );
   return { migrateConfig };
 }
@@ -59,8 +76,52 @@ describe("config-migration-notice", () => {
     const [el, api] = await mount(LEGACY);
     const notice = el.shadowRoot!.querySelector(".notice");
     expect(notice).not.toBeNull();
-    expect(notice?.textContent).toContain("device.config_migration_notice");
+    expect(notice?.textContent).toContain("device.config_migration_change_field");
     expect(api.migrateConfig).toHaveBeenCalledWith(LEGACY);
+  });
+
+  it("lists the first changes and collapses the rest", async () => {
+    const changes = Array.from({ length: 5 }, (_, i) => ({
+      ...API_CHANGE,
+      scope: `s${i}`,
+    }));
+    const [el] = await mount(
+      LEGACY,
+      makeApi(() => Promise.resolve({ yaml_diff: DIFF, changes }))
+    );
+    const items = el.shadowRoot!.querySelectorAll(".notice li");
+    expect(items).toHaveLength(4);
+    expect(items[3].textContent).toContain("device.editor_invalid_more");
+    expect(el.shadowRoot!.querySelector(".required")).toBeNull();
+  });
+
+  it("flags a change the installed ESPHome already rejects", async () => {
+    const [el] = await mount(
+      LEGACY,
+      makeApi(() =>
+        Promise.resolve({ yaml_diff: DIFF, changes: [{ ...API_CHANGE, required: true }] })
+      )
+    );
+    expect(el.shadowRoot!.querySelector(".required .notice")).not.toBeNull();
+  });
+
+  it("opens the preview with the detected draft and its migrated text", async () => {
+    const [el] = await mount(LEGACY);
+    const dialog = el.shadowRoot!.querySelector(
+      "esphome-config-migration-preview-dialog"
+    )!;
+    expect(dialog.shadowRoot!.querySelector("esphome-yaml-diff")).toBeNull();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".cta--secondary")?.click();
+    await el.updateComplete;
+    await dialog.updateComplete;
+    expect(dialog.shadowRoot!.querySelector("esphome-base-dialog")?.open).toBe(true);
+    expect(dialog.shadowRoot!.querySelector("esphome-yaml-diff")).not.toBeNull();
+    expect(dialog.oldValue).toBe(LEGACY);
+    expect(dialog.newValue).toBe("api:\n  actions:\n      then: []\n");
+    const seen = vi.fn();
+    el.addEventListener("request-migrate-config", seen);
+    dialog.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")?.click();
+    expect(seen).toHaveBeenCalledTimes(1);
   });
 
   it("stays hidden when the dry-run returns null", async () => {
@@ -141,7 +202,7 @@ describe("config-migration-notice", () => {
     const api = makeApi(() => {
       call += 1;
       return call === 1
-        ? Promise.resolve({ yaml_diff: DIFF })
+        ? Promise.resolve(MIGRATED)
         : Promise.reject(new Error("ws down"));
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -159,7 +220,7 @@ describe("config-migration-notice", () => {
   });
 
   it("re-arms when the buffer moves during the load-time round-trip", async () => {
-    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let resolveFirst!: (value: MigrateConfigResponse) => void;
     let call = 0;
     const api = makeApi(() => {
       call += 1;
@@ -168,12 +229,12 @@ describe("config-migration-notice", () => {
           resolveFirst = resolve;
         });
       }
-      return Promise.resolve({ yaml_diff: DIFF });
+      return Promise.resolve(MIGRATED);
     });
     const [el] = await mount(LEGACY, api);
     el.yaml = `${LEGACY}# edited\n`;
     await el.updateComplete;
-    resolveFirst({ yaml_diff: DIFF });
+    resolveFirst(MIGRATED);
     await Promise.resolve();
     await vi.runAllTimersAsync();
     await el.updateComplete;
@@ -182,7 +243,7 @@ describe("config-migration-notice", () => {
   });
 
   it("typing defers a pending load-path re-arm instead of firing per debounce", async () => {
-    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let resolveFirst!: (value: MigrateConfigResponse) => void;
     let call = 0;
     const api = makeApi(() => {
       call += 1;
@@ -191,12 +252,12 @@ describe("config-migration-notice", () => {
           resolveFirst = resolve;
         });
       }
-      return Promise.resolve({ yaml_diff: DIFF });
+      return Promise.resolve(MIGRATED);
     });
     const [el] = await mount(LEGACY, api);
     el.yaml = `${LEGACY}# one\n`;
     await el.updateComplete;
-    resolveFirst({ yaml_diff: DIFF });
+    resolveFirst(MIGRATED);
     await Promise.resolve();
     // Keystrokes inside the debounce window keep deferring the re-arm.
     await vi.advanceTimersByTimeAsync(400);
@@ -211,7 +272,7 @@ describe("config-migration-notice", () => {
   });
 
   it("a resolve after disconnect arms nothing", async () => {
-    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let resolveFirst!: (value: MigrateConfigResponse) => void;
     const api = makeApi(
       () =>
         new Promise((resolve) => {
@@ -222,7 +283,7 @@ describe("config-migration-notice", () => {
     el.yaml = `${LEGACY}# edited\n`;
     await el.updateComplete;
     el.remove();
-    resolveFirst({ yaml_diff: DIFF });
+    resolveFirst(MIGRATED);
     await Promise.resolve();
     await vi.runAllTimersAsync();
     expect(api.migrateConfig).toHaveBeenCalledTimes(1);
@@ -249,7 +310,7 @@ describe("config-migration-notice", () => {
   });
 
   it("discards a resolve from before a configuration switch", async () => {
-    let resolveFirst!: (value: { yaml_diff: YamlDiff | null }) => void;
+    let resolveFirst!: (value: MigrateConfigResponse) => void;
     let call = 0;
     const api = makeApi(() => {
       call += 1;
@@ -258,14 +319,14 @@ describe("config-migration-notice", () => {
           resolveFirst = resolve;
         });
       }
-      return Promise.resolve({ yaml_diff: null });
+      return Promise.resolve(CLEAN);
     });
     const [el] = await mount(LEGACY, api);
     el.configuration = "other.yaml";
     el.yaml = CANONICAL;
     await el.updateComplete;
     // The stale resolve for kitchen.yaml lands after the switch.
-    resolveFirst({ yaml_diff: DIFF });
+    resolveFirst(MIGRATED);
     await Promise.resolve();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".notice")).toBeNull();

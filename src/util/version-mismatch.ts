@@ -34,6 +34,12 @@ export function isPinnableVersion(version: string): boolean {
   return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?$/.test(version);
 }
 
+/** ``YYYY.M`` of an ESPHome version (``2026.8.0b5`` → ``2026.8``); the input when unparseable. */
+export function releaseLine(version: string): string {
+  const match = /^(\d+)\.(\d+)/.exec(version);
+  return match ? `${match[1]}.${match[2]}` : version;
+}
+
 /**
  * Returns the mismatch classification for two ESPHome version
  * strings. See module docstring for the contract.

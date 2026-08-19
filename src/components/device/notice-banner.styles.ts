@@ -40,7 +40,7 @@ export const noticeBannerStyles = css`
     min-width: 0;
   }
 
-  .body p {
+  .body .text {
     margin: 0;
   }
 
@@ -67,6 +67,22 @@ export const noticeBannerStyles = css`
   .cta:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
+  }
+
+  .cta--secondary {
+    background: transparent;
+    color: var(--esphome-primary);
+    border: var(--wa-border-width-s) solid var(--esphome-primary);
+  }
+
+  .cta--secondary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
   }
 `;
 
