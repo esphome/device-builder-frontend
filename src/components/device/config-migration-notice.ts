@@ -167,7 +167,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
   private _renderChanges(changes: MigrationChange[]) {
     if (changes.length === 0)
       return this._localize("device.config_migration_notice_generic");
-    const lead = this._localize("device.config_migration_notice");
+    const lead = this._localize("device.config_migration_lead");
     const listed = changes.slice(0, MAX_LISTED_CHANGES);
     const more = changes.length - listed.length;
     return html`

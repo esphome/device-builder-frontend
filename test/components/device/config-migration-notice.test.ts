@@ -77,7 +77,7 @@ describe("config-migration-notice", () => {
     const [el, api] = await mount(LEGACY);
     const notice = el.shadowRoot!.querySelector(".notice");
     expect(notice).not.toBeNull();
-    expect(notice?.textContent).toContain("device.config_migration_notice");
+    expect(notice?.textContent).toContain("device.config_migration_lead");
     expect(notice?.textContent).toContain("device.config_migration_change_field");
     // Config spellings are set in code.
     expect([...notice!.querySelectorAll("li code")].map((c) => c.textContent)).toEqual([

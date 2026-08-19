@@ -40,6 +40,7 @@ export const noticeBannerStyles = css`
     min-width: 0;
   }
 
+  .body p,
   .body .text {
     margin: 0;
   }
