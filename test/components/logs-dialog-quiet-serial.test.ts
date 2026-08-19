@@ -100,6 +100,22 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)).toBeNull();
   });
 
+  it("Reset Device with the banner up restarts the window", async () => {
+    await startSerial();
+    vi.advanceTimersByTime(5000);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+    call(el, "_onResetDevice");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(4999);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(1);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
   it("a deliberate Stop (pause) never counts as silence", async () => {
     await startSerial();
     call(el, "_onStop");

@@ -191,6 +191,9 @@ export function onStart(host: ESPHomeLogsDialog): void {
 export function resumeSerial(host: ESPHomeLogsDialog): void {
   const s = host._session;
   if (s.kind !== "serial") return;
+  // A banner already up (the watchdog fired) counts as armed, so drop it
+  // first and let willUpdate open a fresh window off the rebuilt session.
+  host._quietSerial.disarm();
   host._session = { ...s, paused: false, outputSeen: false };
 }
 
