@@ -1034,7 +1034,7 @@
     "config_migration_change_required": "The installed ESPHome no longer accepts the old spelling; update the config before it will compile.",
     "config_migration_migrate": "Update config",
     "config_migration_preview": "Preview",
-    "config_migration_preview_title": "Config update preview",
+    "config_migration_preview_title": "Config update preview for {configuration}",
     "config_migration_applied": "Config updated in the draft. Save to apply.",
     "config_migration_failed": "Could not update the config.",
     "config_migration_none": "Nothing to update.",

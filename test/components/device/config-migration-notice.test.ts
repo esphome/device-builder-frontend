@@ -50,7 +50,8 @@ async function mount(
 ): Promise<[ESPHomeConfigMigrationNotice, ReturnType<typeof makeApi>]> {
   const el = new ESPHomeConfigMigrationNotice();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._localize = (key: string) => key;
+  (el as any)._localize = (key: string, values?: Record<string, string | number>) =>
+    `${key} ${values ? Object.values(values).join(" ") : ""}`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._api = api;
   el.configuration = "kitchen.yaml";
@@ -77,11 +78,17 @@ describe("config-migration-notice", () => {
     const notice = el.shadowRoot!.querySelector(".notice");
     expect(notice).not.toBeNull();
     expect(notice?.textContent).toContain("device.config_migration_change_field");
+    // Config spellings are set in code.
+    expect([...notice!.querySelectorAll("li code")].map((c) => c.textContent)).toEqual([
+      "services",
+      "actions",
+      "api",
+    ]);
     expect(api.migrateConfig).toHaveBeenCalledWith(LEGACY);
   });
 
   it("lists the first changes and collapses the rest", async () => {
-    const changes = Array.from({ length: 5 }, (_, i) => ({
+    const changes = Array.from({ length: 12 }, (_, i) => ({
       ...API_CHANGE,
       scope: `s${i}`,
     }));
@@ -90,8 +97,8 @@ describe("config-migration-notice", () => {
       makeApi(() => Promise.resolve({ yaml_diff: DIFF, changes }))
     );
     const items = el.shadowRoot!.querySelectorAll(".notice li");
-    expect(items).toHaveLength(4);
-    expect(items[3].textContent).toContain("device.editor_invalid_more");
+    expect(items).toHaveLength(11);
+    expect(items[10].textContent).toContain("device.editor_invalid_more");
     expect(el.shadowRoot!.querySelector(".required")).toBeNull();
   });
 
@@ -116,6 +123,7 @@ describe("config-migration-notice", () => {
     await dialog.updateComplete;
     expect(dialog.shadowRoot!.querySelector("esphome-base-dialog")?.open).toBe(true);
     expect(dialog.shadowRoot!.querySelector("esphome-yaml-diff")).not.toBeNull();
+    expect(dialog.configuration).toBe("kitchen.yaml");
     expect(dialog.oldValue).toBe(LEGACY);
     expect(dialog.newValue).toBe("api:\n  actions:\n      then: []\n");
     const seen = vi.fn();

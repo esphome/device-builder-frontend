@@ -37,7 +37,7 @@ registerMdiIcons({ update: mdiUpdate, close: mdiClose });
 const RECHECK_DEBOUNCE_MS = 750;
 
 /** Changes listed in the banner before the rest collapse into "and N more". */
-const MAX_LISTED_CHANGES = 3;
+const MAX_LISTED_CHANGES = 10;
 
 /** A dry run that found something: the draft it saw, that draft migrated, and the rules. */
 interface Detection {
@@ -119,6 +119,10 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
         margin: 0;
         padding-left: 1.2em;
       }
+      code {
+        font-family: var(--wa-font-family-code);
+        font-size: var(--wa-font-size-xs);
+      }
     `,
   ];
 
@@ -145,6 +149,7 @@ export class ESPHomeConfigMigrationNotice extends LitElement {
         })}
       </div>
       <esphome-config-migration-preview-dialog
+        .configuration=${this.configuration}
         .oldValue=${detection.yaml}
         .newValue=${detection.migrated}
       ></esphome-config-migration-preview-dialog>

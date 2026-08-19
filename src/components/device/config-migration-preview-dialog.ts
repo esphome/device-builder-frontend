@@ -26,6 +26,9 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  /** The configuration (YAML filename) the draft belongs to; names the dialog. */
+  @property() configuration = "";
+
   /** The draft the migration was computed for. */
   @property({ attribute: false }) oldValue = "";
 
@@ -66,7 +69,9 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize("device.config_migration_preview_title")}
+        .label=${this._localize("device.config_migration_preview_title", {
+          configuration: this.configuration,
+        })}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._dialog.onAfterHide}
       >
