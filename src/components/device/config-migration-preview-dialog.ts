@@ -1,5 +1,4 @@
 import { consume } from "@lit/context";
-import { mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -12,16 +11,10 @@ import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderRevealSensitiveToggle } from "./reveal-sensitive-toggle.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
 import "../yaml-diff.js";
-
-registerMdiIcons({
-  eye: mdiEye,
-  "eye-off": mdiEyeOff,
-});
 
 /**
  * Before/after preview of the one-click config migration: the draft
@@ -94,7 +87,13 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
       >
         ${
           this._dialog.open
-            ? html`<div class="diff-header">${this._renderRevealToggle()}</div>
+            ? html`<div class="diff-header">
+                  ${renderRevealSensitiveToggle(
+                    this._localize,
+                    this._revealSensitive,
+                    this._toggleRevealSensitive
+                  )}
+                </div>
                 <div class="diff">
                   <esphome-yaml-diff
                     .oldValue=${this.oldValue}
@@ -116,27 +115,9 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
     `;
   }
 
-  private _renderRevealToggle() {
-    const label = this._localize(
-      this._revealSensitive
-        ? "device.yaml_mask_sensitive"
-        : "device.yaml_reveal_sensitive"
-    );
-    return html`<button
-      type="button"
-      class="ghost-icon-btn"
-      aria-pressed=${this._revealSensitive}
-      aria-label=${label}
-      title=${label}
-      @click=${this._toggleRevealSensitive}
-    >
-      <wa-icon library="mdi" name=${this._revealSensitive ? "eye-off" : "eye"}></wa-icon>
-    </button>`;
-  }
-
-  private _toggleRevealSensitive() {
+  private _toggleRevealSensitive = () => {
     this._revealSensitive = !this._revealSensitive;
-  }
+  };
 
   private _confirm() {
     this.close();

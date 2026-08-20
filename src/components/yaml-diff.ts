@@ -1,8 +1,10 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
+import { sensitiveMaskDeclarationsCss } from "../styles/sensitive-mask.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { type DiffLine, diffLines } from "../util/diff-lines.js";
 import {
@@ -10,17 +12,9 @@ import {
   type SensitiveValueRange,
 } from "../util/yaml-sensitive-scan.js";
 
-/** Per-side sensitive-value ranges, keyed by 1-indexed line number. */
-interface SensitiveLineMasks {
-  old: Map<number, SensitiveValueRange[]>;
-  new: Map<number, SensitiveValueRange[]>;
-}
-
-function groupRangesByLine(
-  ranges: SensitiveValueRange[]
-): Map<number, SensitiveValueRange[]> {
+function sensitiveRangesByLine(yaml: string): Map<number, SensitiveValueRange[]> {
   const byLine = new Map<number, SensitiveValueRange[]>();
-  for (const range of ranges) {
+  for (const range of findSensitiveValueRanges(yaml)) {
     const existing = byLine.get(range.line);
     if (existing) {
       existing.push(range);
@@ -46,6 +40,15 @@ export class ESPHomeYamlDiff extends LitElement {
   @property() newValue = "";
 
   @property({ type: Boolean }) revealSensitive = false;
+
+  // Memoized on the documents: the reveal toggle re-renders this component
+  // without changing them, and the LCS diff is the expensive part. One
+  // memo per side (memoizeOne caches a single call).
+  private _diffLines = memoizeOne(diffLines);
+
+  private _oldMasks = memoizeOne(sensitiveRangesByLine);
+
+  private _newMasks = memoizeOne(sensitiveRangesByLine);
 
   static styles = css`
     :host {
@@ -153,9 +156,7 @@ export class ESPHomeYamlDiff extends LitElement {
     }
 
     .content .sensitive {
-      -webkit-text-security: disc;
-      text-security: disc;
-      letter-spacing: 0.5px;
+      ${sensitiveMaskDeclarationsCss}
     }
   `;
 
@@ -170,36 +171,28 @@ export class ESPHomeYamlDiff extends LitElement {
       return html`<div class="empty">${this._localize("device.diff_no_changes")}</div>`;
     }
 
-    const lines = diffLines(this.oldValue, this.newValue);
-    const masks = this.revealSensitive ? undefined : this._computeMasks();
+    // The diff runs on the raw text and masking wraps each rendered row:
+    // masking the inputs first would collapse a changed credential into an
+    // unchanged context row.
+    const lines = this._diffLines(this.oldValue, this.newValue);
+    const oldMasks = this.revealSensitive ? undefined : this._oldMasks(this.oldValue);
+    const newMasks = this.revealSensitive ? undefined : this._newMasks(this.newValue);
 
     return html`
       <table>
         <tbody>
-          ${lines.map((line) => this._renderLine(line, masks))}
+          ${lines.map((line) =>
+            this._renderLine(line, line.type === "remove" ? oldMasks : newMasks)
+          )}
         </tbody>
       </table>
     `;
   }
 
-  /**
-   * The diff runs on the raw text and masking happens per rendered row:
-   * masking the inputs first would collapse a changed credential into an
-   * unchanged context row. Whole-document scans keep the parent scope
-   * (``key:`` under ``encryption:``) a per-line scan would lose.
-   */
-  private _computeMasks(): SensitiveLineMasks {
-    return {
-      old: groupRangesByLine(findSensitiveValueRanges(this.oldValue)),
-      new: groupRangesByLine(findSensitiveValueRanges(this.newValue)),
-    };
-  }
-
-  private _renderLine(line: DiffLine, masks?: SensitiveLineMasks) {
+  private _renderLine(line: DiffLine, lineMasks?: Map<number, SensitiveValueRange[]>) {
     const marker = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
     const lineNumber = line.type === "remove" ? line.oldLine : line.newLine;
-    const sideLines = line.type === "remove" ? masks?.old : masks?.new;
-    const ranges = lineNumber === undefined ? undefined : sideLines?.get(lineNumber);
+    const ranges = lineNumber === undefined ? undefined : lineMasks?.get(lineNumber);
     return html`
       <tr class=${line.type}>
         <td class="gutter">${lineNumber ?? html`&nbsp;`}</td>
