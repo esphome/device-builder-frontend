@@ -14,6 +14,7 @@ registerMdiIcons({
 /**
  * The eye toggle every masked-YAML surface shares (editor toolbar, diff
  * previews). Hosts style it via `ghost-icon-btn` from `espHomeStyles`.
+ * Render at most once per shadow root: the tooltip anchor id is fixed.
  */
 export function renderRevealSensitiveToggle(
   localize: LocalizeFunc,

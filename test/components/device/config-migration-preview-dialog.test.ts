@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import "../../_mock-webawesome.js";
 
 import { mount } from "../../_dom.js";
+import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { ESPHomeConfigMigrationPreviewDialog } from "../../../src/components/device/config-migration-preview-dialog.js";
 import type { ESPHomeYamlDiff } from "../../../src/components/yaml-diff.js";
 
@@ -57,8 +58,10 @@ describe("config-migration preview dialog reveal toggle", () => {
     const el = await mountOpen();
     const btn = toggle(el, "reveal");
     expect(btn.hasAttribute("title")).toBe(false);
-    const tip = el.shadowRoot!.querySelector("wa-tooltip[for]")!;
-    expect(tip.getAttribute("for")).toBe(btn.id);
+    expectTooltipsAnchored(el, 1);
+    expect(el.shadowRoot!.querySelector("wa-tooltip[for]")!.getAttribute("for")).toBe(
+      btn.id
+    );
   });
 
   it("resets to masked on reopen", async () => {

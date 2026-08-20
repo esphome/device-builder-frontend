@@ -5,8 +5,8 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
+import { expectTooltipsAnchored } from "../_tooltip-anchors.js";
 import { ESPHomeWebHeader } from "../../src/web/header/esphome-web-header.js";
-import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

@@ -18,8 +18,8 @@ vi.mock("../../../src/components/device/device-board-info.js", () => ({}));
 vi.mock("../../../src/components/yaml-editor.js", () => ({}));
 vi.mock("../../../src/components/yaml-diff.js", () => ({}));
 
+import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { ESPHomeDeviceEditor } from "../../../src/components/device/device-editor.js";
-import { expectTooltipsAnchored } from "../../web/_tooltip-anchors.js";
 
 // `_showDiffButton`, `_showDiff` and `_revealSensitive` are private @state but
 // at runtime are plain fields; the loose record lets a test seed them.

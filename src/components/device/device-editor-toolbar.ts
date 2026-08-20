@@ -28,6 +28,20 @@ export interface EditorToolbarProps {
  * styles apply.
  */
 export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
+  const layoutBtn = (mode: DeviceLayoutMode, icon: string, key: string, cls = "") => {
+    const label = p.localize(key);
+    return html`<button
+        id="btn-layout-${mode}"
+        type="button"
+        class="ghost-icon-btn ${cls}"
+        aria-pressed=${p.effectiveLayout === mode}
+        @click=${() => p.onSetLayout(mode)}
+        aria-label=${label}
+      >
+        <wa-icon library="mdi" name=${icon}></wa-icon>
+      </button>
+      <wa-tooltip for="btn-layout-${mode}">${label}</wa-tooltip>`;
+  };
   return html`<div class="header-actions">
     ${
       p.effectiveLayout !== "left"
@@ -66,43 +80,9 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
       aria-label=${p.localize("device.editor_layout_label")}
       ${tourAnchor("layout-toggle")}
     >
-      <button
-        id="btn-layout-left"
-        type="button"
-        class="ghost-icon-btn"
-        aria-pressed=${p.effectiveLayout === "left"}
-        @click=${() => p.onSetLayout("left")}
-        aria-label=${p.localize("device.layout_components_only")}
-      >
-        <wa-icon library="mdi" name="dock-left"></wa-icon>
-      </button>
-      <wa-tooltip for="btn-layout-left"
-        >${p.localize("device.layout_components_only")}</wa-tooltip
-      >
-      <button
-        id="btn-layout-split"
-        class="ghost-icon-btn split-btn"
-        type="button"
-        aria-pressed=${p.effectiveLayout === "both"}
-        @click=${() => p.onSetLayout("both")}
-        aria-label=${p.localize("device.layout_split")}
-      >
-        <wa-icon library="mdi" name="view-split-vertical"></wa-icon>
-      </button>
-      <wa-tooltip for="btn-layout-split">${p.localize("device.layout_split")}</wa-tooltip>
-      <button
-        id="btn-layout-right"
-        type="button"
-        class="ghost-icon-btn"
-        aria-pressed=${p.effectiveLayout === "right"}
-        @click=${() => p.onSetLayout("right")}
-        aria-label=${p.localize("device.layout_yaml_only")}
-      >
-        <wa-icon library="mdi" name="dock-right"></wa-icon>
-      </button>
-      <wa-tooltip for="btn-layout-right"
-        >${p.localize("device.layout_yaml_only")}</wa-tooltip
-      >
+      ${layoutBtn("left", "dock-left", "device.layout_components_only")}
+      ${layoutBtn("both", "view-split-vertical", "device.layout_split", "split-btn")}
+      ${layoutBtn("right", "dock-right", "device.layout_yaml_only")}
     </div>
   </div>`;
 }
