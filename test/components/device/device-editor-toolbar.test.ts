@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 // Stub the heavy children (they pull in CodeMirror / wa-button); the toolbar
 // under test uses plain buttons, so this keeps the mount light and quiet.
@@ -17,6 +18,7 @@ vi.mock("../../../src/components/device/device-board-info.js", () => ({}));
 vi.mock("../../../src/components/yaml-editor.js", () => ({}));
 vi.mock("../../../src/components/yaml-diff.js", () => ({}));
 
+import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { ESPHomeDeviceEditor } from "../../../src/components/device/device-editor.js";
 
 // `_showDiffButton`, `_showDiff` and `_revealSensitive` are private @state but
@@ -96,6 +98,15 @@ describe("device-editor header toolbar", () => {
     await on.updateComplete;
     // Flips into diff view: the button now offers the way back to the editor.
     expect(q(on, '[aria-label="device.diff_view_editor"]')).not.toBeNull();
+  });
+
+  it("anchors a wa-tooltip to every toolbar icon button, with no native title", async () => {
+    const el = await mount({ layout: "both", _showDiffButton: true });
+    // Reveal eye + diff toggle + the three layout buttons.
+    expectTooltipsAnchored(el, 5);
+    for (const btn of qa(el, ".header-actions .ghost-icon-btn")) {
+      expect(btn.hasAttribute("title")).toBe(false);
+    }
   });
 
   it("drives the diff pane's reveal state from the toolbar eye", async () => {

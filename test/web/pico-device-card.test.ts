@@ -13,8 +13,8 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
+import { expectTooltipsAnchored } from "../_tooltip-anchors.js";
 import { ESPHomeWebPicoDeviceCard } from "../../src/web/dashboard/esphome-web-pico-device-card.js";
-import { expectTooltipsAnchored } from "./_tooltip-anchors.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
