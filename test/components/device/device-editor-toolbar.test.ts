@@ -97,6 +97,20 @@ describe("device-editor header toolbar", () => {
     // Flips into diff view: the button now offers the way back to the editor.
     expect(q(on, '[aria-label="device.diff_view_editor"]')).not.toBeNull();
   });
+
+  it("drives the diff pane's reveal state from the toolbar eye", async () => {
+    const el = await mount({
+      layout: "both",
+      _showDiffButton: true,
+      _showDiff: true,
+    });
+    const diff = q(el, "esphome-yaml-diff") as unknown as { revealSensitive: boolean };
+    expect(diff.revealSensitive).toBe(false);
+
+    q(el, '[aria-label="device.yaml_reveal_sensitive"]')!.click();
+    await el.updateComplete;
+    expect(diff.revealSensitive).toBe(true);
+  });
 });
 
 describe("device-editor save button", () => {
