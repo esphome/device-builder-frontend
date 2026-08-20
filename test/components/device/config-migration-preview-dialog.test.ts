@@ -53,6 +53,14 @@ describe("config-migration preview dialog reveal toggle", () => {
     expect(toggle(el, "mask").getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("anchors a wa-tooltip to the reveal toggle, with no native title", async () => {
+    const el = await mountOpen();
+    const btn = toggle(el, "reveal");
+    expect(btn.hasAttribute("title")).toBe(false);
+    const tip = el.shadowRoot!.querySelector("wa-tooltip[for]")!;
+    expect(tip.getAttribute("for")).toBe(btn.id);
+  });
+
   it("resets to masked on reopen", async () => {
     const el = await mountOpen();
     toggle(el, "reveal").click();

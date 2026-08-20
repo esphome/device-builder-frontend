@@ -4,6 +4,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   eye: mdiEye,
@@ -24,13 +25,14 @@ export function renderRevealSensitiveToggle(
     revealed ? "device.yaml_mask_sensitive" : "device.yaml_reveal_sensitive"
   );
   return html`<button
-    type="button"
-    class="ghost-icon-btn ${extraClass}"
-    aria-pressed=${revealed}
-    aria-label=${label}
-    title=${label}
-    @click=${onToggle}
-  >
-    <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
-  </button>`;
+      id="btn-reveal-sensitive"
+      type="button"
+      class="ghost-icon-btn ${extraClass}"
+      aria-pressed=${revealed}
+      aria-label=${label}
+      @click=${onToggle}
+    >
+      <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
+    </button>
+    <wa-tooltip for="btn-reveal-sensitive">${label}</wa-tooltip>`;
 }

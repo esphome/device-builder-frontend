@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 // Stub the heavy children (they pull in CodeMirror / wa-button); the footer
 // under test uses plain buttons, so this keeps the mount light and quiet.
 vi.mock("../../../src/components/device/device-board-info.js", () => ({}));
