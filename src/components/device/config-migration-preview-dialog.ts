@@ -11,6 +11,7 @@ import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { renderRevealSensitiveToggle } from "./reveal-sensitive-toggle.js";
 
 import "../base-dialog.js";
 import "../yaml-diff.js";
@@ -35,6 +36,8 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
   /** The draft with the migration applied. */
   @property({ attribute: false }) newValue = "";
 
+  @state() private _revealSensitive = false;
+
   private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
@@ -58,6 +61,7 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
   ];
 
   open() {
+    this._revealSensitive = false;
     this._dialog.open = true;
   }
 
@@ -81,11 +85,17 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
                 <esphome-yaml-diff
                   .oldValue=${this.oldValue}
                   .newValue=${this.newValue}
+                  .revealSensitive=${this._revealSensitive}
                 ></esphome-yaml-diff>
               </div>`
             : nothing
         }
         <div class="actions">
+          ${renderRevealSensitiveToggle(
+            this._localize,
+            this._revealSensitive,
+            this._toggleRevealSensitive
+          )}
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
@@ -96,6 +106,10 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
       </esphome-base-dialog>
     `;
   }
+
+  private _toggleRevealSensitive = () => {
+    this._revealSensitive = !this._revealSensitive;
+  };
 
   private _confirm() {
     this.close();

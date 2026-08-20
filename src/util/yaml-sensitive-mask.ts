@@ -32,6 +32,7 @@ import {
   StateField,
 } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
+import { SENSITIVE_MASK_DECLARATIONS } from "../styles/sensitive-mask.js";
 import { findSensitiveValueRanges } from "./yaml-sensitive-scan.js";
 
 export const setRevealSensitiveEffect = StateEffect.define<boolean>();
@@ -109,17 +110,5 @@ export function sensitiveValueMaskExtension(
 }
 
 const sensitiveMaskTheme = EditorView.theme({
-  ".cm-esphome-sensitive-value": {
-    // Standard property is `text-security` (CSS Working Draft); the
-    // `-webkit-` prefix is what actually ships in browsers today.
-    // Firefox accepts the prefixed form since 125; Chromium/Safari
-    // have shipped it for years. We set both so a future un-prefix
-    // doesn't regress.
-    "-webkit-text-security": "disc",
-    "text-security": "disc",
-    // Letter-spacing nudge so the bullets sit a bit looser and don't
-    // mash together — purely cosmetic, mirrors how bullets render in
-    // a native `<input type="password">`.
-    "letter-spacing": "0.5px",
-  },
+  ".cm-esphome-sensitive-value": { ...SENSITIVE_MASK_DECLARATIONS },
 });

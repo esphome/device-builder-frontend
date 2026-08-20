@@ -1,10 +1,29 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
+import { sensitiveMaskDeclarationsCss } from "../styles/sensitive-mask.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { type DiffLine, diffLines } from "../util/diff-lines.js";
+import {
+  findSensitiveValueRanges,
+  type SensitiveValueRange,
+} from "../util/yaml-sensitive-scan.js";
+
+function sensitiveRangesByLine(yaml: string): Map<number, SensitiveValueRange[]> {
+  const byLine = new Map<number, SensitiveValueRange[]>();
+  for (const range of findSensitiveValueRanges(yaml)) {
+    const existing = byLine.get(range.line);
+    if (existing) {
+      existing.push(range);
+    } else {
+      byLine.set(range.line, [range]);
+    }
+  }
+  return byLine;
+}
 
 @customElement("esphome-yaml-diff")
 export class ESPHomeYamlDiff extends LitElement {
@@ -19,6 +38,17 @@ export class ESPHomeYamlDiff extends LitElement {
   @property() oldValue = "";
 
   @property() newValue = "";
+
+  @property({ type: Boolean }) revealSensitive = false;
+
+  // Memoized on the documents: the reveal toggle re-renders this component
+  // without changing them, and the LCS diff is the expensive part. One
+  // memo per side (memoizeOne caches a single call).
+  private _diffLines = memoizeOne(diffLines);
+
+  private _oldMasks = memoizeOne(sensitiveRangesByLine);
+
+  private _newMasks = memoizeOne(sensitiveRangesByLine);
 
   static styles = css`
     :host {
@@ -124,6 +154,10 @@ export class ESPHomeYamlDiff extends LitElement {
     tr.remove .marker {
       background: var(--diff-remove-marker-bg);
     }
+
+    .content .sensitive {
+      ${sensitiveMaskDeclarationsCss}
+    }
   `;
 
   protected render() {
@@ -137,27 +171,61 @@ export class ESPHomeYamlDiff extends LitElement {
       return html`<div class="empty">${this._localize("device.diff_no_changes")}</div>`;
     }
 
-    const lines = diffLines(this.oldValue, this.newValue);
+    // The diff runs on the raw text and masking wraps each rendered row:
+    // masking the inputs first would collapse a changed credential into an
+    // unchanged context row.
+    const lines = this._diffLines(this.oldValue, this.newValue);
+    const oldMasks = this.revealSensitive ? undefined : this._oldMasks(this.oldValue);
+    const newMasks = this.revealSensitive ? undefined : this._newMasks(this.newValue);
 
     return html`
       <table>
         <tbody>
-          ${lines.map((line) => this._renderLine(line))}
+          ${lines.map((line) => this._renderLine(line, oldMasks, newMasks))}
         </tbody>
       </table>
     `;
   }
 
-  private _renderLine(line: DiffLine) {
+  private _renderLine(
+    line: DiffLine,
+    oldMasks?: Map<number, SensitiveValueRange[]>,
+    newMasks?: Map<number, SensitiveValueRange[]>
+  ) {
     const marker = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
     const lineNumber = line.type === "remove" ? line.oldLine : line.newLine;
+    // A context row's text is identical on both sides but its sensitivity
+    // may not be: deleting `encryption:` leaves the byte-identical `key:`
+    // line parented differently, so a row masks when either side's scan
+    // marks it. Remove/add rows exist on one side only, so the fallback
+    // chain degenerates to that side's ranges.
+    const oldRanges =
+      line.oldLine === undefined ? undefined : oldMasks?.get(line.oldLine);
+    const newRanges =
+      line.newLine === undefined ? undefined : newMasks?.get(line.newLine);
+    const ranges = newRanges ?? oldRanges;
     return html`
       <tr class=${line.type}>
         <td class="gutter">${lineNumber ?? html`&nbsp;`}</td>
         <td class="marker">${marker}</td>
-        <td class="content">${line.content || nothing}</td>
+        <td class="content">${this._renderContent(line.content, ranges)}</td>
       </tr>
     `;
+  }
+
+  private _renderContent(content: string, ranges?: SensitiveValueRange[]) {
+    if (!ranges?.length) return content || nothing;
+    const segments: (string | TemplateResult)[] = [];
+    let cursor = 0;
+    for (const { valueFrom, valueTo } of ranges) {
+      if (valueFrom > cursor) segments.push(content.slice(cursor, valueFrom));
+      segments.push(
+        html`<span class="sensitive">${content.slice(valueFrom, valueTo)}</span>`
+      );
+      cursor = valueTo;
+    }
+    if (cursor < content.length) segments.push(content.slice(cursor));
+    return segments;
   }
 }
 

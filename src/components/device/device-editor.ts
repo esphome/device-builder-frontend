@@ -4,8 +4,6 @@ import {
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
-  mdiEye,
-  mdiEyeOff,
   mdiFileCompare,
   mdiUpload,
   mdiViewSplitVertical,
@@ -66,8 +64,6 @@ import "./editor-invalid-banner.js";
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "content-save": mdiContentSave,
-  eye: mdiEye,
-  "eye-off": mdiEyeOff,
   "dock-left": mdiDockLeft,
   "dock-right": mdiDockRight,
   "view-split-vertical": mdiViewSplitVertical,
@@ -405,6 +401,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                     ? html`<esphome-yaml-diff
                         .oldValue=${this.savedYaml}
                         .newValue=${this.yaml}
+                        .revealSensitive=${this._revealSensitive}
                       ></esphome-yaml-diff>`
                     : html`<esphome-yaml-editor
                         .value=${this.yaml}

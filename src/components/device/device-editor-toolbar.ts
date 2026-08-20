@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { DeviceLayoutMode } from "./device-editor.js";
+import { renderRevealSensitiveToggle } from "./reveal-sensitive-toggle.js";
 
 export interface EditorToolbarProps {
   localize: LocalizeFunc;
@@ -28,26 +29,12 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
   return html`<div class="header-actions">
     ${
       p.effectiveLayout !== "left"
-        ? (() => {
-            const sensitiveLabel = p.localize(
-              p.revealSensitive
-                ? "device.yaml_mask_sensitive"
-                : "device.yaml_reveal_sensitive"
-            );
-            return html`<button
-              type="button"
-              class="ghost-icon-btn diff-toggle"
-              aria-pressed=${p.revealSensitive}
-              aria-label=${sensitiveLabel}
-              @click=${p.onToggleRevealSensitive}
-              title=${sensitiveLabel}
-            >
-              <wa-icon
-                library="mdi"
-                name=${p.revealSensitive ? "eye-off" : "eye"}
-              ></wa-icon>
-            </button>`;
-          })()
+        ? renderRevealSensitiveToggle(
+            p.localize,
+            p.revealSensitive,
+            p.onToggleRevealSensitive,
+            "diff-toggle"
+          )
         : nothing
     }
     ${
