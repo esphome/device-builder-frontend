@@ -1,10 +1,35 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { type DiffLine, diffLines } from "../util/diff-lines.js";
+import {
+  findSensitiveValueRanges,
+  type SensitiveValueRange,
+} from "../util/yaml-sensitive-scan.js";
+
+/** Per-side sensitive-value ranges, keyed by 1-indexed line number. */
+interface SensitiveLineMasks {
+  old: Map<number, SensitiveValueRange[]>;
+  new: Map<number, SensitiveValueRange[]>;
+}
+
+function groupRangesByLine(
+  ranges: SensitiveValueRange[]
+): Map<number, SensitiveValueRange[]> {
+  const byLine = new Map<number, SensitiveValueRange[]>();
+  for (const range of ranges) {
+    const existing = byLine.get(range.line);
+    if (existing) {
+      existing.push(range);
+    } else {
+      byLine.set(range.line, [range]);
+    }
+  }
+  return byLine;
+}
 
 @customElement("esphome-yaml-diff")
 export class ESPHomeYamlDiff extends LitElement {
@@ -19,6 +44,8 @@ export class ESPHomeYamlDiff extends LitElement {
   @property() oldValue = "";
 
   @property() newValue = "";
+
+  @property({ type: Boolean }) revealSensitive = false;
 
   static styles = css`
     :host {
@@ -124,6 +151,12 @@ export class ESPHomeYamlDiff extends LitElement {
     tr.remove .marker {
       background: var(--diff-remove-marker-bg);
     }
+
+    .content .sensitive {
+      -webkit-text-security: disc;
+      text-security: disc;
+      letter-spacing: 0.5px;
+    }
   `;
 
   protected render() {
@@ -138,26 +171,57 @@ export class ESPHomeYamlDiff extends LitElement {
     }
 
     const lines = diffLines(this.oldValue, this.newValue);
+    const masks = this.revealSensitive ? undefined : this._computeMasks();
 
     return html`
       <table>
         <tbody>
-          ${lines.map((line) => this._renderLine(line))}
+          ${lines.map((line) => this._renderLine(line, masks))}
         </tbody>
       </table>
     `;
   }
 
-  private _renderLine(line: DiffLine) {
+  /**
+   * The diff runs on the raw text and masking happens per rendered row:
+   * masking the inputs first would collapse a changed credential into an
+   * unchanged context row. Whole-document scans keep the parent scope
+   * (``key:`` under ``encryption:``) a per-line scan would lose.
+   */
+  private _computeMasks(): SensitiveLineMasks {
+    return {
+      old: groupRangesByLine(findSensitiveValueRanges(this.oldValue)),
+      new: groupRangesByLine(findSensitiveValueRanges(this.newValue)),
+    };
+  }
+
+  private _renderLine(line: DiffLine, masks?: SensitiveLineMasks) {
     const marker = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
     const lineNumber = line.type === "remove" ? line.oldLine : line.newLine;
+    const sideLines = line.type === "remove" ? masks?.old : masks?.new;
+    const ranges = lineNumber === undefined ? undefined : sideLines?.get(lineNumber);
     return html`
       <tr class=${line.type}>
         <td class="gutter">${lineNumber ?? html`&nbsp;`}</td>
         <td class="marker">${marker}</td>
-        <td class="content">${line.content || nothing}</td>
+        <td class="content">${this._renderContent(line.content, ranges)}</td>
       </tr>
     `;
+  }
+
+  private _renderContent(content: string, ranges?: SensitiveValueRange[]) {
+    if (!ranges?.length) return content || nothing;
+    const segments: (string | TemplateResult)[] = [];
+    let cursor = 0;
+    for (const { valueFrom, valueTo } of ranges) {
+      if (valueFrom > cursor) segments.push(content.slice(cursor, valueFrom));
+      segments.push(
+        html`<span class="sensitive">${content.slice(valueFrom, valueTo)}</span>`
+      );
+      cursor = valueTo;
+    }
+    if (cursor < content.length) segments.push(content.slice(cursor));
+    return segments;
   }
 }
 
