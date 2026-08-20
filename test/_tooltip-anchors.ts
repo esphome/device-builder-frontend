@@ -9,8 +9,11 @@ import { expect } from "vitest";
 export function expectTooltipsAnchored(el: HTMLElement, count: number): void {
   const tips = [...el.shadowRoot!.querySelectorAll("wa-tooltip[for]")];
   expect(tips.length).toBe(count);
-  for (const tip of tips) {
-    const id = tip.getAttribute("for")!;
+  const ids = tips.map((tip) => tip.getAttribute("for")!);
+  // getElementById returns the first match, so tooltips sharing an anchor
+  // id silently pile onto one button; require distinct anchors.
+  expect(new Set(ids).size, "duplicate wa-tooltip anchors").toBe(ids.length);
+  for (const id of ids) {
     expect(el.shadowRoot!.getElementById(id), id).not.toBeNull();
   }
 }
