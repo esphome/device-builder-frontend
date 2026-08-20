@@ -181,18 +181,29 @@ export class ESPHomeYamlDiff extends LitElement {
     return html`
       <table>
         <tbody>
-          ${lines.map((line) =>
-            this._renderLine(line, line.type === "remove" ? oldMasks : newMasks)
-          )}
+          ${lines.map((line) => this._renderLine(line, oldMasks, newMasks))}
         </tbody>
       </table>
     `;
   }
 
-  private _renderLine(line: DiffLine, lineMasks?: Map<number, SensitiveValueRange[]>) {
+  private _renderLine(
+    line: DiffLine,
+    oldMasks?: Map<number, SensitiveValueRange[]>,
+    newMasks?: Map<number, SensitiveValueRange[]>
+  ) {
     const marker = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
     const lineNumber = line.type === "remove" ? line.oldLine : line.newLine;
-    const ranges = lineNumber === undefined ? undefined : lineMasks?.get(lineNumber);
+    // A context row's text is identical on both sides but its sensitivity
+    // may not be: deleting `encryption:` leaves the byte-identical `key:`
+    // line parented differently, so a row masks when either side's scan
+    // marks it. Remove/add rows exist on one side only, so the fallback
+    // chain degenerates to that side's ranges.
+    const oldRanges =
+      line.oldLine === undefined ? undefined : oldMasks?.get(line.oldLine);
+    const newRanges =
+      line.newLine === undefined ? undefined : newMasks?.get(line.newLine);
+    const ranges = newRanges ?? oldRanges;
     return html`
       <tr class=${line.type}>
         <td class="gutter">${lineNumber ?? html`&nbsp;`}</td>

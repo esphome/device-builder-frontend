@@ -70,6 +70,18 @@ describe("yaml-diff credential masking", () => {
     expect(sensitiveSpans(keyRow)[0].textContent).toBe("q1w2e3r4t5y6u7i8o9p0==");
   });
 
+  it("masks a context row that is sensitive only on the old side", async () => {
+    // Deleting `encryption:` leaves the byte-identical `key:` line parented
+    // by `api:`, where the new-side scan alone would let it through.
+    const el = await mount(new ESPHomeYamlDiff(), {
+      oldValue: "api:\n  encryption:\n    key: q1w2e3r4==\n",
+      newValue: "api:\n    key: q1w2e3r4==\n",
+    });
+    const keyRow = rowsContaining(el, "key:")[0];
+    expect(keyRow.className).toBe("context");
+    expect(sensitiveSpans(keyRow)[0].textContent).toBe("q1w2e3r4==");
+  });
+
   it("leaves non-sensitive values unwrapped", async () => {
     const el = await mount(new ESPHomeYamlDiff(), {
       oldValue: OLD_YAML,
