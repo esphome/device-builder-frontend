@@ -50,12 +50,6 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
         --width: min(900px, 95vw);
       }
 
-      .diff-header {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: var(--wa-space-2xs);
-      }
-
       .diff {
         display: flex;
         height: min(60vh, 600px);
@@ -87,23 +81,21 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
       >
         ${
           this._dialog.open
-            ? html`<div class="diff-header">
-                  ${renderRevealSensitiveToggle(
-                    this._localize,
-                    this._revealSensitive,
-                    this._toggleRevealSensitive
-                  )}
-                </div>
-                <div class="diff">
-                  <esphome-yaml-diff
-                    .oldValue=${this.oldValue}
-                    .newValue=${this.newValue}
-                    .revealSensitive=${this._revealSensitive}
-                  ></esphome-yaml-diff>
-                </div>`
+            ? html`<div class="diff">
+                <esphome-yaml-diff
+                  .oldValue=${this.oldValue}
+                  .newValue=${this.newValue}
+                  .revealSensitive=${this._revealSensitive}
+                ></esphome-yaml-diff>
+              </div>`
             : nothing
         }
         <div class="actions">
+          ${renderRevealSensitiveToggle(
+            this._localize,
+            this._revealSensitive,
+            this._toggleRevealSensitive
+          )}
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
