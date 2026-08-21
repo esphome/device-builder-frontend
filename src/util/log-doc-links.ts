@@ -31,6 +31,7 @@ export interface ActionableLogDocLink {
     | "ota_rollback"
     | "slow_component"
     | "sram1_as_iram"
+    | "tcp_buffer"
     | "wifi_ap_no_portal"
     | "wifi_reconnect";
 }
@@ -71,10 +72,38 @@ interface ActionableEntry {
   pattern: RegExp;
   url: string;
   body: ActionableLogDocLink["body"];
+  /** Lower-case ``target_platform`` prefixes the fix applies to; unset
+   *  means every platform. A gated entry never fires for an unknown
+   *  platform. */
+  platforms?: readonly string[];
+}
+
+/** Per-device inputs the line text alone can't carry. */
+export interface LogDocLinkOptions {
+  /** The device's ``target_platform`` (``esp32``, ``ESP8266``, …); empty
+   *  or absent when the host has no configured device. */
+  targetPlatform?: string;
 }
 
 const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
+const NETWORK_CONFIG_URL =
+  "https://esphome.io/components/network/#configuration-variables";
 const TROUBLESHOOTING_URL = "https://esphome.io/guides/troubleshooting/";
+
+// Every WARN-level send refusal the api / proxy components log when the
+// lwIP send buffer is full; the fix is network: tcp_send_buffer, which
+// only exists on ESP32. Verified against the esphome source: the shared
+// API_LOG_MSG_DROPPED helper ("<what> dropped, TCP buffer full") under
+// api / api.connection / voice_assistant / zwave_proxy, and the
+// bluetooth_proxy / bluetooth_connection reply deferrals and drops.
+const TCP_BUFFER_TAGS = [
+  "api",
+  "api.connection",
+  "voice_assistant",
+  "zwave_proxy",
+  "bluetooth_proxy",
+  "bluetooth_connection",
+] as const;
 
 // Verified live against esphome.io (200, anchor present, no redirect).
 // Keep this list small and URL-verified; most lines resolve through the
@@ -158,6 +187,35 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     url: "https://esphome.io/components/bluetooth_proxy/#how-active-connections-work",
     body: "ble_slots",
   },
+  {
+    level: "W",
+    tags: TCP_BUFFER_TAGS,
+    pattern: /TCP buffer full/,
+    url: NETWORK_CONFIG_URL,
+    body: "tcp_buffer",
+    platforms: ["esp32"],
+  },
+  {
+    // Same refusal without the literal text: a GATT reply displaced by a
+    // newer one or abandoned after retries, and the read / notify /
+    // services-done sends that report the failure directly. Only newer
+    // firmware appends the handle to the notify line.
+    level: "W",
+    tags: ["bluetooth_connection"],
+    pattern:
+      /GATT reply for handle 0x[0-9A-F]{4} (?:dropped for handle|undeliverable)|Failed to send (?:read|notify data) response|Failed to send services done|Services done undeliverable/,
+    url: NETWORK_CONFIG_URL,
+    body: "tcp_buffer",
+    platforms: ["esp32"],
+  },
+  {
+    level: "W",
+    tags: ["bluetooth_proxy"],
+    pattern: /dropped, displaced by/,
+    url: NETWORK_CONFIG_URL,
+    body: "tcp_buffer",
+    platforms: ["esp32"],
+  },
 ] as const;
 
 // Tag-keyed index so the per-line check is one Map miss for the vast
@@ -229,19 +287,26 @@ const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|lt)$/;
  * catalogued tag carries both. *integrationDocs* is the backend
  * ``components/get_integration_docs`` map (component name → docs URL,
  * display name, and trimmed description); a present entry guarantees
- * the page exists.
+ * the page exists. *options.targetPlatform* gates the platform-specific
+ * curated entries; a gated entry never fires when it is unknown.
  */
 export function resolveLogDocLink(
   line: string,
-  integrationDocs: Record<string, IntegrationDoc>
+  integrationDocs: Record<string, IntegrationDoc>,
+  options: LogDocLinkOptions = {}
 ): LogDocLinks | undefined {
   const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
+  const platform = options.targetPlatform?.trim().toLowerCase() ?? "";
 
   let actionable: ActionableLogDocLink | undefined;
   if (parsed) {
     for (const entry of ACTIONABLE_BY_TAG.get(parsed.tag) ?? []) {
-      if (entry.level === parsed.level && entry.pattern.test(clean)) {
+      if (entry.level !== parsed.level) continue;
+      // Prefix match: ESP32 variants may report as esp32s3 etc.
+      if (entry.platforms && !entry.platforms.some((p) => platform.startsWith(p)))
+        continue;
+      if (entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;
       }

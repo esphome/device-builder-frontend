@@ -227,6 +227,11 @@ export class ESPHomeAnsiLog extends LitElement {
   @property({ type: Boolean, attribute: "auto-scroll" })
   autoScroll = true;
 
+  /** The device's ``target_platform``; gates platform-specific doc links.
+   *  Empty when the host has no configured device. */
+  @property({ attribute: "target-platform" })
+  targetPlatform = "";
+
   @state()
   private _isUserScrolled = false;
 
@@ -329,9 +334,14 @@ export class ESPHomeAnsiLog extends LitElement {
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
-    // Resolutions are pure in (line, docs map); a docs-map change is the one
-    // input the line-keyed cache can't see, so drop it here.
-    if (changedProperties.has("_integrationDocs")) this._docLinkCache.clear();
+    // Resolutions are pure in (line, docs map, platform); the latter two are
+    // the inputs the line-keyed cache can't see, so drop it here.
+    if (
+      changedProperties.has("_integrationDocs") ||
+      changedProperties.has("targetPlatform")
+    ) {
+      this._docLinkCache.clear();
+    }
   }
 
   protected updated(changedProperties: Map<string, unknown>) {
@@ -427,7 +437,10 @@ export class ESPHomeAnsiLog extends LitElement {
     const cache = this._docLinkCache;
     const hit = cache.get(line);
     if (hit !== undefined) return hit ?? undefined;
-    const links = resolveLogDocLink(line, this._integrationDocs) ?? null;
+    const links =
+      resolveLogDocLink(line, this._integrationDocs, {
+        targetPlatform: this.targetPlatform,
+      }) ?? null;
     if (cache.size >= DOC_LINK_CACHE_MAX) {
       // Prune the oldest half (Map iterates in insertion order).
       let drop = cache.size - DOC_LINK_CACHE_MAX / 2;

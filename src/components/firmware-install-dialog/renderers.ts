@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
+import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
@@ -288,6 +289,7 @@ export function renderLogs(
         ? html`<div class="logs-container">
             <esphome-ansi-log
               .lines=${host._log.lines}
+              .targetPlatform=${host._device ? devicePlatform(host._device) : ""}
               ?light=${!host._darkMode}
             ></esphome-ansi-log>
           </div>`

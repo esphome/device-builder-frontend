@@ -164,6 +164,10 @@ const CURATED_COPY: Record<
     title: "dashboard.logs_doc_ble_slots_title",
     body: "dashboard.logs_doc_ble_slots_body",
   },
+  tcp_buffer: {
+    title: "dashboard.logs_doc_tcp_buffer_title",
+    body: "dashboard.logs_doc_tcp_buffer_body",
+  },
 };
 
 export function docPopoverText(

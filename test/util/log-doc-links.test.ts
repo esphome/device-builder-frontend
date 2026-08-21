@@ -202,6 +202,115 @@ describe("resolveLogDocLink — actionable", () => {
   });
 });
 
+describe("resolveLogDocLink — tcp_buffer", () => {
+  const ESP32 = { targetPlatform: "ESP32" };
+  const NETWORK_URL = "https://esphome.io/components/network/#configuration-variables";
+  const NOTIFY_DROP =
+    "[10:24:27.031][W][bluetooth_connection:376]: [0] [AA:BB:CC:DD:EE:FF] Failed to send notify data response, handle 0x002A";
+
+  it.each([
+    [
+      "api.connection",
+      "[10:24:27.031][W][api.connection:2066]: Action response dropped, TCP buffer full",
+    ],
+    ["api", "[10:24:27.031][W][api:127]: Disconnect request dropped, TCP buffer full"],
+    [
+      "voice_assistant",
+      "[10:24:27.031][W][voice_assistant:753]: Stop request dropped, TCP buffer full",
+    ],
+    [
+      "zwave_proxy",
+      "[10:24:27.031][W][zwave_proxy:334]: Home ID notification dropped, TCP buffer full",
+    ],
+    [
+      "bluetooth_proxy",
+      "[10:24:27.031][W][bluetooth_proxy:132]: GATT read reply for AABBCCDDEEFF deferred, TCP buffer full",
+    ],
+    [
+      "bluetooth_connection",
+      "[10:24:27.031][W][bluetooth_connection:283]: [0] [AA:BB:CC:DD:EE:FF] GATT reply for handle 0x002A deferred, TCP buffer full",
+    ],
+  ])(
+    "maps a %s 'TCP buffer full' warning to the network config docs on ESP32",
+    (_tag, line) => {
+      expect(resolveLogDocLink(line, {}, ESP32)?.actionable).toEqual({
+        kind: "actionable",
+        url: NETWORK_URL,
+        body: "tcp_buffer",
+      });
+    }
+  );
+
+  it.each([
+    ["notify drop with handle", NOTIFY_DROP],
+    [
+      "notify drop without handle (older firmware)",
+      "[10:24:27.031][W][bluetooth_connection:376]: [0] [AA:BB:CC:DD:EE:FF] Failed to send notify data response",
+    ],
+    [
+      "read response",
+      "[10:24:27.031][W][bluetooth_connection:333]: [0] [AA:BB:CC:DD:EE:FF] Failed to send read response",
+    ],
+    [
+      "displaced GATT reply",
+      "[10:24:27.031][W][bluetooth_connection:288]: [0] [AA:BB:CC:DD:EE:FF] GATT reply for handle 0x002A dropped for handle 0x002C",
+    ],
+    [
+      "abandoned GATT reply",
+      "[10:24:27.031][W][bluetooth_connection:308]: [0] [AA:BB:CC:DD:EE:FF] GATT reply for handle 0x002A undeliverable, abandoning",
+    ],
+    [
+      "services done retry",
+      "[10:24:27.031][W][bluetooth_connection:459]: [0] [AA:BB:CC:DD:EE:FF] Failed to send services done, retrying",
+    ],
+    [
+      "services done abandon",
+      "[10:24:27.031][W][bluetooth_connection:470]: [0] [AA:BB:CC:DD:EE:FF] Services done undeliverable, abandoning",
+    ],
+    [
+      "displaced proxy reply",
+      "[10:24:27.031][W][bluetooth_proxy:136]: GATT error reply for AABBCCDDEEFF dropped, displaced by AABBCCDDEE00",
+    ],
+  ])("maps the same-cause %s warning on ESP32", (_what, line) => {
+    expect(resolveLogDocLink(line, {}, ESP32)?.actionable?.body).toBe("tcp_buffer");
+  });
+
+  it.each([
+    ["no platform", {}],
+    ["an empty platform", { targetPlatform: "" }],
+    ["ESP8266", { targetPlatform: "ESP8266" }],
+    ["rp2", { targetPlatform: "rp2" }],
+  ])("does not fire with %s (the option is ESP32-only)", (_what, options) => {
+    expect(resolveLogDocLink(NOTIFY_DROP, {}, options)?.actionable).toBeUndefined();
+  });
+
+  it("prefix-matches ESP32 variants", () => {
+    expect(
+      resolveLogDocLink(NOTIFY_DROP, {}, { targetPlatform: "esp32s3" })?.actionable?.body
+    ).toBe("tcp_buffer");
+  });
+
+  it("does not match the verbose notify-drop variant", () => {
+    const line =
+      "[10:24:27.031][V][bluetooth_connection:379]: [0] [AA:BB:CC:DD:EE:FF] Failed to send notify data response, handle 0x002A";
+    expect(resolveLogDocLink(line, {}, ESP32)?.actionable).toBeUndefined();
+  });
+
+  it("does not match an unrelated bluetooth_connection warning", () => {
+    const line =
+      "[10:24:27.031][W][bluetooth_connection:058]: [0] [AA:BB:CC:DD:EE:FF] connect failed, err=133";
+    expect(resolveLogDocLink(line, {}, ESP32)?.actionable).toBeUndefined();
+  });
+
+  it("leaves ungated entries alone when a platform is passed", () => {
+    const line =
+      "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once to update the bootloader";
+    expect(
+      resolveLogDocLink(line, {}, { targetPlatform: "ESP8266" })?.actionable?.body
+    ).toBe("bootloader");
+  });
+});
+
 describe("resolveLogDocLink — component", () => {
   it("links a simple tag to its component page and ranges the token", () => {
     const line = "[13:22:07][C][ethernet:495]: Ethernet:";

@@ -52,6 +52,9 @@ export class ESPHomeProcessTerminal extends LitElement {
 
   @property() placeholder = "";
 
+  /** Forwarded to the built-in ansi-log's platform-gated doc links. */
+  @property() targetPlatform = "";
+
   /** Mirror of ``!darkMode``; drives the ``--term-*`` light palette + ansi-log. */
   @property({ type: Boolean, reflect: true }) light = false;
 
@@ -124,6 +127,7 @@ export class ESPHomeProcessTerminal extends LitElement {
           <esphome-ansi-log
             .lines=${this.lines}
             placeholder=${this.placeholder}
+            .targetPlatform=${this.targetPlatform}
             ?light=${this.light}
           ></esphome-ansi-log>
           <slot name="overlay"></slot>

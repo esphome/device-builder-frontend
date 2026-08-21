@@ -14,6 +14,7 @@ import {
 import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
@@ -21,6 +22,7 @@ import {
   apiConnectionLostContext,
   apiContext,
   darkModeContext,
+  devicesContext,
   localizeContext,
 } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
@@ -28,6 +30,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
 import { classifyLine, type CrashKind, latchCrashKind } from "../util/crash-detector.js";
+import { devicePlatform } from "../util/crash-report.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
@@ -128,6 +131,11 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   _connectionLost = false;
 
+  // Resolves the streamed device's platform for platform-gated doc links.
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  _devices: ConfiguredDevice[] = [];
+
   @property()
   configuration = "";
 
@@ -206,6 +214,11 @@ export class ESPHomeLogsDialog extends LitElement {
   get _serialPaused(): boolean {
     const s = this._session;
     return (s.kind === "serial" || s.kind === "reconnecting") && s.paused;
+  }
+
+  private get _targetPlatform(): string {
+    const device = this._devices.find((d) => d.configuration === this.configuration);
+    return device ? devicePlatform(device) : "";
   }
 
   static styles = [
@@ -344,6 +357,7 @@ export class ESPHomeLogsDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._log.lines}
           placeholder=${this._localize("dashboard.logs_placeholder")}
+          .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
           .connectionLost=${wsDown}

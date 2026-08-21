@@ -38,6 +38,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { devicePlatform } from "../util/crash-report.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -427,6 +428,11 @@ export class ESPHomeCommandDialog extends LitElement {
     return this._localize(`command.${this._commandType}_title`, { name: this.name });
   }
 
+  private get _targetPlatform(): string {
+    const device = this._devices.find((d) => d.configuration === this.configuration);
+    return device ? devicePlatform(device) : "";
+  }
+
   // True when following a queued job. Context wins once it has the entry —
   // the backend may transition QUEUED → RUNNING before we see it locally;
   // _jobStatus only fills the gap before the first context update.
@@ -529,6 +535,7 @@ export class ESPHomeCommandDialog extends LitElement {
       >
         <esphome-process-terminal
           .lines=${this._log.lines}
+          .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${this._state === "running" && !showRunTimer(this)}
           .state=${this._state}
