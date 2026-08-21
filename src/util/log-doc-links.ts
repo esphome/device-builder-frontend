@@ -216,6 +216,24 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     body: "tcp_buffer",
     platforms: ["esp32"],
   },
+  {
+    // The keepalive ping refused by a full buffer (check_keepalive_).
+    level: "W",
+    tags: ["api.connection"],
+    pattern: /Buffer full, ping queued/,
+    url: NETWORK_CONFIG_URL,
+    body: "tcp_buffer",
+    platforms: ["esp32"],
+  },
+  {
+    // The pipeline-start request refused by a full buffer.
+    level: "W",
+    tags: ["voice_assistant"],
+    pattern: /Could not request start/,
+    url: NETWORK_CONFIG_URL,
+    body: "tcp_buffer",
+    platforms: ["esp32"],
+  },
 ] as const;
 
 // Tag-keyed index so the per-line check is one Map miss for the vast

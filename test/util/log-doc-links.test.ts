@@ -271,6 +271,14 @@ describe("resolveLogDocLink — tcp_buffer", () => {
       "displaced proxy reply",
       "[10:24:27.031][W][bluetooth_proxy:136]: GATT error reply for AABBCCDDEEFF dropped, displaced by AABBCCDDEE00",
     ],
+    [
+      "queued keepalive ping",
+      "[10:24:27.031][W][api.connection:370]: Buffer full, ping queued",
+    ],
+    [
+      "voice assistant start request",
+      "[10:24:27.031][W][voice_assistant:366]: Could not request start",
+    ],
   ])("maps the same-cause %s warning on ESP32", (_what, line) => {
     expect(resolveLogDocLink(line, {}, ESP32)?.actionable?.body).toBe("tcp_buffer");
   });
