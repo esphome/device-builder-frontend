@@ -80,6 +80,8 @@ export class ESPHomeDeviceCard extends LitElement {
 
   @property({ attribute: false }) name = "";
   @property() configuration = "";
+  // ``esphome.comment`` from the YAML — free-form user text.
+  @property({ attribute: false }) comment = "";
   @property() state: DeviceState = DeviceState.UNKNOWN;
   // Truthy name_add_mac_suffix in the YAML — OFFLINE/UNKNOWN verdicts
   // are meaningless for such a device, so the badge shows "No status".
@@ -242,6 +244,11 @@ export class ESPHomeDeviceCard extends LitElement {
               ${renderEncryptionIcon(this)}
             </div>
             <p class="device-config truncate">${this.configuration}</p>
+            ${
+              this.comment
+                ? html`<p class="device-comment truncate">${this.comment}</p>`
+                : nothing
+            }
           </div>
           ${renderStatusBadge(this)}
         </div>
