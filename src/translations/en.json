@@ -659,6 +659,7 @@
     },
     "create_general_error": "Failed to create the device. Please try again.",
     "create_with_board_error": "Failed to create device for {board}: {message}",
+    "open_secrets": "Open secrets",
     "board_load_failed": "Couldn't load the board details. Please try again."
   },
   "device": {
@@ -1720,6 +1721,7 @@
     "empty": "No secrets yet. Add one below or switch to YAML.",
     "invalid_key": "Names may use letters, numbers, dots, dashes and underscores, and can't start with a number.",
     "duplicate_key": "A secret with this name already exists.",
+    "duplicate_row": "Duplicate name; ESPHome rejects secrets.yaml until only one remains.",
     "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n",
     "loading": "Loading secrets…",
     "load_failed": "Secrets could not be loaded. Check your connection and retry.",

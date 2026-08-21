@@ -20,6 +20,8 @@ vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock("../../../src/util/navigation.js", () => ({ navigate }));
 
 import { IntlMessageFormat } from "intl-messageformat";
 import toast from "sonner-js";
@@ -256,6 +258,45 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect((el as any)._submitting).toBe(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._createError).toBeTruthy();
+  });
+
+  it("offers an Open secrets action when the create failed on secrets.yaml", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError(
+          "invalid_args",
+          "Can't create — secrets.yaml doesn't parse: Duplicate key \"wifi_password\" in secrets.yaml, line 7, column 1. Fix secrets.yaml on the Secrets page and try again."
+        )
+      );
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    const action = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      "p.error .error-action"
+    );
+    expect(action).not.toBeNull();
+    action!.click();
+    expect(navigate).toHaveBeenCalledWith("/secrets");
+  });
+
+  it("renders a plain create error without the secrets action", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError("invalid_args", "Configuration kitchen.yaml exists")
+      );
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.querySelector("p.error")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("p.error .error-action")).toBeNull();
   });
 
   it("keeps the setup step's collision set frozen through a successful create", async () => {

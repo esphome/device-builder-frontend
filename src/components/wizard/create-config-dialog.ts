@@ -129,6 +129,11 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _createError = "";
 
+  // The create failed on a secrets.yaml parse error (read off the raw API
+  // details, not the localized message), so the error bar can link there.
+  @state()
+  private _createErrorSecrets = false;
+
   /** The "Import from file" flow (YAML upload + bundle + overwrite/conflict
    *  round-trips). Kept out of this dialog so it stays a thin step machine. */
   private readonly _import = new ImportFlowController(this);
@@ -161,6 +166,17 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         color: var(--esphome-error);
         font-size: var(--wa-font-size-s);
         margin-top: var(--wa-space-s);
+      }
+
+      .error-action {
+        background: none;
+        border: none;
+        padding: 0;
+        margin-left: var(--wa-space-2xs);
+        color: inherit;
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
       }
     `,
   ];
@@ -231,6 +247,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   private _resetCreateErrors(): void {
     this._importError = "";
     this._createError = "";
+    this._createErrorSecrets = false;
   }
 
   public close() {
@@ -319,10 +336,30 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         }
         ${this._renderStep()}
         ${this._importError ? html`<p class="error">${this._importError}</p>` : nothing}
-        ${this._createError ? html`<p class="error">${this._createError}</p>` : nothing}
+        ${this._renderCreateError()}
       </esphome-base-dialog>
     `;
   }
+
+  /** Inline create error; a secrets.yaml parse failure gets a link to the Secrets page. */
+  private _renderCreateError() {
+    if (!this._createError) return nothing;
+    return html`<p class="error">
+      ${this._createError}
+      ${
+        this._createErrorSecrets
+          ? html`<button type="button" class="error-action" @click=${this._openSecrets}>
+              ${this._localize("wizard.open_secrets")}
+            </button>`
+          : nothing
+      }
+    </p>`;
+  }
+
+  private _openSecrets = () => {
+    this.close();
+    void navigate("/secrets");
+  };
 
   private _renderStep() {
     // Show loading message while import creation is in progress
@@ -593,6 +630,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
+      this._createErrorSecrets = apiErrorDetails(err).includes("secrets.yaml");
     } finally {
       this._submitting = false;
     }

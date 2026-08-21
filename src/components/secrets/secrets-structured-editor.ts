@@ -247,31 +247,43 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
 
   private _renderRow(entry: SecretEntry, entries: SecretEntry[]) {
     const keyInvalid = this._keyError?.line === entry.line;
+    // ESPHome's loader rejects the whole file on a repeated top-level key,
+    // so every occurrence is flagged until the user removes the extras.
+    const duplicate = entries.some(
+      (other) => other.line !== entry.line && other.key === entry.key
+    );
+    const hint = keyInvalid
+      ? this._keyError?.message
+      : duplicate
+        ? this._localize("secrets.duplicate_row")
+        : null;
+    const hintRow = hint ? html`<div class="key-error">${hint}</div>` : nothing;
     if (!entry.editable) {
       return html`<div class="row row--advanced">
-        <input
-          type="text"
-          .value=${entry.key}
-          readonly
-          aria-label=${this._localize("secrets.key_placeholder")}
-        />
-        <span class="advanced-badge">
-          <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-          ${this._localize("secrets.advanced_badge")}
-        </span>
-        <span></span>
-      </div>`;
+          <input
+            type="text"
+            .value=${entry.key}
+            readonly
+            aria-label=${this._localize("secrets.key_placeholder")}
+          />
+          <span class="advanced-badge">
+            <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+            ${this._localize("secrets.advanced_badge")}
+          </span>
+          <span></span>
+        </div>
+        ${hintRow}`;
     }
     return html`<div class="row">
         <input
           type="text"
-          class=${keyInvalid ? "invalid" : ""}
+          class=${keyInvalid || duplicate ? "invalid" : ""}
           .value=${live(entry.key)}
           autocomplete="off"
           spellcheck="false"
           placeholder=${this._localize("secrets.key_placeholder")}
           aria-label=${this._localize("secrets.key_placeholder")}
-          aria-invalid=${keyInvalid ? "true" : "false"}
+          aria-invalid=${keyInvalid || duplicate ? "true" : "false"}
           @change=${(e: Event) =>
             this._onKeyChange(entry, entries, e.currentTarget as HTMLInputElement)}
         />
@@ -294,11 +306,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           <wa-icon library="mdi" name="close"></wa-icon>
         </button>
       </div>
-      ${
-        keyInvalid
-          ? html`<div class="key-error">${this._keyError?.message}</div>`
-          : nothing
-      }`;
+      ${hintRow}`;
   }
 
   private _onKeyChange(
