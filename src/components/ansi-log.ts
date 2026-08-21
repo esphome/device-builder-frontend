@@ -227,9 +227,8 @@ export class ESPHomeAnsiLog extends LitElement {
   @property({ type: Boolean, attribute: "auto-scroll" })
   autoScroll = true;
 
-  /** The device's ``target_platform``; gates platform-specific doc links.
-   *  Empty when the host has no configured device. */
-  @property({ attribute: "target-platform" })
+  /** The device's ``target_platform``; "" when the host has no configured device. */
+  @property({ attribute: false })
   targetPlatform = "";
 
   @state()
@@ -438,9 +437,7 @@ export class ESPHomeAnsiLog extends LitElement {
     const hit = cache.get(line);
     if (hit !== undefined) return hit ?? undefined;
     const links =
-      resolveLogDocLink(line, this._integrationDocs, {
-        targetPlatform: this.targetPlatform,
-      }) ?? null;
+      resolveLogDocLink(line, this._integrationDocs, this.targetPlatform) ?? null;
     if (cache.size >= DOC_LINK_CACHE_MAX) {
       // Prune the oldest half (Map iterates in insertion order).
       let drop = cache.size - DOC_LINK_CACHE_MAX / 2;

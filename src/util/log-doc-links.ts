@@ -13,6 +13,7 @@
 import type { IntegrationDoc } from "../api/types/components.js";
 import { isSafeDocsUrl } from "../common/docs.js";
 import { stripAnsi } from "./ansi-escapes.js";
+import { isEsp32Platform } from "./esptool-platform.js";
 import { parseLogLine } from "./log-line.js";
 
 export interface ActionableLogDocLink {
@@ -72,38 +73,12 @@ interface ActionableEntry {
   pattern: RegExp;
   url: string;
   body: ActionableLogDocLink["body"];
-  /** Lower-case ``target_platform`` prefixes the fix applies to; unset
-   *  means every platform. A gated entry never fires for an unknown
-   *  platform. */
-  platforms?: readonly string[];
-}
-
-/** Per-device inputs the line text alone can't carry. */
-export interface LogDocLinkOptions {
-  /** The device's ``target_platform`` (``esp32``, ``ESP8266``, …); empty
-   *  or absent when the host has no configured device. */
-  targetPlatform?: string;
+  /** The fix only exists on ESP32; never fires for an unknown platform. */
+  esp32Only?: true;
 }
 
 const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
-const NETWORK_CONFIG_URL =
-  "https://esphome.io/components/network/#configuration-variables";
 const TROUBLESHOOTING_URL = "https://esphome.io/guides/troubleshooting/";
-
-// Every WARN-level send refusal the api / proxy components log when the
-// lwIP send buffer is full; the fix is network: tcp_send_buffer, which
-// only exists on ESP32. Verified against the esphome source: the shared
-// API_LOG_MSG_DROPPED helper ("<what> dropped, TCP buffer full") under
-// api / api.connection / voice_assistant / zwave_proxy, and the
-// bluetooth_proxy / bluetooth_connection reply deferrals and drops.
-const TCP_BUFFER_TAGS = [
-  "api",
-  "api.connection",
-  "voice_assistant",
-  "zwave_proxy",
-  "bluetooth_proxy",
-  "bluetooth_connection",
-] as const;
 
 // Verified live against esphome.io (200, anchor present, no redirect).
 // Keep this list small and URL-verified; most lines resolve through the
@@ -188,51 +163,22 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     body: "ble_slots",
   },
   {
+    // Every send refusal these components warn about when the lwIP send
+    // buffer is full, literal "TCP buffer full" text or not.
     level: "W",
-    tags: TCP_BUFFER_TAGS,
-    pattern: /TCP buffer full/,
-    url: NETWORK_CONFIG_URL,
-    body: "tcp_buffer",
-    platforms: ["esp32"],
-  },
-  {
-    // Same refusal without the literal text: a GATT reply displaced by a
-    // newer one or abandoned after retries, and the read / notify /
-    // services-done sends that report the failure directly. Only newer
-    // firmware appends the handle to the notify line.
-    level: "W",
-    tags: ["bluetooth_connection"],
+    tags: [
+      "api",
+      "api.connection",
+      "voice_assistant",
+      "zwave_proxy",
+      "bluetooth_proxy",
+      "bluetooth_connection",
+    ],
     pattern:
-      /GATT reply for handle 0x[0-9A-F]{4} (?:dropped for handle|undeliverable)|Failed to send (?:read|notify data) response|Failed to send services done|Services done undeliverable/,
-    url: NETWORK_CONFIG_URL,
+      /TCP buffer full|Buffer full, ping queued|Could not request start|dropped, displaced by|GATT reply for handle 0x[0-9A-F]{4} (?:dropped for handle|undeliverable)|Failed to send (?:read|notify data) response|Failed to send services done|Services done undeliverable/,
+    url: "https://esphome.io/components/network/#configuration-variables",
     body: "tcp_buffer",
-    platforms: ["esp32"],
-  },
-  {
-    level: "W",
-    tags: ["bluetooth_proxy"],
-    pattern: /dropped, displaced by/,
-    url: NETWORK_CONFIG_URL,
-    body: "tcp_buffer",
-    platforms: ["esp32"],
-  },
-  {
-    // The keepalive ping refused by a full buffer (check_keepalive_).
-    level: "W",
-    tags: ["api.connection"],
-    pattern: /Buffer full, ping queued/,
-    url: NETWORK_CONFIG_URL,
-    body: "tcp_buffer",
-    platforms: ["esp32"],
-  },
-  {
-    // The pipeline-start request refused by a full buffer.
-    level: "W",
-    tags: ["voice_assistant"],
-    pattern: /Could not request start/,
-    url: NETWORK_CONFIG_URL,
-    body: "tcp_buffer",
-    platforms: ["esp32"],
+    esp32Only: true,
   },
 ] as const;
 
@@ -305,25 +251,22 @@ const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|lt)$/;
  * catalogued tag carries both. *integrationDocs* is the backend
  * ``components/get_integration_docs`` map (component name → docs URL,
  * display name, and trimmed description); a present entry guarantees
- * the page exists. *options.targetPlatform* gates the platform-specific
- * curated entries; a gated entry never fires when it is unknown.
+ * the page exists. *targetPlatform* is the device's ``target_platform``
+ * ("" when unknown); it gates the ESP32-only curated entries.
  */
 export function resolveLogDocLink(
   line: string,
   integrationDocs: Record<string, IntegrationDoc>,
-  options: LogDocLinkOptions = {}
+  targetPlatform = ""
 ): LogDocLinks | undefined {
   const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
-  const platform = options.targetPlatform?.trim().toLowerCase() ?? "";
 
   let actionable: ActionableLogDocLink | undefined;
   if (parsed) {
     for (const entry of ACTIONABLE_BY_TAG.get(parsed.tag) ?? []) {
       if (entry.level !== parsed.level) continue;
-      // Prefix match: ESP32 variants may report as esp32s3 etc.
-      if (entry.platforms && !entry.platforms.some((p) => platform.startsWith(p)))
-        continue;
+      if (entry.esp32Only && !isEsp32Platform(targetPlatform)) continue;
       if (entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;

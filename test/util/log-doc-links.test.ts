@@ -203,7 +203,7 @@ describe("resolveLogDocLink — actionable", () => {
 });
 
 describe("resolveLogDocLink — tcp_buffer", () => {
-  const ESP32 = { targetPlatform: "ESP32" };
+  const ESP32 = "ESP32";
   const NETWORK_URL = "https://esphome.io/components/network/#configuration-variables";
   const NOTIFY_DROP =
     "[10:24:27.031][W][bluetooth_connection:376]: [0] [AA:BB:CC:DD:EE:FF] Failed to send notify data response, handle 0x002A";
@@ -284,18 +284,18 @@ describe("resolveLogDocLink — tcp_buffer", () => {
   });
 
   it.each([
-    ["no platform", {}],
-    ["an empty platform", { targetPlatform: "" }],
-    ["ESP8266", { targetPlatform: "ESP8266" }],
-    ["rp2", { targetPlatform: "rp2" }],
-  ])("does not fire with %s (the option is ESP32-only)", (_what, options) => {
-    expect(resolveLogDocLink(NOTIFY_DROP, {}, options)?.actionable).toBeUndefined();
+    ["no platform", undefined],
+    ["an empty platform", ""],
+    ["ESP8266", "ESP8266"],
+    ["rp2", "rp2"],
+  ])("does not fire with %s (the option is ESP32-only)", (_what, platform) => {
+    expect(resolveLogDocLink(NOTIFY_DROP, {}, platform)?.actionable).toBeUndefined();
   });
 
   it("prefix-matches ESP32 variants", () => {
-    expect(
-      resolveLogDocLink(NOTIFY_DROP, {}, { targetPlatform: "esp32s3" })?.actionable?.body
-    ).toBe("tcp_buffer");
+    expect(resolveLogDocLink(NOTIFY_DROP, {}, "esp32s3")?.actionable?.body).toBe(
+      "tcp_buffer"
+    );
   });
 
   it("does not match the verbose notify-drop variant", () => {
@@ -313,9 +313,7 @@ describe("resolveLogDocLink — tcp_buffer", () => {
   it("leaves ungated entries alone when a platform is passed", () => {
     const line =
       "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once to update the bootloader";
-    expect(
-      resolveLogDocLink(line, {}, { targetPlatform: "ESP8266" })?.actionable?.body
-    ).toBe("bootloader");
+    expect(resolveLogDocLink(line, {}, "ESP8266")?.actionable?.body).toBe("bootloader");
   });
 });
 

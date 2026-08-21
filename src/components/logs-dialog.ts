@@ -30,7 +30,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
 import { classifyLine, type CrashKind, latchCrashKind } from "../util/crash-detector.js";
-import { devicePlatform } from "../util/crash-report.js";
+import { resolveDevicePlatform } from "../util/crash-report.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
@@ -216,10 +216,9 @@ export class ESPHomeLogsDialog extends LitElement {
     return (s.kind === "serial" || s.kind === "reconnecting") && s.paused;
   }
 
-  private get _targetPlatform(): string {
-    const device = this._devices.find((d) => d.configuration === this.configuration);
-    return device ? devicePlatform(device) : "";
-  }
+  // Derived in willUpdate, not per render: the dialog re-renders per frame
+  // while streaming and the device list can be long.
+  private _targetPlatform = "";
 
   static styles = [
     espHomeStyles,
@@ -238,6 +237,9 @@ export class ESPHomeLogsDialog extends LitElement {
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
+    }
+    if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
+      this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);

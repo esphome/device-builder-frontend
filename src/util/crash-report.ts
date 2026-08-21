@@ -1,3 +1,4 @@
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
@@ -15,6 +16,7 @@ import {
   TRIM_MARKER,
 } from "./crash-report-budget.js";
 import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
+import { isEsp32Platform } from "./esptool-platform.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 
 /**
@@ -80,9 +82,8 @@ const ISSUE_PLATFORMS: Record<string, string> = {
 
 export function issuePlatform(targetPlatform: string): string {
   if (!targetPlatform) return "";
-  const upper = targetPlatform.toUpperCase();
-  if (upper.startsWith("ESP32")) return "ESP32";
-  return ISSUE_PLATFORMS[upper] ?? "Other";
+  if (isEsp32Platform(targetPlatform)) return "ESP32";
+  return ISSUE_PLATFORMS[targetPlatform.toUpperCase()] ?? "Other";
 }
 
 export interface CrashReportMeta {
@@ -254,6 +255,15 @@ export function devicePlatform(device: {
   return (
     device.target_platform || platformFromIntegrations(device.loaded_integrations ?? [])
   );
+}
+
+/** ``devicePlatform`` of the device with this *configuration* id, or "" when unknown. */
+export function resolveDevicePlatform(
+  devices: readonly ConfiguredDevice[],
+  configuration: string
+): string {
+  const device = devices.find((d) => d.configuration === configuration);
+  return device ? devicePlatform(device) : "";
 }
 
 /** Component owning the top decoded frame, for the form's component field. */
