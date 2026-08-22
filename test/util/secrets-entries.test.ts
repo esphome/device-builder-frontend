@@ -238,3 +238,67 @@ describe("duplicateSecretKeys", () => {
     expect(duplicateSecretKeys(parseSecretsEntries("a: 1\nb: 2\n")).size).toBe(0);
   });
 });
+
+describe("quoted top-level keys", () => {
+  test("parse as rows keyed by the bare name, values unquoted", () => {
+    const entries = parseSecretsEntries("\"wifi_password\": 'a b'\n'api_key': b\n");
+    expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
+      ["wifi_password", "a b", true],
+      ["api_key", "b", true],
+    ]);
+  });
+
+  test("a key outside the identifier charset surfaces as a read-only row", () => {
+    const [entry] = parseSecretsEntries('"wifi password": a\n');
+    expect([entry.key, entry.editable]).toEqual(["wifi password", false]);
+  });
+
+  test("a quoted key duplicates its bare spelling", () => {
+    const entries = parseSecretsEntries('wifi_password: a\n"wifi_password": b\n');
+    expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
+  });
+
+  test("a bare merge key is read-only too", () => {
+    expect(parseSecretsEntries("<<:\n")[0]).toMatchObject({ key: "<<", editable: false });
+  });
+
+  test("with an escaped quote surface read-only, name kept verbatim", () => {
+    const entries = parseSecretsEntries("'wifi''s': a\n\"a\\\"b\": c\n");
+    expect(entries.map((e) => [e.key, e.editable])).toEqual([
+      ["wifi''s", false],
+      ['a\\"b', false],
+    ]);
+  });
+
+  test("single-quoted keys round-trip rewrites too", () => {
+    expect(setSecretValue("'api_key': a\n", 0, "b")).toBe("'api_key': b\n");
+    expect(renameSecretKey("'api_key': a\n", 0, "token")).toBe("'token': a\n");
+  });
+
+  test("may contain the other quote character", () => {
+    const entries = parseSecretsEntries("\"don't\": 'a b'\n'say \"hi\"': x\n");
+    // Read-only rows carry no value, per the SecretEntry contract.
+    expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
+      ["don't", "", false],
+      ['say "hi"', "", false],
+    ]);
+  });
+
+  test("rewrites and removal target the quoted line and keep its quoting", () => {
+    const yaml = '"wifi_password": a  # note\n';
+    expect(setSecretValue(yaml, 0, "new")).toBe('"wifi_password": new  # note\n');
+    expect(renameSecretKey(yaml, 0, "wifi_psk")).toBe('"wifi_psk": a  # note\n');
+    expect(removeSecret(yaml, 0)).toBe("");
+  });
+
+  test("a comment-only value keeps its comment through a rewrite", () => {
+    expect(setSecretValue("wifi_ssid: # note\n", 0, "home")).toBe(
+      "wifi_ssid: home # note\n"
+    );
+    expect(renameSecretKey("wifi_ssid: # note\n", 0, "ssid")).toBe("ssid: # note\n");
+  });
+
+  test("mismatched quotes are not a key line", () => {
+    expect(parseSecretsEntries('"wifi_password: a\n')).toEqual([]);
+  });
+});

@@ -8,7 +8,7 @@
 
 import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+import { splitTrimmedInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -33,8 +33,24 @@ export interface SecretGroup {
 // scalar in YAML, not a mapping). No leading indent — nested children
 // are indented and never match, so a parent with a block value is left
 // to the advanced (read-only) path. ``<<`` matches so an HA-style merge
-// key surfaces as an advanced row rather than vanishing.
-const TOP_LEVEL_KEY = /^(<<|[A-Za-z_][A-Za-z0-9_.\-]*):(?:[ \t]+([^\n]*))?$/;
+// key surfaces as an advanced row rather than vanishing, and so does a
+// quoted key (``"wifi_password":``); an escaped quote inside the name is
+// kept verbatim (such a key is read-only anyway). Groups: double-quoted
+// name, single-quoted name, bare name, rest.
+const TOP_LEVEL_KEY =
+  /^(?:"((?:[^"\\\n]|\\.)+)"|'((?:[^'\n]|'')+)'|(<<|[A-Za-z_][A-Za-z0-9_.\-]*)):(?:[ \t]+([^\n]*))?$/;
+
+/** The key, its source quote (``"``, ``'`` or ``""``) and the rest of a matched line. */
+function keyParts(match: RegExpMatchArray): {
+  key: string;
+  quote: string;
+  rest?: string;
+} {
+  const [, dq, sq, bare, rest] = match;
+  if (dq !== undefined) return { key: dq, quote: '"', rest };
+  if (sq !== undefined) return { key: sq, quote: "'", rest };
+  return { key: bare, quote: "", rest };
+}
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
@@ -102,16 +118,25 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(TOP_LEVEL_KEY);
     if (!match) continue;
-    const [, key, rest] = match;
-    entries.push({ key, line: i, ...readValue(rest, lines, i) });
+    const { key, rest } = keyParts(match);
+    const { value, editable } = readValue(rest, lines, i);
+    // A key the form can't write back (``<<``, a quoted key outside the
+    // identifier charset) is shown read-only like other advanced rows.
+    const writable = isValidSecretKey(key);
+    entries.push({
+      key,
+      line: i,
+      value: writable ? value : "",
+      editable: editable && writable,
+    });
   }
   return entries;
 }
 
 /** Replace the value of the entry at *line*, or null when it no longer matches. */
 export function setSecretValue(yaml: string, line: number, value: string): string | null {
-  return rewriteLine(yaml, line, (key, _value, comment) => {
-    return `${key}: ${formatSecretValue(value)}${comment}`;
+  return rewriteLine(yaml, line, (key, quote, _value, comment) => {
+    return `${quote}${key}${quote}: ${formatSecretValue(value)}${comment}`;
   });
 }
 
@@ -121,12 +146,11 @@ export function renameSecretKey(
   line: number,
   newKey: string
 ): string | null {
-  return rewriteLine(yaml, line, (_key, value, comment) => {
-    // A bare ``key:`` has no value or comment; keep it bare so the rename
-    // doesn't leave a trailing space.
-    return value === "" && comment === ""
-      ? `${newKey}:`
-      : `${newKey}: ${value}${comment}`;
+  return rewriteLine(yaml, line, (_key, quote, value, comment) => {
+    // No value: keep ``key:`` bare (the comment, if any, brings its own space).
+    return value === ""
+      ? `${quote}${newKey}${quote}:${comment}`
+      : `${quote}${newKey}${quote}: ${value}${comment}`;
   });
 }
 
@@ -153,12 +177,12 @@ function readValue(
   lines: string[],
   index: number
 ): { value: string; editable: boolean } {
-  const { value } = splitInlineComment(rest ?? "");
+  const { value } = splitTrimmedInlineComment(rest ?? "");
   const trimmed = value.trim();
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable
   // empty scalar unless an indented block sits below it, which makes it
   // advanced — editing it inline would orphan the nested children.
-  if (trimmed === "" || trimmed.startsWith("#")) {
+  if (trimmed === "") {
     return { value: "", editable: !hasIndentedChild(lines, index) };
   }
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
@@ -177,13 +201,14 @@ function hasIndentedChild(lines: string[], index: number): boolean {
 function rewriteLine(
   yaml: string,
   line: number,
-  build: (key: string, value: string, comment: string) => string
+  build: (key: string, quote: string, value: string, comment: string) => string
 ): string | null {
   const lines = yaml.split("\n");
   const match = lines[line]?.match(TOP_LEVEL_KEY);
   if (!match) return null;
-  const [, key, rest] = match;
-  const { value, comment } = splitInlineComment(rest ?? "");
-  lines[line] = build(key, value, comment);
+  const { key, quote, rest } = keyParts(match);
+  // The regex ate the separator, so a comment-only value arrives as ``# note``.
+  const { value, comment } = splitTrimmedInlineComment(rest ?? "");
+  lines[line] = build(key, quote, value, comment);
   return lines.join("\n");
 }
