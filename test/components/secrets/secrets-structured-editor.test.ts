@@ -58,6 +58,33 @@ describe("esphome-secrets-structured-editor", () => {
     expect(rows(el)).toHaveLength(2);
   });
 
+  test("flags every row of a repeated key and leaves unique rows clean", async () => {
+    const el = await mount(
+      "wifi_ssid: home\nwifi_password: a\napi_key: b\nwifi_password: c\n"
+    );
+    const hints = Array.from(el.shadowRoot!.querySelectorAll(".key-error"));
+    expect(hints).toHaveLength(2);
+    expect(hints[0].textContent).toContain("secrets.duplicate_row");
+    const invalid = rows(el).filter((row) =>
+      rowInputs(row)[0].classList.contains("invalid")
+    );
+    expect(invalid.map((row) => rowInputs(row)[0].value)).toEqual([
+      "wifi_password",
+      "wifi_password",
+    ]);
+  });
+
+  test("a duplicated advanced row is marked invalid and described by its hint", async () => {
+    const el = await mount("a: !secret x\na: !secret y\n");
+    const inputs = rows(el).map((row) => rowInputs(row)[0]);
+    expect(inputs.map((i) => i.classList.contains("invalid"))).toEqual([true, true]);
+    expect(inputs.map((i) => i.getAttribute("aria-invalid"))).toEqual(["true", "true"]);
+    for (const input of inputs) {
+      const hint = el.shadowRoot!.getElementById(input.getAttribute("aria-describedby")!);
+      expect(hint?.textContent).toContain("secrets.duplicate_row");
+    }
+  });
+
   test("empty buffer shows the empty state and the add button", async () => {
     const el = await mount("");
     expect(rows(el)).toHaveLength(0);

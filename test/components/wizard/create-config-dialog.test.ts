@@ -6,7 +6,7 @@
  * (the _submitting guard), but a create after a failed attempt is allowed
  * so the user can retry — no permanent lockout.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -20,6 +20,9 @@ vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
+vi.mock("../../../src/util/navigation.js", () => ({ navigate }));
+beforeEach(() => navigate.mockClear());
 
 import { IntlMessageFormat } from "intl-messageformat";
 import toast from "sonner-js";
@@ -256,6 +259,77 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect((el as any)._submitting).toBe(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._createError).toBeTruthy();
+  });
+
+  it("offers an Open secrets action when the create failed on secrets.yaml", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError(
+          "invalid_args",
+          "Can't create — secrets.yaml doesn't parse: Duplicate key \"wifi_password\" in secrets.yaml, line 7, column 1. Fix secrets.yaml on the Secrets page and try again."
+        )
+      );
+    const el = await mount({ createDevice });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    const action = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      ".error-bar .error-action"
+    );
+    expect(action).not.toBeNull();
+    // The board prefix is dropped; the secrets message stands alone.
+    expect(el.shadowRoot!.querySelector("p.error")!.textContent!.trim()).toMatch(
+      /^Can't create — secrets\.yaml/
+    );
+    action!.click();
+    await flush();
+    expect(navigate).toHaveBeenCalledWith("/secrets");
+    // The dialog closes only once the navigation went through.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._dialog.open).toBe(false);
+  });
+
+  it("keeps the dialog and its error when the Secrets navigation is vetoed", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError(
+          "invalid_args",
+          "Can't create: secrets.yaml doesn't parse: bad. Fix it."
+        )
+      );
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    navigate.mockResolvedValueOnce(false); // leave guard kept the page
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".error-bar .error-action")!.click();
+    await flush();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._dialog.open).toBe(true);
+    expect(el.shadowRoot!.querySelector(".error-bar .error-action")).not.toBeNull();
+  });
+
+  it("renders a collision on a device named secrets without the secrets action", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError("already_exists", "Configuration secrets.yaml exists")
+      );
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.querySelector("p.error")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector(".error-bar .error-action")).toBeNull();
   });
 
   it("keeps the setup step's collision set frozen through a successful create", async () => {

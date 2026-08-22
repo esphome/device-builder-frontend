@@ -76,7 +76,7 @@ describe("navigate", () => {
   });
 
   it("pushes state and dispatches popstate when no guard is set", async () => {
-    await navigate("/dashboard");
+    expect(await navigate("/dashboard")).toBe(true);
 
     expect(pushStateSpy).toHaveBeenCalledTimes(1);
     expect(pushStateSpy).toHaveBeenCalledWith(
@@ -109,7 +109,7 @@ describe("navigate", () => {
     const guard = vi.fn(() => Promise.resolve(false));
     setLeaveGuard(guard);
 
-    await navigate("/dashboard");
+    expect(await navigate("/dashboard")).toBe(false);
 
     expect(guard).toHaveBeenCalledTimes(1);
     expect(pushStateSpy).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("navigate", () => {
     const guard = vi.fn(() => Promise.resolve(true));
     setLeaveGuard(guard);
 
-    await navigate("/");
+    expect(await navigate("/")).toBe(true);
 
     expect(pushStateSpy).toHaveBeenCalledWith(
       { d: expect.any(String), n: expect.any(Number) },

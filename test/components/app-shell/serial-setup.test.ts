@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => {}) }));
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
 vi.mock("../../../src/util/navigation.js", async (importActual) => ({
   ...(await importActual<typeof import("../../../src/util/navigation.js")>()),
   navigate,
@@ -21,7 +21,7 @@ const fakePort = {} as SerialPort;
 describe("dispatchOrStashSerialSetup", () => {
   beforeEach(() => {
     navigate.mockReset();
-    navigate.mockResolvedValue(undefined);
+    navigate.mockResolvedValue(true);
     consumePendingSerialSetup(); // drain any stash leaked by a prior test
   });
 
@@ -46,6 +46,7 @@ describe("dispatchOrStashSerialSetup", () => {
     window.history.replaceState({}, "", "/device/foo.yaml");
     navigate.mockImplementation(async () => {
       window.history.replaceState({}, "", "/");
+      return true;
     });
     await dispatchOrStashSerialSetup(fakePort);
 
@@ -56,7 +57,7 @@ describe("dispatchOrStashSerialSetup", () => {
 
   it("clears the stash when the leave guard vetoes the navigation", async () => {
     window.history.replaceState({}, "", "/device/foo.yaml");
-    navigate.mockImplementation(async () => {}); // veto: pathname unchanged
+    navigate.mockImplementation(async () => false); // veto: pathname unchanged
     await dispatchOrStashSerialSetup(fakePort);
 
     expect(consumePendingSerialSetup()).toBeNull();
