@@ -258,6 +258,23 @@ describe("quoted top-level keys", () => {
     expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
   });
 
+  test("a bare merge key is read-only too", () => {
+    expect(parseSecretsEntries("<<:\n")[0]).toMatchObject({ key: "<<", editable: false });
+  });
+
+  test("with an escaped quote surface read-only, name kept verbatim", () => {
+    const entries = parseSecretsEntries("'wifi''s': a\n\"a\\\"b\": c\n");
+    expect(entries.map((e) => [e.key, e.editable])).toEqual([
+      ["wifi''s", false],
+      ['a\\"b', false],
+    ]);
+  });
+
+  test("single-quoted keys round-trip rewrites too", () => {
+    expect(setSecretValue("'api_key': a\n", 0, "b")).toBe("'api_key': b\n");
+    expect(renameSecretKey("'api_key': a\n", 0, "token")).toBe("'token': a\n");
+  });
+
   test("may contain the other quote character", () => {
     const entries = parseSecretsEntries("\"don't\": 'a b'\n'say \"hi\"': x\n");
     // Read-only rows carry no value, per the SecretEntry contract.
