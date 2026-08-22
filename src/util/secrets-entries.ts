@@ -50,6 +50,17 @@ const ADVANCED_VALUE_START = /^[!&*|>[{]/;
 // vanishes from the form, so force-quote it.
 const LEADING_INDICATOR = /^[!&*|>[\]{}@`%]/;
 
+/** Keys defined on more than one line; ESPHome rejects the file while any exist. */
+export function duplicateSecretKeys(entries: SecretEntry[]): Set<string> {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const { key } of entries) {
+    if (seen.has(key)) duplicates.add(key);
+    seen.add(key);
+  }
+  return duplicates;
+}
+
 export function isValidSecretKey(key: string): boolean {
   return VALID_KEY.test(key);
 }

@@ -270,6 +270,7 @@ describe("create-config-dialog create de-dupe + retry", () => {
         )
       );
     const el = await mount({ createDevice });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
 
     emitFinish(el, "kitchen");
     await flush();

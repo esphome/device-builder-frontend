@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   addSecret,
+  duplicateSecretKeys,
   groupSecretsByDevice,
   isValidSecretKey,
   parseSecretsEntries,
@@ -224,5 +225,16 @@ describe("isValidSecretKey", () => {
     expect(isValidSecretKey("has space")).toBe(false);
     expect(isValidSecretKey("1leading")).toBe(false);
     expect(isValidSecretKey("<<")).toBe(false);
+  });
+});
+
+describe("duplicateSecretKeys", () => {
+  test("reports keys defined on more than one line", () => {
+    const entries = parseSecretsEntries("a: 1\nb: 2\na: 3\nc: 4\nb: 5\n");
+    expect([...duplicateSecretKeys(entries)].sort()).toEqual(["a", "b"]);
+  });
+
+  test("is empty for unique keys", () => {
+    expect(duplicateSecretKeys(parseSecretsEntries("a: 1\nb: 2\n")).size).toBe(0);
   });
 });

@@ -22,6 +22,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { secretHostSlug } from "../../util/secret-eligibility.js";
 import {
   addSecret,
+  duplicateSecretKeys,
   groupSecretsByDevice,
   isValidSecretKey,
   parseSecretsEntries,
@@ -93,6 +94,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
 
   protected render() {
     const entries = parseSecretsEntries(this.value);
+    const duplicates = duplicateSecretKeys(entries);
     const groups = groupSecretsByDevice(entries);
     // Headers only earn their keep once a ``<device>__`` prefix appears;
     // a flat shared file stays a plain list.
@@ -105,10 +107,10 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
             </div>`
           : grouped
             ? html`<div class="groups">
-                ${groups.map((group) => this._renderGroup(group, entries))}
+                ${groups.map((group) => this._renderGroup(group, entries, duplicates))}
               </div>`
             : html`<div class="rows">
-                ${entries.map((entry) => this._renderRow(entry, entries))}
+                ${entries.map((entry) => this._renderRow(entry, entries, duplicates))}
               </div>`
       }
       <div class="add-row">
@@ -121,11 +123,15 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     `;
   }
 
-  private _renderGroup(group: SecretGroup, entries: SecretEntry[]) {
+  private _renderGroup(
+    group: SecretGroup,
+    entries: SecretEntry[],
+    duplicates: Set<string>
+  ) {
     return html`<div class="group">
       ${this._renderGroupHeader(group.device)}
       <div class="rows">
-        ${group.entries.map((entry) => this._renderRow(entry, entries))}
+        ${group.entries.map((entry) => this._renderRow(entry, entries, duplicates))}
       </div>
     </div>`;
   }
@@ -245,19 +251,19 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     </esphome-base-dialog>`;
   }
 
-  private _renderRow(entry: SecretEntry, entries: SecretEntry[]) {
+  private _renderRow(
+    entry: SecretEntry,
+    entries: SecretEntry[],
+    duplicates: Set<string>
+  ) {
     const keyInvalid = this._keyError?.line === entry.line;
-    // ESPHome's loader rejects the whole file on a repeated top-level key,
-    // so every occurrence is flagged until the user removes the extras.
-    const duplicate = entries.some(
-      (other) => other.line !== entry.line && other.key === entry.key
-    );
     const hint = keyInvalid
-      ? this._keyError?.message
-      : duplicate
+      ? (this._keyError?.message ?? null)
+      : duplicates.has(entry.key)
         ? this._localize("secrets.duplicate_row")
         : null;
-    const hintRow = hint ? html`<div class="key-error">${hint}</div>` : nothing;
+    const invalid = hint !== null;
+    const hintRow = invalid ? html`<div class="key-error">${hint}</div>` : nothing;
     if (!entry.editable) {
       return html`<div class="row row--advanced">
           <input
@@ -277,13 +283,13 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     return html`<div class="row">
         <input
           type="text"
-          class=${keyInvalid || duplicate ? "invalid" : ""}
+          class=${invalid ? "invalid" : ""}
           .value=${live(entry.key)}
           autocomplete="off"
           spellcheck="false"
           placeholder=${this._localize("secrets.key_placeholder")}
           aria-label=${this._localize("secrets.key_placeholder")}
-          aria-invalid=${keyInvalid || duplicate ? "true" : "false"}
+          aria-invalid=${invalid ? "true" : "false"}
           @change=${(e: Event) =>
             this._onKeyChange(entry, entries, e.currentTarget as HTMLInputElement)}
         />
