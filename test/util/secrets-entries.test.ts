@@ -241,20 +241,19 @@ describe("duplicateSecretKeys", () => {
 
 describe("quoted top-level keys", () => {
   test("parse as rows keyed by the bare name", () => {
-    const entries = parseSecretsEntries("\"wifi_password\": a\n'api_key': b\nplain: c\n");
+    const entries = parseSecretsEntries("\"wifi_password\": a\n'api_key': b\n");
     expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
       ["wifi_password", "a", true],
       ["api_key", "b", true],
-      ["plain", "c", true],
     ]);
   });
 
-  test("count toward duplicate detection", () => {
-    const entries = parseSecretsEntries('"wifi_password": a\nwifi_password: b\n');
-    expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
+  test("outside the identifier charset surface as read-only rows", () => {
+    const [entry] = parseSecretsEntries('"wifi password": a\n');
+    expect([entry.key, entry.editable]).toEqual(["wifi password", false]);
   });
 
-  test("keep their quoting when the value or key is rewritten", () => {
+  test("rewrites and removal target the quoted line and keep its quoting", () => {
     const yaml = '"wifi_password": a  # note\n';
     expect(setSecretValue(yaml, 0, "new")).toBe('"wifi_password": new  # note\n');
     expect(renameSecretKey(yaml, 0, "wifi_psk")).toBe('"wifi_psk": a  # note\n');

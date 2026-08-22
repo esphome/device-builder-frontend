@@ -199,7 +199,7 @@ export function secretValueFromYaml(yaml: string, key: string): string | null {
     // The mapping separator is the first `:` followed by whitespace or EOL,
     // so a key (or value) that itself contains a colon doesn't mis-match.
     const colon = line.search(/:(\s|$)/);
-    if (colon < 0 || line.slice(0, colon).trim() !== key) continue;
+    if (colon < 0 || stripQuotes(line.slice(0, colon).trim()) !== key) continue;
     const rhs = splitInlineComment(line.slice(colon + 1)).value.trim();
     // A double-quoted scalar (what `formatYamlScalar` emits when escaping) must
     // be unescaped to invert the write — `parseScalar`/`stripQuotes` only slice

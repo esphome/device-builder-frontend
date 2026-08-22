@@ -246,6 +246,10 @@ describe("visibleSecretKeys", () => {
 });
 
 describe("secretValueFromYaml", () => {
+  it("reads a quoted top-level key", () => {
+    expect(secretValueFromYaml('"wifi_ssid": home\n', "wifi_ssid")).toBe("home");
+  });
+
   const secrets = [
     "# secrets",
     'wifi_ssid: "my ssid"',
