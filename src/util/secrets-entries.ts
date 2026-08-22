@@ -8,11 +8,7 @@
 
 import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import {
-  splitInlineComment,
-  splitTrimmedInlineComment,
-  stripQuotes,
-} from "./yaml-scalar.js";
+import { splitTrimmedInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -125,7 +121,13 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
     const { value, editable } = readValue(rest, lines, i);
     // A key the form can't write back (``<<``, a quoted key outside the
     // identifier charset) is shown read-only like other advanced rows.
-    entries.push({ key, line: i, value, editable: editable && isValidSecretKey(key) });
+    const writable = isValidSecretKey(key);
+    entries.push({
+      key,
+      line: i,
+      value: writable ? value : "",
+      editable: editable && writable,
+    });
   }
   return entries;
 }
@@ -174,12 +176,12 @@ function readValue(
   lines: string[],
   index: number
 ): { value: string; editable: boolean } {
-  const { value } = splitInlineComment(rest ?? "");
+  const { value } = splitTrimmedInlineComment(rest ?? "");
   const trimmed = value.trim();
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable
   // empty scalar unless an indented block sits below it, which makes it
   // advanced — editing it inline would orphan the nested children.
-  if (trimmed === "" || trimmed.startsWith("#")) {
+  if (trimmed === "") {
     return { value: "", editable: !hasIndentedChild(lines, index) };
   }
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };

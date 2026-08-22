@@ -240,10 +240,10 @@ describe("duplicateSecretKeys", () => {
 });
 
 describe("quoted top-level keys", () => {
-  test("parse as rows keyed by the bare name", () => {
-    const entries = parseSecretsEntries("\"wifi_password\": a\n'api_key': b\n");
+  test("parse as rows keyed by the bare name, values unquoted", () => {
+    const entries = parseSecretsEntries("\"wifi_password\": 'a b'\n'api_key': b\n");
     expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
-      ["wifi_password", "a", true],
+      ["wifi_password", "a b", true],
       ["api_key", "b", true],
     ]);
   });
@@ -258,11 +258,12 @@ describe("quoted top-level keys", () => {
     expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
   });
 
-  test("may contain the other quote character and a quoted value", () => {
+  test("may contain the other quote character", () => {
     const entries = parseSecretsEntries("\"don't\": 'a b'\n'say \"hi\"': x\n");
+    // Read-only rows carry no value, per the SecretEntry contract.
     expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
-      ["don't", "a b", false],
-      ['say "hi"', "x", false],
+      ["don't", "", false],
+      ['say "hi"', "", false],
     ]);
   });
 
