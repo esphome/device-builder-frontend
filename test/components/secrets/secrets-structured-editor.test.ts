@@ -74,6 +74,17 @@ describe("esphome-secrets-structured-editor", () => {
     ]);
   });
 
+  test("a duplicated advanced row is marked invalid and described by its hint", async () => {
+    const el = await mount("a: !secret x\na: !secret y\n");
+    const inputs = rows(el).map((row) => rowInputs(row)[0]);
+    expect(inputs.map((i) => i.classList.contains("invalid"))).toEqual([true, true]);
+    expect(inputs.map((i) => i.getAttribute("aria-invalid"))).toEqual(["true", "true"]);
+    for (const input of inputs) {
+      const hint = el.shadowRoot!.getElementById(input.getAttribute("aria-describedby")!);
+      expect(hint?.textContent).toContain("secrets.duplicate_row");
+    }
+  });
+
   test("empty buffer shows the empty state and the add button", async () => {
     const el = await mount("");
     expect(rows(el)).toHaveLength(0);

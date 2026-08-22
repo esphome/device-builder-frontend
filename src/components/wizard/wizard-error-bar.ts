@@ -43,14 +43,18 @@ export const wizardErrorBarStyles = [
 export function renderWizardErrorBar(
   message: string,
   localize: LocalizeFunc,
-  onOpenSecrets: () => void
+  onOpenSecrets: () => Promise<void>
 ) {
   if (!message) return nothing;
-  return html`<div class="error-bar">
+  return html`<div class="error-bar" role="alert">
     <p class="error">${message}</p>
     ${
       isSecretsRefusal(message)
-        ? html`<button type="button" class="btn error-action" @click=${onOpenSecrets}>
+        ? html`<button
+            type="button"
+            class="btn error-action"
+            @click=${() => void onOpenSecrets()}
+          >
             ${localize("wizard.open_secrets")}
           </button>`
         : nothing

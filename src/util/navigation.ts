@@ -21,10 +21,12 @@ function clearLeaveGuard(guard: LeaveGuard): void {
 const DOC_TOKEN = Math.random().toString(36).slice(2);
 let pushCounter = 0;
 
-export async function navigate(url: string): Promise<void> {
-  if (!(await runLeaveGuard())) return;
+/** Navigate to *url*; resolves ``false`` when the active leave guard kept the page. */
+export async function navigate(url: string): Promise<boolean> {
+  if (!(await runLeaveGuard())) return false;
   window.history.pushState({ d: DOC_TOKEN, n: ++pushCounter }, "", withBase(url));
   window.dispatchEvent(new PopStateEvent("popstate"));
+  return true;
 }
 
 /**

@@ -263,14 +263,20 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         ? this._localize("secrets.duplicate_row")
         : null;
     const invalid = hint !== null;
-    const hintRow = invalid ? html`<div class="key-error">${hint}</div>` : nothing;
+    const hintId = `key-hint-${entry.line}`;
+    const hintRow = invalid
+      ? html`<div id=${hintId} class="key-error">${hint}</div>`
+      : nothing;
     if (!entry.editable) {
       return html`<div class="row row--advanced">
           <input
             type="text"
+            class=${invalid ? "invalid" : ""}
             .value=${entry.key}
             readonly
             aria-label=${this._localize("secrets.key_placeholder")}
+            aria-invalid=${invalid ? "true" : "false"}
+            aria-describedby=${invalid ? hintId : nothing}
           />
           <span class="advanced-badge">
             <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
@@ -290,6 +296,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           placeholder=${this._localize("secrets.key_placeholder")}
           aria-label=${this._localize("secrets.key_placeholder")}
           aria-invalid=${invalid ? "true" : "false"}
+          aria-describedby=${invalid ? hintId : nothing}
           @change=${(e: Event) =>
             this._onKeyChange(entry, entries, e.currentTarget as HTMLInputElement)}
         />
