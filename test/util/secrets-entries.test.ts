@@ -248,7 +248,7 @@ describe("quoted top-level keys", () => {
     ]);
   });
 
-  test("outside the identifier charset surface as read-only rows", () => {
+  test("a key outside the identifier charset surfaces as a read-only row", () => {
     const [entry] = parseSecretsEntries('"wifi password": a\n');
     expect([entry.key, entry.editable]).toEqual(["wifi password", false]);
   });
