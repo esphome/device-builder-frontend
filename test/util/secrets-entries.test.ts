@@ -260,6 +260,13 @@ describe("quoted top-level keys", () => {
     expect(removeSecret(yaml, 0)).toBe("");
   });
 
+  test("a comment-only value keeps its comment through a rewrite", () => {
+    expect(setSecretValue("wifi_ssid: # note\n", 0, "home")).toBe(
+      "wifi_ssid: home # note\n"
+    );
+    expect(renameSecretKey("wifi_ssid: # note\n", 0, "ssid")).toBe("ssid: # note\n");
+  });
+
   test("mismatched quotes are not a key line", () => {
     expect(parseSecretsEntries('"wifi_password: a\n')).toEqual([]);
   });

@@ -8,7 +8,11 @@
 
 import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+import {
+  splitInlineComment,
+  splitTrimmedInlineComment,
+  stripQuotes,
+} from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -134,10 +138,9 @@ export function renameSecretKey(
   newKey: string
 ): string | null {
   return rewriteLine(yaml, line, (_key, quote, value, comment) => {
-    // A bare ``key:`` has no value or comment; keep it bare so the rename
-    // doesn't leave a trailing space.
-    return value === "" && comment === ""
-      ? `${quote}${newKey}${quote}:`
+    // No value: keep ``key:`` bare (the comment, if any, brings its own space).
+    return value === ""
+      ? `${quote}${newKey}${quote}:${comment}`
       : `${quote}${newKey}${quote}: ${value}${comment}`;
   });
 }
@@ -195,7 +198,8 @@ function rewriteLine(
   const match = lines[line]?.match(TOP_LEVEL_KEY);
   if (!match) return null;
   const [, quote = "", quoted, bare, rest] = match;
-  const { value, comment } = splitInlineComment(rest ?? "");
+  // The regex ate the separator, so a comment-only value arrives as ``# note``.
+  const { value, comment } = splitTrimmedInlineComment(rest ?? "");
   lines[line] = build(quoted ?? bare, quote, value, comment);
   return lines.join("\n");
 }
