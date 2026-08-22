@@ -21,7 +21,7 @@ const fakePort = {} as SerialPort;
 describe("dispatchOrStashSerialSetup", () => {
   beforeEach(() => {
     navigate.mockReset();
-    navigate.mockResolvedValue(undefined);
+    navigate.mockResolvedValue(true);
     consumePendingSerialSetup(); // drain any stash leaked by a prior test
   });
 
@@ -56,7 +56,7 @@ describe("dispatchOrStashSerialSetup", () => {
 
   it("clears the stash when the leave guard vetoes the navigation", async () => {
     window.history.replaceState({}, "", "/device/foo.yaml");
-    navigate.mockImplementation(async () => {}); // veto: pathname unchanged
+    navigate.mockImplementation(async () => false); // veto: pathname unchanged
     await dispatchOrStashSerialSetup(fakePort);
 
     expect(consumePendingSerialSetup()).toBeNull();
