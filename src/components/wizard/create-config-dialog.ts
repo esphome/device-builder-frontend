@@ -325,7 +325,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _openSecrets = async () => {
-    // A leave guard that keeps the page must also keep the error and its action.
     if (await navigate("/secrets")) this.close();
   };
 

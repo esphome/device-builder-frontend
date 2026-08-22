@@ -3,9 +3,7 @@ import { css, html, nothing } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 
-// The backend's secrets.yaml refusal (``Can't <action>: secrets.yaml has a
-// duplicate key …`` / ``… secrets.yaml doesn't parse: …``); keyed on that
-// phrasing so a device merely named ``secrets`` never triggers it.
+// The backend refusal phrasing, not the bare filename: a device named "secrets" must not match.
 const SECRETS_REFUSAL = /\bsecrets\.yaml (has a duplicate key|doesn't parse)\b/;
 
 /** True when *message* is the backend's "secrets.yaml doesn't parse" refusal. */
