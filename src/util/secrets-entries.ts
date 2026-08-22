@@ -33,8 +33,26 @@ export interface SecretGroup {
 // scalar in YAML, not a mapping). No leading indent — nested children
 // are indented and never match, so a parent with a block value is left
 // to the advanced (read-only) path. ``<<`` matches so an HA-style merge
-// key surfaces as an advanced row rather than vanishing.
-const TOP_LEVEL_KEY = /^(<<|[A-Za-z_][A-Za-z0-9_.\-]*):(?:[ \t]+([^\n]*))?$/;
+// key surfaces as an advanced row rather than vanishing. A quoted key
+// (``"wifi_password":``) matches too; its quoting is kept on rewrite.
+const TOP_LEVEL_KEY =
+  /^(?:(?<merge><<)|(?<quote>["']?)(?<name>[A-Za-z_][A-Za-z0-9_.\-]*)\k<quote>):(?:[ \t]+(?<rest>[^\n]*))?$/;
+
+interface TopLevelKeyMatch {
+  key: string;
+  quote: string;
+  rest: string | undefined;
+}
+
+function matchTopLevelKey(line: string | undefined): TopLevelKeyMatch | null {
+  const groups = line?.match(TOP_LEVEL_KEY)?.groups;
+  if (!groups) return null;
+  return {
+    key: groups.merge ?? groups.name,
+    quote: groups.quote ?? "",
+    rest: groups.rest,
+  };
+}
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
@@ -100,18 +118,17 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
   const lines = yaml.split("\n");
   const entries: SecretEntry[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(TOP_LEVEL_KEY);
+    const match = matchTopLevelKey(lines[i]);
     if (!match) continue;
-    const [, key, rest] = match;
-    entries.push({ key, line: i, ...readValue(rest, lines, i) });
+    entries.push({ key: match.key, line: i, ...readValue(match.rest, lines, i) });
   }
   return entries;
 }
 
 /** Replace the value of the entry at *line*, or null when it no longer matches. */
 export function setSecretValue(yaml: string, line: number, value: string): string | null {
-  return rewriteLine(yaml, line, (key, _value, comment) => {
-    return `${key}: ${formatSecretValue(value)}${comment}`;
+  return rewriteLine(yaml, line, (key, _value, comment, quote) => {
+    return `${quote}${key}${quote}: ${formatSecretValue(value)}${comment}`;
   });
 }
 
@@ -121,12 +138,12 @@ export function renameSecretKey(
   line: number,
   newKey: string
 ): string | null {
-  return rewriteLine(yaml, line, (_key, value, comment) => {
+  return rewriteLine(yaml, line, (_key, value, comment, quote) => {
     // A bare ``key:`` has no value or comment; keep it bare so the rename
     // doesn't leave a trailing space.
     return value === "" && comment === ""
-      ? `${newKey}:`
-      : `${newKey}: ${value}${comment}`;
+      ? `${quote}${newKey}${quote}:`
+      : `${quote}${newKey}${quote}: ${value}${comment}`;
   });
 }
 
@@ -143,7 +160,7 @@ export function removeSecret(yaml: string, line: number): string | null {
   const lines = yaml.split("\n");
   // Validate the target still holds a key so a stale index can't delete an
   // unrelated comment / blank / other line.
-  if (line < 0 || line >= lines.length || !TOP_LEVEL_KEY.test(lines[line])) return null;
+  if (line < 0 || line >= lines.length || !matchTopLevelKey(lines[line])) return null;
   lines.splice(line, 1);
   return lines.join("\n");
 }
@@ -177,13 +194,12 @@ function hasIndentedChild(lines: string[], index: number): boolean {
 function rewriteLine(
   yaml: string,
   line: number,
-  build: (key: string, value: string, comment: string) => string
+  build: (key: string, value: string, comment: string, quote: string) => string
 ): string | null {
   const lines = yaml.split("\n");
-  const match = lines[line]?.match(TOP_LEVEL_KEY);
+  const match = matchTopLevelKey(lines[line]);
   if (!match) return null;
-  const [, key, rest] = match;
-  const { value, comment } = splitInlineComment(rest ?? "");
-  lines[line] = build(key, value, comment);
+  const { value, comment } = splitInlineComment(match.rest ?? "");
+  lines[line] = build(match.key, value, comment, match.quote);
   return lines.join("\n");
 }

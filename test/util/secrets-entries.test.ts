@@ -238,3 +238,30 @@ describe("duplicateSecretKeys", () => {
     expect(duplicateSecretKeys(parseSecretsEntries("a: 1\nb: 2\n")).size).toBe(0);
   });
 });
+
+describe("quoted top-level keys", () => {
+  test("parse as rows keyed by the bare name", () => {
+    const entries = parseSecretsEntries("\"wifi_password\": a\n'api_key': b\nplain: c\n");
+    expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
+      ["wifi_password", "a", true],
+      ["api_key", "b", true],
+      ["plain", "c", true],
+    ]);
+  });
+
+  test("count toward duplicate detection", () => {
+    const entries = parseSecretsEntries('"wifi_password": a\nwifi_password: b\n');
+    expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
+  });
+
+  test("keep their quoting when the value or key is rewritten", () => {
+    const yaml = '"wifi_password": a  # note\n';
+    expect(setSecretValue(yaml, 0, "new")).toBe('"wifi_password": new  # note\n');
+    expect(renameSecretKey(yaml, 0, "wifi_psk")).toBe('"wifi_psk": a  # note\n');
+    expect(removeSecret(yaml, 0)).toBe("");
+  });
+
+  test("mismatched quotes are not a key line", () => {
+    expect(parseSecretsEntries('"wifi_password: a\n')).toEqual([]);
+  });
+});
