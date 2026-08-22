@@ -38,10 +38,22 @@ export interface SecretGroup {
 // are indented and never match, so a parent with a block value is left
 // to the advanced (read-only) path. ``<<`` matches so an HA-style merge
 // key surfaces as an advanced row rather than vanishing, and so does a
-// quoted key (``"wifi_password":``). Groups: quote, quoted name, bare
-// name, rest.
+// quoted key (``"wifi_password":``). Groups: double-quoted name,
+// single-quoted name, bare name, rest.
 const TOP_LEVEL_KEY =
-  /^(?:(["'])([^"'\n]+)\1|(<<|[A-Za-z_][A-Za-z0-9_.\-]*)):(?:[ \t]+([^\n]*))?$/;
+  /^(?:"([^"\n]+)"|'([^'\n]+)'|(<<|[A-Za-z_][A-Za-z0-9_.\-]*)):(?:[ \t]+([^\n]*))?$/;
+
+/** The key, its source quote (``"``, ``'`` or ``""``) and the rest of a matched line. */
+function keyParts(match: RegExpMatchArray): {
+  key: string;
+  quote: string;
+  rest?: string;
+} {
+  const [, dq, sq, bare, rest] = match;
+  if (dq !== undefined) return { key: dq, quote: '"', rest };
+  if (sq !== undefined) return { key: sq, quote: "'", rest };
+  return { key: bare, quote: "", rest };
+}
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
@@ -109,17 +121,11 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(TOP_LEVEL_KEY);
     if (!match) continue;
-    const [, , quoted, bare, rest] = match;
-    const key = quoted ?? bare;
+    const { key, rest } = keyParts(match);
     const { value, editable } = readValue(rest, lines, i);
-    // A quoted key outside the identifier charset can't be renamed or
-    // rewritten by the form; show it read-only like other advanced rows.
-    entries.push({
-      key,
-      line: i,
-      value,
-      editable: editable && (!quoted || VALID_KEY.test(key)),
-    });
+    // A key the form can't write back (``<<``, a quoted key outside the
+    // identifier charset) is shown read-only like other advanced rows.
+    entries.push({ key, line: i, value, editable: editable && isValidSecretKey(key) });
   }
   return entries;
 }
@@ -197,9 +203,9 @@ function rewriteLine(
   const lines = yaml.split("\n");
   const match = lines[line]?.match(TOP_LEVEL_KEY);
   if (!match) return null;
-  const [, quote = "", quoted, bare, rest] = match;
+  const { key, quote, rest } = keyParts(match);
   // The regex ate the separator, so a comment-only value arrives as ``# note``.
   const { value, comment } = splitTrimmedInlineComment(rest ?? "");
-  lines[line] = build(quoted ?? bare, quote, value, comment);
+  lines[line] = build(key, quote, value, comment);
   return lines.join("\n");
 }

@@ -253,6 +253,19 @@ describe("quoted top-level keys", () => {
     expect([entry.key, entry.editable]).toEqual(["wifi password", false]);
   });
 
+  test("a quoted key duplicates its bare spelling", () => {
+    const entries = parseSecretsEntries('wifi_password: a\n"wifi_password": b\n');
+    expect([...duplicateSecretKeys(entries)]).toEqual(["wifi_password"]);
+  });
+
+  test("may contain the other quote character and a quoted value", () => {
+    const entries = parseSecretsEntries("\"don't\": 'a b'\n'say \"hi\"': x\n");
+    expect(entries.map((e) => [e.key, e.value, e.editable])).toEqual([
+      ["don't", "a b", false],
+      ['say "hi"', "x", false],
+    ]);
+  });
+
   test("rewrites and removal target the quoted line and keep its quoting", () => {
     const yaml = '"wifi_password": a  # note\n';
     expect(setSecretValue(yaml, 0, "new")).toBe('"wifi_password": new  # note\n');
