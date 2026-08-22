@@ -7,7 +7,6 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -25,6 +24,11 @@ import {
   type ImportFlowHost,
   type ImportStep,
 } from "./import-flow-controller.js";
+import {
+  isSecretsRefusal,
+  renderWizardErrorBar,
+  wizardErrorBarStyles,
+} from "./wizard-error-bar.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
@@ -140,7 +144,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     // Shared primary header + back button (also used by add-component) —
     // see dialog-chrome.ts.
     primaryHeaderDialogStyles,
-    dialogActionButtonStyles,
+    ...wizardErrorBarStyles,
     css`
       esphome-base-dialog {
         --width: 520px;
@@ -157,26 +161,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         /* Horizontal gutter drops to a tighter value on the mobile sheet via
            --esphome-dialog-body-gutter (set by fullscreenMobileDialog). */
         padding: var(--wa-space-l) var(--esphome-dialog-body-gutter, var(--wa-space-xl));
-      }
-
-      .error-bar {
-        margin-top: var(--wa-space-s);
-      }
-
-      .error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-s);
-        margin: 0;
-      }
-
-      .error-action {
-        margin-top: var(--wa-space-s);
-        background: var(--wa-color-danger-fill-loud);
-        color: var(--wa-color-danger-on-loud);
-      }
-
-      .error-action:hover {
-        background: color-mix(in srgb, var(--wa-color-danger-fill-loud) 85%, black);
       }
     `,
   ];
@@ -333,29 +317,11 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
               </button>`
             : nothing
         }
-        ${this._renderStep()} ${this._renderErrorBar(this._importError)}
-        ${this._renderErrorBar(this._createError)}
+        ${this._renderStep()}
+        ${renderWizardErrorBar(this._importError, this._localize, this._openSecrets)}
+        ${renderWizardErrorBar(this._createError, this._localize, this._openSecrets)}
       </esphome-base-dialog>
     `;
-  }
-
-  /** Inline error bar; a message naming secrets.yaml gets a button to the Secrets page. */
-  private _renderErrorBar(message: string) {
-    if (!message) return nothing;
-    return html`<div class="error-bar">
-      <p class="error">${message}</p>
-      ${
-        message.includes("secrets.yaml")
-          ? html`<button
-              type="button"
-              class="btn error-action"
-              @click=${this._openSecrets}
-            >
-              ${this._localize("wizard.open_secrets")}
-            </button>`
-          : nothing
-      }
-    </div>`;
   }
 
   private _openSecrets = () => {
@@ -687,7 +653,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   ): string {
     const message = apiErrorDetails(err) || this._localize("wizard.create_general_error");
     // A secrets.yaml refusal already says what to fix; the board prefix is noise.
-    if (board && !message.includes("secrets.yaml")) {
+    if (board && !isSecretsRefusal(message)) {
       return this._localize("wizard.create_with_board_error", {
         board: board.name,
         message,

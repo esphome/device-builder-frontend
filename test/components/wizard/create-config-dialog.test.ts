@@ -288,11 +288,11 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect(navigate).toHaveBeenCalledWith("/secrets");
   });
 
-  it("renders a plain create error without the secrets action", async () => {
+  it("renders a collision on a device named secrets without the secrets action", async () => {
     const createDevice = vi
       .fn()
       .mockRejectedValueOnce(
-        new APIError("invalid_args", "Configuration kitchen.yaml exists")
+        new APIError("already_exists", "Configuration secrets.yaml exists")
       );
     const el = await mount({ createDevice });
 
