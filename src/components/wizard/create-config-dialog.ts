@@ -7,9 +7,9 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
-import { linkButtonStyles } from "../../styles/link-button.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
@@ -140,7 +140,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     // Shared primary header + back button (also used by add-component) —
     // see dialog-chrome.ts.
     primaryHeaderDialogStyles,
-    linkButtonStyles,
+    dialogActionButtonStyles,
     css`
       esphome-base-dialog {
         --width: 520px;
@@ -159,16 +159,24 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         padding: var(--wa-space-l) var(--esphome-dialog-body-gutter, var(--wa-space-xl));
       }
 
-      .error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-s);
+      .error-bar {
         margin-top: var(--wa-space-s);
       }
 
-      /* Delta over .link-button: inherit the error color. */
+      .error {
+        color: var(--esphome-error);
+        font-size: var(--wa-font-size-s);
+        margin: 0;
+      }
+
       .error-action {
-        color: inherit;
-        margin-left: var(--wa-space-2xs);
+        margin-top: var(--wa-space-s);
+        background: var(--wa-color-danger-fill-loud);
+        color: var(--wa-color-danger-on-loud);
+      }
+
+      .error-action:hover {
+        background: color-mix(in srgb, var(--wa-color-danger-fill-loud) 85%, black);
       }
     `,
   ];
@@ -331,23 +339,23 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     `;
   }
 
-  /** Inline error bar; a message naming secrets.yaml gets a link to the Secrets page. */
+  /** Inline error bar; a message naming secrets.yaml gets a button to the Secrets page. */
   private _renderErrorBar(message: string) {
     if (!message) return nothing;
-    return html`<p class="error">
-      ${message}
+    return html`<div class="error-bar">
+      <p class="error">${message}</p>
       ${
         message.includes("secrets.yaml")
           ? html`<button
               type="button"
-              class="error-action link-button"
+              class="btn error-action"
               @click=${this._openSecrets}
             >
               ${this._localize("wizard.open_secrets")}
             </button>`
           : nothing
       }
-    </p>`;
+    </div>`;
   }
 
   private _openSecrets = () => {

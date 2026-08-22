@@ -277,7 +277,7 @@ describe("create-config-dialog create de-dupe + retry", () => {
     await el.updateComplete;
 
     const action = el.shadowRoot!.querySelector<HTMLButtonElement>(
-      "p.error .error-action"
+      ".error-bar .error-action"
     );
     expect(action).not.toBeNull();
     action!.click();
@@ -297,7 +297,7 @@ describe("create-config-dialog create de-dupe + retry", () => {
     await el.updateComplete;
 
     expect(el.shadowRoot!.querySelector("p.error")).not.toBeNull();
-    expect(el.shadowRoot!.querySelector("p.error .error-action")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".error-bar .error-action")).toBeNull();
   });
 
   it("keeps the setup step's collision set frozen through a successful create", async () => {
