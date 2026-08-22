@@ -147,7 +147,7 @@ describe("guided-tour pause state", () => {
   });
 
   it("pauses when a guarded route transition is cancelled", async () => {
-    vi.mocked(navigate).mockImplementationOnce(async () => {});
+    vi.mocked(navigate).mockImplementationOnce(async () => false);
     setTourPending();
     window.history.replaceState(null, "", "/secrets");
     const state = internals(new ESPHomeGuidedTour());
