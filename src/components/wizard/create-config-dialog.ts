@@ -686,7 +686,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     board: BoardCatalogEntry | null
   ): string {
     const message = apiErrorDetails(err) || this._localize("wizard.create_general_error");
-    if (board) {
+    // A secrets.yaml refusal already says what to fix; the board prefix is noise.
+    if (board && !message.includes("secrets.yaml")) {
       return this._localize("wizard.create_with_board_error", {
         board: board.name,
         message,

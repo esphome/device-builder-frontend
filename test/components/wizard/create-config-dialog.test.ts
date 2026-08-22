@@ -280,6 +280,10 @@ describe("create-config-dialog create de-dupe + retry", () => {
       ".error-bar .error-action"
     );
     expect(action).not.toBeNull();
+    // The board prefix is dropped; the secrets message stands alone.
+    expect(el.shadowRoot!.querySelector("p.error")!.textContent!.trim()).toMatch(
+      /^Can't create — secrets\.yaml/
+    );
     action!.click();
     expect(navigate).toHaveBeenCalledWith("/secrets");
   });
