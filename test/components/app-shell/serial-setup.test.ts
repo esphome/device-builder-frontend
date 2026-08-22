@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => {}) }));
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
 vi.mock("../../../src/util/navigation.js", async (importActual) => ({
   ...(await importActual<typeof import("../../../src/util/navigation.js")>()),
   navigate,
@@ -46,6 +46,7 @@ describe("dispatchOrStashSerialSetup", () => {
     window.history.replaceState({}, "", "/device/foo.yaml");
     navigate.mockImplementation(async () => {
       window.history.replaceState({}, "", "/");
+      return true;
     });
     await dispatchOrStashSerialSetup(fakePort);
 

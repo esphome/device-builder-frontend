@@ -284,8 +284,36 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect(el.shadowRoot!.querySelector("p.error")!.textContent!.trim()).toMatch(
       /^Can't create — secrets\.yaml/
     );
+    navigate.mockResolvedValueOnce(true);
     action!.click();
+    await flush();
     expect(navigate).toHaveBeenCalledWith("/secrets");
+    // The dialog closes only once the navigation went through.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._dialog.open).toBe(false);
+  });
+
+  it("keeps the dialog and its error when the Secrets navigation is vetoed", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError(
+          "invalid_args",
+          "Can't create: secrets.yaml doesn't parse: bad. Fix it."
+        )
+      );
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+
+    navigate.mockResolvedValueOnce(false); // leave guard kept the page
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".error-bar .error-action")!.click();
+    await flush();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._dialog.open).toBe(true);
+    expect(el.shadowRoot!.querySelector(".error-bar .error-action")).not.toBeNull();
   });
 
   it("renders a collision on a device named secrets without the secrets action", async () => {
