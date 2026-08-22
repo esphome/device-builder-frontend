@@ -16,7 +16,7 @@ export interface ImportFlowHost extends ReactiveControllerHost {
   /** Shared "a request is in flight" flag (the dialog's busy state). */
   importBusy: boolean;
   goToImportStep(step: ImportStep): void;
-  navigateToCreated(configuration: string): void;
+  navigateToCreated(configuration: string): Promise<void>;
   setImportError(message: string): void;
   resetErrors(): void;
 }
@@ -150,7 +150,7 @@ export class ImportFlowController implements ReactiveController {
         file_content: fileContent,
         ...(overwrite ? { overwrite: true } : {}),
       });
-      this._host.navigateToCreated(configuration);
+      void this._host.navigateToCreated(configuration);
     } catch (err) {
       if (!overwrite && err instanceof APIError && err.errorCode === "already_exists") {
         this._pendingUpload = { slug, fileContent };
@@ -192,7 +192,7 @@ export class ImportFlowController implements ReactiveController {
         this._host.goToImportStep("import-partial");
         return;
       }
-      this._host.navigateToCreated(res.configuration);
+      void this._host.navigateToCreated(res.configuration);
     } catch (err) {
       this._host.setImportError(
         apiErrorDetails(err) || this._host.localize("wizard.import_general_error")

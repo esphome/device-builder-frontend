@@ -10,6 +10,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
@@ -325,7 +326,12 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _openSecrets = async () => {
-    if (await navigate("/secrets")) this.close();
+    try {
+      if (await navigate("/secrets")) this.close();
+    } catch {
+      // Fall back to a full navigation so the click is never a silent no-op.
+      window.location.assign(withBase("/secrets"));
+    }
   };
 
   private _renderStep() {
@@ -445,7 +451,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
 
   private _onOpenImportedDevice() {
     if (this._import.partial) {
-      this.navigateToCreated(this._import.partial.configuration);
+      void this.navigateToCreated(this._import.partial.configuration);
     }
   }
 
@@ -490,11 +496,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    * Public so the import controller can reuse it; centralised so the
    * creation paths can't drift on which one-shot signals they arm.
    */
-  navigateToCreated(configuration: string): void {
+  async navigateToCreated(configuration: string): Promise<void> {
     markJustCreated(configuration);
     markPendingHighlight(configuration);
-    this.close();
-    void navigate(`/device/${encodeURIComponent(configuration)}`);
+    if (await navigate(`/device/${encodeURIComponent(configuration)}`)) this.close();
   }
 
   private async _onCreateEmptyConfig(
@@ -585,7 +590,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         await this._applyFullSetup(configuration, options.board);
       }
       this._created = true; // keep the collision check frozen through the close
-      this.navigateToCreated(configuration);
+      await this.navigateToCreated(configuration);
       // A package board whose upstream failed to load still creates; the
       // toast is the repair signal once the dialog has closed.
       if (warning) {
@@ -645,13 +650,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   /** Build a create-flow error message. Falls back to a localised generic
    *  when the error carries no actionable detail (a blank red bar is worse
    *  than 'create failed'). When 'board' is set, the message names the
-   *  board the wizard tried to use so a template failure is attributable. */
+   *  board the wizard tried to use so a template failure is attributable,
+   *  except for a secrets.yaml refusal, which already says what to fix. */
   private _extractCreateErrorMessage(
     err: unknown,
     board: BoardCatalogEntry | null
   ): string {
     const message = apiErrorDetails(err) || this._localize("wizard.create_general_error");
-    // A secrets.yaml refusal already says what to fix; the board prefix is noise.
     if (board && !isSecretsRefusal(message)) {
       return this._localize("wizard.create_with_board_error", {
         board: board.name,
