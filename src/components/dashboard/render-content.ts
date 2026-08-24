@@ -2,6 +2,7 @@ import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
 import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { matchesDeviceSearch } from "../../util/device-filter.js";
 import {
   DEVICE_SORT_COLLATOR,
   deviceSortKey,
@@ -175,10 +176,15 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
   // Sorted input so the no-column-sort default matches the card grid's
   // collator order instead of the backend's path order (#1917); an active
   // column sort still re-sorts on top.
-  const filteredDevices = includeTourDevice(
-    host._applyFacetFilters(host._sortedDevices),
-    host._sortedDevices
-  );
+  const facetFiltered = host._applyFacetFilters(host._sortedDevices);
+  const filteredDevices = includeTourDevice(facetFiltered, host._sortedDevices);
+  // The table applies the text search itself (device-table.ts
+  // _globalFilterFn), so the count row has to re-run the same predicate
+  // over the facet list or it only reflects the facets (device-builder#2627).
+  const q = host._search.trim().toLowerCase();
+  const matchCount = q
+    ? facetFiltered.filter((d) => matchesDeviceSearch(d, q, true)).length
+    : facetFiltered.length;
   return html`
     <esphome-device-table
       .devices=${filteredDevices}
@@ -239,7 +245,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         </div>
       </div>
       <div slot="below-controls" class="table-device-count-row">
-        ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
+        ${renderDeviceCountRow(host, matchCount, host._devices.length)}
       </div>
       <button
         ${tourAnchor("create-device-fab")}
