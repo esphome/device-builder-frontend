@@ -13,8 +13,10 @@ vi.mock("../../src/web/install/run-flash.js", () => ({
 }));
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 
 import { ESPHomeWebInstallAdoptableDialog } from "../../src/web/install/esphome-web-install-adoptable-dialog.js";
+import { runFlash } from "../../src/web/install/run-flash.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -58,5 +60,34 @@ describe("esphome-web-install-adoptable-dialog Wi-Fi hand-off", () => {
     (el as any)._continue();
 
     expect(spy).toHaveBeenCalledOnce();
+  });
+});
+
+describe("esphome-web-install-adoptable-dialog erase option", () => {
+  it("flashes without erasing by default", async () => {
+    const el = await mount();
+    await (el as any)._install();
+    expect(vi.mocked(runFlash).mock.calls[0][1]).toMatchObject({ erase: false });
+  });
+
+  it("asks the flow to erase first when the checkbox is ticked", async () => {
+    const el = await mount();
+    const box = el.shadowRoot!.querySelector(
+      "wa-checkbox"
+    ) as unknown as HTMLInputElement;
+    expect(box).toBeTruthy();
+    box.checked = true;
+    box.dispatchEvent(new Event("change"));
+    await el.updateComplete;
+
+    await (el as any)._install();
+    expect(vi.mocked(runFlash).mock.calls[0][1]).toMatchObject({ erase: true });
+  });
+
+  it("forgets the erase choice when the dialog closes", async () => {
+    const el = await mount();
+    (el as any)._erase = true;
+    (el as any)._onAfterHide();
+    expect((el as any)._erase).toBe(false);
   });
 });
