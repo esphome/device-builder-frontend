@@ -3,7 +3,7 @@
  *
  * Pins the toast clearance publisher: measured from the target's top edge
  * to the viewport bottom, re-measured on resize, cleared when the target is
- * gone or the host leaves.
+ * gone or the host leaves, and same-target host updates coalesce to a frame.
  */
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,6 +13,8 @@ import {
   TOAST_CLEARANCE_PROPERTY,
   ToastClearanceController,
 } from "../../src/util/toast-clearance-controller.js";
+
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
 
 const clearance = () =>
   document.documentElement.style.getPropertyValue(TOAST_CLEARANCE_PROPERTY);
@@ -30,7 +32,7 @@ describe("ToastClearanceController", () => {
     document.documentElement.style.removeProperty(TOAST_CLEARANCE_PROPERTY);
   });
 
-  it("publishes the target clearance and follows window resizes", () => {
+  it("publishes the target clearance and follows window resizes", async () => {
     let fromBottom = 40;
     const target = targetAt(() => fromBottom);
     const ctrl = new ToastClearanceController(new FakeHost(), () => target);
@@ -41,6 +43,9 @@ describe("ToastClearanceController", () => {
     expect(clearance()).toBe("64px");
     fromBottom = 48;
     ctrl.hostUpdated();
+    ctrl.hostUpdated();
+    expect(clearance()).toBe("64px");
+    await nextFrame();
     expect(clearance()).toBe("48px");
     ctrl.hostDisconnected();
     expect(clearance()).toBe("");
@@ -58,12 +63,13 @@ describe("ToastClearanceController", () => {
     ctrl.hostDisconnected();
   });
 
-  it("restores the property if another writer cleared it", () => {
+  it("restores the property if another writer cleared it", async () => {
     const target = targetAt(() => 40);
     const ctrl = new ToastClearanceController(new FakeHost(), () => target);
     ctrl.hostConnected();
     document.documentElement.style.removeProperty(TOAST_CLEARANCE_PROPERTY);
     ctrl.hostUpdated();
+    await nextFrame();
     expect(clearance()).toBe("40px");
     ctrl.hostDisconnected();
   });

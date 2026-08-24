@@ -26,6 +26,7 @@ export class ToastClearanceController implements ReactiveController {
   private _observer = new ResizeObserver(() => this._measure());
   private _observed: HTMLElement | null = null;
   private _published: string | null = null;
+  private _frame: number | null = null;
 
   constructor(
     host: ReactiveControllerHost,
@@ -46,17 +47,33 @@ export class ToastClearanceController implements ReactiveController {
       if (this._observed) this._observer.unobserve(this._observed);
       this._observed = target;
       if (target) this._observer.observe(target);
+      this._measure();
+      return;
     }
-    // Always measure: ResizeObserver reports the target's box, not its
-    // position, and siblings above can move the row without resizing it.
-    this._measure();
+    // Same target: still re-measure, since ResizeObserver reports the
+    // target's box, not its position, and siblings above can move the row
+    // without resizing it. Coalesced to one layout read per frame because
+    // the editor re-renders on every keystroke.
+    this._scheduleMeasure();
   }
 
   hostDisconnected(): void {
     window.removeEventListener("resize", this._measure);
     this._observer.disconnect();
     this._observed = null;
+    if (this._frame !== null) {
+      cancelAnimationFrame(this._frame);
+      this._frame = null;
+    }
     this._publish(null);
+  }
+
+  private _scheduleMeasure(): void {
+    if (this._frame !== null) return;
+    this._frame = requestAnimationFrame(() => {
+      this._frame = null;
+      this._measure();
+    });
   }
 
   private _measure = (): void => {
