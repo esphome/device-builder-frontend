@@ -76,6 +76,8 @@
     "logs_doc_nvs_body": "The device could not open its NVS storage, so component states may not restore after reboot. The FAQ explains recovery options.",
     "logs_doc_ble_slots_title": "No free BLE connection slots",
     "logs_doc_ble_slots_body": "Every active connection slot is in use. The Bluetooth proxy documentation explains how active connections and slot limits work.",
+    "logs_doc_tcp_buffer_title": "Outgoing TCP buffer full",
+    "logs_doc_tcp_buffer_body": "The device's outgoing TCP send buffer filled up, so a message was dropped or delayed. Raising tcp_send_buffer under network: gives bursty senders like Bluetooth proxies more headroom.",
     "logs_doc_sram1_title": "Reclaim SRAM1 as IRAM",
     "logs_doc_sram1_body": "This device's bootloader can use SRAM1 as instruction RAM. Setting sram1_as_iram frees about 40KB.",
     "logs_source_web_serial": "Web Serial",

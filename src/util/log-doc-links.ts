@@ -31,6 +31,7 @@ export interface ActionableLogDocLink {
     | "ota_rollback"
     | "slow_component"
     | "sram1_as_iram"
+    | "tcp_buffer"
     | "wifi_ap_no_portal"
     | "wifi_reconnect";
 }
@@ -71,6 +72,10 @@ interface ActionableEntry {
   pattern: RegExp;
   url: string;
   body: ActionableLogDocLink["body"];
+  /** Target platforms the fix exists on, as lowercase prefixes of the
+   *  device's ``target_platform`` (``"esp32"`` covers every variant).
+   *  Unset = all platforms. A gated entry never fires for an unknown one. */
+  platforms?: readonly string[];
 }
 
 const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
@@ -158,7 +163,32 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     url: "https://esphome.io/components/bluetooth_proxy/#how-active-connections-work",
     body: "ble_slots",
   },
+  {
+    // Every send refusal these components warn about when the lwIP send
+    // buffer is full, literal "TCP buffer full" text or not.
+    level: "W",
+    tags: [
+      "api",
+      "api.connection",
+      "voice_assistant",
+      "zwave_proxy",
+      "bluetooth_proxy",
+      "bluetooth_connection",
+    ],
+    pattern:
+      /TCP buffer full|Buffer full, ping queued|Could not request start|dropped, displaced by|GATT reply for handle 0x[0-9A-F]{4} (?:dropped for handle|undeliverable)|Failed to send (?:read|notify data) response|Failed to send services done|Services done undeliverable/,
+    url: "https://esphome.io/components/network/#configuration-variables",
+    body: "tcp_buffer",
+    // tcp_send_buffer is cv.only_on_esp32 in esphome/components/network.
+    platforms: ["esp32"],
+  },
 ] as const;
+
+/** Whether ``targetPlatform`` (any casing, "" = unknown) is one of ``platforms``. */
+function onPlatform(platforms: readonly string[], targetPlatform: string): boolean {
+  const target = targetPlatform.toLowerCase();
+  return target !== "" && platforms.some((p) => target.startsWith(p));
+}
 
 // Tag-keyed index so the per-line check is one Map miss for the vast
 // majority of tags, with zero regex work. URLs are static, so the safety
@@ -229,11 +259,13 @@ const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|lt)$/;
  * catalogued tag carries both. *integrationDocs* is the backend
  * ``components/get_integration_docs`` map (component name → docs URL,
  * display name, and trimmed description); a present entry guarantees
- * the page exists.
+ * the page exists. *targetPlatform* is the device's ``target_platform``
+ * ("" when unknown); it gates the platform-specific curated entries.
  */
 export function resolveLogDocLink(
   line: string,
-  integrationDocs: Record<string, IntegrationDoc>
+  integrationDocs: Record<string, IntegrationDoc>,
+  targetPlatform = ""
 ): LogDocLinks | undefined {
   const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
@@ -241,7 +273,9 @@ export function resolveLogDocLink(
   let actionable: ActionableLogDocLink | undefined;
   if (parsed) {
     for (const entry of ACTIONABLE_BY_TAG.get(parsed.tag) ?? []) {
-      if (entry.level === parsed.level && entry.pattern.test(clean)) {
+      if (entry.level !== parsed.level) continue;
+      if (entry.platforms && !onPlatform(entry.platforms, targetPlatform)) continue;
+      if (entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;
       }

@@ -5,6 +5,7 @@ import {
   CRASH_BLOCK_STACK_SCAN,
   MASKED_CONFIG_YAML,
 } from "../_crash-lines.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import {
   buildFullReport,
   buildIssueUrl,
@@ -12,6 +13,7 @@ import {
   inferComponentName,
   issuePlatform,
   platformFromIntegrations,
+  resolveDevicePlatform,
   scrapeCrashData,
 } from "../../src/util/crash-report.js";
 
@@ -161,6 +163,21 @@ describe("issuePlatform / inferComponentName", () => {
     expect(platformFromIntegrations(["logger", "rp2"])).toBe("rp2");
     expect(platformFromIntegrations(["logger", "rp2040"])).toBe("rp2040");
     expect(platformFromIntegrations(["logger"])).toBe("");
+  });
+
+  it("resolves a device's platform by configuration, '' when unknown", () => {
+    const devices = [
+      makeConfiguredDevice({ configuration: "a.yaml", target_platform: "ESP32S3" }),
+      makeConfiguredDevice({
+        configuration: "b.yaml",
+        target_platform: "",
+        loaded_integrations: ["logger", "rp2"],
+      }),
+    ];
+    expect(resolveDevicePlatform(devices, "a.yaml")).toBe("ESP32S3");
+    expect(resolveDevicePlatform(devices, "b.yaml")).toBe("rp2");
+    expect(resolveDevicePlatform(devices, "missing.yaml")).toBe("");
+    expect(resolveDevicePlatform([], "a.yaml")).toBe("");
   });
 
   it("names the first component-owned decoded frame", () => {

@@ -38,6 +38,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { resolveDevicePlatform } from "../util/crash-report.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -294,6 +295,9 @@ export class ESPHomeCommandDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
+    if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
+      this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
+    }
     // When a job ends, the success/error banner takes ~56px of flex space
     // below the log; the container shrinks, scrollTop is preserved, and
     // the bottom slides out of view — which trips ansi-log's _isUserScrolled
@@ -427,6 +431,10 @@ export class ESPHomeCommandDialog extends LitElement {
     return this._localize(`command.${this._commandType}_title`, { name: this.name });
   }
 
+  // Derived in willUpdate, not per render: the dialog re-renders per frame
+  // while streaming and the device list can be long.
+  private _targetPlatform = "";
+
   // True when following a queued job. Context wins once it has the entry —
   // the backend may transition QUEUED → RUNNING before we see it locally;
   // _jobStatus only fills the gap before the first context update.
@@ -529,6 +537,7 @@ export class ESPHomeCommandDialog extends LitElement {
       >
         <esphome-process-terminal
           .lines=${this._log.lines}
+          .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${this._state === "running" && !showRunTimer(this)}
           .state=${this._state}

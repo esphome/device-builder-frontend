@@ -11,7 +11,14 @@
  * browser flasher that won't work.
  */
 export function isEsptoolPlatform(targetPlatform: string | null | undefined): boolean {
-  const p = (targetPlatform ?? "").toLowerCase();
   // esp82… covers esp8266 and esp8285.
-  return p.startsWith("esp32") || p.startsWith("esp82");
+  return (
+    isEsp32Platform(targetPlatform) ||
+    (targetPlatform ?? "").toLowerCase().startsWith("esp82")
+  );
+}
+
+/** ESP32 family, any variant (esp32s3, esp32c6, ...); false for empty / unknown. */
+export function isEsp32Platform(targetPlatform: string | null | undefined): boolean {
+  return (targetPlatform ?? "").toLowerCase().startsWith("esp32");
 }
