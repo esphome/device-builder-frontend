@@ -19,8 +19,11 @@ export const TOAST_CLEARANCE_PROPERTY = "--esphome-toast-clearance";
  * mounted at a time (each opt-in page is its own route). Re-measures follow
  * the target's box (ResizeObserver) and the viewport (window resize); host
  * updates only re-resolve the target, which can render late behind a load
- * ladder. The host itself is not observed because page hosts are
- * ``display: contents`` and never report a box.
+ * ladder. The host itself is not observed: the current hosts either report
+ * no box (``display: contents``) or are pinned to the viewport height, which
+ * window resize already covers. The target is expected to live in a
+ * non-scrolling container; the clearance is clamped to the viewport so a
+ * target above the fold only over-lifts instead of hiding toasts.
  */
 export class ToastClearanceController implements ReactiveController {
   private _observer = new ResizeObserver(() => this._measure());
@@ -90,7 +93,7 @@ export class ToastClearanceController implements ReactiveController {
       return;
     }
     const clearance = Math.round(window.innerHeight - rect.top);
-    this._publish(`${Math.max(0, clearance)}px`);
+    this._publish(`${Math.min(Math.max(0, clearance), window.innerHeight)}px`);
   };
 
   /** Skips the write when unchanged: a root property write restyles the whole document. */

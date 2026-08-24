@@ -63,6 +63,14 @@ describe("ToastClearanceController", () => {
     ctrl.hostDisconnected();
   });
 
+  it("clamps a target above the viewport to the viewport height", () => {
+    const target = targetAt(() => window.innerHeight + 500);
+    const ctrl = new ToastClearanceController(new FakeHost(), () => target);
+    ctrl.hostConnected();
+    expect(clearance()).toBe(`${window.innerHeight}px`);
+    ctrl.hostDisconnected();
+  });
+
   it("restores the property if another writer cleared it", async () => {
     const target = targetAt(() => 40);
     const ctrl = new ToastClearanceController(new FakeHost(), () => target);
