@@ -18,6 +18,8 @@ describe("device-card comment", () => {
     const node = el.shadowRoot!.querySelector(".device-comment")!;
     expect(node.textContent).toContain("Garage, behind the freezer");
     expect(node.previousElementSibling?.classList.contains("device-config")).toBe(true);
+    // The line is ellipsis-truncated; the native tooltip carries the full text.
+    expect(node.getAttribute("title")).toBe("Garage, behind the freezer");
   });
 
   it("renders no comment node when the device has none", async () => {

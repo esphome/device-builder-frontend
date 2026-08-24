@@ -246,7 +246,9 @@ export class ESPHomeDeviceCard extends LitElement {
             <p class="device-config truncate">${this.configuration}</p>
             ${
               this.comment
-                ? html`<p class="device-comment truncate">${this.comment}</p>`
+                ? html`<p class="device-comment truncate" title=${this.comment}>
+                    ${this.comment}
+                  </p>`
                 : nothing
             }
           </div>
