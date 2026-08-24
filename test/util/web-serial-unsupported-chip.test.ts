@@ -55,8 +55,7 @@ vi.mock("esptool-js", () => {
       return this.chip?.CHIP_NAME ?? "unknown";
     }
   }
-  class UsbJtagSerialReset {}
-  return { ESPLoader, Transport, UsbJtagSerialReset };
+  return { ESPLoader, Transport };
 });
 
 import { connectToPort, UnsupportedChipError } from "../../src/util/web-serial.js";

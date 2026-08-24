@@ -129,6 +129,10 @@ export async function reacquirePort(
  * ``open()`` attempt is the real liveness test. Each round prefers a
  * freshly-granted handle (Chrome's re-enumerated port), then the cached
  * handle (Firefox / UART bridges reopen it in place).
+ *
+ * ``onOpened`` fires only when this call performed the ``open()``; a
+ * candidate found already open belongs to whoever opened it, so a caller
+ * that closes on teardown can tell the two apart.
  */
 export async function openLiveSerialPort(
   cachedPort: SerialPort,
@@ -137,6 +141,7 @@ export async function openLiveSerialPort(
     bufferSize?: number;
     timeoutMs?: number;
     cancelled?: () => boolean;
+    onOpened?: (port: SerialPort) => void;
   }
 ): Promise<SerialPort | null> {
   const {
@@ -144,6 +149,7 @@ export async function openLiveSerialPort(
     bufferSize,
     timeoutMs = SERIAL_REOPEN_TIMEOUT_MS,
     cancelled = () => false,
+    onOpened,
   } = options;
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
@@ -163,6 +169,7 @@ export async function openLiveSerialPort(
       }
       try {
         await p.open(bufferSize ? { baudRate, bufferSize } : { baudRate });
+        onOpened?.(p);
         return p;
       } catch (err) {
         lastErr = err;

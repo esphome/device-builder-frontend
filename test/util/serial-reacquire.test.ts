@@ -120,8 +120,29 @@ describe("openLiveSerialPort", () => {
     const openUnlocked = fakePort({ readable: { locked: false } });
     stubGetPorts(async () => [openUnlocked]);
 
-    const got = await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 500 });
+    const onOpened = vi.fn();
+    const got = await openLiveSerialPort(cached, {
+      baudRate: 115200,
+      timeoutMs: 500,
+      onOpened,
+    });
     expect(got).toBe(openUnlocked);
+    // Found open, not opened here: the caller must not take ownership.
+    expect(onOpened).not.toHaveBeenCalled();
+  });
+
+  it("reports the handle it opened through onOpened", async () => {
+    const cached = fakePort({ readable: null, open: vi.fn(async () => {}) });
+    stubGetPorts(async () => []);
+
+    const onOpened = vi.fn();
+    const got = await openLiveSerialPort(cached, {
+      baudRate: 115200,
+      timeoutMs: 500,
+      onOpened,
+    });
+    expect(got).toBe(cached);
+    expect(onOpened).toHaveBeenCalledWith(cached);
   });
 
   it("gives up past the deadline when every candidate stays unopenable", async () => {

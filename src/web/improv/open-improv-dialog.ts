@@ -25,6 +25,15 @@ export interface ImprovResult {
 
 const NO_IMPROV: ImprovResult = { improv: false, provisioned: false };
 
+export interface ImprovOptions {
+  /**
+   * Called when the session had to reopen on a different handle than the one
+   * passed in (a native-USB chip re-enumerated after its post-flash reset).
+   * The card should adopt it for its other actions; see ``port-replaced``.
+   */
+  onPortReplaced?: (port: SerialPort) => void;
+}
+
 /**
  * Delay before opening Improv after a first-time install/setup. Covers the
  * native install-dialog's hide animation so Improv doesn't open behind its
@@ -54,12 +63,13 @@ const activePorts = new WeakSet<SerialPort>();
  */
 export async function openImprovDialog(
   port: SerialPort,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  options: ImprovOptions = {}
 ): Promise<ImprovResult> {
   if (activePorts.has(port)) return NO_IMPROV;
   activePorts.add(port);
   try {
-    return await runImprov(port, localize);
+    return await runImprov(port, localize, options);
   } finally {
     activePorts.delete(port);
   }
@@ -72,7 +82,9 @@ export async function openImprovDialog(
  * ``openLiveSerialPort``: right after a flash the device has just been reset,
  * and a native-USB chip (ESP32-C6 / S3 / C3 …) drops off the bus and comes
  * back as a *new* handle, so a bare ``port.open()`` on the cached handle races
- * the re-enumeration (#1678). DTR / RTS are cleared afterwards so an
+ * the re-enumeration (#1678). ``weOpened`` is true only for a handle that
+ * call actually opened, so a candidate it found already open is never closed
+ * out from under its owner. DTR / RTS are cleared after opening so an
  * auto-reset circuit on a UART-bridge board isn't left holding EN low.
  */
 async function acquirePort(
@@ -86,29 +98,37 @@ async function acquirePort(
     }
     return { port, weOpened: false };
   }
+  let weOpened = false;
   const live = await openLiveSerialPort(port, {
     baudRate: IMPROV_BAUD_RATE,
     bufferSize: IMPROV_BUFFER_SIZE,
+    onOpened: () => {
+      weOpened = true;
+    },
   });
   if (!live) {
-    toast.error(localize("web.improv.port_not_found"));
+    toast.error(localize("web.improv.open_failed"));
     return null;
   }
-  try {
-    await live.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    /* Recoverable: the chip is most likely booting fine already. */
+  if (weOpened) {
+    try {
+      await live.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch {
+      /* Recoverable: the chip is most likely booting fine already. */
+    }
   }
-  return { port: live, weOpened: true };
+  return { port: live, weOpened };
 }
 
 async function runImprov(
   cachedPort: SerialPort,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  options: ImprovOptions
 ): Promise<ImprovResult> {
   const acquired = await acquirePort(cachedPort, localize);
   if (!acquired) return NO_IMPROV;
   const { port, weOpened } = acquired;
+  if (port !== cachedPort) options.onPortReplaced?.(port);
 
   // The SDK loads as a lazy chunk; a chunk-load / CSP / network failure here
   // would otherwise throw out of a ``void openImprovDialog(...)`` call as an

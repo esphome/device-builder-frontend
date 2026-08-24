@@ -66,7 +66,23 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   }
 
   private _configureWifi(): void {
-    void openImprovDialog(this.port, this._localize);
+    void this._openImprov();
+  }
+
+  // Improv may have to reopen on a fresh handle (native-USB re-enumeration
+  // after the post-flash reset); hand it to the parent card like the logs
+  // dialog does, so the other actions stop using the dead pre-reset one.
+  private _openImprov(): Promise<unknown> {
+    return openImprovDialog(this.port, this._localize, {
+      onPortReplaced: (port) =>
+        this.dispatchEvent(
+          new CustomEvent("port-replaced", {
+            detail: port,
+            bubbles: true,
+            composed: true,
+          })
+        ),
+    });
   }
 
   // Fired by the adoptable dialog's Continue button after a successful flash.
@@ -77,7 +93,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _onProvisionWifi(): Promise<void> {
     this._adoptableOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);
-    void openImprovDialog(this.port, this._localize);
+    void this._openImprov();
   }
 
   private _disconnect(): void {

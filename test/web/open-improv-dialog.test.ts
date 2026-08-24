@@ -37,9 +37,14 @@ function dialogEl(): HTMLElement | null {
   return document.querySelector("improv-wifi-serial-provision-dialog");
 }
 
+type LiveOptions = { onOpened?: (port: SerialPort) => void };
+
 beforeEach(() => {
   // Default: the cached handle reopens in place (UART bridge / Firefox).
-  openLiveSerialPort.mockImplementation(async (port: SerialPort) => port);
+  openLiveSerialPort.mockImplementation(async (port: SerialPort, opts: LiveOptions) => {
+    opts.onOpened?.(port);
+    return port;
+  });
 });
 
 afterEach(() => {
@@ -53,10 +58,10 @@ describe("openImprovDialog", () => {
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
 
-    expect(openLiveSerialPort).toHaveBeenCalledWith(port, {
-      baudRate: 115200,
-      bufferSize: 8192,
-    });
+    expect(openLiveSerialPort).toHaveBeenCalledWith(
+      port,
+      expect.objectContaining({ baudRate: 115200, bufferSize: 8192 })
+    );
     // DTR/RTS released so a bridge board's auto-reset circuit can't hold EN low.
     expect(port.setSignals).toHaveBeenCalledWith({
       dataTerminalReady: false,
@@ -108,11 +113,19 @@ describe("openImprovDialog", () => {
   it("hands the SDK the fresh handle a re-enumerated device came back as (#1678)", async () => {
     const stale = makePort();
     const fresh = makePort();
-    openLiveSerialPort.mockResolvedValue(fresh as unknown as SerialPort);
-    const promise = openImprovDialog(stale as unknown as SerialPort, localize);
+    openLiveSerialPort.mockImplementation(async (_p: SerialPort, opts: LiveOptions) => {
+      opts.onOpened?.(fresh as unknown as SerialPort);
+      return fresh;
+    });
+    const onPortReplaced = vi.fn();
+    const promise = openImprovDialog(stale as unknown as SerialPort, localize, {
+      onPortReplaced,
+    });
     await flush();
 
     expect((dialogEl() as unknown as { port: unknown }).port).toBe(fresh);
+    // The card is told so its other actions drop the dead pre-reset handle.
+    expect(onPortReplaced).toHaveBeenCalledWith(fresh);
     dialogEl()!.dispatchEvent(
       new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
     );
@@ -120,6 +133,33 @@ describe("openImprovDialog", () => {
     // The handle we opened is the one we release.
     expect(fresh.close).toHaveBeenCalledOnce();
     expect(stale.close).not.toHaveBeenCalled();
+  });
+
+  it("does not report a replacement when the cached handle reopened in place", async () => {
+    const port = makePort();
+    const onPortReplaced = vi.fn();
+    const promise = openImprovDialog(port as unknown as SerialPort, localize, {
+      onPortReplaced,
+    });
+    await flush();
+    expect(onPortReplaced).not.toHaveBeenCalled();
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+  });
+
+  it("does not close a handle openLiveSerialPort found already open", async () => {
+    const stale = makePort();
+    const theirs = makePort();
+    theirs.readable = { locked: false };
+    // Found open (no onOpened): it belongs to whoever opened it.
+    openLiveSerialPort.mockResolvedValue(theirs as unknown as SerialPort);
+    const promise = openImprovDialog(stale as unknown as SerialPort, localize);
+    await flush();
+
+    expect(theirs.setSignals).not.toHaveBeenCalled();
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+    expect(theirs.close).not.toHaveBeenCalled();
   });
 
   it("proceeds when the port is already open, and does NOT close a port it didn't open", async () => {
