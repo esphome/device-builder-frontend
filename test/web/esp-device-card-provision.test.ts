@@ -54,7 +54,7 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     expect(openImprovDialog).toHaveBeenCalledWith(
       port,
       expect.any(Function),
-      expect.objectContaining({ onPortReplaced: expect.any(Function) })
+      expect.objectContaining({ afterReset: true, onPortReplaced: expect.any(Function) })
     );
   });
 
@@ -81,6 +81,9 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     (el as any)._configureWifi();
 
     expect(openImprovDialog).toHaveBeenCalledOnce();
+    // No reset preceded the click: the reopen must fail fast, not wait out
+    // the re-enumeration budget.
+    expect(openImprovDialog.mock.calls[0][2]).toMatchObject({ afterReset: false });
   });
 
   it("anchors every action tooltip to a real button id", async () => {

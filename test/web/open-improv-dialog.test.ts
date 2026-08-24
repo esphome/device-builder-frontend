@@ -135,6 +135,42 @@ describe("openImprovDialog", () => {
     expect(stale.close).not.toHaveBeenCalled();
   });
 
+  it("guards the swapped-in handle against a second mount too", async () => {
+    const stale = makePort();
+    const fresh = makePort();
+    openLiveSerialPort.mockImplementation(async (_p: SerialPort, opts: LiveOptions) => {
+      opts.onOpened?.(fresh as unknown as SerialPort);
+      return fresh;
+    });
+    const first = openImprovDialog(stale as unknown as SerialPort, localize);
+    await flush();
+    // After port-replaced adoption the card's next click passes the fresh handle.
+    const second = await openImprovDialog(fresh as unknown as SerialPort, localize);
+    expect(second).toEqual({ improv: false, provisioned: false });
+    expect(dialogEls().length).toBe(1);
+
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await first;
+  });
+
+  it("uses the full re-enumeration budget only after a reset", async () => {
+    const port = makePort();
+    let p = openImprovDialog(port as unknown as SerialPort, localize, {
+      afterReset: true,
+    });
+    await flush();
+    expect(openLiveSerialPort.mock.calls[0][1]).not.toHaveProperty("timeoutMs");
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await p;
+    dialogEls().forEach((el) => el.remove());
+
+    p = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    expect(openLiveSerialPort.mock.calls[1][1]).toMatchObject({ timeoutMs: 2000 });
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await p;
+  });
+
   it("does not report a replacement when the cached handle reopened in place", async () => {
     const port = makePort();
     const onPortReplaced = vi.fn();

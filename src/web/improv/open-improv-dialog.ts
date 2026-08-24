@@ -32,7 +32,16 @@ export interface ImprovOptions {
    * The card should adopt it for its other actions; see ``port-replaced``.
    */
   onPortReplaced?: (port: SerialPort) => void;
+  /**
+   * The device was just reset (post-flash hand-off), so give the reopen the
+   * full re-enumeration budget. Off for the manual Configure Wi-Fi button,
+   * where nothing is re-enumerating and a dead port should fail fast.
+   */
+  afterReset?: boolean;
 }
+
+/** Reopen budget when no reset preceded the click: fail fast, not in 8 s. */
+const MANUAL_OPEN_TIMEOUT_MS = 2000;
 
 /**
  * Delay before opening Improv after a first-time install/setup. Covers the
@@ -67,11 +76,17 @@ export async function openImprovDialog(
   options: ImprovOptions = {}
 ): Promise<ImprovResult> {
   if (activePorts.has(port)) return NO_IMPROV;
+  // Also guard the handle the session actually runs on: after a
+  // ``port-replaced`` adoption the card's next click passes the fresh handle.
+  const guarded = [port];
   activePorts.add(port);
   try {
-    return await runImprov(port, localize, options);
+    return await runImprov(port, localize, options, (live) => {
+      guarded.push(live);
+      activePorts.add(live);
+    });
   } finally {
-    activePorts.delete(port);
+    for (const p of guarded) activePorts.delete(p);
   }
 }
 
@@ -89,7 +104,8 @@ export async function openImprovDialog(
  */
 async function acquirePort(
   port: SerialPort,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  afterReset: boolean
 ): Promise<{ port: SerialPort; weOpened: boolean } | null> {
   if (port.readable) {
     if (port.readable.locked || port.writable?.locked) {
@@ -102,6 +118,7 @@ async function acquirePort(
   const live = await openLiveSerialPort(port, {
     baudRate: IMPROV_BAUD_RATE,
     bufferSize: IMPROV_BUFFER_SIZE,
+    ...(afterReset ? {} : { timeoutMs: MANUAL_OPEN_TIMEOUT_MS }),
     onOpened: () => {
       weOpened = true;
     },
@@ -129,12 +146,16 @@ async function acquirePort(
 async function runImprov(
   cachedPort: SerialPort,
   localize: LocalizeFunc,
-  options: ImprovOptions
+  options: ImprovOptions,
+  onReplaced: (port: SerialPort) => void
 ): Promise<ImprovResult> {
-  const acquired = await acquirePort(cachedPort, localize);
+  const acquired = await acquirePort(cachedPort, localize, options.afterReset ?? false);
   if (!acquired) return NO_IMPROV;
   const { port, weOpened } = acquired;
-  if (port !== cachedPort) options.onPortReplaced?.(port);
+  if (port !== cachedPort) {
+    onReplaced(port);
+    options.onPortReplaced?.(port);
+  }
 
   // The SDK loads as a lazy chunk; a chunk-load / CSP / network failure here
   // would otherwise throw out of a ``void openImprovDialog(...)`` call as an
