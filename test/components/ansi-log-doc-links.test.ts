@@ -19,6 +19,7 @@ const BOOTLOADER =
   "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once to update the bootloader";
 const ETHERNET = "[13:22:07][C][ethernet:495]: Ethernet:";
 const PLAIN = "[13:22:07][I][main:042]: Some unremarkable status line";
+const TCP_FULL = "[13:22:07][W][api:127]: Disconnect request dropped, TCP buffer full";
 
 async function mountLog(lines: string[]): Promise<ESPHomeAnsiLog> {
   const el = new ESPHomeAnsiLog();
@@ -121,6 +122,16 @@ describe("ansi-log doc-link annotations", () => {
     internals(bare)._integrationDocs = DOCS;
     await bare.updateComplete;
     expect(root(bare).querySelector(".log-tag-link")).not.toBeNull();
+  });
+
+  it("re-resolves cached lines when the target platform arrives late", async () => {
+    // The dialogs render once with "" before the devices context resolves;
+    // a platform-gated entry must appear once the platform is known.
+    const el = await mountLog([TCP_FULL]);
+    expect(root(el).querySelector(".log-line--doc")).toBeNull();
+    el.targetPlatform = "ESP32";
+    await el.updateComplete;
+    expect(root(el).querySelector(".log-line--doc")).not.toBeNull();
   });
 });
 

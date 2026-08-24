@@ -13,7 +13,6 @@
 import type { IntegrationDoc } from "../api/types/components.js";
 import { isSafeDocsUrl } from "../common/docs.js";
 import { stripAnsi } from "./ansi-escapes.js";
-import { isEsp32Platform } from "./esptool-platform.js";
 import { parseLogLine } from "./log-line.js";
 
 export interface ActionableLogDocLink {
@@ -73,8 +72,10 @@ interface ActionableEntry {
   pattern: RegExp;
   url: string;
   body: ActionableLogDocLink["body"];
-  /** The fix only exists on ESP32; never fires for an unknown platform. */
-  esp32Only?: true;
+  /** Target platforms the fix exists on, as lowercase prefixes of the
+   *  device's ``target_platform`` (``"esp32"`` covers every variant).
+   *  Unset = all platforms. A gated entry never fires for an unknown one. */
+  platforms?: readonly string[];
 }
 
 const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
@@ -178,9 +179,16 @@ const ACTIONABLE: readonly ActionableEntry[] = [
       /TCP buffer full|Buffer full, ping queued|Could not request start|dropped, displaced by|GATT reply for handle 0x[0-9A-F]{4} (?:dropped for handle|undeliverable)|Failed to send (?:read|notify data) response|Failed to send services done|Services done undeliverable/,
     url: "https://esphome.io/components/network/#configuration-variables",
     body: "tcp_buffer",
-    esp32Only: true,
+    // tcp_send_buffer is cv.only_on_esp32 in esphome/components/network.
+    platforms: ["esp32"],
   },
 ] as const;
+
+/** Whether ``targetPlatform`` (any casing, "" = unknown) is one of ``platforms``. */
+function onPlatform(platforms: readonly string[], targetPlatform: string): boolean {
+  const target = targetPlatform.toLowerCase();
+  return target !== "" && platforms.some((p) => target.startsWith(p));
+}
 
 // Tag-keyed index so the per-line check is one Map miss for the vast
 // majority of tags, with zero regex work. URLs are static, so the safety
@@ -252,7 +260,7 @@ const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|lt)$/;
  * ``components/get_integration_docs`` map (component name → docs URL,
  * display name, and trimmed description); a present entry guarantees
  * the page exists. *targetPlatform* is the device's ``target_platform``
- * ("" when unknown); it gates the ESP32-only curated entries.
+ * ("" when unknown); it gates the platform-specific curated entries.
  */
 export function resolveLogDocLink(
   line: string,
@@ -266,7 +274,7 @@ export function resolveLogDocLink(
   if (parsed) {
     for (const entry of ACTIONABLE_BY_TAG.get(parsed.tag) ?? []) {
       if (entry.level !== parsed.level) continue;
-      if (entry.esp32Only && !isEsp32Platform(targetPlatform)) continue;
+      if (entry.platforms && !onPlatform(entry.platforms, targetPlatform)) continue;
       if (entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;

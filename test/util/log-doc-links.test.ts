@@ -288,7 +288,7 @@ describe("resolveLogDocLink — tcp_buffer", () => {
     ["an empty platform", ""],
     ["ESP8266", "ESP8266"],
     ["rp2", "rp2"],
-  ])("does not fire with %s (the option is ESP32-only)", (_what, platform) => {
+  ])("does not fire with %s (the entry is gated to esp32)", (_what, platform) => {
     expect(resolveLogDocLink(NOTIFY_DROP, {}, platform)?.actionable).toBeUndefined();
   });
 
