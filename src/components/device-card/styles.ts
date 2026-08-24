@@ -205,9 +205,10 @@ export const deviceCardStyles = [
       color: var(--wa-color-text-quiet);
     }
 
-    /* Free-form user text under the filename. The icon is what tells it
-       apart from the filename line above it, which shares the same size
-       and quiet colour; italic alone did not read as a different thing. */
+    /* Free-form user text under the filename, set as a standard metadata
+       row: a leading glyph on an upright quiet line. The icon is what tells
+       it apart from the filename above (same size, same colour); the italic
+       #1671 shipped did not read as a different thing at this size. */
     .device-comment {
       display: flex;
       align-items: center;
@@ -216,7 +217,6 @@ export const deviceCardStyles = [
       margin: 2px 0 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
-      font-style: italic;
     }
     .device-comment wa-icon {
       flex: none;
