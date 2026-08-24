@@ -88,22 +88,45 @@ export const deviceCardStyles = [
       }
     }
 
+    /* Three columns: select checkbox, text, status badge. Only the name row
+       shares its line with the badge; the filename and comment span under
+       it, so a long path or note is not cut short by dead space beneath
+       the badge. Spacing is on the outer items rather than a column gap so
+       an absent checkbox leaves no phantom indent. */
     .device-card-header {
       padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
       border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--wa-space-xs);
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: start;
     }
 
     .device-card-header:last-child {
       border-bottom: none;
     }
 
+    /* Its children lay out on the header grid directly. */
     .device-card-header-left {
-      flex: 1;
+      display: contents;
+    }
+    .device-checkbox {
+      grid-column: 1;
+      grid-row: 1;
+      margin-right: var(--wa-space-xs);
+    }
+    .device-name-wrap {
+      grid-column: 2;
+      grid-row: 1;
       min-width: 0;
+    }
+    .device-status {
+      grid-column: 3;
+      grid-row: 1;
+      margin-left: var(--wa-space-xs);
+    }
+    .device-config,
+    .device-comment {
+      grid-column: 2 / -1;
     }
 
     .device-name-wrap {
