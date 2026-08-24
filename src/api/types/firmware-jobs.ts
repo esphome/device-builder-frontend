@@ -92,13 +92,12 @@ export interface FirmwareJob {
    *  track later renames (the install dialog should show what the
    *  user saw when they clicked Install). */
   source_label: string;
-  /** Receiver's bundled ``esphome`` version at job-creation time,
-   *  snapshotted from the pairing's last-known
-   *  ``esphome_version``. Empty for LOCAL jobs and for REMOTE jobs
-   *  whose pairing hadn't yet completed a peer-link session. The
-   *  install dialog renders this next to ``source_label`` so the
-   *  operator can spot a version skew between the offloader and
-   *  the receiver actually compiling the firmware. */
+  /** Receiver's installed ``esphome`` version, snapshotted at
+   *  job-creation time only when the receiver builds with it instead
+   *  of ours. Empty for LOCAL jobs, same-version receivers, receivers
+   *  that provision our version into a venv, and pairings that hadn't
+   *  yet completed a peer-link session. Rendered next to
+   *  ``source_label`` so the operator can spot a real version skew. */
   source_esphome_version: string;
   /** Offloader's ``dashboard_id`` when this job came in via the
    *  peer-link ``submit_job`` flow. Empty for locally-submitted

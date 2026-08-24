@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 //
 // Pins the "Building on <receiver> (<version>)" sub-line: the version
-// shown is the one that actually builds — the receiver's installed
-// esphome normally, this dashboard's own when the receiver
-// auto-provisions a mismatch.
+// renders verbatim from source_esphome_version, which the backend stamps
+// only when the receiver builds with its own esphome instead of ours.
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -40,7 +39,7 @@ function makePairing(auto: boolean): PairingSummary {
 
 function makeHost(opts: {
   auto: boolean;
-  localVersion?: string;
+  sourceVersion?: string;
   commandType?: string;
 }): ESPHomeCommandDialog {
   return {
@@ -51,32 +50,28 @@ function makeHost(opts: {
     _primedSource: {
       source: JobSource.REMOTE,
       source_label: "builder",
-      source_esphome_version: "2026.6.5",
+      source_esphome_version: opts.sourceVersion ?? "2026.6.5",
       source_pin_sha256: PIN,
     },
     _pairings: new Map([[PIN, makePairing(opts.auto)]]),
-    _appVersion: opts.localVersion ?? "2026.7.0b2",
+    _appVersion: "2026.7.0b2",
     _commandType: opts.commandType ?? "compile",
     _switchingToLocal: false,
   } as unknown as ESPHomeCommandDialog;
 }
 
 describe("renderRemoteBuilderSubLine version", () => {
-  it("shows the local version when the receiver auto-provisions the mismatch", () => {
+  it("renders the stamped version verbatim, ignoring the pairing's provisioning", () => {
     const el = renderInto(renderRemoteBuilderSubLine(makeHost({ auto: true })));
-    expect(el.textContent).toContain("builder (2026.7.0b2)");
-  });
-
-  it("shows the receiver's version when it can't auto-provision", () => {
-    const el = renderInto(renderRemoteBuilderSubLine(makeHost({ auto: false })));
     expect(el.textContent).toContain("builder (2026.6.5)");
   });
 
-  it("shows the receiver's version for a dev local build (unprovisionable)", () => {
+  it("renders just the receiver name when no version is stamped", () => {
     const el = renderInto(
-      renderRemoteBuilderSubLine(makeHost({ auto: true, localVersion: "2026.8.0-dev" }))
+      renderRemoteBuilderSubLine(makeHost({ auto: true, sourceVersion: "" }))
     );
-    expect(el.textContent).toContain("builder (2026.6.5)");
+    expect(el.textContent).toContain("builder");
+    expect(el.textContent).not.toContain("(");
   });
 
   it("offers Build locally for a reopened remote deferred install", () => {
