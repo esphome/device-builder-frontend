@@ -89,11 +89,9 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
           @change=${(e: Event) => {
             this._erase = (e.currentTarget as HTMLElement & { checked: boolean }).checked;
           }}
-          >${this._localize("web.install.adoptable_erase")}</wa-checkbox
-        >
-        <span class="helper"
-          >${this._localize("web.install.adoptable_erase_helper")}</span
-        >
+          >${this._localize("web.install.adoptable_erase")}
+          <span slot="hint">${this._localize("web.install.adoptable_erase_helper")}</span>
+        </wa-checkbox>
       </div>
     `;
   }
@@ -144,14 +142,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         font-weight: var(--wa-font-weight-semibold);
       }
       .erase-row {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
         margin-top: var(--wa-space-m);
-      }
-      .helper {
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
       }
       .actions {
         display: flex;
