@@ -4,7 +4,10 @@ import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { formatElapsed } from "../../util/format-job-time.js";
-import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import {
+  jobBuildServerDisplay,
+  pairingDisplayNameForPin,
+} from "../../util/pairing-display-name.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
   renderOffloadHint,
@@ -35,16 +38,15 @@ export function renderRemoteBuilderSubLine(
   const source = liveJob?.source ?? host._primedSource?.source;
   const label = liveJob?.source_label ?? host._primedSource?.source_label;
   if (source !== JobSource.REMOTE || !label) return nothing;
-  // source_esphome_version is also a job-creation-time snapshot; the backend
-  // stamps it only when the receiver builds with its own esphome instead of
-  // ours, so a non-empty value is always the version that builds the firmware.
-  const version =
-    liveJob?.source_esphome_version ?? host._primedSource?.source_esphome_version ?? "";
   const pin = liveJob?.source_pin_sha256 ?? host._primedSource?.source_pin_sha256 ?? "";
   // The live pairing's display name (handshake friendly name, rename-aware)
   // wins over the job's creation-time source_label snapshot.
-  const name = pairingDisplayNameForPin(host._pairings, pin, label);
-  const display = version ? `${name} (${version})` : name;
+  const display = jobBuildServerDisplay(host._pairings, {
+    source_pin_sha256: pin,
+    source_label: label,
+    source_esphome_version:
+      liveJob?.source_esphome_version ?? host._primedSource?.source_esphome_version ?? "",
+  });
   // Only allow override for an in-flight install chain — a deferred install
   // (offline_compile) is the same chain head and keeps the link it had when
   // it derived "install". Switching a plain compile has no UI today.

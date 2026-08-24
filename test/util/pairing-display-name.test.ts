@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PairingSummary, PeerSummary } from "../../src/api/types/remote-build.js";
 import {
+  jobBuildServerDisplay,
   jobPeerDisplayName,
   offloaderSelfLabel,
   pairingDisplayName,
@@ -96,6 +97,20 @@ describe("pairingDisplayNameForPin", () => {
       "snapshot"
     );
     expect(pairingDisplayNameForPin(null, undefined, "snapshot")).toBe("snapshot");
+  });
+});
+
+describe("jobBuildServerDisplay", () => {
+  it("appends the stamped version to the resolved name", () => {
+    const p = pairing({ receiver_label_auto: true, friendly_name: "Nicks-Mac-Studio" });
+    const map = new Map([[p.pin_sha256, p]]);
+    const job = { source_pin_sha256: p.pin_sha256, source_label: "snapshot" };
+    expect(
+      jobBuildServerDisplay(map, { ...job, source_esphome_version: "2026.8.0" })
+    ).toBe("Nicks-Mac-Studio (2026.8.0)");
+    expect(jobBuildServerDisplay(map, { ...job, source_esphome_version: "" })).toBe(
+      "Nicks-Mac-Studio"
+    );
   });
 });
 
