@@ -24,6 +24,10 @@ describe("device-card comment", () => {
     expect(node.querySelector("wa-icon")?.getAttribute("name")).toBe(
       "comment-text-outline"
     );
+    // The icon is aria-hidden, so the paragraph names itself for AT.
+    expect(node.getAttribute("aria-label")).toBe(
+      "dashboard.device_comment: Garage, behind the freezer"
+    );
   });
 
   it("renders no comment node when the device has none", async () => {

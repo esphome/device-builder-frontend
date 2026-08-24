@@ -109,20 +109,11 @@ export const deviceCardStyles = [
     .device-card-header-left {
       display: contents;
     }
-    .device-checkbox {
-      grid-column: 1;
-      grid-row: 1;
-      margin-right: var(--wa-space-xs);
-    }
-    .device-name-wrap {
-      grid-column: 2;
-      grid-row: 1;
-      min-width: 0;
-    }
-    .device-status {
+    /* The badge's tooltip is a sibling referenced by for=; keep it out of
+       auto-placement so it can never claim a cell (and a column) of its own. */
+    .device-card-header > wa-tooltip {
       grid-column: 3;
       grid-row: 1;
-      margin-left: var(--wa-space-xs);
     }
     .device-config,
     .device-comment {
@@ -130,6 +121,9 @@ export const deviceCardStyles = [
     }
 
     .device-name-wrap {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -248,13 +242,15 @@ export const deviceCardStyles = [
       flex: none;
       width: 1em;
       font-size: 14px;
-      opacity: 0.8;
     }
     .device-comment .truncate {
       min-width: 0;
     }
 
     .device-status {
+      grid-column: 3;
+      grid-row: 1;
+      margin-left: var(--wa-space-xs);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -263,7 +259,6 @@ export const deviceCardStyles = [
       font-size: var(--wa-font-size-2xs);
       font-weight: var(--wa-font-weight-bold);
       letter-spacing: 0.02em;
-      flex-shrink: 0;
       margin-top: 2px;
     }
 
@@ -357,13 +352,15 @@ export const deviceCardStyles = [
     }
 
     .device-checkbox {
+      grid-column: 1;
+      grid-row: 1;
+      margin-right: var(--wa-space-xs);
       font-size: 22px;
       color: var(--wa-color-text-quiet);
-      flex-shrink: 0;
       transition: color 0.12s;
       /* Box the glyph to the title's first-line height so it centers
-         on the device name while the header keeps align-items:
-         flex-start (the status badge stays top-anchored). */
+         on the device name while the header grid keeps align-items:
+         start (the status badge stays top-anchored). */
       display: flex;
       align-items: center;
       height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
