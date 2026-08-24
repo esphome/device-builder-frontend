@@ -110,6 +110,12 @@ async function acquirePort(
     toast.error(localize("web.improv.open_failed"));
     return null;
   }
+  // openLiveSerialPort only screens readable.locked; a handle it found open
+  // can still have its writer held, and the SDK takes both.
+  if (live.readable?.locked || live.writable?.locked) {
+    toast.error(localize("web.improv.port_busy"));
+    return null;
+  }
   if (weOpened) {
     try {
       await live.setSignals({ dataTerminalReady: false, requestToSend: false });

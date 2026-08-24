@@ -147,6 +147,20 @@ describe("openImprovDialog", () => {
     await promise;
   });
 
+  it("bails with the busy toast when the live handle's writer is held", async () => {
+    const stale = makePort();
+    const theirs = makePort();
+    theirs.readable = { locked: false };
+    theirs.writable = { locked: true };
+    openLiveSerialPort.mockResolvedValue(theirs as unknown as SerialPort);
+    const result = await openImprovDialog(stale as unknown as SerialPort, localize);
+
+    expect(result).toEqual({ improv: false, provisioned: false });
+    expect(toast.error).toHaveBeenCalledWith("web.improv.port_busy");
+    expect(dialogEl()).toBeNull();
+    expect(theirs.close).not.toHaveBeenCalled();
+  });
+
   it("does not close a handle openLiveSerialPort found already open", async () => {
     const stale = makePort();
     const theirs = makePort();

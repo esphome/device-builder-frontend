@@ -15,7 +15,11 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { sleep } from "../../util/sleep.js";
-import { IMPROV_OPEN_DELAY_MS, openImprovDialog } from "../improv/open-improv-dialog.js";
+import {
+  IMPROV_OPEN_DELAY_MS,
+  type ImprovResult,
+  openImprovDialog,
+} from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-install-adoptable-dialog.js";
 import "../install/esphome-web-install-upload-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
@@ -72,7 +76,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   // Improv may have to reopen on a fresh handle (native-USB re-enumeration
   // after the post-flash reset); hand it to the parent card like the logs
   // dialog does, so the other actions stop using the dead pre-reset one.
-  private _openImprov(): Promise<unknown> {
+  private _openImprov(): Promise<ImprovResult> {
     return openImprovDialog(this.port, this._localize, {
       onPortReplaced: (port) =>
         this.dispatchEvent(
