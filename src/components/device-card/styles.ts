@@ -109,8 +109,9 @@ export const deviceCardStyles = [
     .device-card-header-left {
       display: contents;
     }
-    /* The badge's tooltip is a sibling referenced by for=; keep it out of
-       auto-placement so it can never claim a cell (and a column) of its own. */
+    /* The badge's tooltip is a sibling referenced by for=. Its host is
+       position: absolute, so it never takes part in auto-placement; the
+       pin only makes the intended cell explicit for the next reader. */
     .device-card-header > wa-tooltip {
       grid-column: 3;
       grid-row: 1;
