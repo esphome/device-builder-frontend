@@ -87,7 +87,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         <wa-checkbox
           .checked=${this._erase}
           @change=${(e: Event) => {
-            this._erase = (e.target as HTMLInputElement).checked;
+            this._erase = (e.currentTarget as HTMLElement & { checked: boolean }).checked;
           }}
           >${this._localize("web.install.adoptable_erase")}</wa-checkbox
         >

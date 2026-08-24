@@ -72,9 +72,9 @@ describe("esphome-web-install-adoptable-dialog erase option", () => {
 
   it("asks the flow to erase first when the checkbox is ticked", async () => {
     const el = await mount();
-    const box = el.shadowRoot!.querySelector(
-      "wa-checkbox"
-    ) as unknown as HTMLInputElement;
+    const box = el.shadowRoot!.querySelector("wa-checkbox") as HTMLElement & {
+      checked: boolean;
+    };
     expect(box).toBeTruthy();
     box.checked = true;
     box.dispatchEvent(new Event("change"));
