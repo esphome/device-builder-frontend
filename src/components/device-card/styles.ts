@@ -212,15 +212,19 @@ export const deviceCardStyles = [
     .device-comment {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
       min-width: 0;
       margin: 2px 0 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
     }
+    /* wa-icon's host is 1.25em wide with the glyph centred, which pushed
+       the text ~7px past the icon; hug the glyph so the line reads as one
+       row starting at the filename's left edge. */
     .device-comment wa-icon {
       flex: none;
-      font-size: var(--wa-font-size-s);
+      width: 1em;
+      font-size: 14px;
       opacity: 0.8;
     }
     .device-comment .truncate {
