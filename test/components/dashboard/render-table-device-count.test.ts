@@ -5,7 +5,7 @@
  * as the facets. The table applies the search inside its own global
  * filter, so the count used to reflect facets only (device-builder#2627).
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -14,6 +14,11 @@ import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DashboardView } from "../../../src/api/types/system.js";
 import { renderTable } from "../../../src/components/dashboard/render-content.js";
+import {
+  clearTourConfiguration,
+  setTourActive,
+  setTourConfiguration,
+} from "../../../src/components/guided-tour/tour-session.js";
 import { makeTableHost } from "./_host.js";
 
 const DEVICES = [
@@ -55,6 +60,11 @@ function countRow(host: ReturnType<typeof makeHost>): { count: string; text: str
   };
 }
 
+afterEach(() => {
+  setTourActive(false);
+  clearTourConfiguration();
+});
+
 describe("renderTable device count", () => {
   it("counts every facet-visible device when the search is empty", () => {
     const row = countRow(makeHost());
@@ -81,5 +91,19 @@ describe("renderTable device count", () => {
     // "Servion" matches, "Garland" doesn't; "ECU Boiler" is hidden by
     // the facet before the search runs.
     expect(countRow(host).count).toBe("1");
+  });
+
+  it("leaves the forced guided-tour row out of the count", () => {
+    // The table keeps the tour target visible even when it doesn't match
+    // the search; the count mirrors the card view and only counts matches.
+    setTourConfiguration("garland.yaml");
+    setTourActive(true);
+    const host = makeHost({ _search: "ecu" });
+    const container = renderInto(renderTable(host));
+    const table = container.querySelector("esphome-device-table") as unknown as {
+      devices: ConfiguredDevice[];
+    };
+    expect(table.devices.map((d) => d.configuration)).toContain("garland.yaml");
+    expect(container.querySelector(".device-count strong")!.textContent).toBe("1");
   });
 });
