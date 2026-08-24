@@ -205,6 +205,14 @@ export const deviceCardStyles = [
       color: var(--wa-color-text-quiet);
     }
 
+    /* Italic to match the archived-devices dialog's comment rows. */
+    .device-comment {
+      margin: 2px 0 0;
+      font-size: var(--wa-font-size-xs);
+      color: var(--wa-color-text-quiet);
+      font-style: italic;
+    }
+
     .device-status {
       display: inline-flex;
       align-items: center;
