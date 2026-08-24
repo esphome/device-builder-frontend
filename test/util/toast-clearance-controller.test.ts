@@ -35,11 +35,36 @@ describe("ToastClearanceController", () => {
     const target = targetAt(() => fromBottom);
     const ctrl = new ToastClearanceController(new FakeHost(), () => target);
     ctrl.hostConnected();
-    ctrl.hostUpdated();
     expect(clearance()).toBe("40px");
     fromBottom = 64;
     window.dispatchEvent(new Event("resize"));
     expect(clearance()).toBe("64px");
+    fromBottom = 48;
+    ctrl.hostUpdated();
+    expect(clearance()).toBe("48px");
+    ctrl.hostDisconnected();
+    expect(clearance()).toBe("");
+    ctrl.hostConnected();
+    expect(clearance()).toBe("48px");
+    ctrl.hostDisconnected();
+  });
+
+  it("falls back to the default offset for a hidden target", () => {
+    const target = document.createElement("div");
+    target.getBoundingClientRect = () => ({ top: 0, width: 0, height: 0 }) as DOMRect;
+    const ctrl = new ToastClearanceController(new FakeHost(), () => target);
+    ctrl.hostConnected();
+    expect(clearance()).toBe("");
+    ctrl.hostDisconnected();
+  });
+
+  it("restores the property if another writer cleared it", () => {
+    const target = targetAt(() => 40);
+    const ctrl = new ToastClearanceController(new FakeHost(), () => target);
+    ctrl.hostConnected();
+    document.documentElement.style.removeProperty(TOAST_CLEARANCE_PROPERTY);
+    ctrl.hostUpdated();
+    expect(clearance()).toBe("40px");
     ctrl.hostDisconnected();
   });
 

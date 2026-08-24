@@ -36,14 +36,19 @@ export class ToastClearanceController implements ReactiveController {
 
   hostConnected(): void {
     window.addEventListener("resize", this._measure);
+    // A cache()d host can reattach without a render; re-resolve here too.
+    this.hostUpdated();
   }
 
   hostUpdated(): void {
     const target = this._target() ?? null;
-    if (target === this._observed) return;
-    if (this._observed) this._observer.unobserve(this._observed);
-    this._observed = target;
-    if (target) this._observer.observe(target);
+    if (target !== this._observed) {
+      if (this._observed) this._observer.unobserve(this._observed);
+      this._observed = target;
+      if (target) this._observer.observe(target);
+    }
+    // Always measure: ResizeObserver reports the target's box, not its
+    // position, and siblings above can move the row without resizing it.
     this._measure();
   }
 
@@ -60,15 +65,27 @@ export class ToastClearanceController implements ReactiveController {
       this._publish(null);
       return;
     }
-    const clearance = Math.round(window.innerHeight - target.getBoundingClientRect().top);
+    const rect = target.getBoundingClientRect();
+    // A hidden target reports an all-zero rect, which would read as a
+    // full-viewport clearance and push toasts off-screen.
+    if (rect.width === 0 && rect.height === 0) {
+      this._publish(null);
+      return;
+    }
+    const clearance = Math.round(window.innerHeight - rect.top);
     this._publish(`${Math.max(0, clearance)}px`);
   };
 
   /** Skips the write when unchanged: a root property write restyles the whole document. */
   private _publish(value: string | null): void {
-    if (value === this._published) return;
-    this._published = value;
     const style = document.documentElement.style;
+    if (
+      value === this._published &&
+      style.getPropertyValue(TOAST_CLEARANCE_PROPERTY) === (value ?? "")
+    ) {
+      return;
+    }
+    this._published = value;
     if (value === null) style.removeProperty(TOAST_CLEARANCE_PROPERTY);
     else style.setProperty(TOAST_CLEARANCE_PROPERTY, value);
   }

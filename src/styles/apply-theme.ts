@@ -99,7 +99,9 @@ function applySonnerOverrides(): void {
     /* Pages with corner buttons publish ${TOAST_CLEARANCE_PROPERTY}
        (see ToastClearanceController); sit above it. Only bottom moves:
        sonner shares one --offset for bottom and right, so its offset
-       option can't do this. The breakpoint mirrors sonner's own. */
+       option can't do this. With no publisher the lift is just --gap,
+       which stays below sonner's offsets, so other pages and ESPHome Web
+       keep the default placement. The breakpoint mirrors sonner's own. */
     [data-sonner-toaster][data-position*="bottom"][data-position*="right"] {
       --esphome-toast-lift: calc(var(${TOAST_CLEARANCE_PROPERTY}, 0px) + var(--gap));
       bottom: max(var(--offset), var(--esphome-toast-lift)) !important;
