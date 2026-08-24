@@ -205,12 +205,26 @@ export const deviceCardStyles = [
       color: var(--wa-color-text-quiet);
     }
 
-    /* Italic to match the archived-devices dialog's comment rows. */
+    /* Free-form user text under the filename. The icon is what tells it
+       apart from the filename line above it, which shares the same size
+       and quiet colour; italic alone did not read as a different thing. */
     .device-comment {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
       margin: 2px 0 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
       font-style: italic;
+    }
+    .device-comment wa-icon {
+      flex: none;
+      font-size: var(--wa-font-size-s);
+      opacity: 0.8;
+    }
+    .device-comment .truncate {
+      min-width: 0;
     }
 
     .device-status {

@@ -20,6 +20,10 @@ describe("device-card comment", () => {
     expect(node.previousElementSibling?.classList.contains("device-config")).toBe(true);
     // The line is ellipsis-truncated; the native tooltip carries the full text.
     expect(node.getAttribute("title")).toBe("Garage, behind the freezer");
+    // The icon is the cue that separates it from the filename line above.
+    expect(node.querySelector("wa-icon")?.getAttribute("name")).toBe(
+      "comment-text-outline"
+    );
   });
 
   it("renders no comment node when the device has none", async () => {
