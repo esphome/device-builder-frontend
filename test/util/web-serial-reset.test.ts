@@ -5,17 +5,13 @@
  * For a classic ESP32 / ESP8266 behind a UART bridge that means an EN (RTS)
  * pulse with GPIO0 (DTR) released — esptool-js's ClassicReset would instead
  * drive GPIO0 low and strand the chip in the serial bootloader (#1529).
+ * A chip on its own USB-Serial/JTAG peripheral (ESP32-C6 and friends outside
+ * the watchdog list) needs the same EN pulse with esptool's USB timings;
+ * esptool-js's UsbJtagSerialReset is the *enter download mode* sequence and
+ * left the XIAO ESP32-C6 in the ROM bootloader after flashing (#1678).
  */
 import type { ESPLoader, Transport } from "esptool-js";
-import { describe, expect, it, vi } from "vitest";
-
-const { jtagResetSpy } = vi.hoisted(() => ({ jtagResetSpy: vi.fn() }));
-vi.mock("esptool-js", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  UsbJtagSerialReset: class {
-    reset = jtagResetSpy;
-  },
-}));
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resetAndDisconnect } from "../../src/util/web-serial.js";
 
@@ -50,30 +46,71 @@ describe("resetAndDisconnect — classic ESP32 / ESP8266 over a UART bridge", ()
   });
 });
 
-describe("resetAndDisconnect — Espressif USB identity discriminator", () => {
-  it("uses the JTAG reset only for the on-chip USB-Serial-JTAG device", async () => {
-    jtagResetSpy.mockClear();
+const jtagPort = {
+  getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
+} as unknown as SerialPort;
+// ESP32-C6: no watchdog reset (its USB-Serial/JTAG controller can drop the
+// port), so it takes the USB-JTAG branch.
+const c6Loader = { chip: { CHIP_NAME: "ESP32-C6" } } as unknown as ESPLoader;
+
+describe("resetAndDisconnect — chip's own USB-Serial/JTAG peripheral", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("boots the app on an ESP32-C6 with an EN pulse, boot strap released", async () => {
+    vi.useFakeTimers();
     const transport = fakeTransport();
-    const jtagPort = {
-      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
-    } as unknown as SerialPort;
-    await resetAndDisconnect(esp8266Loader, transport as unknown as Transport, jtagPort);
-    expect(jtagResetSpy).toHaveBeenCalledTimes(1);
-    expect(transport.setRTS).not.toHaveBeenCalled();
+    const done = resetAndDisconnect(
+      c6Loader,
+      transport as unknown as Transport,
+      jtagPort
+    );
+    await vi.runAllTimersAsync();
+    await done;
+
+    // EN pulse only: RTS true (reset) then false (boot). The download-mode
+    // sequence would toggle RTS three times and drive DTR high.
+    expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true, false]);
+    expect(transport.setDTR).toHaveBeenCalledWith(false);
+    expect(transport.setDTR.mock.calls.every((c) => c[0] === false)).toBe(true);
+    expect(transport.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds EN low for esptool's 200 ms USB timing before releasing", async () => {
+    vi.useFakeTimers();
+    const transport = fakeTransport();
+    const done = resetAndDisconnect(
+      c6Loader,
+      transport as unknown as Transport,
+      jtagPort
+    );
+    await vi.advanceTimersByTimeAsync(150);
+    expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true]);
+    await vi.advanceTimersByTimeAsync(60);
+    expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true, false]);
+    // Then waits out the USB re-enumeration window before closing the port.
+    expect(transport.disconnect).not.toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    await done;
+    expect(transport.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it("treats the ESP-USB-Bridge as a bridge despite the Espressif vendor id", async () => {
-    jtagResetSpy.mockClear();
+    vi.useFakeTimers();
     const transport = fakeTransport();
     const bridgePort = {
       getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1002 }),
     } as unknown as SerialPort;
-    await resetAndDisconnect(
+    const done = resetAndDisconnect(
       esp8266Loader,
       transport as unknown as Transport,
       bridgePort
     );
-    expect(jtagResetSpy).not.toHaveBeenCalled();
+    // Bridge timing: EN released after 100 ms, no post-release wait.
+    await vi.advanceTimersByTimeAsync(100);
+    await done;
     expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true, false]);
+    expect(transport.disconnect).toHaveBeenCalledTimes(1);
   });
 });

@@ -70,10 +70,10 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   }
 
   // Fired by the adoptable dialog's Continue button after a successful flash.
-  // Close the (native modal) install dialog first, then give the freshly-reset
-  // device a moment to re-enumerate and boot the new firmware before Improv
-  // grabs the port — legacy slept 1s here for the same reason. The delay also
-  // lets the modal finish hiding so Improv doesn't open behind its backdrop.
+  // Close the (native modal) install dialog first and let it finish hiding so
+  // Improv doesn't open behind its backdrop. Waiting for the freshly-reset
+  // device to re-enumerate is openImprovDialog's job (it reopens through
+  // openLiveSerialPort); this.port may be a dead pre-reset handle by now.
   private async _onProvisionWifi(): Promise<void> {
     this._adoptableOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);

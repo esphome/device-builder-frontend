@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The SDK module only needs to register the custom element as a side effect;
 // in happy-dom ``createElement`` yields a generic element we drive directly.
 vi.mock("improv-wifi-serial-sdk/dist/serial-provision-dialog", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+// Post-reset reopen goes through openLiveSerialPort (re-enumeration retry
+// loop); stub it so the suite can hand back the cached or a fresh handle.
+const { openLiveSerialPort } = vi.hoisted(() => ({ openLiveSerialPort: vi.fn() }));
+vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort }));
 
 import toast from "sonner-js";
 import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
@@ -12,15 +16,15 @@ import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
 const localize: (k: string, v?: Record<string, string | number>) => string = (k) => k;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-function makePort(openImpl?: () => Promise<void>): {
-  open: ReturnType<typeof vi.fn>;
+function makePort(): {
   close: ReturnType<typeof vi.fn>;
+  setSignals: ReturnType<typeof vi.fn>;
   readable: unknown;
   writable: unknown;
 } {
   return {
-    open: vi.fn(openImpl ?? (async () => {})),
     close: vi.fn(async () => {}),
+    setSignals: vi.fn(async () => {}),
     readable: null,
     writable: null,
   };
@@ -33,18 +37,31 @@ function dialogEl(): HTMLElement | null {
   return document.querySelector("improv-wifi-serial-provision-dialog");
 }
 
+beforeEach(() => {
+  // Default: the cached handle reopens in place (UART bridge / Firefox).
+  openLiveSerialPort.mockImplementation(async (port: SerialPort) => port);
+});
+
 afterEach(() => {
   document.body.innerHTML = "";
   vi.clearAllMocks();
 });
 
 describe("openImprovDialog", () => {
-  it("opens the port at 115200 with an 8k buffer and mounts the SDK dialog", async () => {
+  it("reopens the port at 115200 with an 8k buffer and mounts the SDK dialog", async () => {
     const port = makePort();
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
 
-    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200, bufferSize: 8192 });
+    expect(openLiveSerialPort).toHaveBeenCalledWith(port, {
+      baudRate: 115200,
+      bufferSize: 8192,
+    });
+    // DTR/RTS released so a bridge board's auto-reset circuit can't hold EN low.
+    expect(port.setSignals).toHaveBeenCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
     const el = dialogEl();
     expect(el).toBeTruthy();
     expect((el as unknown as { port: unknown }).port).toBe(port);
@@ -88,13 +105,30 @@ describe("openImprovDialog", () => {
     expect(dialogEl()).toBeTruthy();
   });
 
+  it("hands the SDK the fresh handle a re-enumerated device came back as (#1678)", async () => {
+    const stale = makePort();
+    const fresh = makePort();
+    openLiveSerialPort.mockResolvedValue(fresh as unknown as SerialPort);
+    const promise = openImprovDialog(stale as unknown as SerialPort, localize);
+    await flush();
+
+    expect((dialogEl() as unknown as { port: unknown }).port).toBe(fresh);
+    dialogEl()!.dispatchEvent(
+      new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
+    );
+    await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
+    // The handle we opened is the one we release.
+    expect(fresh.close).toHaveBeenCalledOnce();
+    expect(stale.close).not.toHaveBeenCalled();
+  });
+
   it("proceeds when the port is already open, and does NOT close a port it didn't open", async () => {
-    const port = makePort(async () => {
-      throw new DOMException("already open", "InvalidStateError");
-    });
+    const port = makePort();
+    port.readable = { locked: false };
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
 
+    expect(openLiveSerialPort).not.toHaveBeenCalled();
     expect(dialogEl()).toBeTruthy();
     dialogEl()!.dispatchEvent(
       new CustomEvent("closed", { detail: { improv: true, provisioned: false } })
@@ -128,9 +162,7 @@ describe("openImprovDialog", () => {
   });
 
   it("bails with a toast when the already-open port's streams are locked", async () => {
-    const port = makePort(async () => {
-      throw new DOMException("already open", "InvalidStateError");
-    });
+    const port = makePort();
     port.readable = { locked: true };
     const result = await openImprovDialog(port as unknown as SerialPort, localize);
 
@@ -139,10 +171,9 @@ describe("openImprovDialog", () => {
     expect(dialogEl()).toBeNull();
   });
 
-  it("toasts and returns a false result without mounting when open fails", async () => {
-    const port = makePort(async () => {
-      throw new Error("device gone");
-    });
+  it("toasts and returns a false result without mounting when no live port opens", async () => {
+    const port = makePort();
+    openLiveSerialPort.mockResolvedValue(null);
     const result = await openImprovDialog(port as unknown as SerialPort, localize);
 
     expect(result).toEqual({ improv: false, provisioned: false });
