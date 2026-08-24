@@ -63,6 +63,22 @@ export function pairingDisplayNameForPin(
 }
 
 /**
+ * "Building on" text for a REMOTE job: the server's display name, with
+ * the stamped `source_esphome_version` in parentheses when present.
+ */
+export function jobBuildServerDisplay(
+  pairings: Map<string, PairingSummary> | null | undefined,
+  job: Pick<FirmwareJob, "source_pin_sha256" | "source_label" | "source_esphome_version">
+): string {
+  const name = pairingDisplayNameForPin(
+    pairings,
+    job.source_pin_sha256,
+    job.source_label
+  );
+  return job.source_esphome_version ? `${name} (${job.source_esphome_version})` : name;
+}
+
+/**
  * Display name for a paired offloader (receiver side).
  *
  * The receiver can't derive "was this label auto-prefilled" from a

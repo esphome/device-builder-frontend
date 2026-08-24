@@ -11,8 +11,8 @@ import { firmwareJobTypeLabel } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import {
+  jobBuildServerDisplay,
   jobPeerDisplayName,
-  pairingDisplayNameForPin,
 } from "../../util/pairing-display-name.js";
 
 /**
@@ -182,7 +182,7 @@ function renderRowAction(host: FirmwareJobsListHost, job: FirmwareJob): Template
 }
 
 // Names the build server from the live pairing (rename-aware, handshake
-// friendly name) via pairingDisplayNameForPin, falling back to the job's
+// friendly name) via jobBuildServerDisplay, falling back to the job's
 // creation-time source_label snapshot when the pairing is gone. Symmetric
 // receiver-side rendering: when remote_peer is set, the job was submitted
 // from another dashboard's offloader.
@@ -193,18 +193,10 @@ export function renderSourceLine(
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
-    const name = pairingDisplayNameForPin(
-      host._pairings,
-      job.source_pin_sha256,
-      job.source_label
-    );
-    const display = job.source_esphome_version
-      ? `${name} (${job.source_esphome_version})`
-      : name;
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.building_on", {
-          label: display,
+          label: jobBuildServerDisplay(host._pairings, job),
         })}
       </div>
     `;
