@@ -107,7 +107,10 @@ async function acquirePort(
   localize: LocalizeFunc,
   afterReset: boolean
 ): Promise<{ port: SerialPort; weOpened: boolean } | null> {
-  if (port.readable) {
+  // An open handle is reused only while its device is still attached: a
+  // reset that threw out of transport.disconnect() can leave the pre-reset
+  // handle open but dead, and that one must go through the reopen loop.
+  if (port.readable && port.connected !== false) {
     if (port.readable.locked || port.writable?.locked) {
       toast.error(localize("web.improv.port_busy"));
       return null;

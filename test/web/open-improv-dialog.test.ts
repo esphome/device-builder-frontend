@@ -171,6 +171,24 @@ describe("openImprovDialog", () => {
     await p;
   });
 
+  it("reopens instead of reusing an open handle whose device is gone", async () => {
+    const dead = makePort();
+    dead.readable = { locked: false };
+    (dead as unknown as { connected: boolean }).connected = false;
+    const fresh = makePort();
+    openLiveSerialPort.mockImplementation(async (_p: SerialPort, opts: LiveOptions) => {
+      opts.onOpened?.(fresh as unknown as SerialPort);
+      return fresh;
+    });
+    const promise = openImprovDialog(dead as unknown as SerialPort, localize);
+    await flush();
+
+    expect(openLiveSerialPort).toHaveBeenCalledOnce();
+    expect((dialogEl() as unknown as { port: unknown }).port).toBe(fresh);
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+  });
+
   it("does not report a replacement when the cached handle reopened in place", async () => {
     const port = makePort();
     const onPortReplaced = vi.fn();
