@@ -7,6 +7,15 @@ vi.mock("improv-wifi-serial-sdk/dist/serial-provision-dialog", () => {
   throw new Error("chunk load failed");
 });
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+// The reopen retry loop is exercised elsewhere; here the cached handle just opens.
+vi.mock("../../src/util/web-serial.js", () => ({
+  openLiveSerialPort: vi.fn(
+    async (port: SerialPort, opts: { onOpened?: (p: SerialPort) => void }) => {
+      opts.onOpened?.(port);
+      return port;
+    }
+  ),
+}));
 
 import toast from "sonner-js";
 import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
@@ -15,8 +24,8 @@ describe("openImprovDialog — SDK load failure", () => {
   it("closes the port and returns false with a toast when the chunk fails to load", async () => {
     const close = vi.fn(async () => {});
     const port = {
-      open: vi.fn(async () => {}),
       close,
+      setSignals: vi.fn(async () => {}),
       readable: null,
       writable: null,
     };

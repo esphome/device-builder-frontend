@@ -5,10 +5,11 @@
  * Web Serial API. No backend involvement — talks directly to the
  * USB-connected ESP device.
  */
-import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
+import { ESPLoader, Transport } from "esptool-js";
 
 import { getErrorMessage } from "./error-message.js";
 import { markSerialActivity } from "./serial-reacquire.js";
+import { sleep } from "./sleep.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 const ESPRESSIF_USB_VID = 0x303a;
@@ -466,17 +467,39 @@ async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<b
 }
 
 /**
- * Boot the just-flashed firmware on a classic ESP32 / ESP8266 behind a UART
- * bridge: pulse EN (RTS) low→high while leaving GPIO0 (DTR) released, so the
+ * Boot the just-flashed firmware with an EN pulse: drive EN (RTS) low then
+ * high while leaving the boot strap (DTR / GPIO0 / GPIO9) released, so the
  * chip resets out of the bootloader and runs the app. Mirrors esptool's
- * ``--after hard-reset`` and the legacy dashboard's ``resetSerialDevice``.
+ * ``--after hard-reset`` (``HardReset``) and the legacy dashboard's
+ * ``resetSerialDevice``.
+ *
+ * ``holdMs`` is how long EN stays low; ``postReleaseMs`` waits after release
+ * before the caller closes the port. esptool uses 100 / 0 through a UART
+ * bridge and 200 / 200 over a chip's own USB peripheral, where the device
+ * drops off the bus during reset and needs the extra time to re-enumerate.
  */
-async function classicHardReset(transport: Transport): Promise<void> {
-  await transport.setDTR(false); // GPIO0 high → boot from flash, not download mode
+async function enPulseHardReset(
+  transport: Transport,
+  holdMs: number,
+  postReleaseMs: number
+): Promise<void> {
+  await transport.setDTR(false); // boot strap released → boot from flash
   await transport.setRTS(true); // EN low (hold in reset)
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await sleep(holdMs);
   await transport.setRTS(false); // EN high → boot the app
+  if (postReleaseMs > 0) await sleep(postReleaseMs);
 }
+
+/** esptool's ``HardReset`` timings through an external UART bridge. */
+const classicHardReset = (transport: Transport) => enPulseHardReset(transport, 100, 0);
+
+/**
+ * esptool's ``HardReset(uses_usb=True)`` timings for a chip's own
+ * USB-Serial/JTAG peripheral. The controller maps RTS to EN and DTR to the
+ * boot strap, so the same EN pulse works; the longer delays cover the USB
+ * drop + re-enumeration that the reset causes.
+ */
+const usbJtagHardReset = (transport: Transport) => enPulseHardReset(transport, 200, 200);
 
 /**
  * Pick a reset strategy based on the chip and how it's connected.
@@ -495,9 +518,14 @@ async function classicHardReset(transport: Transport): Promise<void> {
  *   "cancellation" behaviour the DTR/RTS sequence implicitly assumes.
  * - Native USB-Serial/JTAG (0x303a:0x1001 — esptool-js discriminates on
  *   the PID; other 0x303a products like the ESP-USB-Bridge are real UART
- *   bridges) for chips not in the WDT
- *   list (mostly fall-through; safety net): esptool-js's
- *   ``UsbJtagSerialReset``.
+ *   bridges) for chips not in the WDT list (ESP32-C6 / H2 / P4 …): the
+ *   EN pulse with esptool's USB timings (``usbJtagHardReset``). NOT
+ *   esptool-js's ``UsbJtagSerialReset``: that is esptool's
+ *   ``usb_jtag_bootloader_reset``, the *enter download mode* sequence
+ *   (drives the boot strap via DTR while pulsing EN), so running it after
+ *   ``writeFlash`` reset the chip straight back into the ROM bootloader.
+ *   The ROM's USB CDC re-enumerates and opens fine, so nothing looked
+ *   wrong until Improv / the logs never answered (#1678, XIAO ESP32-C6).
  * - Everything else (classic ESP32 / ESP8266 via CP210x / CH340 /
  *   FTDI / etc. bridges): an EN pulse with GPIO0 released
  *   (``classicHardReset``), matching esptool's ``--after hard-reset``.
@@ -512,7 +540,7 @@ async function hardResetChip(
 ): Promise<void> {
   if (await watchdogReset(loader, transport)) return;
   if (isEspressifUsbJtagPort(port)) {
-    await new UsbJtagSerialReset(transport).reset();
+    await usbJtagHardReset(transport);
   } else {
     await classicHardReset(transport);
   }

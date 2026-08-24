@@ -15,7 +15,11 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { sleep } from "../../util/sleep.js";
-import { IMPROV_OPEN_DELAY_MS, openImprovDialog } from "../improv/open-improv-dialog.js";
+import {
+  IMPROV_OPEN_DELAY_MS,
+  type ImprovResult,
+  openImprovDialog,
+} from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-install-adoptable-dialog.js";
 import "../install/esphome-web-install-upload-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
@@ -66,18 +70,35 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   }
 
   private _configureWifi(): void {
-    void openImprovDialog(this.port, this._localize);
+    void this._openImprov(false);
+  }
+
+  // Improv may have to reopen on a fresh handle (native-USB re-enumeration
+  // after the post-flash reset); hand it to the parent card like the logs
+  // dialog does, so the other actions stop using the dead pre-reset one.
+  private _openImprov(afterReset: boolean): Promise<ImprovResult> {
+    return openImprovDialog(this.port, this._localize, {
+      afterReset,
+      onPortReplaced: (port) =>
+        this.dispatchEvent(
+          new CustomEvent("port-replaced", {
+            detail: port,
+            bubbles: true,
+            composed: true,
+          })
+        ),
+    });
   }
 
   // Fired by the adoptable dialog's Continue button after a successful flash.
-  // Close the (native modal) install dialog first, then give the freshly-reset
-  // device a moment to re-enumerate and boot the new firmware before Improv
-  // grabs the port — legacy slept 1s here for the same reason. The delay also
-  // lets the modal finish hiding so Improv doesn't open behind its backdrop.
+  // Close the (native modal) install dialog first and let it finish hiding so
+  // Improv doesn't open behind its backdrop. Waiting for the freshly-reset
+  // device to re-enumerate is openImprovDialog's job (it reopens through
+  // openLiveSerialPort); this.port may be a dead pre-reset handle by now.
   private async _onProvisionWifi(): Promise<void> {
     this._adoptableOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);
-    void openImprovDialog(this.port, this._localize);
+    void this._openImprov(true);
   }
 
   private _disconnect(): void {

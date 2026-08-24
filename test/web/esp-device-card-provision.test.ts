@@ -51,7 +51,28 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     // Modal closed first, then Improv opened on the same port.
     expect((el as any)._adoptableOpen).toBe(false);
     expect(openImprovDialog).toHaveBeenCalledOnce();
-    expect(openImprovDialog).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(openImprovDialog).toHaveBeenCalledWith(
+      port,
+      expect.any(Function),
+      expect.objectContaining({ afterReset: true, onPortReplaced: expect.any(Function) })
+    );
+  });
+
+  it("re-dispatches Improv's replacement handle as a bubbling port-replaced event", async () => {
+    const el = await mount();
+    const seen = vi.fn();
+    document.body.addEventListener("port-replaced", (e) =>
+      seen((e as CustomEvent).detail)
+    );
+
+    (el as any)._configureWifi();
+    const options = openImprovDialog.mock.calls[0][2] as {
+      onPortReplaced: (p: SerialPort) => void;
+    };
+    const fresh = { id: "fresh" } as unknown as SerialPort;
+    options.onPortReplaced(fresh);
+
+    expect(seen).toHaveBeenCalledWith(fresh);
   });
 
   it("opens Improv directly for the manual Configure Wi-Fi action", async () => {
@@ -60,6 +81,9 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     (el as any)._configureWifi();
 
     expect(openImprovDialog).toHaveBeenCalledOnce();
+    // No reset preceded the click: the reopen must fail fast, not wait out
+    // the re-enumeration budget.
+    expect(openImprovDialog.mock.calls[0][2]).toMatchObject({ afterReset: false });
   });
 
   it("anchors every action tooltip to a real button id", async () => {

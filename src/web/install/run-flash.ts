@@ -129,7 +129,7 @@ export async function runFlash(
   }
 
   // The firmware is already written and committed at this point. The final
-  // reset is best-effort: native-USB chips (C6/H2/P4 → UsbJtagSerialReset)
+  // reset is best-effort: native-USB chips (C6/H2/P4 → the USB-JTAG EN pulse)
   // drop and re-enumerate mid-reset, so resetAndDisconnect can throw even
   // though the write succeeded. Swallow it — a reset hiccup must not turn a
   // successful flash into a reported failure (which would also skip the

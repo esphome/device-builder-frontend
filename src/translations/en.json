@@ -1807,7 +1807,7 @@
       "failed": "Failed to connect: {error}"
     },
     "improv": {
-      "open_failed": "Could not open the serial port for Wi-Fi setup: {error}",
+      "open_failed": "Could not open the serial port for Wi-Fi setup. If the device just restarted, unplug it, plug it back in and retry.",
       "port_busy": "The device is busy with another operation. Close it and try again.",
       "load_failed": "Could not load the Wi-Fi setup dialog. Check your connection and try again."
     },

@@ -7,6 +7,7 @@ import type {} from "improv-wifi-serial-sdk/dist/serial-provision-dialog";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import { openLiveSerialPort } from "../../util/web-serial.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
@@ -24,11 +25,30 @@ export interface ImprovResult {
 
 const NO_IMPROV: ImprovResult = { improv: false, provisioned: false };
 
+export interface ImprovOptions {
+  /**
+   * Called when the session had to reopen on a different handle than the one
+   * passed in (a native-USB chip re-enumerated after its post-flash reset).
+   * The card should adopt it for its other actions; see ``port-replaced``.
+   */
+  onPortReplaced?: (port: SerialPort) => void;
+  /**
+   * The device was just reset (post-flash hand-off), so give the reopen the
+   * full re-enumeration budget. Off for the manual Configure Wi-Fi button,
+   * where nothing is re-enumerating and a dead port should fail fast.
+   */
+  afterReset?: boolean;
+}
+
+/** Reopen budget when no reset preceded the click: fail fast, not in 8 s. */
+const MANUAL_OPEN_TIMEOUT_MS = 2000;
+
 /**
  * Delay before opening Improv after a first-time install/setup. Covers the
- * native install-dialog's hide animation (so Improv doesn't open behind its
- * backdrop) and gives a just-reset device time to re-enumerate and boot the new
- * firmware. Legacy slept 1s post-reset for the same reason.
+ * native install-dialog's hide animation so Improv doesn't open behind its
+ * backdrop. Riding out the post-reset USB re-enumeration is NOT this delay's
+ * job: ``runImprov`` reopens through ``openLiveSerialPort``, which retries
+ * until a live handle opens.
  */
 export const IMPROV_OPEN_DELAY_MS = 1000;
 
@@ -52,45 +72,99 @@ const activePorts = new WeakSet<SerialPort>();
  */
 export async function openImprovDialog(
   port: SerialPort,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  options: ImprovOptions = {}
 ): Promise<ImprovResult> {
   if (activePorts.has(port)) return NO_IMPROV;
+  // Also guard the handle the session actually runs on: after a
+  // ``port-replaced`` adoption the card's next click passes the fresh handle.
+  const guarded = [port];
   activePorts.add(port);
   try {
-    return await runImprov(port, localize);
+    return await runImprov(port, localize, options, (live) => {
+      guarded.push(live);
+      activePorts.add(live);
+    });
   } finally {
-    activePorts.delete(port);
+    for (const p of guarded) activePorts.delete(p);
   }
 }
 
-async function runImprov(
+/**
+ * Resolve an open, unlocked port for the SDK. An already-open port belongs to
+ * whoever opened it and is used as-is (``weOpened`` false) unless another
+ * consumer holds its streams. A closed one is reopened through
+ * ``openLiveSerialPort``: right after a flash the device has just been reset,
+ * and a native-USB chip (ESP32-C6 / S3 / C3 …) drops off the bus and comes
+ * back as a *new* handle, so a bare ``port.open()`` on the cached handle races
+ * the re-enumeration (#1678). ``weOpened`` is true only for a handle that
+ * call actually opened, so a candidate it found already open is never closed
+ * out from under its owner. DTR / RTS are cleared after opening so an
+ * auto-reset circuit on a UART-bridge board isn't left holding EN low.
+ */
+async function acquirePort(
   port: SerialPort,
-  localize: LocalizeFunc
-): Promise<ImprovResult> {
-  // Track whether *we* opened the port, so on close we only release a port we
-  // own — an already-open port belongs to whoever opened it.
-  let weOpened = false;
-  try {
-    await port.open({ baudRate: IMPROV_BAUD_RATE, bufferSize: IMPROV_BUFFER_SIZE });
-    weOpened = true;
-  } catch (err) {
-    // ``InvalidStateError`` means the port is already open. That's fine ONLY if
-    // nothing else holds its reader/writer — the Improv SDK takes its own
-    // reader + writer, so a locked stream (another consumer mid-op) would make
-    // it fail cryptically. Surface a clear toast and bail in that case.
-    if (err instanceof DOMException && err.name === "InvalidStateError") {
-      if (port.readable?.locked || port.writable?.locked) {
-        toast.error(localize("web.improv.port_busy"));
-        return NO_IMPROV;
-      }
-    } else {
-      toast.error(
-        localize("web.improv.open_failed", {
-          error: err instanceof Error ? err.message : String(err),
-        })
-      );
-      return NO_IMPROV;
+  localize: LocalizeFunc,
+  afterReset: boolean
+): Promise<{ port: SerialPort; weOpened: boolean } | null> {
+  // An open handle is reused only while its device is still attached: a
+  // reset that threw out of transport.disconnect() can leave the pre-reset
+  // handle open but dead, and that one must go through the reopen loop.
+  if (port.readable && port.connected !== false) {
+    if (port.readable.locked || port.writable?.locked) {
+      toast.error(localize("web.improv.port_busy"));
+      return null;
     }
+    return { port, weOpened: false };
+  }
+  if (port.readable) {
+    // Open but its device is gone: close it so the reopen loop can actually
+    // reopen it if the same handle comes back (UART bridge / same-handle
+    // re-enumeration), instead of handing the SDK the errored stream. Mirrors
+    // the logs dialog's recovery.
+    await port.close().catch(() => {});
+  }
+  let weOpened = false;
+  const live = await openLiveSerialPort(port, {
+    baudRate: IMPROV_BAUD_RATE,
+    bufferSize: IMPROV_BUFFER_SIZE,
+    ...(afterReset ? {} : { timeoutMs: MANUAL_OPEN_TIMEOUT_MS }),
+    onOpened: () => {
+      weOpened = true;
+    },
+  });
+  if (!live) {
+    toast.error(localize("web.improv.open_failed"));
+    return null;
+  }
+  // openLiveSerialPort only screens readable.locked; a handle it found open
+  // can still have its writer held, and the SDK takes both.
+  if (live.readable?.locked || live.writable?.locked) {
+    toast.error(localize("web.improv.port_busy"));
+    return null;
+  }
+  if (weOpened) {
+    try {
+      await live.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch {
+      /* Recoverable: the chip is most likely booting fine already. */
+    }
+  }
+  return { port: live, weOpened };
+}
+
+async function runImprov(
+  cachedPort: SerialPort,
+  localize: LocalizeFunc,
+  options: ImprovOptions,
+  onReplaced: (port: SerialPort) => void
+): Promise<ImprovResult> {
+  const acquired = await acquirePort(cachedPort, localize, options.afterReset ?? false);
+  if (!acquired) return NO_IMPROV;
+  const { port, weOpened } = acquired;
+  if (port !== cachedPort) {
+    onReplaced(port);
+    options.onPortReplaced?.(port);
   }
 
   // The SDK loads as a lazy chunk; a chunk-load / CSP / network failure here
