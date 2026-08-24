@@ -15,6 +15,7 @@ import { InstallFlowController } from "./install-flow-controller.js";
 import { renderInstallProgress } from "./install-progress.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
+import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 
 /**
  * "Prepare for first use": flash the prebuilt esphome-web firmware fetched
@@ -32,8 +33,16 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
 
   private _flow = new InstallFlowController(this);
 
+  // Erase the whole flash before writing. Off by default: the factory image
+  // alone is enough for a fresh board, and erasing costs extra time. On a
+  // board that ran something before, leftover NVS (old Wi-Fi credentials, an
+  // AP password) survives a plain write, so the new firmware may come up
+  // already "provisioned" and skip the Wi-Fi scan; erasing fixes that.
+  @state() private _erase = false;
+
   private async _install(): Promise<void> {
     await this._flow.start(this.port, {
+      erase: this._erase,
       filesCallback: async (chipFamily) => {
         const manifest = await fetchEsphomeWebManifest();
         const build = selectBuild(manifest, chipFamily);
@@ -66,6 +75,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
 
   private _onAfterHide(): void {
     this._flow.reset();
+    this._erase = false;
     this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true }));
   }
 
@@ -73,6 +83,16 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
     return html`
       <p>${this._localize("web.install.adoptable_intro")}</p>
       <p>${this._localize("web.install.adoptable_detail")}</p>
+      <div class="erase-row">
+        <wa-checkbox
+          .checked=${this._erase}
+          @change=${(e: Event) => {
+            this._erase = (e.currentTarget as HTMLElement & { checked: boolean }).checked;
+          }}
+          >${this._localize("web.install.adoptable_erase")}
+          <span slot="hint">${this._localize("web.install.adoptable_erase_helper")}</span>
+        </wa-checkbox>
+      </div>
     `;
   }
 
@@ -120,6 +140,9 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
       .done {
         color: var(--esphome-success);
         font-weight: var(--wa-font-weight-semibold);
+      }
+      .erase-row {
+        margin-top: var(--wa-space-m);
       }
       .actions {
         display: flex;
