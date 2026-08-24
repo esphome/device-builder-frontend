@@ -74,7 +74,8 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
       }
 
       /* Cap the dialog short of the viewport edges so toasts that
-         render bottom-right (sonner-js, ~24px gap + ~80px height)
+         render bottom-right (sonner-js, ~24px gap + ~80px height, lifted
+         further on pages with corner buttons)
          aren't covered by a long archive list. The dialog body
          itself scrolls (see the .body rule below) so the visible
          chrome (header / desc / footer) always fits in the

@@ -1,3 +1,4 @@
+import { TOAST_CLEARANCE_PROPERTY } from "../util/toast-clearance-controller.js";
 /**
  * Applies the Web Awesome theme to the document.
  *
@@ -94,6 +95,21 @@ function applySonnerOverrides(): void {
     }
     [data-sonner-toast] [data-button]:hover {
       background: color-mix(in srgb, var(--wa-color-brand-fill-loud), black 10%) !important;
+    }
+    /* Pages with corner buttons publish ${TOAST_CLEARANCE_PROPERTY}
+       (see ToastClearanceController); sit above it. Only bottom moves:
+       sonner shares one --offset for bottom and right, so its offset
+       option can't do this. With no publisher the lift is just --gap,
+       which stays below sonner's offsets, so other pages and ESPHome Web
+       keep the default placement. The breakpoint mirrors sonner's own. */
+    [data-sonner-toaster][data-position*="bottom"][data-position*="right"] {
+      --esphome-toast-lift: calc(var(${TOAST_CLEARANCE_PROPERTY}, 0px) + var(--gap));
+      bottom: max(var(--offset), var(--esphome-toast-lift)) !important;
+    }
+    @media (max-width: 600px) {
+      [data-sonner-toaster][data-position*="bottom"][data-position*="right"] {
+        bottom: max(var(--mobile-offset), var(--esphome-toast-lift)) !important;
+      }
     }
   `;
 
