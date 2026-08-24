@@ -94,11 +94,16 @@ describe("renderTable device count", () => {
   });
 
   it("leaves the forced guided-tour row out of the count", () => {
-    // The table keeps the tour target visible even when it doesn't match
+    // The facets drop the tour target and includeTourDevice puts it back
+    // for the table, which also keeps it visible when it doesn't match
     // the search; the count mirrors the card view and only counts matches.
     setTourConfiguration("garland.yaml");
     setTourActive(true);
-    const host = makeHost({ _search: "ecu" });
+    const host = makeHost({
+      _search: "ecu",
+      _applyFacetFilters: (list: ConfiguredDevice[]) =>
+        list.filter((d) => d.configuration !== "garland.yaml"),
+    });
     const container = renderInto(renderTable(host));
     const table = container.querySelector("esphome-device-table") as unknown as {
       devices: ConfiguredDevice[];
