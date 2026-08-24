@@ -131,6 +131,7 @@ export function renderCardGrid(
             data-configuration=${device.configuration}
             .name=${device.friendly_name || device.name}
             .configuration=${device.configuration}
+            .comment=${device.comment ?? ""}
             .state=${rt.state}
             .labelIds=${device.labels ?? []}
             ?has-pending-changes=${device.has_pending_changes === true}
