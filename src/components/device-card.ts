@@ -250,6 +250,7 @@ export class ESPHomeDeviceCard extends LitElement {
               this.comment
                 ? html`<p
                     class="device-comment"
+                    role="note"
                     title=${this.comment}
                     aria-label="${this._localize("dashboard.device_comment")}: ${this.comment}"
                   >

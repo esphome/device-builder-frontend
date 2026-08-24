@@ -24,7 +24,9 @@ describe("device-card comment", () => {
     expect(node.querySelector("wa-icon")?.getAttribute("name")).toBe(
       "comment-text-outline"
     );
-    // The icon is aria-hidden, so the paragraph names itself for AT.
+    // The icon is aria-hidden, so the paragraph names itself for AT; a bare
+    // <p> would not expose an author label, hence role="note".
+    expect(node.getAttribute("role")).toBe("note");
     expect(node.getAttribute("aria-label")).toBe(
       "dashboard.device_comment: Garage, behind the freezer"
     );
