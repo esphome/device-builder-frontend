@@ -33,6 +33,7 @@ import {
   nextSplitRatioForKey,
   saveSplitRatio,
 } from "../../util/split-ratio.js";
+import { ToastClearanceController } from "../../util/toast-clearance-controller.js";
 import type { BannerError, YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import {
@@ -262,6 +263,14 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   @query("esphome-confirm-dialog.auto-fix-confirm")
   private _autoFixConfirmDialog?: ESPHomeConfirmDialog;
+
+  @query(".editor-floating-actions")
+  private _floatingActionsEl?: HTMLElement;
+
+  protected readonly _toastClearance = new ToastClearanceController(
+    this,
+    () => this._floatingActionsEl
+  );
 
   static styles = [espHomeStyles, textStyles, deviceEditorStyles];
 

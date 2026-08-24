@@ -29,6 +29,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
+import { ToastClearanceController } from "../util/toast-clearance-controller.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { secretsStyles } from "./secrets.styles.js";
 
@@ -114,6 +115,14 @@ export class ESPHomePageSecrets extends LitElement {
 
   @query("esphome-confirm-dialog")
   private _wipeDialog?: ESPHomeConfirmDialog;
+
+  @query(".save-button")
+  private _saveButton?: HTMLElement;
+
+  protected readonly _toastClearance = new ToastClearanceController(
+    this,
+    () => this._saveButton
+  );
 
   private _unsavedGuard = new UnsavedGuard();
 
