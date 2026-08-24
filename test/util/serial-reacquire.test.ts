@@ -131,6 +131,16 @@ describe("openLiveSerialPort", () => {
     expect(onOpened).not.toHaveBeenCalled();
   });
 
+  it("skips an open cached handle whose device is gone and takes the fresh one", async () => {
+    const dead = fakePort({ readable: { locked: false }, connected: false });
+    const fresh = fakePort({ readable: null, open: vi.fn(async () => {}) });
+    stubGetPorts(async () => [fresh]);
+
+    const got = await openLiveSerialPort(dead, { baudRate: 115200, timeoutMs: 500 });
+    expect(got).toBe(fresh);
+    expect((fresh as any).open).toHaveBeenCalledOnce();
+  });
+
   it("reports the handle it opened through onOpened", async () => {
     const cached = fakePort({ readable: null, open: vi.fn(async () => {}) });
     stubGetPorts(async () => []);

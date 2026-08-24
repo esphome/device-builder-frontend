@@ -157,6 +157,13 @@ export async function openLiveSerialPort(
     const { fresh } = await grantedHandlesFor(cachedPort);
     const candidates = [...fresh, cachedPort];
     for (const p of candidates) {
+      // Same liveness test as reacquirePort: a handle whose device dropped
+      // off the bus can still be open (a reset that threw mid-disconnect),
+      // and reusing it would hand the caller a dead stream.
+      if (p.connected === false) {
+        lastErr = new Error("port device disconnected");
+        continue;
+      }
       if (p.readable) {
         // Open but locked by an existing reader → unusable: the caller's
         // getReader() would throw "already locked". Skip it and try the
