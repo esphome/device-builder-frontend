@@ -93,8 +93,8 @@ export interface FirmwareJob {
    *  user saw when they clicked Install). */
   source_label: string;
   /** The receiver's ``esphome`` when it compiles with its own instead
-   *  of ours; empty otherwise (LOCAL, same version, or the receiver
-   *  provisions ours into a venv). */
+   *  of ours; empty otherwise (LOCAL, same version, the receiver
+   *  provisions ours into a venv, or its version isn't known yet). */
   source_esphome_version: string;
   /** Offloader's ``dashboard_id`` when this job came in via the
    *  peer-link ``submit_job`` flow. Empty for locally-submitted
