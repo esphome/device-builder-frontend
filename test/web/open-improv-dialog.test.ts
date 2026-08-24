@@ -184,6 +184,9 @@ describe("openImprovDialog", () => {
     await flush();
 
     expect(openLiveSerialPort).toHaveBeenCalledOnce();
+    // Released first so the reopen loop can reopen the same handle if it
+    // comes back, rather than handing the SDK the errored stream.
+    expect(dead.close).toHaveBeenCalledOnce();
     expect((dialogEl() as unknown as { port: unknown }).port).toBe(fresh);
     dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
     await promise;

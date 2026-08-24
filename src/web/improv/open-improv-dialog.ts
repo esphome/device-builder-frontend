@@ -117,6 +117,13 @@ async function acquirePort(
     }
     return { port, weOpened: false };
   }
+  if (port.readable) {
+    // Open but its device is gone: close it so the reopen loop can actually
+    // reopen it if the same handle comes back (UART bridge / same-handle
+    // re-enumeration), instead of handing the SDK the errored stream. Mirrors
+    // the logs dialog's recovery.
+    await port.close().catch(() => {});
+  }
   let weOpened = false;
   const live = await openLiveSerialPort(port, {
     baudRate: IMPROV_BAUD_RATE,
