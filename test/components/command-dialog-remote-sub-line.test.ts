@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 //
-// Pins the "Building on <receiver> (<version>)" sub-line: the version
-// renders verbatim from source_esphome_version, which the backend stamps
-// only when the receiver builds with its own esphome instead of ours.
+// Pins the "Building on <receiver>" sub-line: source_esphome_version, which
+// the backend stamps only when the receiver builds with its own esphome
+// instead of ours, renders as a "(<version>)" suffix when present.
 
 import { describe, expect, it, vi } from "vitest";
 
