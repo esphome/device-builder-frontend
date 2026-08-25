@@ -7,6 +7,7 @@ import {
   mdiCheckNetworkOutline,
   mdiClockOutline,
   mdiCloseCircle,
+  mdiCommentTextOutline,
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
@@ -51,6 +52,7 @@ registerMdiIcons({
   "checkbox-blank-outline": mdiCheckboxBlankOutline,
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
+  "comment-text-outline": mdiCommentTextOutline,
   "text-box-outline": mdiTextBoxOutline,
   "dots-vertical": mdiDotsVertical,
   "check-network-outline": mdiCheckNetworkOutline,
@@ -246,8 +248,16 @@ export class ESPHomeDeviceCard extends LitElement {
             <p class="device-config truncate">${this.configuration}</p>
             ${
               this.comment
-                ? html`<p class="device-comment truncate" title=${this.comment}>
-                    ${this.comment}
+                ? html`<p
+                    class="device-comment"
+                    role="note"
+                    title=${this.comment}
+                    aria-label=${this._localize("dashboard.device_comment", {
+                      comment: this.comment,
+                    })}
+                  >
+                    <wa-icon library="mdi" name="comment-text-outline"></wa-icon>
+                    <span class="truncate">${this.comment}</span>
                   </p>`
                 : nothing
             }

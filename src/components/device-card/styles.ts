@@ -88,25 +88,43 @@ export const deviceCardStyles = [
       }
     }
 
+    /* Three columns: select checkbox, text, status badge. Only the name row
+       shares its line with the badge; the filename and comment span under
+       it, so a long path or note is not cut short by dead space beneath
+       the badge. Spacing is on the outer items rather than a column gap so
+       an absent checkbox leaves no phantom indent. */
     .device-card-header {
       padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
       border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--wa-space-xs);
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: start;
     }
 
     .device-card-header:last-child {
       border-bottom: none;
     }
 
+    /* Its children lay out on the header grid directly. */
     .device-card-header-left {
-      flex: 1;
-      min-width: 0;
+      display: contents;
+    }
+    /* The badge's tooltip is a sibling referenced by for=. Its host is
+       position: absolute, so it never takes part in auto-placement; the
+       pin only makes the intended cell explicit for the next reader. */
+    .device-card-header > wa-tooltip {
+      grid-column: 3;
+      grid-row: 1;
+    }
+    .device-config,
+    .device-comment {
+      grid-column: 2 / -1;
     }
 
     .device-name-wrap {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -205,15 +223,35 @@ export const deviceCardStyles = [
       color: var(--wa-color-text-quiet);
     }
 
-    /* Italic to match the archived-devices dialog's comment rows. */
+    /* Free-form user text under the filename, set as a standard metadata
+       row: a leading glyph on an upright quiet line. The icon is what tells
+       it apart from the filename above (same size, same colour); the italic
+       #1671 shipped did not read as a different thing at this size. */
     .device-comment {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
       margin: 2px 0 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
-      font-style: italic;
+    }
+    /* wa-icon's host is 1.25em wide with the glyph centred, which pushed
+       the text ~7px past the icon; hug the glyph so the line reads as one
+       row starting at the filename's left edge. */
+    .device-comment wa-icon {
+      flex: none;
+      width: 1em;
+      font-size: 14px;
+    }
+    .device-comment .truncate {
+      min-width: 0;
     }
 
     .device-status {
+      grid-column: 3;
+      grid-row: 1;
+      margin-left: var(--wa-space-xs);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -222,7 +260,6 @@ export const deviceCardStyles = [
       font-size: var(--wa-font-size-2xs);
       font-weight: var(--wa-font-weight-bold);
       letter-spacing: 0.02em;
-      flex-shrink: 0;
       margin-top: 2px;
     }
 
@@ -316,13 +353,15 @@ export const deviceCardStyles = [
     }
 
     .device-checkbox {
+      grid-column: 1;
+      grid-row: 1;
+      margin-right: var(--wa-space-xs);
       font-size: 22px;
       color: var(--wa-color-text-quiet);
-      flex-shrink: 0;
       transition: color 0.12s;
       /* Box the glyph to the title's first-line height so it centers
-         on the device name while the header keeps align-items:
-         flex-start (the status badge stays top-anchored). */
+         on the device name while the header grid keeps align-items:
+         start (the status badge stays top-anchored). */
       display: flex;
       align-items: center;
       height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
