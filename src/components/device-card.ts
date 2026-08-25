@@ -252,7 +252,9 @@ export class ESPHomeDeviceCard extends LitElement {
                     class="device-comment"
                     role="note"
                     title=${this.comment}
-                    aria-label="${this._localize("dashboard.device_comment")}: ${this.comment}"
+                    aria-label=${this._localize("dashboard.device_comment", {
+                      comment: this.comment,
+                    })}
                   >
                     <wa-icon library="mdi" name="comment-text-outline"></wa-icon>
                     <span class="truncate">${this.comment}</span>

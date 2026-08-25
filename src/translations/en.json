@@ -232,7 +232,7 @@
     "table_col_platform": "Platform",
     "table_col_version": "ESPHome Version",
     "table_col_comment": "Comment",
-    "device_comment": "Comment",
+    "device_comment": "Comment: {comment}",
     "table_col_area": "Area",
     "table_col_labels": "Labels",
     "table_col_config": "Config File",
