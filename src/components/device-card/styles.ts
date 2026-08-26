@@ -9,14 +9,17 @@ export const deviceCardStyles = [
   textStyles,
   css`
     /* Only rendered when the device carries labels; an untagged device
-       gets no chip row and the card collapses naturally. Padding leans
-       top-heavy because the actions row below carries its own top padding. */
+       gets no chip row and the card collapses naturally. margin-top: auto
+       bottom-anchors the row so chips line up across a grid row of
+       stretched cards instead of trailing each header; bottom padding
+       keeps them off the divider the actions row now carries. */
     .device-card-labels {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 4px;
-      padding: 8px var(--wa-space-m) 4px;
+      padding: 4px var(--wa-space-m) 10px;
+      margin-top: auto;
     }
   `,
   css`
@@ -376,6 +379,12 @@ export const deviceCardStyles = [
       padding: var(--wa-space-s) var(--wa-space-m);
       border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       margin-top: auto;
+    }
+
+    /* When a labels row precedes the actions, it already carries the auto
+       spacer; a second one here would split the free space between them. */
+    .device-card-labels + .device-actions {
+      margin-top: 0;
     }
   `,
 ];
