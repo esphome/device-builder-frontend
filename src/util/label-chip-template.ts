@@ -98,7 +98,8 @@ export function renderLabelChips(
       ${labels.map((l) => renderLabelChip(l))}
     </span>`;
   }
-  // A cap below 1 collapses the whole list into the "+N" chip.
+  // max 1 leaves no room for a chip beside the "+N"; a cap of 0 or
+  // less would slice from the end, so clamp to a full collapse.
   const visibleCount = Math.max(0, max - 1);
   const visible = labels.slice(0, visibleCount);
   const hidden = labels.slice(visibleCount);
