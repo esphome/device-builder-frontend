@@ -9,17 +9,14 @@ export const deviceCardStyles = [
   textStyles,
   css`
     /* Only rendered when the device carries labels; an untagged device
-       gets no chip row and the card collapses naturally. margin-top: auto
-       bottom-anchors the row so chips line up across a grid row of
-       stretched cards instead of trailing each header; bottom padding
-       keeps them off the divider the actions row now carries. */
+       gets no chip row and the card collapses naturally. Bottom padding
+       keeps the chips off the divider the actions row carries. */
     .device-card-labels {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 4px;
       padding: 4px var(--wa-space-m) 10px;
-      margin-top: auto;
     }
   `,
   css`
@@ -101,6 +98,11 @@ export const deviceCardStyles = [
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: start;
+      /* Grid rows stretch every card to the tallest sibling; the auto
+         margin soaks up the extra height so the rows below (labels,
+         divider, actions) stay bottom-anchored and line up across the
+         row. */
+      margin-bottom: auto;
     }
 
     /* Its children lay out on the header grid directly. */
@@ -370,21 +372,14 @@ export const deviceCardStyles = [
     }
 
     /* The divider rides on the actions row, not the header, so the
-       margin-top: auto spacer that equalizes grid-row card heights opens
-       above the line and it always hugs the buttons. */
+       header's auto bottom margin opens above the line and it always
+       hugs the buttons. */
     .device-actions {
       display: flex;
       align-items: center;
       gap: var(--wa-space-2xs);
       padding: var(--wa-space-s) var(--wa-space-m);
       border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      margin-top: auto;
-    }
-
-    /* When a labels row precedes the actions, it already carries the auto
-       spacer; a second one here would split the free space between them. */
-    .device-card-labels + .device-actions {
-      margin-top: 0;
     }
   `,
 ];
