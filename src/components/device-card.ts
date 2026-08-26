@@ -197,7 +197,7 @@ export class ESPHomeDeviceCard extends LitElement {
           }
           <div class="device-card-header-left">
             <div class="device-name-wrap">
-              <h3 class="device-name truncate">${this.name}</h3>
+              <h3 class="device-name truncate" title=${this.name}>${this.name}</h3>
               ${
                 this.showModified
                   ? html`<span
@@ -245,7 +245,9 @@ export class ESPHomeDeviceCard extends LitElement {
               }
               ${renderEncryptionIcon(this)}
             </div>
-            <p class="device-config truncate">${this.configuration}</p>
+            <p class="device-config truncate" title=${this.configuration}>
+              ${this.configuration}
+            </p>
             ${
               this.comment
                 ? html`<p
