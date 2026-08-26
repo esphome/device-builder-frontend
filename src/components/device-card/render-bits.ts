@@ -31,7 +31,7 @@ const RECENT_JOB_LABEL: Record<JobStatus, string> = {
   [JobStatus.CANCELLED]: "firmware_jobs.status_cancelled",
 };
 
-// Caps at 4 visible chips with a "+N" overflow chip — heavily-tagged
+// Caps the row at 4 items (overflow "+N" chip included) — heavily-tagged
 // devices don't blow out the card height; full set lives in the drawer.
 export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof nothing {
   const labels = resolveLabelIds(card.labelIds, card._labelCatalog);

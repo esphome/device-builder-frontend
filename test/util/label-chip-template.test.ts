@@ -14,7 +14,7 @@
  *  - ``renderLabelChip`` — one pill; ``suppressTitle`` opts out of the
  *    chip's native tooltip when the parent owns a row-level ``title``.
  *  - ``renderLabelChips`` — a (possibly truncated) row; ``max`` caps
- *    the visible chips and collapses the rest into a "+N" overflow
+ *    the total items, collapsing an overflowing tail into a "+N"
  *    chip whose tooltip lists the hidden labels. Empty list renders
  *    ``nothing`` so the caller doesn't have to gate.
  *
@@ -164,17 +164,22 @@ describe("renderLabelChips", () => {
     expect(container.querySelector(".label-chip--overflow")).toBeNull();
   });
 
-  it("collapses the tail into a +N overflow chip when count exceeds max", () => {
+  it("collapses the tail into a +N overflow chip within the max item count", () => {
     const container = renderInto(renderLabelChips(labels, { max: 2 }));
-    // Two visible labels, then the "+2" overflow chip.
-    expect(chipTexts(container)).toEqual(["Alpha", "Beta", "+2"]);
+    // One visible label, then the overflow chip: two items total.
+    expect(chipTexts(container)).toEqual(["Alpha", "+3"]);
     expect(container.querySelector(".label-chip--overflow")).not.toBeNull();
+  });
+
+  it("collapses the whole list into the overflow chip when max is below 2", () => {
+    expect(chipTexts(renderInto(renderLabelChips(labels, { max: 1 })))).toEqual(["+4"]);
+    expect(chipTexts(renderInto(renderLabelChips(labels, { max: 0 })))).toEqual(["+4"]);
   });
 
   it("lists the hidden label names in the overflow chip's tooltip", () => {
     const container = renderInto(renderLabelChips(labels, { max: 2 }));
     expect(container.querySelector(".label-chip--overflow")?.getAttribute("title")).toBe(
-      "Gamma, Delta"
+      "Beta, Gamma, Delta"
     );
   });
 });

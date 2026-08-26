@@ -322,7 +322,7 @@ export function createDeviceColumns(
       cell: (info) => {
         const labels = info.getValue() as Label[];
         if (!labels || labels.length === 0) return EMPTY_CELL;
-        return renderLabelChips(labels, { max: 3 });
+        return renderLabelChips(labels, { max: 4 });
       },
       sortFn: (rowA, rowB) => {
         const a = rowA.original.labels.map((l) => l.name).join(",");

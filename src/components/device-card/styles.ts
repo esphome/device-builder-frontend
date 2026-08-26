@@ -9,14 +9,20 @@ export const deviceCardStyles = [
   textStyles,
   css`
     /* Only rendered when the device carries labels; an untagged device
-       gets no chip row and the card collapses naturally. Padding leans
-       top-heavy because the actions row below carries its own top padding. */
+       gets no chip row and the card collapses naturally. Bottom padding
+       keeps the chips off the divider the actions row carries. */
     .device-card-labels {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 4px;
-      padding: 8px var(--wa-space-m) 4px;
+      padding: 4px var(--wa-space-m) 10px;
+    }
+
+    /* In select mode no actions row follows; the card edge needs more
+       clearance than the divider does. */
+    .device-card-labels:last-child {
+      padding-bottom: var(--wa-space-m);
     }
   `,
   css`
@@ -95,14 +101,14 @@ export const deviceCardStyles = [
        an absent checkbox leaves no phantom indent. */
     .device-card-header {
       padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
-      border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: start;
-    }
-
-    .device-card-header:last-child {
-      border-bottom: none;
+      /* Grid rows stretch every card to the tallest sibling; the auto
+         margin soaks up the extra height so the rows below (labels,
+         divider, actions) stay bottom-anchored and line up across the
+         row. */
+      margin-bottom: auto;
     }
 
     /* Its children lay out on the header grid directly. */
@@ -116,9 +122,11 @@ export const deviceCardStyles = [
       grid-column: 3;
       grid-row: 1;
     }
+    /* Full-width from column 1 so select mode's checkbox doesn't indent
+       them; only the name row shares its line with the checkbox. */
     .device-config,
     .device-comment {
-      grid-column: 2 / -1;
+      grid-column: 1 / -1;
     }
 
     .device-name-wrap {
@@ -355,15 +363,19 @@ export const deviceCardStyles = [
     .device-checkbox {
       grid-column: 1;
       grid-row: 1;
-      margin-right: var(--wa-space-xs);
+      margin-right: var(--wa-space-2xs);
       font-size: 22px;
       color: var(--wa-color-text-quiet);
       transition: color 0.12s;
       /* Box the glyph to the title's first-line height so it centers
          on the device name while the header grid keeps align-items:
-         start (the status badge stays top-anchored). */
+         start (the status badge stays top-anchored). The explicit width
+         pins the host to the glyph so the icon's slack doesn't widen
+         the checkbox column and eat into the name. */
       display: flex;
       align-items: center;
+      justify-content: center;
+      width: 1em;
       height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
     }
 
@@ -371,12 +383,15 @@ export const deviceCardStyles = [
       color: var(--esphome-primary);
     }
 
+    /* The divider rides on the actions row, not the header, so the
+       header's auto bottom margin opens above the line and it always
+       hugs the buttons. */
     .device-actions {
       display: flex;
       align-items: center;
       gap: var(--wa-space-2xs);
       padding: var(--wa-space-s) var(--wa-space-m);
-      margin-top: auto;
+      border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     }
   `,
 ];
