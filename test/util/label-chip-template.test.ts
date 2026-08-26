@@ -171,6 +171,11 @@ describe("renderLabelChips", () => {
     expect(container.querySelector(".label-chip--overflow")).not.toBeNull();
   });
 
+  it("collapses the whole list into the overflow chip when max is below 2", () => {
+    expect(chipTexts(renderInto(renderLabelChips(labels, { max: 1 })))).toEqual(["+4"]);
+    expect(chipTexts(renderInto(renderLabelChips(labels, { max: 0 })))).toEqual(["+4"]);
+  });
+
   it("lists the hidden label names in the overflow chip's tooltip", () => {
     const container = renderInto(renderLabelChips(labels, { max: 2 }));
     expect(container.querySelector(".label-chip--overflow")?.getAttribute("title")).toBe(

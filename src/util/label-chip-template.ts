@@ -98,8 +98,10 @@ export function renderLabelChips(
       ${labels.map((l) => renderLabelChip(l))}
     </span>`;
   }
-  const visible = labels.slice(0, max - 1);
-  const hidden = labels.slice(max - 1);
+  // A cap below 1 collapses the whole list into the "+N" chip.
+  const visibleCount = Math.max(0, max - 1);
+  const visible = labels.slice(0, visibleCount);
+  const hidden = labels.slice(visibleCount);
   const overflowTitle = hidden.map((l) => l.name).join(", ");
   return html`<span class="label-chips">
     ${visible.map((l) => renderLabelChip(l))}
