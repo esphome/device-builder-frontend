@@ -81,11 +81,12 @@ export function renderLabelChip(
 
 /** Render a (possibly truncated) list of label chips.
  *
- *  ``max`` caps how many chips render before collapsing the rest
- *  into a "+N" overflow chip; the overflow chip's tooltip lists the
- *  hidden labels by name. Pass ``null`` / omit ``max`` to render
- *  every chip. Returns ``nothing`` for an empty list so the caller
- *  doesn't have to gate. */
+ *  ``max`` caps the row at that many items total: an overflowing
+ *  list renders ``max - 1`` chips plus a "+N" overflow chip, so the
+ *  collapsed row is never wider than the uncollapsed one. The
+ *  overflow chip's tooltip lists the hidden labels by name. Pass
+ *  ``null`` / omit ``max`` to render every chip. Returns ``nothing``
+ *  for an empty list so the caller doesn't have to gate. */
 export function renderLabelChips(
   labels: Label[],
   options: { max?: number | null } = {}
@@ -97,8 +98,8 @@ export function renderLabelChips(
       ${labels.map((l) => renderLabelChip(l))}
     </span>`;
   }
-  const visible = labels.slice(0, max);
-  const hidden = labels.slice(max);
+  const visible = labels.slice(0, max - 1);
+  const hidden = labels.slice(max - 1);
   const overflowTitle = hidden.map((l) => l.name).join(", ");
   return html`<span class="label-chips">
     ${visible.map((l) => renderLabelChip(l))}
