@@ -375,7 +375,7 @@ export const deviceCardStyles = [
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
+      width: 1em;
       height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
     }
 
