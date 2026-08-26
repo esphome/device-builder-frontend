@@ -95,14 +95,9 @@ export const deviceCardStyles = [
        an absent checkbox leaves no phantom indent. */
     .device-card-header {
       padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
-      border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: start;
-    }
-
-    .device-card-header:last-child {
-      border-bottom: none;
     }
 
     /* Its children lay out on the header grid directly. */
@@ -371,11 +366,15 @@ export const deviceCardStyles = [
       color: var(--esphome-primary);
     }
 
+    /* The divider rides on the actions row, not the header, so the
+       margin-top: auto spacer that equalizes grid-row card heights opens
+       above the line and it always hugs the buttons. */
     .device-actions {
       display: flex;
       align-items: center;
       gap: var(--wa-space-2xs);
       padding: var(--wa-space-s) var(--wa-space-m);
+      border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       margin-top: auto;
     }
   `,
