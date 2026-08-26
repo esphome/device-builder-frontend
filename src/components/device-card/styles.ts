@@ -18,6 +18,12 @@ export const deviceCardStyles = [
       gap: 4px;
       padding: 4px var(--wa-space-m) 10px;
     }
+
+    /* In select mode no actions row follows; the card edge needs more
+       clearance than the divider does. */
+    .device-card-labels:last-child {
+      padding-bottom: var(--wa-space-m);
+    }
   `,
   css`
     :host {
@@ -116,9 +122,11 @@ export const deviceCardStyles = [
       grid-column: 3;
       grid-row: 1;
     }
+    /* Full-width from column 1 so select mode's checkbox doesn't indent
+       them; only the name row shares its line with the checkbox. */
     .device-config,
     .device-comment {
-      grid-column: 2 / -1;
+      grid-column: 1 / -1;
     }
 
     .device-name-wrap {
@@ -355,15 +363,19 @@ export const deviceCardStyles = [
     .device-checkbox {
       grid-column: 1;
       grid-row: 1;
-      margin-right: var(--wa-space-xs);
+      margin-right: var(--wa-space-2xs);
       font-size: 22px;
       color: var(--wa-color-text-quiet);
       transition: color 0.12s;
       /* Box the glyph to the title's first-line height so it centers
          on the device name while the header grid keeps align-items:
-         start (the status badge stays top-anchored). */
+         start (the status badge stays top-anchored). The explicit width
+         pins the host to the glyph so the icon's slack doesn't widen
+         the checkbox column and eat into the name. */
       display: flex;
       align-items: center;
+      justify-content: center;
+      width: 22px;
       height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
     }
 
