@@ -96,8 +96,8 @@ importers:
         specifier: 2.1.10
         version: 2.1.10(@swc/helpers@0.5.23)
       '@rspack/dev-server':
-        specifier: 2.2.0
-        version: 2.2.0(@rspack/core@2.1.10(@swc/helpers@0.5.23))
+        specifier: 2.2.1
+        version: 2.2.1(@rspack/core@2.1.10(@swc/helpers@0.5.23))
       '@swc/helpers':
         specifier: 0.5.23
         version: 0.5.23
@@ -524,8 +524,8 @@ packages:
       '@rspack/core':
         optional: true
 
-  '@rspack/dev-server@2.2.0':
-    resolution: {integrity: sha512-Bd0DNphOJ5/KAm3bFpUUZeP7O6jvVDNdXJEmlpsVZLfdSgjmrd6Ut/EHCBv95tmiwOQN0M41SdvlUU4f855HFA==}
+  '@rspack/dev-server@2.2.1':
+    resolution: {integrity: sha512-Il8HbYGK3rH5rM0XmUOsOGZVw69BKRpBZ61P28Fy8ry35CtfniDBWtbo/rvJtIT/sK0qwijmNrhF498ltsV+uA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@rspack/core': ^2.0.0
@@ -1809,7 +1809,7 @@ snapshots:
     optionalDependencies:
       '@rspack/core': 2.1.10(@swc/helpers@0.5.23)
 
-  '@rspack/dev-server@2.2.0(@rspack/core@2.1.10(@swc/helpers@0.5.23))':
+  '@rspack/dev-server@2.2.1(@rspack/core@2.1.10(@swc/helpers@0.5.23))':
     dependencies:
       '@rspack/core': 2.1.10(@swc/helpers@0.5.23)
       '@rspack/dev-middleware': 2.0.3(@rspack/core@2.1.10(@swc/helpers@0.5.23))
