@@ -89,9 +89,8 @@ export function stripComment(line: string): string {
  *  *value*. Mirrors the AST's ``readLiteralText`` so the regex
  *  walkers (and ``yaml-hover``) and the AST agree on the
  *  user-facing string. Deliberately NOT ``yaml-scalar``'s
- *  ``stripQuotes``: importing ``yaml-scalar`` here would close an
- *  import cycle (``yaml-scalar`` → ``yaml-serialize`` →
- *  ``esphome-yaml-lang`` → this module). */
+ *  ``stripQuotes``, which also unescapes — these walkers want the
+ *  literal interior. */
 export function unquote(value: string): string {
   if (value.length < 2) return value;
   const q = value[0];

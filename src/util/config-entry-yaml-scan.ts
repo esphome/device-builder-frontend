@@ -295,9 +295,9 @@ export function findUsedPins(
 }
 
 /**
- * 1-indexed line number of the first sibling that comes after the
- * section starting at `fromLine`. Used to bound `excludeToLine` for
- * `findUsedPins`. Returns `lines.length` if the section runs to EOF.
+ * 1-indexed inclusive last line of the section starting at `fromLine`
+ * (the line before the next sibling key). Used to bound `excludeToLine`
+ * for `findUsedPins`. Returns `lines.length` if the section runs to EOF.
  */
 export function sectionEndLine(yaml: string, fromLine?: number): number | undefined {
   if (fromLine === undefined) return undefined;
