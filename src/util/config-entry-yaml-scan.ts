@@ -25,6 +25,11 @@ import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { indentOf } from "./yaml-line-walker.js";
 import {
+  IGNORED_TOP_LEVEL_KEY_RE,
+  TOP_LEVEL_KEY_RE,
+  TOP_LEVEL_KEY_START_RE,
+} from "./yaml-section-lexer.js";
+import {
   collectIdsAtPath,
   findFieldLine,
   parseYamlTopLevelSections,
@@ -228,14 +233,17 @@ export function findUsedPins(
   // Indentation of an open free-text block scalar; continuation lines
   // indented deeper than this are prose and skipped. -1 when none is open.
   let blockScalarIndent = -1;
+  let inIgnoredBlock = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const topMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
-    if (topMatch) {
-      currentDomain = topMatch[1];
+    const topMatch = line.match(TOP_LEVEL_KEY_RE);
+    if (topMatch || IGNORED_TOP_LEVEL_KEY_RE.test(line)) {
+      currentDomain = topMatch ? topMatch[1] : "";
+      inIgnoredBlock = !topMatch;
       blockScalarIndent = -1;
       continue;
     }
+    if (inIgnoredBlock) continue;
     const lineNo = i + 1;
     if (
       excludeFromLine !== undefined &&
@@ -297,7 +305,7 @@ export function sectionEndLine(yaml: string, fromLine?: number): number | undefi
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line === "") continue;
-    if (/^[a-zA-Z]/.test(line)) return i;
+    if (TOP_LEVEL_KEY_START_RE.test(line)) return i;
   }
   return lines.length;
 }

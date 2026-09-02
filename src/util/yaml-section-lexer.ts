@@ -25,7 +25,8 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
  * MAP editor. Supporting them would require a different parsing
  * strategy; see issue tracker for upstream support if needed.
  */
-export const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
+const KEY_BODY = "[^\\s:#]*";
+export const KEY_PATTERN = `[a-zA-Z_]${KEY_BODY}`;
 
 /**
  * Matches a line that begins a top-level YAML section (column-0
@@ -45,7 +46,7 @@ export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_.]/;
  * park YAML anchors), so the section parser must close the
  * preceding section at one but never emit a section for it.
  */
-export const IGNORED_TOP_LEVEL_KEY_RE = /^\.[^\s:#]*:/;
+export const IGNORED_TOP_LEVEL_KEY_RE = new RegExp(`^\\.${KEY_BODY}:`);
 
 /**
  * Capture a column-0 top-level key. Group 1 is the key; the prefix

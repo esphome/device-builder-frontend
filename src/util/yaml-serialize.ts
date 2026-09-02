@@ -17,6 +17,7 @@ import { isLambdaValue, type LambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
+import { IGNORED_TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 
 /**
  * Wrap a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
@@ -474,6 +475,10 @@ export function parseConfiguredPlatforms(yaml: string): Set<string> {
     const top = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(?:#.*)?$/);
     if (top) {
       currentDomain = top[1];
+      continue;
+    }
+    if (IGNORED_TOP_LEVEL_KEY_RE.test(line)) {
+      currentDomain = null;
       continue;
     }
     if (!currentDomain) continue;

@@ -78,6 +78,21 @@ describe("findUsedPins", () => {
     expect(map.get(5)).toBe("binary_sensor");
   });
 
+  it("skips pins inside a dot-prefixed ignored block", () => {
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin: GPIO4",
+      ".pins:",
+      "  - &spare",
+      "    pin: GPIO7",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(4)).toBe("switch");
+    expect(map.has(7)).toBe(false);
+  });
+
   it("namespaces an I/O-expander pin so its channel doesn't alias a board GPIO", () => {
     const config = [
       "binary_sensor:",

@@ -229,14 +229,15 @@ export function collectSiblingKeysByIndent(
   return out;
 }
 
-/** Walk back from *lineIdx* to the first column-0 ``key:`` line. */
+/** Walk back from *lineIdx* to the first column-0 line; its ``key:``, or
+ *  ``null`` when that line isn't one (a dot-prefixed ignored key, ``---``). */
 export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
     const m = stripped.match(RE_TOP_LEVEL_KEY);
-    if (m) return m[1];
+    return m ? m[1] : null;
   }
   return null;
 }

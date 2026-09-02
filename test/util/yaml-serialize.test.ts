@@ -54,6 +54,13 @@ describe("parseConfiguredPlatforms", () => {
     expect(parseConfiguredPlatforms("  - platform: gpio")).toEqual(new Set());
   });
 
+  it("does not attribute a dot-prefixed anchor block to the domain above", () => {
+    const yaml = ["time:", "  - platform: sntp", ".presets:", "  - platform: dht"].join(
+      "\n"
+    );
+    expect(parseConfiguredPlatforms(yaml)).toEqual(new Set(["time.sntp"]));
+  });
+
   it("returns an empty set for blank input", () => {
     expect(parseConfiguredPlatforms("")).toEqual(new Set());
   });

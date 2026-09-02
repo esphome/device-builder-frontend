@@ -121,16 +121,22 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     return _topLevelSectionsValue;
   }
   const lines = splitYamlDocLines(yaml);
-  const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
-  let lastClosedByIgnoredKey = false;
+  const rawSections: Array<{
+    key: string;
+    fromLine: number;
+    toLine: number;
+    ignored?: boolean;
+  }> = [];
 
   for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(TOP_LEVEL_KEY_RE);
     // ESPHome ignores dot-prefixed top-level keys (anchor containers);
-    // close the previous section at one but emit no section for it.
-    const ignored = IGNORED_TOP_LEVEL_KEY_RE.test(lines[i]);
-    const match = ignored ? null : lines[i].match(TOP_LEVEL_KEY_RE);
-    if (ignored || match) {
-      if (rawSections.length > 0 && !lastClosedByIgnoredKey) {
+    // they close the previous section but never become one — tracked
+    // as a raw section so both trims work unchanged, dropped before
+    // expansion.
+    const ignored = !match && IGNORED_TOP_LEVEL_KEY_RE.test(lines[i]);
+    if (match || ignored) {
+      if (rawSections.length > 0) {
         // The previous section content ends one line before the new
         // top-level key. Walk backward over trailing blank /
         // comment-only lines: those typically decorate the upcoming
@@ -147,13 +153,11 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
         }
         prev.toLine = endIdx + 1;
       }
-      lastClosedByIgnoredKey = ignored;
-    }
-    if (match) {
       rawSections.push({
-        key: match[1],
+        key: match ? match[1] : "",
         fromLine: i + 1, // convert 0-indexed array to 1-indexed CM line
         toLine: lines.length,
+        ignored,
       });
     }
   }
@@ -161,9 +165,8 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   // Trim trailing blank / comment-only lines from the final section
   // for the same reason as above — a comment block at the very end
   // of the file (or right before EOF whitespace) shouldn't extend
-  // the last section's hover-highlight range. A section already
-  // closed by an ignored dot-key keeps that boundary.
-  if (rawSections.length > 0 && !lastClosedByIgnoredKey) {
+  // the last section's hover-highlight range.
+  if (rawSections.length > 0) {
     const last = rawSections[rawSections.length - 1];
     const lastStart = last.fromLine - 1; // 0-indexed
     let endIdx = lines.length - 1;
@@ -179,6 +182,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   // Expand list items within each section
   const sections: YamlSection[] = [];
   for (const raw of rawSections) {
+    if (raw.ignored) continue;
     sections.push(..._expandListItems(lines, raw));
   }
 
