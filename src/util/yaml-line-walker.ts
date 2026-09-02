@@ -14,7 +14,7 @@
 
 import type { Text } from "@codemirror/state";
 
-import { IGNORED_TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
+import { IGNORED_TOP_LEVEL_KEY_RE, TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 
 // ─── Shared regex constants ─────────────────────────────────────────
 
@@ -31,10 +31,6 @@ export const RE_INLINE_COMMENT_BOUNDARY = /(^|\s)#/;
  *  argument mapping — without that, ``findParentKey`` walks past
  *  the action and the action-arg completion can't fire. */
 export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_.]+)\s*:\s*(.*)$/;
-
-/** Column-0 pair: key starts at indent 0. Used to identify
- *  top-level component blocks when walking up from the cursor. */
-export const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
 
 /** A list-item line — optional indent then a ``- `` dash. The item is an
  *  anonymous container, so an indent walk treating list items as parentless
@@ -238,7 +234,7 @@ export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
     const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(RE_TOP_LEVEL_KEY);
+    const m = stripped.match(TOP_LEVEL_KEY_RE);
     if (m) return m[1];
     if (IGNORED_TOP_LEVEL_KEY_RE.test(stripped)) return null;
   }

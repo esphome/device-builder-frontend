@@ -17,12 +17,8 @@ import {
   YAML_INDENT_STEP,
 } from "./yaml-error-analysis.js";
 import type { YamlFixContext } from "./yaml-fix-context.js";
-import {
-  indentOf,
-  RE_LIST_ITEM,
-  RE_TOP_LEVEL_KEY,
-  stripComment,
-} from "./yaml-line-walker.js";
+import { indentOf, RE_LIST_ITEM, stripComment } from "./yaml-line-walker.js";
+import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 
 const COMPONENT_NOT_FOUND_RE = /^Component not found: ([A-Za-z0-9_]+)\.?$/;
 
@@ -95,7 +91,7 @@ function sectionOpenerAbove(
     const stripped = stripComment(doc.line(n).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(RE_TOP_LEVEL_KEY);
+    const m = stripped.match(TOP_LEVEL_KEY_RE);
     return m && stripped.slice(m[0].length).trim() === "" ? { key: m[1], line: n } : null;
   }
   return null;
