@@ -29,14 +29,23 @@ export const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
 
 /**
  * Matches a line that begins a top-level YAML section (column-0
- * identifier). Mirrors ``KEY_PATTERN``'s leading-character set —
- * accepts ``_internal:`` and similar underscore-leading keys, not
- * just ASCII letters. Used by every "stop at the next sibling
+ * identifier). Accepts ``_internal:`` and similar underscore-leading
+ * keys, plus a leading ``.`` — ESPHome ignores dot-prefixed top-level
+ * keys (the anchor-container convention), but such a key still ends
+ * the block above it. Used by every "stop at the next sibling
  * section" terminator across these layers so the predicate stays
  * consistent — drift between sites would let one walk past a
  * section header another walk treats as a hard stop.
  */
-export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
+export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_.]/;
+
+/**
+ * A column-0 dot-prefixed key (``.defaultfilters:``). ESPHome
+ * ignores these top-level keys entirely (the documented way to
+ * park YAML anchors), so the section parser must close the
+ * preceding section at one but never emit a section for it.
+ */
+export const IGNORED_TOP_LEVEL_KEY_RE = /^\.[^\s:#]*:/;
 
 /**
  * Capture a column-0 top-level key. Group 1 is the key; the prefix
