@@ -21,7 +21,7 @@ import type {
   SchemaConfigVarKey,
   SchemaRegistryEntry,
 } from "./esphome-schema.js";
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import type { CatalogIndex } from "./yaml-completion-catalog.js";
 import { AUTOMATION_KEYS, CORE_KEYS } from "./yaml-sections.js";
 

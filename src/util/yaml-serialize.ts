@@ -14,7 +14,7 @@
  */
 
 import { isLambdaValue, type LambdaValue } from "../api/types/automations.js";
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { isPlainObject } from "./nested-values.js";
 import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
 import { IGNORED_TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";

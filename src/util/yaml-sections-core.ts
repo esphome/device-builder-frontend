@@ -10,7 +10,7 @@
  * importing these from `./yaml-sections.js` are unaffected.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { isIndexSegment } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";

@@ -7,7 +7,7 @@
  * read and write — not as a general YAML parser.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import {

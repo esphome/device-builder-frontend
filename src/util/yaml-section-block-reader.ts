@@ -8,7 +8,7 @@
  * calls back up into the section parser.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import {
   blockScalarValue,
   isEditableLambdaBlock,
