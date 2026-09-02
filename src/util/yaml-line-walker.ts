@@ -14,6 +14,8 @@
 
 import type { Text } from "@codemirror/state";
 
+import { IGNORED_TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
+
 // ─── Shared regex constants ─────────────────────────────────────────
 
 /** ``# comment`` boundary — must be at line start or after whitespace.
@@ -229,15 +231,17 @@ export function collectSiblingKeysByIndent(
   return out;
 }
 
-/** Walk back from *lineIdx* to the first column-0 line; its ``key:``, or
- *  ``null`` when that line isn't one (a dot-prefixed ignored key, ``---``). */
+/** Walk back from *lineIdx* to the first column-0 ``key:`` line; a
+ *  dot-prefixed ignored key answers ``null``, other non-key column-0
+ *  lines (a compact-sequence dash, ``---``) are skipped. */
 export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
     const m = stripped.match(RE_TOP_LEVEL_KEY);
-    return m ? m[1] : null;
+    if (m) return m[1];
+    if (IGNORED_TOP_LEVEL_KEY_RE.test(stripped)) return null;
   }
   return null;
 }

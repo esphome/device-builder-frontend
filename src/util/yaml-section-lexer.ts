@@ -7,6 +7,9 @@
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 
+/** Non-leading key characters: anything but whitespace, ``:``, ``#``. */
+const KEY_BODY = "[^\\s:#]*";
+
 /**
  * Identifier alphabet for plain-scalar YAML keys the parser will
  * accept. The leading character stays strict (``[a-zA-Z_]``) so
@@ -25,7 +28,6 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
  * MAP editor. Supporting them would require a different parsing
  * strategy; see issue tracker for upstream support if needed.
  */
-const KEY_BODY = "[^\\s:#]*";
 export const KEY_PATTERN = `[a-zA-Z_]${KEY_BODY}`;
 
 /**

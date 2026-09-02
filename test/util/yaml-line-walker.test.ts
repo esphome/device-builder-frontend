@@ -134,6 +134,15 @@ describe("findTopLevelBlock", () => {
     expect(findTopLevelBlock(t(lines), 0)).toBeNull();
   });
 
+  it("walks past a column-0 compact-sequence dash to the domain key", () => {
+    const doc = [
+      "sensor:",
+      "- platform: dht",
+      "  name: x", //                  2 — ancestor: sensor
+    ];
+    expect(findTopLevelBlock(t(doc), 2)).toBe("sensor");
+  });
+
   it("returns null inside a dot-prefixed ignored block", () => {
     const doc = [
       "time:",
