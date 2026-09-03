@@ -10,7 +10,7 @@
  * importing these from `./yaml-sections.js` are unaffected.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { isIndexSegment } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
@@ -19,6 +19,7 @@ import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import {
   _skipBlankAndCommentLines,
   endsBlockAtIndent,
+  IGNORED_TOP_LEVEL_KEY_RE,
   LIST_ITEM_START_RE,
   TOP_LEVEL_KEY_RE,
 } from "./yaml-section-lexer.js";
@@ -120,11 +121,21 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     return _topLevelSectionsValue;
   }
   const lines = splitYamlDocLines(yaml);
-  const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
+  const rawSections: Array<{
+    key: string;
+    fromLine: number;
+    toLine: number;
+    ignored?: boolean;
+  }> = [];
 
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(TOP_LEVEL_KEY_RE);
-    if (match) {
+    // ESPHome ignores dot-prefixed top-level keys (anchor containers);
+    // they close the previous section but never become one — tracked
+    // as a raw section so both trims work unchanged, dropped before
+    // expansion.
+    const ignored = !match && IGNORED_TOP_LEVEL_KEY_RE.test(lines[i]);
+    if (match || ignored) {
       if (rawSections.length > 0) {
         // The previous section content ends one line before the new
         // top-level key. Walk backward over trailing blank /
@@ -143,9 +154,10 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
         prev.toLine = endIdx + 1;
       }
       rawSections.push({
-        key: match[1],
+        key: match ? match[1] : "",
         fromLine: i + 1, // convert 0-indexed array to 1-indexed CM line
         toLine: lines.length,
+        ignored,
       });
     }
   }
@@ -170,6 +182,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   // Expand list items within each section
   const sections: YamlSection[] = [];
   for (const raw of rawSections) {
+    if (raw.ignored) continue;
     sections.push(..._expandListItems(lines, raw));
   }
 

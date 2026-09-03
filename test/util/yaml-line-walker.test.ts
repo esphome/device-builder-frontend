@@ -133,6 +133,25 @@ describe("findTopLevelBlock", () => {
   it("returns null when the cursor is the top of the doc", () => {
     expect(findTopLevelBlock(t(lines), 0)).toBeNull();
   });
+
+  it("walks past a column-0 compact-sequence dash to the domain key", () => {
+    const doc = [
+      "sensor:",
+      "- platform: dht",
+      "  name: x", //                  2 — ancestor: sensor
+    ];
+    expect(findTopLevelBlock(t(doc), 2)).toBe("sensor");
+  });
+
+  it("returns null inside a dot-prefixed ignored block", () => {
+    const doc = [
+      "time:",
+      "  - platform: sntp",
+      ".defaultfilters:",
+      "  - &throttle_time", //          3 — ancestor: none (ignored key)
+    ];
+    expect(findTopLevelBlock(t(doc), 3)).toBeNull();
+  });
 });
 
 describe("readPlatformSibling (regex fallback)", () => {

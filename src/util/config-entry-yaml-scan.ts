@@ -25,6 +25,11 @@ import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import { indentOf } from "./yaml-line-walker.js";
 import {
+  IGNORED_TOP_LEVEL_KEY_RE,
+  TOP_LEVEL_KEY_RE,
+  TOP_LEVEL_KEY_START_RE,
+} from "./yaml-section-lexer.js";
+import {
   collectIdsAtPath,
   findFieldLine,
   parseYamlTopLevelSections,
@@ -230,9 +235,11 @@ export function findUsedPins(
   let blockScalarIndent = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const topMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
-    if (topMatch) {
-      currentDomain = topMatch[1];
+    const topMatch = line.match(TOP_LEVEL_KEY_RE);
+    if (topMatch || IGNORED_TOP_LEVEL_KEY_RE.test(line)) {
+      // An ignored dot key clears the domain; the !currentDomain
+      // guard below then skips its whole block.
+      currentDomain = topMatch ? topMatch[1] : "";
       blockScalarIndent = -1;
       continue;
     }
@@ -287,9 +294,9 @@ export function findUsedPins(
 }
 
 /**
- * 1-indexed line number of the first sibling that comes after the
- * section starting at `fromLine`. Used to bound `excludeToLine` for
- * `findUsedPins`. Returns `lines.length` if the section runs to EOF.
+ * 1-indexed inclusive last line of the section starting at `fromLine`
+ * (the line before the next sibling key). Used to bound `excludeToLine`
+ * for `findUsedPins`. Returns `lines.length` if the section runs to EOF.
  */
 export function sectionEndLine(yaml: string, fromLine?: number): number | undefined {
   if (fromLine === undefined) return undefined;
@@ -297,7 +304,7 @@ export function sectionEndLine(yaml: string, fromLine?: number): number | undefi
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line === "") continue;
-    if (/^[a-zA-Z]/.test(line)) return i;
+    if (TOP_LEVEL_KEY_START_RE.test(line)) return i;
   }
   return lines.length;
 }

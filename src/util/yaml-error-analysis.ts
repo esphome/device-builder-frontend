@@ -10,6 +10,7 @@
  * signed one-line repair — live only here.
  */
 import type { LocalizeFunc } from "../common/localize.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { indentOf, parseListItemMarker, stripComment } from "./yaml-line-walker.js";
 
 /** Match `line N, column M` (1-indexed) globally in a YAML parse error message. */
@@ -29,10 +30,8 @@ const PAIR_RE = /^\s*([^\s:#][^:]*?)\s*:(?:\s+(.*))?$/;
 /** Analysis walks never scan further than this many lines. */
 export const WALK_BOUND = 50;
 
-/** Canonical child-indent step. A literal two: this module stays free of
- *  esphome-yaml-lang's CodeMirror import graph, where ESPHOME_YAML_INDENT
- *  is the same two spaces. */
-export const YAML_INDENT_STEP = 2;
+/** Canonical child-indent step. */
+export const YAML_INDENT_STEP = ESPHOME_YAML_INDENT.length;
 
 /**
  * Strip absolute directory paths out of a backend error message.

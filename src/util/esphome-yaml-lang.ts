@@ -31,14 +31,6 @@ const RE_BLOCK_OPENER = /:\s*$/;
 const RE_BLOCK_SCALAR_OPENER = /:\s*[|>][+-]?\s*$/;
 
 /**
- * Single source of truth for ESPHome YAML's indent width. Two
- * spaces matches the legacy dashboard and the upstream ESPHome
- * code style. Exported so consumers (the editor, tests) share
- * the same unit and the indent service derives ``step`` from it.
- */
-export const ESPHOME_YAML_INDENT = "  ";
-
-/**
  * Document span of a `!lambda` value's C++ content: the Literal as-is, the
  * QuotedLiteral's interior (inside the quotes), or the BlockLiteralContent.
  * Null when the Tagged node carries no recognised value node.

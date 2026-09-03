@@ -470,6 +470,30 @@ describe("updateSectionInYaml — trailing comments / blank lines", () => {
     expect(after).toContain("logger:");
   });
 
+  it("saves a list item without eating a following dot-prefixed key", () => {
+    // ESPHome-ignored anchor container below the section; the splice
+    // must stop at it, not swallow its header line (#2651).
+    const before = [
+      "time:",
+      "  - platform: sntp",
+      "    id: my_time",
+      ".defaultfilters:",
+      "  - &throttle_time",
+      "    throttle: 60s",
+      "",
+    ].join("\n");
+    const after = updateSectionInYaml(
+      before,
+      "time.sntp",
+      { platform: "sntp", id: "other_time" },
+      2
+    );
+    expect(after).toContain("id: other_time");
+    expect(after).toContain(".defaultfilters:");
+    expect(after).toContain("- &throttle_time");
+    expect(after).toContain("throttle: 60s");
+  });
+
   it("keeps comments when the section body is comment-only", () => {
     // Exercises the `> start + 1` guard: header replaced, comments kept.
     const before = "wifi:\n  # configure later\n  # see docs\nlogger:\n";
@@ -553,6 +577,26 @@ describe("removeSectionFromYaml — multi-item list", () => {
     // The first item and its sibling field survive.
     expect(after).toContain("- platform: esphome");
     expect(after).toContain("password: foo");
+  });
+
+  it("preserves a following dot-prefixed block when removing an item", () => {
+    const before = [
+      "ota:",
+      "  - platform: esphome",
+      "  - platform: web_server",
+      ".defaultfilters:",
+      "  - &throttle_time",
+      "    throttle: 60s",
+      "",
+    ].join("\n");
+    const after = removeSectionFromYaml(
+      before,
+      "ota.web_server",
+      nthListItemLine(before, "ota", 2)
+    );
+    expect(after).not.toContain("- platform: web_server");
+    expect(after).toContain(".defaultfilters:");
+    expect(after).toContain("throttle: 60s");
   });
 
   it("drops the parent block when removing the only list item", () => {

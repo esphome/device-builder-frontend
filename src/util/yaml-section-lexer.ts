@@ -5,7 +5,10 @@
  * constant. (Scalar value parsing lives in yaml-scalar.ts.)
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
+
+/** Non-leading key characters: anything but whitespace, ``:``, ``#``. */
+const KEY_BODY = "[^\\s:#]*";
 
 /**
  * Identifier alphabet for plain-scalar YAML keys the parser will
@@ -25,18 +28,27 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
  * MAP editor. Supporting them would require a different parsing
  * strategy; see issue tracker for upstream support if needed.
  */
-export const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
+export const KEY_PATTERN = `[a-zA-Z_]${KEY_BODY}`;
 
 /**
  * Matches a line that begins a top-level YAML section (column-0
- * identifier). Mirrors ``KEY_PATTERN``'s leading-character set —
- * accepts ``_internal:`` and similar underscore-leading keys, not
- * just ASCII letters. Used by every "stop at the next sibling
+ * identifier). Accepts ``_internal:`` and similar underscore-leading
+ * keys, plus a leading ``.`` — ESPHome ignores dot-prefixed top-level
+ * keys (the anchor-container convention), but such a key still ends
+ * the block above it. Used by every "stop at the next sibling
  * section" terminator across these layers so the predicate stays
  * consistent — drift between sites would let one walk past a
  * section header another walk treats as a hard stop.
  */
-export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
+export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_.]/;
+
+/**
+ * A column-0 dot-prefixed key (``.defaultfilters:``). ESPHome
+ * ignores these top-level keys entirely (the documented way to
+ * park YAML anchors), so the section parser must close the
+ * preceding section at one but never emit a section for it.
+ */
+export const IGNORED_TOP_LEVEL_KEY_RE = new RegExp(`^\\.${KEY_BODY}:`);
 
 /**
  * Capture a column-0 top-level key. Group 1 is the key; the prefix

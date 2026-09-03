@@ -7,7 +7,8 @@ import {
 } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { ESPHOME_YAML_INDENT, esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "../../src/util/esphome-yaml-indent.js";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 
 /**
  * The indent service mirrors the legacy esphome dashboard's Monaco

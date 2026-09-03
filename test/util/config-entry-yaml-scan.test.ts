@@ -8,6 +8,7 @@ import {
   findReferenceCandidates,
   findUsedPins,
   isCertainlyDanglingId,
+  sectionEndLine,
   yamlHasExternalIdSources,
   yamlHasMergedSources,
 } from "../../src/util/config-entry-yaml-scan.js";
@@ -76,6 +77,36 @@ describe("findUsedPins", () => {
     const map = findUsedPins(yaml);
     expect(map.get(4)).toBe("switch");
     expect(map.get(5)).toBe("binary_sensor");
+  });
+
+  it("bounds sectionEndLine at the next sibling, dot and underscore keys included", () => {
+    const config = [
+      "switch:", //          line 1
+      "  - platform: gpio",
+      ".anchors:", //        line 3
+      "  - &spare 7",
+      "_extras:", //         line 5
+      "  note: x",
+      "",
+    ].join("\n");
+    expect(sectionEndLine(config, 1)).toBe(2);
+    expect(sectionEndLine(config, 3)).toBe(4);
+    expect(sectionEndLine(config, undefined)).toBeUndefined();
+  });
+
+  it("skips pins inside a dot-prefixed ignored block", () => {
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin: GPIO4",
+      ".pins:",
+      "  - &spare",
+      "    pin: GPIO7",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(4)).toBe("switch");
+    expect(map.has(7)).toBe(false);
   });
 
   it("namespaces an I/O-expander pin so its channel doesn't alias a board GPIO", () => {

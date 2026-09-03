@@ -279,6 +279,40 @@ wifi:
     expect(parseYamlTopLevelSections(yaml).map((s) => s.key)).toEqual(["esphome"]);
   });
 
+  it("ignores a dot-prefixed top-level key and closes the section above (#2651)", () => {
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+.defaultfilters:
+  - &moving_avg
+    sliding_window_moving_average:
+      window_size: 12
+  - &throttle_time
+    throttle: 60s
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].key).toBe("time");
+    expect(sections[0].platform).toBe("sntp");
+    expect(sections[0].toLine).toBe(3);
+    expect(sectionAtLine(yaml, 5)).toBeNull();
+  });
+
+  it("attributes sections after a dot-prefixed block to their own keys", () => {
+    const yaml = `time:
+  - platform: sntp
+.defaultfilters:
+  - &throttle_time
+    throttle: 60s
+wifi:
+  ssid: x
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections.map((s) => s.key)).toEqual(["time", "wifi"]);
+    expect(sections[0].toLine).toBe(2);
+    expect(sections[1].fromLine).toBe(6);
+  });
+
   it("keeps non-list sections as a single entry", () => {
     const yaml = `wifi:
   ssid: foo

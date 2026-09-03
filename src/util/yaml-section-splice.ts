@@ -8,7 +8,7 @@
  * with this concern.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-indent.js";
 import { isPlainObject, isPrimitiveOrNullish } from "./nested-values.js";
 import { arraysEqual } from "./set-equal.js";
 import type { ListItemSource } from "./yaml-section-list.js";

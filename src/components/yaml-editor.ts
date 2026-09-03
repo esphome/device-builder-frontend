@@ -27,7 +27,8 @@ import {
 } from "../util/codemirror-theme.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
-import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT } from "../util/esphome-yaml-indent.js";
+import { esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { fireEvent } from "../util/fire-event.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";

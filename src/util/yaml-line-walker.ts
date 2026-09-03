@@ -14,6 +14,8 @@
 
 import type { Text } from "@codemirror/state";
 
+import { IGNORED_TOP_LEVEL_KEY_RE, TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
+
 // ─── Shared regex constants ─────────────────────────────────────────
 
 /** ``# comment`` boundary — must be at line start or after whitespace.
@@ -29,10 +31,6 @@ export const RE_INLINE_COMMENT_BOUNDARY = /(^|\s)#/;
  *  argument mapping — without that, ``findParentKey`` walks past
  *  the action and the action-arg completion can't fire. */
 export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_.]+)\s*:\s*(.*)$/;
-
-/** Column-0 pair: key starts at indent 0. Used to identify
- *  top-level component blocks when walking up from the cursor. */
-export const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
 
 /** A list-item line — optional indent then a ``- `` dash. The item is an
  *  anonymous container, so an indent walk treating list items as parentless
@@ -87,9 +85,8 @@ export function stripComment(line: string): string {
  *  *value*. Mirrors the AST's ``readLiteralText`` so the regex
  *  walkers (and ``yaml-hover``) and the AST agree on the
  *  user-facing string. Deliberately NOT ``yaml-scalar``'s
- *  ``stripQuotes``: importing ``yaml-scalar`` here would close an
- *  import cycle (``yaml-scalar`` → ``yaml-serialize`` →
- *  ``esphome-yaml-lang`` → this module). */
+ *  ``stripQuotes``, which also unescapes — these walkers want the
+ *  literal interior. */
 export function unquote(value: string): string {
   if (value.length < 2) return value;
   const q = value[0];
@@ -229,14 +226,17 @@ export function collectSiblingKeysByIndent(
   return out;
 }
 
-/** Walk back from *lineIdx* to the first column-0 ``key:`` line. */
+/** Walk back from *lineIdx* to the first column-0 ``key:`` line; a
+ *  dot-prefixed ignored key answers ``null``, other non-key column-0
+ *  lines (a compact-sequence dash, ``---``) are skipped. */
 export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(RE_TOP_LEVEL_KEY);
+    const m = stripped.match(TOP_LEVEL_KEY_RE);
     if (m) return m[1];
+    if (IGNORED_TOP_LEVEL_KEY_RE.test(stripped)) return null;
   }
   return null;
 }
