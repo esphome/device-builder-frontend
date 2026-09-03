@@ -233,17 +233,16 @@ export function findUsedPins(
   // Indentation of an open free-text block scalar; continuation lines
   // indented deeper than this are prose and skipped. -1 when none is open.
   let blockScalarIndent = -1;
-  let inIgnoredBlock = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const topMatch = line.match(TOP_LEVEL_KEY_RE);
     if (topMatch || IGNORED_TOP_LEVEL_KEY_RE.test(line)) {
+      // An ignored dot key clears the domain; the !currentDomain
+      // guard below then skips its whole block.
       currentDomain = topMatch ? topMatch[1] : "";
-      inIgnoredBlock = !topMatch;
       blockScalarIndent = -1;
       continue;
     }
-    if (inIgnoredBlock) continue;
     const lineNo = i + 1;
     if (
       excludeFromLine !== undefined &&
