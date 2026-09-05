@@ -145,6 +145,28 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(onPicked).toHaveBeenCalledTimes(1);
   });
 
+  it("a request landing between after-hide and the deferred re-show wins", async () => {
+    const dialog = await mountDialog();
+    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
+    dialog.open();
+    await dialog.updateComplete;
+    wrapper.dispatchEvent(new CustomEvent("request-close"));
+    const older = vi.fn();
+    const newer = vi.fn();
+    dialog.open({ kind: "action", items: [], devices: [], onPicked: older });
+    afterHide(dialog);
+    // Same tick as after-hide: the closed state has not committed yet.
+    dialog.open({ kind: "condition", items: [], devices: [], onPicked: newer });
+    expect(isOpen(dialog)).toBe(false);
+    await dialog.updateComplete;
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("condition");
+    (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
+    expect(newer).toHaveBeenCalledTimes(1);
+    expect(older).not.toHaveBeenCalled();
+  });
+
   it("drops the served request once the dialog has fully closed", async () => {
     const dialog = await mountDialog();
     const onPicked = vi.fn();

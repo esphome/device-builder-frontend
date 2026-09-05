@@ -527,16 +527,21 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
   private _onAfterHide = () => {
     this._dialog.onAfterHide();
-    this._hiding = false;
-    const next = this._pending;
-    this._pending = null;
-    if (!next) {
+    if (!this._pending) {
+      this._hiding = false;
       this._request = null;
       return;
     }
     // Let the closed state reach the wrapper first; flipping the flag back in
     // the same tick would leave the ?open binding unchanged and never re-show.
-    void this.updateComplete.then(() => this.open(next));
+    // ``_hiding`` stays set until then, so a request landing in the gap
+    // replaces the pending one instead of being overwritten by it.
+    void this.updateComplete.then(() => {
+      this._hiding = false;
+      const next = this._pending;
+      this._pending = null;
+      if (next) this.open(next);
+    });
   };
 
   private _setTargetOpen(id: string, open: boolean) {
