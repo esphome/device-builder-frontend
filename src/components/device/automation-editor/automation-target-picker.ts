@@ -41,9 +41,8 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   firstSelectableTarget,
-  instanceContext,
+  indexTargets,
   instanceName,
-  selectableTargets,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -167,7 +166,8 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         this.value?.kind === "component_on" ? this.value.component_id : "";
       // A multi-entity container isn't a valid trigger target — its
       // sub-entities are (offered as their own instances).
-      const targets = selectableTargets(this.devices);
+      const index = indexTargets(this.devices);
+      const targets = index.selectable;
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">
           ${this._localize("device.automation_target_no_components")}
@@ -188,9 +188,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             (d) =>
               html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
                 >${instanceName(d)}
-                <span class="ae-muted"
-                  >(${instanceContext(d, this.devices)})</span
-                ></wa-option
+                <span class="ae-muted">(${index.context(d)})</span></wa-option
               >`
           )}
         </wa-select>

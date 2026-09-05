@@ -393,4 +393,42 @@ describe("catalog-picker-dialog by-target groups", () => {
     await dialog.updateComplete;
     expect(expandedFlags(dialog)).toEqual(["false", "false"]);
   });
+
+  it("group labels carry the container name for same-named sub-entities", async () => {
+    const temperature = action({ id: "sensor.state", name: "State", domain: "sensor" });
+    const dialog = await mountDialog({
+      items: [temperature],
+      devices: [
+        {
+          component_id: "sensor.aht10",
+          id: "aht_a",
+          name: "AHT A",
+          is_entity_container: true,
+        },
+        {
+          component_id: "sensor",
+          id: "aht_a_temp",
+          name: "Temperature",
+          parent_id: "aht_a",
+        },
+        {
+          component_id: "sensor.aht10",
+          id: "aht_b",
+          name: "AHT B",
+          is_entity_container: true,
+        },
+        {
+          component_id: "sensor",
+          id: "aht_b_temp",
+          name: "Temperature",
+          parent_id: "aht_b",
+        },
+      ],
+      tab: "by-target",
+    });
+    const labels = groupLabels(dialog);
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain("AHT A");
+    expect(labels[1]).toContain("AHT B");
+  });
 });

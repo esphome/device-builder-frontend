@@ -7,11 +7,10 @@ import type {
 import {
   componentDomain,
   firstSelectableTarget,
-  instanceContext,
+  indexTargets,
   instanceName,
   isSelectableTarget,
   preFillIdParam,
-  selectableTargets,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
 
@@ -53,7 +52,7 @@ describe("component-targets", () => {
 
   it("drops containers from the selectable list and the first-selectable lookup", () => {
     const devices = [container, temp, relay];
-    expect(selectableTargets(devices)).toEqual([temp, relay]);
+    expect(indexTargets(devices).selectable).toEqual([temp, relay]);
     expect(firstSelectableTarget(devices)).toBe(temp);
   });
 
@@ -103,18 +102,21 @@ describe("instance label helpers", () => {
     expect(componentDomain("sensor")).toBe("sensor");
   });
 
-  it("instanceContext appends the owning container for a sub-entity", () => {
-    const named = inst({ id: "aht20", component_id: "sensor.aht10", name: "AHT20" });
-    const devices = [named, temp];
-    // Sub-entity → domain · parent label; plain instance → bare domain only.
-    expect(instanceContext(temp, devices)).toBe("sensor · AHT20");
-    expect(instanceContext(relay, devices)).toBe("switch.gpio");
-    // A dangling parent_id (parent absent) degrades to the bare domain.
+  it("indexTargets resolves a sub-entity's container even though selectable drops it", () => {
+    const named = inst({
+      id: "aht20",
+      component_id: "sensor.aht10",
+      name: "AHT20",
+      is_entity_container: true,
+    });
+    const index = indexTargets([named, temp, relay]);
+    expect(index.selectable).toEqual([temp, relay]);
+    // Sub-entity → component id · parent label; plain instance → component id only.
+    expect(index.context(temp)).toBe("sensor · AHT20");
+    expect(index.context(relay)).toBe("switch.gpio");
+    // A dangling parent_id (parent absent) degrades to the component id.
     expect(
-      instanceContext(
-        inst({ id: "o", component_id: "sensor", parent_id: "gone" }),
-        devices
-      )
+      index.context(inst({ id: "o", component_id: "sensor", parent_id: "gone" }))
     ).toBe("sensor");
   });
 });
