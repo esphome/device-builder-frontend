@@ -32,7 +32,7 @@ import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
-import { findMissingDependencies } from "./add-component-deps.js";
+import { findMissingDependencies, liveDependencies } from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   type DepNavHost,
@@ -543,17 +543,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this.yaml,
       this._resolvedComponents
     );
-    // `findMissingDependencies` (dotted deps, platform stems) over a plain
-    // top-level-block check, so a stem-satisfied dep doesn't keep a blank
-    // form. The form's async `provides` subtraction isn't replicated — this
-    // stays stricter, only keeping the form a touch more often.
-    const missing = findMissingDependencies(
-      entry.dependencies ?? [],
-      this.yaml,
-      present,
-      this._resolvedPlatforms
-    );
-    if (missing.length > 0) return null;
     const seeded = buildInitialValues({
       entries: entry.config_entries,
       component: entry,
@@ -564,6 +553,18 @@ export class ESPHomeAddComponentDialog extends LitElement {
       restoredValues: null,
       localize: this._localize,
     });
+    const live = liveDependencies(entry, seeded);
+    // `findMissingDependencies` (dotted deps, platform stems) over a plain
+    // top-level-block check, so a stem-satisfied dep doesn't keep a blank
+    // form. The form's async `provides` subtraction isn't replicated — this
+    // stays stricter, only keeping the form a touch more often.
+    const missing = findMissingDependencies(
+      live,
+      this.yaml,
+      present,
+      this._resolvedPlatforms
+    );
+    if (missing.length > 0) return null;
     if (
       addFormNeedsUserInput(
         entry.config_entries,

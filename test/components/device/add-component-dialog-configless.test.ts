@@ -22,6 +22,7 @@ import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-co
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import { makeEthernetEntry } from "../../util/_make-ethernet-entry.js";
 
 /** Dialog whose API hydrates to `entry` and records `addComponent` calls. */
 function makeDialog(entry: ReturnType<typeof makeComponentEntry>) {
@@ -75,6 +76,28 @@ describe("add-component-dialog skips the form for configless components", () => 
       false
     );
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
+  });
+
+  it("fast-paths a component whose bus dep the seeded type hides", async () => {
+    const { dialog, addComponent } = makeDialog(makeEthernetEntry("IP101"));
+
+    await select(dialog, "ethernet");
+
+    // At-default fields are omitted from the payload.
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "ethernet", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+  });
+
+  it("keeps the form when the seeded type shows the bus reference", async () => {
+    const { dialog, addComponent } = makeDialog(makeEthernetEntry("W5500"));
+
+    await select(dialog, "ethernet");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).not.toBeNull();
   });
 
   it("opens the form for a bus-constrained component even when input-free", async () => {

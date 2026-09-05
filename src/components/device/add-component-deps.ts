@@ -1,6 +1,11 @@
 import type { ESPHomeAPI } from "../../api/index.js";
-import { ComponentCategory } from "../../api/types/components.js";
+import {
+  type ComponentCatalogEntry,
+  ComponentCategory,
+} from "../../api/types/components.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
@@ -13,6 +18,26 @@ import {
 // another domain: a `binary_sensor: - platform: switch` mirror must not
 // pass for a `switch:` dependency. Guards the stem-match branch below.
 const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
+
+/**
+ * *component*'s dependencies minus those every referencing top-level entry
+ * hides behind a resolved `depends_on` value gate. Nested entries are not
+ * walked.
+ */
+export function liveDependencies(
+  component: Pick<ComponentCatalogEntry, "dependencies" | "config_entries">,
+  values: Record<string, unknown>
+): string[] {
+  const entries = component.config_entries;
+  const valueGateHides = (entry: ConfigEntry): boolean => {
+    const gate = resolveDependsOn(entry, values, undefined, entries);
+    return gate != null && !gateAccepts(entry, gate);
+  };
+  return (component.dependencies ?? []).filter((dep) => {
+    const refs = entries.filter((e) => e.references_component === dep);
+    return refs.length === 0 || !refs.every(valueGateHides);
+  });
+}
 
 /**
  * Catalog dependencies not yet satisfied by the current YAML.

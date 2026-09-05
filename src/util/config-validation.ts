@@ -105,15 +105,33 @@ export function isEntryVisible(
     return false;
   }
 
-  if (!entry.depends_on) return true;
-  // The backend sets at most one of the three gate fields, so the
-  // check order below is immaterial. Resolve the dependency in the
-  // local scope first, then fall back to the component root so a
-  // nested entry can gate on a top-level field.
-  let depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
+  return gateAccepts(entry, resolveDependsOn(entry, values, rootValues, siblings));
+}
+
+/**
+ * The value *entry*'s `depends_on` gate reads: the local sibling, else the
+ * component root, else the gate field's `default_value` from `siblings`.
+ */
+export function resolveDependsOn(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+  rootValues?: Record<string, unknown>,
+  siblings?: readonly ConfigEntry[]
+): unknown {
+  if (!entry.depends_on) return undefined;
+  // Resolve the dependency in the local scope first, then fall back to
+  // the component root so a nested entry can gate on a top-level field.
+  const depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
     ? values[entry.depends_on]
     : rootValues?.[entry.depends_on];
-  depValue ??= siblings?.find((s) => s.key === entry.depends_on)?.default_value;
+  return depValue ?? siblings?.find((s) => s.key === entry.depends_on)?.default_value;
+}
+
+/** Whether *depValue* passes *entry*'s `depends_on` gate; an entry without one passes. */
+export function gateAccepts(entry: ConfigEntry, depValue: unknown): boolean {
+  if (!entry.depends_on) return true;
+  // The backend sets at most one of the three gate fields, so the
+  // check order below is immaterial.
   // Type-insensitive across primitives: the parser hands back numbers /
   // booleans for plain scalars (#1360) while catalog gate values may be
   // strings. A non-primitive (or nullish) depValue never matches — so

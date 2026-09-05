@@ -2,12 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
+import {
   depsSatisfiedByProvides,
   findMissingDependencies,
+  liveDependencies,
 } from "../../../src/components/device/add-component-deps.js";
 import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { parseTopLevelComponents } from "../../../src/util/yaml-serialize.js";
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import { makeEthernetEntry } from "../../util/_make-ethernet-entry.js";
 
 function providersResponse(ids: string[]) {
   return {
@@ -251,5 +259,71 @@ describe("depsSatisfiedByProvides", () => {
     await depsSatisfiedByProvides(api, ...args);
     await depsSatisfiedByProvides(api, ...args);
     expect(getComponents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("liveDependencies", () => {
+  const uartRef = (extra: Partial<ConfigEntry>) =>
+    makeComponentEntry("x", {
+      dependencies: ["uart"],
+      config_entries: [
+        makeConfigEntry({
+          key: "uart_id",
+          type: ConfigEntryType.ID,
+          references_component: "uart",
+          ...extra,
+        }),
+      ],
+    });
+
+  it("drops a dep whose only referencing entry the chosen type hides", () => {
+    expect(liveDependencies(makeEthernetEntry(), { type: "IP101" })).toEqual([]);
+  });
+
+  it("keeps the dep once the chosen type shows the reference", () => {
+    expect(liveDependencies(makeEthernetEntry(), { type: "W5500" })).toEqual(["spi"]);
+  });
+
+  it("resolves an untouched gate through the sibling default", () => {
+    expect(liveDependencies(makeEthernetEntry("W5500"), {})).toEqual(["spi"]);
+    expect(liveDependencies(makeEthernetEntry("IP101"), {})).toEqual([]);
+  });
+
+  it("keeps the dep while the gate is unset with no default", () => {
+    expect(liveDependencies(makeEthernetEntry(), {})).toEqual(["spi"]);
+  });
+
+  it("keeps a dep no entry references", () => {
+    const ethernet = { ...makeEthernetEntry(), dependencies: ["spi", "uart"] };
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual(["uart"]);
+  });
+
+  it("does not walk nested entries", () => {
+    const [type, spiId] = makeEthernetEntry().config_entries;
+    const nested = makeConfigEntry({
+      key: "bus",
+      type: ConfigEntryType.NESTED,
+      config_entries: [spiId],
+    });
+    const ethernet = { ...makeEthernetEntry(), config_entries: [type, nested] };
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual(["spi"]);
+  });
+
+  it("keeps a dep whose reference is hidden for a non-value reason", () => {
+    // improv_serial shape: a hidden uart_id reference still needs the bus.
+    expect(liveDependencies(uartRef({ hidden: true }), {})).toEqual(["uart"]);
+    expect(liveDependencies(uartRef({ depends_on_component: "uart" }), {})).toEqual([
+      "uart",
+    ]);
+  });
+
+  it("reads only the value gate on a hidden reference", () => {
+    const [type, spiId] = makeEthernetEntry().config_entries;
+    const ethernet = {
+      ...makeEthernetEntry(),
+      config_entries: [type, { ...spiId, hidden: true }],
+    };
+    expect(liveDependencies(ethernet, { type: "W5500" })).toEqual(["spi"]);
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual([]);
   });
 });
