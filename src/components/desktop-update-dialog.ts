@@ -87,7 +87,7 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
   }
 
   close() {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   private _runCheck = async (): Promise<void> => {

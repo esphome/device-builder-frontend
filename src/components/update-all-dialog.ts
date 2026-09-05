@@ -124,6 +124,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   ];
 
   async open() {
+    this._confirmed = false;
     this._selection = defaultSelection();
     this._dialog.open = true;
     // Sections only exist after the open render; default-expand the two
@@ -137,7 +138,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   }
 
   close() {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   private _sectionEls(): (HTMLElement & { expanded: boolean })[] {
@@ -230,7 +231,12 @@ export class ESPHomeUpdateAllDialog extends LitElement {
     `;
   }
 
+  /** Set on the first confirm; the button stays live through the hide animation. */
+  private _confirmed = false;
+
   private _confirm = () => {
+    if (this._confirmed) return;
+    this._confirmed = true;
     const configurations = this._matched().map((d) => d.configuration);
     this.close();
     // runBulkUpdate owns the empty case (the Update button is disabled at

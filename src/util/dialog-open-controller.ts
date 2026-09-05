@@ -1,5 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
+type DialogHost = ReactiveControllerHost & { shadowRoot?: ShadowRoot | null };
+
 /**
  * Owns the reactive open flag for an ``esphome-base-dialog`` host with no
  * close-veto logic.
@@ -24,11 +26,17 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
  * Dialogs with a real veto (busy guard, unsaved-changes prompt) keep their
  * own ``@request-close`` handler instead; the trivial flip here never
  * ``preventDefault()``s.
+ *
+ * A programmatic close (a pick, a finished action) should go through
+ * ``requestClose`` rather than writing ``open = false``: the wrapper then
+ * runs its normal hide sequence and the host's bound handler flips the flag
+ * afterwards, so a body rendered only while ``open`` stays up through the
+ * animation instead of vanishing on the first frame.
  */
 export class DialogOpenController implements ReactiveController {
   private _open = false;
 
-  constructor(private readonly _host: ReactiveControllerHost) {
+  constructor(private readonly _host: DialogHost) {
     _host.addController(this);
   }
 
@@ -46,6 +54,18 @@ export class DialogOpenController implements ReactiveController {
     if (value === this._open) return;
     this._open = value;
     this._host.requestUpdate();
+  }
+
+  /** Close via the host's ``esphome-base-dialog`` hide sequence. Only a host
+   *  bound to ``onAfterHide`` keeps an open-gated body through the animation;
+   *  ``onRequestClose`` flips the flag synchronously and gains nothing here.
+   *  Flips the flag directly when no wrapper is mounted. */
+  requestClose(): void {
+    const wrapper = this._host.shadowRoot?.querySelector<
+      Element & { requestClose?: () => void }
+    >("esphome-base-dialog");
+    if (wrapper?.requestClose) wrapper.requestClose();
+    else this.open = false;
   }
 
   /** The trivial ``@request-close`` handler: flip the flag, veto nothing. */

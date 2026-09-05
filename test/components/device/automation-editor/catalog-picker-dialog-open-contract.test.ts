@@ -5,8 +5,9 @@
  * migration onto ``esphome-base-dialog``. The wrapper never mutates
  * its own ``open`` on a user-driven close, so the host owns the
  * reactive ``_open`` flag: ``open()`` sets it, ``@after-hide``
- * clears it once the hide animation ends, and picking an item clears
- * it. The body renders only while open. The sibling
+ * clears it once the hide animation ends, and picking an item requests
+ * a close through the wrapper so the same after-hide clears it. The body
+ * renders only while open. The sibling
  * ``catalog-picker-dialog.test.ts`` covers the filter / grouping
  * contract; this file owns the open/close lifecycle.
  */
@@ -79,7 +80,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(body()).toBe(0);
   });
 
-  it("picking an item emits catalog-picked and closes the dialog", async () => {
+  it("picking an item emits catalog-picked", async () => {
     const dialog = await mountDialog();
     dialog.open();
     const picked = vi.fn();
@@ -94,6 +95,54 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
       id: "switch.toggle",
       preFilledParams: { id: "relay" },
     });
+  });
+
+  it("a pick closes through the wrapper so the body outlives the hide animation", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    await dialog.updateComplete;
+    const wrapper = dialog.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
+    await dialog.updateComplete;
+    expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.shadowRoot!.querySelector(".picker-body")).not.toBeNull();
+
+    afterHide(dialog);
+    await dialog.updateComplete;
     expect(isOpen(dialog)).toBe(false);
+    expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
+  });
+
+  it("a second pick during the hide is ignored until the picker reopens", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    await dialog.updateComplete;
+    const wrapper = dialog.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    const picked = vi.fn();
+    dialog.addEventListener("catalog-picked", picked);
+    const pick = (dialog as unknown as { _pick: (id: string) => void })._pick.bind(
+      dialog
+    );
+
+    pick("switch.toggle");
+    pick("switch.turn_on");
+    expect(picked).toHaveBeenCalledTimes(1);
+
+    afterHide(dialog);
+    dialog.open();
+    await dialog.updateComplete;
+    pick("switch.turn_on");
+    expect(picked).toHaveBeenCalledTimes(2);
   });
 });
