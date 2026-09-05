@@ -13,22 +13,27 @@ import type {
 } from "./catalog-picker-dialog.js";
 
 /** What a nested editor asks the shared picker to show, and who gets the pick. */
-export interface CatalogPickRequest {
-  kind: "action" | "condition";
-  items: AutomationAction[] | AutomationCondition[];
+export type CatalogPickRequest = (
+  | { kind: "action"; items: AutomationAction[] }
+  | { kind: "condition"; items: AutomationCondition[] }
+) & {
   devices: AvailableComponentInstance[];
   onPicked(detail: CatalogPickedDetail): void;
-}
+};
 
-/** Ask the nearest ``esphome-catalog-picker-host`` above *from* to open its picker. */
+/** Ask the nearest ``esphome-catalog-picker-host`` above *from* to open its
+ *  picker; warns when no host answers, since the button is otherwise dead. */
 export function requestCatalogPick(from: HTMLElement, request: CatalogPickRequest): void {
-  from.dispatchEvent(
-    new CustomEvent<CatalogPickRequest>("request-catalog-pick", {
-      detail: request,
-      bubbles: true,
-      composed: true,
-    })
-  );
+  const event = new CustomEvent<CatalogPickRequest>("request-catalog-pick", {
+    detail: request,
+    bubbles: true,
+    composed: true,
+    cancelable: true,
+  });
+  from.dispatchEvent(event);
+  if (!event.defaultPrevented) {
+    console.warn("request-catalog-pick found no esphome-catalog-picker-host above", from);
+  }
 }
 
 /**
@@ -72,6 +77,7 @@ export class ESPHomeCatalogPickerHost extends LitElement {
 
   private _onRequest = (e: Event) => {
     e.stopPropagation();
+    e.preventDefault();
     this._request = (e as CustomEvent<CatalogPickRequest>).detail;
     // The picker reads the request through its bindings; open after they land.
     void this.updateComplete.then(() => this._picker.open());

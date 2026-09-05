@@ -115,6 +115,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _targetOverrides = new Map<string, boolean>();
   /** Set on the first pick; the rows stay live through the hide animation. */
   private _picked = false;
+  /** An ``open()`` that arrived while the previous close was still animating. */
+  private _reopenAfterHide = false;
 
   /**
    * Open the dialog with a fresh search, no clicked-open groups, and the
@@ -126,7 +128,10 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     this._query = "";
     this._targetOverrides = new Map();
     this._picked = false;
-    this._dialog.open = true;
+    // The shared instance may still be hiding from the last pick; the flag is
+    // already true then, so re-show once that hide has finished.
+    if (this._dialog.open) this._reopenAfterHide = true;
+    else this._dialog.open = true;
   }
 
   static styles = [
@@ -343,7 +348,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<esphome-base-dialog
       ?open=${this._dialog.open}
       .label=${title}
-      @after-hide=${this._dialog.onAfterHide}
+      @after-hide=${this._onAfterHide}
     >
       ${this._dialog.open ? this._renderBody() : nothing}
     </esphome-base-dialog>`;
@@ -487,6 +492,14 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // prettier-ignore
     return html`<span class="picker-group-label">${name}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
   }
+
+  private _onAfterHide = () => {
+    this._dialog.onAfterHide();
+    if (this._reopenAfterHide) {
+      this._reopenAfterHide = false;
+      this._dialog.open = true;
+    }
+  };
 
   private _setTargetOpen(id: string, open: boolean) {
     this._targetOverrides = new Map(this._targetOverrides).set(id, open);

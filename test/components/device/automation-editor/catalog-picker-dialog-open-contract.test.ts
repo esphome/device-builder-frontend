@@ -119,6 +119,29 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
   });
 
+  it("an open() during the previous hide re-shows once that hide ends", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    await dialog.updateComplete;
+    const wrapper = dialog.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
+    // Still hiding: the flag is true, so a fresh open() cannot flip it yet.
+    dialog.open();
+    expect(isOpen(dialog)).toBe(true);
+
+    afterHide(dialog);
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(true);
+    // A plain close with nothing queued stays closed.
+    afterHide(dialog);
+    expect(isOpen(dialog)).toBe(false);
+  });
+
   it("a second pick during the hide is ignored until the picker reopens", async () => {
     const dialog = await mountDialog();
     dialog.open();

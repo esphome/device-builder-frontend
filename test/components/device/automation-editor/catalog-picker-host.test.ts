@@ -5,21 +5,21 @@
  * its dialog with the request's catalog, and the pick goes back to whoever
  * asked.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { identityLocalize } from "../../../_dom.js";
-import type { AutomationAction } from "../../../../src/api/types/automations.js";
+import type { AutomationCondition } from "../../../../src/api/types/automations.js";
 import type { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 import {
   ESPHomeCatalogPickerHost,
   requestCatalogPick,
 } from "../../../../src/components/device/automation-editor/catalog-picker-host.js";
 
-const action = (id: string): AutomationAction =>
-  ({ id, name: id, domain: id.split(".")[0], description: "" }) as AutomationAction;
+const condition = (id: string): AutomationCondition =>
+  ({ id, name: id, domain: id.split(".")[0], description: "" }) as AutomationCondition;
 
 async function mountHost() {
   const host = new ESPHomeCatalogPickerHost();
@@ -40,12 +40,17 @@ async function mountHost() {
 }
 
 describe("esphome-catalog-picker-host", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.restoreAllMocks();
+  });
+
   it("opens its one picker with the requesting editor's catalog", async () => {
     const { host, inner, picker } = await mountHost();
     const open = vi.spyOn(picker, "open");
     requestCatalogPick(inner, {
       kind: "condition",
-      items: [action("sensor.in_range")],
+      items: [condition("sensor.in_range")],
       devices: [],
       onPicked: () => {},
     });
@@ -89,8 +94,9 @@ describe("esphome-catalog-picker-host", () => {
   });
 
   it("does not let the request escape above the host", async () => {
-    const { host, inner } = await mountHost();
+    const { inner } = await mountHost();
     const above = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     document.body.addEventListener("request-catalog-pick", above);
     requestCatalogPick(inner, {
       kind: "action",
@@ -99,7 +105,19 @@ describe("esphome-catalog-picker-host", () => {
       onPicked: () => {},
     });
     expect(above).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
     document.body.removeEventListener("request-catalog-pick", above);
-    host.remove();
+  });
+
+  it("warns when no host is above the requester", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const orphan = document.body.appendChild(document.createElement("button"));
+    requestCatalogPick(orphan, {
+      kind: "action",
+      items: [],
+      devices: [],
+      onPicked: () => {},
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
