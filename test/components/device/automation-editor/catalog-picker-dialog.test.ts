@@ -363,6 +363,7 @@ describe("catalog-picker-dialog by-target groups", () => {
     await search(dialog, "valve");
     expect(groupLabels(dialog)).toHaveLength(1);
     expect(groupLabels(dialog)[0]).toContain("Valve");
+    expect(dialog.shadowRoot!.querySelectorAll(".picker-group-count")).toHaveLength(0);
     expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
   });
 
