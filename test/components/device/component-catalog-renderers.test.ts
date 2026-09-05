@@ -260,11 +260,11 @@ describe("shouldHandleCardClick", () => {
   });
 
   it("skips when the click landed inside the inner + Add button", () => {
-    // The button contains a <wa-icon> child — the click target is
+    // The button contains an inline svg glyph — the click target is
     // the icon, not the button. closest() must walk up to find it.
     const card = document.createElement("article");
     const addButton = document.createElement("button");
-    const icon = document.createElement("wa-icon");
+    const icon = document.createElement("svg");
     addButton.append(icon);
     card.append(addButton);
     expect(shouldHandleCardClick(clickFrom(icon))).toBe(false);

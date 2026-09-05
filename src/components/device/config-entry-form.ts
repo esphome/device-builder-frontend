@@ -20,7 +20,6 @@ import {
   mdiChevronUp,
   mdiClose,
   mdiOpenInNew,
-  mdiPlus,
 } from "@mdi/js";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -123,7 +122,6 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   close: mdiClose,
   "open-in-new": mdiOpenInNew,
-  plus: mdiPlus,
 });
 
 /** Detail emitted with `value-change` events. */
