@@ -254,3 +254,84 @@ describe("catalog-picker-dialog tab strip", () => {
     expect(text).not.toContain("HA Service");
   });
 });
+
+describe("catalog-picker-dialog by-target groups", () => {
+  const turnOn = action({ id: "switch.turn_on", name: "Turn On", domain: "switch" });
+  const turnOff = action({ id: "switch.turn_off", name: "Turn Off", domain: "switch" });
+  const devices: AvailableComponentInstance[] = [
+    { component_id: "switch.gpio", id: "relay1", name: "Pump" },
+    { component_id: "switch.gpio", id: "relay2", name: "Valve" },
+    { component_id: "switch.gpio", id: "relay3", name: "Fan" },
+  ];
+  const toggles = (dialog: ESPHomeCatalogPickerDialog) =>
+    Array.from(dialog.shadowRoot!.querySelectorAll<HTMLElement>(".picker-group-toggle"));
+
+  it("starts collapsed and expands one entity per click", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    expect(groupLabels(dialog)).toHaveLength(3);
+    expect(rowTitles(dialog)).toEqual([]);
+    expect(toggles(dialog).map((t) => t.getAttribute("aria-expanded"))).toEqual([
+      "false",
+      "false",
+      "false",
+    ]);
+
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
+    expect(toggles(dialog)[1].getAttribute("aria-expanded")).toBe("true");
+
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(rowTitles(dialog)).toEqual([]);
+  });
+
+  it("an action query narrows rows but leaves groups collapsed", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    await search(dialog, "turn off");
+    expect(groupLabels(dialog)).toHaveLength(3);
+    expect(rowTitles(dialog)).toEqual([]);
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(rowTitles(dialog)).toEqual(["Turn Off"]);
+  });
+
+  it("an entity query shows that group expanded with all its actions", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    await search(dialog, "valve");
+    expect(groupLabels(dialog)).toHaveLength(1);
+    expect(groupLabels(dialog)[0]).toContain("Valve");
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
+  });
+
+  it("a lone group is expanded without a click", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: [devices[0]],
+      tab: "by-target",
+    });
+    expect(rowTitles(dialog)).toEqual(["Turn On"]);
+  });
+
+  it("rows draw the add glyph inline instead of mounting an icon element", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: [devices[0]],
+      tab: "by-target",
+    });
+    expect(dialog.shadowRoot!.querySelector(".picker-row wa-icon")).toBeNull();
+    expect(dialog.shadowRoot!.querySelector(".picker-row-add svg")).not.toBeNull();
+  });
+});

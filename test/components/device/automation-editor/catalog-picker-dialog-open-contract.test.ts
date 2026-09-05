@@ -70,11 +70,9 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     const dialog = await mountDialog();
     dialog.items = [
       { id: "switch.turn_on", name: "Turn On", domain: "switch" } as AutomationAction,
+      { id: "switch.turn_off", name: "Turn Off", domain: "switch" } as AutomationAction,
     ];
-    dialog.devices = [
-      { component_id: "switch.gpio", id: "relay1" },
-      { component_id: "switch.gpio", id: "relay2" },
-    ];
+    dialog.devices = [{ component_id: "switch.gpio", id: "relay1" }];
     await dialog.updateComplete;
     const rows = () => dialog.shadowRoot!.querySelectorAll(".picker-row").length;
     expect(rows()).toBe(0);
