@@ -35,10 +35,11 @@ const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
   (d as unknown as { _dialog: { open: boolean } })._dialog.open;
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
-const afterHide = (d: ESPHomeCatalogPickerDialog): void =>
-  d
-    .shadowRoot!.querySelector("esphome-base-dialog")!
-    .dispatchEvent(new CustomEvent("after-hide"));
+const afterHide = (d: ESPHomeCatalogPickerDialog): void => {
+  d.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+    new CustomEvent("after-hide")
+  );
+};
 
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("open() drives the reactive _open flag and resets the search", async () => {
