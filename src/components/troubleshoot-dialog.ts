@@ -164,7 +164,7 @@ export class ESPHomeTroubleshootDialog extends LitElement {
   }
 
   close(): void {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   protected render() {
@@ -184,7 +184,6 @@ export class ESPHomeTroubleshootDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         .label=${label}
-        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         ${
