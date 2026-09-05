@@ -5,9 +5,9 @@
  * a type-gated reference (ethernet's spi_id) is asked for only while the
  * chosen type shows that reference, and follows the type as it changes.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import "../../_mock-webawesome.js";
 
 import type { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
