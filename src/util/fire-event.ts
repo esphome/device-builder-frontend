@@ -13,7 +13,7 @@ export function fireEvent(target: EventTarget, name: string, detail?: unknown): 
   target.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
 }
 
-/** Dispatch a cancelable request the same way; ``true`` when an ancestor
+/** Dispatch a cancelable request the same way; ``true`` when a listener
  *  claimed it with ``preventDefault()``. */
 export function fireRequestEvent(
   target: EventTarget,
