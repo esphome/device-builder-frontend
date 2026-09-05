@@ -282,11 +282,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       }
 
       .disclosure-toggle .picker-group-label {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--wa-space-2xs);
         margin: 0;
       }
 
       .picker-group-count {
-        margin-left: var(--wa-space-2xs);
         padding: 0 var(--wa-space-2xs);
         border-radius: var(--wa-border-radius-s);
         background: var(--wa-color-surface-lowered);
@@ -501,11 +503,10 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         open,
         onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
-        labelText: html`<span class="picker-group-label">
-          ${instanceName(device)}
-          <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
-          ${q && !entityMatch ? html`<span class="picker-group-count">${matching.length}</span>` : nothing}
-        </span>`,
+        labelText: this._renderGroupLabel(
+          device,
+          q && !entityMatch ? matching.length : null
+        ),
         body: () =>
           html`${matching.map((item) =>
             this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
@@ -514,6 +515,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         iconBefore: true,
       });
     })}`;
+  }
+
+  private _renderGroupLabel(device: AvailableComponentInstance, count: number | null) {
+    const context = instanceContext(device, this.devices);
+    // Whitespace in this template would be a text node per header.
+    // prettier-ignore
+    return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count">${count}</span>`}</span>`;
   }
 
   private _setTargetOpen(id: string, open: boolean) {
