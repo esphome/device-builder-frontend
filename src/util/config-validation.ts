@@ -105,7 +105,7 @@ export function isEntryVisible(
     return false;
   }
 
-  return dependsOnSatisfied(entry, values, rootValues, siblings);
+  return gateAccepts(entry, resolveDependsOn(entry, values, rootValues, siblings));
 }
 
 /**
@@ -127,17 +127,11 @@ export function resolveDependsOn(
   return depValue ?? siblings?.find((s) => s.key === entry.depends_on)?.default_value;
 }
 
-/** Whether *entry*'s `depends_on` gate passes; an entry without one passes. */
-export function dependsOnSatisfied(
-  entry: ConfigEntry,
-  values: Record<string, unknown>,
-  rootValues?: Record<string, unknown>,
-  siblings?: readonly ConfigEntry[]
-): boolean {
+/** Whether *depValue* passes *entry*'s `depends_on` gate; an entry without one passes. */
+export function gateAccepts(entry: ConfigEntry, depValue: unknown): boolean {
   if (!entry.depends_on) return true;
   // The backend sets at most one of the three gate fields, so the
   // check order below is immaterial.
-  const depValue = resolveDependsOn(entry, values, rootValues, siblings);
   // Type-insensitive across primitives: the parser hands back numbers /
   // booleans for plain scalars (#1360) while catalog gate values may be
   // strings. A non-primitive (or nullish) depValue never matches — so

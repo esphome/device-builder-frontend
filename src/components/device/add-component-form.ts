@@ -283,17 +283,14 @@ export class ESPHomeAddComponentForm extends LitElement {
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
-    const live = liveDependencies(this.component.dependencies ?? [], {
-      entries: this._entries,
-      values: this._values,
-    });
+    const live = liveDependencies(this.component, this._values);
     const missing = findMissingDependencies(
       live,
       this.yaml,
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
-    // The bus verdict reads the flat list; only uart carries one today.
+    // _busBlockedDep is not value-gated.
     const blocked = this._busBlockedDep;
     return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
   }
@@ -313,8 +310,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Common dep-free case: nothing to resolve, so skip the YAML parse too.
     if (!api || deps.length === 0) return;
     const present = this._visibilityPresence();
-    // Ungated on purpose: resolving provides for the whole flat list once
-    // covers any dep a later value change makes live.
+    // Flat list, not live: a dep a later value change reveals is then already resolved.
     const missing = findMissingDependencies(
       deps,
       this.yaml,

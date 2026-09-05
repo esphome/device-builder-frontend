@@ -553,10 +553,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       restoredValues: null,
       localize: this._localize,
     });
-    const live = liveDependencies(entry.dependencies ?? [], {
-      entries: entry.config_entries,
-      values: seeded,
-    });
+    const live = liveDependencies(entry, seeded);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank
     // form. The form's async `provides` subtraction isn't replicated — this

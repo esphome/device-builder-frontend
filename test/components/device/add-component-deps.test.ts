@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
-import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
@@ -10,8 +13,9 @@ import {
 import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { parseTopLevelComponents } from "../../../src/util/yaml-serialize.js";
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
-import { ethernetEntries } from "../../util/_make-ethernet-entry.js";
+import { makeEthernetEntry } from "../../util/_make-ethernet-entry.js";
 
 function providersResponse(ids: string[]) {
   return {
@@ -259,72 +263,66 @@ describe("depsSatisfiedByProvides", () => {
 });
 
 describe("liveDependencies", () => {
-  const scope = (values: Record<string, unknown>, entries = ethernetEntries()) => ({
-    entries,
-    values,
-  });
+  const uartRef = (extra: Partial<ConfigEntry>) =>
+    makeComponentEntry("x", {
+      dependencies: ["uart"],
+      config_entries: [
+        makeConfigEntry({
+          key: "uart_id",
+          type: ConfigEntryType.ID,
+          references_component: "uart",
+          ...extra,
+        }),
+      ],
+    });
 
   it("drops a dep whose only referencing entry the chosen type hides", () => {
-    expect(liveDependencies(["spi"], scope({ type: "IP101" }))).toEqual([]);
+    expect(liveDependencies(makeEthernetEntry(), { type: "IP101" })).toEqual([]);
   });
 
   it("keeps the dep once the chosen type shows the reference", () => {
-    expect(liveDependencies(["spi"], scope({ type: "W5500" }))).toEqual(["spi"]);
+    expect(liveDependencies(makeEthernetEntry(), { type: "W5500" })).toEqual(["spi"]);
   });
 
   it("resolves an untouched gate through the sibling default", () => {
-    expect(liveDependencies(["spi"], scope({}, ethernetEntries("W5500")))).toEqual([
-      "spi",
-    ]);
-    expect(liveDependencies(["spi"], scope({}, ethernetEntries("IP101")))).toEqual([]);
+    expect(liveDependencies(makeEthernetEntry("W5500"), {})).toEqual(["spi"]);
+    expect(liveDependencies(makeEthernetEntry("IP101"), {})).toEqual([]);
   });
 
   it("keeps the dep while the gate is unset with no default", () => {
-    expect(liveDependencies(["spi"], scope({}))).toEqual(["spi"]);
-  });
-
-  it("keeps a dep whose reference is hidden for a non-value reason", () => {
-    // improv_serial shape: a hidden uart_id reference still needs the bus.
-    const hidden = makeConfigEntry({
-      key: "uart_id",
-      type: ConfigEntryType.ID,
-      references_component: "uart",
-      hidden: true,
-    });
-    expect(liveDependencies(["uart"], scope({}, [hidden]))).toEqual(["uart"]);
-    const componentGated = makeConfigEntry({
-      key: "uart_id",
-      type: ConfigEntryType.ID,
-      references_component: "uart",
-      depends_on_component: "uart",
-    });
-    expect(liveDependencies(["uart"], scope({}, [componentGated]))).toEqual(["uart"]);
-  });
-
-  it("keeps a dep whose hidden reference has a passing value gate", () => {
-    const [type, spiId] = ethernetEntries();
-    const hiddenGated = { ...spiId, hidden: true };
-    expect(
-      liveDependencies(["spi"], scope({ type: "W5500" }, [type, hiddenGated]))
-    ).toEqual(["spi"]);
-    expect(
-      liveDependencies(["spi"], scope({ type: "IP101" }, [type, hiddenGated]))
-    ).toEqual([]);
+    expect(liveDependencies(makeEthernetEntry(), {})).toEqual(["spi"]);
   });
 
   it("keeps a dep no entry references", () => {
-    expect(liveDependencies(["spi", "uart"], scope({ type: "IP101" }))).toEqual(["uart"]);
+    const ethernet = { ...makeEthernetEntry(), dependencies: ["spi", "uart"] };
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual(["uart"]);
   });
 
   it("does not walk nested entries", () => {
-    const [type, spiId] = ethernetEntries();
+    const [type, spiId] = makeEthernetEntry().config_entries;
     const nested = makeConfigEntry({
       key: "bus",
       type: ConfigEntryType.NESTED,
       config_entries: [spiId],
     });
-    expect(liveDependencies(["spi"], scope({ type: "IP101" }, [type, nested]))).toEqual([
-      "spi",
+    const ethernet = { ...makeEthernetEntry(), config_entries: [type, nested] };
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual(["spi"]);
+  });
+
+  it("keeps a dep whose reference is hidden for a non-value reason", () => {
+    // improv_serial shape: a hidden uart_id reference still needs the bus.
+    expect(liveDependencies(uartRef({ hidden: true }), {})).toEqual(["uart"]);
+    expect(liveDependencies(uartRef({ depends_on_component: "uart" }), {})).toEqual([
+      "uart",
     ]);
+  });
+
+  it("keeps a dep whose hidden reference has a passing value gate", () => {
+    const [type, spiId] = makeEthernetEntry().config_entries;
+    const ethernet = {
+      ...makeEthernetEntry(),
+      config_entries: [type, { ...spiId, hidden: true }],
+    };
+    expect(liveDependencies(ethernet, { type: "W5500" })).toEqual(["spi"]);
   });
 });

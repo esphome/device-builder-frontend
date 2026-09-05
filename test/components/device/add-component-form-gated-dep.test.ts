@@ -1,9 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the value-gated dependency banner: a bus dep the catalog flattens off
- * a type-gated reference (ethernet's spi_id) is asked for only while the
- * chosen type shows that reference, and follows the type as it changes.
+ * Pins the value-gated dependency banner following the chosen type.
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -41,14 +39,11 @@ describe("add-component-form value-gated dependency", () => {
     _clearProvidesCache();
   });
 
-  it("does not ask for spi while the type hides the spi reference", async () => {
+  it("follows the type: W5500 asks for spi, IP101 clears it", async () => {
     const el = await mountEthernet("IP101");
     expect(depsBanner(el)).toBeNull();
     expect(submitButton(el).disabled).toBe(false);
-  });
 
-  it("follows the type: W5500 asks for spi, IP101 clears it", async () => {
-    const el = await mountEthernet("IP101");
     await setType(el, "W5500");
     expect(depsBanner(el)).not.toBeNull();
     expect(submitButton(el).disabled).toBe(true);

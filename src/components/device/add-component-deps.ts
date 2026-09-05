@@ -1,8 +1,11 @@
 import type { ESPHomeAPI } from "../../api/index.js";
-import { ComponentCategory } from "../../api/types/components.js";
+import {
+  type ComponentCatalogEntry,
+  ComponentCategory,
+} from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
-import { dependsOnSatisfied, resolveDependsOn } from "../../util/config-validation.js";
+import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
@@ -16,33 +19,23 @@ import {
 // pass for a `switch:` dependency. Guards the stem-match branch below.
 const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
 
-/** Top-level entries and values `liveDependencies` reads value gates from. */
-export interface DepScope {
-  entries: readonly ConfigEntry[];
-  values: Record<string, unknown>;
-}
-
 /**
- * *dependencies* minus those a resolved value gate hides on every
- * referencing top-level entry.
- *
- * Only a `depends_on` gate that resolves (a value, or the gate field's
- * default) and fails drops a dep; an unresolved gate, any other
- * visibility reason, or no referencing entry keeps it. Nested entries
- * are not walked.
+ * *component*'s dependencies minus those every referencing top-level entry
+ * hides behind a resolved `depends_on` value gate. Nested entries are not
+ * walked.
  */
 export function liveDependencies(
-  dependencies: readonly string[],
-  scope: DepScope
+  component: Pick<ComponentCatalogEntry, "dependencies" | "config_entries">,
+  values: Record<string, unknown>
 ): string[] {
-  if (dependencies.length === 0) return [];
-  const { entries, values } = scope;
-  const valueGateHides = (entry: ConfigEntry): boolean =>
-    resolveDependsOn(entry, values, values, entries) != null &&
-    !dependsOnSatisfied(entry, values, values, entries);
-  return dependencies.filter((dep) => {
+  const entries = component.config_entries;
+  const valueGateHides = (entry: ConfigEntry): boolean => {
+    const gate = resolveDependsOn(entry, values, undefined, entries);
+    return gate != null && !gateAccepts(entry, gate);
+  };
+  return (component.dependencies ?? []).filter((dep) => {
     const refs = entries.filter((e) => e.references_component === dep);
-    return refs.length === 0 || refs.some((e) => !valueGateHides(e));
+    return refs.length === 0 || !refs.every(valueGateHides);
   });
 }
 
