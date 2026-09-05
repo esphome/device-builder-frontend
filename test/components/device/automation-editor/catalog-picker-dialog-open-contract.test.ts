@@ -4,8 +4,9 @@
  * Open/close contract for the catalog-picker dialog after its
  * migration onto ``esphome-base-dialog``. The wrapper never mutates
  * its own ``open`` on a user-driven close, so the host owns the
- * reactive ``_open`` flag: ``open()`` sets it, ``@request-close``
- * clears it, and picking an item clears it. The sibling
+ * reactive ``_open`` flag: ``open()`` sets it, ``@after-hide``
+ * clears it once the hide animation ends, and picking an item clears
+ * it. The body renders only while open. The sibling
  * ``catalog-picker-dialog.test.ts`` covers the filter / grouping
  * contract; this file owns the open/close lifecycle.
  */
@@ -15,6 +16,7 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { identityLocalize } from "../../../_dom.js";
+import type { AutomationAction } from "../../../../src/api/types/automations.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 
 async function mountDialog(
@@ -33,6 +35,11 @@ const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
   (d as unknown as { _dialog: { open: boolean } })._dialog.open;
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
+const afterHide = (d: ESPHomeCatalogPickerDialog): void => {
+  d.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+    new CustomEvent("after-hide")
+  );
+};
 
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("open() drives the reactive _open flag and resets the search", async () => {
@@ -51,14 +58,34 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(activeTab(dialog)).toBe("by-type");
   });
 
-  it("the controller's onRequestClose flips the open flag back to false", async () => {
+  it("the controller's onAfterHide flips the open flag back to false", async () => {
     const dialog = await mountDialog();
     dialog.open();
     expect(isOpen(dialog)).toBe(true);
-    (
-      dialog as unknown as { _dialog: { onRequestClose: () => void } }
-    )._dialog.onRequestClose();
+    afterHide(dialog);
     expect(isOpen(dialog)).toBe(false);
+  });
+
+  it("renders the body only while open", async () => {
+    const dialog = await mountDialog();
+    dialog.items = [
+      { id: "switch.turn_on", name: "Turn On", domain: "switch" } as AutomationAction,
+    ];
+    dialog.devices = [
+      { component_id: "switch.gpio", id: "relay1" },
+      { component_id: "switch.gpio", id: "relay2" },
+    ];
+    await dialog.updateComplete;
+    const rows = () => dialog.shadowRoot!.querySelectorAll(".picker-row").length;
+    expect(rows()).toBe(0);
+
+    dialog.open();
+    await dialog.updateComplete;
+    expect(rows()).toBe(2);
+
+    afterHide(dialog);
+    await dialog.updateComplete;
+    expect(rows()).toBe(0);
   });
 
   it("picking an item emits catalog-picked and closes the dialog", async () => {

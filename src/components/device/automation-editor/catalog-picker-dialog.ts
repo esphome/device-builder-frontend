@@ -298,6 +298,18 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       this.kind === "action"
         ? this._localize("device.automation_pick_action")
         : this._localize("device.automation_pick_condition");
+    // The by-target tab is one row per entity x action; a closed picker
+    // must not hold that subtree.
+    return html`<esphome-base-dialog
+      ?open=${this._dialog.open}
+      .label=${title}
+      @after-hide=${this._dialog.onAfterHide}
+    >
+      ${this._dialog.open ? this._renderBody() : nothing}
+    </esphome-base-dialog>`;
+  }
+
+  private _renderBody() {
     const placeholder = this._localize("device.automation_pick_search");
 
     // Conditions don't have a "by target" surface — they test the
@@ -308,12 +320,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ? ["by-target", "by-type", "building-blocks"]
         : ["by-type", "building-blocks"];
 
-    return html`<esphome-base-dialog
-      ?open=${this._dialog.open}
-      .label=${title}
-      @request-close=${this._dialog.onRequestClose}
-    >
-      <div class="picker-search">
+    return html`<div class="picker-search">
         <div class="picker-search-wrap">
           <wa-icon
             class="picker-search-icon"
@@ -349,8 +356,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
             </button>`
         )}
       </div>
-      <div class="picker-body" role="tabpanel">${this._renderActiveTab()}</div>
-    </esphome-base-dialog>`;
+      <div class="picker-body" role="tabpanel">${this._renderActiveTab()}</div>`;
   }
 
   private _tabLabel(tab: Tab): string {
