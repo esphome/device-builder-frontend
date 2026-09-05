@@ -17,7 +17,7 @@ vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
-import { flushMicrotasks, identityLocalize } from "../../_dom.js";
+import { baseDialog, flushMicrotasks, identityLocalize } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
@@ -566,8 +566,6 @@ describe("add-automation-dialog unique-trigger preselect (device-builder#2214)",
 // contract — request-close flipping _open is what makes a user-driven close
 // (Escape / X / outside-click) actually dismiss.
 describe("add-automation-dialog open/close contract", () => {
-  const baseDialog = (d: ESPHomeAddAutomationDialog): HTMLElement =>
-    d.shadowRoot!.querySelector("esphome-base-dialog")!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isOpen = (d: ESPHomeAddAutomationDialog): boolean => (d as any)._dialog.open;
 

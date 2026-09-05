@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { identityLocalize } from "../../../_dom.js";
+import { baseDialog, identityLocalize } from "../../../_dom.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 
 async function mountDialog(
@@ -36,9 +36,7 @@ const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
 const afterHide = (d: ESPHomeCatalogPickerDialog): void => {
-  d.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
-    new CustomEvent("after-hide")
-  );
+  baseDialog(d).dispatchEvent(new CustomEvent("after-hide"));
 };
 
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
@@ -120,7 +118,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
 
   it("a request arriving mid-hide shows once that hide ends, with fresh state", async () => {
     const dialog = await mountDialog();
-    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
+    const wrapper = baseDialog(dialog);
     dialog.open();
     await dialog.updateComplete;
     (dialog as unknown as { _query: string })._query = "still visible";
@@ -146,7 +144,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
 
   it("a request landing between after-hide and the deferred re-show wins", async () => {
     const dialog = await mountDialog();
-    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
+    const wrapper = baseDialog(dialog);
     dialog.open();
     await dialog.updateComplete;
     wrapper.dispatchEvent(new CustomEvent("request-close"));

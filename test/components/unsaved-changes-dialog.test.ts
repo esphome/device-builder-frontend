@@ -12,12 +12,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { baseDialogSettled, mount } from "../_dom.js";
+import { baseDialog, baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 import { ESPHomeUnsavedChangesDialog } from "../../src/components/unsaved-changes-dialog.js";
-
-const baseDialog = (el: ESPHomeUnsavedChangesDialog): HTMLElement =>
-  el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 describe("unsaved-changes-dialog ENTER", () => {
   it("saves and leaves on Enter (never discards)", async () => {
