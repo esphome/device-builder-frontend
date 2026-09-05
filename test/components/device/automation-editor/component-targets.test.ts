@@ -112,10 +112,10 @@ describe("instance label helpers", () => {
     });
     const index = indexTargets([named, temp, relay]);
     expect(index.selectable).toEqual([temp, relay]);
-    // Sub-entity → domain · parent label; plain instance → bare domain only.
+    // Sub-entity → component id · parent label; plain instance → component id only.
     expect(index.context(temp)).toBe("sensor · AHT20");
     expect(index.context(relay)).toBe("switch.gpio");
-    // A dangling parent_id (parent absent) degrades to the bare domain.
+    // A dangling parent_id (parent absent) degrades to the component id.
     expect(
       index.context(inst({ id: "o", component_id: "sensor", parent_id: "gone" }))
     ).toBe("sensor");

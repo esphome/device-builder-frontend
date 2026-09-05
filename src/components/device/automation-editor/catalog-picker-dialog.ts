@@ -448,9 +448,10 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // sub-entities are surfaced as their own instances. The query matches
     // either axis: an entity hit lists all of that entity's actions.
     const sections = index.selectable.flatMap((device) => {
-      const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
+      const name = instanceName(device);
+      const entityMatch = q !== "" && navItemMatches(q, name, device.id);
       const matching = itemsForDevice(entityMatch ? byDomain : filteredByDomain, device);
-      return matching.length ? [{ device, matching, entityMatch }] : [];
+      return matching.length ? [{ device, name, matching, entityMatch }] : [];
     });
     if (sections.length === 0) {
       return html`<p class="picker-empty">
@@ -460,14 +461,14 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // Open by default when the list is already small; a click overrides that
     // default for the target, so an auto-opened group can still be closed.
     const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
-    return html`${sections.map(({ device, matching, entityMatch }) => {
+    return html`${sections.map(({ device, name, matching, entityMatch }) => {
       const open = this._targetOverrides.get(device.id) ?? defaultOpen;
       return renderDisclosure({
         open,
         onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
         labelText: this._renderGroupLabel(
-          instanceName(device),
+          name,
           index.context(device),
           q && !entityMatch ? matching.length : null
         ),

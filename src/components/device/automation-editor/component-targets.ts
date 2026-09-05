@@ -31,8 +31,8 @@ export function componentDomain(componentId: string): string {
 export interface TargetIndex {
   /** The instances a picker offers; containers are excluded. */
   readonly selectable: AvailableComponentInstance[];
-  /** The parenthetical context beside an instance's label: its domain, plus
-   *  the owning container's name when it's a sub-entity, so two readings
+  /** The parenthetical context beside an instance's label: its component id,
+   *  plus the owning container's name when it's a sub-entity, so two readings
    *  named alike (``Temperature``) read distinctly. */
   context(device: AvailableComponentInstance): string;
 }
