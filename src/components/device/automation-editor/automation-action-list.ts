@@ -13,7 +13,7 @@
 import { consume } from "@lit/context";
 import { mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type {
   ActionNode,
@@ -36,11 +36,8 @@ import {
   childFocus,
   focusTargetHasChanged,
 } from "./automation-focus.js";
-import "./catalog-picker-dialog.js";
-import type {
-  CatalogPickedDetail,
-  ESPHomeCatalogPickerDialog,
-} from "./catalog-picker-dialog.js";
+import type { CatalogPickedDetail } from "./catalog-picker-dialog.js";
+import { requestCatalogPick } from "./catalog-picker-host.js";
 import { emptyActionNode, removeAt, replaceAt, swap } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -89,9 +86,6 @@ export class ESPHomeAutomationActionList extends LitElement {
   @property({ attribute: false, hasChanged: focusTargetHasChanged })
   focusTarget: AutomationFocus | null = null;
 
-  @query("esphome-catalog-picker-dialog")
-  private _picker!: ESPHomeCatalogPickerDialog;
-
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
@@ -122,19 +116,18 @@ export class ESPHomeAutomationActionList extends LitElement {
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_action")}
         </button>
-        <esphome-catalog-picker-dialog
-          kind="action"
-          .items=${this.catalog}
-          .devices=${this.devices}
-          @catalog-picked=${this._onActionPicked}
-        ></esphome-catalog-picker-dialog>
       </div>
     `;
   }
 
   private _openPicker = () => {
     if (this.catalog.length === 0) return;
-    this._picker.open();
+    requestCatalogPick(this, {
+      kind: "action",
+      items: this.catalog,
+      devices: this.devices,
+      onPicked: this._onActionPicked,
+    });
   };
 
   private _renderRow(node: ActionNode, idx: number, isLast: boolean) {
@@ -159,11 +152,10 @@ export class ESPHomeAutomationActionList extends LitElement {
     ></esphome-automation-action-node>`;
   }
 
-  private _onActionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
-    e.stopPropagation();
-    const node = emptyActionNode(e.detail.id);
-    if (e.detail.preFilledParams) {
-      node.params = { ...node.params, ...e.detail.preFilledParams };
+  private _onActionPicked = (detail: CatalogPickedDetail) => {
+    const node = emptyActionNode(detail.id);
+    if (detail.preFilledParams) {
+      node.params = { ...node.params, ...detail.preFilledParams };
     }
     this._emit([...this.actions, node]);
   };

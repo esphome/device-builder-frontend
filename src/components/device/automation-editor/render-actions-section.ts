@@ -16,6 +16,7 @@ import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import "./automation-action-list.js";
+import "./catalog-picker-host.js";
 import type { AutomationFocus } from "./automation-focus.js";
 
 export function renderActionsSection(opts: {
@@ -40,19 +41,21 @@ export function renderActionsSection(opts: {
       <p class="field-description">
         ${renderMarkdown(opts.localize(opts.descriptionKey))}
       </p>
-      <esphome-automation-action-list
-        no-header
-        .focusTarget=${opts.focusTarget ?? null}
-        .actions=${opts.automation.actions}
-        .catalog=${opts.catalog}
-        .conditionCatalog=${opts.conditionCatalog}
-        .scripts=${opts.scripts}
-        .devices=${opts.devices}
-        .board=${opts.board}
-        .yaml=${opts.yaml}
-        ?disabled=${opts.disabled}
-        @actions-change=${opts.onActionsChange}
-      ></esphome-automation-action-list>
+      <esphome-catalog-picker-host>
+        <esphome-automation-action-list
+          no-header
+          .focusTarget=${opts.focusTarget ?? null}
+          .actions=${opts.automation.actions}
+          .catalog=${opts.catalog}
+          .conditionCatalog=${opts.conditionCatalog}
+          .scripts=${opts.scripts}
+          .devices=${opts.devices}
+          .board=${opts.board}
+          .yaml=${opts.yaml}
+          ?disabled=${opts.disabled}
+          @actions-change=${opts.onActionsChange}
+        ></esphome-automation-action-list>
+      </esphome-catalog-picker-host>
     </div>
   `;
 }
