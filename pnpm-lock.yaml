@@ -117,8 +117,8 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
       happy-dom:
-        specifier: ^20.11.6
-        version: 20.11.6
+        specifier: ^20.13.1
+        version: 20.13.1
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -133,7 +133,7 @@ importers:
         version: 8.67.0(eslint@10.9.1)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@types/node@26.4.0)(happy-dom@20.11.6)(vite@8.1.4(@types/node@26.4.0))
+        version: 4.1.11(@types/node@26.4.0)(happy-dom@20.13.1)(vite@8.1.4(@types/node@26.4.0))
 
 packages:
 
@@ -1019,8 +1019,8 @@ packages:
     resolution: {integrity: sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A==}
     engines: {node: '>=10.13.0'}
 
-  happy-dom@20.11.6:
-    resolution: {integrity: sha512-Hldbg8AdAa5a5oDcZpjqnGitp7JB0hqWmfv/8qr+kft4vzSD8BHsbdRfzYvL/0QcbKcURC/yyoygbeDQarPvYg==}
+  happy-dom@20.13.1:
+    resolution: {integrity: sha512-hoh0Sq+2vSDi8CJaFnLBLAlEK7/vrRmUiim30PwFj9aiVwqF/Z+6cCpmt9gNuQgu+PHjNC4O2PhjxA9Nr+UlBQ==}
     engines: {node: '>=20.0.0'}
 
   husky@9.1.7:
@@ -2354,7 +2354,7 @@ snapshots:
     dependencies:
       is-glob: 4.0.3
 
-  happy-dom@20.11.6:
+  happy-dom@20.13.1:
     dependencies:
       '@types/node': 26.4.0
       '@types/whatwg-mimetype': 3.0.2
@@ -2663,7 +2663,7 @@ snapshots:
       '@types/node': 26.4.0
       fsevents: 2.3.3
 
-  vitest@4.1.11(@types/node@26.4.0)(happy-dom@20.11.6)(vite@8.1.4(@types/node@26.4.0)):
+  vitest@4.1.11(@types/node@26.4.0)(happy-dom@20.13.1)(vite@8.1.4(@types/node@26.4.0)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.1.4(@types/node@26.4.0))
@@ -2687,7 +2687,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 26.4.0
-      happy-dom: 20.11.6
+      happy-dom: 20.13.1
     transitivePeerDependencies:
       - msw
 

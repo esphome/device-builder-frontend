@@ -65,7 +65,7 @@
     "eslint": "^10.9.1",
     "eslint-plugin-perfectionist": "^5.11.0",
     "fflate": "^0.8.3",
-    "happy-dom": "^20.11.6",
+    "happy-dom": "^20.13.1",
     "husky": "^9.1.7",
     "prettier": "3.9.6",
     "typescript": "7.0.2",
