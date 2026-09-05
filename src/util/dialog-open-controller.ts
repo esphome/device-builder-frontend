@@ -1,5 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
+type DialogHost = ReactiveControllerHost & { shadowRoot?: ShadowRoot | null };
+
 /**
  * Owns the reactive open flag for an ``esphome-base-dialog`` host with no
  * close-veto logic.
@@ -31,8 +33,6 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
  * afterwards, so a body rendered only while ``open`` stays up through the
  * animation instead of vanishing on the first frame.
  */
-type DialogHost = ReactiveControllerHost & { shadowRoot?: ShadowRoot | null };
-
 export class DialogOpenController implements ReactiveController {
   private _open = false;
 
@@ -56,8 +56,9 @@ export class DialogOpenController implements ReactiveController {
     this._host.requestUpdate();
   }
 
-  /** Close via the host's ``esphome-base-dialog`` hide sequence; the host
-   *  must bind ``onRequestClose`` or ``onAfterHide`` for the flag to follow.
+  /** Close via the host's ``esphome-base-dialog`` hide sequence. Only a host
+   *  bound to ``onAfterHide`` keeps an open-gated body through the animation;
+   *  ``onRequestClose`` flips the flag synchronously and gains nothing here.
    *  Flips the flag directly when no wrapper is mounted. */
   requestClose(): void {
     const wrapper = this._host.shadowRoot?.querySelector<
