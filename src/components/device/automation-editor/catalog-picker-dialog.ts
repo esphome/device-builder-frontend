@@ -40,11 +40,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
-import type {
-  AutomationAction,
-  AutomationCondition,
-  AvailableComponentInstance,
-} from "../../../api/types/automations.js";
+import type { AvailableComponentInstance } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { disclosureStyles } from "../../../styles/disclosure.js";
@@ -57,6 +53,13 @@ import { mdiSvg } from "../../../util/mdi-svg.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderDisclosure } from "../../shared/disclosure.js";
 import { navItemMatches } from "../navigator-search-match.js";
+import {
+  AUTO_EXPAND_MAX_GROUPS,
+  type CatalogItem,
+  filterItems,
+  groupByDomain,
+  itemsForDevice,
+} from "./catalog-picker-filter.js";
 import {
   componentDomain,
   instanceContext,
@@ -74,8 +77,6 @@ registerMdiIcons({ close: mdiClose, magnify: mdiMagnify });
  *  tab visibility and the result-shape of picks. */
 type CatalogKind = "action" | "condition";
 
-type CatalogItem = AutomationAction | AutomationCondition;
-
 /** Detail of the ``catalog-picked`` event. ``preFilledParams`` is
  *  optional — only the By-target tab sets it (to seed the action's
  *  ``id:`` field with the picked instance). */
@@ -85,51 +86,6 @@ export interface CatalogPickedDetail {
 }
 
 type Tab = "by-target" | "by-type" | "building-blocks";
-
-/** A query that leaves this many target groups or fewer opens them all. */
-const AUTO_EXPAND_MAX_GROUPS = 5;
-
-function groupByDomain(
-  items: CatalogItem[],
-  key: (item: CatalogItem) => string = (item) => item.domain
-): Map<string, CatalogItem[]> {
-  const groups = new Map<string, CatalogItem[]>();
-  for (const item of items) {
-    const k = key(item);
-    const list = groups.get(k) ?? [];
-    list.push(item);
-    groups.set(k, list);
-  }
-  return groups;
-}
-
-/**
- * Filter the catalog by the lower-cased search query *q*. Match against the
- * id, name, and description fields. Case-insensitive substring match —
- * anything fancier (fuzzy / weighted) would surprise the user with hits they
- * couldn't explain.
- */
-function filterItems(items: CatalogItem[], q: string): CatalogItem[] {
-  if (!q) return items;
-  return items.filter(
-    (i) =>
-      i.id.toLowerCase().includes(q) ||
-      i.name.toLowerCase().includes(q) ||
-      (i.description ?? "").toLowerCase().includes(q)
-  );
-}
-
-/** Items whose domain is the device's bare domain or its exact platform id. */
-function itemsForDevice(
-  byDomain: Map<string, CatalogItem[]>,
-  device: AvailableComponentInstance
-): CatalogItem[] {
-  const domain = componentDomain(device.component_id);
-  const generic = byDomain.get(domain) ?? [];
-  const specific =
-    device.component_id === domain ? undefined : byDomain.get(device.component_id);
-  return specific ? generic.concat(specific) : generic;
-}
 
 @customElement("esphome-catalog-picker-dialog")
 export class ESPHomeCatalogPickerDialog extends LitElement {
@@ -160,8 +116,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _targetOverrides = new Map<string, boolean>();
 
   /**
-   * Open the dialog. Resets the active tab to a sensible default
-   * for the kind: ``by-target`` for actions, ``by-type`` for
+   * Open the dialog with a fresh search, no clicked-open groups, and the
+   * kind's default tab: ``by-target`` for actions, ``by-type`` for
    * conditions (which lack a target tab).
    */
   public open() {
@@ -487,7 +443,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
       const candidates = itemsForDevice(byDomain, device);
       const matching = entityMatch || !q ? candidates : filterItems(candidates, q);
-      return matching.length ? [{ device, matching }] : [];
+      return matching.length ? [{ device, matching, entityMatch }] : [];
     });
     if (sections.length === 0) {
       return html`<p class="picker-empty">
@@ -497,13 +453,16 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // Open by default when the list is already small; a click overrides that
     // default for the target, so an auto-opened group can still be closed.
     const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
-    return html`${sections.map(({ device, matching }) => {
+    return html`${sections.map(({ device, matching, entityMatch }) => {
       const open = this._targetOverrides.get(device.id) ?? defaultOpen;
       return renderDisclosure({
         open,
         onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
-        labelText: this._renderGroupLabel(device, q ? matching.length : null),
+        labelText: this._renderGroupLabel(
+          device,
+          q && !entityMatch ? matching.length : null
+        ),
         body: () =>
           html`${matching.map((item) =>
             this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
