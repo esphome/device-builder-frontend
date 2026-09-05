@@ -221,10 +221,6 @@ export const componentCatalogStyles = css`
     outline-offset: 1px;
   }
 
-  .expand-button wa-icon {
-    transition: transform var(--wa-transition-normal) var(--wa-transition-easing);
-  }
-
   .component-card-header {
     display: flex;
     align-items: center;
@@ -339,7 +335,7 @@ export const componentCatalogStyles = css`
     text-decoration: underline;
   }
 
-  .more-info wa-icon {
+  .more-info svg {
     font-size: 11px;
   }
 
@@ -414,7 +410,7 @@ export const componentCatalogStyles = css`
     padding: 1px 6px;
   }
 
-  .bundle-badge wa-icon {
+  .bundle-badge svg {
     font-size: 11px;
   }
 `;

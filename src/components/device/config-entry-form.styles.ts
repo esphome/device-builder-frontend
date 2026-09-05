@@ -357,7 +357,7 @@ export const configEntryFormStyles = css`
     color: var(--wa-color-text-normal);
   }
 
-  .multi-btn wa-icon {
+  .multi-btn svg {
     font-size: 14px;
   }
 

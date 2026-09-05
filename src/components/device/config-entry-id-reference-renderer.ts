@@ -5,6 +5,7 @@
  * literal sentinel as a config value.
  */
 
+import { mdiPlus } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import {
@@ -12,6 +13,7 @@ import {
   isCertainlyDanglingId,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -23,6 +25,8 @@ import {
   renderLabel,
   renderYamlOnlyFallbackIfNonPrimitive,
 } from "./config-entry-renderers-shared.js";
+
+registerMdiIcons({ plus: mdiPlus });
 
 export const ADD_NEW_SENTINEL = "__esphome_add_new__";
 export const AUTO_SENTINEL = "__esphome_auto__";

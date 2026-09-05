@@ -1,8 +1,10 @@
+import { mdiClose, mdiPlus } from "@mdi/js";
 import { html, nothing } from "lit";
 import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
+import { mdiSvg } from "../../../util/mdi-svg.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -73,7 +75,7 @@ export function renderListRemoveButton(
       aria-label=${ctx.localize("device.multi_value_remove")}
       @click=${onClick}
     >
-      <wa-icon library="mdi" name="close"></wa-icon>
+      ${mdiSvg(mdiClose)}
     </button>
   `;
 }
@@ -90,8 +92,7 @@ export function renderListAddButton(
       ?disabled=${disabled}
       @click=${onClick}
     >
-      <wa-icon library="mdi" name="plus"></wa-icon>
-      ${ctx.localize("device.multi_value_add")}
+      ${mdiSvg(mdiPlus)} ${ctx.localize("device.multi_value_add")}
     </button>
   `;
 }
@@ -310,7 +311,7 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
           aria-label=${ctx.localize("device.map_remove")}
           @click=${() => removeEntry(rowKey)}
         >
-          <wa-icon library="mdi" name="close"></wa-icon>
+          ${mdiSvg(mdiClose)}
         </button>
       </div>
     `;
@@ -331,8 +332,7 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
         ?disabled=${disabled}
         @click=${addEntry}
       >
-        <wa-icon library="mdi" name="plus"></wa-icon>
-        ${ctx.localize("device.map_add")}
+        ${mdiSvg(mdiPlus)} ${ctx.localize("device.map_add")}
       </button>
       ${renderFieldError(path, ctx)}
     </div>

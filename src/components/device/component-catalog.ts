@@ -1,12 +1,4 @@
 import { consume } from "@lit/context";
-import {
-  mdiArrowCollapseAll,
-  mdiArrowExpandAll,
-  mdiMemory,
-  mdiOpenInNew,
-  mdiPackageVariantClosed,
-  mdiPlus,
-} from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, queryAll, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -25,7 +17,6 @@ import { fireEvent } from "../../util/fire-event.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { isVisible } from "../../util/is-visible.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { ResizeController } from "../../util/resize-controller.js";
 import { setsEqual } from "../../util/set-equal.js";
 import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
@@ -40,18 +31,7 @@ import {
 import { renderBundleCard, renderCard } from "./component-catalog/renderers.js";
 import { componentCatalogStyles } from "./component-catalog/styles.js";
 
-import "@home-assistant/webawesome/dist/components/badge/badge.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
-
-registerMdiIcons({
-  "arrow-collapse-all": mdiArrowCollapseAll,
-  "arrow-expand-all": mdiArrowExpandAll,
-  memory: mdiMemory,
-  "open-in-new": mdiOpenInNew,
-  "package-variant-closed": mdiPackageVariantClosed,
-  plus: mdiPlus,
-});
 
 @customElement("esphome-component-catalog")
 export class ESPHomeComponentCatalog extends LitElement {

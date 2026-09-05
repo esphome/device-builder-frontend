@@ -1,8 +1,17 @@
+import {
+  mdiArrowCollapseAll,
+  mdiArrowExpandAll,
+  mdiMemory,
+  mdiOpenInNew,
+  mdiPackageVariantClosed,
+  mdiPlus,
+} from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import type { FeaturedBundle } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
+import { mdiSvg } from "../../../util/mdi-svg.js";
 import {
   categoryChipLabel,
   platformLabel,
@@ -38,13 +47,11 @@ function renderExpandButton(host: ESPHomeComponentCatalog, id: string): Template
     class="expand-button"
     type="button"
     aria-pressed=${expanded}
+    aria-label=${host._localize("wizard.expand_board")}
     title=${host._localize("wizard.expand_board")}
     @click=${() => host._onToggleExpand(id)}
   >
-    <wa-icon
-      library="mdi"
-      name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-    ></wa-icon>
+    ${mdiSvg(expanded ? mdiArrowCollapseAll : mdiArrowExpandAll)}
   </button>`;
 }
 
@@ -84,7 +91,7 @@ export function renderBundleCard(
                 />
               </div>`
             : html`<div class="component-image--placeholder">
-                <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+                ${mdiSvg(mdiPackageVariantClosed)}
               </div>`
         }
         <div class="component-card-header-text">
@@ -95,7 +102,7 @@ export function renderBundleCard(
           )}
         </div>
         <span class="bundle-badge">
-          <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+          ${mdiSvg(mdiPackageVariantClosed)}
           ${host._localize("device.featured_bundle_badge")}
         </span>
         ${expandable ? renderExpandButton(host, expandKey) : nothing}
@@ -119,8 +126,7 @@ export function renderBundleCard(
           type="button"
           @click=${() => host._onAddBundle(bundle)}
         >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${host._localize("device.add_component_action")}
+          ${mdiSvg(mdiPlus)} ${host._localize("device.add_component_action")}
         </button>
       </div>
     </article>
@@ -177,9 +183,7 @@ export function renderCard(
                   @error=${() => host._onImageError(component.id)}
                 />
               </div>`
-            : html`<div class="component-image--placeholder">
-                <wa-icon library="mdi" name="memory"></wa-icon>
-              </div>`
+            : html`<div class="component-image--placeholder">${mdiSvg(mdiMemory)}</div>`
         }
         <div class="component-card-header-text">
           <h3 class="component-title truncate">${component.name}</h3>
@@ -219,8 +223,7 @@ export function renderCard(
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                ${localize("device.more_info")}
-                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                ${localize("device.more_info")} ${mdiSvg(mdiOpenInNew)}
               </a>`
             : html`<span></span>`
         }
@@ -229,8 +232,7 @@ export function renderCard(
           type="button"
           @click=${() => host._onAdd(component)}
         >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${localize("device.add_component_action")}
+          ${mdiSvg(mdiPlus)} ${localize("device.add_component_action")}
         </button>
       </div>
     </article>
