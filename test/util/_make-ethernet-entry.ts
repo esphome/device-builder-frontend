@@ -1,4 +1,4 @@
-/** Ethernet-shaped fixture: a ``type`` select plus an ``spi_id`` reference gated on it. */
+/** Ethernet-shaped fixture: a ``type`` select plus a ``spi_id`` reference gated on it. */
 import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
