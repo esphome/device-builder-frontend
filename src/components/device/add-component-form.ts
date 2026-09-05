@@ -281,7 +281,7 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   /** Net-missing deps driving the banner and submit gate: the widened
    *  scan minus those a present component provides (`_providedDeps`), plus
-   *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
+   *  a live bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
     const live = liveDependencies(this.component, this._values);
     const missing = findMissingDependencies(
@@ -290,9 +290,10 @@ export class ESPHomeAddComponentForm extends LitElement {
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
-    // _busBlockedDep is not value-gated.
     const blocked = this._busBlockedDep;
-    return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
+    return blocked && live.includes(blocked) && !missing.includes(blocked)
+      ? [...missing, blocked]
+      : missing;
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping

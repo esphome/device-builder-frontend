@@ -55,6 +55,21 @@ describe("add-component-form value-gated dependency", () => {
     expect(submitButton(el).disabled).toBe(false);
   });
 
+  it("drops a bus verdict on a dep the type hides", async () => {
+    const el = await mountEthernet("IP101");
+    const inst = el as unknown as {
+      _busBlockedDep: string | null;
+      requestUpdate: () => void;
+    };
+    inst._busBlockedDep = "spi";
+    inst.requestUpdate();
+    await el.updateComplete;
+    expect(depsBanner(el)).toBeNull();
+
+    await setType(el, "W5500");
+    expect(depsBanner(el)).not.toBeNull();
+  });
+
   it("still asks for spi when the type shows the reference", async () => {
     const el = await mountEthernet("W5500");
     expect(depsBanner(el)).not.toBeNull();
