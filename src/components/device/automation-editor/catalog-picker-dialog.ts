@@ -53,7 +53,8 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { DialogOpenController } from "../../../util/dialog-open-controller.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { mdiSvg, registerMdiIcons } from "../../../util/register-icons.js";
+import { mdiSvg } from "../../../util/mdi-svg.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderDisclosure } from "../../shared/disclosure.js";
 import { navItemMatches } from "../navigator-search-match.js";
 import {
@@ -84,6 +85,9 @@ export interface CatalogPickedDetail {
 }
 
 type Tab = "by-target" | "by-type" | "building-blocks";
+
+/** A query that leaves this many target groups or fewer opens them all. */
+const AUTO_EXPAND_MAX_GROUPS = 5;
 
 function groupByDomain(
   items: CatalogItem[],
@@ -262,6 +266,16 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
       .disclosure-toggle .picker-group-label {
         margin: 0;
+      }
+
+      .picker-group-count {
+        margin-left: var(--wa-space-2xs);
+        padding: 0 var(--wa-space-2xs);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-lowered);
+        font-weight: var(--wa-font-weight-normal);
+        letter-spacing: normal;
+        text-transform: none;
       }
 
       .picker-body .disclosure-panel {
@@ -480,15 +494,18 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${this._localize("device.automation_pick_no_results")}
       </p>`;
     }
-    const lone = sections.length === 1;
+    // Open by default when the list is already small; the expanded set is an
+    // override of that default, so an auto-opened group can still be closed.
+    const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
     return html`${sections.map(({ device, matching, entityMatch }) =>
       renderDisclosure({
-        open: lone || entityMatch || this._expandedTargets.has(device.id),
+        open: this._expandedTargets.has(device.id) !== (defaultOpen || entityMatch),
         onToggle: () => this._toggleTarget(device.id),
         localize: this._localize,
         labelText: html`<span class="picker-group-label">
           ${instanceName(device)}
           <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
+          ${q && !entityMatch ? html`<span class="picker-group-count">${matching.length}</span>` : nothing}
         </span>`,
         body: () =>
           html`${matching.map((item) =>

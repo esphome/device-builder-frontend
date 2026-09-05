@@ -2,7 +2,7 @@ import { mdiChevronDown } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 
 import type { LocalizeFunc } from "../../common/localize.js";
-import { mdiSvg } from "../../util/register-icons.js";
+import { mdiSvg } from "../../util/mdi-svg.js";
 
 /** At least one of `labelKey` / `labelText`; `labelText` wins when both are set. */
 type DisclosureLabel =

@@ -10,7 +10,6 @@
  *   <wa-icon library="mdi" name="home"></wa-icon>
  */
 import { registerIconLibrary } from "@home-assistant/webawesome/dist/components/icon/library.js";
-import { html, nothing, type TemplateResult } from "lit";
 
 const iconMap = new Map<string, string>();
 
@@ -49,12 +48,4 @@ export function registerMdiIcons(icons: Record<string, string>): void {
 export function mdiIconSrc(pathData: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="${pathData}"/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-/** Inline MDI glyph in currentColor; for repeated rows, where a wa-icon
- *  element per row is too heavy. */
-export function mdiSvg(pathData: string, className?: string): TemplateResult {
-  // Single line: whitespace inside the template becomes a text node per row.
-  // prettier-ignore
-  return html`<svg class=${className ?? nothing} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d=${pathData}></path></svg>`;
 }

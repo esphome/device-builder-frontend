@@ -43,8 +43,6 @@ export const disclosureStyles = css`
      Single icon rotated via CSS rather than swapping chevron-up/down names. */
   .disclosure-toggle__chevron {
     font-size: 16px;
-    width: 1em;
-    height: 1em;
     flex-shrink: 0;
     transition: transform 0.15s ease;
   }
