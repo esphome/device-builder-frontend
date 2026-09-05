@@ -119,37 +119,39 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
   });
 
-  it("an open() during the previous hide re-shows once that hide ends", async () => {
+  it("a request arriving mid-hide shows once that hide ends, with fresh state", async () => {
     const dialog = await mountDialog();
+    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
     dialog.open();
     await dialog.updateComplete;
-    const wrapper = dialog.shadowRoot!.querySelector(
-      "esphome-base-dialog"
-    )! as HTMLElement & {
-      requestClose?: () => void;
-    };
-    wrapper.requestClose = vi.fn();
     (dialog as unknown as { _query: string })._query = "still visible";
-    (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
-    // Still hiding: the rows are live, so the queued open() leaves the state alone.
-    dialog.open();
+    // The wrapper starts hiding (Escape, X, or a pick's requestClose).
+    wrapper.dispatchEvent(new CustomEvent("request-close"));
+    const onPicked = vi.fn();
+    dialog.open({ kind: "condition", items: [], devices: [], onPicked });
+    // Rows are still live: nothing changes until the hide ends.
     expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("action");
     expect((dialog as unknown as { _query: string })._query).toBe("still visible");
 
-    // The hide ends: the flag drops so the wrapper sees a real close, then the
-    // queued open runs with a fresh reset.
     afterHide(dialog);
     expect(isOpen(dialog)).toBe(false);
     await dialog.updateComplete;
     await dialog.updateComplete;
     expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("condition");
     expect((dialog as unknown as { _query: string })._query).toBe("");
+    (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
+    expect(onPicked).toHaveBeenCalledTimes(1);
+  });
 
-    // A plain close with nothing queued stays closed.
+  it("drops the served request once the dialog has fully closed", async () => {
+    const dialog = await mountDialog();
+    const onPicked = vi.fn();
+    dialog.open({ kind: "action", items: [], devices: [], onPicked });
+    await dialog.updateComplete;
     afterHide(dialog);
-    await dialog.updateComplete;
-    await dialog.updateComplete;
-    expect(isOpen(dialog)).toBe(false);
+    expect((dialog as unknown as { _request: unknown })._request).toBeNull();
   });
 
   it("a second pick during the hide is ignored until the picker reopens", async () => {

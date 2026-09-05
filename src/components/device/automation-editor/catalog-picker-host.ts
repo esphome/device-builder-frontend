@@ -1,37 +1,19 @@
 import { css, html, LitElement } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, query } from "lit/decorators.js";
 
-import type {
-  AutomationAction,
-  AutomationCondition,
-  AvailableComponentInstance,
-} from "../../../api/types/automations.js";
+import { fireRequestEvent } from "../../../util/fire-event.js";
 import "./catalog-picker-dialog.js";
 import type {
-  CatalogPickedDetail,
+  CatalogPickRequest,
   ESPHomeCatalogPickerDialog,
 } from "./catalog-picker-dialog.js";
 
-/** What a nested editor asks the shared picker to show, and who gets the pick. */
-export type CatalogPickRequest = (
-  | { kind: "action"; items: AutomationAction[] }
-  | { kind: "condition"; items: AutomationCondition[] }
-) & {
-  devices: AvailableComponentInstance[];
-  onPicked(detail: CatalogPickedDetail): void;
-};
+export type { CatalogPickRequest } from "./catalog-picker-dialog.js";
 
 /** Ask the nearest ``esphome-catalog-picker-host`` above *from* to open its
  *  picker; warns when no host answers, since the button is otherwise dead. */
 export function requestCatalogPick(from: HTMLElement, request: CatalogPickRequest): void {
-  const event = new CustomEvent<CatalogPickRequest>("request-catalog-pick", {
-    detail: request,
-    bubbles: true,
-    composed: true,
-    cancelable: true,
-  });
-  from.dispatchEvent(event);
-  if (!event.defaultPrevented) {
+  if (!fireRequestEvent(from, "request-catalog-pick", request)) {
     console.warn("request-catalog-pick found no esphome-catalog-picker-host above", from);
   }
 }
@@ -39,12 +21,11 @@ export function requestCatalogPick(from: HTMLElement, request: CatalogPickReques
 /**
  * One picker for a whole editor tree. Action lists, action nodes and
  * condition trees request a pick instead of each mounting a dialog, so a
- * long automation carries one picker, not one per row.
+ * long automation carries one picker, not one per row. A pick lands on the
+ * requester's callback even if its row has since been removed.
  */
 @customElement("esphome-catalog-picker-host")
 export class ESPHomeCatalogPickerHost extends LitElement {
-  @state() private _request: CatalogPickRequest | null = null;
-
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
@@ -65,27 +46,14 @@ export class ESPHomeCatalogPickerHost extends LitElement {
   }
 
   protected render() {
-    const request = this._request;
     return html`<slot></slot>
-      <esphome-catalog-picker-dialog
-        kind=${request?.kind ?? "action"}
-        .items=${request?.items ?? []}
-        .devices=${request?.devices ?? []}
-        @catalog-picked=${this._onPicked}
-      ></esphome-catalog-picker-dialog>`;
+      <esphome-catalog-picker-dialog></esphome-catalog-picker-dialog>`;
   }
 
   private _onRequest = (e: Event) => {
     e.stopPropagation();
     e.preventDefault();
-    this._request = (e as CustomEvent<CatalogPickRequest>).detail;
-    // The picker reads the request through its bindings; open after they land.
-    void this.updateComplete.then(() => this._picker.open());
-  };
-
-  private _onPicked = (e: CustomEvent<CatalogPickedDetail>) => {
-    e.stopPropagation();
-    this._request?.onPicked(e.detail);
+    this._picker.open((e as CustomEvent<CatalogPickRequest>).detail);
   };
 }
 

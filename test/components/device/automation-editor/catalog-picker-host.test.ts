@@ -2,8 +2,7 @@
  * @vitest-environment happy-dom
  *
  * One picker per editor tree: nested editors request a pick, the host opens
- * its dialog with the request's catalog, and the pick goes back to whoever
- * asked.
+ * its dialog with the request, and the pick goes back to whoever asked.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,12 +13,22 @@ import { identityLocalize } from "../../../_dom.js";
 import type { AutomationCondition } from "../../../../src/api/types/automations.js";
 import type { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 import {
+  type CatalogPickRequest,
   ESPHomeCatalogPickerHost,
   requestCatalogPick,
 } from "../../../../src/components/device/automation-editor/catalog-picker-host.js";
 
 const condition = (id: string): AutomationCondition =>
   ({ id, name: id, domain: id.split(".")[0], description: "" }) as AutomationCondition;
+
+const actionRequest = (
+  onPicked: CatalogPickRequest["onPicked"] = () => {}
+): CatalogPickRequest => ({
+  kind: "action",
+  items: [],
+  devices: [],
+  onPicked,
+});
 
 async function mountHost() {
   const host = new ESPHomeCatalogPickerHost();
@@ -48,15 +57,14 @@ describe("esphome-catalog-picker-host", () => {
   it("opens its one picker with the requesting editor's catalog", async () => {
     const { host, inner, picker } = await mountHost();
     const open = vi.spyOn(picker, "open");
-    requestCatalogPick(inner, {
+    const request: CatalogPickRequest = {
       kind: "condition",
       items: [condition("sensor.in_range")],
       devices: [],
       onPicked: () => {},
-    });
-    await host.updateComplete;
-    await host.updateComplete;
-    expect(open).toHaveBeenCalledTimes(1);
+    };
+    requestCatalogPick(inner, request);
+    expect(open).toHaveBeenCalledWith(request);
     expect(picker.kind).toBe("condition");
     expect(picker.items.map((i) => i.id)).toEqual(["sensor.in_range"]);
     expect(
@@ -65,32 +73,18 @@ describe("esphome-catalog-picker-host", () => {
   });
 
   it("routes the pick to the latest requester only", async () => {
-    const { host, inner, picker } = await mountHost();
-    vi.spyOn(picker, "open");
+    const { inner, picker } = await mountHost();
     const first = vi.fn();
     const second = vi.fn();
-    requestCatalogPick(inner, {
-      kind: "action",
-      items: [],
-      devices: [],
-      onPicked: first,
-    });
-    await host.updateComplete;
-    requestCatalogPick(inner, {
-      kind: "action",
-      items: [],
-      devices: [],
-      onPicked: second,
-    });
-    await host.updateComplete;
-    picker.dispatchEvent(
-      new CustomEvent("catalog-picked", {
-        detail: { id: "switch.toggle" },
-        bubbles: true,
-      })
-    );
+    requestCatalogPick(inner, actionRequest(first));
+    requestCatalogPick(inner, actionRequest(second));
+    await picker.updateComplete;
+    (picker as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
     expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledWith({ id: "switch.toggle" });
+    expect(second).toHaveBeenCalledWith({
+      id: "switch.toggle",
+      preFilledParams: undefined,
+    });
   });
 
   it("does not let the request escape above the host", async () => {
@@ -98,12 +92,7 @@ describe("esphome-catalog-picker-host", () => {
     const above = vi.fn();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     document.body.addEventListener("request-catalog-pick", above);
-    requestCatalogPick(inner, {
-      kind: "action",
-      items: [],
-      devices: [],
-      onPicked: () => {},
-    });
+    requestCatalogPick(inner, actionRequest());
     expect(above).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
     document.body.removeEventListener("request-catalog-pick", above);
@@ -112,12 +101,7 @@ describe("esphome-catalog-picker-host", () => {
   it("warns when no host is above the requester", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const orphan = document.body.appendChild(document.createElement("button"));
-    requestCatalogPick(orphan, {
-      kind: "action",
-      items: [],
-      devices: [],
-      onPicked: () => {},
-    });
+    requestCatalogPick(orphan, actionRequest());
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });

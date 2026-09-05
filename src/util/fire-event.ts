@@ -12,3 +12,15 @@
 export function fireEvent(target: EventTarget, name: string, detail?: unknown): void {
   target.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
 }
+
+/** Dispatch a cancelable request the same way; ``true`` when an ancestor
+ *  claimed it with ``preventDefault()``. */
+export function fireRequestEvent(
+  target: EventTarget,
+  name: string,
+  detail?: unknown
+): boolean {
+  return !target.dispatchEvent(
+    new CustomEvent(name, { detail, bubbles: true, composed: true, cancelable: true })
+  );
+}

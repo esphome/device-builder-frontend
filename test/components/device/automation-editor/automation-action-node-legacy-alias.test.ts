@@ -13,8 +13,10 @@ vi.mock(
   () => ({})
 );
 vi.mock(
-  "../../../../src/components/device/automation-editor/catalog-picker-dialog.js",
-  () => ({})
+  "../../../../src/components/device/automation-editor/catalog-picker-host.js",
+  () => ({
+    requestCatalogPick: () => {},
+  })
 );
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));

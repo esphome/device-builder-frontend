@@ -162,7 +162,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
           type="button"
           class="ae-add"
           ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this._openPickerForAdd}
+          @click=${() => this._openPicker(-1)}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_condition")}
@@ -188,7 +188,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             type="button"
             class="ae-row-picker"
             ?disabled=${this.disabled}
-            @click=${() => this._openPickerForChange(idx)}
+            @click=${() => this._openPicker(idx)}
           >
             <span class="ae-row-picker-name truncate">
               ${def?.name ?? node.condition_id}
@@ -275,19 +275,10 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     `;
   }
 
-  private _openPickerForAdd = () => {
+  /** ``-1`` adds a row; an index changes that row's kind. */
+  private _openPicker(changingIdx: number) {
     if (this.catalog.length === 0) return;
-    this._changingIdx = -1;
-    this._requestPick();
-  };
-
-  private _openPickerForChange(idx: number) {
-    if (this.catalog.length === 0) return;
-    this._changingIdx = idx;
-    this._requestPick();
-  }
-
-  private _requestPick() {
+    this._changingIdx = changingIdx;
     requestCatalogPick(this, {
       kind: "condition",
       items: this.catalog,

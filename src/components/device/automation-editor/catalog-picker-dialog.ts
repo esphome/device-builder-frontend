@@ -23,9 +23,10 @@
  * Search box at the top filters across all three tabs.
  *
  * Emits ``catalog-picked`` (``{ id: string; preFilledParams?:
- * Record<string, unknown> }``) when the user picks an item. The
- * parent (an action-list, action-node, or condition-tree) creates
- * the appropriate node and adds / replaces it.
+ * Record<string, unknown> }``) when the user picks an item, and hands
+ * the same detail to the ``onPicked`` of the request it was opened
+ * with. One instance serves a whole editor tree through
+ * ``esphome-catalog-picker-host``; requesters create the node.
  *
  * Generic over the catalog kind (actions vs conditions) so we
  * don't fork the recursion logic between the two; the only
@@ -40,7 +41,11 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
-import type { AvailableComponentInstance } from "../../../api/types/automations.js";
+import type {
+  AutomationAction,
+  AutomationCondition,
+  AvailableComponentInstance,
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { disclosureStyles } from "../../../styles/disclosure.js";
@@ -86,6 +91,15 @@ export interface CatalogPickedDetail {
 
 type Tab = "by-target" | "by-type" | "building-blocks";
 
+/** What a requester asks the picker to show, and who gets the pick. */
+export type CatalogPickRequest = (
+  | { kind: "action"; items: AutomationAction[] }
+  | { kind: "condition"; items: AutomationCondition[] }
+) & {
+  devices: AvailableComponentInstance[];
+  onPicked(detail: CatalogPickedDetail): void;
+};
+
 @customElement("esphome-catalog-picker-dialog")
 export class ESPHomeCatalogPickerDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -115,20 +129,29 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _targetOverrides = new Map<string, boolean>();
   /** Set on the first pick; the rows stay live through the hide animation. */
   private _picked = false;
-  /** An ``open()`` that arrived while the previous close was still animating. */
-  private _reopenAfterHide = false;
+  /** The request being served; cleared once the dialog has fully closed. */
+  private _request: CatalogPickRequest | null = null;
+  /** A request that arrived while the previous close was still animating. */
+  private _pending: CatalogPickRequest | null = null;
+  /** True from the close request until the wrapper's ``after-hide``. */
+  private _hiding = false;
 
   /**
-   * Open the dialog with a fresh search, no clicked-open groups, and the
-   * kind's default tab: ``by-target`` for actions, ``by-type`` for
-   * conditions (which lack a target tab).
+   * Show *request*'s catalog with a fresh search, no clicked-open groups, and
+   * the kind's default tab (``by-target`` for actions, ``by-type`` for
+   * conditions, which lack a target tab). A request arriving mid-hide shows
+   * once that hide ends. Without a request the current catalog is reused.
    */
-  public open() {
-    // The shared instance may still be hiding from the last pick; its rows are
-    // live until then, so leave its state alone and re-show after the hide.
-    if (this._dialog.open) {
-      this._reopenAfterHide = true;
+  public open(request?: CatalogPickRequest) {
+    if (this._hiding) {
+      if (request) this._pending = request;
       return;
+    }
+    if (request) {
+      this._request = request;
+      this.kind = request.kind;
+      this.items = request.items;
+      this.devices = request.devices;
     }
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
@@ -351,6 +374,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<esphome-base-dialog
       ?open=${this._dialog.open}
       .label=${title}
+      @request-close=${this._onRequestClose}
       @after-hide=${this._onAfterHide}
     >
       ${this._dialog.open ? this._renderBody() : nothing}
@@ -496,13 +520,23 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<span class="picker-group-label">${name}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
   }
 
+  /** The wrapper still hides on its own; only the flag's timing changes. */
+  private _onRequestClose = () => {
+    this._hiding = true;
+  };
+
   private _onAfterHide = () => {
     this._dialog.onAfterHide();
-    if (!this._reopenAfterHide) return;
-    this._reopenAfterHide = false;
+    this._hiding = false;
+    const next = this._pending;
+    this._pending = null;
+    if (!next) {
+      this._request = null;
+      return;
+    }
     // Let the closed state reach the wrapper first; flipping the flag back in
     // the same tick would leave the ?open binding unchanged and never re-show.
-    void this.updateComplete.then(() => this.open());
+    void this.updateComplete.then(() => this.open(next));
   };
 
   private _setTargetOpen(id: string, open: boolean) {
@@ -584,13 +618,11 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   private _pick(id: string, preFilledParams?: Record<string, unknown>) {
     if (this._picked) return;
     this._picked = true;
+    const detail: CatalogPickedDetail = { id, preFilledParams };
     this.dispatchEvent(
-      new CustomEvent<CatalogPickedDetail>("catalog-picked", {
-        detail: { id, preFilledParams },
-        bubbles: true,
-        composed: true,
-      })
+      new CustomEvent<CatalogPickedDetail>("catalog-picked", { detail })
     );
+    this._request?.onPicked(detail);
     this._dialog.requestClose();
   }
 }
