@@ -1,8 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the migration preview dialog's reveal toggle: the diff opens
- * masked, the eye button flips it, and reopening resets to masked.
+ * Pins the migration preview dialog's reveal toggle (the diff opens
+ * masked, the eye button flips it, reopening resets to masked), its
+ * close path (the body survives the hide, the flag drops at after-hide),
+ * and the one-shot confirm guard that re-arms on reopen.
  */
 import { describe, expect, it, vi } from "vitest";
 

@@ -16,6 +16,7 @@ vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/filters/filter-section.js", () => ({}));
 vi.mock("../../src/components/filters/labels-filter-section.js", () => ({}));
 
+import { stubDialogRequestClose } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { DeviceState } from "../../src/api/types/devices.js";
@@ -120,12 +121,7 @@ describe("update-all-dialog", () => {
     const { api, firmwareInstallBulk } = fakeApi();
     const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
     // With the wrapper routing the close, the button stays live until after-hide.
-    const wrapper = el.shadowRoot!.querySelector(
-      "esphome-base-dialog"
-    )! as HTMLElement & {
-      requestClose?: () => void;
-    };
-    wrapper.requestClose = vi.fn();
+    const wrapper = stubDialogRequestClose(el);
     primaryButton(el).click();
     primaryButton(el).click();
     expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
