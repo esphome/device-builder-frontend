@@ -363,7 +363,33 @@ describe("catalog-picker-dialog by-target groups", () => {
     await search(dialog, "valve");
     expect(groupLabels(dialog)).toHaveLength(1);
     expect(groupLabels(dialog)[0]).toContain("Valve");
-    expect(dialog.shadowRoot!.querySelector(".picker-group-count")).toBeNull();
     expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
+  });
+
+  it("an entity query matching many groups stays under the expand cap", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: relays(6),
+      tab: "by-target",
+    });
+    // Every id is relayN, so all six match; above the cap they stay collapsed.
+    await search(dialog, "relay");
+    expect(groupLabels(dialog)).toHaveLength(6);
+    expect(rowTitles(dialog)).toEqual([]);
+  });
+
+  it("reopening the picker forgets clicked groups", async () => {
+    const dialog = await mountDialog({ items: [turnOn], devices, tab: "by-target" });
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    dialog
+      .shadowRoot!.querySelector("esphome-base-dialog")!
+      .dispatchEvent(new CustomEvent("after-hide"));
+    await dialog.updateComplete;
+    dialog.open();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["false", "false"]);
   });
 });

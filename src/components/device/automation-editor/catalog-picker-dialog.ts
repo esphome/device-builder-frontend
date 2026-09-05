@@ -487,7 +487,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
       const candidates = itemsForDevice(byDomain, device);
       const matching = entityMatch || !q ? candidates : filterItems(candidates, q);
-      return matching.length ? [{ device, matching, entityMatch }] : [];
+      return matching.length ? [{ device, matching }] : [];
     });
     if (sections.length === 0) {
       return html`<p class="picker-empty">
@@ -497,16 +497,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // Open by default when the list is already small; a click overrides that
     // default for the target, so an auto-opened group can still be closed.
     const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
-    return html`${sections.map(({ device, matching, entityMatch }) => {
-      const open = this._targetOverrides.get(device.id) ?? (defaultOpen || entityMatch);
+    return html`${sections.map(({ device, matching }) => {
+      const open = this._targetOverrides.get(device.id) ?? defaultOpen;
       return renderDisclosure({
         open,
         onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
-        labelText: this._renderGroupLabel(
-          device,
-          q && !entityMatch ? matching.length : null
-        ),
+        labelText: this._renderGroupLabel(device, q ? matching.length : null),
         body: () =>
           html`${matching.map((item) =>
             this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
@@ -521,7 +518,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     const context = instanceContext(device, this.devices);
     // Whitespace in this template would be a text node per header.
     // prettier-ignore
-    return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count">${count}</span>`}</span>`;
+    return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
   }
 
   private _setTargetOpen(id: string, open: boolean) {
