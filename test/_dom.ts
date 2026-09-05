@@ -98,6 +98,24 @@ export function baseDialog(host: HTMLElement): HTMLElement {
   return host.shadowRoot!.querySelector("esphome-base-dialog")!;
 }
 
+/** Replace the wrapper's ``requestClose`` with a spy so a host's programmatic
+ *  close can be asserted without the mocked wa-dialog; the returned wrapper
+ *  still takes ``after-hide`` dispatches. */
+export function stubDialogRequestClose(
+  host: HTMLElement
+): HTMLElement & { requestClose: ReturnType<typeof vi.fn> } {
+  const wrapper = baseDialog(host) as HTMLElement & {
+    requestClose: ReturnType<typeof vi.fn>;
+  };
+  wrapper.requestClose = vi.fn();
+  return wrapper;
+}
+
+/** The host's ``DialogOpenController`` flag. */
+export function dialogOpen(host: HTMLElement): boolean {
+  return (host as unknown as { _dialog: { open: boolean } })._dialog.open;
+}
+
 /**
  * The nested ``<esphome-device-name-inputs>`` inside ``host``'s shadow
  * root, settled. Suites reach its friendly/hostname inputs through the

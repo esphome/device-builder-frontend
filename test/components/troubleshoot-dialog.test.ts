@@ -11,7 +11,14 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
-import { baseDialogSettled, flush, mount } from "../_dom.js";
+import {
+  baseDialog,
+  baseDialogSettled,
+  dialogOpen,
+  flush,
+  mount,
+  stubDialogRequestClose,
+} from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { makeReachabilityEvent } from "../_make-reachability-event.js";
 import type { DeviceTroubleshootResult } from "../../src/api/types/troubleshoot.js";
@@ -405,10 +412,19 @@ describe("troubleshoot-dialog", () => {
       "kitchen",
       expect.any(Function)
     );
-    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
-      new CustomEvent("after-hide")
-    );
+    baseDialog(el).dispatchEvent(new CustomEvent("after-hide"));
     await el.updateComplete;
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("close() runs the wrapper's hide and drops the flag only at after-hide", async () => {
+    const { el } = await openDialog();
+    const wrapper = stubDialogRequestClose(el);
+    el.close();
+    await el.updateComplete;
+    expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
+    expect(dialogOpen(el)).toBe(true);
+    wrapper.dispatchEvent(new CustomEvent("after-hide"));
+    expect(dialogOpen(el)).toBe(false);
   });
 });

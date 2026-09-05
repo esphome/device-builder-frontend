@@ -60,13 +60,17 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
     `,
   ];
 
+  /** Set on the first confirm; the button stays live through the hide animation. */
+  private _confirmed = false;
+
   open() {
     this._revealSensitive = false;
+    this._confirmed = false;
     this._dialog.open = true;
   }
 
   close() {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   protected render() {
@@ -76,7 +80,6 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
         .label=${this._localize("device.config_migration_preview_title", {
           configuration: this.configuration,
         })}
-        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._dialog.onAfterHide}
       >
         ${
@@ -112,6 +115,8 @@ export class ESPHomeConfigMigrationPreviewDialog extends LitElement {
   };
 
   private _confirm() {
+    if (this._confirmed) return;
+    this._confirmed = true;
     this.close();
     fireEvent(this, "request-migrate-config");
   }

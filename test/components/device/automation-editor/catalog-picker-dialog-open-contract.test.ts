@@ -16,7 +16,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { baseDialog, identityLocalize } from "../../../_dom.js";
+import {
+  baseDialog,
+  dialogOpen,
+  identityLocalize,
+  stubDialogRequestClose,
+} from "../../../_dom.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 
 async function mountDialog(
@@ -31,8 +36,6 @@ async function mountDialog(
   return dialog;
 }
 
-const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
-  (d as unknown as { _dialog: { open: boolean } })._dialog.open;
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
 const afterHide = (d: ESPHomeCatalogPickerDialog): void => {
@@ -42,10 +45,10 @@ const afterHide = (d: ESPHomeCatalogPickerDialog): void => {
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("open() drives the reactive _open flag and resets the search", async () => {
     const dialog = await mountDialog("action");
-    expect(isOpen(dialog)).toBe(false);
+    expect(dialogOpen(dialog)).toBe(false);
     (dialog as unknown as { _query: string })._query = "stale";
     dialog.open();
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     expect(activeTab(dialog)).toBe("by-target");
     expect((dialog as unknown as { _query: string })._query).toBe("");
   });
@@ -59,9 +62,9 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("the controller's onAfterHide flips the open flag back to false", async () => {
     const dialog = await mountDialog();
     dialog.open();
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     afterHide(dialog);
-    expect(isOpen(dialog)).toBe(false);
+    expect(dialogOpen(dialog)).toBe(false);
   });
 
   it("renders the body only while open", async () => {
@@ -98,21 +101,16 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     const dialog = await mountDialog();
     dialog.open();
     await dialog.updateComplete;
-    const wrapper = dialog.shadowRoot!.querySelector(
-      "esphome-base-dialog"
-    )! as HTMLElement & {
-      requestClose?: () => void;
-    };
-    wrapper.requestClose = vi.fn();
+    const wrapper = stubDialogRequestClose(dialog);
     (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
     await dialog.updateComplete;
     expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     expect(dialog.shadowRoot!.querySelector(".picker-body")).not.toBeNull();
 
     afterHide(dialog);
     await dialog.updateComplete;
-    expect(isOpen(dialog)).toBe(false);
+    expect(dialogOpen(dialog)).toBe(false);
     expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
   });
 
@@ -127,15 +125,15 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     const onPicked = vi.fn();
     dialog.open({ kind: "condition", items: [], devices: [], onPicked });
     // Rows are still live: nothing changes until the hide ends.
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     expect(dialog.kind).toBe("action");
     expect((dialog as unknown as { _query: string })._query).toBe("still visible");
 
     afterHide(dialog);
-    expect(isOpen(dialog)).toBe(false);
+    expect(dialogOpen(dialog)).toBe(false);
     await dialog.updateComplete;
     await dialog.updateComplete;
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     expect(dialog.kind).toBe("condition");
     expect((dialog as unknown as { _query: string })._query).toBe("");
     (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
@@ -154,10 +152,10 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     afterHide(dialog);
     // Same tick as after-hide: the closed state has not committed yet.
     dialog.open({ kind: "condition", items: [], devices: [], onPicked: newer });
-    expect(isOpen(dialog)).toBe(false);
+    expect(dialogOpen(dialog)).toBe(false);
     await dialog.updateComplete;
     await dialog.updateComplete;
-    expect(isOpen(dialog)).toBe(true);
+    expect(dialogOpen(dialog)).toBe(true);
     expect(dialog.kind).toBe("condition");
     (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
     expect(newer).toHaveBeenCalledTimes(1);
@@ -177,12 +175,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     const dialog = await mountDialog();
     dialog.open();
     await dialog.updateComplete;
-    const wrapper = dialog.shadowRoot!.querySelector(
-      "esphome-base-dialog"
-    )! as HTMLElement & {
-      requestClose?: () => void;
-    };
-    wrapper.requestClose = vi.fn();
+    stubDialogRequestClose(dialog);
     const picked = vi.fn();
     const request = { kind: "action" as const, items: [], devices: [], onPicked: picked };
     dialog.open(request);
