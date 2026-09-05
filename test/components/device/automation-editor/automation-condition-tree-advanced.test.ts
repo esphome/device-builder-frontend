@@ -8,14 +8,17 @@
  * ``repeat()``), so the per-row "Show advanced settings" flag is keyed
  * by index and must follow its row across kind changes and removals.
  * ``config-entry-form`` drags CodeMirror in transitively, so ``vi.mock``
- * no-ops it; the picker dialog gets a stub element with an ``open()``.
+ * no-ops it; picks are delivered by answering the tree's pick request.
  */
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
-  "../../../../src/components/device/automation-editor/catalog-picker-dialog.js",
-  () => ({})
+  "../../../../src/components/device/automation-editor/catalog-picker-host.js",
+  () => ({
+    requestCatalogPick: (from: HTMLElement, request: unknown) =>
+      from.dispatchEvent(new CustomEvent("request-catalog-pick", { detail: request })),
+  })
 );
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -25,15 +28,6 @@ import type {
 } from "../../../../src/api/types/automations.js";
 import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationConditionTree } from "../../../../src/components/device/automation-editor/automation-condition-tree.js";
-
-if (!customElements.get("esphome-catalog-picker-dialog")) {
-  customElements.define(
-    "esphome-catalog-picker-dialog",
-    class extends HTMLElement {
-      open() {}
-    }
-  );
-}
 
 function entry(key: string, advanced: boolean): ConfigEntry {
   return {
@@ -144,11 +138,14 @@ describe("automation-condition-tree advanced section", () => {
     await el.updateComplete;
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(true);
 
-    // Change the row's kind through the picker flow.
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".ae-row-picker")!.click();
-    el.shadowRoot!.querySelector("esphome-catalog-picker-dialog")!.dispatchEvent(
-      new CustomEvent("catalog-picked", { detail: { id: "number.in_range" } })
+    // Change the row's kind through the picker flow: answer the pick request.
+    const requests: { onPicked(detail: { id: string }): void }[] = [];
+    el.addEventListener("request-catalog-pick", (e) =>
+      requests.push((e as CustomEvent).detail)
     );
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".ae-row-picker")!.click();
+    expect(requests).toHaveLength(1);
+    requests[0].onPicked({ id: "number.in_range" });
     await el.updateComplete;
 
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);

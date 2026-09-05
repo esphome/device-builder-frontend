@@ -2,6 +2,7 @@ import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
@@ -148,13 +149,7 @@ export function dispatchShowLogsAfterInstall(
   source: HTMLElement,
   detail: PostInstallShowLogsDetail
 ): boolean {
-  const event = new CustomEvent("request-show-logs-after-install", {
-    bubbles: true,
-    composed: true,
-    cancelable: true,
-    detail,
-  });
-  return !source.dispatchEvent(event);
+  return fireRequestEvent(source, "request-show-logs-after-install", detail);
 }
 
 /**

@@ -80,11 +80,10 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(body()).toBe(0);
   });
 
-  it("picking an item emits catalog-picked", async () => {
+  it("picking an item hands the detail to the request's onPicked", async () => {
     const dialog = await mountDialog();
-    dialog.open();
     const picked = vi.fn();
-    dialog.addEventListener("catalog-picked", (e) => picked((e as CustomEvent).detail));
+    dialog.open({ kind: "action", items: [], devices: [], onPicked: picked });
     (
       dialog as unknown as {
         _pick: (id: string, p?: Record<string, unknown>) => void;
@@ -119,6 +118,63 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
   });
 
+  it("a request arriving mid-hide shows once that hide ends, with fresh state", async () => {
+    const dialog = await mountDialog();
+    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
+    dialog.open();
+    await dialog.updateComplete;
+    (dialog as unknown as { _query: string })._query = "still visible";
+    // The wrapper starts hiding (Escape, X, or a pick's requestClose).
+    wrapper.dispatchEvent(new CustomEvent("request-close"));
+    const onPicked = vi.fn();
+    dialog.open({ kind: "condition", items: [], devices: [], onPicked });
+    // Rows are still live: nothing changes until the hide ends.
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("action");
+    expect((dialog as unknown as { _query: string })._query).toBe("still visible");
+
+    afterHide(dialog);
+    expect(isOpen(dialog)).toBe(false);
+    await dialog.updateComplete;
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("condition");
+    expect((dialog as unknown as { _query: string })._query).toBe("");
+    (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
+    expect(onPicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("a request landing between after-hide and the deferred re-show wins", async () => {
+    const dialog = await mountDialog();
+    const wrapper = dialog.shadowRoot!.querySelector("esphome-base-dialog")!;
+    dialog.open();
+    await dialog.updateComplete;
+    wrapper.dispatchEvent(new CustomEvent("request-close"));
+    const older = vi.fn();
+    const newer = vi.fn();
+    dialog.open({ kind: "action", items: [], devices: [], onPicked: older });
+    afterHide(dialog);
+    // Same tick as after-hide: the closed state has not committed yet.
+    dialog.open({ kind: "condition", items: [], devices: [], onPicked: newer });
+    expect(isOpen(dialog)).toBe(false);
+    await dialog.updateComplete;
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.kind).toBe("condition");
+    (dialog as unknown as { _pick: (id: string) => void })._pick("sensor.in_range");
+    expect(newer).toHaveBeenCalledTimes(1);
+    expect(older).not.toHaveBeenCalled();
+  });
+
+  it("drops the served request once the dialog has fully closed", async () => {
+    const dialog = await mountDialog();
+    const onPicked = vi.fn();
+    dialog.open({ kind: "action", items: [], devices: [], onPicked });
+    await dialog.updateComplete;
+    afterHide(dialog);
+    expect((dialog as unknown as { _request: unknown })._request).toBeNull();
+  });
+
   it("a second pick during the hide is ignored until the picker reopens", async () => {
     const dialog = await mountDialog();
     dialog.open();
@@ -130,7 +186,9 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     };
     wrapper.requestClose = vi.fn();
     const picked = vi.fn();
-    dialog.addEventListener("catalog-picked", picked);
+    const request = { kind: "action" as const, items: [], devices: [], onPicked: picked };
+    dialog.open(request);
+    await dialog.updateComplete;
     const pick = (dialog as unknown as { _pick: (id: string) => void })._pick.bind(
       dialog
     );
@@ -140,7 +198,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(picked).toHaveBeenCalledTimes(1);
 
     afterHide(dialog);
-    dialog.open();
+    dialog.open(request);
     await dialog.updateComplete;
     pick("switch.turn_on");
     expect(picked).toHaveBeenCalledTimes(2);

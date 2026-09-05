@@ -20,7 +20,7 @@ import {
   mdiPlus,
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type {
   AutomationCondition,
@@ -46,11 +46,8 @@ import {
   childFocus,
   focusTargetHasChanged,
 } from "./automation-focus.js";
-import "./catalog-picker-dialog.js";
-import type {
-  CatalogPickedDetail,
-  ESPHomeCatalogPickerDialog,
-} from "./catalog-picker-dialog.js";
+import type { CatalogPickedDetail } from "./catalog-picker-dialog.js";
+import { requestCatalogPick } from "./catalog-picker-host.js";
 import {
   applyParamChange,
   emptyConditionNode,
@@ -115,9 +112,6 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   @property({ attribute: false, hasChanged: focusTargetHasChanged })
   focusTarget: AutomationFocus | null = null;
 
-  @query("esphome-catalog-picker-dialog")
-  private _picker!: ESPHomeCatalogPickerDialog;
-
   /**
    * Tracks which row the user is currently changing the kind of.
    * ``-1`` means "we're not changing an existing row — the picker
@@ -168,17 +162,11 @@ export class ESPHomeAutomationConditionTree extends LitElement {
           type="button"
           class="ae-add"
           ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this._openPickerForAdd}
+          @click=${() => this._openPicker(-1)}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_condition")}
         </button>
-        <esphome-catalog-picker-dialog
-          kind="condition"
-          .items=${this.catalog}
-          .devices=${this.devices}
-          @catalog-picked=${this._onConditionPicked}
-        ></esphome-catalog-picker-dialog>
       </div>
     `;
   }
@@ -200,7 +188,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             type="button"
             class="ae-row-picker"
             ?disabled=${this.disabled}
-            @click=${() => this._openPickerForChange(idx)}
+            @click=${() => this._openPicker(idx)}
           >
             <span class="ae-row-picker-name truncate">
               ${def?.name ?? node.condition_id}
@@ -287,27 +275,26 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     `;
   }
 
-  private _openPickerForAdd = () => {
+  /** ``-1`` adds a row; an index changes that row's kind. */
+  private _openPicker(changingIdx: number) {
     if (this.catalog.length === 0) return;
-    this._changingIdx = -1;
-    this._picker.open();
-  };
-
-  private _openPickerForChange(idx: number) {
-    if (this.catalog.length === 0) return;
-    this._changingIdx = idx;
-    this._picker.open();
+    this._changingIdx = changingIdx;
+    requestCatalogPick(this, {
+      kind: "condition",
+      items: this.catalog,
+      devices: this.devices,
+      onPicked: this._onConditionPicked,
+    });
   }
 
-  private _onConditionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
-    e.stopPropagation();
+  private _onConditionPicked = (detail: CatalogPickedDetail) => {
     // Switching condition kinds drops the old params — the new
     // condition's schema is different, so retaining values would
     // surface fields the renderer wouldn't paint and re-emit values
     // the writer wouldn't understand.
-    const node: ConditionNode = emptyConditionNode(e.detail.id);
-    if (e.detail.preFilledParams) {
-      node.params = { ...node.params, ...e.detail.preFilledParams };
+    const node: ConditionNode = emptyConditionNode(detail.id);
+    if (detail.preFilledParams) {
+      node.params = { ...node.params, ...detail.preFilledParams };
     }
     if (this._changingIdx >= 0) {
       // A new kind means a new schema — reopen with advanced collapsed.

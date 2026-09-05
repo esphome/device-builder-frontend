@@ -22,10 +22,10 @@
  *
  * Search box at the top filters across all three tabs.
  *
- * Emits ``catalog-picked`` (``{ id: string; preFilledParams?:
- * Record<string, unknown> }``) when the user picks an item. The
- * parent (an action-list, action-node, or condition-tree) creates
- * the appropriate node and adds / replaces it.
+ * A pick (``{ id: string; preFilledParams?: Record<string, unknown> }``)
+ * goes to the ``onPicked`` of the request the picker was opened with.
+ * One instance serves a whole editor tree through
+ * ``esphome-catalog-picker-host``; requesters create the node.
  *
  * Generic over the catalog kind (actions vs conditions) so we
  * don't fork the recursion logic between the two; the only
@@ -36,11 +36,16 @@
 
 import { consume } from "@lit/context";
 import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { catalogPickerDialogStyles } from "./catalog-picker-dialog.styles.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
-import type { AvailableComponentInstance } from "../../../api/types/automations.js";
+import type {
+  AutomationAction,
+  AutomationCondition,
+  AvailableComponentInstance,
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { disclosureStyles } from "../../../styles/disclosure.js";
@@ -76,15 +81,24 @@ registerMdiIcons({ close: mdiClose, magnify: mdiMagnify });
  *  tab visibility and the result-shape of picks. */
 type CatalogKind = "action" | "condition";
 
-/** Detail of the ``catalog-picked`` event. ``preFilledParams`` is
- *  optional — only the By-target tab sets it (to seed the action's
- *  ``id:`` field with the picked instance). */
+/** What a pick hands to the requester. ``preFilledParams`` is optional —
+ *  only the By-target tab sets it (to seed the action's ``id:`` field with
+ *  the picked instance). */
 export interface CatalogPickedDetail {
   id: string;
   preFilledParams?: Record<string, unknown>;
 }
 
 type Tab = "by-target" | "by-type" | "building-blocks";
+
+/** What a requester asks the picker to show, and who gets the pick. */
+export type CatalogPickRequest = (
+  | { kind: "action"; items: AutomationAction[] }
+  | { kind: "condition"; items: AutomationCondition[] }
+) & {
+  devices: AvailableComponentInstance[];
+  onPicked(detail: CatalogPickedDetail): void;
+};
 
 @customElement("esphome-catalog-picker-dialog")
 export class ESPHomeCatalogPickerDialog extends LitElement {
@@ -115,13 +129,30 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _targetOverrides = new Map<string, boolean>();
   /** Set on the first pick; the rows stay live through the hide animation. */
   private _picked = false;
+  /** The request being served; cleared once the dialog has fully closed. */
+  private _request: CatalogPickRequest | null = null;
+  /** A request that arrived while the previous close was still animating. */
+  private _pending: CatalogPickRequest | null = null;
+  /** True from the close request until the wrapper's ``after-hide``. */
+  private _hiding = false;
 
   /**
-   * Open the dialog with a fresh search, no clicked-open groups, and the
-   * kind's default tab: ``by-target`` for actions, ``by-type`` for
-   * conditions (which lack a target tab).
+   * Show *request*'s catalog with a fresh search, no clicked-open groups, and
+   * the kind's default tab (``by-target`` for actions, ``by-type`` for
+   * conditions, which lack a target tab). A request arriving mid-hide shows
+   * once that hide ends. Without a request the current catalog is reused.
    */
-  public open() {
+  public open(request?: CatalogPickRequest) {
+    if (this._hiding) {
+      if (request) this._pending = request;
+      return;
+    }
+    if (request) {
+      this._request = request;
+      this.kind = request.kind;
+      this.items = request.items;
+      this.devices = request.devices;
+    }
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
     this._targetOverrides = new Map();
@@ -134,203 +165,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     inputStyles,
     textStyles,
     disclosureStyles,
-    css`
-      esphome-base-dialog {
-        --width: 640px;
-      }
-
-      esphome-base-dialog::part(body) {
-        padding: 0;
-      }
-
-      /* Search field — mirrors the dashboard's .search-wrap +
-         .search-input pattern (absolute-positioned leading icon over
-         a fully-chromed native <input> that inherits styling from
-         inputStyles). Padding lives on the outer container so the
-         input has breathing room from the dialog edges. */
-      .picker-search {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      .picker-search-wrap {
-        position: relative;
-      }
-
-      .picker-search-icon {
-        position: absolute;
-        left: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
-        pointer-events: none;
-        z-index: 1;
-      }
-
-      .picker-search-wrap .picker-search-input {
-        padding-left: 36px;
-      }
-
-      .picker-tabs {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        padding: 4px;
-        margin: 0 var(--wa-space-l) var(--wa-space-s);
-        background: var(--wa-color-surface-lowered);
-        border-radius: var(--wa-border-radius-m);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .picker-tab {
-        appearance: none;
-        border: none;
-        background: transparent;
-        color: inherit;
-        padding: 4px var(--wa-space-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        font-family: inherit;
-        cursor: pointer;
-        border-radius: calc(var(--wa-border-radius-m) - 2px);
-        transition:
-          background 0.12s,
-          color 0.12s,
-          box-shadow 0.12s;
-      }
-
-      .picker-tab:hover:not(.active) {
-        color: var(--wa-color-text-normal);
-      }
-
-      .picker-tab.active {
-        background: var(--wa-color-surface-raised);
-        color: var(--wa-color-text-normal);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-      }
-
-      .picker-body {
-        height: min(60vh, 500px);
-        min-height: 320px;
-        overflow-y: auto;
-        padding: 0 var(--wa-space-l) var(--wa-space-l);
-      }
-
-      .picker-group-label {
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-quiet);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        margin: var(--wa-space-m) var(--wa-space-2xs) var(--wa-space-2xs);
-      }
-
-      .picker-group-label:first-child {
-        margin-top: var(--wa-space-2xs);
-      }
-
-      .picker-body .disclosure-toggle {
-        display: flex;
-        width: 100%;
-        margin: var(--wa-space-m) 0 var(--wa-space-2xs);
-      }
-
-      .picker-body .disclosure-toggle:first-child {
-        margin-top: var(--wa-space-2xs);
-      }
-
-      .disclosure-toggle .picker-group-label {
-        display: inline-flex;
-        align-items: baseline;
-        gap: var(--wa-space-2xs);
-        margin: 0;
-      }
-
-      .picker-group-count {
-        padding: 0 var(--wa-space-2xs);
-        border-radius: var(--wa-border-radius-s);
-        background: var(--wa-color-surface-lowered);
-        font-weight: var(--wa-font-weight-normal);
-        letter-spacing: normal;
-        text-transform: none;
-      }
-
-      .picker-body .disclosure-panel {
-        margin-top: 0;
-      }
-
-      .picker-row {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: var(--wa-space-m);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        transition: background 0.12s;
-      }
-
-      .picker-row:hover,
-      .picker-row:focus-visible {
-        background: var(--wa-color-surface-lowered);
-        outline: none;
-      }
-
-      .picker-row-body {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-
-      .picker-row-title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .picker-row-desc {
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
-      }
-
-      .picker-row-add {
-        display: grid;
-        place-items: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: transparent;
-        color: var(--wa-color-text-quiet);
-        flex: 0 0 auto;
-        line-height: 0;
-        transition:
-          background 0.12s,
-          color 0.12s;
-      }
-
-      .picker-row-add svg {
-        display: block;
-        width: 18px;
-        height: 18px;
-        fill: currentColor;
-      }
-
-      .picker-row:hover .picker-row-add,
-      .picker-row:focus-visible .picker-row-add {
-        background: var(--wa-color-brand-fill-loud, var(--esphome-primary));
-        color: var(--wa-color-brand-on-loud, var(--esphome-on-primary));
-      }
-
-      .picker-empty {
-        text-align: center;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        padding: var(--wa-space-xl) var(--wa-space-l);
-        font-style: italic;
-      }
-    `,
+    catalogPickerDialogStyles,
   ];
 
   protected render() {
@@ -343,7 +178,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<esphome-base-dialog
       ?open=${this._dialog.open}
       .label=${title}
-      @after-hide=${this._dialog.onAfterHide}
+      @request-close=${this._onRequestClose}
+      @after-hide=${this._onAfterHide}
     >
       ${this._dialog.open ? this._renderBody() : nothing}
     </esphome-base-dialog>`;
@@ -488,6 +324,30 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<span class="picker-group-label">${name}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
   }
 
+  /** The wrapper still hides on its own; only the flag's timing changes. */
+  private _onRequestClose = () => {
+    this._hiding = true;
+  };
+
+  private _onAfterHide = () => {
+    this._dialog.onAfterHide();
+    if (!this._pending) {
+      this._hiding = false;
+      this._request = null;
+      return;
+    }
+    // Let the closed state reach the wrapper first; flipping the flag back in
+    // the same tick would leave the ?open binding unchanged and never re-show.
+    // ``_hiding`` stays set until then, so a request landing in the gap
+    // replaces the pending one instead of being overwritten by it.
+    void this.updateComplete.then(() => {
+      this._hiding = false;
+      const next = this._pending;
+      this._pending = null;
+      if (next) this.open(next);
+    });
+  };
+
   private _setTargetOpen(id: string, open: boolean) {
     this._targetOverrides = new Map(this._targetOverrides).set(id, open);
   }
@@ -567,13 +427,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   private _pick(id: string, preFilledParams?: Record<string, unknown>) {
     if (this._picked) return;
     this._picked = true;
-    this.dispatchEvent(
-      new CustomEvent<CatalogPickedDetail>("catalog-picked", {
-        detail: { id, preFilledParams },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    this._request?.onPicked({ id, preFilledParams });
     this._dialog.requestClose();
   }
 }

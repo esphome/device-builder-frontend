@@ -169,11 +169,17 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
 
   /** Click the first row; the cell asserts the emitted detail (an
    *  undefined return means the pick never fired). */
-  function pickFirstRow(dialog: ESPHomeCatalogPickerDialog): CatalogPickedDetail {
+  async function pickFirstRow(
+    dialog: ESPHomeCatalogPickerDialog
+  ): Promise<CatalogPickedDetail> {
     const picked = vi.fn();
-    dialog.addEventListener("catalog-picked", (e) =>
-      picked((e as CustomEvent<CatalogPickedDetail>).detail)
-    );
+    dialog.open({
+      kind: "action",
+      items: [turnOn],
+      devices: dialog.devices,
+      onPicked: picked,
+    });
+    await dialog.updateComplete;
     dialog.shadowRoot!.querySelector<HTMLElement>(".picker-row")!.click();
     return picked.mock.calls[0]?.[0] as CatalogPickedDetail;
   }
@@ -191,7 +197,7 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
       ],
       tab: "by-target",
     });
-    expect(pickFirstRow(dialog)).toEqual({
+    expect(await pickFirstRow(dialog)).toEqual({
       id: "switch.turn_on",
       preFilledParams: { id: "relay1" },
     });
@@ -203,7 +209,7 @@ describe("catalog-picker-dialog by-target pre-fill", () => {
       devices: [{ component_id: "switch.gpio", id: "switch_0", name: "Warmtepomp" }],
       tab: "by-target",
     });
-    expect(pickFirstRow(dialog)).toEqual({
+    expect(await pickFirstRow(dialog)).toEqual({
       id: "switch.turn_on",
       preFilledParams: undefined,
     });

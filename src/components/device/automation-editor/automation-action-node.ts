@@ -22,7 +22,7 @@ import {
   mdiPencilOutline,
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type {
   ActionNode,
@@ -64,11 +64,8 @@ import {
   childFocus,
   focusTargetHasChanged,
 } from "./automation-focus.js";
-import "./catalog-picker-dialog.js";
-import type {
-  CatalogPickedDetail,
-  ESPHomeCatalogPickerDialog,
-} from "./catalog-picker-dialog.js";
+import type { CatalogPickedDetail } from "./catalog-picker-dialog.js";
+import { requestCatalogPick } from "./catalog-picker-host.js";
 import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -151,9 +148,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
    *  this node's params form or the row itself. */
   @property({ attribute: false, hasChanged: focusTargetHasChanged })
   focusTarget: AutomationFocus | null = null;
-
-  @query("esphome-catalog-picker-dialog")
-  private _picker!: ESPHomeCatalogPickerDialog;
 
   /**
    * Collapsed = compact one-line view (just the picker / action
@@ -304,12 +298,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
             </button>
           </div>
         </div>
-        <esphome-catalog-picker-dialog
-          kind="action"
-          .items=${this.catalog}
-          .devices=${this.devices}
-          @catalog-picked=${this._onActionPicked}
-        ></esphome-catalog-picker-dialog>
         ${
           collapsed
             ? nothing
@@ -544,18 +532,22 @@ export class ESPHomeAutomationActionNode extends LitElement {
   }
 
   private _openPicker = () => {
-    this._picker.open();
+    requestCatalogPick(this, {
+      kind: "action",
+      items: this.catalog,
+      devices: this.devices,
+      onPicked: this._onActionPicked,
+    });
   };
 
-  private _onActionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
-    e.stopPropagation();
+  private _onActionPicked = (detail: CatalogPickedDetail) => {
     // Switching kinds drops params / nested children — different
     // schemas, parallel state would surface fields the renderer
     // wouldn't paint. Pre-filled params from the "By target" tab
     // are seeded on top of the reset.
     this._emit({
-      action_id: e.detail.id,
-      params: { ...(e.detail.preFilledParams ?? {}) },
+      action_id: detail.id,
+      params: { ...(detail.preFilledParams ?? {}) },
       children: {},
       conditions: [],
     });
