@@ -281,8 +281,26 @@ describe("liveDependencies", () => {
     expect(liveDependencies(["spi"], scope({}, ethernetEntries("IP101")))).toEqual([]);
   });
 
-  it("drops the dep while the gate is unset with no default", () => {
-    expect(liveDependencies(["spi"], scope({}))).toEqual([]);
+  it("keeps the dep while the gate is unset with no default", () => {
+    expect(liveDependencies(["spi"], scope({}))).toEqual(["spi"]);
+  });
+
+  it("keeps a dep whose reference is hidden for a non-value reason", () => {
+    // improv_serial shape: a hidden uart_id reference still needs the bus.
+    const hidden = makeConfigEntry({
+      key: "uart_id",
+      type: ConfigEntryType.ID,
+      references_component: "uart",
+      hidden: true,
+    });
+    expect(liveDependencies(["uart"], scope({}, [hidden]))).toEqual(["uart"]);
+    const componentGated = makeConfigEntry({
+      key: "uart_id",
+      type: ConfigEntryType.ID,
+      references_component: "uart",
+      depends_on_component: "uart",
+    });
+    expect(liveDependencies(["uart"], scope({}, [componentGated]))).toEqual(["uart"]);
   });
 
   it("keeps a dep no entry references", () => {

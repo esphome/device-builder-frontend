@@ -295,6 +295,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
+    // The bus verdict reads the flat list; only uart carries one today.
     const blocked = this._busBlockedDep;
     return blocked && !missing.includes(blocked) ? [...missing, blocked] : missing;
   }

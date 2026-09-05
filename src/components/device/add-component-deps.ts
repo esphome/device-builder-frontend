@@ -26,10 +26,13 @@ export interface DepScope {
 }
 
 /**
- * *dependencies* minus those every referencing top-level entry hides.
+ * *dependencies* minus those a resolved value gate hides on every
+ * referencing top-level entry.
  *
- * A dep no top-level entry references is kept; nested entries are not
- * walked. An unresolvable gate hides its entry, so the dep is dropped.
+ * Only a `depends_on` gate that resolves (a value, or the gate field's
+ * default) and hides the entry drops its dep. An unresolved gate, a
+ * hidden entry, a component gate, or no referencing entry keeps it.
+ * Nested entries are not walked.
  */
 export function liveDependencies(
   dependencies: readonly string[],
@@ -42,9 +45,16 @@ export function liveDependencies(
     scope.board,
     scope.presentComponents
   );
+  const valueGateHides = (entry: ConfigEntry): boolean => {
+    if (!entry.depends_on) return false;
+    const gate =
+      scope.values[entry.depends_on] ??
+      scope.entries.find((s) => s.key === entry.depends_on)?.default_value;
+    return gate != null && !visible(entry);
+  };
   return dependencies.filter((dep) => {
     const refs = scope.entries.filter((e) => e.references_component === dep);
-    return refs.length === 0 || refs.some(visible);
+    return refs.length === 0 || refs.some((e) => !valueGateHides(e));
   });
 }
 
