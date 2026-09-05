@@ -58,7 +58,10 @@ function composedContains(ancestor: Node, node: Node): boolean {
  * during migration. Consumers with no close-veto logic should
  * use :class:`DialogOpenController` (``util/dialog-open-controller.ts``)
  * for the flag + the trivial ``@request-close`` handler instead
- * of hand-rolling both.
+ * of hand-rolling both. A body that is expensive to build (a long
+ * list, or a dialog mounted once per row) should render only while
+ * ``open`` and bind ``@after-hide`` so it survives the hide animation;
+ * ``desktop-update-dialog`` and ``catalog-picker-dialog`` are the shape.
  *
  * **Busy gate**. When ``?busy=true``:
  *

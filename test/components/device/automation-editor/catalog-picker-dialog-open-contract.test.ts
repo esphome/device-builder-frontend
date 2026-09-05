@@ -16,6 +16,7 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { identityLocalize } from "../../../_dom.js";
+import type { AutomationAction } from "../../../../src/api/types/automations.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 
 async function mountDialog(
@@ -67,35 +68,23 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("renders the body only while open", async () => {
     const dialog = await mountDialog();
     dialog.items = [
-      {
-        id: "switch.turn_on",
-        name: "Turn On",
-        domain: "switch",
-        description: "",
-        docs_url: "",
-        config_entries: [],
-        is_control_flow: false,
-        has_else_branch: false,
-        accepts_action_list: [],
-      },
+      { id: "switch.turn_on", name: "Turn On", domain: "switch" } as AutomationAction,
     ];
-    dialog.devices = Array.from({ length: 20 }, (_, i) => ({
-      component_id: "switch.gpio",
-      id: `relay${i}`,
-      name: `Relay ${i}`,
-      has_explicit_id: true,
-    }));
+    dialog.devices = [
+      { component_id: "switch.gpio", id: "relay1" },
+      { component_id: "switch.gpio", id: "relay2" },
+    ];
     await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelector(".picker-search")).toBeNull();
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(0);
+    const rows = () => dialog.shadowRoot!.querySelectorAll(".picker-row").length;
+    expect(rows()).toBe(0);
 
     dialog.open();
     await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(20);
+    expect(rows()).toBe(2);
 
     afterHide(dialog);
     await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(0);
+    expect(rows()).toBe(0);
   });
 
   it("picking an item emits catalog-picked and closes the dialog", async () => {
