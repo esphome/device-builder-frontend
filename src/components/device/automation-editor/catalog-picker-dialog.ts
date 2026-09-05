@@ -40,19 +40,26 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
-import type {
-  AutomationAction,
-  AutomationCondition,
-  AvailableComponentInstance,
-} from "../../../api/types/automations.js";
+import type { AvailableComponentInstance } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { disclosureStyles } from "../../../styles/disclosure.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { DialogOpenController } from "../../../util/dialog-open-controller.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { mdiSvg } from "../../../util/mdi-svg.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderDisclosure } from "../../shared/disclosure.js";
+import { navItemMatches } from "../navigator-search-match.js";
+import {
+  AUTO_EXPAND_MAX_GROUPS,
+  type CatalogItem,
+  filterItems,
+  groupByDomain,
+  itemsForDevice,
+} from "./catalog-picker-filter.js";
 import {
   componentDomain,
   instanceContext,
@@ -64,13 +71,11 @@ import {
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../../base-dialog.js";
 
-registerMdiIcons({ close: mdiClose, magnify: mdiMagnify, plus: mdiPlus });
+registerMdiIcons({ close: mdiClose, magnify: mdiMagnify });
 
 /** Catalog kind the dialog is rendering. Drives the "By target"
  *  tab visibility and the result-shape of picks. */
 type CatalogKind = "action" | "condition";
-
-type CatalogItem = AutomationAction | AutomationCondition;
 
 /** Detail of the ``catalog-picked`` event. ``preFilledParams`` is
  *  optional — only the By-target tab sets it (to seed the action's
@@ -107,15 +112,18 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   private readonly _dialog = new DialogOpenController(this);
   @state() private _activeTab: Tab = "by-target";
   @state() private _query = "";
+  /** Per-target open state the user set by clicking; wins over the default. */
+  @state() private _targetOverrides = new Map<string, boolean>();
 
   /**
-   * Open the dialog. Resets the active tab to a sensible default
-   * for the kind: ``by-target`` for actions, ``by-type`` for
+   * Open the dialog with a fresh search, no clicked-open groups, and the
+   * kind's default tab: ``by-target`` for actions, ``by-type`` for
    * conditions (which lack a target tab).
    */
   public open() {
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
+    this._targetOverrides = new Map();
     this._dialog.open = true;
   }
 
@@ -123,6 +131,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     textStyles,
+    disclosureStyles,
     css`
       esphome-base-dialog {
         --width: 640px;
@@ -218,6 +227,36 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         margin-top: var(--wa-space-2xs);
       }
 
+      .picker-body .disclosure-toggle {
+        display: flex;
+        width: 100%;
+        margin: var(--wa-space-m) 0 var(--wa-space-2xs);
+      }
+
+      .picker-body .disclosure-toggle:first-child {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      .disclosure-toggle .picker-group-label {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--wa-space-2xs);
+        margin: 0;
+      }
+
+      .picker-group-count {
+        padding: 0 var(--wa-space-2xs);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-lowered);
+        font-weight: var(--wa-font-weight-normal);
+        letter-spacing: normal;
+        text-transform: none;
+      }
+
+      .picker-body .disclosure-panel {
+        margin-top: 0;
+      }
+
       .picker-row {
         display: grid;
         grid-template-columns: 1fr auto;
@@ -269,12 +308,11 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
           color 0.12s;
       }
 
-      .picker-row-add wa-icon {
+      .picker-row-add svg {
         display: block;
         width: 18px;
         height: 18px;
-        font-size: 18px;
-        line-height: 0;
+        fill: currentColor;
       }
 
       .picker-row:hover .picker-row-add,
@@ -371,35 +409,16 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   }
 
   private _renderActiveTab() {
-    const filtered = this._applyQuery(
-      this.items.filter((item) => !LEGACY_AUTOMATION_IDS.has(item.id))
-    );
+    const all = this.items.filter((item) => !LEGACY_AUTOMATION_IDS.has(item.id));
+    const q = this._query.trim().toLowerCase();
     switch (this._activeTab) {
       case "by-target":
-        return this._renderByTarget(filtered);
+        return this._renderByTarget(all, q);
       case "by-type":
-        return this._renderByType(filtered);
+        return this._renderByType(filterItems(all, q));
       case "building-blocks":
-        return this._renderBuildingBlocks(filtered);
+        return this._renderBuildingBlocks(filterItems(all, q));
     }
-  }
-
-  /**
-   * Filter the catalog by the search query. Match against the
-   * id, name, and description fields. Case-insensitive substring
-   * match — anything fancier (fuzzy / weighted) would surprise the
-   * user with hits they couldn't explain.
-   */
-  private _applyQuery(items: CatalogItem[]): CatalogItem[] {
-    const q = this._query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) => {
-      return (
-        i.id.toLowerCase().includes(q) ||
-        i.name.toLowerCase().includes(q) ||
-        (i.description ?? "").toLowerCase().includes(q)
-      );
-    });
   }
 
   /**
@@ -410,39 +429,59 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * this domain) so the user doesn't have to re-select the
    * instance after picking.
    */
-  private _renderByTarget(items: CatalogItem[]) {
+  private _renderByTarget(items: CatalogItem[], q: string) {
     if (this.devices.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_targets")}
       </p>`;
     }
+    const byDomain = groupByDomain(items);
     // A multi-entity container isn't itself a referenceable entity — its
-    // sub-entities are surfaced as their own instances.
-    const sections = selectableTargets(this.devices).map((device) => {
-      const domain = componentDomain(device.component_id);
-      const matching = items.filter((i) => {
-        if (!("domain" in i)) return false;
-        return i.domain === domain || i.domain === device.component_id;
-      });
-      return { device, matching };
+    // sub-entities are surfaced as their own instances. The query matches
+    // either axis: an entity hit lists all of that entity's actions.
+    const sections = selectableTargets(this.devices).flatMap((device) => {
+      const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
+      const candidates = itemsForDevice(byDomain, device);
+      const matching = entityMatch || !q ? candidates : filterItems(candidates, q);
+      return matching.length ? [{ device, matching, entityMatch }] : [];
     });
-    const nonEmpty = sections.filter((s) => s.matching.length > 0);
-    if (nonEmpty.length === 0) {
+    if (sections.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_results")}
       </p>`;
     }
-    return html`${nonEmpty.map(
-      ({ device, matching }) => html`
-        <p class="picker-group-label">
-          ${instanceName(device)}
-          <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
-        </p>
-        ${matching.map((item) =>
-          this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
-        )}
-      `
-    )}`;
+    // Open by default when the list is already small; a click overrides that
+    // default for the target, so an auto-opened group can still be closed.
+    const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
+    return html`${sections.map(({ device, matching, entityMatch }) => {
+      const open = this._targetOverrides.get(device.id) ?? defaultOpen;
+      return renderDisclosure({
+        open,
+        onToggle: () => this._setTargetOpen(device.id, !open),
+        localize: this._localize,
+        labelText: this._renderGroupLabel(
+          device,
+          q && !entityMatch ? matching.length : null
+        ),
+        body: () =>
+          html`${matching.map((item) =>
+            this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
+          )}`,
+        variant: "quiet",
+        iconBefore: true,
+      });
+    })}`;
+  }
+
+  private _renderGroupLabel(device: AvailableComponentInstance, count: number | null) {
+    const context = instanceContext(device, this.devices);
+    // Whitespace in this template would be a text node per header.
+    // prettier-ignore
+    return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
+  }
+
+  private _setTargetOpen(id: string, open: boolean) {
+    this._targetOverrides = new Map(this._targetOverrides).set(id, open);
   }
 
   /**
@@ -451,17 +490,12 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * domains sorted alphabetically.
    */
   private _renderByType(items: CatalogItem[]) {
-    const byDomain = new Map<string, CatalogItem[]>();
-    for (const item of items) {
-      if (!("domain" in item)) continue;
-      if (item.domain === "core") continue;
-      // Normalise to bare ``<domain>``: an item with
-      // ``switch.template`` lives under the "switch" group.
-      const bare = componentDomain(item.domain);
-      const list = byDomain.get(bare) ?? [];
-      list.push(item);
-      byDomain.set(bare, list);
-    }
+    // Normalise to bare ``<domain>``: an item with ``switch.template`` lives
+    // under the "switch" group.
+    const byDomain = groupByDomain(
+      items.filter((item) => item.domain !== "core"),
+      (item) => componentDomain(item.domain)
+    );
     const domains = Array.from(byDomain.keys()).sort();
     if (domains.length === 0) {
       return html`<p class="picker-empty">
@@ -486,7 +520,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * for the condition picker.
    */
   private _renderBuildingBlocks(items: CatalogItem[]) {
-    const core = items.filter((i) => "domain" in i && i.domain === "core");
+    const core = items.filter((i) => i.domain === "core");
     if (core.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_results")}
@@ -518,9 +552,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
             : nothing
         }
       </div>
-      <span class="picker-row-add" aria-hidden="true">
-        <wa-icon library="mdi" name="plus"></wa-icon>
-      </span>
+      <span class="picker-row-add" aria-hidden="true">${mdiSvg(mdiPlus)}</span>
     </div>`;
   }
 

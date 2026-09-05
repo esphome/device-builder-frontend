@@ -254,3 +254,142 @@ describe("catalog-picker-dialog tab strip", () => {
     expect(text).not.toContain("HA Service");
   });
 });
+
+describe("catalog-picker-dialog by-target groups", () => {
+  const turnOn = action({ id: "switch.turn_on", name: "Turn On", domain: "switch" });
+  const turnOff = action({ id: "switch.turn_off", name: "Turn Off", domain: "switch" });
+  const relays = (n: number): AvailableComponentInstance[] =>
+    Array.from({ length: n }, (_, i) => ({
+      component_id: "switch.gpio",
+      id: `relay${i}`,
+      name: i === 1 ? "Valve" : `Relay ${i}`,
+    }));
+  const devices = relays(2);
+  const toggles = (dialog: ESPHomeCatalogPickerDialog) =>
+    Array.from(dialog.shadowRoot!.querySelectorAll<HTMLElement>(".disclosure-toggle"));
+  const expandedFlags = (dialog: ESPHomeCatalogPickerDialog) =>
+    toggles(dialog).map((t) => t.getAttribute("aria-expanded"));
+
+  it("starts collapsed and expands one entity per click", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    expect(expandedFlags(dialog)).toEqual(["false", "false"]);
+    expect(rowTitles(dialog)).toEqual([]);
+
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["false", "true"]);
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
+
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(rowTitles(dialog)).toEqual([]);
+  });
+
+  it("a lone group opens by itself and can still be collapsed", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: relays(1),
+      tab: "by-target",
+    });
+    expect(rowTitles(dialog)).toEqual(["Turn On"]);
+    expect(dialog.shadowRoot!.querySelector(".picker-row-add svg")).not.toBeNull();
+
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["false"]);
+    expect(rowTitles(dialog)).toEqual([]);
+  });
+
+  it("an action query over many groups shows match counts and stays collapsed", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices: relays(6),
+      tab: "by-target",
+    });
+    await search(dialog, "turn off");
+    expect(rowTitles(dialog)).toEqual([]);
+    const counts = Array.from(
+      dialog.shadowRoot!.querySelectorAll(".picker-group-count")
+    ).map((n) => n.textContent?.trim());
+    expect(counts).toEqual(["1", "1", "1", "1", "1", "1"]);
+
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(rowTitles(dialog)).toEqual(["Turn Off"]);
+  });
+
+  it("a clicked group keeps its state when a query changes the default", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    // Two groups remain, so the default flips to open; the click still wins.
+    await search(dialog, "turn");
+    expect(expandedFlags(dialog)).toEqual(["true", "true"]);
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    await search(dialog, "");
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+  });
+
+  it("an action query that leaves a few groups opens them", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    await search(dialog, "turn off");
+    expect(expandedFlags(dialog)).toEqual(["true", "true"]);
+    expect(rowTitles(dialog)).toEqual(["Turn Off", "Turn Off"]);
+  });
+
+  it("an entity query shows that group expanded with all its actions", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices: relays(6),
+      tab: "by-target",
+    });
+    await search(dialog, "valve");
+    expect(groupLabels(dialog)).toHaveLength(1);
+    expect(groupLabels(dialog)[0]).toContain("Valve");
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
+  });
+
+  it("an entity query matching many groups stays under the expand cap", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn],
+      devices: relays(6),
+      tab: "by-target",
+    });
+    // Every id is relayN, so all six match; above the cap they stay collapsed.
+    await search(dialog, "relay");
+    expect(groupLabels(dialog)).toHaveLength(6);
+    expect(rowTitles(dialog)).toEqual([]);
+  });
+
+  it("reopening the picker forgets clicked groups", async () => {
+    const dialog = await mountDialog({ items: [turnOn], devices, tab: "by-target" });
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    dialog
+      .shadowRoot!.querySelector("esphome-base-dialog")!
+      .dispatchEvent(new CustomEvent("after-hide"));
+    await dialog.updateComplete;
+    dialog.open();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["false", "false"]);
+  });
+});

@@ -16,7 +16,6 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { identityLocalize } from "../../../_dom.js";
-import type { AutomationAction } from "../../../../src/api/types/automations.js";
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 
 async function mountDialog(
@@ -68,24 +67,16 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
 
   it("renders the body only while open", async () => {
     const dialog = await mountDialog();
-    dialog.items = [
-      { id: "switch.turn_on", name: "Turn On", domain: "switch" } as AutomationAction,
-    ];
-    dialog.devices = [
-      { component_id: "switch.gpio", id: "relay1" },
-      { component_id: "switch.gpio", id: "relay2" },
-    ];
-    await dialog.updateComplete;
-    const rows = () => dialog.shadowRoot!.querySelectorAll(".picker-row").length;
-    expect(rows()).toBe(0);
+    const body = () => dialog.shadowRoot!.querySelectorAll(".picker-body").length;
+    expect(body()).toBe(0);
 
     dialog.open();
     await dialog.updateComplete;
-    expect(rows()).toBe(2);
+    expect(body()).toBe(1);
 
     afterHide(dialog);
     await dialog.updateComplete;
-    expect(rows()).toBe(0);
+    expect(body()).toBe(0);
   });
 
   it("picking an item emits catalog-picked and closes the dialog", async () => {

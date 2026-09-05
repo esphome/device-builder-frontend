@@ -1,13 +1,6 @@
 import { html } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
-// renderDisclosure's module-level registerMdiIcons() reaches webawesome's
-// icon-library registry; stub it so this node-environment test stays hermetic
-// and doesn't pull the DOM-dependent real implementation.
-vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
-  registerIconLibrary: () => {},
-}));
-
 import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
@@ -69,7 +62,7 @@ describe("renderDisclosure", () => {
       body: () => html``,
     });
     expect(renderedText(result)).toContain("settings.my_label");
-    const chevrons = findTemplatesByAnchor(result, "<wa-icon");
+    const chevrons = findTemplatesByAnchor(result, "<svg");
     expect(chevrons).toHaveLength(1);
     expect(chevrons[0].strings.join("")).toContain('aria-hidden="true"');
   });
@@ -101,7 +94,7 @@ describe("renderDisclosure", () => {
     });
     visitTemplates(result, (t) => {
       const s = t.strings.join("");
-      if (s.includes("<wa-icon")) order.push("icon");
+      if (s.includes("<svg")) order.push("icon");
       else if (s.includes("disclosure-toggle__label")) order.push("label");
     });
     expect(order).toEqual(["icon", "label"]);
