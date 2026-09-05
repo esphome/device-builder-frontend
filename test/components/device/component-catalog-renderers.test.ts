@@ -264,10 +264,13 @@ describe("shouldHandleCardClick", () => {
     // the icon, not the button. closest() must walk up to find it.
     const card = document.createElement("article");
     const addButton = document.createElement("button");
-    const icon = document.createElement("svg");
+    const svgNs = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(svgNs, "svg");
+    const path = document.createElementNS(svgNs, "path");
+    icon.append(path);
     addButton.append(icon);
     card.append(addButton);
-    expect(shouldHandleCardClick(clickFrom(icon))).toBe(false);
+    expect(shouldHandleCardClick(clickFrom(path))).toBe(false);
   });
 
   it("skips when the click landed on the more-info anchor", () => {

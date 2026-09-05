@@ -31,8 +31,6 @@ import {
 import { renderBundleCard, renderCard } from "./component-catalog/renderers.js";
 import { componentCatalogStyles } from "./component-catalog/styles.js";
 
-import "@home-assistant/webawesome/dist/components/badge/badge.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 @customElement("esphome-component-catalog")

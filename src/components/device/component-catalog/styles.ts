@@ -221,10 +221,6 @@ export const componentCatalogStyles = css`
     outline-offset: 1px;
   }
 
-  .expand-button svg {
-    transition: transform var(--wa-transition-normal) var(--wa-transition-easing);
-  }
-
   .component-card-header {
     display: flex;
     align-items: center;
