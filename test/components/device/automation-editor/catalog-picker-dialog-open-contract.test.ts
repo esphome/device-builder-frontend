@@ -129,16 +129,26 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
       requestClose?: () => void;
     };
     wrapper.requestClose = vi.fn();
+    (dialog as unknown as { _query: string })._query = "still visible";
     (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
-    // Still hiding: the flag is true, so a fresh open() cannot flip it yet.
+    // Still hiding: the rows are live, so the queued open() leaves the state alone.
     dialog.open();
     expect(isOpen(dialog)).toBe(true);
+    expect((dialog as unknown as { _query: string })._query).toBe("still visible");
 
+    // The hide ends: the flag drops so the wrapper sees a real close, then the
+    // queued open runs with a fresh reset.
     afterHide(dialog);
+    expect(isOpen(dialog)).toBe(false);
+    await dialog.updateComplete;
     await dialog.updateComplete;
     expect(isOpen(dialog)).toBe(true);
+    expect((dialog as unknown as { _query: string })._query).toBe("");
+
     // A plain close with nothing queued stays closed.
     afterHide(dialog);
+    await dialog.updateComplete;
+    await dialog.updateComplete;
     expect(isOpen(dialog)).toBe(false);
   });
 

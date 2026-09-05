@@ -124,14 +124,17 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * conditions (which lack a target tab).
    */
   public open() {
+    // The shared instance may still be hiding from the last pick; its rows are
+    // live until then, so leave its state alone and re-show after the hide.
+    if (this._dialog.open) {
+      this._reopenAfterHide = true;
+      return;
+    }
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
     this._targetOverrides = new Map();
     this._picked = false;
-    // The shared instance may still be hiding from the last pick; the flag is
-    // already true then, so re-show once that hide has finished.
-    if (this._dialog.open) this._reopenAfterHide = true;
-    else this._dialog.open = true;
+    this._dialog.open = true;
   }
 
   static styles = [
@@ -495,10 +498,11 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
   private _onAfterHide = () => {
     this._dialog.onAfterHide();
-    if (this._reopenAfterHide) {
-      this._reopenAfterHide = false;
-      this._dialog.open = true;
-    }
+    if (!this._reopenAfterHide) return;
+    this._reopenAfterHide = false;
+    // Let the closed state reach the wrapper first; flipping the flag back in
+    // the same tick would leave the ?open binding unchanged and never re-show.
+    void this.updateComplete.then(() => this.open());
   };
 
   private _setTargetOpen(id: string, open: boolean) {
