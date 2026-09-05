@@ -80,11 +80,10 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(body()).toBe(0);
   });
 
-  it("picking an item emits catalog-picked", async () => {
+  it("picking an item hands the detail to the request's onPicked", async () => {
     const dialog = await mountDialog();
-    dialog.open();
     const picked = vi.fn();
-    dialog.addEventListener("catalog-picked", (e) => picked((e as CustomEvent).detail));
+    dialog.open({ kind: "action", items: [], devices: [], onPicked: picked });
     (
       dialog as unknown as {
         _pick: (id: string, p?: Record<string, unknown>) => void;
@@ -187,7 +186,9 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     };
     wrapper.requestClose = vi.fn();
     const picked = vi.fn();
-    dialog.addEventListener("catalog-picked", picked);
+    const request = { kind: "action" as const, items: [], devices: [], onPicked: picked };
+    dialog.open(request);
+    await dialog.updateComplete;
     const pick = (dialog as unknown as { _pick: (id: string) => void })._pick.bind(
       dialog
     );
@@ -197,7 +198,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(picked).toHaveBeenCalledTimes(1);
 
     afterHide(dialog);
-    dialog.open();
+    dialog.open(request);
     await dialog.updateComplete;
     pick("switch.turn_on");
     expect(picked).toHaveBeenCalledTimes(2);

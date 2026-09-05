@@ -22,10 +22,9 @@
  *
  * Search box at the top filters across all three tabs.
  *
- * Emits ``catalog-picked`` (``{ id: string; preFilledParams?:
- * Record<string, unknown> }``) when the user picks an item, and hands
- * the same detail to the ``onPicked`` of the request it was opened
- * with. One instance serves a whole editor tree through
+ * A pick (``{ id: string; preFilledParams?: Record<string, unknown> }``)
+ * goes to the ``onPicked`` of the request the picker was opened with.
+ * One instance serves a whole editor tree through
  * ``esphome-catalog-picker-host``; requesters create the node.
  *
  * Generic over the catalog kind (actions vs conditions) so we
@@ -81,9 +80,9 @@ registerMdiIcons({ close: mdiClose, magnify: mdiMagnify });
  *  tab visibility and the result-shape of picks. */
 type CatalogKind = "action" | "condition";
 
-/** Detail of the ``catalog-picked`` event. ``preFilledParams`` is
- *  optional — only the By-target tab sets it (to seed the action's
- *  ``id:`` field with the picked instance). */
+/** What a pick hands to the requester. ``preFilledParams`` is optional —
+ *  only the By-target tab sets it (to seed the action's ``id:`` field with
+ *  the picked instance). */
 export interface CatalogPickedDetail {
   id: string;
   preFilledParams?: Record<string, unknown>;
@@ -623,11 +622,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   private _pick(id: string, preFilledParams?: Record<string, unknown>) {
     if (this._picked) return;
     this._picked = true;
-    const detail: CatalogPickedDetail = { id, preFilledParams };
-    this.dispatchEvent(
-      new CustomEvent<CatalogPickedDetail>("catalog-picked", { detail })
-    );
-    this._request?.onPicked(detail);
+    this._request?.onPicked({ id, preFilledParams });
     this._dialog.requestClose();
   }
 }

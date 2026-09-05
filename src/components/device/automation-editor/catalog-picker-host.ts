@@ -21,8 +21,9 @@ export function requestCatalogPick(from: HTMLElement, request: CatalogPickReques
 /**
  * One picker for a whole editor tree. Action lists, action nodes and
  * condition trees request a pick instead of each mounting a dialog, so a
- * long automation carries one picker, not one per row. A pick lands on the
- * requester's callback even if its row has since been removed.
+ * long automation carries one picker, not one per row. A pick still runs the
+ * requester's callback if its row was removed meanwhile; the emit then reaches
+ * nobody.
  */
 @customElement("esphome-catalog-picker-host")
 export class ESPHomeCatalogPickerHost extends LitElement {
@@ -32,6 +33,12 @@ export class ESPHomeCatalogPickerHost extends LitElement {
   static styles = css`
     :host {
       display: contents;
+    }
+
+    /* The host has no box, so keep the closed picker out of the section's
+       flex flow; the open dialog renders in the top layer regardless. */
+    esphome-catalog-picker-dialog {
+      position: absolute;
     }
   `;
 
