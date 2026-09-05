@@ -11,7 +11,6 @@ import {
   instanceName,
   isSelectableTarget,
   preFillIdParam,
-  selectableTargets,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
 
@@ -53,7 +52,7 @@ describe("component-targets", () => {
 
   it("drops containers from the selectable list and the first-selectable lookup", () => {
     const devices = [container, temp, relay];
-    expect(selectableTargets(devices)).toEqual([temp, relay]);
+    expect(indexTargets(devices).selectable).toEqual([temp, relay]);
     expect(firstSelectableTarget(devices)).toBe(temp);
   });
 

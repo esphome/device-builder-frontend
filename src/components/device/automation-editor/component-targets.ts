@@ -59,7 +59,7 @@ export function isSelectableTarget(device: AvailableComponentInstance): boolean 
 }
 
 /** The instances a picker may offer (containers dropped). */
-export function selectableTargets(
+function selectableTargets(
   devices: AvailableComponentInstance[]
 ): AvailableComponentInstance[] {
   return devices.filter(isSelectableTarget);
