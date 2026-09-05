@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
-import { baseDialog, mount } from "../../_dom.js";
+import { baseDialog, dialogOpen, mount, stubDialogRequestClose } from "../../_dom.js";
 import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { ESPHomeConfigMigrationPreviewDialog } from "../../../src/components/device/config-migration-preview-dialog.js";
 import type { ESPHomeYamlDiff } from "../../../src/components/yaml-diff.js";
@@ -71,7 +71,9 @@ describe("config-migration preview dialog reveal toggle", () => {
     expect(diffEl(el).revealSensitive).toBe(true);
 
     el.close();
+    baseDialog(el).dispatchEvent(new CustomEvent("after-hide"));
     await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("esphome-yaml-diff")).toBeNull();
     el.open();
     await el.updateComplete;
     expect(diffEl(el).revealSensitive).toBe(false);
@@ -79,37 +81,38 @@ describe("config-migration preview dialog reveal toggle", () => {
 });
 
 describe("config-migration preview dialog close path", () => {
-  const stubWrapper = (el: ESPHomeConfigMigrationPreviewDialog) => {
-    const wrapper = baseDialog(el) as HTMLElement & { requestClose?: () => void };
-    wrapper.requestClose = vi.fn();
-    return wrapper;
-  };
-  const isOpen = (el: ESPHomeConfigMigrationPreviewDialog): boolean =>
-    (el as unknown as { _dialog: { open: boolean } })._dialog.open;
-
   it("keeps the diff rendered until the wrapper has finished hiding", async () => {
     const el = await mountOpen();
-    const wrapper = stubWrapper(el);
+    const wrapper = stubDialogRequestClose(el);
     el.close();
     await el.updateComplete;
     expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
-    expect(isOpen(el)).toBe(true);
+    expect(dialogOpen(el)).toBe(true);
     expect(diffEl(el)).not.toBeNull();
 
     wrapper.dispatchEvent(new CustomEvent("after-hide"));
     await el.updateComplete;
-    expect(isOpen(el)).toBe(false);
+    expect(dialogOpen(el)).toBe(false);
     expect(el.shadowRoot!.querySelector("esphome-yaml-diff")).toBeNull();
   });
 
   it("a second confirm during the hide does not request the migration again", async () => {
     const el = await mountOpen();
-    stubWrapper(el);
+    const wrapper = stubDialogRequestClose(el);
     const requested = vi.fn();
     el.addEventListener("request-migrate-config", requested);
-    const confirm = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")!;
-    confirm.click();
-    confirm.click();
+    const confirm = () =>
+      el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")!.click();
+    confirm();
+    confirm();
     expect(requested).toHaveBeenCalledTimes(1);
+
+    // The same instance is reused across previews; a reopen re-arms the button.
+    wrapper.dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    el.open();
+    await el.updateComplete;
+    confirm();
+    expect(requested).toHaveBeenCalledTimes(2);
   });
 });
