@@ -20,6 +20,14 @@ vi.mock(
   "../../../../src/components/device/automation-editor/automation-action-list.js",
   () => ({})
 );
+// The shared picker host would mount the real dialog chain (base-dialog,
+// wa-dialog, wa-button), which happy-dom cannot upgrade.
+vi.mock(
+  "../../../../src/components/device/automation-editor/catalog-picker-host.js",
+  () => ({
+    requestCatalogPick: () => {},
+  })
+);
 vi.mock(
   "../../../../src/components/device/automation-editor/automation-target-picker.js",
   () => ({})
