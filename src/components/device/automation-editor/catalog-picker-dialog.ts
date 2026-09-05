@@ -114,6 +114,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _query = "";
   /** Per-target open state the user set by clicking; wins over the default. */
   @state() private _targetOverrides = new Map<string, boolean>();
+  /** Set on the first pick; the rows stay live through the hide animation. */
+  private _picked = false;
 
   /**
    * Open the dialog with a fresh search, no clicked-open groups, and the
@@ -124,6 +126,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
     this._targetOverrides = new Map();
+    this._picked = false;
     this._dialog.open = true;
   }
 
@@ -557,6 +560,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   }
 
   private _pick(id: string, preFilledParams?: Record<string, unknown>) {
+    if (this._picked) return;
+    this._picked = true;
     this.dispatchEvent(
       new CustomEvent<CatalogPickedDetail>("catalog-picked", {
         detail: { id, preFilledParams },

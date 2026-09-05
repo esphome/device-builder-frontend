@@ -118,4 +118,31 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(isOpen(dialog)).toBe(false);
     expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
   });
+
+  it("a second pick during the hide is ignored until the picker reopens", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    await dialog.updateComplete;
+    const wrapper = dialog.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    const picked = vi.fn();
+    dialog.addEventListener("catalog-picked", picked);
+    const pick = (dialog as unknown as { _pick: (id: string) => void })._pick.bind(
+      dialog
+    );
+
+    pick("switch.toggle");
+    pick("switch.turn_on");
+    expect(picked).toHaveBeenCalledTimes(1);
+
+    afterHide(dialog);
+    dialog.open();
+    await dialog.updateComplete;
+    pick("switch.turn_on");
+    expect(picked).toHaveBeenCalledTimes(2);
+  });
 });
