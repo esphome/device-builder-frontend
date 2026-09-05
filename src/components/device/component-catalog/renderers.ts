@@ -47,6 +47,7 @@ function renderExpandButton(host: ESPHomeComponentCatalog, id: string): Template
     class="expand-button"
     type="button"
     aria-pressed=${expanded}
+    aria-label=${host._localize("wizard.expand_board")}
     title=${host._localize("wizard.expand_board")}
     @click=${() => host._onToggleExpand(id)}
   >
