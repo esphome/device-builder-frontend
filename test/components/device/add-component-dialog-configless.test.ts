@@ -91,6 +91,15 @@ describe("add-component-dialog skips the form for configless components", () => 
     );
   });
 
+  it("keeps the form when the seeded type shows the bus reference", async () => {
+    const { dialog, addComponent } = makeDialog(makeEthernetEntry("W5500"));
+
+    await select(dialog, "ethernet");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).not.toBeNull();
+  });
+
   it("opens the form for a bus-constrained component even when input-free", async () => {
     // The bus-hostability verdict resolves async inside the form; the
     // fast path must not add before it can gate.
