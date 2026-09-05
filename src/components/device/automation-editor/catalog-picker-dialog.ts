@@ -156,7 +156,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   private readonly _dialog = new DialogOpenController(this);
   @state() private _activeTab: Tab = "by-target";
   @state() private _query = "";
-  @state() private _expandedTargets = new Set<string>();
+  /** Per-target open state the user set by clicking; wins over the default. */
+  @state() private _targetOverrides = new Map<string, boolean>();
 
   /**
    * Open the dialog. Resets the active tab to a sensible default
@@ -166,7 +167,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   public open() {
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
-    this._expandedTargets = new Set();
+    this._targetOverrides = new Map();
     this._dialog.open = true;
   }
 
@@ -491,13 +492,14 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${this._localize("device.automation_pick_no_results")}
       </p>`;
     }
-    // Open by default when the list is already small; the expanded set is an
-    // override of that default, so an auto-opened group can still be closed.
+    // Open by default when the list is already small; a click overrides that
+    // default for the target, so an auto-opened group can still be closed.
     const defaultOpen = sections.length <= (q ? AUTO_EXPAND_MAX_GROUPS : 1);
-    return html`${sections.map(({ device, matching, entityMatch }) =>
-      renderDisclosure({
-        open: this._expandedTargets.has(device.id) !== (defaultOpen || entityMatch),
-        onToggle: () => this._toggleTarget(device.id),
+    return html`${sections.map(({ device, matching, entityMatch }) => {
+      const open = this._targetOverrides.get(device.id) ?? (defaultOpen || entityMatch);
+      return renderDisclosure({
+        open,
+        onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
         labelText: html`<span class="picker-group-label">
           ${instanceName(device)}
@@ -510,14 +512,12 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
           )}`,
         variant: "quiet",
         iconBefore: true,
-      })
-    )}`;
+      });
+    })}`;
   }
 
-  private _toggleTarget(key: string) {
-    const next = new Set(this._expandedTargets);
-    if (!next.delete(key)) next.add(key);
-    this._expandedTargets = next;
+  private _setTargetOpen(id: string, open: boolean) {
+    this._targetOverrides = new Map(this._targetOverrides).set(id, open);
   }
 
   /**

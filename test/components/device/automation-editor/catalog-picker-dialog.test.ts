@@ -322,6 +322,27 @@ describe("catalog-picker-dialog by-target groups", () => {
     expect(rowTitles(dialog)).toEqual(["Turn Off"]);
   });
 
+  it("a clicked group keeps its state when a query changes the default", async () => {
+    const dialog = await mountDialog({
+      items: [turnOn, turnOff],
+      devices,
+      tab: "by-target",
+    });
+    toggles(dialog)[0].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    // Two groups remain, so the default flips to open; the click still wins.
+    await search(dialog, "turn");
+    expect(expandedFlags(dialog)).toEqual(["true", "true"]);
+    toggles(dialog)[1].click();
+    await dialog.updateComplete;
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+
+    await search(dialog, "");
+    expect(expandedFlags(dialog)).toEqual(["true", "false"]);
+  });
+
   it("an action query that leaves a few groups opens them", async () => {
     const dialog = await mountDialog({
       items: [turnOn, turnOff],
