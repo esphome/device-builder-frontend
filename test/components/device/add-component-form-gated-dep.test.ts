@@ -3,9 +3,11 @@
  *
  * Pins the value-gated dependency banner following the chosen type.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
+
+vi.mock("../../../src/components/device/config-entry-form.js", () => ({}));
 
 import type { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
