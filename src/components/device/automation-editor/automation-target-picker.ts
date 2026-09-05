@@ -44,6 +44,7 @@ import {
   instanceContext,
   instanceName,
   selectableTargets,
+  targetsById,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -168,6 +169,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
       // A multi-entity container isn't a valid trigger target — its
       // sub-entities are (offered as their own instances).
       const targets = selectableTargets(this.devices);
+      const byId = targetsById(this.devices);
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">
           ${this._localize("device.automation_target_no_components")}
@@ -188,9 +190,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             (d) =>
               html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
                 >${instanceName(d)}
-                <span class="ae-muted"
-                  >(${instanceContext(d, this.devices)})</span
-                ></wa-option
+                <span class="ae-muted">(${instanceContext(d, byId)})</span></wa-option
               >`
           )}
         </wa-select>

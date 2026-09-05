@@ -66,6 +66,7 @@ import {
   instanceName,
   preFillIdParam,
   selectableTargets,
+  targetsById,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -439,6 +440,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       </p>`;
     }
     const byDomain = groupByDomain(items);
+    const byId = targetsById(this.devices);
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances. The query matches
     // either axis: an entity hit lists all of that entity's actions.
@@ -464,6 +466,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         localize: this._localize,
         labelText: this._renderGroupLabel(
           device,
+          byId,
           q && !entityMatch ? matching.length : null
         ),
         body: () =>
@@ -476,8 +479,12 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     })}`;
   }
 
-  private _renderGroupLabel(device: AvailableComponentInstance, count: number | null) {
-    const context = instanceContext(device, this.devices);
+  private _renderGroupLabel(
+    device: AvailableComponentInstance,
+    byId: ReadonlyMap<string, AvailableComponentInstance>,
+    count: number | null
+  ) {
+    const context = instanceContext(device, byId);
     // Whitespace in this template would be a text node per header.
     // prettier-ignore
     return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;

@@ -28,16 +28,21 @@ export function componentDomain(componentId: string): string {
   return parseCatalogId(componentId).domain;
 }
 
+/** Instances keyed by id, built once per render for the per-row lookups. */
+export function targetsById(
+  devices: AvailableComponentInstance[]
+): Map<string, AvailableComponentInstance> {
+  return new Map(devices.map((d) => [d.id, d]));
+}
+
 /** The parenthetical context shown beside an instance's label: its domain,
  *  plus the owning container's name when it's a sub-entity, so two readings
  *  named alike (``Temperature``) read distinctly across the picker surfaces. */
 export function instanceContext(
   device: AvailableComponentInstance,
-  devices: AvailableComponentInstance[]
+  byId: ReadonlyMap<string, AvailableComponentInstance>
 ): string {
-  const parent = device.parent_id
-    ? devices.find((p) => p.id === device.parent_id)
-    : undefined;
+  const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
   return parent
     ? `${device.component_id} · ${instanceName(parent)}`
     : device.component_id;

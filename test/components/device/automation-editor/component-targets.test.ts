@@ -12,6 +12,7 @@ import {
   isSelectableTarget,
   preFillIdParam,
   selectableTargets,
+  targetsById,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
 
@@ -105,16 +106,13 @@ describe("instance label helpers", () => {
 
   it("instanceContext appends the owning container for a sub-entity", () => {
     const named = inst({ id: "aht20", component_id: "sensor.aht10", name: "AHT20" });
-    const devices = [named, temp];
+    const byId = targetsById([named, temp]);
     // Sub-entity → domain · parent label; plain instance → bare domain only.
-    expect(instanceContext(temp, devices)).toBe("sensor · AHT20");
-    expect(instanceContext(relay, devices)).toBe("switch.gpio");
+    expect(instanceContext(temp, byId)).toBe("sensor · AHT20");
+    expect(instanceContext(relay, byId)).toBe("switch.gpio");
     // A dangling parent_id (parent absent) degrades to the bare domain.
     expect(
-      instanceContext(
-        inst({ id: "o", component_id: "sensor", parent_id: "gone" }),
-        devices
-      )
+      instanceContext(inst({ id: "o", component_id: "sensor", parent_id: "gone" }), byId)
     ).toBe("sensor");
   });
 });
