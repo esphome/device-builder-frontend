@@ -317,12 +317,13 @@ describe("liveDependencies", () => {
     ]);
   });
 
-  it("keeps a dep whose hidden reference has a passing value gate", () => {
+  it("reads only the value gate on a hidden reference", () => {
     const [type, spiId] = makeEthernetEntry().config_entries;
     const ethernet = {
       ...makeEthernetEntry(),
       config_entries: [type, { ...spiId, hidden: true }],
     };
     expect(liveDependencies(ethernet, { type: "W5500" })).toEqual(["spi"]);
+    expect(liveDependencies(ethernet, { type: "IP101" })).toEqual([]);
   });
 });
