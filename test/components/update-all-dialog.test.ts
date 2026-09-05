@@ -116,6 +116,22 @@ describe("update-all-dialog", () => {
     expect(firmwareInstallBulk).toHaveBeenCalledWith(["a.yaml"]);
   });
 
+  it("a second confirm during the hide animation does not enqueue again", async () => {
+    const { api, firmwareInstallBulk } = fakeApi();
+    const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
+    // With the wrapper routing the close, the button stays live until after-hide.
+    const wrapper = el.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    primaryButton(el).click();
+    primaryButton(el).click();
+    expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
+    expect(firmwareInstallBulk).toHaveBeenCalledTimes(1);
+  });
+
   it("disables Update and skips the API call when nothing matches", async () => {
     const { api, firmwareInstallBulk } = fakeApi();
     const el = await mount([onlineCurrent, offlineUpdatable], api);
