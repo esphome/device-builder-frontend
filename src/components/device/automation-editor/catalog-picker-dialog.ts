@@ -103,6 +103,22 @@ function groupByDomain(
   return groups;
 }
 
+/**
+ * Filter the catalog by the lower-cased search query *q*. Match against the
+ * id, name, and description fields. Case-insensitive substring match —
+ * anything fancier (fuzzy / weighted) would surprise the user with hits they
+ * couldn't explain.
+ */
+function filterItems(items: CatalogItem[], q: string): CatalogItem[] {
+  if (!q) return items;
+  return items.filter(
+    (i) =>
+      i.id.toLowerCase().includes(q) ||
+      i.name.toLowerCase().includes(q) ||
+      (i.description ?? "").toLowerCase().includes(q)
+  );
+}
+
 /** Items whose domain is the device's bare domain or its exact platform id. */
 function itemsForDevice(
   byDomain: Map<string, CatalogItem[]>,
@@ -435,33 +451,15 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
   private _renderActiveTab() {
     const all = this.items.filter((item) => !LEGACY_AUTOMATION_IDS.has(item.id));
-    const filtered = this._applyQuery(all);
+    const q = this._query.trim().toLowerCase();
     switch (this._activeTab) {
       case "by-target":
-        return this._renderByTarget(all);
+        return this._renderByTarget(all, q);
       case "by-type":
-        return this._renderByType(filtered);
+        return this._renderByType(filterItems(all, q));
       case "building-blocks":
-        return this._renderBuildingBlocks(filtered);
+        return this._renderBuildingBlocks(filterItems(all, q));
     }
-  }
-
-  /**
-   * Filter the catalog by the search query. Match against the
-   * id, name, and description fields. Case-insensitive substring
-   * match — anything fancier (fuzzy / weighted) would surprise the
-   * user with hits they couldn't explain.
-   */
-  private _applyQuery(items: CatalogItem[]): CatalogItem[] {
-    const q = this._query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) => {
-      return (
-        i.id.toLowerCase().includes(q) ||
-        i.name.toLowerCase().includes(q) ||
-        (i.description ?? "").toLowerCase().includes(q)
-      );
-    });
   }
 
   /**
@@ -472,13 +470,12 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * this domain) so the user doesn't have to re-select the
    * instance after picking.
    */
-  private _renderByTarget(items: CatalogItem[]) {
+  private _renderByTarget(items: CatalogItem[], q: string) {
     if (this.devices.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_targets")}
       </p>`;
     }
-    const q = this._query.trim();
     const byDomain = groupByDomain(items);
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances. The query matches
@@ -486,7 +483,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     const sections = selectableTargets(this.devices).flatMap((device) => {
       const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
       const candidates = itemsForDevice(byDomain, device);
-      const matching = entityMatch ? candidates : this._applyQuery(candidates);
+      const matching = entityMatch || !q ? candidates : filterItems(candidates, q);
       return matching.length ? [{ device, matching, entityMatch }] : [];
     });
     if (sections.length === 0) {
