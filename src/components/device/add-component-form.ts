@@ -33,6 +33,7 @@ import {
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
+  liveDependencies,
 } from "./add-component-deps.js";
 import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
@@ -282,8 +283,14 @@ export class ESPHomeAddComponentForm extends LitElement {
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a bus dep present but with no attachable bus (`_busBlockedDep`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
+    const live = liveDependencies(this.component.dependencies ?? [], {
+      entries: this._entries,
+      values: this._values,
+      board: this.board,
+      presentComponents: present,
+    });
     const missing = findMissingDependencies(
-      this.component.dependencies ?? [],
+      live,
       this.yaml,
       present,
       this.resolvedPlatforms
@@ -307,6 +314,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Common dep-free case: nothing to resolve, so skip the YAML parse too.
     if (!api || deps.length === 0) return;
     const present = this._visibilityPresence();
+    // Ungated on purpose: resolving provides for the whole flat list once
+    // covers any dep a later value change makes live.
     const missing = findMissingDependencies(
       deps,
       this.yaml,

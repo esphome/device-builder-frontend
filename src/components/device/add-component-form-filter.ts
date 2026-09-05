@@ -30,6 +30,20 @@ function addFormFilterOptions(
   });
 }
 
+/** Visibility predicate for *entries* under the add-component form's fixed filter. */
+export function addFormEntryVisible(
+  entries: readonly ConfigEntry[],
+  values: Record<string, unknown>,
+  board: BoardCatalogEntry | null,
+  presentComponents: ReadonlySet<string>
+): (entry: ConfigEntry) => boolean {
+  return visibleUnder(
+    entries,
+    values,
+    addFormFilterOptions(values, board, presentComponents)
+  );
+}
+
 /**
  * Dotted paths the add-component form would paint for *entries* under its
  * fixed filter. The form's error-visibility check reads it so a validation
@@ -69,16 +83,7 @@ export function addFormNeedsUserInput(
   // Group/cluster members are unfiltered in the plan; gate them on the same
   // visibility the form uses so a hidden unlocked member can't keep the form
   // open when every rendered field is board-locked.
-  const isVisible = (entry: ConfigEntry): boolean =>
-    isEntryVisible(
-      entry,
-      values,
-      opts.presentComponents,
-      opts.targetPlatform ?? null,
-      opts.rootValues,
-      entries
-    );
-  if (planNeedsUserInput(plan, isVisible)) return true;
+  if (planNeedsUserInput(plan, visibleUnder(entries, values, opts))) return true;
   // Pure-cardinality groups with no cluster box surface a banner only when
   // unsatisfied; keys are irrelevant to presence, so format to "".
   return (
@@ -94,4 +99,20 @@ export function addFormNeedsUserInput(
       plan.memberKeys
     ).length > 0
   );
+}
+
+function visibleUnder(
+  entries: readonly ConfigEntry[],
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions
+): (entry: ConfigEntry) => boolean {
+  return (entry) =>
+    isEntryVisible(
+      entry,
+      values,
+      opts.presentComponents,
+      opts.targetPlatform ?? null,
+      opts.rootValues,
+      entries
+    );
 }

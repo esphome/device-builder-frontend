@@ -1,5 +1,7 @@
 import type { ESPHomeAPI } from "../../api/index.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import { ComponentCategory } from "../../api/types/components.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
@@ -7,12 +9,44 @@ import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
 } from "../../util/yaml-serialize.js";
+import { addFormEntryVisible } from "./add-component-form-filter.js";
 
 // Platform domains (sensor, switch, number, ...) are satisfied only by
 // a top-level block of that name, never by a same-named platform under
 // another domain: a `binary_sensor: - platform: switch` mirror must not
 // pass for a `switch:` dependency. Guards the stem-match branch below.
 const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
+
+/** Form scope `liveDependencies` evaluates entry gates in. */
+export interface DepScope {
+  entries: readonly ConfigEntry[];
+  values: Record<string, unknown>;
+  board: BoardCatalogEntry | null;
+  presentComponents: ReadonlySet<string>;
+}
+
+/**
+ * *dependencies* minus those every referencing top-level entry hides.
+ *
+ * A dep no top-level entry references is kept; nested entries are not
+ * walked.
+ */
+export function liveDependencies(
+  dependencies: readonly string[],
+  scope: DepScope
+): string[] {
+  if (dependencies.length === 0) return [];
+  const visible = addFormEntryVisible(
+    scope.entries,
+    scope.values,
+    scope.board,
+    scope.presentComponents
+  );
+  return dependencies.filter((dep) => {
+    const refs = scope.entries.filter((e) => e.references_component === dep);
+    return refs.length === 0 || refs.some(visible);
+  });
+}
 
 /**
  * Catalog dependencies not yet satisfied by the current YAML.

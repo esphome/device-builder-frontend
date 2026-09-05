@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
+  liveDependencies,
 } from "../../../src/components/device/add-component-deps.js";
 import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 import { parseTopLevelComponents } from "../../../src/util/yaml-serialize.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import { ethernetEntries } from "../../util/_make-ethernet-entry.js";
 
 function providersResponse(ids: string[]) {
   return {
@@ -251,5 +255,49 @@ describe("depsSatisfiedByProvides", () => {
     await depsSatisfiedByProvides(api, ...args);
     await depsSatisfiedByProvides(api, ...args);
     expect(getComponents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("liveDependencies", () => {
+  const scope = (values: Record<string, unknown>, entries = ethernetEntries()) => ({
+    entries,
+    values,
+    board: null,
+    presentComponents: new Set<string>(),
+  });
+
+  it("drops a dep whose only referencing entry the chosen type hides", () => {
+    expect(liveDependencies(["spi"], scope({ type: "IP101" }))).toEqual([]);
+  });
+
+  it("keeps the dep once the chosen type shows the reference", () => {
+    expect(liveDependencies(["spi"], scope({ type: "W5500" }))).toEqual(["spi"]);
+  });
+
+  it("resolves an untouched gate through the sibling default", () => {
+    expect(liveDependencies(["spi"], scope({}, ethernetEntries("W5500")))).toEqual([
+      "spi",
+    ]);
+    expect(liveDependencies(["spi"], scope({}, ethernetEntries("IP101")))).toEqual([]);
+  });
+
+  it("drops the dep while the gate is unset with no default", () => {
+    expect(liveDependencies(["spi"], scope({}))).toEqual([]);
+  });
+
+  it("keeps a dep no entry references", () => {
+    expect(liveDependencies(["spi", "uart"], scope({ type: "IP101" }))).toEqual(["uart"]);
+  });
+
+  it("does not walk nested entries", () => {
+    const [type, spiId] = ethernetEntries();
+    const nested = makeConfigEntry({
+      key: "bus",
+      type: ConfigEntryType.NESTED,
+      config_entries: [spiId],
+    });
+    expect(liveDependencies(["spi"], scope({ type: "IP101" }, [type, nested]))).toEqual([
+      "spi",
+    ]);
   });
 });
