@@ -5,8 +5,9 @@
  * migration onto ``esphome-base-dialog``. The wrapper never mutates
  * its own ``open`` on a user-driven close, so the host owns the
  * reactive ``_open`` flag: ``open()`` sets it, ``@after-hide``
- * clears it once the hide animation ends, and picking an item clears
- * it. The body renders only while open. The sibling
+ * clears it once the hide animation ends, and picking an item requests
+ * a close through the wrapper so the same after-hide clears it. The body
+ * renders only while open. The sibling
  * ``catalog-picker-dialog.test.ts`` covers the filter / grouping
  * contract; this file owns the open/close lifecycle.
  */
