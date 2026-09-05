@@ -308,12 +308,19 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ? ["by-target", "by-type", "building-blocks"]
         : ["by-type", "building-blocks"];
 
+    // Every action node mounts its own picker and the by-target tab is one
+    // row per entity x action, so a closed picker must not hold that subtree.
     return html`<esphome-base-dialog
       ?open=${this._dialog.open}
       .label=${title}
       @request-close=${this._dialog.onRequestClose}
     >
-      <div class="picker-search">
+      ${this._dialog.open ? this._renderBody(tabs, placeholder) : nothing}
+    </esphome-base-dialog>`;
+  }
+
+  private _renderBody(tabs: Tab[], placeholder: string) {
+    return html`<div class="picker-search">
         <div class="picker-search-wrap">
           <wa-icon
             class="picker-search-icon"
@@ -349,8 +356,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
             </button>`
         )}
       </div>
-      <div class="picker-body" role="tabpanel">${this._renderActiveTab()}</div>
-    </esphome-base-dialog>`;
+      <div class="picker-body" role="tabpanel">${this._renderActiveTab()}</div>`;
   }
 
   private _tabLabel(tab: Tab): string {
