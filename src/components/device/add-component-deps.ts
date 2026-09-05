@@ -29,7 +29,7 @@ export interface DepScope {
  * *dependencies* minus those every referencing top-level entry hides.
  *
  * A dep no top-level entry references is kept; nested entries are not
- * walked.
+ * walked. An unresolvable gate hides its entry, so the dep is dropped.
  */
 export function liveDependencies(
   dependencies: readonly string[],

@@ -30,7 +30,7 @@ function addFormFilterOptions(
   });
 }
 
-/** Visibility predicate for *entries* under the add-component form's fixed filter. */
+/** Visibility predicate for *entries* in the add-component form's board and presence scope. */
 export function addFormEntryVisible(
   entries: readonly ConfigEntry[],
   values: Record<string, unknown>,
