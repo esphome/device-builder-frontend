@@ -119,6 +119,8 @@ export function resolveDependsOn(
   siblings?: readonly ConfigEntry[]
 ): unknown {
   if (!entry.depends_on) return undefined;
+  // Resolve the dependency in the local scope first, then fall back to
+  // the component root so a nested entry can gate on a top-level field.
   const depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
     ? values[entry.depends_on]
     : rootValues?.[entry.depends_on];
@@ -133,6 +135,8 @@ export function dependsOnSatisfied(
   siblings?: readonly ConfigEntry[]
 ): boolean {
   if (!entry.depends_on) return true;
+  // The backend sets at most one of the three gate fields, so the
+  // check order below is immaterial.
   const depValue = resolveDependsOn(entry, values, rootValues, siblings);
   // Type-insensitive across primitives: the parser hands back numbers /
   // booleans for plain scalars (#1360) while catalog gate values may be
