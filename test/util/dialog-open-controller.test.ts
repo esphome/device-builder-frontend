@@ -38,6 +38,23 @@ describe("DialogOpenController", () => {
   // The close-animation race guard the copy-pasted host handlers used to
   // pin: the flag must flip on the initiating request-close, before
   // wa-dialog finishes hiding, so a host re-render can't re-assert ?open.
+  it("onRequestClose flips the flag false", () => {
+    const host = new FakeHost();
+    const ctrl = new DialogOpenController(host);
+    ctrl.open = true;
+
+    ctrl.onRequestClose();
+    expect(ctrl.open).toBe(false);
+    expect(host.updates).toBe(2);
+  });
+
+  it("onRequestClose is a stable reference usable as an event listener", () => {
+    const ctrl = new DialogOpenController(new FakeHost());
+    const first = ctrl.onRequestClose;
+    ctrl.open = true;
+    expect(ctrl.onRequestClose).toBe(first);
+  });
+
   it("requestClose flips the flag directly when no wrapper is mounted", () => {
     const host = new FakeHost();
     const ctrl = new DialogOpenController(host);
@@ -59,23 +76,6 @@ describe("DialogOpenController", () => {
     expect(ctrl.open).toBe(true);
     ctrl.onAfterHide();
     expect(ctrl.open).toBe(false);
-  });
-
-  it("onRequestClose flips the flag false", () => {
-    const host = new FakeHost();
-    const ctrl = new DialogOpenController(host);
-    ctrl.open = true;
-
-    ctrl.onRequestClose();
-    expect(ctrl.open).toBe(false);
-    expect(host.updates).toBe(2);
-  });
-
-  it("onRequestClose is a stable reference usable as an event listener", () => {
-    const ctrl = new DialogOpenController(new FakeHost());
-    const first = ctrl.onRequestClose;
-    ctrl.open = true;
-    expect(ctrl.onRequestClose).toBe(first);
   });
 
   it("onAfterHide flips the flag false", () => {

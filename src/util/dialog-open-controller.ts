@@ -56,7 +56,6 @@ export class DialogOpenController implements ReactiveController {
     this._host.requestUpdate();
   }
 
-  /** The trivial ``@request-close`` handler: flip the flag, veto nothing. */
   /** Close via the host's ``esphome-base-dialog`` hide sequence; the host
    *  must bind ``onRequestClose`` or ``onAfterHide`` for the flag to follow.
    *  Flips the flag directly when no wrapper is mounted. */
@@ -68,6 +67,7 @@ export class DialogOpenController implements ReactiveController {
     else this.open = false;
   }
 
+  /** The trivial ``@request-close`` handler: flip the flag, veto nothing. */
   readonly onRequestClose = (): void => {
     this.open = false;
   };

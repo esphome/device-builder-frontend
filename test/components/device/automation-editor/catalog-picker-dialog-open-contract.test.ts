@@ -79,7 +79,7 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(body()).toBe(0);
   });
 
-  it("picking an item emits catalog-picked and closes the dialog", async () => {
+  it("picking an item emits catalog-picked", async () => {
     const dialog = await mountDialog();
     dialog.open();
     const picked = vi.fn();
@@ -94,7 +94,6 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
       id: "switch.toggle",
       preFilledParams: { id: "relay" },
     });
-    expect(isOpen(dialog)).toBe(false);
   });
 
   it("a pick closes through the wrapper so the body outlives the hide animation", async () => {
