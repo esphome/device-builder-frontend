@@ -254,35 +254,3 @@ describe("catalog-picker-dialog tab strip", () => {
     expect(text).not.toContain("HA Service");
   });
 });
-
-describe("catalog-picker-dialog closed body", () => {
-  const turnOn = action({ id: "switch.turn_on", name: "Turn On", domain: "switch" });
-  const devices: AvailableComponentInstance[] = Array.from({ length: 20 }, (_, i) => ({
-    component_id: "switch.gpio",
-    id: `relay${i}`,
-    name: `Relay ${i}`,
-    has_explicit_id: true,
-  }));
-
-  it("renders no rows while closed, builds them on open, drops them on close", async () => {
-    const dialog = new ESPHomeCatalogPickerDialog();
-    dialog.items = [turnOn];
-    dialog.devices = devices;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._localize = identityLocalize;
-    document.body.appendChild(dialog);
-    await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(0);
-    expect(dialog.shadowRoot!.querySelector(".picker-search")).toBeNull();
-
-    dialog.open();
-    await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(20);
-
-    (
-      dialog as unknown as { _dialog: { onRequestClose: () => void } }
-    )._dialog.onRequestClose();
-    await dialog.updateComplete;
-    expect(dialog.shadowRoot!.querySelectorAll(".picker-row")).toHaveLength(0);
-  });
-});

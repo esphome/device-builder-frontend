@@ -313,7 +313,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`<esphome-base-dialog
       ?open=${this._dialog.open}
       .label=${title}
-      @request-close=${this._dialog.onRequestClose}
+      @after-hide=${this._dialog.onAfterHide}
     >
       ${this._dialog.open ? this._renderBody(tabs, placeholder) : nothing}
     </esphome-base-dialog>`;
