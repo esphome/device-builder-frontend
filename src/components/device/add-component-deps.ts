@@ -1,15 +1,14 @@
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import { ComponentCategory } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import { dependsOnSatisfied, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
 } from "../../util/yaml-serialize.js";
-import { addFormEntryVisible } from "./add-component-form-filter.js";
 
 // Platform domains (sensor, switch, number, ...) are satisfied only by
 // a top-level block of that name, never by a same-named platform under
@@ -17,12 +16,10 @@ import { addFormEntryVisible } from "./add-component-form-filter.js";
 // pass for a `switch:` dependency. Guards the stem-match branch below.
 const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
 
-/** Form scope `liveDependencies` evaluates entry gates in. */
+/** Top-level entries and values `liveDependencies` reads value gates from. */
 export interface DepScope {
   entries: readonly ConfigEntry[];
   values: Record<string, unknown>;
-  board: BoardCatalogEntry | null;
-  presentComponents: ReadonlySet<string>;
 }
 
 /**
@@ -30,30 +27,21 @@ export interface DepScope {
  * referencing top-level entry.
  *
  * Only a `depends_on` gate that resolves (a value, or the gate field's
- * default) and hides the entry drops its dep. An unresolved gate, a
- * hidden entry, a component gate, or no referencing entry keeps it.
- * Nested entries are not walked.
+ * default) and fails drops a dep; an unresolved gate, any other
+ * visibility reason, or no referencing entry keeps it. Nested entries
+ * are not walked.
  */
 export function liveDependencies(
   dependencies: readonly string[],
   scope: DepScope
 ): string[] {
   if (dependencies.length === 0) return [];
-  const visible = addFormEntryVisible(
-    scope.entries,
-    scope.values,
-    scope.board,
-    scope.presentComponents
-  );
-  const valueGateHides = (entry: ConfigEntry): boolean => {
-    if (!entry.depends_on) return false;
-    const gate =
-      scope.values[entry.depends_on] ??
-      scope.entries.find((s) => s.key === entry.depends_on)?.default_value;
-    return gate != null && !visible(entry);
-  };
+  const { entries, values } = scope;
+  const valueGateHides = (entry: ConfigEntry): boolean =>
+    resolveDependsOn(entry, values, values, entries) != null &&
+    !dependsOnSatisfied(entry, values, values, entries);
   return dependencies.filter((dep) => {
-    const refs = scope.entries.filter((e) => e.references_component === dep);
+    const refs = entries.filter((e) => e.references_component === dep);
     return refs.length === 0 || refs.some((e) => !valueGateHides(e));
   });
 }

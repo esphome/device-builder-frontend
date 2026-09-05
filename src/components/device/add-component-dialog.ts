@@ -556,8 +556,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
     const live = liveDependencies(entry.dependencies ?? [], {
       entries: entry.config_entries,
       values: seeded,
-      board: this.board,
-      presentComponents: present,
     });
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank

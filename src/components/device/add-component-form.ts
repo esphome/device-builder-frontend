@@ -286,8 +286,6 @@ export class ESPHomeAddComponentForm extends LitElement {
     const live = liveDependencies(this.component.dependencies ?? [], {
       entries: this._entries,
       values: this._values,
-      board: this.board,
-      presentComponents: present,
     });
     const missing = findMissingDependencies(
       live,

@@ -262,8 +262,6 @@ describe("liveDependencies", () => {
   const scope = (values: Record<string, unknown>, entries = ethernetEntries()) => ({
     entries,
     values,
-    board: null,
-    presentComponents: new Set<string>(),
   });
 
   it("drops a dep whose only referencing entry the chosen type hides", () => {
@@ -301,6 +299,17 @@ describe("liveDependencies", () => {
       depends_on_component: "uart",
     });
     expect(liveDependencies(["uart"], scope({}, [componentGated]))).toEqual(["uart"]);
+  });
+
+  it("keeps a dep whose hidden reference has a passing value gate", () => {
+    const [type, spiId] = ethernetEntries();
+    const hiddenGated = { ...spiId, hidden: true };
+    expect(
+      liveDependencies(["spi"], scope({ type: "W5500" }, [type, hiddenGated]))
+    ).toEqual(["spi"]);
+    expect(
+      liveDependencies(["spi"], scope({ type: "IP101" }, [type, hiddenGated]))
+    ).toEqual([]);
   });
 
   it("keeps a dep no entry references", () => {
