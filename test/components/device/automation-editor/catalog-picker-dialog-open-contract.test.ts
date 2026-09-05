@@ -35,7 +35,9 @@ const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
 const afterHide = (d: ESPHomeCatalogPickerDialog): void =>
-  (d as unknown as { _dialog: { onAfterHide: () => void } })._dialog.onAfterHide();
+  d
+    .shadowRoot!.querySelector("esphome-base-dialog")!
+    .dispatchEvent(new CustomEvent("after-hide"));
 
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
   it("open() drives the reactive _open flag and resets the search", async () => {
