@@ -574,7 +574,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
             : nothing
         }
       </div>
-      <span class="picker-row-add" aria-hidden="true"> ${mdiSvg(mdiPlus)} </span>
+      <span class="picker-row-add" aria-hidden="true">${mdiSvg(mdiPlus)}</span>
     </div>`;
   }
 

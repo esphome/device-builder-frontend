@@ -54,12 +54,7 @@ export function mdiIconSrc(pathData: string): string {
 /** Inline MDI glyph in currentColor; for repeated rows, where a wa-icon
  *  element per row is too heavy. */
 export function mdiSvg(pathData: string, className?: string): TemplateResult {
-  return html`<svg
-    class=${className ?? nothing}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-  >
-    <path d=${pathData}></path>
-  </svg>`;
+  // Single line: whitespace inside the template becomes a text node per row.
+  // prettier-ignore
+  return html`<svg class=${className ?? nothing} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d=${pathData}></path></svg>`;
 }

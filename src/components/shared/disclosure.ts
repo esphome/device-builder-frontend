@@ -4,7 +4,12 @@ import { html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { mdiSvg } from "../../util/register-icons.js";
 
-export interface DisclosureOptions {
+/** At least one of `labelKey` / `labelText`; `labelText` wins when both are set. */
+type DisclosureLabel =
+  | { labelKey: string; labelText?: string | TemplateResult }
+  | { labelKey?: undefined; labelText: string | TemplateResult };
+
+export type DisclosureOptions = DisclosureLabel & {
   /** Whether the panel is shown. The caller owns this state. */
   open: boolean;
   /** Fired on toggle-button click; the caller flips its own `open`. Receives
@@ -12,13 +17,8 @@ export interface DisclosureOptions {
    *  zero-arg arrow is also fine (extra params are ignored). */
   onToggle: (event: Event) => void;
   localize: LocalizeFunc;
-  /** Translation key for the toggle label; omit when `labelText` is given. */
-  labelKey?: string;
   /** Substitution values for the toggle label. */
   labelParams?: Record<string, string | number>;
-  /** Pre-localized label overriding *labelKey* — for toggles whose text
-   *  carries dynamic state (the pin wiring summary). */
-  labelText?: string | TemplateResult;
   /** Panel content; called (and built) only while `open`, so a collapsed
    *  disclosure never constructs its body or runs its render side effects. */
   body: () => TemplateResult;
@@ -29,7 +29,7 @@ export interface DisclosureOptions {
   disabled?: boolean;
   /** When set, ids the panel and wires `aria-controls` while open. */
   panelId?: string;
-}
+};
 
 /**
  * Shared "advanced options" disclosure: a button + rotating chevron that
@@ -42,9 +42,11 @@ export interface DisclosureOptions {
  */
 export function renderDisclosure(opts: DisclosureOptions): TemplateResult {
   const { open, variant = "link", iconBefore = false, panelId } = opts;
-  const label = html`<span class="disclosure-toggle__label">
-    ${opts.labelText ?? opts.localize(opts.labelKey ?? "", opts.labelParams)}
-  </span>`;
+  const text =
+    opts.labelKey !== undefined
+      ? (opts.labelText ?? opts.localize(opts.labelKey, opts.labelParams))
+      : opts.labelText;
+  const label = html`<span class="disclosure-toggle__label">${text}</span>`;
   const chevron = mdiSvg(mdiChevronDown, "disclosure-toggle__chevron");
   return html`
     <button
