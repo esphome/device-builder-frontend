@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FakeHost } from "../_fake-host.js";
 import { DialogOpenController } from "../../src/util/dialog-open-controller.js";
 
@@ -38,6 +38,29 @@ describe("DialogOpenController", () => {
   // The close-animation race guard the copy-pasted host handlers used to
   // pin: the flag must flip on the initiating request-close, before
   // wa-dialog finishes hiding, so a host re-render can't re-assert ?open.
+  it("requestClose flips the flag directly when no wrapper is mounted", () => {
+    const host = new FakeHost();
+    const ctrl = new DialogOpenController(host);
+    ctrl.open = true;
+    ctrl.requestClose();
+    expect(ctrl.open).toBe(false);
+  });
+
+  it("requestClose defers to the mounted wrapper and leaves the flag to its handlers", () => {
+    const host = new FakeHost();
+    const wrapper = { requestClose: vi.fn() };
+    (host as unknown as { shadowRoot: unknown }).shadowRoot = {
+      querySelector: (sel: string) => (sel === "esphome-base-dialog" ? wrapper : null),
+    };
+    const ctrl = new DialogOpenController(host);
+    ctrl.open = true;
+    ctrl.requestClose();
+    expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
+    expect(ctrl.open).toBe(true);
+    ctrl.onAfterHide();
+    expect(ctrl.open).toBe(false);
+  });
+
   it("onRequestClose flips the flag false", () => {
     const host = new FakeHost();
     const ctrl = new DialogOpenController(host);

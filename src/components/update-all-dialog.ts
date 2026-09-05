@@ -137,7 +137,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   }
 
   close() {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   private _sectionEls(): (HTMLElement & { expanded: boolean })[] {

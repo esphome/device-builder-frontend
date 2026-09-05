@@ -96,4 +96,26 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     });
     expect(isOpen(dialog)).toBe(false);
   });
+
+  it("a pick closes through the wrapper so the body outlives the hide animation", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    await dialog.updateComplete;
+    const wrapper = dialog.shadowRoot!.querySelector(
+      "esphome-base-dialog"
+    )! as HTMLElement & {
+      requestClose?: () => void;
+    };
+    wrapper.requestClose = vi.fn();
+    (dialog as unknown as { _pick: (id: string) => void })._pick("switch.toggle");
+    await dialog.updateComplete;
+    expect(wrapper.requestClose).toHaveBeenCalledTimes(1);
+    expect(isOpen(dialog)).toBe(true);
+    expect(dialog.shadowRoot!.querySelector(".picker-body")).not.toBeNull();
+
+    afterHide(dialog);
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(false);
+    expect(dialog.shadowRoot!.querySelector(".picker-body")).toBeNull();
+  });
 });

@@ -564,7 +564,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         composed: true,
       })
     );
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 }
 
