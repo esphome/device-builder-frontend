@@ -28,24 +28,28 @@ export function componentDomain(componentId: string): string {
   return parseCatalogId(componentId).domain;
 }
 
-/** Instances keyed by id, built once per render for the per-row lookups. */
-export function targetsById(
-  devices: AvailableComponentInstance[]
-): Map<string, AvailableComponentInstance> {
-  return new Map(devices.map((d) => [d.id, d]));
+export interface TargetIndex {
+  /** The instances a picker offers; containers are excluded. */
+  readonly selectable: AvailableComponentInstance[];
+  /** The parenthetical context beside an instance's label: its domain, plus
+   *  the owning container's name when it's a sub-entity, so two readings
+   *  named alike (``Temperature``) read distinctly. */
+  context(device: AvailableComponentInstance): string;
 }
 
-/** The parenthetical context shown beside an instance's label: its domain,
- *  plus the owning container's name when it's a sub-entity, so two readings
- *  named alike (``Temperature``) read distinctly across the picker surfaces. */
-export function instanceContext(
-  device: AvailableComponentInstance,
-  byId: ReadonlyMap<string, AvailableComponentInstance>
-): string {
-  const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
-  return parent
-    ? `${device.component_id} · ${instanceName(parent)}`
-    : device.component_id;
+/** Index the full instance list once per render; ``context`` resolves parents
+ *  against every instance, including the containers ``selectable`` drops. */
+export function indexTargets(devices: AvailableComponentInstance[]): TargetIndex {
+  const byId = new Map(devices.map((d) => [d.id, d]));
+  return {
+    selectable: selectableTargets(devices),
+    context(device) {
+      const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
+      return parent
+        ? `${device.component_id} · ${instanceName(parent)}`
+        : device.component_id;
+    },
+  };
 }
 
 /** A multi-entity platform container holds no triggers of its own (its

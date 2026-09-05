@@ -7,12 +7,11 @@ import type {
 import {
   componentDomain,
   firstSelectableTarget,
-  instanceContext,
+  indexTargets,
   instanceName,
   isSelectableTarget,
   preFillIdParam,
   selectableTargets,
-  targetsById,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
 
@@ -104,15 +103,21 @@ describe("instance label helpers", () => {
     expect(componentDomain("sensor")).toBe("sensor");
   });
 
-  it("instanceContext appends the owning container for a sub-entity", () => {
-    const named = inst({ id: "aht20", component_id: "sensor.aht10", name: "AHT20" });
-    const byId = targetsById([named, temp]);
+  it("indexTargets resolves a sub-entity's container even though selectable drops it", () => {
+    const named = inst({
+      id: "aht20",
+      component_id: "sensor.aht10",
+      name: "AHT20",
+      is_entity_container: true,
+    });
+    const index = indexTargets([named, temp, relay]);
+    expect(index.selectable).toEqual([temp, relay]);
     // Sub-entity → domain · parent label; plain instance → bare domain only.
-    expect(instanceContext(temp, byId)).toBe("sensor · AHT20");
-    expect(instanceContext(relay, byId)).toBe("switch.gpio");
+    expect(index.context(temp)).toBe("sensor · AHT20");
+    expect(index.context(relay)).toBe("switch.gpio");
     // A dangling parent_id (parent absent) degrades to the bare domain.
     expect(
-      instanceContext(inst({ id: "o", component_id: "sensor", parent_id: "gone" }), byId)
+      index.context(inst({ id: "o", component_id: "sensor", parent_id: "gone" }))
     ).toBe("sensor");
   });
 });

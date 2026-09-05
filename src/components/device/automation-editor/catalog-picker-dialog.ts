@@ -62,11 +62,9 @@ import {
 } from "./catalog-picker-filter.js";
 import {
   componentDomain,
-  instanceContext,
+  indexTargets,
   instanceName,
   preFillIdParam,
-  selectableTargets,
-  targetsById,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -440,14 +438,18 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       </p>`;
     }
     const byDomain = groupByDomain(items);
-    const byId = targetsById(this.devices);
+    // Filter once per domain, not once per entity: hundreds of entities share
+    // a handful of domains.
+    const filteredByDomain = q
+      ? new Map([...byDomain].map(([domain, list]) => [domain, filterItems(list, q)]))
+      : byDomain;
+    const index = indexTargets(this.devices);
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances. The query matches
     // either axis: an entity hit lists all of that entity's actions.
-    const sections = selectableTargets(this.devices).flatMap((device) => {
+    const sections = index.selectable.flatMap((device) => {
       const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
-      const candidates = itemsForDevice(byDomain, device);
-      const matching = entityMatch || !q ? candidates : filterItems(candidates, q);
+      const matching = itemsForDevice(entityMatch ? byDomain : filteredByDomain, device);
       return matching.length ? [{ device, matching, entityMatch }] : [];
     });
     if (sections.length === 0) {
@@ -465,8 +467,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         onToggle: () => this._setTargetOpen(device.id, !open),
         localize: this._localize,
         labelText: this._renderGroupLabel(
-          device,
-          byId,
+          instanceName(device),
+          index.context(device),
           q && !entityMatch ? matching.length : null
         ),
         body: () =>
@@ -479,15 +481,10 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     })}`;
   }
 
-  private _renderGroupLabel(
-    device: AvailableComponentInstance,
-    byId: ReadonlyMap<string, AvailableComponentInstance>,
-    count: number | null
-  ) {
-    const context = instanceContext(device, byId);
+  private _renderGroupLabel(name: string, context: string, count: number | null) {
     // Whitespace in this template would be a text node per header.
     // prettier-ignore
-    return html`<span class="picker-group-label">${instanceName(device)}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
+    return html`<span class="picker-group-label">${name}<span class="ae-muted">(${context})</span>${count === null ? nothing : html`<span class="picker-group-count" aria-hidden="true">${count}</span>`}</span>`;
   }
 
   private _setTargetOpen(id: string, open: boolean) {
