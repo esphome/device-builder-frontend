@@ -35,8 +35,8 @@
  */
 
 import { consume } from "@lit/context";
-import { mdiChevronDown, mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
-import { css, html, LitElement, nothing, type TemplateResult } from "lit";
+import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { LEGACY_AUTOMATION_IDS } from "./legacy-automation-ids.js";
 
@@ -47,12 +47,15 @@ import type {
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { disclosureStyles } from "../../../styles/disclosure.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { DialogOpenController } from "../../../util/dialog-open-controller.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
+import { mdiSvg, registerMdiIcons } from "../../../util/register-icons.js";
+import { renderDisclosure } from "../../shared/disclosure.js";
+import { navItemMatches } from "../navigator-search-match.js";
 import {
   componentDomain,
   instanceContext,
@@ -82,21 +85,18 @@ export interface CatalogPickedDetail {
 
 type Tab = "by-target" | "by-type" | "building-blocks";
 
-const targetKey = (device: AvailableComponentInstance): string =>
-  `${device.component_id}:${device.id}`;
-
-const targetMatches = (device: AvailableComponentInstance, q: string): boolean =>
-  instanceName(device).toLowerCase().includes(q) || device.id.toLowerCase().includes(q);
-
-function groupByDomain(items: CatalogItem[]): Map<string, CatalogItem[]> {
-  const byDomain = new Map<string, CatalogItem[]>();
+function groupByDomain(
+  items: CatalogItem[],
+  key: (item: CatalogItem) => string = (item) => item.domain
+): Map<string, CatalogItem[]> {
+  const groups = new Map<string, CatalogItem[]>();
   for (const item of items) {
-    if (!("domain" in item)) continue;
-    const list = byDomain.get(item.domain) ?? [];
+    const k = key(item);
+    const list = groups.get(k) ?? [];
     list.push(item);
-    byDomain.set(item.domain, list);
+    groups.set(k, list);
   }
-  return byDomain;
+  return groups;
 }
 
 /** Items whose domain is the device's bare domain or its exact platform id. */
@@ -106,8 +106,9 @@ function itemsForDevice(
 ): CatalogItem[] {
   const domain = componentDomain(device.component_id);
   const generic = byDomain.get(domain) ?? [];
-  if (device.component_id === domain) return generic;
-  return generic.concat(byDomain.get(device.component_id) ?? []);
+  const specific =
+    device.component_id === domain ? undefined : byDomain.get(device.component_id);
+  return specific ? generic.concat(specific) : generic;
 }
 
 @customElement("esphome-catalog-picker-dialog")
@@ -136,9 +137,6 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @state() private _activeTab: Tab = "by-target";
   @state() private _query = "";
   @state() private _expandedTargets = new Set<string>();
-  /** Rendered description per catalog id; the by-target tab repeats each
-   *  action once per entity, so the markdown must not re-render per row. */
-  private _descriptions = new Map<string, TemplateResult | typeof nothing>();
 
   /**
    * Open the dialog. Resets the active tab to a sensible default
@@ -149,7 +147,6 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
     this._expandedTargets = new Set();
-    this._descriptions.clear();
     this._dialog.open = true;
   }
 
@@ -157,6 +154,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     textStyles,
+    disclosureStyles,
     css`
       esphome-base-dialog {
         --width: 640px;
@@ -252,51 +250,22 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         margin-top: var(--wa-space-2xs);
       }
 
-      .picker-group-toggle {
-        appearance: none;
+      .picker-body .disclosure-toggle {
         display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
         width: 100%;
-        border: none;
-        background: transparent;
-        padding: 0;
         margin: var(--wa-space-m) 0 var(--wa-space-2xs);
-        cursor: pointer;
-        text-align: left;
-        font: inherit;
-        border-radius: var(--wa-border-radius-s);
       }
 
-      .picker-group-toggle:first-child {
+      .picker-body .disclosure-toggle:first-child {
         margin-top: var(--wa-space-2xs);
       }
 
-      .picker-group-toggle .picker-group-label {
+      .disclosure-toggle .picker-group-label {
         margin: 0;
       }
 
-      .picker-group-toggle:hover .picker-group-label,
-      .picker-group-toggle:focus-visible .picker-group-label {
-        color: var(--wa-color-text-normal);
-      }
-
-      .picker-group-toggle:focus-visible {
-        outline: none;
-        box-shadow: var(--esphome-focus-ring-tight);
-      }
-
-      .picker-group-chevron {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
-        color: var(--wa-color-text-quiet);
-        transform: rotate(-90deg);
-        transition: transform 0.12s;
-      }
-
-      .picker-group-toggle[aria-expanded="true"] .picker-group-chevron {
-        transform: none;
+      .picker-body .disclosure-panel {
+        margin-top: 0;
       }
 
       .picker-row {
@@ -455,7 +424,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     const filtered = this._applyQuery(all);
     switch (this._activeTab) {
       case "by-target":
-        return this._renderByTarget(all, filtered);
+        return this._renderByTarget(all);
       case "by-type":
         return this._renderByType(filtered);
       case "building-blocks":
@@ -489,22 +458,21 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * this domain) so the user doesn't have to re-select the
    * instance after picking.
    */
-  private _renderByTarget(all: CatalogItem[], filtered: CatalogItem[]) {
+  private _renderByTarget(items: CatalogItem[]) {
     if (this.devices.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_targets")}
       </p>`;
     }
-    const q = this._query.trim().toLowerCase();
-    const byDomain = groupByDomain(filtered);
-    // An entity whose name matches the query is what the user is looking
-    // for: show every action it has, with the group open.
-    const byDomainAll = q ? groupByDomain(all) : byDomain;
+    const q = this._query.trim();
+    const byDomain = groupByDomain(items);
     // A multi-entity container isn't itself a referenceable entity — its
-    // sub-entities are surfaced as their own instances.
+    // sub-entities are surfaced as their own instances. The query matches
+    // either axis: an entity hit lists all of that entity's actions.
     const sections = selectableTargets(this.devices).flatMap((device) => {
-      const entityMatch = q !== "" && targetMatches(device, q);
-      const matching = itemsForDevice(entityMatch ? byDomainAll : byDomain, device);
+      const entityMatch = q !== "" && navItemMatches(q, instanceName(device), device.id);
+      const candidates = itemsForDevice(byDomain, device);
+      const matching = entityMatch ? candidates : this._applyQuery(candidates);
       return matching.length ? [{ device, matching, entityMatch }] : [];
     });
     if (sections.length === 0) {
@@ -512,38 +480,24 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${this._localize("device.automation_pick_no_results")}
       </p>`;
     }
-    // Rows exist only for expanded groups: a fleet of hundreds of entities
-    // otherwise opens to entities x actions rows.
     const lone = sections.length === 1;
-    return html`${sections.map(({ device, matching, entityMatch }) => {
-      const key = targetKey(device);
-      const expanded = lone || entityMatch || this._expandedTargets.has(key);
-      return html`
-        <button
-          type="button"
-          class="picker-group-toggle"
-          aria-expanded=${expanded}
-          @click=${() => this._toggleTarget(key)}
-        >
-          <svg class="picker-group-chevron" viewBox="0 0 24 24" aria-hidden="true">
-            <path d=${mdiChevronDown}></path>
-          </svg>
-          <span class="picker-group-label">
-            ${instanceName(device)}
-            <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
-          </span>
-        </button>
-        ${
-          expanded
-            ? matching.map((item) =>
-                this._renderRow(item, () =>
-                  this._pick(item.id, preFillIdParam(item, device))
-                )
-              )
-            : nothing
-        }
-      `;
-    })}`;
+    return html`${sections.map(({ device, matching, entityMatch }) =>
+      renderDisclosure({
+        open: lone || entityMatch || this._expandedTargets.has(device.id),
+        onToggle: () => this._toggleTarget(device.id),
+        localize: this._localize,
+        labelText: html`<span class="picker-group-label">
+          ${instanceName(device)}
+          <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
+        </span>`,
+        body: () =>
+          html`${matching.map((item) =>
+            this._renderRow(item, () => this._pick(item.id, preFillIdParam(item, device)))
+          )}`,
+        variant: "quiet",
+        iconBefore: true,
+      })
+    )}`;
   }
 
   private _toggleTarget(key: string) {
@@ -558,17 +512,12 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * domains sorted alphabetically.
    */
   private _renderByType(items: CatalogItem[]) {
-    const byDomain = new Map<string, CatalogItem[]>();
-    for (const item of items) {
-      if (!("domain" in item)) continue;
-      if (item.domain === "core") continue;
-      // Normalise to bare ``<domain>``: an item with
-      // ``switch.template`` lives under the "switch" group.
-      const bare = componentDomain(item.domain);
-      const list = byDomain.get(bare) ?? [];
-      list.push(item);
-      byDomain.set(bare, list);
-    }
+    // Normalise to bare ``<domain>``: an item with ``switch.template`` lives
+    // under the "switch" group.
+    const byDomain = groupByDomain(
+      items.filter((item) => item.domain !== "core"),
+      (item) => componentDomain(item.domain)
+    );
     const domains = Array.from(byDomain.keys()).sort();
     if (domains.length === 0) {
       return html`<p class="picker-empty">
@@ -593,7 +542,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * for the condition picker.
    */
   private _renderBuildingBlocks(items: CatalogItem[]) {
-    const core = items.filter((i) => "domain" in i && i.domain === "core");
+    const core = items.filter((i) => i.domain === "core");
     if (core.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_results")}
@@ -620,24 +569,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${
           item.description
             ? html`<span class="picker-row-desc line-clamp-2">
-                ${this._description(item)}
+                ${renderMarkdown(item.description)}
               </span>`
             : nothing
         }
       </div>
-      <span class="picker-row-add" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d=${mdiPlus}></path></svg>
-      </span>
+      <span class="picker-row-add" aria-hidden="true"> ${mdiSvg(mdiPlus)} </span>
     </div>`;
-  }
-
-  private _description(item: CatalogItem) {
-    let rendered = this._descriptions.get(item.id);
-    if (rendered === undefined) {
-      rendered = renderMarkdown(item.description);
-      this._descriptions.set(item.id, rendered);
-    }
-    return rendered;
   }
 
   private _pick(id: string, preFilledParams?: Record<string, unknown>) {

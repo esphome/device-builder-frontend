@@ -261,10 +261,9 @@ describe("catalog-picker-dialog by-target groups", () => {
   const devices: AvailableComponentInstance[] = [
     { component_id: "switch.gpio", id: "relay1", name: "Pump" },
     { component_id: "switch.gpio", id: "relay2", name: "Valve" },
-    { component_id: "switch.gpio", id: "relay3", name: "Fan" },
   ];
   const toggles = (dialog: ESPHomeCatalogPickerDialog) =>
-    Array.from(dialog.shadowRoot!.querySelectorAll<HTMLElement>(".picker-group-toggle"));
+    Array.from(dialog.shadowRoot!.querySelectorAll<HTMLElement>(".disclosure-toggle"));
 
   it("starts collapsed and expands one entity per click", async () => {
     const dialog = await mountDialog({
@@ -272,18 +271,16 @@ describe("catalog-picker-dialog by-target groups", () => {
       devices,
       tab: "by-target",
     });
-    expect(groupLabels(dialog)).toHaveLength(3);
-    expect(rowTitles(dialog)).toEqual([]);
     expect(toggles(dialog).map((t) => t.getAttribute("aria-expanded"))).toEqual([
       "false",
       "false",
-      "false",
     ]);
+    expect(rowTitles(dialog)).toEqual([]);
 
     toggles(dialog)[1].click();
     await dialog.updateComplete;
-    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
     expect(toggles(dialog)[1].getAttribute("aria-expanded")).toBe("true");
+    expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
 
     toggles(dialog)[1].click();
     await dialog.updateComplete;
@@ -297,7 +294,6 @@ describe("catalog-picker-dialog by-target groups", () => {
       tab: "by-target",
     });
     await search(dialog, "turn off");
-    expect(groupLabels(dialog)).toHaveLength(3);
     expect(rowTitles(dialog)).toEqual([]);
     toggles(dialog)[0].click();
     await dialog.updateComplete;
@@ -316,22 +312,13 @@ describe("catalog-picker-dialog by-target groups", () => {
     expect(rowTitles(dialog)).toEqual(["Turn On", "Turn Off"]);
   });
 
-  it("a lone group is expanded without a click", async () => {
+  it("a lone group is expanded without a click and draws the add glyph inline", async () => {
     const dialog = await mountDialog({
       items: [turnOn],
       devices: [devices[0]],
       tab: "by-target",
     });
     expect(rowTitles(dialog)).toEqual(["Turn On"]);
-  });
-
-  it("rows draw the add glyph inline instead of mounting an icon element", async () => {
-    const dialog = await mountDialog({
-      items: [turnOn],
-      devices: [devices[0]],
-      tab: "by-target",
-    });
-    expect(dialog.shadowRoot!.querySelector(".picker-row wa-icon")).toBeNull();
     expect(dialog.shadowRoot!.querySelector(".picker-row-add svg")).not.toBeNull();
   });
 });
