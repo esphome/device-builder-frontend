@@ -21,6 +21,7 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { identityLocalize } from "../../../_dom.js";
+import { makeAutomationAction } from "../../../_make-automation-action.js";
 import type {
   AutomationAction,
   AvailableComponentInstance,
@@ -29,19 +30,7 @@ import type { CatalogPickedDetail } from "../../../../src/components/device/auto
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
 import { makeConfigEntry } from "../../../../src/util/config-entry-defaults.js";
 
-function action(
-  over: Pick<AutomationAction, "id" | "name" | "domain"> & Partial<AutomationAction>
-): AutomationAction {
-  return {
-    description: "",
-    docs_url: "",
-    config_entries: [],
-    is_control_flow: false,
-    has_else_branch: false,
-    accepts_action_list: [],
-    ...over,
-  };
-}
+const action = makeAutomationAction;
 
 async function mountDialog(opts: {
   kind?: "action" | "condition";

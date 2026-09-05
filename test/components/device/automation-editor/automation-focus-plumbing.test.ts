@@ -31,10 +31,10 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import { flushMicrotasks, mount } from "../../../_dom.js";
+import { makeAutomationAction } from "../../../_make-automation-action.js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
   ActionNode,
-  AutomationAction,
   AutomationCondition,
   AvailableAutomations,
   ConditionNode,
@@ -49,21 +49,19 @@ import type { AutomationFocus } from "../../../../src/components/device/automati
 const entry = (key: string, advanced = false) =>
   ({ key, type: "string", label: key, advanced }) as unknown as ConfigEntry;
 
-const IF_DEF = {
+const IF_DEF = makeAutomationAction({
   id: "if",
   name: "If",
-  description: "",
-  config_entries: [],
+  is_control_flow: true,
+  has_else_branch: true,
   accepts_action_list: ["then", "else"],
-} as unknown as AutomationAction;
+});
 
-const LOG_DEF = {
+const LOG_DEF = makeAutomationAction({
   id: "logger.log",
   name: "Log",
-  description: "",
   config_entries: [entry("format"), entry("level", true)],
-  accepts_action_list: [],
-} as unknown as AutomationAction;
+});
 
 const IN_RANGE_DEF = {
   id: "sensor.in_range",

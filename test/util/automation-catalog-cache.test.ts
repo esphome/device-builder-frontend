@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeAutomationAction } from "../_make-automation-action.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type {
   AutomationAction,
@@ -35,17 +36,8 @@ const trigger = (id: string): AutomationTrigger => ({
   config_entries: [],
 });
 
-const action = (id: string): AutomationAction => ({
-  id,
-  name: id,
-  description: "",
-  docs_url: "",
-  domain: "core",
-  config_entries: [],
-  is_control_flow: false,
-  has_else_branch: false,
-  accepts_action_list: [],
-});
+const action = (id: string): AutomationAction =>
+  makeAutomationAction({ id, domain: "core" });
 
 const condition = (id: string): AutomationCondition => ({
   id,

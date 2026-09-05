@@ -11,12 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { baseDialogSettled, mount } from "../_dom.js";
+import { baseDialog, baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 import { ESPHomeYamlValidationDialog } from "../../src/components/yaml-validation-dialog.js";
-
-const baseDialog = (el: ESPHomeYamlValidationDialog): HTMLElement =>
-  el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 describe("yaml-validation-dialog ENTER", () => {
   it("goes to the first error on Enter when a line is known", async () => {

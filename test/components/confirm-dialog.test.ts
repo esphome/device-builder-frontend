@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { baseDialogSettled, mount } from "../_dom.js";
+import { baseDialog, baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
 
@@ -62,9 +62,6 @@ describe("confirm-dialog ENTER", () => {
 // the request-close handler, and the after-hide -> cancel path. Pin them so the
 // dismiss-cancels contract can't silently regress.
 describe("confirm-dialog dismiss / request-close", () => {
-  const baseDialog = (el: ESPHomeConfirmDialog): HTMLElement =>
-    el.shadowRoot!.querySelector("esphome-base-dialog")!;
-
   it("fires a single cancel when dismissed without a decision", async () => {
     const el = await mount(new ESPHomeConfirmDialog());
     el.open();

@@ -31,10 +31,9 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
-import type {
-  ActionNode,
-  AutomationAction,
-} from "../../../../src/api/types/automations.js";
+import { makeAutomationAction } from "../../../_make-automation-action.js";
+import type { ActionNode } from "../../../../src/api/types/automations.js";
+import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationActionNode } from "../../../../src/components/device/automation-editor/automation-action-node.js";
 
 const DELAY_FIELDS = [
@@ -46,19 +45,17 @@ const DELAY_FIELDS = [
   "seconds",
 ] as const;
 
-const DELAY_ACTION: AutomationAction = {
+const DELAY_ACTION = makeAutomationAction({
   id: "delay",
   name: "Delay",
-  description: "",
   config_entries: DELAY_FIELDS.map((key) => ({
     key,
     advanced: true,
     type: "string",
     label: key,
     required: false,
-  })),
-  accepts_action_list: [],
-} as unknown as AutomationAction;
+  })) as unknown as ConfigEntry[],
+});
 
 async function mountDelay(
   params: Record<string, unknown>

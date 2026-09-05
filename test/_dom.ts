@@ -92,6 +92,12 @@ export async function baseDialogSettled(el: HTMLElement): Promise<void> {
   await (base as { updateComplete?: Promise<unknown> } | null)?.updateComplete;
 }
 
+/** The ``<esphome-base-dialog>`` wrapper inside *host*'s shadow root, for
+ *  dispatching its ``request-close`` / ``after-hide`` events in tests. */
+export function baseDialog(host: HTMLElement): HTMLElement {
+  return host.shadowRoot!.querySelector("esphome-base-dialog")!;
+}
+
 /**
  * The nested ``<esphome-device-name-inputs>`` inside ``host``'s shadow
  * root, settled. Suites reach its friendly/hostname inputs through the

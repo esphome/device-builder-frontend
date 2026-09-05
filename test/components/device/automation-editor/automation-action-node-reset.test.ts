@@ -35,6 +35,7 @@ vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 
+import { makeAutomationAction } from "../../../_make-automation-action.js";
 import type {
   ActionNode,
   AutomationAction,
@@ -58,14 +59,11 @@ function entry(key: string, advanced: boolean): ConfigEntry {
  *  "Show advanced" toggle renders and ``show-advanced`` tracks the
  *  user's ``_showAdvanced`` choice. */
 function action(id: string): AutomationAction {
-  return {
+  return makeAutomationAction({
     id,
-    name: id,
-    description: "",
     config_entries: [entry("plain", false), entry("secret", true)],
-    accepts_action_list: [],
     required_groups: [{ kind: "exactly_one", keys: ["plain", "secret"] }],
-  } as unknown as AutomationAction;
+  });
 }
 
 function node(action_id: string): ActionNode {
