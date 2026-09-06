@@ -76,9 +76,7 @@ describe("device-navigator row icons", () => {
     const nav = await mountNavigator();
     // The sensor subgroup header shows the gauge glyph...
     expect(iconPaths(nav, ".nav-subgroup-icon")).toContain(mdiGauge);
-    // ...and, once opened, its rows don't repeat a per-row glyph.
-    nav.shadowRoot!.querySelector<HTMLElement>(".nav-subgroup-header")!.click();
-    await nav.updateComplete;
+    // ...and its rows don't repeat a per-row glyph.
     expect(
       nav.shadowRoot!.querySelectorAll(".nav-items--grouped .nav-item")
     ).toHaveLength(2);

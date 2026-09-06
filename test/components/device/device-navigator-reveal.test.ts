@@ -27,7 +27,6 @@ import {
   parseYamlTopLevelSections,
   sectionKeyOf,
 } from "../../../src/util/yaml-sections.js";
-import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
 
 const YAML = [
   "esphome:",
@@ -46,13 +45,12 @@ const YAML = [
 ].join("\n");
 
 /** fromLine of the sensor.template row (lives in the Components section). */
-const sensorLine = () => sectionLine(YAML, "sensor.template");
-
-/** Collapse the Sensor subgroup by hand (open, then close) so the selection
- *  can't auto-open it. */
-const collapseSensorByHand = async (nav: ESPHomeDeviceNavigator) => {
-  await clickSubgroup(nav, "Sensor");
-  await clickSubgroup(nav, "Sensor");
+const sensorLine = () => {
+  const s = parseYamlTopLevelSections(YAML).find(
+    (sec) => sectionKeyOf(sec) === "sensor.template"
+  );
+  if (!s) throw new Error("fixture: sensor.template not found");
+  return s.fromLine;
 };
 
 let scrollSpy: ReturnType<typeof vi.fn>;
@@ -184,32 +182,57 @@ describe("device-navigator reveal-selected", () => {
     expect(scrollSpy).toHaveBeenCalledTimes(1);
   });
 
-  // A hand-collapsed domain subgroup yields to a selection that lands in it,
-  // so the row mounts and scrolls instead of staying hidden.
-  it("reopens a hand-collapsed subgroup for a new selection and scrolls", async () => {
+  // A Components row inside a collapsed domain subgroup isn't rendered even
+  // when its section is open; the controller must not latch on that empty
+  // render, so it retries once the subgroup expands and the row mounts.
+  it("retries the scroll after a collapsed subgroup is expanded", async () => {
     const { nav } = await mount(new Set([1]));
-    await collapseSensorByHand(nav);
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup, then select the sensor row it hides.
+    sensorGroup().click();
+    await nav.updateComplete;
     nav.selectedKey = "sensor.template";
     nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
+    expect(scrollSpy).not.toHaveBeenCalled();
+
+    // Expand it: the row mounts and the deferred scroll fires.
+    sensorGroup().click();
     await nav.updateComplete;
     expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
     expect(scrollSpy).toHaveBeenCalledTimes(1);
   });
 
-  // Regression: a selected row whose section was revealed must not re-fire
-  // section-reveal when the user later opens a different section, or the
-  // cursor's section is force-reopened on every render and the user can't
-  // toggle anything else.
+  // Regression: a selected row whose section was revealed but never scrolled
+  // (it lives in a collapsed subgroup) must not re-fire section-reveal when the
+  // user later opens a different section, or the cursor's section is force-
+  // reopened on every render and the user can't toggle anything else.
   it("does not re-reveal the cursor's section after the user opens another", async () => {
-    const { nav, reveals } = await mount(new Set());
+    const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
 
-    // Cursor lands on the sensor row: section reveal fires exactly once.
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
+    nav.openSections = new Set();
+    await nav.updateComplete;
+
+    // Cursor lands on the hidden sensor row: section reveal fires exactly once.
     nav.selectedKey = "sensor.template";
     nav.selectedFromLine = sensorLine();
     await nav.updateComplete;
     nav.openSections = new Set([1]);
     await nav.updateComplete;
     expect(reveals).toEqual([1]);
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
 
     // User opens Core (accordion closes Components). The controller must not
     // re-reveal Components — reveals stays [1], so the toggle sticks.
@@ -223,6 +246,14 @@ describe("device-navigator reveal-selected", () => {
   // section (by opening another) doesn't re-fire reveal and snap it back open.
   it("does not re-reveal a section that was already open when selected", async () => {
     const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
 
     // Select the row while Components is already open: nothing to reveal.
     nav.selectedKey = "sensor.template";

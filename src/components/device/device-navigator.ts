@@ -38,7 +38,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
-import { groupRowsByDomain, isFlatDomain } from "./navigator-groups.js";
+import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
 import { NavigatorRevealController } from "./navigator-reveal-controller.js";
@@ -224,10 +224,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
-  /** Open domain subgroups. Groups start collapsed; a selection opens its
-   *  own group and never closes another, and a hand toggle applies on top. */
+  /** Domains collapsed by hand in the grouped Components list. */
   @state()
-  private _openGroups = new Map<string, boolean>();
+  private _collapsedGroups = new Set<string>();
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -276,25 +275,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
           ? allSections.find((s) => s.fromLine === this.selectedFromLine)
           : undefined) ?? allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
       if (match) {
-        const moved = match.fromLine !== this._selectedLine;
         this._selectedLine = match.fromLine;
         this._selectedRange = {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
-        // A selection that moved must show its row, so it opens its own
-        // group even over a hand collapse; a flat single row has no group.
-        // A yaml edit re-syncing the same selection leaves a hand collapse.
-        const { components } = this._deriveBuckets(this.yaml);
-        const siblings = components.filter((s) => s.key === match.key);
-        if (
-          moved &&
-          siblings.some((s) => s.fromLine === match.fromLine) &&
-          !isFlatDomain(siblings.length, match) &&
-          !this._openGroups.get(match.key)
-        ) {
-          this._openGroups = new Map(this._openGroups).set(match.key, true);
-        }
       }
     }
   }
@@ -302,7 +287,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
-    const isGroupOpen = (key: string) => this._openGroups.get(key) ?? false;
+    const isGroupOpen = (key: string) => !this._collapsedGroups.has(key);
 
     interface NavSection {
       label: string;
@@ -546,9 +531,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
     fireEvent(this, "section-toggle", { index });
   }
 
-  /** Collapse/expand one domain subgroup (new Map so @state reacts). */
+  /** Collapse/expand one domain subgroup (new Set so @state reacts). */
   private _setGroupOpen(key: string, open: boolean) {
-    this._openGroups = new Map(this._openGroups).set(key, open);
+    const next = new Set(this._collapsedGroups);
+    if (open) next.delete(key);
+    else next.add(key);
+    this._collapsedGroups = next;
   }
 
   /** Ask the page to hide the navigator. The page decides between
