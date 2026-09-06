@@ -100,6 +100,18 @@ describe("device-navigator domain grouping", () => {
     expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
   });
 
+  it("keeps the selected domain open after the selection clears", async () => {
+    const nav = await mountNavigator([1]);
+    nav.selectedKey = "switch.template";
+    nav.selectedFromLine = sectionLine(YAML, "switch.template");
+    await nav.updateComplete;
+    nav.selectedKey = "";
+    nav.selectedFromLine = undefined;
+    await nav.updateComplete;
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
+    expect(subExpanded(nav)).toEqual(["false", "true"]);
+  });
+
   it("keeps an explicit toggle across a selection change", async () => {
     const nav = await mountNavigator([1]);
     // Open Switch by hand, then select a sensor row: both stay open.

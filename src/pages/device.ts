@@ -1528,12 +1528,12 @@ export class ESPHomePageDevice extends LitElement {
 
   /**
    * The drawer (mobile) and desktop navigators share the same prop set;
-   * only their CSS class differs. One is mounted per layout, the desktop
-   * copy only while the sidebar is shown. Pulled into a render helper so
-   * adding a prop touches one place.
+   * only their CSS class differs. One is mounted per layout. Pulled into
+   * a render helper so adding a prop touches one place.
    */
   private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
-    const isVisibleTourNavigator = className === "desktop-nav" || this._drawerOpen;
+    const isVisibleTourNavigator =
+      className === "desktop-nav" ? !this._navCollapsed : this._drawerOpen;
     return html`<esphome-device-navigator
       class=${className}
       .tourAnchorId=${isVisibleTourNavigator ? "nav" : undefined}
@@ -1552,11 +1552,7 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _renderEditor(deviceTitle: string, showEdgeTab: boolean, backLabel: string) {
-    return html` ${
-        !this._isMobile && !this._navCollapsed
-          ? this._renderNavigator("desktop-nav")
-          : nothing
-      }
+    return html` ${!this._isMobile ? this._renderNavigator("desktop-nav") : nothing}
       <esphome-device-editor
         .yaml=${this._yaml}
         .savedYaml=${this._savedYaml}

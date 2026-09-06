@@ -225,9 +225,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
   private _searchOpen = false;
 
   /** Domain subgroups the user toggled by hand; the rest follow the
-   *  selection (only the selected row's domain is open). */
+   *  selection (only the last selected row's domain is open). */
   @state()
   private _groupOverrides = new Map<string, boolean>();
+
+  /** Domain of the last selected component row; stays open after the
+   *  selection clears. */
+  @state()
+  private _openDomain: string | null = null;
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -281,6 +286,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
+        const { components } = this._deriveBuckets(this.yaml);
+        if (components.some((s) => s.fromLine === match.fromLine)) {
+          this._openDomain = match.key;
+        }
       }
     }
   }
@@ -288,10 +297,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
-    const selectedDomain =
-      components.find((s) => s.fromLine === this._selectedLine)?.key ?? null;
     const isGroupOpen = (key: string) =>
-      this._groupOverrides.get(key) ?? key === selectedDomain;
+      this._groupOverrides.get(key) ?? key === this._openDomain;
 
     interface NavSection {
       label: string;

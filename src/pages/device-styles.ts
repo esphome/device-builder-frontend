@@ -41,6 +41,10 @@ export const devicePageStyles = css`
     background: var(--wa-color-surface-default);
   }
 
+  .layout-grid.nav-collapsed .desktop-nav {
+    display: none;
+  }
+
   .drawer,
   .drawer-backdrop {
     display: none;

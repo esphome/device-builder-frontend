@@ -2,7 +2,8 @@
  * @vitest-environment happy-dom
  *
  * Pins that the device page mounts one navigator per layout: the drawer
- * copy on mobile, the desktop copy only while the sidebar is shown.
+ * copy on mobile, the desktop copy on desktop (hidden by CSS while the
+ * sidebar is collapsed, so its search and reveal state survive).
  */
 import { describe, expect, it } from "vitest";
 
@@ -40,8 +41,10 @@ describe("device page navigator mount", () => {
     expect(navigators(makePage({ mobile: false }))).toEqual(["desktop-nav"]);
   });
 
-  it("mounts no navigator while the desktop sidebar is collapsed", () => {
-    expect(navigators(makePage({ mobile: false, navCollapsed: true }))).toEqual([]);
+  it("keeps the desktop navigator mounted while the sidebar is collapsed", () => {
+    expect(navigators(makePage({ mobile: false, navCollapsed: true }))).toEqual([
+      "desktop-nav",
+    ]);
   });
 
   it("mounts only the drawer navigator on mobile, drawer open or closed", () => {
