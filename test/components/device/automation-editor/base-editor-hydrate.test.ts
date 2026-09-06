@@ -80,6 +80,17 @@ describe("base editor relocation hydrate", () => {
     expect((editor as any).value.actions).toHaveLength(1);
   });
 
+  it("does not stay inert when a relocation cannot be parsed", async () => {
+    const parse = vi.fn();
+    const { editor } = await mountAt("a", parse);
+    (editor as any)._api = undefined;
+    (editor as any).location = { kind: "script", id: "b" };
+    await editor.updateComplete;
+    await flushMicrotasks(3);
+    expect(parse).not.toHaveBeenCalled();
+    expect((editor as any)._hydrating).toBe(false);
+  });
+
   it("drops the previous tree when the new location has no parse", async () => {
     const parse = vi.fn().mockResolvedValue([]);
     const { editor } = await mountAt("a", parse);

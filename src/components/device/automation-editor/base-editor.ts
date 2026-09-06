@@ -203,7 +203,11 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected abstract _loadAvailable(): Promise<void>;
 
   protected async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
+    if (!this._api || !this.configuration || !this.location) {
+      // No parse is coming, so don't leave the held tree inert.
+      this._hydrating = false;
+      return;
+    }
     const id = ++this._hydrateId;
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
