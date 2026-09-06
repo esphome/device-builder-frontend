@@ -225,7 +225,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
   private _searchOpen = false;
 
   /** Domain subgroups the user toggled by hand; the rest follow the
-   *  selection (only the last selected row's domain is open). */
+   *  selection (only the last selected row's domain is open). A new
+   *  selection reopens its own domain. */
   @state()
   private _groupOverrides = new Map<string, boolean>();
 
@@ -281,6 +282,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           ? allSections.find((s) => s.fromLine === this.selectedFromLine)
           : undefined) ?? allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
       if (match) {
+        const moved = match.fromLine !== this._selectedLine;
         this._selectedLine = match.fromLine;
         this._selectedRange = {
           fromLine: match.fromLine,
@@ -296,6 +298,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
           !isFlatDomain(siblings.length, match)
         ) {
           this._openDomain = match.key;
+          // A caret, deep link or navigator selection must show its row,
+          // so a hand collapse yields to a selection that actually moved.
+          if (moved && this._groupOverrides.has(match.key)) {
+            const next = new Map(this._groupOverrides);
+            next.delete(match.key);
+            this._groupOverrides = next;
+          }
         }
       }
     }

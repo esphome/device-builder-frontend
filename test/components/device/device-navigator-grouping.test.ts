@@ -134,7 +134,7 @@ describe("device-navigator domain grouping", () => {
     expect(subExpanded(nav)).toEqual(["true", "false"]);
   });
 
-  it("keeps an explicit toggle across a selection change", async () => {
+  it("keeps a hand-opened domain and reopens a hand-collapsed one for a new selection", async () => {
     const nav = await mountNavigator([1]);
     // Open Switch by hand, then select a sensor row: both stay open.
     await clickSubgroup(nav, "Switch");
@@ -142,12 +142,26 @@ describe("device-navigator domain grouping", () => {
     nav.selectedFromLine = sectionLine(YAML, "sensor.template");
     await nav.updateComplete;
     expect(subExpanded(nav)).toEqual(["true", "true"]);
-    // Collapse Sensor by hand; selecting its other row doesn't reopen it.
+    // Collapse Sensor by hand; selecting its other row must show that row.
     await clickSubgroup(nav, "Sensor");
+    expect(subExpanded(nav)).toEqual(["false", "true"]);
     nav.selectedFromLine = sectionLine(YAML, "sensor.template", 1);
     await nav.updateComplete;
-    expect(subExpanded(nav)).toEqual(["false", "true"]);
-    expect(navItemCount(nav)).toBe(2);
+    expect(subExpanded(nav)).toEqual(["true", "true"]);
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
+  });
+
+  it("keeps a hand collapse while the selection is unchanged", async () => {
+    const nav = await mountNavigator([1]);
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sectionLine(YAML, "sensor.template");
+    await nav.updateComplete;
+    await clickSubgroup(nav, "Sensor");
+    expect(subExpanded(nav)).toEqual(["false", "false"]);
+    // A yaml edit re-syncs the same selection; the collapse must survive it.
+    nav.yaml = `${YAML}# note\n`;
+    await nav.updateComplete;
+    expect(subExpanded(nav)).toEqual(["false", "false"]);
   });
 
   it("leaves non-component sections flat (no subgroups)", async () => {
