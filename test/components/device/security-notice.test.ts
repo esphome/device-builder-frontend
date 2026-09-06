@@ -16,6 +16,7 @@ vi.mock("../../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import toast from "sonner-js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeSecurityNotice } from "../../../src/components/device/security-notice.js";
 
@@ -131,6 +132,44 @@ describe("security-notice — render", () => {
       (c) => c.textContent
     );
     expect(codes).toEqual(["kitchen__web_password"]);
+  });
+});
+
+describe("security-notice — ota password yields to the encryption nudge", () => {
+  const NOISE = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
+  const YAML = 'api:\n  encryption:\n    key: "abc"\nota:\n  - platform: esphome\n';
+  async function mountOta(
+    deployed_version: string,
+    api_encryption_active: string | null
+  ) {
+    const { el, inner } = make("ota.esphome", YAML, 4);
+    inner._esphomeVersion = "2026.9.0";
+    inner._devices = [
+      makeConfiguredDevice({
+        configuration: "device.yaml",
+        api_enabled: true,
+        api_encrypted: true,
+        runtime_state: { deployed_version, api_encryption_active },
+      }),
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+
+  it("keeps the password nudge on firmware that cannot offer encryption", async () => {
+    expect(
+      (await mountOta("2026.8.3", NOISE)).shadowRoot!.querySelector(".notice")
+    ).not.toBeNull();
+    expect(
+      (await mountOta("2026.9.0", "")).shadowRoot!.querySelector(".notice")
+    ).not.toBeNull();
+  });
+
+  it("hides the password nudge once the device offers encryption", async () => {
+    expect(
+      (await mountOta("2026.9.0", NOISE)).shadowRoot!.querySelector(".notice")
+    ).toBeNull();
   });
 });
 

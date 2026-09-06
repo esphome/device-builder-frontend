@@ -21,11 +21,20 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  devicesContext,
+  localizeContext,
+  versionContext,
+} from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { generateApiEncryptionKey } from "../../util/api-encryption-key.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
+import {
+  otaEncryptionNudge,
+  type OtaEncryptionNudgeInputs,
+} from "../../util/ota-encryption-nudge.js";
 import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
@@ -63,6 +72,8 @@ interface SecuritySetting {
   copyPrefix: string;
   /** The value(s) to generate, store/inline, and reference. */
   fields: GeneratedField[];
+  /** When true the nudge stays hidden even though the marker is absent. */
+  suppressWhen?: (inputs: OtaEncryptionNudgeInputs) => boolean;
 }
 
 /** A 4-word passphrase (strong); a single random word (memorable, non-secret). */
@@ -88,6 +99,9 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
     marker: "password",
     copyPrefix: "ota_password",
     fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],
+    // A device that already offers encrypted OTA gets the encryption nudge
+    // instead; a password next to its api key only wastes flash.
+    suppressWhen: (inputs) => otaEncryptionNudge(inputs) !== null,
   },
   web_server: {
     secretSection: "web_server",
@@ -120,6 +134,10 @@ export class ESPHomeSecurityNotice extends LitElement {
   @state()
   private _devices: ConfiguredDevice[] = [];
 
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _esphomeVersion = "";
+
   /** The section whose form this notice sits above. */
   @property() sectionKey = "";
 
@@ -147,8 +165,15 @@ export class ESPHomeSecurityNotice extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues) {
-    if (changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey")) {
-      this._markerAbsent = !!this._setting && !this._markerPresent();
+    if (
+      changed.has("yaml") ||
+      changed.has("fromLine") ||
+      changed.has("sectionKey") ||
+      changed.has("_devices") ||
+      changed.has("_esphomeVersion")
+    ) {
+      this._markerAbsent =
+        !!this._setting && !this._markerPresent() && !this._suppressed();
     }
   }
 
@@ -190,6 +215,16 @@ export class ESPHomeSecurityNotice extends LitElement {
     return (
       findDirectChildLine(this.yaml.split("\n"), baseKey, marker, this.fromLine) >= 0
     );
+  }
+
+  private _suppressed(): boolean {
+    const suppress = this._setting?.suppressWhen;
+    if (!suppress) return false;
+    return suppress({
+      device: this._devices.find((d) => d.configuration === this.configuration),
+      yaml: this.yaml,
+      esphomeVersion: this._esphomeVersion,
+    });
   }
 
   private _onCta = (): void => {
