@@ -1243,7 +1243,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // The full dropdown candidate set, distinct from the Add-component
     // picker's paginated grid. The cache dedupes in-flight fetches and
     // logs a failure once.
-    if (this._api) fetchInterfaceProviders(this._api, interfaceName).catch(() => {});
+    if (this._api) void fetchInterfaceProviders(this._api, interfaceName).catch(() => {});
     // Unsettled: no api yet, fetch in flight, or the last fetch failed.
     // Distinct from a cached [] so consumers don't treat an incomplete
     // candidate list as complete.
