@@ -206,10 +206,10 @@ export class ESPHomeSecurityNotice extends LitElement {
     return fields.length > 0 && fields.every((f) => !f.field.secretField || f.key !== "");
   }
 
-  /** Whether the section body has one of the setting's markers as a *direct child*. A
-   *  line scan (not the parsed values) because the parser drops a keyless block
-   *  (e.g. a keyless `encryption:` that HA auto-provisions) which must NOT
-   *  suppress the nudge. */
+  /** Whether the section body has one of the setting's markers as a *direct child*.
+   *  A line scan (not the parsed values) because the parser drops a keyless block
+   *  (e.g. a keyless `encryption:` that HA auto-provisions), which still counts
+   *  as configured and must keep the nudge hidden. */
   private _markerPresent(): boolean {
     const setting = this._setting;
     if (!setting) return false;
