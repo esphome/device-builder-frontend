@@ -57,6 +57,7 @@ export function hasStaticApiKey(yaml: string): boolean {
   // Last key wins, so pick the line first and read its value after.
   const key = findDirectChildLine(lines, "api", KEY_RE, encryption + 1);
   if (key < 0) return false;
+  // Keep the space after the colon; the comment splitter needs it to see `#`.
   const raw = lines[key].replace(/^\s*key\s*:/, "");
   const value = stripQuotes(splitInlineComment(raw).value.trim());
   return value.length > 0 && !/^!\S*$/.test(value);
@@ -139,6 +140,7 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
     encryptionLine,
     passwordLine,
     keyLine,
+    // A key on the dash compares against the item's child column, not the dash.
     multiLine:
       (passwordLine >= 0 &&
         continuesOnNextLine(
