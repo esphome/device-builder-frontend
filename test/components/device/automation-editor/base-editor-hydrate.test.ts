@@ -5,12 +5,13 @@
  * lands, concurrent parses share one round trip, and a superseded parse
  * never overwrites a newer one.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import "./_editor-harness.js";
 
 import { deferred, flushMicrotasks } from "../../../_dom.js";
 import type { ParsedAutomation } from "../../../../src/api/types/automations.js";
+import { _clearAutomationParseCache } from "../../../../src/components/device/automation-editor/base-editor.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,6 +45,8 @@ async function mountAt(id: string, parse: ReturnType<typeof vi.fn>) {
 }
 
 describe("base editor relocation hydrate", () => {
+  afterEach(() => _clearAutomationParseCache());
+
   it("keeps the previous tree read-only until the parse lands", async () => {
     const d = deferred<ParsedAutomation[]>();
     const parse = vi.fn().mockReturnValue(d.promise);

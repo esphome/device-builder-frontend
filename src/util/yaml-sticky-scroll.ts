@@ -36,7 +36,7 @@
  */
 import type { HighlightStyle } from "@codemirror/language";
 import { syntaxTree } from "@codemirror/language";
-import type { Extension, Text } from "@codemirror/state";
+import { type Extension, type Text, Transaction } from "@codemirror/state";
 import {
   EditorView,
   type PluginValue,
@@ -390,6 +390,8 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
 
         this.view.dispatch({
           selection: { anchor: line.from },
+          // A breadcrumb click switches the structured pane at once.
+          annotations: Transaction.userEvent.of("select.pointer"),
           effects: EditorView.scrollIntoView(line.from, {
             y: "start",
             yMargin,

@@ -38,6 +38,11 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
  *  of relocations and reloads shares the round trip. */
 const _parses = new KeyedPromiseCache<ParsedAutomation[]>({ evictOnSettle: true });
 
+/** Test-only: drop any parse still in flight. */
+export function _clearAutomationParseCache(): void {
+  _parses.clear();
+}
+
 export abstract class BaseAutomationEditor<L extends AutomationLocation>
   extends LitElement
   implements SectionEditor
