@@ -15,6 +15,7 @@ vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
+import { clickSubgroup } from "./_navigator-fixtures.js";
 
 const YAML = [
   "esphome:",
@@ -74,10 +75,7 @@ describe("device-navigator domain grouping", () => {
 
   it("collapsing a subgroup hides its rows", async () => {
     const nav = await mountNavigator([1]);
-    const sensorHeader =
-      nav.shadowRoot?.querySelector<HTMLElement>(".nav-subgroup-header");
-    sensorHeader!.click();
-    await nav.updateComplete;
+    await clickSubgroup(nav, "Sensor");
     // The two Sensor rows are hidden; only the two Switch rows remain.
     expect(navItemCount(nav)).toBe(2);
     // Headers themselves stay visible.
@@ -157,8 +155,7 @@ describe("device-navigator domain grouping", () => {
   it("force-opens a collapsed domain while filtering and drops empty ones", async () => {
     const nav = await mountNavigator([1]);
     // Collapse Sensor, then filter for a Sensor id.
-    nav.shadowRoot!.querySelector<HTMLElement>(".nav-subgroup-header")!.click();
-    await nav.updateComplete;
+    await clickSubgroup(nav, "Sensor");
     await setQuery(nav, "s1");
     // Sensor survives and shows its match despite being collapsed; Switch
     // (no match) drops out entirely.
