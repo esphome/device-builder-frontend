@@ -285,7 +285,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   private _unsubscribeProviders?: () => void;
 
-  /** Dotted paths of lazy option lists the user has opened. */
+  /** Field keys (``fieldKeyAttr``) of lazy option lists the user has opened. */
   private _expandedOptionFields: Set<string> = new Set();
 
   /** Scrolls the YAML-cursor-selected field into view (the structured side
@@ -1086,9 +1086,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
-      isOptionsExpanded: (path) => this._expandedOptionFields.has(path.join(".")),
+      isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
-        const key = path.join(".");
+        const key = fieldKeyAttr(path);
         if (this._expandedOptionFields.has(key)) return;
         this._expandedOptionFields.add(key);
         this.requestUpdate();
