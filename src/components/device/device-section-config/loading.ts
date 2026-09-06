@@ -115,7 +115,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
   } finally {
     if (id === host._loadId) {
       host._loading = false;
-      host._retargeting = false;
+      host._reloading = false;
     }
   }
 }

@@ -20,7 +20,7 @@ import {
 } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
+import { espHomeStyles, heldStyles } from "../../styles/shared.js";
 import { joinActionFieldPath } from "../../util/action-field-path.js";
 import {
   type InstanceBackendErrors,
@@ -29,6 +29,7 @@ import {
 import type { ValidationError } from "../../util/config-validation.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { setHeld } from "../../util/held.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -215,9 +216,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
-  /** The in-flight load targets a different section or instance than the
-   *  one on screen; a same-section refresh keeps the pane live. */
-  _retargeting = false;
+  /** A retargeting load is in flight while the outgoing section is still
+   *  on screen. The pane is inert meanwhile; the write fences cover
+   *  programmatic dispatch, so nothing writes its values under the
+   *  incoming key. A same-section refresh keeps the pane live. */
+  _reloading = false;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
   private _announceUnmount: (() => void) | null = null;
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
@@ -260,15 +263,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
   );
 
-  /** A retargeting load is in flight while the outgoing section is still
-   *  on screen. */
-  get _reloading(): boolean {
-    return this._loading && this._config !== null && this._retargeting;
-  }
-
   /** The section the pane is rendering; the outgoing one during a reload. */
   get _renderedKey(): string {
     return this._config?.section_key ?? this.sectionKey;
+  }
+
+  /** The caret's field target; withheld while the outgoing form is held. */
+  get _focusTarget(): string[] | undefined {
+    return this._reloading ? undefined : this.focusFieldPath;
   }
 
   get _showAdvanced(): boolean {
@@ -288,6 +290,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   static styles = [
     espHomeStyles,
+    heldStyles,
     inputStyles,
     dangerBannerStyles,
     deviceSectionConfigStyles,
@@ -322,15 +325,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       this.sectionKey &&
       this.configuration
     ) {
-      this._retargeting = true;
+      this._reloading = this._config !== null;
       void loadConfig(this);
     }
     this._revealAdvancedForFocus(changedProperties);
     this._revealAdvancedForErrors(changedProperties);
-    // The outgoing section stays on screen through a reload but takes no
-    // input, so nothing writes its values under the incoming key.
-    this.inert = this._reloading;
-    this.ariaBusy = this._reloading ? "true" : null;
+    setHeld(this, this._reloading);
   }
 
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {
@@ -343,7 +343,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   updated() {
     this._triggerCatalog.ensure();
-    if (!this._reloading) maybeFlashApiActionsList(this);
+    maybeFlashApiActionsList(this);
   }
 
   connectedCallback() {
@@ -387,8 +387,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     if (!this.sectionKey || !this.configuration) return;
     if (this._draftTimer !== null) return;
     if (this.yaml === this._lastSelfWrittenYaml) return;
-    // A refresh landing inside a retargeting load must not drop its fence.
-    if (!this._reloading) this._retargeting = false;
     void loadConfig(this);
   }
 
@@ -431,7 +429,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     applySectionValues(this, e.detail.changes);
 
   protected render() {
-    // A reload keeps the previous form on screen until the next config lands.
     if (this._loading && !this._config) {
       return html`<div class="loading"><wa-spinner></wa-spinner></div>`;
     }
@@ -445,8 +442,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    // Schema reads key on the rendered config, which a reload holds at the
-    // outgoing section until the incoming one lands.
     const renderEntries = resolveSectionEntries(config.section_key, config.entries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated

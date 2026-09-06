@@ -1414,7 +1414,6 @@ export class ESPHomePageDevice extends LitElement {
    *  not this one. */
   private _onBack = () => {
     this._heldUnknownInstance = null;
-    this._cancelCursorSwitch();
     const prev = this._sectionHistory.length
       ? this._sectionHistory[this._sectionHistory.length - 1]
       : null;
@@ -1731,22 +1730,26 @@ export class ESPHomePageDevice extends LitElement {
     // A click or an edit switches at once; a move within the current
     // section only retargets the field. Keyboard and find jumps across
     // sections coalesce so a run of matches rebuilds the pane once.
-    const immediate = detail.viaEdit || detail.pointer || this._isSelected(match);
+    const immediate =
+      detail.viaEdit ||
+      detail.pointer ||
+      this._isSelected(sectionKeyOf(match), match.fromLine);
     if (immediate) {
       this._applyCursorMove(detail, match);
       return;
     }
+    // A navigation that lands inside the window wins over the move.
+    const key = this._selectedSection;
+    const line = this._selectedFromLine;
     this._cursorSwitchTimer = setTimeout(() => {
       this._cursorSwitchTimer = null;
+      if (key !== this._selectedSection || line !== this._selectedFromLine) return;
       this._applyCursorMove(detail);
     }, CURSOR_SWITCH_COALESCE_MS);
   }
 
-  private _isSelected(section: YamlSection): boolean {
-    return (
-      sectionKeyOf(section) === this._selectedSection &&
-      section.fromLine === this._selectedFromLine
-    );
+  private _isSelected(sectionKey: string, fromLine: number | undefined): boolean {
+    return sectionKey === this._selectedSection && fromLine === this._selectedFromLine;
   }
 
   private _cancelCursorSwitch() {
@@ -1768,7 +1771,7 @@ export class ESPHomePageDevice extends LitElement {
     // fields are section-relative — the shared slice rule covers them.
     const rel = formRelativePath(full);
     const sectionKey = sectionKeyOf(match);
-    if (this._isSelected(match)) {
+    if (this._isSelected(sectionKey, match.fromLine)) {
       // Same section: update the field target directly for intra-section
       // moves (the cross-section path below would no-op and freeze it).
       this._focusFieldPath = rel;
@@ -1779,9 +1782,8 @@ export class ESPHomePageDevice extends LitElement {
     // being typed (`sendx:` on its way to `sensor:`) — hold the switch so
     // the pane doesn't flip to the unknown-component error surface on
     // every keystroke (#2211). Clicks and caret moves (viaEdit false)
-    // always switch, clicks at once and other moves after the coalesce
-    // window, so a settled external component still opens its pane
-    // deliberately. One quirk to know: the editor's same-line
+    // always switch, so a settled external component still opens its
+    // pane deliberately. One quirk to know: the editor's same-line
     // throttle means clicking the held line itself emits no event; the
     // navigator entry (kept visible) is the release path there.
     if (detail.viaEdit === true) {
@@ -2083,8 +2085,7 @@ export class ESPHomePageDevice extends LitElement {
   ) {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
-    this._cancelCursorSwitch();
-    if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
+    if (sectionKey !== null && this._isSelected(sectionKey, fromLine)) {
       this._drawerOpen = false;
       return;
     }

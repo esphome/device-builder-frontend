@@ -90,7 +90,7 @@ describe("base editor relocation hydrate", () => {
     expect((editor as any)._hydrating).toBe(false);
   });
 
-  it("does not stay inert when a relocation cannot be parsed", async () => {
+  it("drops the tree and the hold when a relocation cannot be parsed", async () => {
     const parse = vi.fn();
     const { editor } = await mountAt("a", parse);
     (editor as any)._api = undefined;
@@ -99,6 +99,7 @@ describe("base editor relocation hydrate", () => {
     await flushMicrotasks(3);
     expect(parse).not.toHaveBeenCalled();
     expect((editor as any)._hydrating).toBe(false);
+    expect((editor as any).value).toBeNull();
   });
 
   it("drops the previous tree when the new location has no parse", async () => {

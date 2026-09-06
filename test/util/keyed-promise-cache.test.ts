@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { deferred } from "../_dom.js";
 import { KeyedPromiseCache } from "../../src/util/keyed-promise-cache.js";
 
 describe("KeyedPromiseCache", () => {
@@ -108,16 +109,13 @@ describe("KeyedPromiseCache", () => {
   });
 
   it("with evictOnSettle, a stale settle doesn't evict a fresh entry cached after clear()", async () => {
-    let release!: (v: string) => void;
-    const first = new Promise<string>((r) => {
-      release = r;
-    });
+    const first = deferred<string>();
     const cache = new KeyedPromiseCache<string>({ evictOnSettle: true });
-    void cache.fetch("k", () => first);
+    void cache.fetch("k", () => first.promise);
     cache.clear();
     const fresh = cache.fetch("k", () => new Promise<string>(() => {}));
-    release("old");
-    await first;
+    first.resolve("old");
+    await first.promise;
     await Promise.resolve();
     expect(cache.fetch("k", () => Promise.resolve("new"))).toBe(fresh);
   });

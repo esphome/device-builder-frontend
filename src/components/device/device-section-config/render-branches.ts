@@ -94,7 +94,7 @@ export function renderStructuredFormBranch(
       .fromLine=${host._resolvedFromLine}
       .sectionKey=${config.section_key}
       .configuration=${host.configuration}
-      .focusFieldPath=${host._reloading ? undefined : host.focusFieldPath}
+      .focusFieldPath=${host._focusTarget}
       .presentComponents=${host._effectivePresentComponents}
       advanced-section
       gate-advanced

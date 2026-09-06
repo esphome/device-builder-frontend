@@ -522,8 +522,6 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               // caret here — the page holds section switches onto a
               // half-typed unknown key only for edit-driven moves.
               viaEdit: update.docChanged,
-              // True for a deliberate activation (select.pointer); the page
-              // switches at once for those and coalesces other moves.
               pointer: update.transactions.some((tr) =>
                 tr.annotation(Transaction.userEvent)?.startsWith("select.pointer")
               ),

@@ -20,8 +20,9 @@ import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
+import { espHomeStyles, heldStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
+import { setHeld } from "../../../util/held.js";
 import { KeyedPromiseCache } from "../../../util/keyed-promise-cache.js";
 import type { SectionEditor } from "../section-editor.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
@@ -33,15 +34,6 @@ import { renderDeleteRow } from "./render-delete-row.js";
 import { sectionKeyFromLocation } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-
-/** One ``automations/parse`` per buffer while it is in flight, so a burst
- *  of relocations and reloads shares the round trip. */
-const _parses = new KeyedPromiseCache<ParsedAutomation[]>({ evictOnSettle: true });
-
-/** Test-only: drop any parse still in flight. */
-export function _clearAutomationParseCache(): void {
-  _parses.clear();
-}
 
 export abstract class BaseAutomationEditor<L extends AutomationLocation>
   extends LitElement
@@ -97,6 +89,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
    *  screen read-only until the parse lands. */
   @state() protected _hydrating = false;
   private _hydrateId = 0;
+
+  /** One ``automations/parse`` per buffer while it is in flight, so a burst
+   *  of relocations and reloads shares the round trip. */
+  private readonly _parses = new KeyedPromiseCache<ParsedAutomation[]>({
+    evictOnSettle: true,
+  });
 
   protected _resolveFocus = createFocusResolver();
 
@@ -159,7 +157,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     return this._engine.lastRoundFailed;
   }
 
-  static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles: CSSResultGroup = [
+    espHomeStyles,
+    heldStyles,
+    inputStyles,
+    automationEditorStyles,
+  ];
 
   /** Loading spinner / parse-error panel that preempts the body
    *  render, or ``null`` once the editor is ready to paint. */
@@ -204,8 +207,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) {
-      // No parse is coming, so don't leave the held tree inert.
-      this._hydrating = false;
+      this._dropStaleTree();
       return;
     }
     const id = ++this._hydrateId;
@@ -216,7 +218,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       // leave the form empty even though the YAML pane shows the
       // user's input.
       const { configuration, yaml } = this;
-      const parsed = await _parses.fetch(`${configuration}\0${yaml}`, () =>
+      const parsed = await this._parses.fetch(`${configuration}\0${yaml}`, () =>
         this._api.parseDeviceAutomations(configuration, yaml)
       );
       if (id !== this._hydrateId) return;
@@ -250,8 +252,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // and a re-attached one must not come back read-only.
     this._hydrateId++;
     this._hydrating = false;
-    this.inert = false;
-    this.ariaBusy = null;
+    setHeld(this, false);
   }
 
   /** A relocation whose parse found no tree must not keep showing the
@@ -265,9 +266,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected willUpdate(changed: Map<string, unknown>) {
     // Navigator-driven location swap: when the parent passes in a
     // different ``location`` (user clicked a sibling section), the
-    // editor element is reused — its previous ``value`` is stale.
-    // Keep it on screen read-only and let the hydrate path in
-    // ``updated`` replace it, so the tree is diffed rather than rebuilt.
+    // editor element is reused — its previous ``value`` is stale, so
+    // the hydrate path in ``updated`` re-fetches.
     if (changed.has("location") && !this.addMode) {
       const prev = changed.get("location") as L | null | undefined;
       if (
@@ -278,9 +278,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._hydrating = true;
       }
     }
-    // The stale tree takes no input while the relocation re-parses.
-    this.inert = this._hydrating;
-    this.ariaBusy = this._hydrating ? "true" : null;
+    setHeld(this, this._hydrating);
   }
 
   protected updated(changed: Map<string, unknown>) {

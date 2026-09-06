@@ -9,6 +9,13 @@
 import { css } from "lit";
 
 /** ESPHome brand colors and design tokens. */
+/** Dim a host held inert while its content is being replaced. */
+export const heldStyles = css`
+  :host([inert]) {
+    opacity: 0.6;
+  }
+`;
+
 export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ───

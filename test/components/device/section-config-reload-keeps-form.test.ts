@@ -163,7 +163,6 @@ describe("section reload keeps the form mounted", () => {
     expect(c.inert).toBe(true);
     await settle("switch.template");
     expect(inner._reloading).toBe(false);
-    expect(inner._retargeting).toBe(false);
     expect(c.inert).toBe(false);
   });
 

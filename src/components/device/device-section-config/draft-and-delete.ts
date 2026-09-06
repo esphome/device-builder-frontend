@@ -88,7 +88,6 @@ export function onValueChange(
   host: ESPHomeDeviceSectionConfig,
   e: CustomEvent<ConfigEntryValueChange>
 ): void {
-  // The values belong to the outgoing section while a reload is in flight.
   if (host._reloading) return;
   const { path, value } = e.detail;
   host._values = setIn(host._values, path, value);

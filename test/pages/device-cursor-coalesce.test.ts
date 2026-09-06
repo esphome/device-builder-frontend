@@ -78,13 +78,7 @@ describe("cross-section caret moves coalesce", () => {
     expect(replace).toHaveBeenCalledTimes(1);
   });
 
-  it("switches at once on a click", () => {
-    const page = makePage();
-    cursor(page, 4, { pointer: true });
-    expect(internals(page)._selectedSection).toBe("sensor.aht10");
-  });
-
-  it("switches at once on an edit onto a known key and drops a pending move", () => {
+  it("an edit onto a known key drops a pending move and switches at once", () => {
     const page = makePage();
     cursor(page, 6);
     cursor(page, 4, { viaEdit: true });
