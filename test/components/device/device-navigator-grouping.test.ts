@@ -90,7 +90,7 @@ describe("device-navigator domain grouping", () => {
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
   });
 
-  it("opens only the selected row's domain", async () => {
+  it("opens the selected row's domain and leaves the others alone", async () => {
     const nav = await mountNavigator([1]);
     nav.selectedKey = "switch.template";
     nav.selectedFromLine = sectionLine(YAML, "switch.template");
@@ -98,6 +98,18 @@ describe("device-navigator domain grouping", () => {
     expect(subExpanded(nav)).toEqual(["false", "true"]);
     expect(navItemCount(nav)).toBe(2);
     expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
+  });
+
+  it("keeps a domain open when the selection moves to another", async () => {
+    const nav = await mountNavigator([1]);
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sectionLine(YAML, "sensor.template");
+    await nav.updateComplete;
+    nav.selectedKey = "switch.template";
+    nav.selectedFromLine = sectionLine(YAML, "switch.template");
+    await nav.updateComplete;
+    expect(subExpanded(nav)).toEqual(["true", "true"]);
+    expect(navItemCount(nav)).toBe(4);
   });
 
   it("keeps the selected domain open after the selection clears", async () => {

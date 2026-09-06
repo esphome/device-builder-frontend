@@ -224,16 +224,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
-  /** Domain subgroups the user toggled by hand; the rest follow the
-   *  selection (only the last selected row's domain is open). A new
-   *  selection reopens its own domain. */
+  /** Open domain subgroups. Groups start collapsed; a selection opens its
+   *  own group and never closes another, and a hand toggle applies on top. */
   @state()
-  private _groupOverrides = new Map<string, boolean>();
-
-  /** Domain of the last selected component row; stays open after the
-   *  selection clears. */
-  @state()
-  private _openDomain: string | null = null;
+  private _openGroups = new Map<string, boolean>();
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -288,23 +282,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
-        // Only a domain that renders a subgroup header takes the latch; a
-        // flat single row opens nothing and must not close the group the
-        // user was browsing.
+        // A selection that moved must show its row, so it opens its own
+        // group even over a hand collapse; a flat single row has no group.
+        // A yaml edit re-syncing the same selection leaves a hand collapse.
         const { components } = this._deriveBuckets(this.yaml);
         const siblings = components.filter((s) => s.key === match.key);
         if (
+          moved &&
           siblings.some((s) => s.fromLine === match.fromLine) &&
-          !isFlatDomain(siblings.length, match)
+          !isFlatDomain(siblings.length, match) &&
+          !this._openGroups.get(match.key)
         ) {
-          this._openDomain = match.key;
-          // A caret, deep link or navigator selection must show its row,
-          // so a hand collapse yields to a selection that actually moved.
-          if (moved && this._groupOverrides.has(match.key)) {
-            const next = new Map(this._groupOverrides);
-            next.delete(match.key);
-            this._groupOverrides = next;
-          }
+          this._openGroups = new Map(this._openGroups).set(match.key, true);
         }
       }
     }
@@ -313,8 +302,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
-    const isGroupOpen = (key: string) =>
-      this._groupOverrides.get(key) ?? key === this._openDomain;
+    const isGroupOpen = (key: string) => this._openGroups.get(key) ?? false;
 
     interface NavSection {
       label: string;
@@ -560,7 +548,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   /** Collapse/expand one domain subgroup (new Map so @state reacts). */
   private _setGroupOpen(key: string, open: boolean) {
-    this._groupOverrides = new Map(this._groupOverrides).set(key, open);
+    this._openGroups = new Map(this._openGroups).set(key, open);
   }
 
   /** Ask the page to hide the navigator. The page decides between
