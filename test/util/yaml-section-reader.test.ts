@@ -36,6 +36,8 @@ describe("findDirectChildLine", () => {
     expect(findDirectChildLine(doc, "ota", PASSWORD_RE, 2)).toBe(3);
   });
 
+  // Documents the gate rather than guarding it: a column-0 scan starts on the
+  // `ota:` header, so the dash branch is unreachable for this input.
   it("never reports a dash line for a column-0 section scan", () => {
     const doc = lines("- password: x\nota:\n  - platform: esphome\n");
     expect(findDirectChildLine(doc, "ota", PASSWORD_RE)).toBe(-1);

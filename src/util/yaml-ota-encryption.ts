@@ -107,16 +107,17 @@ function removeDirectChildLines(
   fromLine: number
 ): number {
   let first = -1;
-  for (let line = childBelowDash(lines, keyRe, fromLine); line >= 0;) {
+  for (let line = childBelowStart(lines, keyRe, fromLine); line >= 0;) {
     lines.splice(line, 1);
     first = line;
-    line = childBelowDash(lines, keyRe, fromLine);
+    line = childBelowStart(lines, keyRe, fromLine);
   }
   return first;
 }
 
-/** `findDirectChildLine` without the dash line, so removal never eats the item's dash. */
-function childBelowDash(lines: string[], keyRe: RegExp, fromLine: number): number {
+/** `findDirectChildLine` without the start line itself (the item's dash or the
+ *  `encryption:` header), so removal never eats the line it scans from. */
+function childBelowStart(lines: string[], keyRe: RegExp, fromLine: number): number {
   const line = findDirectChildLine(lines, "ota", keyRe, fromLine);
   return line === fromLine - 1 ? -1 : line;
 }
