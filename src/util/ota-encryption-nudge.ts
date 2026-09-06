@@ -34,8 +34,12 @@ export function otaEncryptionNudge({
 }: OtaEncryptionNudgeInputs): OtaEncryptionNudge | null {
   const facts = otaEsphomeFacts(yaml);
   if (!facts.present || !hasStaticApiKey(yaml)) return null;
-  // A redundant own key is a config shape, not a firmware capability: the
-  // device already uses the api key for OTA whatever the running version.
+  // A redundant own key is a config shape, not a firmware capability, so no
+  // device gate and no key comparison: with a static api key esphome builds the
+  // OTA transport from that key and ignores the OTA `key:` (ota/__init__.py
+  // to_code, own key only without a static api key), and its validation
+  // rejects a differing pair (_resolve_encryption_key), so the running firmware
+  // never holds the OTA `key:` and dropping it cannot change what it requires.
   if (facts.hasEncryption) return facts.hasOwnKey ? "drop_own_key" : null;
   if (!device || !deviceOffersOtaEncryption(device)) return null;
   if (!toolchainAcceptsOtaEncryption(esphomeVersion)) return null;
