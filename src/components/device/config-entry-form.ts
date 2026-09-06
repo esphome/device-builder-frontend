@@ -812,6 +812,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const current = Array.isArray(select.value)
         ? (select.value[0] ?? "")
         : (select.value ?? "");
+      // A select holding the raw value as its own spelling never re-syncs,
+      // so a late-mounting option list must always include the value's
+      // option (the lazy id-reference list keeps the selected one mounted).
       if (this._showsValue(current, raw)) continue;
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
