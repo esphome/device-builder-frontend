@@ -47,7 +47,10 @@ function response(ids: string[]) {
 
 describe("config-entry-form _resolveInterfaceProviders", () => {
   beforeEach(() => _clearProvidesCache());
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    _clearProvidesCache();
+  });
 
   it("returns null on the first miss, then the fetched providers, fetching once", async () => {
     const getComponents = vi

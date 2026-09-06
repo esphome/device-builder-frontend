@@ -29,7 +29,10 @@ function response(ids: string[]) {
 
 describe("interface providers cache", () => {
   beforeEach(() => _clearProvidesCache());
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    _clearProvidesCache();
+  });
 
   it("fetches once per interface and notifies subscribers", async () => {
     const getComponents = vi.fn().mockResolvedValue(response(["sensor.adc"]));
