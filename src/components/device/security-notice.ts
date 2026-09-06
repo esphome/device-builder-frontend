@@ -5,7 +5,8 @@
  * component covers every setting in `SECURITY_SETTINGS`:
  *
  * - `api` — missing `encryption:` → generate a Noise key.
- * - `ota.esphome` — missing `password:` → generate a passphrase.
+ * - `ota.esphome` — missing `password:` (and no `encryption:`) → generate a
+ *   passphrase; yields to the OTA encryption nudge when that applies.
  * - `web_server` — missing `auth:` → generate an inline username + a password.
  *
  * On confirm it stores each generated secret in secrets.yaml (via
@@ -21,15 +22,22 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  devicesContext,
+  localizeContext,
+  versionContext,
+} from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { generateApiEncryptionKey } from "../../util/api-encryption-key.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
+import { otaEncryptionNudge } from "../../util/ota-encryption-nudge.js";
 import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
+import { splitYamlDocLines } from "../../util/yaml-doc-lines.js";
 import { findDirectChildLine } from "../../util/yaml-section-reader.js";
 import { dispatchApplySectionValues } from "./notice-banner.js";
 import { noticeBannerStyles } from "./notice-banner.styles.js";
@@ -52,17 +60,26 @@ interface GeneratedField {
   secretField?: string;
 }
 
+/** What a suppression predicate can see about the device and the draft. */
+interface SuppressInputs {
+  device: ConfiguredDevice | undefined;
+  yaml: string;
+  esphomeVersion: string;
+}
+
 /** A recommended security setting and how to satisfy it. */
 interface SecuritySetting {
   /** Section name passed to `recommendedSecretKeys`; matches the field picker's
    *  `sectionKey` so both derive the same secret name (e.g. `ota.esphome`). */
   secretSection: string;
-  /** Direct-child key whose presence means the setting is already configured. */
-  marker: string;
+  /** Direct-child keys any one of which means the setting is already configured. */
+  markers: string[];
   /** `device.<copyPrefix>_*` localization keys for this setting's copy. */
   copyPrefix: string;
   /** The value(s) to generate, store/inline, and reference. */
   fields: GeneratedField[];
+  /** When true the nudge stays hidden even though the marker is absent. */
+  suppressWhen?: (inputs: SuppressInputs) => boolean;
 }
 
 /** A 4-word passphrase (strong); a single random word (memorable, non-secret). */
@@ -73,7 +90,7 @@ const word = () => generatePassphrase(1);
 export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   api: {
     secretSection: "api",
-    marker: "encryption",
+    markers: ["encryption"],
     copyPrefix: "api_encryption",
     fields: [
       {
@@ -85,13 +102,15 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   },
   "ota.esphome": {
     secretSection: "ota.esphome",
-    marker: "password",
+    markers: ["password", "encryption"],
     copyPrefix: "ota_password",
     fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],
+    // Yields to the OTA encryption nudge.
+    suppressWhen: (inputs) => otaEncryptionNudge(inputs) !== null,
   },
   web_server: {
     secretSection: "web_server",
-    marker: "auth",
+    markers: ["auth"],
     copyPrefix: "web_auth",
     fields: [
       // Username isn't sensitive and its field isn't a secret field — inline it.
@@ -120,6 +139,10 @@ export class ESPHomeSecurityNotice extends LitElement {
   @state()
   private _devices: ConfiguredDevice[] = [];
 
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _esphomeVersion = "";
+
   /** The section whose form this notice sits above. */
   @property() sectionKey = "";
 
@@ -136,6 +159,8 @@ export class ESPHomeSecurityNotice extends LitElement {
    *  Recomputed only when the YAML, section, or resolved line changes. */
   @state() private _markerAbsent = false;
 
+  private _device?: ConfiguredDevice;
+
   @state() private _generating = false;
 
   @query("esphome-confirm-dialog") private _dialog?: ESPHomeConfirmDialog;
@@ -147,8 +172,18 @@ export class ESPHomeSecurityNotice extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues) {
-    if (changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey")) {
-      this._markerAbsent = !!this._setting && !this._markerPresent();
+    const yamlDriven =
+      changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey");
+    // The devices context is replaced on every fleet event; only this device's row matters.
+    const device = this._devices.find((d) => d.configuration === this.configuration);
+    const deviceDriven =
+      device !== this._device ||
+      changed.has("_esphomeVersion") ||
+      changed.has("configuration");
+    this._device = device;
+    if (yamlDriven || (deviceDriven && this._setting?.suppressWhen)) {
+      this._markerAbsent =
+        !!this._setting && !this._markerPresent() && !this._suppressed();
     }
   }
 
@@ -177,19 +212,28 @@ export class ESPHomeSecurityNotice extends LitElement {
     return fields.length > 0 && fields.every((f) => !f.field.secretField || f.key !== "");
   }
 
-  /** Whether the section body has the setting's marker as a *direct child*. A
-   *  line scan (not the parsed values) because the parser drops a keyless block
-   *  (e.g. a keyless `encryption:` that HA auto-provisions) which must NOT
-   *  suppress the nudge. */
+  /** Whether a marker is a *direct child* of the section. A line scan, since the
+   *  parser drops a keyless block (an HA-provisioned `encryption:`) that counts. */
   private _markerPresent(): boolean {
     const setting = this._setting;
     if (!setting) return false;
     // `ota.esphome` → scan from the esphome list-item dash (its fromLine).
     const baseKey = this.sectionKey.split(".")[0];
-    const marker = new RegExp(`^${setting.marker}\\s*:`);
+    const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
     return (
-      findDirectChildLine(this.yaml.split("\n"), baseKey, marker, this.fromLine) >= 0
+      findDirectChildLine(splitYamlDocLines(this.yaml), baseKey, marker, this.fromLine) >=
+      0
     );
+  }
+
+  private _suppressed(): boolean {
+    const suppress = this._setting?.suppressWhen;
+    if (!suppress) return false;
+    return suppress({
+      device: this._device,
+      yaml: this.yaml,
+      esphomeVersion: this._esphomeVersion,
+    });
   }
 
   private _onCta = (): void => {

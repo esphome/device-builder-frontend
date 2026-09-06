@@ -88,6 +88,10 @@ import {
 } from "../util/yaml-lint-backend.js";
 import { disableMacSuffixInYaml } from "../util/yaml-mac-suffix.js";
 import {
+  dropOtaEncryptionKeyInYaml,
+  enableOtaEncryptionInYaml,
+} from "../util/yaml-ota-encryption.js";
+import {
   findFieldLine,
   parseYamlTopLevelSections,
   resolveCurrentSectionLine,
@@ -1585,6 +1589,8 @@ export class ESPHomePageDevice extends LitElement {
         @request-install=${this._saveThenInstall}
         @request-migrate-config=${this._onMigrateConfig}
         @request-disable-mac-suffix=${this._onDisableMacSuffix}
+        @request-enable-ota-encryption=${this._onEnableOtaEncryption}
+        @request-drop-ota-encryption-key=${this._onDropOtaEncryptionKey}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -2073,10 +2079,30 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onDisableMacSuffix() {
-    const updated = disableMacSuffixInYaml(this._yaml);
+    this._applyDraftRewrite(disableMacSuffixInYaml, "device.mac_suffix_applied");
+  }
+
+  private _onEnableOtaEncryption() {
+    this._applyDraftRewrite(enableOtaEncryptionInYaml, "device.ota_encryption_applied");
+  }
+
+  private _onDropOtaEncryptionKey() {
+    this._applyDraftRewrite(
+      dropOtaEncryptionKeyInYaml,
+      "device.ota_encryption_key_dropped"
+    );
+  }
+
+  /** Apply a notice CTA's line-level rewrite to the draft and re-pin the selection. */
+  private _applyDraftRewrite(
+    rewrite: (yaml: string) => string | null,
+    successKey: string
+  ) {
+    const updated = rewrite(this._yaml);
     if (updated === null) return;
     this._setYaml(updated);
-    notifySuccess(this._localize("device.mac_suffix_applied"));
+    this._repinSelection(updated);
+    notifySuccess(this._localize(successKey));
   }
 
   private _onSectionSelect(

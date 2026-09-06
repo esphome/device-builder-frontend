@@ -16,6 +16,7 @@ vi.mock("../../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import toast from "sonner-js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeSecurityNotice } from "../../../src/components/device/security-notice.js";
 
@@ -64,6 +65,27 @@ describe("security-notice — detection", () => {
       true,
     ],
     ["ota: absent", "ota.esphome", "ota:\n  - platform: esphome\n", 2, false],
+    [
+      "ota: password inline on the dash",
+      "ota.esphome",
+      "ota:\n  - password: x\n    platform: esphome\n",
+      2,
+      true,
+    ],
+    [
+      "ota: password present in a CRLF document",
+      "ota.esphome",
+      "ota:\r\n  - platform: esphome\r\n    password: x\r\n",
+      2,
+      true,
+    ],
+    [
+      "ota: encryption satisfies the setting",
+      "ota.esphome",
+      "ota:\n  - platform: esphome\n    encryption:\n",
+      2,
+      true,
+    ],
     [
       "ota: a sibling platform has a password, this one doesn't",
       "ota.esphome",
@@ -131,6 +153,52 @@ describe("security-notice — render", () => {
       (c) => c.textContent
     );
     expect(codes).toEqual(["kitchen__web_password"]);
+  });
+});
+
+describe("security-notice — ota password yields to the encryption nudge", () => {
+  const NOISE = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
+  const YAML = 'api:\n  encryption:\n    key: "abc"\nota:\n  - platform: esphome\n';
+  async function mountOta(
+    deployed_version: string,
+    api_encryption_active: string | null
+  ) {
+    const { el, inner } = make("ota.esphome", YAML, 5);
+    inner._esphomeVersion = "2026.9.0";
+    inner._devices = [
+      makeConfiguredDevice({
+        configuration: "device.yaml",
+        api_enabled: true,
+        api_encrypted: true,
+        runtime_state: { deployed_version, api_encryption_active },
+      }),
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+
+  it("keeps the password nudge on firmware that cannot offer encryption", async () => {
+    expect(
+      (await mountOta("2026.8.3", NOISE)).shadowRoot!.querySelector(".notice")
+    ).not.toBeNull();
+    expect(
+      (await mountOta("2026.9.0", "")).shadowRoot!.querySelector(".notice")
+    ).not.toBeNull();
+  });
+
+  it("recomputes when the notice is pointed at another configuration", async () => {
+    const el = await mountOta("2026.9.0", NOISE);
+    expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
+    el.configuration = "other.yaml";
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
+  });
+
+  it("hides the password nudge once the device offers encryption", async () => {
+    expect(
+      (await mountOta("2026.9.0", NOISE)).shadowRoot!.querySelector(".notice")
+    ).toBeNull();
   });
 });
 

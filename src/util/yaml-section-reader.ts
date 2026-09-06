@@ -58,7 +58,9 @@ export function findSectionStart(
  * rejects; the dedent stop keeps a list section scoped to its own
  * item. Duplicate matches follow YAML's last-key-wins, but only among
  * lines `keyRe` matches — a caller whose regex requires a value won't
- * see a later valueless re-declaration of the same key.
+ * see a later valueless re-declaration of the same key. With `fromLine`
+ * pointing at a list item, that item's inline dash key counts as a direct
+ * child too, so the result can be the dash line itself.
  */
 export function findDirectChildLine(
   lines: string[],
@@ -70,6 +72,12 @@ export function findDirectChildLine(
   if (start < 0) return -1;
   let childIndent: number | null = null;
   let found = -1;
+  // A list item's inline key (`- password: x`) is a direct child on the dash line.
+  const dash = fromLine !== undefined ? LIST_ITEM_INLINE_KEY_RE.exec(lines[start]) : null;
+  if (dash) {
+    keyRe.lastIndex = 0;
+    if (keyRe.test(lines[start].replace(/^\s*-\s+/, ""))) found = start;
+  }
   for (let i = start + 1; i < lines.length; i++) {
     const l = lines[i];
     if (isBlankOrCommentLine(l)) continue;
