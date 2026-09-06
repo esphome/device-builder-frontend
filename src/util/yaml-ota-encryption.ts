@@ -98,8 +98,9 @@ export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
   return lines.join(yamlDocEol(yaml));
 }
 
-/** Splice out every direct-child line below `fromLine` matching `keyRe` (the dash
- *  line itself is left to the caller); returns the first removed index, or -1. */
+/** Splice out every direct-child line below `fromLine` matching `keyRe`; the dash
+ *  line is left to the caller. The reader returns the last match, so removal runs
+ *  bottom-up and the value is the lowest index removed, or -1. */
 function removeDirectChildLines(
   lines: string[],
   keyRe: RegExp,
