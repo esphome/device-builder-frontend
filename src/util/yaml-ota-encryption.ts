@@ -7,7 +7,11 @@
  */
 import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
-import { _detectSectionChildIndent } from "./yaml-section-lexer.js";
+import {
+  _detectSectionChildIndent,
+  _leadingIndent,
+  isBlankOrCommentLine,
+} from "./yaml-section-lexer.js";
 import { findDirectChildLine } from "./yaml-section-reader.js";
 import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
@@ -25,6 +29,9 @@ interface OtaEsphomeItem {
   passwordLine: number;
   /** Zero-based line of `key:` inside the item's `encryption:` block, or -1. */
   keyLine: number;
+  /** A `password:` or `key:` value continues on following lines (block scalar,
+   *  value on its own line), which the one-line splices cannot handle. */
+  multiLine: boolean;
 }
 
 /** What the draft's esphome OTA item already carries. */
@@ -34,6 +41,8 @@ export interface OtaEsphomeFacts {
   hasPassword: boolean;
   /** The `encryption:` block carries its own `key:` instead of inheriting the api key. */
   hasOwnKey: boolean;
+  /** False when a value spans several lines, so neither rewrite can edit it safely. */
+  rewritable: boolean;
 }
 
 export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
@@ -43,6 +52,7 @@ export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
     hasEncryption: !!item && item.encryptionLine >= 0,
     hasPassword: !!item && item.passwordLine >= 0,
     hasOwnKey: !!item && item.keyLine >= 0,
+    rewritable: !!item && !item.multiLine,
   };
 }
 
@@ -72,18 +82,27 @@ export function hasStaticApiKey(yaml: string): boolean {
 export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
-  if (!item || item.encryptionLine >= 0) return null;
+  if (!item || item.encryptionLine >= 0 || item.multiLine) return null;
+  if (item.passwordLine === item.line) {
+    // The password sits inline on the item's dash: swap the key in place.
+    lines[item.line] = lines[item.line].replace(/password\s*:.*$/, "encryption:");
+  }
   // Duplicate keys are legal YAML (last wins), so every password line goes;
   // the block lands where the first one was, else after `platform:` (which a
   // bare-dash item carries on its own line, not on the dash).
   const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, item.line + 1);
   let insertAt = platform >= 0 ? platform + 1 : item.line + 1;
-  for (let line = item.passwordLine; line >= 0;) {
+  for (
+    let line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
+    line >= 0;
+  ) {
     lines.splice(line, 1);
     insertAt = line;
     line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
   }
-  lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
+  if (item.passwordLine !== item.line) {
+    lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
+  }
   return lines.join(yamlDocEol(yaml));
 }
 
@@ -92,7 +111,7 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
 export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
-  if (!item || item.keyLine < 0) return null;
+  if (!item || item.keyLine < 0 || item.multiLine) return null;
   for (let line = item.keyLine; line >= 0;) {
     lines.splice(line, 1);
     line = findDirectChildLine(lines, "ota", KEY_RE, item.encryptionLine + 1);
@@ -106,20 +125,45 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
   );
   if (!section) return null;
   const line = section.fromLine - 1;
-  const encryptionLine = findDirectChildLine(
+  const isListItem = section.parentKey !== undefined;
+  // A key written inline on the dash (`- password: x`) is a child too, but
+  // `findDirectChildLine` starts below the dash, so test the dash itself.
+  const dashKey = isListItem ? lines[line].replace(/^\s*-\s+/, "") : "";
+  const childEncryption = findDirectChildLine(
     lines,
     "ota",
     ENCRYPTION_RE,
     section.fromLine
   );
+  const childPassword = findDirectChildLine(lines, "ota", PASSWORD_RE, section.fromLine);
+  const encryptionLine =
+    childEncryption >= 0 || !ENCRYPTION_RE.test(dashKey) ? childEncryption : line;
+  const passwordLine =
+    childPassword >= 0 || !PASSWORD_RE.test(dashKey) ? childPassword : line;
+  const keyLine =
+    encryptionLine >= 0
+      ? findDirectChildLine(lines, "ota", KEY_RE, encryptionLine + 1)
+      : -1;
   return {
     line,
-    childIndent: _detectSectionChildIndent(lines, line, section.parentKey !== undefined),
+    childIndent: _detectSectionChildIndent(lines, line, isListItem),
     encryptionLine,
-    passwordLine: findDirectChildLine(lines, "ota", PASSWORD_RE, section.fromLine),
-    keyLine:
-      encryptionLine >= 0
-        ? findDirectChildLine(lines, "ota", KEY_RE, encryptionLine + 1)
-        : -1,
+    passwordLine,
+    keyLine,
+    multiLine:
+      (passwordLine > line && continuesOnNextLine(lines, passwordLine)) ||
+      (keyLine >= 0 && continuesOnNextLine(lines, keyLine)),
   };
+}
+
+/** Whether the scalar on `idx` is a block scalar or continues on a deeper line. */
+function continuesOnNextLine(lines: string[], idx: number): boolean {
+  const value = splitInlineComment(lines[idx].replace(/^[^:]*:/, "")).value.trim();
+  if (/^[|>]/.test(value)) return true;
+  const indent = _leadingIndent(lines[idx]).length;
+  for (let i = idx + 1; i < lines.length; i++) {
+    if (isBlankOrCommentLine(lines[i])) continue;
+    return _leadingIndent(lines[i]).length > indent;
+  }
+  return false;
 }

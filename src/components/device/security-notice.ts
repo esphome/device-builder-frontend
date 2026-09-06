@@ -220,10 +220,12 @@ export class ESPHomeSecurityNotice extends LitElement {
     // `ota.esphome` → scan from the esphome list-item dash (its fromLine).
     const baseKey = this.sectionKey.split(".")[0];
     const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
-    return (
-      findDirectChildLine(splitYamlDocLines(this.yaml), baseKey, marker, this.fromLine) >=
-      0
-    );
+    const lines = splitYamlDocLines(this.yaml);
+    // A marker written inline on a list item's dash (`- password: x`) sits on
+    // the fromLine itself, which the direct-child scan starts below.
+    const dash = this.fromLine !== undefined ? (lines[this.fromLine - 1] ?? "") : "";
+    if (/^\s*-\s+/.test(dash) && marker.test(dash.replace(/^\s*-\s+/, ""))) return true;
+    return findDirectChildLine(lines, baseKey, marker, this.fromLine) >= 0;
   }
 
   private _suppressed(): boolean {

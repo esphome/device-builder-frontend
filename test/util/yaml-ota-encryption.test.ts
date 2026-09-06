@@ -29,6 +29,7 @@ describe("otaEsphomeFacts", () => {
       hasEncryption: false,
       hasPassword: false,
       hasOwnKey: false,
+      rewritable: true,
     });
     expect(otaEsphomeFacts(PASSWORD_OTA)).toMatchObject({
       hasPassword: true,
@@ -51,6 +52,7 @@ describe("otaEsphomeFacts", () => {
       hasEncryption: false,
       hasPassword: false,
       hasOwnKey: false,
+      rewritable: false,
     });
   });
 
@@ -75,6 +77,33 @@ describe("otaEsphomeFacts", () => {
       hasEncryption: false,
     });
     expect(enableOtaEncryptionInYaml("ota:\n  -\n")).toBeNull();
+  });
+
+  it("sees a key written inline on the item's dash", () => {
+    expect(
+      otaEsphomeFacts("ota:\n  - password: x\n    platform: esphome\n")
+    ).toMatchObject({
+      present: true,
+      hasPassword: true,
+    });
+    expect(
+      otaEsphomeFacts("ota:\n  - encryption:\n    platform: esphome\n")
+    ).toMatchObject({
+      present: true,
+      hasEncryption: true,
+    });
+  });
+
+  it("reports multi-line values as not rewritable", () => {
+    expect(
+      otaEsphomeFacts("ota:\n  - platform: esphome\n    password: >-\n      long\n")
+    ).toMatchObject({ hasPassword: true, rewritable: false });
+    expect(
+      otaEsphomeFacts(
+        "ota:\n  - platform: esphome\n    encryption:\n      key:\n        abc\n"
+      )
+    ).toMatchObject({ hasOwnKey: true, rewritable: false });
+    expect(otaEsphomeFacts(PASSWORD_OTA)).toMatchObject({ rewritable: true });
   });
 
   it("does not read a sibling platform's password", () => {
@@ -153,6 +182,23 @@ describe("enableOtaEncryptionInYaml", () => {
     );
   });
 
+  it("swaps a password written inline on the dash", () => {
+    expect(
+      enableOtaEncryptionInYaml("ota:\n  - password: x\n    platform: esphome\n")
+    ).toBe("ota:\n  - encryption:\n    platform: esphome\n");
+    expect(
+      enableOtaEncryptionInYaml("ota:\n  - encryption:\n    platform: esphome\n")
+    ).toBeNull();
+  });
+
+  it("refuses a multi-line password", () => {
+    expect(
+      enableOtaEncryptionInYaml(
+        "ota:\n  - platform: esphome\n    password: >-\n      long\n"
+      )
+    ).toBeNull();
+  });
+
   it("returns null when already encrypted or without an item", () => {
     expect(enableOtaEncryptionInYaml(ENCRYPTED_OTA)).toBeNull();
     expect(enableOtaEncryptionInYaml(API_KEY)).toBeNull();
@@ -180,6 +226,14 @@ describe("dropOtaEncryptionKeyInYaml", () => {
     expect(dropOtaEncryptionKeyInYaml(yaml)).toBe(
       "ota:\n  - platform: esphome\n    encryption:\n"
     );
+  });
+
+  it("refuses a block-scalar key", () => {
+    expect(
+      dropOtaEncryptionKeyInYaml(
+        "ota:\n  - platform: esphome\n    encryption:\n      key: >-\n        abc\n"
+      )
+    ).toBeNull();
   });
 
   it("returns null without an own key", () => {

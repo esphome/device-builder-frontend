@@ -66,6 +66,13 @@ describe("security-notice — detection", () => {
     ],
     ["ota: absent", "ota.esphome", "ota:\n  - platform: esphome\n", 2, false],
     [
+      "ota: password inline on the dash",
+      "ota.esphome",
+      "ota:\n  - password: x\n    platform: esphome\n",
+      2,
+      true,
+    ],
+    [
       "ota: password present in a CRLF document",
       "ota.esphome",
       "ota:\r\n  - platform: esphome\r\n    password: x\r\n",
