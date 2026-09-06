@@ -112,6 +112,28 @@ describe("device-navigator domain grouping", () => {
     expect(subExpanded(nav)).toEqual(["false", "true"]);
   });
 
+  it("selecting a flat config block keeps the browsed domain open", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    const yaml = [...YAML.split("\n").slice(0, -1), "i2c:", "  sda: GPIO1", ""].join(
+      "\n"
+    );
+    nav.yaml = yaml;
+    nav.openSections = new Set([1]);
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sectionLine(yaml, "sensor.template");
+    await nav.updateComplete;
+    expect(subExpanded(nav)).toEqual(["true", "false"]);
+    nav.selectedKey = "i2c";
+    nav.selectedFromLine = sectionLine(yaml, "i2c");
+    await nav.updateComplete;
+    expect(
+      nav.shadowRoot!.querySelector(".nav-items--single .nav-item--selected")
+    ).toBeTruthy();
+    expect(subExpanded(nav)).toEqual(["true", "false"]);
+  });
+
   it("keeps an explicit toggle across a selection change", async () => {
     const nav = await mountNavigator([1]);
     // Open Switch by hand, then select a sensor row: both stay open.

@@ -5,7 +5,7 @@ import { withBase } from "../../util/base-path.js";
 import { mdiSvg } from "../../util/mdi-svg.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
-import type { NavGroup } from "./navigator-groups.js";
+import { isFlatDomain, type NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
 import { iconPathForDomain } from "./navigator-row-icons.js";
 
@@ -39,9 +39,9 @@ export interface NavSectionView {
   /** When set, ``rows`` are rendered under collapsible domain subgroups
    *  instead of as a flat list. */
   groups?: NavGroup[];
-  /** Whether a domain subgroup shows its rows; open when omitted. */
-  isGroupOpen?: (key: string) => boolean;
-  onSetGroupOpen?: (key: string, open: boolean) => void;
+  /** Whether a domain subgroup shows its rows. */
+  isGroupOpen: (key: string) => boolean;
+  onSetGroupOpen: (key: string, open: boolean) => void;
 }
 
 const ROW_CHEVRON = mdiSvg(mdiChevronRight, "nav-item-chevron");
@@ -119,7 +119,7 @@ function renderErrorBadge(count: number, v: NavSectionView): TemplateResult {
 function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   // Force open while filtering — you can't collapse a search result, so
   // the header is a static label there (no toggle, no focus, no chevron).
-  const open = v.filtering || (v.isGroupOpen?.(group.key) ?? true);
+  const open = v.filtering || v.isGroupOpen(group.key);
   const interactive = !v.filtering;
   // Only a collapsed group renders the header badge, so only then pay
   // for the per-row sum.
@@ -127,7 +127,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   const groupErrors =
     !open && count ? group.rows.reduce((sum, row) => sum + count(row.item), 0) : 0;
   const toggle = () => {
-    if (interactive) v.onSetGroupOpen?.(group.key, !open);
+    if (interactive) v.onSetGroupOpen(group.key, !open);
   };
   const rowsId = `navgroup-${group.key}`;
   return html`
@@ -232,7 +232,7 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
                     // Collapse a lone config-block domain (e.g. bluetooth_proxy,
                     // i2c) to a flat row in both views; a platform component
                     // ("- platform:" list) keeps its domain header even with one.
-                    group.rows.length === 1 && !group.rows[0].item.platform
+                    isFlatDomain(group.rows.length, group.rows[0].item)
                       ? renderNavSingleGroup(group, v)
                       : renderNavGroup(group, v)
                   )

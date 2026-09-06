@@ -38,7 +38,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
-import { groupRowsByDomain } from "./navigator-groups.js";
+import { groupRowsByDomain, isFlatDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
 import { NavigatorRevealController } from "./navigator-reveal-controller.js";
@@ -286,8 +286,15 @@ export class ESPHomeDeviceNavigator extends LitElement {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
+        // Only a domain that renders a subgroup header takes the latch; a
+        // flat single row opens nothing and must not close the group the
+        // user was browsing.
         const { components } = this._deriveBuckets(this.yaml);
-        if (components.some((s) => s.fromLine === match.fromLine)) {
+        const siblings = components.filter((s) => s.key === match.key);
+        if (
+          siblings.some((s) => s.fromLine === match.fromLine) &&
+          !isFlatDomain(siblings.length, match)
+        ) {
           this._openDomain = match.key;
         }
       }

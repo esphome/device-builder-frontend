@@ -1,4 +1,11 @@
+import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavRow } from "./navigator-labels.js";
+
+/** A lone config block (i2c) renders as a flat row, not a domain subgroup;
+ *  a lone platform component keeps its header. */
+export function isFlatDomain(count: number, item: YamlSection): boolean {
+  return count === 1 && !item.platform;
+}
 
 /** Rows of one domain (the YAML key, e.g. ``sensor``). */
 export interface NavGroup {

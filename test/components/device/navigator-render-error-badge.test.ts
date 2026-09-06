@@ -33,6 +33,8 @@ function makeView(overrides: Partial<NavSectionView>): NavSectionView {
     selectedLine: null,
     hoveredLine: null,
     errorLabel: (count) => `${count} validation errors`,
+    isGroupOpen: () => true,
+    onSetGroupOpen: () => {},
     onToggle: () => {},
     onItemEnter: () => {},
     onItemLeave: () => {},
