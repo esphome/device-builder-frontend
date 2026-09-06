@@ -34,7 +34,9 @@ export function firmwareOffersOtaEncryption(deployed: string): boolean {
   );
 }
 
-/** Whether the dashboard's own esphome accepts `ota: encryption:` inheriting the api key. */
+/** Whether the dashboard's own esphome accepts `ota: encryption:`; the 2026.9
+ *  prereleases do, so only the numeric release line counts here. */
 export function toolchainAcceptsOtaEncryption(esphomeVersion: string): boolean {
-  return versionAtLeast(esphomeVersion, OTA_ENCRYPTION_OFFER_VERSION);
+  const release = /^\d+\.\d+(?:\.\d+)?/.exec(esphomeVersion.trim())?.[0] ?? "";
+  return versionAtLeast(release, OTA_ENCRYPTION_OFFER_VERSION);
 }

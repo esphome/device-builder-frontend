@@ -61,11 +61,13 @@ describe("firmwareOffersOtaEncryption", () => {
 });
 
 describe("toolchainAcceptsOtaEncryption", () => {
-  it("accepts 2026.9.0 and later, dev builds of later lines included", () => {
+  it("accepts the 2026.9 line and later, prereleases included", () => {
     expect(toolchainAcceptsOtaEncryption("2026.9.0")).toBe(true);
+    expect(toolchainAcceptsOtaEncryption("2026.9.0b2")).toBe(true);
+    expect(toolchainAcceptsOtaEncryption("2026.9.0-dev")).toBe(true);
     expect(toolchainAcceptsOtaEncryption("2026.10.0-dev")).toBe(true);
-    expect(toolchainAcceptsOtaEncryption("2026.9.0b2")).toBe(false);
     expect(toolchainAcceptsOtaEncryption("2026.8.0")).toBe(false);
+    expect(toolchainAcceptsOtaEncryption("2026.8.3b1")).toBe(false);
     expect(toolchainAcceptsOtaEncryption("")).toBe(false);
   });
 });

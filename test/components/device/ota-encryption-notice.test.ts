@@ -105,5 +105,11 @@ describe("ota-encryption-notice", () => {
     el.shadowRoot!.querySelector<HTMLButtonElement>(".notice-close")?.click();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
+    // A different variant is a different message and shows again.
+    el.yaml = `${YAML}    password: x\n`;
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".notice")?.textContent).toContain(
+      "device.ota_encryption_notice_replace_password"
+    );
   });
 });

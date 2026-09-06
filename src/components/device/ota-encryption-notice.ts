@@ -38,7 +38,8 @@ export class ESPHomeOtaEncryptionNotice extends LitElement {
   /** The page's draft buffer. */
   @property({ attribute: false }) yaml = "";
 
-  @state() private _dismissed = false;
+  /** The variant the user dismissed; a different variant shows again. */
+  @state() private _dismissed: OtaEncryptionNudge | null = null;
 
   /** Memoized so fleet events for other devices do not rescan the draft. */
   @state() private _nudge: OtaEncryptionNudge | null = null;
@@ -46,7 +47,7 @@ export class ESPHomeOtaEncryptionNotice extends LitElement {
   private _device?: ConfiguredDevice;
 
   protected willUpdate(changed: PropertyValues) {
-    if (changed.has("configuration")) this._dismissed = false;
+    if (changed.has("configuration")) this._dismissed = null;
     const device = this._devices.find((d) => d.configuration === this.configuration);
     const deviceChanged = device !== this._device;
     this._device = device;
@@ -76,7 +77,7 @@ export class ESPHomeOtaEncryptionNotice extends LitElement {
 
   protected render() {
     const nudge = this._nudge;
-    if (this._dismissed || !nudge) return nothing;
+    if (!nudge || this._dismissed === nudge) return nothing;
     const dropKey = nudge === "drop_own_key";
     return renderNoticeBanner({
       icon: "lock-alert",
@@ -91,7 +92,7 @@ export class ESPHomeOtaEncryptionNotice extends LitElement {
         ),
       dismissLabel: this._localize("device.ota_encryption_dismiss"),
       onDismiss: () => {
-        this._dismissed = true;
+        this._dismissed = nudge;
       },
     });
   }
