@@ -92,15 +92,14 @@ describe("offloader version match policy translation keys", () => {
 
 describe("OTA encryption nudge translation keys", () => {
   // <esphome-ota-encryption-notice> renders `device.ota_encryption_notice_${nudge}`.
-  const nudges = [
-    "add",
-    "replace_password",
-    "drop_own_key",
-  ] satisfies OtaEncryptionNudge[];
-  for (const nudge of nudges) {
-    it(`has copy for the ${nudge} variant`, () => {
-      const key = `ota_encryption_notice_${nudge}`;
-      expect(device[key], `missing en.json key "device.${key}"`).toBeTruthy();
-    });
-  }
+  const NUDGES: Record<OtaEncryptionNudge, true> = {
+    add: true,
+    replace_password: true,
+    drop_own_key: true,
+  };
+
+  it.each(Object.keys(NUDGES))("has copy for the %s variant", (nudge) => {
+    const key = `ota_encryption_notice_${nudge}`;
+    expect(device[key], `missing en.json key "device.${key}"`).toBeTruthy();
+  });
 });
