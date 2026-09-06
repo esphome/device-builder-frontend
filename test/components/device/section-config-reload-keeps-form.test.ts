@@ -140,6 +140,19 @@ describe("section reload keeps the form mounted", () => {
     expect(c.ariaBusy).toBeNull();
   });
 
+  it("keeps a same-section refresh live", async () => {
+    const { c, inner, settle } = await firstLoad();
+    _clearComponentCache();
+    c.reload();
+    await c.updateComplete;
+    expect(inner._loading).toBe(true);
+    expect(inner._reloading).toBe(false);
+    expect(c.inert).toBe(false);
+    expect(form(c)).not.toBeNull();
+    await settle("sensor.template");
+    expect(inner._loading).toBe(false);
+  });
+
   it("withholds the focus target from the stale form", async () => {
     const { c, settle } = await firstLoad();
     c.focusFieldPath = ["name"];

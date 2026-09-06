@@ -215,6 +215,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
+  /** The in-flight load targets a different section or instance than the
+   *  one on screen; a same-section refresh keeps the pane live. */
+  _retargeting = false;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
   private _announceUnmount: (() => void) | null = null;
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
@@ -257,9 +260,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
   );
 
-  /** A reload is in flight while the outgoing section is still on screen. */
+  /** A retargeting load is in flight while the outgoing section is still
+   *  on screen. */
   get _reloading(): boolean {
-    return this._loading && this._config !== null;
+    return this._loading && this._config !== null && this._retargeting;
   }
 
   /** The section the pane is rendering; the outgoing one during a reload. */
@@ -318,6 +322,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       this.sectionKey &&
       this.configuration
     ) {
+      this._retargeting = true;
       void loadConfig(this);
     }
     this._revealAdvancedForFocus(changedProperties);
@@ -382,6 +387,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     if (!this.sectionKey || !this.configuration) return;
     if (this._draftTimer !== null) return;
     if (this.yaml === this._lastSelfWrittenYaml) return;
+    this._retargeting = false;
     void loadConfig(this);
   }
 
