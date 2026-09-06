@@ -6,6 +6,15 @@
  * Dialog + icon children are no-oped so the element constructs in happy-dom;
  * see ``device-navigator-coalesce.test.ts``.
  */
+import {
+  mdiCardTextOutline,
+  mdiCheckboxMarkedCircleOutline,
+  mdiClockOutline,
+  mdiCpu32Bit,
+  mdiGauge,
+  mdiScriptTextOutline,
+  mdiShapeOutline,
+} from "@mdi/js";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
@@ -39,28 +48,41 @@ async function mountNavigator(): Promise<ESPHomeDeviceNavigator> {
   return nav;
 }
 
-const iconNames = (nav: ESPHomeDeviceNavigator, sel: string) =>
-  [...(nav.shadowRoot?.querySelectorAll(sel) ?? [])].map((el) => el.getAttribute("name"));
+/** Inline svg path per matched glyph (the esphome logo is a wa-icon src). */
+const iconPaths = (nav: ESPHomeDeviceNavigator, sel: string) =>
+  [...(nav.shadowRoot?.querySelectorAll(sel) ?? [])].map((el) =>
+    el.querySelector("path")?.getAttribute("d")
+  );
 
 describe("device-navigator row icons", () => {
   it("gives ungrouped Core rows a leading domain glyph", async () => {
     const nav = await mountNavigator();
-    // esphome -> brand logo (an src, not an mdi name); esp32 -> cpu-32-bit;
-    // logger -> card-text-outline.
+    // esphome -> brand logo (a wa-icon src); esp32 and logger -> inline svg.
     const icons = [...(nav.shadowRoot?.querySelectorAll(".nav-item-icon") ?? [])];
     expect(icons[0].getAttribute("src")).toContain("logo/esphome-mono-black.svg");
-    expect(icons.slice(1).map((el) => el.getAttribute("name"))).toEqual([
-      "cpu-32-bit",
-      "card-text-outline",
+    expect(icons.slice(1).map((el) => el.tagName.toLowerCase())).toEqual(["svg", "svg"]);
+    expect(iconPaths(nav, ".nav-item-icon").slice(1)).toEqual([
+      mdiCpu32Bit,
+      mdiCardTextOutline,
     ]);
+    // The row chevron is inline too: the logo is the only icon element left.
+    expect(nav.shadowRoot!.querySelectorAll(".nav-item wa-icon")).toHaveLength(1);
+    expect(
+      nav.shadowRoot!.querySelectorAll("svg.nav-item-chevron").length
+    ).toBeGreaterThan(0);
   });
 
   it("keeps grouped Component rows glyph-free (the subgroup header carries it)", async () => {
     const nav = await mountNavigator();
     // The sensor subgroup header shows the gauge glyph...
-    expect(iconNames(nav, ".nav-subgroup-icon")).toContain("gauge");
-    // ...and its rows don't repeat a per-row glyph.
-    expect(iconNames(nav, ".nav-items--grouped .nav-item-icon")).toEqual([]);
+    expect(iconPaths(nav, ".nav-subgroup-icon")).toContain(mdiGauge);
+    // ...and, once opened, its rows don't repeat a per-row glyph.
+    nav.shadowRoot!.querySelector<HTMLElement>(".nav-subgroup-header")!.click();
+    await nav.updateComplete;
+    expect(
+      nav.shadowRoot!.querySelectorAll(".nav-items--grouped .nav-item")
+    ).toHaveLength(2);
+    expect(iconPaths(nav, ".nav-items--grouped .nav-item-icon")).toEqual([]);
   });
 
   it("shows each Automation row the glyph of its component domain", async () => {
@@ -88,12 +110,12 @@ describe("device-navigator row icons", () => {
     document.body.appendChild(nav);
     await nav.updateComplete;
 
-    const names = iconNames(nav, ".nav-item-icon");
+    const paths = iconPaths(nav, ".nav-item-icon");
     // The on_press automation targets a binary_sensor -> its component glyph.
-    expect(names).toContain("checkbox-marked-circle-outline");
-    expect(names).toContain("script-text-outline"); // script
-    expect(names).toContain("clock-outline"); // interval
-    expect(names).not.toContain("shape-outline");
+    expect(paths).toContain(mdiCheckboxMarkedCircleOutline);
+    expect(paths).toContain(mdiScriptTextOutline); // script
+    expect(paths).toContain(mdiClockOutline); // interval
+    expect(paths).not.toContain(mdiShapeOutline);
   });
 
   it("titles each row glyph with its domain for a hover tooltip", async () => {
@@ -115,7 +137,7 @@ describe("device-navigator row icons", () => {
 
     // The on_press automation glyph carries the targeted component's domain.
     const titles = [...(nav.shadowRoot?.querySelectorAll(".nav-item-icon") ?? [])].map(
-      (el) => el.getAttribute("title")
+      (el) => el.querySelector("title")?.textContent
     );
     expect(titles).toContain("Binary sensor");
   });

@@ -32,17 +32,16 @@ export function sectionIndexForLine(buckets: NavigatorBuckets, line: number): nu
  * expand its collapsed section, then scroll it into view on the next render.
  * Latches the scrolled line so idle re-renders (hover, search) don't re-scroll.
  *
- * Opening fires the idempotent 'section-reveal' (a set, not a toggle); two
- * navigator instances share one openSections, so a toggle would race and
- * oscillate the section open/closed forever.
+ * Opening fires the idempotent 'section-reveal' (a set, not a toggle), so a
+ * reveal that re-fires for the same row can't close the section it opened.
  */
 export class NavigatorRevealController implements ReactiveController {
   private _scrolledLine: number | null = null;
   // Section reveal is one-shot per selected line. The scroll below only
   // latches once the row is actually visible, and a row inside a collapsed
-  // subgroup (or the hidden desktop nav) never gets there — without this
-  // guard every later render re-fires section-reveal, forcing the cursor's
-  // section back open and locking the user out of toggling any other section.
+  // subgroup never gets there; without this guard every later render
+  // re-fires section-reveal, forcing the cursor's section back open and
+  // locking the user out of toggling any other section.
   private _revealedLine: number | null = null;
 
   constructor(
@@ -97,7 +96,7 @@ export class NavigatorRevealController implements ReactiveController {
     // Latch only on a confirmed scroll so the reveal retries when the row
     // becomes scrollable: querySelector misses a row that isn't rendered yet
     // (collapsed Components subgroup), and getClientRects catches one that is
-    // rendered but has no layout box (display:none collapsed desktop nav).
+    // rendered but has no layout box (a hidden ancestor).
     const row = this._host.renderRoot.querySelector(".nav-item--selected");
     if (row && row.getClientRects().length > 0) {
       row.scrollIntoView({ block: "nearest" });
