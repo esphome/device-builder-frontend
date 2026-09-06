@@ -13,7 +13,7 @@
  * side-effect imports in place. The suites' separate named import
  * for the helpers is therefore deliberate, not redundant.
  */
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -64,7 +64,11 @@ import type {
   AvailableAutomations,
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
+import { _clearAutomationParseCache } from "../../../../src/components/device/automation-editor/base-editor.js";
 import type { BaseAutomationEditor } from "../../../../src/components/device/automation-editor/base-editor.js";
+
+// A parse left in flight by one suite must not be shared with the next.
+afterEach(() => _clearAutomationParseCache());
 
 /** Minimal editable tree for seeding an editor in edit mode. */
 export const seedTree = (): AutomationTree => ({
