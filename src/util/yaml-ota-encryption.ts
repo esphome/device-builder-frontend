@@ -77,7 +77,9 @@ export function hasStaticApiKey(yaml: string): boolean {
 /**
  * Add a bare `encryption:` to the esphome OTA item (inheriting the api
  * key) and drop its `password:` line; `null` when there is no item or it
- * already has `encryption:`.
+ * already has `encryption:`. Comment lines are the user's and are left
+ * where they are, so one written above the password ends up above the
+ * new `encryption:` line; deleting it would risk taking unrelated notes.
  */
 export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
