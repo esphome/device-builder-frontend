@@ -5,6 +5,7 @@
  * drafts; item discovery rides the navigator's section parser so the
  * nudge agrees with the surface the user is looking at.
  */
+import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { _detectSectionChildIndent } from "./yaml-section-lexer.js";
 import { findDirectChildLine } from "./yaml-section-reader.js";
@@ -36,7 +37,7 @@ export interface OtaEsphomeFacts {
 }
 
 export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
-  const item = locate(yaml, yaml.split("\n"));
+  const item = locate(yaml, splitYamlDocLines(yaml));
   return {
     present: item !== null,
     hasEncryption: !!item && item.encryptionLine >= 0,
@@ -49,7 +50,7 @@ export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
  *  time (a literal, `!secret`, or a substitution). A keyless block is
  *  provisioned at runtime and does not count. */
 export function hasStaticApiKey(yaml: string): boolean {
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const encryption = findDirectChildLine(lines, "api", ENCRYPTION_RE);
   if (encryption < 0) return false;
   const key = findDirectChildLine(lines, "api", KEY_VALUE_RE, encryption + 1);
@@ -64,23 +65,23 @@ export function hasStaticApiKey(yaml: string): boolean {
  * already has `encryption:`.
  */
 export function enableOtaEncryptionInYaml(yaml: string): string | null {
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0) return null;
   const insertAt = item.passwordLine >= 0 ? item.passwordLine : item.line + 1;
   if (item.passwordLine >= 0) lines.splice(item.passwordLine, 1);
   lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
-  return lines.join("\n");
+  return lines.join(yamlDocEol(yaml));
 }
 
 /** Drop the `key:` under the esphome OTA item's `encryption:` so the block
  *  inherits the api key; `null` when there is no such key. */
 export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
-  const lines = yaml.split("\n");
+  const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.keyLine < 0) return null;
   lines.splice(item.keyLine, 1);
-  return lines.join("\n");
+  return lines.join(yamlDocEol(yaml));
 }
 
 function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {

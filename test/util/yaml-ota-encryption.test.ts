@@ -146,3 +146,16 @@ describe("dropOtaEncryptionKeyInYaml", () => {
     expect(dropOtaEncryptionKeyInYaml(API_KEY)).toBeNull();
   });
 });
+
+describe("line endings", () => {
+  it("keeps CRLF documents CRLF through both rewrites", () => {
+    const crlf = PASSWORD_OTA.replace(/\n/g, "\r\n");
+    expect(enableOtaEncryptionInYaml(crlf)).toBe(
+      "ota:\r\n  - platform: esphome\r\n    encryption:\r\n    port: 3232\r\n"
+    );
+    const ownKeyCrlf = OWN_KEY_OTA.replace(/\n/g, "\r\n");
+    expect(dropOtaEncryptionKeyInYaml(ownKeyCrlf)).toBe(
+      "ota:\r\n  - platform: esphome\r\n    encryption:\r\n    port: 3232\r\n"
+    );
+  });
+});

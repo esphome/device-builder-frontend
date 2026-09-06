@@ -5,7 +5,8 @@
  * component covers every setting in `SECURITY_SETTINGS`:
  *
  * - `api` — missing `encryption:` → generate a Noise key.
- * - `ota.esphome` — missing `password:` → generate a passphrase.
+ * - `ota.esphome` — missing `password:` (and no `encryption:`) → generate a
+ *   passphrase; yields to the OTA encryption nudge when that applies.
  * - `web_server` — missing `auth:` → generate an inline username + a password.
  *
  * On confirm it stores each generated secret in secrets.yaml (via
