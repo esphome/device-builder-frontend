@@ -98,6 +98,16 @@ describe("hasStaticApiKey", () => {
     );
   });
 
+  it("honours last-key-wins when a later key line is empty or comment-only", () => {
+    expect(hasStaticApiKey('api:\n  encryption:\n    key: "abc"\n    key:\n')).toBe(
+      false
+    );
+    expect(
+      hasStaticApiKey('api:\n  encryption:\n    key: "abc"\n    key:  # todo\n')
+    ).toBe(false);
+    expect(hasStaticApiKey('api:\n  encryption:\n    key:\n    key: "abc"\n')).toBe(true);
+  });
+
   it("rejects a runtime-provisioned block and a missing api", () => {
     expect(hasStaticApiKey("api:\n  encryption:\n")).toBe(false);
     expect(hasStaticApiKey("api:\n  encryption:\n    key:\n")).toBe(false);

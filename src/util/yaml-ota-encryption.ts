@@ -14,7 +14,6 @@ import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
 const ENCRYPTION_RE = /^encryption\s*:/;
 const PASSWORD_RE = /^password\s*:/;
 const PLATFORM_RE = /^platform\s*:/;
-const KEY_VALUE_RE = /^key\s*:\s*([^\s#]|$)/;
 const KEY_RE = /^key\s*:/;
 
 interface OtaEsphomeItem {
@@ -54,9 +53,12 @@ export function hasStaticApiKey(yaml: string): boolean {
   const lines = splitYamlDocLines(yaml);
   const encryption = findDirectChildLine(lines, "api", ENCRYPTION_RE);
   if (encryption < 0) return false;
-  const key = findDirectChildLine(lines, "api", KEY_VALUE_RE, encryption + 1);
+  // Last key wins, so pick the last `key:` line before reading its value; a
+  // regex that needs a value would skip a trailing empty or comment-only one.
+  const key = findDirectChildLine(lines, "api", KEY_RE, encryption + 1);
   if (key < 0) return false;
-  const raw = lines[key].replace(/^\s*key\s*:\s*/, "");
+  // Keep the space after the colon: the comment splitter needs it to see `#`.
+  const raw = lines[key].replace(/^\s*key\s*:/, "");
   const value = stripQuotes(splitInlineComment(raw).value.trim());
   // A bare `!secret` with no name is not a usable reference.
   return value.length > 0 && !/^!\S*$/.test(value);
