@@ -127,6 +127,7 @@ describe("section reload keeps the form mounted", () => {
     expect(loading(c)).toBeNull();
     expect(form(c)).toBe(before);
     expect(form(c).entries).toBe(bodies["sensor.template"].config_entries);
+    expect(form(c).sectionKey).toBe("sensor.template");
     expect(c.inert).toBe(true);
     expect(c.ariaBusy).toBe("true");
 
@@ -134,6 +135,7 @@ describe("section reload keeps the form mounted", () => {
     expect(inner._loading).toBe(false);
     expect(form(c)).toBe(before);
     expect(form(c).entries).toBe(bodies["switch.template"].config_entries);
+    expect(form(c).sectionKey).toBe("switch.template");
     expect(c.inert).toBe(false);
     expect(c.ariaBusy).toBeNull();
   });

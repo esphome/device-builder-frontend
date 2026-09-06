@@ -67,12 +67,12 @@ export function renderStructuredFormBranch(
   // Repeats render()'s call. Cheap: the resolver returns a constant or the
   // catalog's own array for map/default sections; only list sections
   // allocate fresh, as every render already did.
-  const renderEntries = resolveSectionEntries(host.sectionKey, config.entries);
+  const renderEntries = resolveSectionEntries(config.section_key, config.entries);
   return html`
     ${
-      isSecuritySection(host.sectionKey)
+      isSecuritySection(config.section_key)
         ? html`<esphome-security-notice
-            .sectionKey=${host.sectionKey}
+            .sectionKey=${config.section_key}
             .yaml=${host.yaml}
             .configuration=${host.configuration}
             .fromLine=${host._resolvedFromLine}
@@ -92,7 +92,7 @@ export function renderStructuredFormBranch(
       .board=${host.board}
       .yaml=${host.yaml}
       .fromLine=${host._resolvedFromLine}
-      .sectionKey=${host.sectionKey}
+      .sectionKey=${config.section_key}
       .configuration=${host.configuration}
       .focusFieldPath=${host._reloading ? undefined : host.focusFieldPath}
       .presentComponents=${host._effectivePresentComponents}

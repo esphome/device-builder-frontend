@@ -433,12 +433,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    const renderEntries = resolveSectionEntries(this.sectionKey, config.entries);
+    // Schema reads key on the rendered config, which a reload holds at the
+    // outgoing section until the incoming one lands.
+    const renderEntries = resolveSectionEntries(config.section_key, config.entries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
     // unions don't fit the catalog — see #361 for the packages data-loss
     // regression). Zero-entries sections also fall back here.
-    const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
+    const yamlOnly = isYamlOnlySection(config.section_key, renderEntries.length);
 
     // Backend messages this pane must carry: section-level ones when the
     // banner's pane is hidden, and field-mapped ones for yaml-only

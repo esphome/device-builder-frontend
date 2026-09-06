@@ -10,7 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "./_editor-harness.js";
 
 import { deferred, flushMicrotasks } from "../../../_dom.js";
-import type { ParsedAutomation } from "../../../../src/api/types/automations.js";
+import type {
+  ActionNode,
+  ParsedAutomation,
+} from "../../../../src/api/types/automations.js";
 import { _clearAutomationParseCache } from "../../../../src/components/device/automation-editor/base-editor.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 
@@ -24,11 +27,14 @@ import {
   seedTree,
 } from "./_editor-harness.js";
 
-const parsedScript = (id: string, actions: unknown[] = [{ action_id: "logger.log" }]) =>
+const parsedScript = (
+  id: string,
+  actions: ActionNode[] = [{ action_id: "logger.log", params: {} }]
+) =>
   parsedAutomation({
     location: { kind: "script", id },
     label: id,
-    automation: { trigger_id: null, trigger_params: {}, actions } as never,
+    automation: { ...seedTree(), actions },
   });
 
 async function mountAt(id: string, parse: ReturnType<typeof vi.fn>) {
