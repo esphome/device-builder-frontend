@@ -13,6 +13,7 @@ import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 const ENCRYPTION_RE = /^encryption\s*:/;
 const PASSWORD_RE = /^password\s*:/;
+const PLATFORM_RE = /^platform\s*:/;
 const KEY_VALUE_RE = /^key\s*:\s*([^\s#]|$)/;
 const KEY_RE = /^key\s*:/;
 
@@ -71,8 +72,10 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0) return null;
   // Duplicate keys are legal YAML (last wins), so every password line goes;
-  // the block lands where the first one was.
-  let insertAt = item.line + 1;
+  // the block lands where the first one was, else after `platform:` (which a
+  // bare-dash item carries on its own line, not on the dash).
+  const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, item.line + 1);
+  let insertAt = platform >= 0 ? platform + 1 : item.line + 1;
   for (let line = item.passwordLine; line >= 0;) {
     lines.splice(line, 1);
     insertAt = line;

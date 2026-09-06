@@ -128,6 +128,15 @@ describe("enableOtaEncryptionInYaml", () => {
     );
   });
 
+  it("inserts after platform on a bare-dash item and in the mapping form", () => {
+    expect(
+      enableOtaEncryptionInYaml("ota:\n  -\n    platform: esphome\n    port: 1\n")
+    ).toBe("ota:\n  -\n    platform: esphome\n    encryption:\n    port: 1\n");
+    expect(enableOtaEncryptionInYaml("ota:\n  id: my_ota\n  platform: esphome\n")).toBe(
+      "ota:\n  id: my_ota\n  platform: esphome\n  encryption:\n"
+    );
+  });
+
   it("handles the bare mapping form", () => {
     expect(enableOtaEncryptionInYaml(MAPPING_OTA)).toBe(
       "ota:\n  platform: esphome\n  encryption:\n"
