@@ -55,6 +55,7 @@ describe("base editor relocation hydrate", () => {
     await flushMicrotasks(3);
     expect((editor as any).value).toBe(previous);
     expect((editor as any)._hydrating).toBe(true);
+    expect(editor.inert).toBe(true);
     expect(parse).toHaveBeenCalledTimes(1);
 
     // Edits on the stale tree are ignored.
@@ -64,7 +65,9 @@ describe("base editor relocation hydrate", () => {
 
     d.resolve([parsedScript("b")]);
     await flushMicrotasks(5);
+    await editor.updateComplete;
     expect((editor as any)._hydrating).toBe(false);
+    expect(editor.inert).toBe(false);
     expect((editor as any).value.actions).toHaveLength(1);
   });
 

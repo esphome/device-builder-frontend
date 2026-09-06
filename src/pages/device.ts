@@ -1778,8 +1778,9 @@ export class ESPHomePageDevice extends LitElement {
     // being typed (`sendx:` on its way to `sensor:`) — hold the switch so
     // the pane doesn't flip to the unknown-component error surface on
     // every keystroke (#2211). Clicks and caret moves (viaEdit false)
-    // always switch, so a settled external component still opens its
-    // pane deliberately. One quirk to know: the editor's same-line
+    // always switch, clicks at once and other moves after the coalesce
+    // window, so a settled external component still opens its pane
+    // deliberately. One quirk to know: the editor's same-line
     // throttle means clicking the held line itself emits no event; the
     // navigator entry (kept visible) is the release path there.
     if (detail.viaEdit === true) {

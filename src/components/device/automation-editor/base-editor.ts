@@ -237,8 +237,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    // A parse resolving after unmount must not write into the element.
+    // A parse resolving after unmount must not write into the element,
+    // and a re-attached one must not come back read-only.
     this._hydrateId++;
+    this._hydrating = false;
   }
 
   /** A relocation whose parse found no tree must not keep showing the
@@ -265,6 +267,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._hydrating = true;
       }
     }
+    // The stale tree takes no input while the relocation re-parses.
+    this.inert = this._hydrating;
+    this.ariaBusy = this._hydrating ? "true" : null;
   }
 
   protected updated(changed: Map<string, unknown>) {

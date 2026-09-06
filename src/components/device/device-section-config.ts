@@ -320,6 +320,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     // The outgoing section stays on screen through a reload but takes no
     // input, so nothing writes its values under the incoming key.
     this.inert = this._reloading;
+    this.ariaBusy = this._reloading ? "true" : null;
   }
 
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {

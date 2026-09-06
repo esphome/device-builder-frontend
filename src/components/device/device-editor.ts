@@ -42,7 +42,11 @@ import {
   type TourRevealEventDetail,
 } from "../guided-tour/tour-anchor.js";
 import { TOUR_LAYOUT_CHANGE_EVENT } from "../guided-tour/tour-layout-controller.js";
-import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
+import type {
+  ESPHomeYamlEditor,
+  HighlightRange,
+  YamlCursorLineDetail,
+} from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 import type {
@@ -546,7 +550,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._liveErrors = next;
   }
 
-  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+  private _onYamlCursorLine(e: CustomEvent<YamlCursorLineDetail>) {
     this._caretLine = e.detail.line;
   }
 

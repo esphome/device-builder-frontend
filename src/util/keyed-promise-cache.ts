@@ -23,7 +23,7 @@ export interface KeyedPromiseCacheOptions {
   /** Evict a rejected promise so the next call retries. Default
    *  ``true`` — the point of the idiom. Set ``false`` to memoise
    *  rejections too (a replayed rejection is then permanent for the
-   *  cache's lifetime). */
+   *  cache's lifetime). Ignored when ``evictOnSettle`` is set. */
   evictOnReject?: boolean;
   /** Evict once the promise settles either way, so the cache only
    *  shares an in-flight request and never memoises its result. */

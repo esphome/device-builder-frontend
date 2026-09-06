@@ -1,6 +1,10 @@
 import { css } from "lit";
 
 export const deviceSectionConfigStyles = css`
+  :host([inert]) {
+    opacity: 0.6;
+  }
+
   :host {
     display: flex;
     flex-direction: column;

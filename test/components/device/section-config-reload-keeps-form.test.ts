@@ -128,12 +128,14 @@ describe("section reload keeps the form mounted", () => {
     expect(form(c)).toBe(before);
     expect(form(c).entries).toBe(bodies["sensor.template"].config_entries);
     expect(c.inert).toBe(true);
+    expect(c.ariaBusy).toBe("true");
 
     await settle("switch.template");
     expect(inner._loading).toBe(false);
     expect(form(c)).toBe(before);
     expect(form(c).entries).toBe(bodies["switch.template"].config_entries);
     expect(c.inert).toBe(false);
+    expect(c.ariaBusy).toBeNull();
   });
 
   it("withholds the focus target from the stale form", async () => {

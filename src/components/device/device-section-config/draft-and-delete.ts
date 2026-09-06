@@ -120,6 +120,7 @@ export function applySectionValues(
   host: ESPHomeDeviceSectionConfig,
   changes: { path: string[]; value: unknown }[]
 ): void {
+  if (host._reloading) return;
   for (const { path, value } of changes) {
     host._values = setIn(host._values, path, value);
   }
@@ -185,7 +186,7 @@ export function settleOwnDraft(host: ESPHomeDeviceSectionConfig): string {
 }
 
 export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
-  if (!host._config) return;
+  if (!host._config || host._reloading) return;
   // Settle our own pending draft first: the basis must include the
   // user's last keystroke, or the delete supersedes itself.
   const baseYaml = settleOwnDraft(host);
