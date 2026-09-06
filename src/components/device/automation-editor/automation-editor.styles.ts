@@ -9,6 +9,10 @@ import { automationEditorScriptParamStyles } from "./automation-editor-script-pa
 
 /** Editor frame: header card, section panels, and field layout. */
 const automationEditorFrameStyles = css`
+  :host([inert]) {
+    opacity: 0.6;
+  }
+
   :host {
     display: flex;
     flex-direction: column;
