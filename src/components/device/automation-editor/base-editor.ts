@@ -250,6 +250,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // and a re-attached one must not come back read-only.
     this._hydrateId++;
     this._hydrating = false;
+    this.inert = false;
+    this.ariaBusy = null;
   }
 
   /** A relocation whose parse found no tree must not keep showing the

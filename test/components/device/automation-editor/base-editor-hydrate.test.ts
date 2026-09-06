@@ -77,6 +77,19 @@ describe("base editor relocation hydrate", () => {
     expect((editor as any).value.actions).toHaveLength(1);
   });
 
+  it("comes back editable after a detach mid-hydrate", async () => {
+    const d = deferred<ParsedAutomation[]>();
+    const parse = vi.fn().mockReturnValue(d.promise);
+    const { editor } = await mountAt("a", parse);
+    (editor as any).location = { kind: "script", id: "b" };
+    await editor.updateComplete;
+    expect(editor.inert).toBe(true);
+    editor.remove();
+    expect(editor.inert).toBe(false);
+    expect(editor.ariaBusy).toBeNull();
+    expect((editor as any)._hydrating).toBe(false);
+  });
+
   it("does not stay inert when a relocation cannot be parsed", async () => {
     const parse = vi.fn();
     const { editor } = await mountAt("a", parse);
