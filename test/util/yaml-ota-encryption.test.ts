@@ -200,6 +200,11 @@ describe("enableOtaEncryptionInYaml", () => {
     expect(
       enableOtaEncryptionInYaml("ota:\n  - encryption:\n    platform: esphome\n")
     ).toBeNull();
+    expect(
+      enableOtaEncryptionInYaml(
+        "ota:\n  - password: x  # keep me\n    platform: esphome\n"
+      )
+    ).toBe("ota:\n  - encryption:  # keep me\n    platform: esphome\n");
   });
 
   it("refuses a multi-line password", () => {
