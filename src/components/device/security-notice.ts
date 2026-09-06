@@ -159,6 +159,8 @@ export class ESPHomeSecurityNotice extends LitElement {
    *  Recomputed only when the YAML, section, or resolved line changes. */
   @state() private _markerAbsent = false;
 
+  private _device?: ConfiguredDevice;
+
   @state() private _generating = false;
 
   @query("esphome-confirm-dialog") private _dialog?: ESPHomeConfirmDialog;
@@ -172,10 +174,13 @@ export class ESPHomeSecurityNotice extends LitElement {
   protected willUpdate(changed: PropertyValues) {
     const yamlDriven =
       changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey");
+    // The devices context is replaced on every fleet event; only this device's row matters.
+    const device = this._devices.find((d) => d.configuration === this.configuration);
     const deviceDriven =
-      changed.has("_devices") ||
+      device !== this._device ||
       changed.has("_esphomeVersion") ||
       changed.has("configuration");
+    this._device = device;
     if (yamlDriven || (deviceDriven && this._setting?.suppressWhen)) {
       this._markerAbsent =
         !!this._setting && !this._markerPresent() && !this._suppressed();
@@ -226,7 +231,7 @@ export class ESPHomeSecurityNotice extends LitElement {
     const suppress = this._setting?.suppressWhen;
     if (!suppress) return false;
     return suppress({
-      device: this._devices.find((d) => d.configuration === this.configuration),
+      device: this._device,
       yaml: this.yaml,
       esphomeVersion: this._esphomeVersion,
     });

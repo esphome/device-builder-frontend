@@ -24,7 +24,7 @@ export function versionAtLeast(version: string, minimum: string): boolean {
   return true;
 }
 
-/** First esphome whose firmware offers OTA encryption with the api key. */
+/** First esphome whose firmware offers OTA encryption with the api key (esphome/esphome#18979). */
 export const OTA_ENCRYPTION_OFFER_VERSION = "2026.9.0";
 
 /** Whether firmware at `deployed` offers OTA encryption: a released 2026.9.0 or newer. */
