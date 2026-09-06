@@ -84,8 +84,12 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0 || item.multiLine) return null;
   if (item.passwordLine === item.line) {
-    // The password sits inline on the item's dash: swap the key in place.
-    lines[item.line] = lines[item.line].replace(/password\s*:.*$/, "encryption:");
+    // The password sits inline on the item's dash: swap the key in place,
+    // keeping any trailing comment.
+    const match = /^(\s*-\s+)password\s*:(.*)$/.exec(lines[item.line]);
+    if (match) {
+      lines[item.line] = `${match[1]}encryption:${splitInlineComment(match[2]).comment}`;
+    }
   }
   // Duplicate keys are legal YAML (last wins), so every password line goes;
   // the block lands where the first one was, else after `platform:` (which a
