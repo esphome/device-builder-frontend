@@ -3,6 +3,7 @@ import type { VersionMatchPolicy } from "../../src/api/types/event-subscription.
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { CommandType } from "../../src/components/command-dialog.js";
 import enMessages from "../../src/translations/en.json";
+import type { OtaEncryptionNudge } from "../../src/util/ota-encryption-nudge.js";
 
 // Pin enum-driven dynamic translation keys to en.json so a new enum member
 // can't ship without English copy (cf. #636 / #634). Runtime enums drive
@@ -13,6 +14,7 @@ const firmwareJobs = (enMessages as { firmware_jobs: Record<string, string> })
   .firmware_jobs;
 const settings = (enMessages as { settings: Record<string, string> }).settings;
 const command = (enMessages as { command: Record<string, string> }).command;
+const device = (enMessages as { device: Record<string, string> }).device;
 
 describe("firmware job type translation keys", () => {
   // <esphome-firmware-jobs-dialog> renders `firmware_jobs.type_${job.job_type}`.
@@ -86,4 +88,19 @@ describe("offloader version match policy translation keys", () => {
       expect(settings[desc], `missing en.json key "settings.${desc}"`).toBeTruthy();
     }
   );
+});
+
+describe("OTA encryption nudge translation keys", () => {
+  // <esphome-ota-encryption-notice> renders `device.ota_encryption_notice_${nudge}`.
+  const nudges = [
+    "add",
+    "replace_password",
+    "drop_own_key",
+  ] satisfies OtaEncryptionNudge[];
+  for (const nudge of nudges) {
+    it(`has copy for the ${nudge} variant`, () => {
+      const key = `ota_encryption_notice_${nudge}`;
+      expect(device[key], `missing en.json key "device.${key}"`).toBeTruthy();
+    });
+  }
 });
