@@ -1738,13 +1738,18 @@ export class ESPHomePageDevice extends LitElement {
       this._applyCursorMove(detail, match);
       return;
     }
-    // A navigation that lands inside the window wins over the move.
+    // A navigation that lands inside the window wins over the move, and a
+    // draft that shifts lines meanwhile re-pins the target section rather
+    // than replaying the caret's line number.
     const key = this._selectedSection;
     const line = this._selectedFromLine;
+    const targetKey = sectionKeyOf(match);
     this._cursorSwitchTimer = setTimeout(() => {
       this._cursorSwitchTimer = null;
       if (key !== this._selectedSection || line !== this._selectedFromLine) return;
-      this._applyCursorMove(detail);
+      const fromLine = resolveCurrentSectionLine(this._yaml, targetKey, match.fromLine);
+      if (fromLine === undefined) return;
+      this._applyCursorMove(detail, { ...match, fromLine });
     }, CURSOR_SWITCH_COALESCE_MS);
   }
 
@@ -1758,15 +1763,9 @@ export class ESPHomePageDevice extends LitElement {
     this._cursorSwitchTimer = null;
   }
 
-  /** Move the selection and field focus to the caret. A deferred move
-   *  re-resolves ``match`` against the buffer at fire time. */
-  private _applyCursorMove(detail: YamlCursorLineDetail, match?: YamlSection | null) {
+  /** Move the selection and field focus to the caret's section. */
+  private _applyCursorMove(detail: YamlCursorLineDetail, match: YamlSection) {
     const full = detail.path ?? [];
-    // `sectionForCursor` falls back to the caret's key path when no section
-    // range covers the line, so the panel follows the caret into a blank,
-    // indented child line under a just-typed top-level block.
-    match ??= sectionForCursor(this._yaml, detail.line, full);
-    if (!match) return;
     // MAP sections like substitutions render at an empty path, so their
     // fields are section-relative — the shared slice rule covers them.
     const rel = formRelativePath(full);

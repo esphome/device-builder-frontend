@@ -126,14 +126,16 @@ describe("cross-section caret moves coalesce", () => {
     expect(internals(page)._selectedSection).toBe("switch.gpio");
   });
 
-  it("resolves the target against the buffer at fire time", () => {
+  it("re-pins the target section when a draft shifts lines before it fires", () => {
     const page = makePage();
     cursor(page, 6);
-    // A draft inserted a line above the target before the window closed.
+    // Two lines land above the target: the caret's line 6 now sits inside
+    // sensor, but the move was aimed at the switch block.
     internals(page)._yaml = [
       "i2c:",
       "  sda: 1",
       "  scl: 2",
+      "  frequency: 100kHz",
       "sensor:",
       "  - platform: aht10",
       "switch:",
@@ -142,7 +144,21 @@ describe("cross-section caret moves coalesce", () => {
     ].join("\n");
     vi.advanceTimersByTime(100);
     expect(internals(page)._selectedSection).toBe("switch.gpio");
-    expect(internals(page)._selectedFromLine).toBe(7);
+    expect(internals(page)._selectedFromLine).toBe(8);
+  });
+
+  it("drops the move when its section vanished before it fires", () => {
+    const page = makePage();
+    cursor(page, 6);
+    internals(page)._yaml = [
+      "i2c:",
+      "  sda: 1",
+      "sensor:",
+      "  - platform: aht10",
+      "",
+    ].join("\n");
+    vi.advanceTimersByTime(100);
+    expect(internals(page)._selectedSection).toBe("i2c");
   });
 
   it("clears the pending move on disconnect", () => {
