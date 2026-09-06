@@ -1,4 +1,15 @@
 import type { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
+import {
+  parseYamlTopLevelSections,
+  sectionKeyOf,
+} from "../../../src/util/yaml-sections.js";
+
+/** fromLine of the first ``key`` section in ``yaml``. */
+export function sectionLine(yaml: string, key: string): number {
+  const s = parseYamlTopLevelSections(yaml).find((sec) => sectionKeyOf(sec) === key);
+  if (!s) throw new Error(`fixture: ${key} not found`);
+  return s.fromLine;
+}
 
 /** The Components subgroup header titled ``title``. */
 export function subgroupHeader(nav: ESPHomeDeviceNavigator, title: string): HTMLElement {

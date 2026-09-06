@@ -23,11 +23,7 @@ import {
   type RevealState,
   sectionIndexForLine,
 } from "../../../src/components/device/navigator-reveal-controller.js";
-import {
-  parseYamlTopLevelSections,
-  sectionKeyOf,
-} from "../../../src/util/yaml-sections.js";
-import { clickSubgroup } from "./_navigator-fixtures.js";
+import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
 
 const YAML = [
   "esphome:",
@@ -46,13 +42,7 @@ const YAML = [
 ].join("\n");
 
 /** fromLine of the sensor.template row (lives in the Components section). */
-const sensorLine = () => {
-  const s = parseYamlTopLevelSections(YAML).find(
-    (sec) => sectionKeyOf(sec) === "sensor.template"
-  );
-  if (!s) throw new Error("fixture: sensor.template not found");
-  return s.fromLine;
-};
+const sensorLine = () => sectionLine(YAML, "sensor.template");
 
 let scrollSpy: ReturnType<typeof vi.fn>;
 let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
@@ -256,13 +246,7 @@ describe("device-navigator reveal-selected", () => {
   // cursor away and clicking back to a line whose reveal never scroll-latched
   // (its section was left closed) must reveal it again.
   it("re-reveals a line after the selection moves away and returns", async () => {
-    const coreLine = () => {
-      const s = parseYamlTopLevelSections(YAML).find(
-        (sec) => sectionKeyOf(sec) === "wifi"
-      );
-      if (!s) throw new Error("fixture: wifi not found");
-      return s.fromLine;
-    };
+    const coreLine = () => sectionLine(YAML, "wifi");
     // Leave everything collapsed so no reveal ever scroll-latches.
     const { nav, reveals } = await mount(new Set());
 
