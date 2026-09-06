@@ -2085,6 +2085,9 @@ export class ESPHomePageDevice extends LitElement {
   ) {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
+    // A re-click leaves the selection unchanged, so the fire-time guard
+    // would let a pending move through.
+    this._cancelCursorSwitch();
     if (sectionKey !== null && this._isSelected(sectionKey, fromLine)) {
       this._drawerOpen = false;
       return;

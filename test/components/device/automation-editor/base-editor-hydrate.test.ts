@@ -88,6 +88,7 @@ describe("base editor relocation hydrate", () => {
     expect(editor.inert).toBe(false);
     expect(editor.ariaBusy).toBeNull();
     expect((editor as any)._hydrating).toBe(false);
+    expect((editor as any).value).toBeNull();
   });
 
   it("drops the tree and the hold when a relocation cannot be parsed", async () => {

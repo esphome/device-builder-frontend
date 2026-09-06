@@ -522,9 +522,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               // caret here — the page holds section switches onto a
               // half-typed unknown key only for edit-driven moves.
               viaEdit: update.docChanged,
-              pointer: update.transactions.some((tr) =>
-                tr.annotation(Transaction.userEvent)?.startsWith("select.pointer")
-              ),
+              pointer: update.transactions.some((tr) => tr.isUserEvent("select.pointer")),
               // AST-only sibling of ``path`` carrying block-sequence
               // list indices — what the automation editor needs to
               // resolve a node inside a handler body.

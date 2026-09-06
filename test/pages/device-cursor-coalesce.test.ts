@@ -104,6 +104,16 @@ describe("cross-section caret moves coalesce", () => {
     expect(internals(page)._selectedSection).toBe("i2c");
   });
 
+  it("re-clicking the selected row cancels a pending move", () => {
+    const page = makePage();
+    cursor(page, 4);
+    internals(page)._onSectionSelect(
+      new CustomEvent("section-select", { detail: { sectionKey: "i2c", fromLine: 1 } })
+    );
+    vi.advanceTimersByTime(100);
+    expect(internals(page)._selectedSection).toBe("i2c");
+  });
+
   it("a navigator selection wins over a pending move", () => {
     const page = makePage();
     cursor(page, 4);

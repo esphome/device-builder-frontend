@@ -249,9 +249,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   disconnectedCallback() {
     super.disconnectedCallback();
     // A parse resolving after unmount must not write into the element,
-    // and a re-attached one must not come back read-only.
+    // and a re-attached one must not come back read-only or show the
+    // previous section's tree under the new location.
     this._hydrateId++;
-    this._hydrating = false;
+    this._dropStaleTree();
     setHeld(this, false);
   }
 
