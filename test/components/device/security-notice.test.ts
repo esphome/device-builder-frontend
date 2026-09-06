@@ -66,6 +66,13 @@ describe("security-notice — detection", () => {
     ],
     ["ota: absent", "ota.esphome", "ota:\n  - platform: esphome\n", 2, false],
     [
+      "ota: encryption satisfies the setting",
+      "ota.esphome",
+      "ota:\n  - platform: esphome\n    encryption:\n",
+      2,
+      true,
+    ],
+    [
       "ota: a sibling platform has a password, this one doesn't",
       "ota.esphome",
       "ota:\n  - platform: esphome\n    id: x\n  - platform: http_request\n    password: y\n",

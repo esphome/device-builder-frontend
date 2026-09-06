@@ -6,8 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dropOtaEncryptionKeyInYaml,
   enableOtaEncryptionInYaml,
-  findOtaEsphomeItem,
   hasStaticApiKey,
   otaEsphomeFacts,
 } from "../../src/util/yaml-ota-encryption.js";
@@ -18,34 +18,9 @@ const PLAIN_OTA = "ota:\n  - platform: esphome\n";
 const PASSWORD_OTA =
   "ota:\n  - platform: esphome\n    password: !secret ota_password\n    port: 3232\n";
 const ENCRYPTED_OTA = "ota:\n  - platform: esphome\n    encryption:\n";
+const OWN_KEY_OTA =
+  'ota:\n  - platform: esphome\n    encryption:\n      key: "abc"  # own\n    port: 3232\n';
 const MAPPING_OTA = "ota:\n  platform: esphome\n  password: x\n";
-
-describe("findOtaEsphomeItem", () => {
-  it("finds the esphome item among other platforms", () => {
-    const lines =
-      "ota:\n  - platform: web_server\n  - platform: esphome\n    port: 1\n".split("\n");
-    expect(findOtaEsphomeItem(lines)).toEqual({ line: 2, childIndent: "    " });
-  });
-
-  it("handles the legacy bare mapping form", () => {
-    expect(findOtaEsphomeItem(MAPPING_OTA.split("\n"))).toEqual({
-      line: 0,
-      childIndent: "  ",
-    });
-  });
-
-  it("returns null without an ota block or without the esphome platform", () => {
-    expect(findOtaEsphomeItem(API_KEY.split("\n"))).toBeNull();
-    expect(findOtaEsphomeItem("ota:\n  - platform: web_server\n".split("\n"))).toBeNull();
-    expect(findOtaEsphomeItem("ota:\n  platform: web_server\n".split("\n"))).toBeNull();
-  });
-
-  it("ignores a nested esphome platform elsewhere", () => {
-    const lines =
-      "sensor:\n  - platform: esphome\nota:\n  - platform: web_server\n".split("\n");
-    expect(findOtaEsphomeItem(lines)).toBeNull();
-  });
-});
 
 describe("otaEsphomeFacts", () => {
   it("reports encryption and password as direct children", () => {
@@ -53,12 +28,20 @@ describe("otaEsphomeFacts", () => {
       present: true,
       hasEncryption: false,
       hasPassword: false,
+      hasOwnKey: false,
     });
     expect(otaEsphomeFacts(PASSWORD_OTA)).toMatchObject({
       hasPassword: true,
       hasEncryption: false,
     });
-    expect(otaEsphomeFacts(ENCRYPTED_OTA)).toMatchObject({ hasEncryption: true });
+    expect(otaEsphomeFacts(ENCRYPTED_OTA)).toMatchObject({
+      hasEncryption: true,
+      hasOwnKey: false,
+    });
+    expect(otaEsphomeFacts(OWN_KEY_OTA)).toMatchObject({
+      hasEncryption: true,
+      hasOwnKey: true,
+    });
     expect(otaEsphomeFacts(MAPPING_OTA)).toMatchObject({
       present: true,
       hasPassword: true,
@@ -67,7 +50,22 @@ describe("otaEsphomeFacts", () => {
       present: false,
       hasEncryption: false,
       hasPassword: false,
+      hasOwnKey: false,
     });
+  });
+
+  it("finds the esphome item among other platforms and ignores nested platforms", () => {
+    expect(
+      otaEsphomeFacts(
+        "ota:\n  - platform: web_server\n  - platform: esphome\n    port: 1\n"
+      )
+    ).toMatchObject({ present: true, hasEncryption: false });
+    expect(otaEsphomeFacts("ota:\n  - platform: web_server\n")).toMatchObject({
+      present: false,
+    });
+    expect(
+      otaEsphomeFacts("sensor:\n  - platform: esphome\nota:\n  - platform: web_server\n")
+    ).toMatchObject({ present: false });
   });
 
   it("does not read a sibling platform's password", () => {
@@ -123,5 +121,19 @@ describe("enableOtaEncryptionInYaml", () => {
     expect(out.startsWith(API_KEY)).toBe(true);
     expect(out.endsWith("wifi:\n  ssid: x\n")).toBe(true);
     expect(out).not.toContain("ota_password");
+  });
+});
+
+describe("dropOtaEncryptionKeyInYaml", () => {
+  it("removes only the key line, leaving a bare encryption block", () => {
+    expect(dropOtaEncryptionKeyInYaml(OWN_KEY_OTA)).toBe(
+      "ota:\n  - platform: esphome\n    encryption:\n    port: 3232\n"
+    );
+  });
+
+  it("returns null without an own key", () => {
+    expect(dropOtaEncryptionKeyInYaml(ENCRYPTED_OTA)).toBeNull();
+    expect(dropOtaEncryptionKeyInYaml(PLAIN_OTA)).toBeNull();
+    expect(dropOtaEncryptionKeyInYaml(API_KEY)).toBeNull();
   });
 });

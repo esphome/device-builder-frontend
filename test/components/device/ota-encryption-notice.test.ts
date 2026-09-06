@@ -59,6 +59,23 @@ describe("ota-encryption-notice", () => {
     );
   });
 
+  it("renders the drop-own-key variant with its own CTA event", async () => {
+    const el = await mount(
+      `${YAML}    encryption:\n      key: "abc"\n`,
+      "2026.8.0",
+      null
+    );
+    const notice = el.shadowRoot!.querySelector(".notice");
+    expect(notice?.textContent).toContain("device.ota_encryption_notice_drop_own_key");
+    expect(notice?.querySelector(".cta")?.textContent).toContain(
+      "device.ota_encryption_use_api_key"
+    );
+    const seen = vi.fn();
+    el.addEventListener("request-drop-ota-encryption-key", seen);
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".cta")?.click();
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+
   it("stays hidden when the firmware is a beta or Noise is not reported", async () => {
     expect(
       (await mount(YAML, "2026.9.0b2")).shadowRoot!.querySelector(".notice")

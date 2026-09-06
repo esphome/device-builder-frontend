@@ -1,58 +1,29 @@
 /**
  * Draft-buffer detection and rewrite for OTA encryption on the esphome
- * OTA platform. Line-level (not the section parser) so the edit keeps
- * comments and formatting, and detection works on mid-edit drafts.
+ * OTA platform. Line-level (not the section parser's values) so the
+ * edit keeps comments and formatting, and detection works on mid-edit
+ * drafts; item discovery rides the navigator's section parser so the
+ * nudge agrees with the surface the user is looking at.
  */
-import { stripQuotes } from "./yaml-scalar.js";
-import {
-  _leadingIndent,
-  isBlankOrCommentLine,
-  LIST_ITEM_START_RE,
-  TOP_LEVEL_KEY_START_RE,
-} from "./yaml-section-lexer.js";
-import { findDirectChildLine, findSectionStart } from "./yaml-section-reader.js";
+import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+import { _detectSectionChildIndent } from "./yaml-section-lexer.js";
+import { findDirectChildLine } from "./yaml-section-reader.js";
+import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
-const PLATFORM_RE = /^\s*(?:-\s+)?platform\s*:\s*([^\s#]+)/;
 const ENCRYPTION_RE = /^encryption\s*:/;
 const PASSWORD_RE = /^password\s*:/;
 const KEY_VALUE_RE = /^key\s*:\s*([^\s#]|$)/;
+const KEY_RE = /^key\s*:/;
 
-/** The esphome OTA platform item in the draft. */
-export interface OtaEsphomeItem {
-  /** Zero-based line of `- platform: esphome` (or of `ota:` for the bare mapping form). */
+interface OtaEsphomeItem {
+  /** Zero-based line of the item (its dash, or `ota:` for the bare mapping form). */
   line: number;
-  /** Indent of the item's own keys. */
   childIndent: string;
-}
-
-/** Locate the `- platform: esphome` item under top-level `ota:`, or the
- *  legacy bare mapping `ota:\n  platform: esphome`; `null` when absent. */
-export function findOtaEsphomeItem(lines: string[]): OtaEsphomeItem | null {
-  const start = findSectionStart(lines, "ota");
-  if (start < 0) return null;
-  let listIndent: string | null = null;
-  for (let i = start + 1; i < lines.length; i++) {
-    const l = lines[i];
-    if (isBlankOrCommentLine(l)) continue;
-    if (TOP_LEVEL_KEY_START_RE.test(l)) break;
-    if (LIST_ITEM_START_RE.test(l)) {
-      const indent = _leadingIndent(l);
-      if (listIndent === null) listIndent = indent;
-      if (indent !== listIndent) continue;
-      const childIndent = indent + " ".repeat(l.slice(indent.length).search(/[^-\s]/));
-      if (itemPlatform(lines, i, childIndent) === "esphome")
-        return { line: i, childIndent };
-      continue;
-    }
-    if (listIndent === null) {
-      // Bare mapping form: the block's own keys are the item.
-      const childIndent = _leadingIndent(l);
-      return itemPlatform(lines, start, childIndent) === "esphome"
-        ? { line: start, childIndent }
-        : null;
-    }
-  }
-  return null;
+  /** Zero-based line of the item's direct-child key, or -1. */
+  encryptionLine: number;
+  passwordLine: number;
+  /** Zero-based line of `key:` inside the item's `encryption:` block, or -1. */
+  keyLine: number;
 }
 
 /** What the draft's esphome OTA item already carries. */
@@ -60,16 +31,17 @@ export interface OtaEsphomeFacts {
   present: boolean;
   hasEncryption: boolean;
   hasPassword: boolean;
+  /** The `encryption:` block carries its own `key:` instead of inheriting the api key. */
+  hasOwnKey: boolean;
 }
 
 export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
-  const lines = yaml.split("\n");
-  const item = findOtaEsphomeItem(lines);
-  if (!item) return { present: false, hasEncryption: false, hasPassword: false };
+  const item = locate(yaml, yaml.split("\n"));
   return {
-    present: true,
-    hasEncryption: findDirectChildLine(lines, "ota", ENCRYPTION_RE, item.line + 1) >= 0,
-    hasPassword: findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1) >= 0,
+    present: item !== null,
+    hasEncryption: !!item && item.encryptionLine >= 0,
+    hasPassword: !!item && item.passwordLine >= 0,
+    hasOwnKey: !!item && item.keyLine >= 0,
   };
 }
 
@@ -82,9 +54,8 @@ export function hasStaticApiKey(yaml: string): boolean {
   if (encryption < 0) return false;
   const key = findDirectChildLine(lines, "api", KEY_VALUE_RE, encryption + 1);
   if (key < 0) return false;
-  const match = /^\s*key\s*:\s*(.*?)\s*$/.exec(lines[key]);
-  const value = stripQuotes((match?.[1] ?? "").replace(/\s+#.*$/, ""));
-  return value.length > 0;
+  const raw = lines[key].replace(/^\s*key\s*:\s*/, "");
+  return stripQuotes(splitInlineComment(raw).value.trim()).length > 0;
 }
 
 /**
@@ -94,21 +65,44 @@ export function hasStaticApiKey(yaml: string): boolean {
  */
 export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = yaml.split("\n");
-  const item = findOtaEsphomeItem(lines);
-  if (!item) return null;
-  if (findDirectChildLine(lines, "ota", ENCRYPTION_RE, item.line + 1) >= 0) return null;
-  const password = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
-  const insertAt = password >= 0 ? password : item.line + 1;
-  if (password >= 0) lines.splice(password, 1);
+  const item = locate(yaml, lines);
+  if (!item || item.encryptionLine >= 0) return null;
+  const insertAt = item.passwordLine >= 0 ? item.passwordLine : item.line + 1;
+  if (item.passwordLine >= 0) lines.splice(item.passwordLine, 1);
   lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
   return lines.join("\n");
 }
 
-function itemPlatform(lines: string[], line: number, childIndent: string): string | null {
-  const own = PLATFORM_RE.exec(lines[line]);
-  if (own && LIST_ITEM_START_RE.test(lines[line])) return stripQuotes(own[1]);
-  const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, line + 1);
-  if (platform < 0) return null;
-  if (_leadingIndent(lines[platform]) !== childIndent) return null;
-  return stripQuotes(PLATFORM_RE.exec(lines[platform])![1]);
+/** Drop the `key:` under the esphome OTA item's `encryption:` so the block
+ *  inherits the api key; `null` when there is no such key. */
+export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
+  const lines = yaml.split("\n");
+  const item = locate(yaml, lines);
+  if (!item || item.keyLine < 0) return null;
+  lines.splice(item.keyLine, 1);
+  return lines.join("\n");
+}
+
+function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
+  const section = parseYamlTopLevelSections(yaml).find(
+    (s) => s.key === "ota" && s.platform === "esphome"
+  );
+  if (!section) return null;
+  const line = section.fromLine - 1;
+  const encryptionLine = findDirectChildLine(
+    lines,
+    "ota",
+    ENCRYPTION_RE,
+    section.fromLine
+  );
+  return {
+    line,
+    childIndent: _detectSectionChildIndent(lines, line, section.parentKey !== undefined),
+    encryptionLine,
+    passwordLine: findDirectChildLine(lines, "ota", PASSWORD_RE, section.fromLine),
+    keyLine:
+      encryptionLine >= 0
+        ? findDirectChildLine(lines, "ota", KEY_RE, encryptionLine + 1)
+        : -1,
+  };
 }

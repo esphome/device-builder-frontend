@@ -7,7 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import { makeConfiguredDevice } from "../_make-configured-device.js";
-import { otaEncryptionNudge } from "../../src/util/ota-encryption-nudge.js";
+import {
+  otaEncryptionNudge,
+  type OtaEncryptionNudgeInputs,
+} from "../../src/util/ota-encryption-nudge.js";
 
 const NOISE = "Noise_NNpsk0_25519_ChaChaPoly_SHA256";
 const YAML = 'api:\n  encryption:\n    key: "abc"\nota:\n  - platform: esphome\n';
@@ -20,7 +23,7 @@ const eligible = () =>
     runtime_state: { deployed_version: "2026.9.0", api_encryption_active: NOISE },
   });
 
-const nudge = (overrides: Parameters<typeof otaEncryptionNudge>[0] = {} as never) =>
+const nudge = (overrides: Partial<OtaEncryptionNudgeInputs> = {}) =>
   otaEncryptionNudge({
     device: eligible(),
     yaml: YAML,
@@ -40,6 +43,18 @@ describe("otaEncryptionNudge", () => {
         },
       })
     ).toBe("add");
+  });
+
+  it("flags an own OTA key next to a static api key regardless of the device", () => {
+    const yaml = `${YAML}    encryption:\n      key: "abc"\n`;
+    expect(nudge({ yaml })).toBe("drop_own_key");
+    expect(nudge({ yaml, device: undefined })).toBe("drop_own_key");
+    expect(nudge({ yaml, esphomeVersion: "" })).toBe("drop_own_key");
+    expect(
+      nudge({
+        yaml: `api:\n  encryption:\nota:\n  - platform: esphome\n    encryption:\n      key: "abc"\n`,
+      })
+    ).toBeNull();
   });
 
   it("stays silent without the device or its mDNS evidence", () => {

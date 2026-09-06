@@ -87,7 +87,10 @@ import {
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
 import { disableMacSuffixInYaml } from "../util/yaml-mac-suffix.js";
-import { enableOtaEncryptionInYaml } from "../util/yaml-ota-encryption.js";
+import {
+  dropOtaEncryptionKeyInYaml,
+  enableOtaEncryptionInYaml,
+} from "../util/yaml-ota-encryption.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
@@ -1579,6 +1582,7 @@ export class ESPHomePageDevice extends LitElement {
         @request-migrate-config=${this._onMigrateConfig}
         @request-disable-mac-suffix=${this._onDisableMacSuffix}
         @request-enable-ota-encryption=${this._onEnableOtaEncryption}
+        @request-drop-ota-encryption-key=${this._onDropOtaEncryptionKey}
         @goto-line=${this._onEditorGoToLine}
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
@@ -2049,6 +2053,13 @@ export class ESPHomePageDevice extends LitElement {
     if (updated === null) return;
     this._setYaml(updated);
     notifySuccess(this._localize("device.ota_encryption_applied"));
+  }
+
+  private _onDropOtaEncryptionKey() {
+    const updated = dropOtaEncryptionKeyInYaml(this._yaml);
+    if (updated === null) return;
+    this._setYaml(updated);
+    notifySuccess(this._localize("device.ota_encryption_key_dropped"));
   }
 
   private _onSectionSelect(

@@ -66,8 +66,8 @@ interface SecuritySetting {
   /** Section name passed to `recommendedSecretKeys`; matches the field picker's
    *  `sectionKey` so both derive the same secret name (e.g. `ota.esphome`). */
   secretSection: string;
-  /** Direct-child key whose presence means the setting is already configured. */
-  marker: string;
+  /** Direct-child keys any one of which means the setting is already configured. */
+  markers: string[];
   /** `device.<copyPrefix>_*` localization keys for this setting's copy. */
   copyPrefix: string;
   /** The value(s) to generate, store/inline, and reference. */
@@ -84,7 +84,7 @@ const word = () => generatePassphrase(1);
 export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   api: {
     secretSection: "api",
-    marker: "encryption",
+    markers: ["encryption"],
     copyPrefix: "api_encryption",
     fields: [
       {
@@ -96,7 +96,9 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   },
   "ota.esphome": {
     secretSection: "ota.esphome",
-    marker: "password",
+    // Encryption satisfies the setting too, so following the OTA encryption
+    // nudge never brings the password nudge back.
+    markers: ["password", "encryption"],
     copyPrefix: "ota_password",
     fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],
     // A device that already offers encrypted OTA gets the encryption nudge
@@ -105,7 +107,7 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   },
   web_server: {
     secretSection: "web_server",
-    marker: "auth",
+    markers: ["auth"],
     copyPrefix: "web_auth",
     fields: [
       // Username isn't sensitive and its field isn't a secret field — inline it.
@@ -165,13 +167,10 @@ export class ESPHomeSecurityNotice extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues) {
-    if (
-      changed.has("yaml") ||
-      changed.has("fromLine") ||
-      changed.has("sectionKey") ||
-      changed.has("_devices") ||
-      changed.has("_esphomeVersion")
-    ) {
+    const yamlDriven =
+      changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey");
+    const deviceDriven = changed.has("_devices") || changed.has("_esphomeVersion");
+    if (yamlDriven || (deviceDriven && this._setting?.suppressWhen)) {
       this._markerAbsent =
         !!this._setting && !this._markerPresent() && !this._suppressed();
     }
@@ -202,7 +201,7 @@ export class ESPHomeSecurityNotice extends LitElement {
     return fields.length > 0 && fields.every((f) => !f.field.secretField || f.key !== "");
   }
 
-  /** Whether the section body has the setting's marker as a *direct child*. A
+  /** Whether the section body has one of the setting's markers as a *direct child*. A
    *  line scan (not the parsed values) because the parser drops a keyless block
    *  (e.g. a keyless `encryption:` that HA auto-provisions) which must NOT
    *  suppress the nudge. */
@@ -211,7 +210,7 @@ export class ESPHomeSecurityNotice extends LitElement {
     if (!setting) return false;
     // `ota.esphome` → scan from the esphome list-item dash (its fromLine).
     const baseKey = this.sectionKey.split(".")[0];
-    const marker = new RegExp(`^${setting.marker}\\s*:`);
+    const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
     return (
       findDirectChildLine(this.yaml.split("\n"), baseKey, marker, this.fromLine) >= 0
     );

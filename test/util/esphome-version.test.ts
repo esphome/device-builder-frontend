@@ -1,40 +1,37 @@
 /**
- * Pins the ordered esphome version comparator and the two OTA-encryption
+ * Pins the esphome version ordering and the two OTA-encryption
  * gates built on it: released 2026.9.0+ firmware offers, and the
  * dashboard's own esphome must accept the block.
  */
 import { describe, expect, it } from "vitest";
 
 import {
-  compareEsphomeVersions,
   firmwareOffersOtaEncryption,
   isReleaseVersion,
   toolchainAcceptsOtaEncryption,
+  versionAtLeast,
 } from "../../src/util/esphome-version.js";
 
-describe("compareEsphomeVersions", () => {
+describe("versionAtLeast", () => {
   it.each([
-    ["2026.9.0", "2026.9.0", 0],
-    ["2026.9", "2026.9.0", 0],
-    ["2026.9.1", "2026.9.0", 1],
-    ["2026.8.3", "2026.9.0", -1],
-    ["2026.10.0", "2026.9.0", 1],
-    ["2027.1.0", "2026.12.0", 1],
-    ["2026.9.0b1", "2026.9.0", -1],
-    ["2026.9.0b2", "2026.9.0b1", 1],
-    ["2026.9.0rc1", "2026.9.0b3", 1],
-    ["2026.9.0rc1", "2026.9.0", -1],
-    ["2026.9.0-dev", "2026.9.0", -1],
-    ["2026.9.0.dev0", "2026.9.0b1", -1],
-    ["2026.10.0-dev", "2026.9.0", 1],
-    ["2026.9.0+abc", "2026.9.0", 0],
-  ] as const)("%s vs %s is %d", (a, b, expected) => {
-    expect(compareEsphomeVersions(a, b)).toBe(expected);
+    ["2026.9.0", "2026.9.0", true],
+    ["2026.9", "2026.9.0", true],
+    ["2026.9.1", "2026.9.0", true],
+    ["2026.8.3", "2026.9.0", false],
+    ["2026.10.0", "2026.9.0", true],
+    ["2027.1.0", "2026.12.0", true],
+    ["2026.9.0b1", "2026.9.0", false],
+    ["2026.9.0rc1", "2026.9.0", false],
+    ["2026.9.0-dev", "2026.9.0", false],
+    ["2026.10.0-dev", "2026.9.0", true],
+    ["2026.10.0b1", "2026.9.0", true],
+  ] as const)("%s at least %s is %s", (a, b, expected) => {
+    expect(versionAtLeast(a, b)).toBe(expected);
   });
 
-  it("returns null for anything that is not a version", () => {
-    expect(compareEsphomeVersions("", "2026.9.0")).toBeNull();
-    expect(compareEsphomeVersions("2026.9.0", "unknown")).toBeNull();
+  it("is false when either side is not a version", () => {
+    expect(versionAtLeast("", "2026.9.0")).toBe(false);
+    expect(versionAtLeast("2026.9.0", "unknown")).toBe(false);
   });
 });
 
