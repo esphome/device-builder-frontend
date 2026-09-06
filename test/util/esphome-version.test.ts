@@ -36,9 +36,11 @@ describe("versionAtLeast", () => {
 });
 
 describe("isReleaseVersion", () => {
-  it("accepts plain dotted numerals only", () => {
+  it("accepts the YYYY.M[.P] release shape only", () => {
     expect(isReleaseVersion("2026.9.0")).toBe(true);
     expect(isReleaseVersion("2026.9")).toBe(true);
+    expect(isReleaseVersion("2026")).toBe(false);
+    expect(isReleaseVersion("2026.9.0.1")).toBe(false);
     expect(isReleaseVersion("2026.9.0b1")).toBe(false);
     expect(isReleaseVersion("2026.9.0-dev")).toBe(false);
     expect(isReleaseVersion("")).toBe(false);

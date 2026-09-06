@@ -14,9 +14,9 @@ function parse(version: string): [number, number, number, number] | null {
   return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0), match[4] ? 0 : 1];
 }
 
-/** Plain dotted numerals only: a final release, not a beta, rc, or dev build. */
+/** A final `YYYY.M[.P]` release: not a beta, rc, or dev build. */
 export function isReleaseVersion(version: string): boolean {
-  return /^\d+(?:\.\d+)*$/.test(version.trim());
+  return /^\d+\.\d+(?:\.\d+)?$/.test(version.trim());
 }
 
 /** Whether `version` orders at or after `minimum`; `false` when either isn't a version. */
