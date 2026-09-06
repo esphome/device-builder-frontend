@@ -1,4 +1,5 @@
 /** Ordering for ESPHome `YYYY.M[.P][suffix]` versions; a suffix orders below its release. */
+import { releaseLine } from "./version-mismatch.js";
 
 const VERSION_RE = /^(\d+)\.(\d+)(?:\.(\d+))?(.*)$/;
 
@@ -10,7 +11,7 @@ function parse(version: string): [number, number, number, number] | null {
 
 /** A final `YYYY.M[.P]` release: not a beta, rc, or dev build. */
 export function isReleaseVersion(version: string): boolean {
-  return /^\d+\.\d+(?:\.\d+)?$/.test(version.trim());
+  return parse(version)?.[3] === 1;
 }
 
 /** Whether `version` orders at or after `minimum`; `false` when either isn't a version. */
@@ -37,6 +38,5 @@ export function firmwareOffersOtaEncryption(deployed: string): boolean {
 /** Whether the dashboard's own esphome accepts `ota: encryption:`; the 2026.9
  *  prereleases do, so only the numeric release line counts here. */
 export function toolchainAcceptsOtaEncryption(esphomeVersion: string): boolean {
-  const release = /^\d+\.\d+(?:\.\d+)?/.exec(esphomeVersion.trim())?.[0] ?? "";
-  return versionAtLeast(release, OTA_ENCRYPTION_OFFER_VERSION);
+  return versionAtLeast(releaseLine(esphomeVersion), OTA_ENCRYPTION_OFFER_VERSION);
 }

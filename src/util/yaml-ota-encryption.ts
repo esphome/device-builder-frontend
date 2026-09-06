@@ -3,11 +3,11 @@ import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import {
   _detectSectionChildIndent,
-  _leadingIndent,
+  BLOCK_SCALAR_RE,
   isBlankOrCommentLine,
 } from "./yaml-section-lexer.js";
 import { findDirectChildLine } from "./yaml-section-reader.js";
-import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
+import { lineIndent, parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 const ENCRYPTION_RE = /^encryption\s*:/;
 const PASSWORD_RE = /^password\s*:/;
@@ -79,18 +79,11 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   if (dash) {
     lines[item.line] = `${dash[1]}encryption:${splitInlineComment(dash[2]).comment}`;
   }
-  // Every duplicate password line goes; the block lands where the first was.
   const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, item.line + 1);
-  let insertAt = platform >= 0 ? platform + 1 : item.line + 1;
-  for (
-    let line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
-    line >= 0;
-  ) {
-    lines.splice(line, 1);
-    insertAt = line;
-    line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
-  }
+  const removed = removeDirectChildLines(lines, PASSWORD_RE, item.line + 1);
   if (!dash) {
+    const insertAt =
+      removed >= 0 ? removed : platform >= 0 ? platform + 1 : item.line + 1;
     lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
   }
   return lines.join(yamlDocEol(yaml));
@@ -101,11 +94,30 @@ export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.keyLine < 0 || item.multiLine) return null;
-  for (let line = item.keyLine; line >= 0;) {
-    lines.splice(line, 1);
-    line = findDirectChildLine(lines, "ota", KEY_RE, item.encryptionLine + 1);
-  }
+  removeDirectChildLines(lines, KEY_RE, item.encryptionLine + 1);
   return lines.join(yamlDocEol(yaml));
+}
+
+/** Splice out every direct-child line below `fromLine` matching `keyRe` (the dash
+ *  line itself is left to the caller); returns the first removed index, or -1. */
+function removeDirectChildLines(
+  lines: string[],
+  keyRe: RegExp,
+  fromLine: number
+): number {
+  let first = -1;
+  for (let line = childBelowDash(lines, keyRe, fromLine); line >= 0;) {
+    lines.splice(line, 1);
+    first = line;
+    line = childBelowDash(lines, keyRe, fromLine);
+  }
+  return first;
+}
+
+/** `findDirectChildLine` without the dash line, so removal never eats the item's dash. */
+function childBelowDash(lines: string[], keyRe: RegExp, fromLine: number): number {
+  const line = findDirectChildLine(lines, "ota", keyRe, fromLine);
+  return line === fromLine - 1 ? -1 : line;
 }
 
 function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
@@ -114,25 +126,22 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
   );
   if (!section) return null;
   const line = section.fromLine - 1;
-  const isListItem = section.parentKey !== undefined;
-  // `findDirectChildLine` starts below the dash, so test an inline dash key too.
-  const dashKey = isListItem ? lines[line].replace(/^\s*-\s+/, "") : "";
-  const childEncryption = findDirectChildLine(
+  const encryptionLine = findDirectChildLine(
     lines,
     "ota",
     ENCRYPTION_RE,
     section.fromLine
   );
-  const childPassword = findDirectChildLine(lines, "ota", PASSWORD_RE, section.fromLine);
-  const encryptionLine =
-    childEncryption >= 0 || !ENCRYPTION_RE.test(dashKey) ? childEncryption : line;
-  const passwordLine =
-    childPassword >= 0 || !PASSWORD_RE.test(dashKey) ? childPassword : line;
+  const passwordLine = findDirectChildLine(lines, "ota", PASSWORD_RE, section.fromLine);
   const keyLine =
     encryptionLine >= 0
       ? findDirectChildLine(lines, "ota", KEY_RE, encryptionLine + 1)
       : -1;
-  const childIndent = _detectSectionChildIndent(lines, line, isListItem);
+  const childIndent = _detectSectionChildIndent(
+    lines,
+    line,
+    section.parentKey !== undefined
+  );
   return {
     line,
     childIndent,
@@ -153,12 +162,11 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
 
 /** Whether the scalar on `idx` is a block scalar or continues past `floor`'s indent. */
 function continuesOnNextLine(lines: string[], idx: number, floor: string): boolean {
-  const value = splitInlineComment(lines[idx].replace(/^[^:]*:/, "")).value.trim();
-  if (/^[|>]/.test(value)) return true;
-  const indent = Math.max(_leadingIndent(lines[idx]).length, floor.length);
+  if (BLOCK_SCALAR_RE.test(lines[idx])) return true;
+  const indent = Math.max(lineIndent(lines[idx]), floor.length);
   for (let i = idx + 1; i < lines.length; i++) {
     if (isBlankOrCommentLine(lines[i])) continue;
-    return _leadingIndent(lines[i]).length > indent;
+    return lineIndent(lines[i]) > indent;
   }
   return false;
 }

@@ -2042,26 +2042,30 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onDisableMacSuffix() {
-    const updated = disableMacSuffixInYaml(this._yaml);
-    if (updated === null) return;
-    this._setYaml(updated);
-    notifySuccess(this._localize("device.mac_suffix_applied"));
+    this._applyDraftRewrite(disableMacSuffixInYaml, "device.mac_suffix_applied");
   }
 
   private _onEnableOtaEncryption() {
-    const updated = enableOtaEncryptionInYaml(this._yaml);
-    if (updated === null) return;
-    this._setYaml(updated);
-    this._repinSelection(updated);
-    notifySuccess(this._localize("device.ota_encryption_applied"));
+    this._applyDraftRewrite(enableOtaEncryptionInYaml, "device.ota_encryption_applied");
   }
 
   private _onDropOtaEncryptionKey() {
-    const updated = dropOtaEncryptionKeyInYaml(this._yaml);
+    this._applyDraftRewrite(
+      dropOtaEncryptionKeyInYaml,
+      "device.ota_encryption_key_dropped"
+    );
+  }
+
+  /** Apply a notice CTA's line-level rewrite to the draft and re-pin the selection. */
+  private _applyDraftRewrite(
+    rewrite: (yaml: string) => string | null,
+    successKey: string
+  ) {
+    const updated = rewrite(this._yaml);
     if (updated === null) return;
     this._setYaml(updated);
     this._repinSelection(updated);
-    notifySuccess(this._localize("device.ota_encryption_key_dropped"));
+    notifySuccess(this._localize(successKey));
   }
 
   private _onSectionSelect(

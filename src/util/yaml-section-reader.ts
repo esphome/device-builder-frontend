@@ -70,6 +70,12 @@ export function findDirectChildLine(
   if (start < 0) return -1;
   let childIndent: number | null = null;
   let found = -1;
+  // A list item's inline key (`- password: x`) is a direct child on the dash line.
+  const dash = fromLine !== undefined ? LIST_ITEM_INLINE_KEY_RE.exec(lines[start]) : null;
+  if (dash) {
+    keyRe.lastIndex = 0;
+    if (keyRe.test(lines[start].replace(/^\s*-\s+/, ""))) found = start;
+  }
   for (let i = start + 1; i < lines.length; i++) {
     const l = lines[i];
     if (isBlankOrCommentLine(l)) continue;
