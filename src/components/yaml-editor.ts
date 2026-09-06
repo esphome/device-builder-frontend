@@ -115,7 +115,8 @@ export interface YamlCursorLineDetail extends YamlLinePaths {
   line: number;
   /** A doc edit moved the caret here. */
   viaEdit: boolean;
-  /** A mouse click moved the caret here. */
+  /** A deliberate activation (mouse click, breadcrumb) moved the caret
+   *  here; the page switches sections at once for these. */
   pointer: boolean;
 }
 
@@ -521,8 +522,8 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               // caret here — the page holds section switches onto a
               // half-typed unknown key only for edit-driven moves.
               viaEdit: update.docChanged,
-              // True for a mouse click; the page switches sections at
-              // once for those and coalesces keyboard and find jumps.
+              // True for a deliberate activation (select.pointer); the page
+              // switches at once for those and coalesces other moves.
               pointer: update.transactions.some((tr) =>
                 tr.annotation(Transaction.userEvent)?.startsWith("select.pointer")
               ),
