@@ -90,4 +90,24 @@ describe("_syncSelectValues", () => {
     await sync(select, 9);
     expect(select.value).toBe("GPIO9");
   });
+
+  it.each([
+    ["P0.27", ["P0.26", "P0.27"], "P0.27"],
+    [27, ["P0.26", "P0.27"], "P0.27"],
+    ["P0.27", ["GPIO26", "GPIO27"], "GPIO27"],
+    ["P23", ["GPIO22", "GPIO23"], "GPIO23"],
+    ["PA02", ["GPIO1", "GPIO2"], "GPIO2"],
+    ["PB03", ["GPIO18", "GPIO19"], "GPIO19"],
+    ["GPIO19", ["PB02", "PB03"], "PB03"],
+  ])("maps pin %s onto its board option", async (raw, options, expected) => {
+    const select = fakeSelect({ value: "", options });
+    await sync(select, raw);
+    expect(select.value).toBe(expected);
+  });
+
+  it("leaves a pin with no matching option untouched", async () => {
+    const select = fakeSelect({ value: "", options: ["GPIO1", "GPIO2"] });
+    await sync(select, "P0.30");
+    expect(select.value).toBe("P0.30");
+  });
 });

@@ -41,6 +41,7 @@ import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { parseBoardGpio } from "../../util/pin/gpio.js";
 import {
   fetchPinRegistryModes,
   getCachedPinRegistryModes,
@@ -821,11 +822,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       //
       // Pin entries are a second mismatch: the seeded YAML value is
       // a bare int (`9`, from `seedBoardPinDefaults` reading the
-      // board manifest's pin features) or a string alias (`"SCL"`),
-      // but the option values are always `"GPIOn"`. Normalise both
-      // into the bare GPIO number for comparison so a freshly seeded
-      // i2c bus on ESP32-C3 lands on the right option instead of
-      // showing an empty select.
+      // board manifest's pin features) or a board spelling (`"P0.27"`,
+      // `"PB03"`) that differs from the option's. Normalise both sides
+      // through the shared pin parser so a freshly seeded i2c bus lands
+      // on the right option instead of showing an empty select.
       const desired = this._matchOptionValue(select, raw);
       if (current !== desired) {
         select.value = desired;
@@ -838,12 +838,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const options = Array.from(
       select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
     );
-    const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
-    const findByValue = (v: string) =>
-      options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
-    const matched =
-      findByValue(raw) ?? (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined);
-    return matched?.value ?? raw;
+    const lower = raw.toLowerCase();
+    const exact = options.find((o) => o.value?.toLowerCase() === lower);
+    if (exact) return exact.value;
+    const gpio = parseBoardGpio(raw);
+    if (gpio === null) return raw;
+    return options.find((o) => parseBoardGpio(o.value) === gpio)?.value ?? raw;
   }
 
   /**
