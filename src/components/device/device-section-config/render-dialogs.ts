@@ -11,7 +11,7 @@ import "../add-api-action-dialog.js";
 import "../add-automation-dialog.js";
 
 export function renderApiActionDialog(host: ESPHomeDeviceSectionConfig) {
-  if (host.sectionKey !== "api") return nothing;
+  if (host._renderedKey !== "api") return nothing;
   return html`<esphome-add-api-action-dialog
     .boardName=${host.boardName}
     .configuration=${host.configuration}

@@ -25,12 +25,12 @@ export function renderPlatformDomainBranch(
   return html`${renderNotice(html`
     <p>
       ${host._localize("device.platform_domain_section", {
-        key: host.sectionKey,
+        key: host._renderedKey,
       })}
     </p>
     <button type="button" class="yaml-only-notice-cta" @click=${host._onAddPlatform}>
       ${host._localize("device.id_reference_add", {
-        domain: host.sectionKey,
+        domain: host._renderedKey,
       })}
     </button>
   `)}

@@ -262,6 +262,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     return this._loading && this._config !== null;
   }
 
+  /** The section the pane is rendering; the outgoing one during a reload. */
+  get _renderedKey(): string {
+    return this._config?.section_key ?? this.sectionKey;
+  }
+
   get _showAdvanced(): boolean {
     return this._advancedShownSections.has(this.sectionKey);
   }

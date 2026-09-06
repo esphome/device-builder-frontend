@@ -19,7 +19,7 @@ import "../device-section-automation-list.js";
  * surface for api actions, triggers, and component action fields).
  */
 export function renderApiActionsTable(host: ESPHomeDeviceSectionConfig) {
-  if (host.sectionKey !== "api") return nothing;
+  if (host._renderedKey !== "api") return nothing;
   const rows = selectApiActionRows(parseYamlAutomations(host.yaml));
   return html`<esphome-section-automation-list
     .heading=${host._localize("device.api_actions_list_title")}
