@@ -25,9 +25,6 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
   const id = ++host._loadId;
   host._loading = true;
   host._error = "";
-  host._config = null;
-  host._isUnknown = false;
-  host._isPlatformDomain = false;
   host._setDirty(false);
   if (host._draftTimer) {
     clearTimeout(host._draftTimer);
@@ -85,6 +82,8 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         entries: component.config_entries,
         required_groups: component.required_groups ?? [],
       };
+      host._isPlatformDomain = false;
+      host._isUnknown = false;
     }
     // Asymmetric with save/delete paths: undefined here means "section
     // not in live yaml" — surface an empty form (silent), since this load
@@ -107,6 +106,8 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     host._presentComponents = parseTopLevelComponents(yaml);
   } catch (e) {
     if (id !== host._loadId) return;
+    host._config = null;
+    host._values = {};
     const msg = e instanceof Error ? e.message : "";
     host._error = msg.includes("timed out")
       ? host._localize("device.load_config_error")
@@ -114,6 +115,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
   } finally {
     if (id === host._loadId) {
       host._loading = false;
+      host._reloading = false;
     }
   }
 }

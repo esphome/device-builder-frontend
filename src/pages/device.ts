@@ -33,7 +33,7 @@ import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
-import type { HighlightRange } from "../components/yaml-editor.js";
+import type { HighlightRange, YamlCursorLineDetail } from "../components/yaml-editor.js";
 import type { ESPHomeYamlValidationDialog } from "../components/yaml-validation-dialog.js";
 import {
   activeJobsContext,
@@ -126,6 +126,10 @@ registerMdiIcons({
   "chevron-right": mdiChevronRight,
   menu: mdiMenu,
 });
+
+/** Trailing window that folds a burst of keyboard or find-driven caret moves
+ *  into one section switch. */
+const CURSOR_SWITCH_COALESCE_MS = 100;
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -291,6 +295,8 @@ export class ESPHomePageDevice extends LitElement {
    *  key; null when nothing is held. */
   @state()
   private _heldUnknownInstance: string | null = null;
+
+  private _cursorSwitchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Valid top-level keys (core + automation + catalog domains/ids); null
    *  until the catalog resolves — treated as "everything is known" so a
@@ -657,6 +663,7 @@ export class ESPHomePageDevice extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("keydown", this._onKeydown);
     this._mql.removeEventListener("change", this._onMqlChange);
+    this._cancelCursorSwitch();
     // Drop any in-flight unsaved-changes guard so its caller's
     // ``await`` doesn't dangle past unmount — resolve as "don't
     // proceed" since the page is going away anyway.
@@ -703,6 +710,7 @@ export class ESPHomePageDevice extends LitElement {
       // would linger until the new device's first lint pass.
       if (this._backendErrors.length) this._backendErrors = [];
       this._heldUnknownInstance = null;
+      this._cancelCursorSwitch();
       this._kickKnownKeys();
       // The loading gate detaches the editor subtree, so the section
       // editor's unmount announcement never reaches this page — drop the
@@ -1709,35 +1717,64 @@ export class ESPHomePageDevice extends LitElement {
    * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
    * `updateListener`.
    */
-  private _onYamlCursorLine(
-    e: CustomEvent<{
-      line: number;
-      path?: string[];
-      viaEdit?: boolean;
-      indexedPath?: (string | number)[];
-    }>
-  ) {
+  private _onYamlCursorLine(e: CustomEvent<YamlCursorLineDetail>) {
     // The user is driving from the YAML pane now — drop any pending
     // form-field retry so it can't re-highlight after they've moved on.
     this._clearPendingFieldLine();
-    const full = e.detail.path ?? [];
-    // `sectionForCursor` falls back to the caret's key path when no section
-    // range covers the line, so the panel follows the caret into a blank,
-    // indented child line under a just-typed top-level block.
-    const match = sectionForCursor(this._yaml, e.detail.line, full);
+    // Any caret move supersedes a pending switch, even one that resolves
+    // to no section.
+    this._cancelCursorSwitch();
+    const detail = e.detail;
+    const match = sectionForCursor(this._yaml, detail.line, detail.path ?? []);
     if (!match) return;
+    // A click or an edit switches at once; a move within the current
+    // section only retargets the field. Keyboard and find jumps across
+    // sections coalesce so a run of matches rebuilds the pane once.
+    const immediate =
+      detail.viaEdit ||
+      detail.pointer ||
+      this._isSelected(sectionKeyOf(match), match.fromLine);
+    if (immediate) {
+      this._applyCursorMove(detail, match);
+      return;
+    }
+    // A navigation that lands inside the window wins over the move, and a
+    // draft that shifts lines meanwhile re-pins the target section rather
+    // than replaying the caret's line number.
+    const key = this._selectedSection;
+    const line = this._selectedFromLine;
+    const targetKey = sectionKeyOf(match);
+    this._cursorSwitchTimer = setTimeout(() => {
+      this._cursorSwitchTimer = null;
+      if (key !== this._selectedSection || line !== this._selectedFromLine) return;
+      const fromLine = resolveCurrentSectionLine(this._yaml, targetKey, match.fromLine);
+      if (fromLine === undefined) return;
+      this._applyCursorMove(detail, { ...match, fromLine });
+    }, CURSOR_SWITCH_COALESCE_MS);
+  }
+
+  private _isSelected(sectionKey: string, fromLine: number | undefined): boolean {
+    return sectionKey === this._selectedSection && fromLine === this._selectedFromLine;
+  }
+
+  private _cancelCursorSwitch() {
+    if (this._cursorSwitchTimer === null) return;
+    clearTimeout(this._cursorSwitchTimer);
+    this._cursorSwitchTimer = null;
+  }
+
+  /** Move the selection and field focus to the caret's section. */
+  private _applyCursorMove(detail: YamlCursorLineDetail, match: YamlSection) {
+    const full = detail.path ?? [];
     // MAP sections like substitutions render at an empty path, so their
     // fields are section-relative — the shared slice rule covers them.
     const rel = formRelativePath(full);
     const sectionKey = sectionKeyOf(match);
-    if (
-      sectionKey === this._selectedSection &&
-      match.fromLine === this._selectedFromLine
-    ) {
+    if (this._isSelected(sectionKey, match.fromLine)) {
       // Same section: update the field target directly for intra-section
       // moves (the cross-section path below would no-op and freeze it).
       this._focusFieldPath = rel;
-      this._focusYamlPath = e.detail.indexedPath;
+      this._focusYamlPath = detail.indexedPath;
       return;
     }
     // A doc edit that resolves an unknown top-level key is a key still
@@ -1748,7 +1785,7 @@ export class ESPHomePageDevice extends LitElement {
     // pane deliberately. One quirk to know: the editor's same-line
     // throttle means clicking the held line itself emits no event; the
     // navigator entry (kept visible) is the release path there.
-    if (e.detail.viaEdit === true) {
+    if (detail.viaEdit === true) {
       // An unresolved key set (catalog still loading, or failed — retried
       // on the next device load, never from this hot path) means no holds.
       if (this._knownTopLevelKeys !== null && !this._knownTopLevelKeys.has(match.key)) {
@@ -1757,13 +1794,13 @@ export class ESPHomePageDevice extends LitElement {
       }
     }
     this._heldUnknownInstance = null;
-    // Cross-section: the switch is synchronous, so the click-time
-    // coordinates are read against the click-time buffer; a draft
-    // landing later re-pins the selection in ``_onYamlDraft``.
+    // Cross-section: the coordinates are read against the buffer at
+    // switch time; a draft landing later re-pins the selection in
+    // ``_onYamlDraft``.
     this._selectedSection = sectionKey;
     this._selectedFromLine = match.fromLine;
     this._focusFieldPath = rel;
-    this._focusYamlPath = e.detail.indexedPath;
+    this._focusYamlPath = detail.indexedPath;
     // The navigator selection follows the caret; a block highlight
     // left on the previously clicked component would disagree with
     // it (#1885). The highlight is a navigator/form affordance —
@@ -2047,7 +2084,10 @@ export class ESPHomePageDevice extends LitElement {
   ) {
     const { sectionKey, fromLine } = e.detail;
     this._heldUnknownInstance = null;
-    if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
+    // A re-click leaves the selection unchanged, so the fire-time guard
+    // would let a pending move through.
+    this._cancelCursorSwitch();
+    if (sectionKey !== null && this._isSelected(sectionKey, fromLine)) {
       this._drawerOpen = false;
       return;
     }

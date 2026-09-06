@@ -20,7 +20,7 @@ export function revealAdvancedForErrors(
   if (!changedProperties.has("backendErrors") && !changedProperties.has("_config")) {
     return;
   }
-  if (!host.backendErrors.fields.size) return;
+  if (host._reloading || !host.backendErrors.fields.size) return;
   autoRevealAdvanced(
     host,
     [...host.backendErrors.fields.keys()].map((path) => path.split("."))
@@ -40,17 +40,19 @@ export function revealAdvancedForFocus(
   if (!changedProperties.has("focusFieldPath") && !changedProperties.has("_config")) {
     return;
   }
-  if (host.focusFieldPath?.length) autoRevealAdvanced(host, [host.focusFieldPath]);
+  const target = host._focusTarget;
+  if (target?.length) autoRevealAdvanced(host, [target]);
 }
 
 /** ``api.actions`` / ``services`` are hidden from the form — the
  *  manage-list below it owns them, so a caret on those keys lands
  *  there instead of on a field that no longer renders. */
 export function maybeFlashApiActionsList(host: ESPHomeDeviceSectionConfig): void {
-  if (host.sectionKey !== "api") return;
-  const head = host.focusFieldPath?.[0];
+  if (host._renderedKey !== "api") return;
+  const target = host._focusTarget;
+  const head = target?.[0];
   if (!API_ACTIONS_BLOCK_KEYS.some((key) => key === head)) return;
-  const key = JSON.stringify(host.focusFieldPath);
+  const key = JSON.stringify(target);
   if (key === host._apiListFlashKey) return;
   const list = host.shadowRoot?.querySelector<HTMLElement>(
     "esphome-section-automation-list"
@@ -72,8 +74,8 @@ function autoRevealAdvanced(
   paths: readonly string[][]
 ): void {
   if (host._showAdvanced || !host._config) return;
-  if (host._autoRevealedSections.has(host.sectionKey)) return;
-  const entries = resolveSectionEntries(host.sectionKey, host._config.entries);
+  if (host._autoRevealedSections.has(host._renderedKey)) return;
+  const entries = resolveSectionEntries(host._renderedKey, host._config.entries);
   const unitGate = unitAdvancedGate(
     entries,
     host._config.required_groups ?? [],
@@ -82,6 +84,6 @@ function autoRevealAdvanced(
   if (!paths.some((path) => pathIsAdvanced(entries, path, host._values, unitGate))) {
     return;
   }
-  host._autoRevealedSections.add(host.sectionKey);
+  host._autoRevealedSections.add(host._renderedKey);
   host._setShowAdvanced(true);
 }

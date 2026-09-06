@@ -28,7 +28,7 @@ export function renderSectionHeader(
   // doesn't carry.
   const featured = catalogMiss
     ? null
-    : featuredEntryForInstance(host.board, host.sectionKey, host._values.id);
+    : featuredEntryForInstance(host.board, config.section_key, host._values.id);
   const headerTitle = host._isUnknown
     ? host._localize("device.external_component_title")
     : host._isPlatformDomain
@@ -42,7 +42,7 @@ export function renderSectionHeader(
   // section key there instead.
   const featuredName = featured ? featuredDisplayName(featured, config.title) : null;
   const subtitle = catalogMiss
-    ? host.sectionKey
+    ? config.section_key
     : featuredName !== config.title
       ? featuredName
       : null;

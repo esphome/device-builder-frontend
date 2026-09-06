@@ -23,16 +23,21 @@ export interface KeyedPromiseCacheOptions {
   /** Evict a rejected promise so the next call retries. Default
    *  ``true`` — the point of the idiom. Set ``false`` to memoise
    *  rejections too (a replayed rejection is then permanent for the
-   *  cache's lifetime). */
+   *  cache's lifetime). Ignored when ``evictOnSettle`` is set. */
   evictOnReject?: boolean;
+  /** Evict once the promise settles either way, so the cache only
+   *  shares an in-flight request and never memoises its result. */
+  evictOnSettle?: boolean;
 }
 
 export class KeyedPromiseCache<T> {
   private readonly _cache = new Map<string, Promise<T>>();
   private readonly _evictOnReject: boolean;
+  private readonly _evictOnSettle: boolean;
 
   constructor(opts: KeyedPromiseCacheOptions = {}) {
     this._evictOnReject = opts.evictOnReject ?? true;
+    this._evictOnSettle = opts.evictOnSettle ?? false;
   }
 
   /**
@@ -45,7 +50,11 @@ export class KeyedPromiseCache<T> {
     const cached = this._cache.get(key);
     if (cached) return cached;
     let promise: Promise<T>;
-    if (this._evictOnReject) {
+    if (this._evictOnSettle) {
+      promise = create().finally(() => {
+        if (this._cache.get(key) === promise) this._cache.delete(key);
+      });
+    } else if (this._evictOnReject) {
       // Store and return the rethrowing ``.catch`` chain, not the
       // original promise with a side-listener. A side-listener would
       // mark the rejection handled and silence ``unhandledRejection``

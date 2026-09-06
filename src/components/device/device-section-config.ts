@@ -20,7 +20,7 @@ import {
 } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
+import { espHomeStyles, heldStyles } from "../../styles/shared.js";
 import { joinActionFieldPath } from "../../util/action-field-path.js";
 import {
   type InstanceBackendErrors,
@@ -29,6 +29,7 @@ import {
 import type { ValidationError } from "../../util/config-validation.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { setHeld } from "../../util/held.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -215,6 +216,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
+  /** A retargeting load is in flight while the outgoing section is still
+   *  on screen. The pane is inert meanwhile; the write fences cover
+   *  programmatic dispatch, so nothing writes its values under the
+   *  incoming key. A same-section refresh keeps the pane live. */
+  _reloading = false;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
   private _announceUnmount: (() => void) | null = null;
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
@@ -257,14 +263,24 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
   );
 
+  /** The section the pane is rendering; the outgoing one during a reload. */
+  get _renderedKey(): string {
+    return this._config?.section_key ?? this.sectionKey;
+  }
+
+  /** The caret's field target; withheld while the outgoing form is held. */
+  get _focusTarget(): string[] | undefined {
+    return this._reloading ? undefined : this.focusFieldPath;
+  }
+
   get _showAdvanced(): boolean {
-    return this._advancedShownSections.has(this.sectionKey);
+    return this._advancedShownSections.has(this._renderedKey);
   }
 
   _setShowAdvanced(show: boolean) {
     const next = new Set(this._advancedShownSections);
-    if (show) next.add(this.sectionKey);
-    else next.delete(this.sectionKey);
+    if (show) next.add(this._renderedKey);
+    else next.delete(this._renderedKey);
     this._advancedShownSections = next;
   }
 
@@ -274,6 +290,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   static styles = [
     espHomeStyles,
+    heldStyles,
     inputStyles,
     dangerBannerStyles,
     deviceSectionConfigStyles,
@@ -293,11 +310,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     if (
       changedProperties.has("_resolvedComponents") &&
       this._config &&
+      !this._reloading &&
       this._fieldErrors.size
     ) {
       revalidateFields(this);
     }
-    // loadConfig synchronously flips _loading/_config/_error; running it in
+    // loadConfig synchronously flips _loading/_error; running it in
     // willUpdate folds those into the in-progress render rather than
     // scheduling a second one.
     if (
@@ -307,10 +325,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       this.sectionKey &&
       this.configuration
     ) {
+      this._reloading = this._config !== null;
       void loadConfig(this);
     }
     this._revealAdvancedForFocus(changedProperties);
     this._revealAdvancedForErrors(changedProperties);
+    setHeld(this, this._reloading);
   }
 
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {
@@ -409,7 +429,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     applySectionValues(this, e.detail.changes);
 
   protected render() {
-    if (this._loading) {
+    if (this._loading && !this._config) {
       return html`<div class="loading"><wa-spinner></wa-spinner></div>`;
     }
 
@@ -422,12 +442,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    const renderEntries = resolveSectionEntries(this.sectionKey, config.entries);
+    const renderEntries = resolveSectionEntries(config.section_key, config.entries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
     // unions don't fit the catalog — see #361 for the packages data-loss
     // regression). Zero-entries sections also fall back here.
-    const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
+    const yamlOnly = isYamlOnlySection(config.section_key, renderEntries.length);
 
     // Backend messages this pane must carry: section-level ones when the
     // banner's pane is hidden, and field-mapped ones for yaml-only
@@ -438,7 +458,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       ...(yamlOnly ? this.backendErrors.fieldMessages : []),
     ];
 
-    const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
+    const canDelete = !UNDELETABLE_SECTIONS.has(config.section_key);
 
     return html`
       ${renderSectionHeader(this, config, sectionAlerts)}
@@ -536,7 +556,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   _shortcutTarget(): ShortcutTarget {
     return resolveShortcutTarget(
       this.yaml,
-      this.sectionKey,
+      this._renderedKey,
       this._resolvedFromLine,
       (scopes) => this._triggerCatalog.hasTriggersFor(scopes)
     );
@@ -544,7 +564,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   /** Addressable id of the component instance this section edits, or null. */
   _resolveComponentId(): string | null {
-    return resolveComponentId(this.yaml, this.sectionKey, this._resolvedFromLine);
+    return resolveComponentId(this.yaml, this._renderedKey, this._resolvedFromLine);
   }
 
   _onOpenAddAutomation = () => {

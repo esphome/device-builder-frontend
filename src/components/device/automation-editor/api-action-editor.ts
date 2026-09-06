@@ -86,7 +86,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const focus = this._currentFocus();
     return html`
       ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
@@ -175,7 +175,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
    *  its field when the cursor targets ``action:`` (or legacy
    *  ``service:``). */
   private _maybeFlashName(): void {
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const focus = this._currentFocus();
     const head = entryFieldFocus(focus)?.[0];
     if (head !== "action" && head !== "service") return;
     const key = focusKey(focus);

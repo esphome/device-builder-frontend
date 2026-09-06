@@ -72,8 +72,9 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
 
   /** The Parameters block hides behind the advanced toggle; reveal it
    *  when the cursor targets a parameter so the row can render. */
-  protected willUpdate(): void {
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+  protected willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    const focus = this._currentFocus();
     const key = focusKey(focus);
     if (key === this._paramsRevealKey) return;
     this._paramsRevealKey = key;
@@ -134,7 +135,7 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const focus = this._currentFocus();
     return html`
       ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
       ${

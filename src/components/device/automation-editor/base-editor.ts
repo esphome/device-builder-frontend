@@ -14,13 +14,16 @@ import type {
   AutomationLocation,
   AutomationTree,
   AvailableAutomations,
+  ParsedAutomation,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
+import { espHomeStyles, heldStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
+import { setHeld } from "../../../util/held.js";
+import { KeyedPromiseCache } from "../../../util/keyed-promise-cache.js";
 import type { SectionEditor } from "../section-editor.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -82,7 +85,27 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   @state() protected _loading = true;
   @state() protected _error = "";
 
+  /** A relocation is re-reading the tree; the previous one stays on
+   *  screen read-only until the parse lands. */
+  @state() protected _hydrating = false;
+  private _hydrateId = 0;
+
+  /** One ``automations/parse`` per buffer while it is in flight, so a burst
+   *  of relocations and reloads shares the round trip. */
+  private readonly _parses = new KeyedPromiseCache<ParsedAutomation[]>({
+    evictOnSettle: true,
+  });
+
   protected _resolveFocus = createFocusResolver();
+
+  /** Focus target for the current caret; none while a stale tree is shown. */
+  protected _currentFocus() {
+    return this._resolveFocus(
+      this._hydrating ? null : this.value,
+      this.location,
+      this.focusYamlPath
+    );
+  }
 
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  section so its empty tree can't overwrite the real YAML. */
@@ -104,7 +127,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected readonly _engine = new AutoApplyController(this, {
     getApi: () => this._api,
     getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active,
+    isReadOnly: () => this._parseError.active || this._hydrating,
     canApply: (location) => this._canApply(location),
     setError: (message) => {
       this._error = message;
@@ -134,7 +157,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     return this._engine.lastRoundFailed;
   }
 
-  static styles: CSSResultGroup = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles: CSSResultGroup = [
+    espHomeStyles,
+    heldStyles,
+    inputStyles,
+    automationEditorStyles,
+  ];
 
   /** Loading spinner / parse-error panel that preempts the body
    *  render, or ``null`` once the editor is ready to paint. */
@@ -178,17 +206,22 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected abstract _loadAvailable(): Promise<void>;
 
   protected async _hydrateFromBackend() {
-    if (!this._api || !this.configuration || !this.location) return;
+    if (!this._api || !this.configuration || !this.location) {
+      this._dropStaleTree();
+      return;
+    }
+    const id = ++this._hydrateId;
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
       // draft buffer — without it the post-add hydrate would read
       // the on-disk YAML, miss the just-inserted section, and
       // leave the form empty even though the YAML pane shows the
       // user's input.
-      const parsed = await this._api.parseDeviceAutomations(
-        this.configuration,
-        this.yaml
+      const { configuration, yaml } = this;
+      const parsed = await this._parses.fetch(`${configuration}\0${yaml}`, () =>
+        this._api.parseDeviceAutomations(configuration, yaml)
       );
+      if (id !== this._hydrateId) return;
       // A successful parse clears any prior parse error, so the banner
       // doesn't stick after the user fixes invalid YAML in the pane.
       this._error = "";
@@ -198,24 +231,44 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       if (m) {
         this.location = m.location;
         this.value = m.tree;
+        this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
         // included — a still-latched flush failure would refuse a
         // leave over an edit that no longer exists.
         this._engine.notifyHydrated();
+      } else {
+        this._dropStaleTree();
       }
     } catch (err) {
+      if (id !== this._hydrateId) return;
+      this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     }
   }
 
-  protected updated(changed: Map<string, unknown>) {
-    if (changed.has("configuration")) {
-      void this._loadAvailable();
-    }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    // A parse resolving after unmount must not write into the element,
+    // and a re-attached one must not come back read-only or show the
+    // previous section's tree under the new location.
+    this._hydrateId++;
+    this._dropStaleTree();
+    setHeld(this, false);
+  }
+
+  /** A relocation whose parse found no tree must not keep showing the
+   *  previous section's. */
+  private _dropStaleTree() {
+    if (!this._hydrating) return;
+    this.value = null;
+    this._hydrating = false;
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
     // Navigator-driven location swap: when the parent passes in a
     // different ``location`` (user clicked a sibling section), the
-    // editor element is reused — its previous ``value`` is stale.
-    // Invalidate it so the hydrate path below re-fetches.
+    // editor element is reused — its previous ``value`` is stale, so
+    // the hydrate path in ``updated`` re-fetches.
     if (changed.has("location") && !this.addMode) {
       const prev = changed.get("location") as L | null | undefined;
       if (
@@ -223,8 +276,15 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this.location &&
         sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
-        this.value = null;
+        this._hydrating = true;
       }
+    }
+    setHeld(this, this._hydrating);
+  }
+
+  protected updated(changed: Map<string, unknown>) {
+    if (changed.has("configuration")) {
+      void this._loadAvailable();
     }
     // Hydrate from the backend in edit-mode: mounted with a known
     // location but no value. Triggering on ``_loading`` covers the
@@ -238,7 +298,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         changed.has("configuration") ||
         changed.has("_loading")) &&
       this.location &&
-      this.value === null &&
+      (this.value === null || this._hydrating) &&
       !this._loading
     ) {
       void this._hydrateFromBackend();

@@ -141,6 +141,21 @@ export async function typeFriendlyName(host: HTMLElement, value: string): Promis
   await (host as { updateComplete?: Promise<unknown> }).updateComplete;
 }
 
+/** A promise with its settle handles exposed, for gating a mocked fetch. */
+export function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (err: Error) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (err: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 /** Resolve after a zero-delay timeout so queued real-timer callbacks run. */
 export const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 

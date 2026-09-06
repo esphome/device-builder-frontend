@@ -255,6 +255,7 @@ export class AutoApplyController implements ReactiveController {
   /** Patch the host's ``value``, announce ``automation-change`` so
    *  the parent can mirror state, and schedule the debounced upsert. */
   withValue(patch: Partial<AutomationTree>): void {
+    if (this._options.isReadOnly()) return;
     const value: AutomationTree = {
       ...(this._host.value ?? emptyAutomationTree()),
       ...patch,
@@ -464,6 +465,7 @@ export class AutoApplyController implements ReactiveController {
   async delete(): Promise<void> {
     const api = this._options.getApi();
     if (!api || !this._host.location || this._deleteMode) return;
+    if (this._options.isReadOnly()) return;
     // Snapshot the identity before any await: location is a reactive prop
     // the parent reassigns on navigation, and the element is reused across
     // sibling automations — a mid-flush section switch must not retarget

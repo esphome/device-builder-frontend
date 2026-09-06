@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { deferred } from "../_dom.js";
 import { KeyedPromiseCache } from "../../src/util/keyed-promise-cache.js";
 
 describe("KeyedPromiseCache", () => {
@@ -82,6 +83,41 @@ describe("KeyedPromiseCache", () => {
     await expect(cache.fetch("k", create)).rejects.toThrow("permanent");
     await expect(cache.fetch("k", create)).rejects.toThrow("permanent");
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("with evictOnSettle, shares the in-flight promise and drops it once settled", async () => {
+    const create = vi.fn(async () => "value");
+    const cache = new KeyedPromiseCache<string>({ evictOnSettle: true });
+
+    const a = cache.fetch("k", create);
+    expect(cache.fetch("k", create)).toBe(a);
+    await a;
+    await Promise.resolve();
+    void cache.fetch("k", create);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("with evictOnSettle, a rejection is dropped too", async () => {
+    const create = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const cache = new KeyedPromiseCache<string>({ evictOnSettle: true });
+    await expect(cache.fetch("k", create)).rejects.toThrow("boom");
+    await Promise.resolve();
+    await expect(cache.fetch("k", create)).rejects.toThrow("boom");
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("with evictOnSettle, a stale settle doesn't evict a fresh entry cached after clear()", async () => {
+    const first = deferred<string>();
+    const cache = new KeyedPromiseCache<string>({ evictOnSettle: true });
+    void cache.fetch("k", () => first.promise);
+    cache.clear();
+    const fresh = cache.fetch("k", () => new Promise<string>(() => {}));
+    first.resolve("old");
+    await first.promise;
+    await Promise.resolve();
+    expect(cache.fetch("k", () => Promise.resolve("new"))).toBe(fresh);
   });
 
   it("clear() drops entries so the next call refetches", async () => {

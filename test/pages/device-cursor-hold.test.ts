@@ -49,14 +49,16 @@ function makePage(): ESPHomePageDevice {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internals = (page: ESPHomePageDevice) => page as any;
 
+/** A click (pointer) unless the move is edit-driven. */
 function cursorEvent(
   page: ESPHomePageDevice,
   line: number,
   opts: { path?: string[]; viaEdit?: boolean } = {}
 ) {
+  const viaEdit = opts.viaEdit ?? false;
   internals(page)._onYamlCursorLine(
     new CustomEvent("yaml-cursor-line", {
-      detail: { line, path: opts.path ?? [], viaEdit: opts.viaEdit ?? false },
+      detail: { line, path: opts.path ?? [], viaEdit, pointer: !viaEdit },
     })
   );
 }
@@ -140,9 +142,9 @@ describe("mid-typing hold for an unknown top-level key (#2211)", () => {
   it("withholds only the held instance's navigator error chip", () => {
     const page = makePage();
     const errors: BackendFieldError[] = [
-      { sectionKey: "sendx", fromLine: 4, keyPath: [], message: "x" },
-      { sectionKey: "i2c", fromLine: 1, keyPath: [], message: "y" },
-    ] as never;
+      { sectionKey: "sendx", fromLine: 4, relPath: "", message: "x" },
+      { sectionKey: "i2c", fromLine: 1, relPath: "", message: "y" },
+    ];
     const counts = internals(page)._navErrorCounts(errors, "sendx@4");
     expect(counts.has("sendx@4")).toBe(false);
     expect(counts.get("i2c@1")).toBe(1);

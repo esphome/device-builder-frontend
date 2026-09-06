@@ -37,7 +37,7 @@ function makeHost(sectionKey: string, entries: ConfigEntry[]) {
   const inner = c as any;
   inner.sectionKey = sectionKey;
   inner._localize = (key: string) => key;
-  inner._config = { title: sectionKey, entries };
+  inner._config = { section_key: sectionKey, title: sectionKey, entries };
   inner._presentComponents = new Set<string>();
   return { c, inner };
 }
