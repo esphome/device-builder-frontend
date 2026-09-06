@@ -3,6 +3,10 @@
  * a sentinel value so the form can intercept the select's `change`
  * event and route to the add-component flow instead of writing the
  * literal sentinel as a config value.
+ *
+ * The candidate list mounts only once the select has opened
+ * (``ctx.expandOptions``); until then only the selected candidate is
+ * rendered.
  */
 
 import { mdiPlus } from "@mdi/js";
@@ -68,7 +72,13 @@ export function renderIdReferenceField(
   // include / another file the scan can't see, or a dangling reference (typo,
   // deleted id). We can't tell which, so surface it as a selected option with
   // provenance-neutral copy rather than dropping it on save.
-  const hasOrphanValue = value !== "" && !candidates.some((c) => c.id === value);
+  const selected = candidates.find((c) => c.id === value);
+  const hasOrphanValue = value !== "" && !selected;
+  const shownCandidates = ctx.isOptionsExpanded(path)
+    ? candidates
+    : selected
+      ? [selected]
+      : [];
   const orphanOption = hasOrphanValue
     ? idOption(value, value, ctx.localize("device.id_reference_unresolved", { domain }))
     : nothing;
@@ -188,10 +198,11 @@ export function renderIdReferenceField(
               defaultCandidate.id
             : nothing
         }
+        @wa-show=${() => ctx.expandOptions(path)}
         @change=${onChange}
       >
         ${autoOption} ${orphanOption}
-        ${candidates.map((c) => {
+        ${shownCandidates.map((c) => {
           const secondary = c.name ? `${c.id} · ${domain}` : domain;
           // The label is display-only; the stored value stays c.id. Resolve
           // ${...} so the picker shows the same name the text field previews.
