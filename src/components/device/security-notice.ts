@@ -102,13 +102,10 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
   },
   "ota.esphome": {
     secretSection: "ota.esphome",
-    // Encryption satisfies the setting too, so following the OTA encryption
-    // nudge never brings the password nudge back.
     markers: ["password", "encryption"],
     copyPrefix: "ota_password",
     fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],
-    // A device that already offers encrypted OTA gets the encryption nudge
-    // instead; a password next to its api key only wastes flash.
+    // Yields to the OTA encryption nudge.
     suppressWhen: (inputs) => otaEncryptionNudge(inputs) !== null,
   },
   web_server: {
@@ -210,10 +207,8 @@ export class ESPHomeSecurityNotice extends LitElement {
     return fields.length > 0 && fields.every((f) => !f.field.secretField || f.key !== "");
   }
 
-  /** Whether the section body has one of the setting's markers as a *direct child*.
-   *  A line scan (not the parsed values) because the parser drops a keyless block
-   *  (e.g. a keyless `encryption:` that HA auto-provisions), which still counts
-   *  as configured and must keep the nudge hidden. */
+  /** Whether a marker is a *direct child* of the section. A line scan, since the
+   *  parser drops a keyless block (an HA-provisioned `encryption:`) that counts. */
   private _markerPresent(): boolean {
     const setting = this._setting;
     if (!setting) return false;
@@ -221,8 +216,7 @@ export class ESPHomeSecurityNotice extends LitElement {
     const baseKey = this.sectionKey.split(".")[0];
     const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
     const lines = splitYamlDocLines(this.yaml);
-    // A marker written inline on a list item's dash (`- password: x`) sits on
-    // the fromLine itself, which the direct-child scan starts below.
+    // The direct-child scan starts below the dash, so test an inline dash key too.
     const dash = this.fromLine !== undefined ? (lines[this.fromLine - 1] ?? "") : "";
     if (/^\s*-\s+/.test(dash) && marker.test(dash.replace(/^\s*-\s+/, ""))) return true;
     return findDirectChildLine(lines, baseKey, marker, this.fromLine) >= 0;

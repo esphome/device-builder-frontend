@@ -1,10 +1,4 @@
-/**
- * Draft-buffer detection and rewrite for OTA encryption on the esphome
- * OTA platform. Line-level (not the section parser's values) so the
- * edit keeps comments and formatting, and detection works on mid-edit
- * drafts; item discovery rides the navigator's section parser so the
- * nudge agrees with the surface the user is looking at.
- */
+/** Draft-buffer detection and rewrite for OTA encryption on the esphome OTA platform. */
 import { splitYamlDocLines, yamlDocEol } from "./yaml-doc-lines.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import {
@@ -29,8 +23,7 @@ interface OtaEsphomeItem {
   passwordLine: number;
   /** Zero-based line of `key:` inside the item's `encryption:` block, or -1. */
   keyLine: number;
-  /** A `password:` or `key:` value continues on following lines (block scalar,
-   *  value on its own line), which the one-line splices cannot handle. */
+  /** A `password:` or `key:` value spans several lines. */
   multiLine: boolean;
 }
 
@@ -41,7 +34,7 @@ export interface OtaEsphomeFacts {
   hasPassword: boolean;
   /** The `encryption:` block carries its own `key:` instead of inheriting the api key. */
   hasOwnKey: boolean;
-  /** False when a value spans several lines, so neither rewrite can edit it safely. */
+  /** False when a value spans several lines. */
   rewritable: boolean;
 }
 
@@ -56,46 +49,37 @@ export function otaEsphomeFacts(yaml: string): OtaEsphomeFacts {
   };
 }
 
-/** Whether `api: encryption: key:` carries a value the CLI can read at build
- *  time (a literal, `!secret`, or a substitution). A keyless block is
- *  provisioned at runtime and does not count. */
+/** Whether `api: encryption: key:` has a build-time value (literal, `!secret`, or substitution). */
 export function hasStaticApiKey(yaml: string): boolean {
   const lines = splitYamlDocLines(yaml);
   const encryption = findDirectChildLine(lines, "api", ENCRYPTION_RE);
   if (encryption < 0) return false;
-  // Last key wins, so pick the last `key:` line before reading its value; a
-  // regex that needs a value would skip a trailing empty or comment-only one.
+  // Last key wins, so pick the line first and read its value after.
   const key = findDirectChildLine(lines, "api", KEY_RE, encryption + 1);
   if (key < 0) return false;
-  // Keep the space after the colon: the comment splitter needs it to see `#`.
   const raw = lines[key].replace(/^\s*key\s*:/, "");
   const value = stripQuotes(splitInlineComment(raw).value.trim());
-  // A bare `!secret` with no name is not a usable reference.
   return value.length > 0 && !/^!\S*$/.test(value);
 }
 
 /**
- * Add a bare `encryption:` to the esphome OTA item (inheriting the api
- * key) and drop its `password:` line; `null` when there is no item or it
- * already has `encryption:`. Comment lines are the user's and are left
- * where they are, so one written above the password ends up above the
- * new `encryption:` line; deleting it would risk taking unrelated notes.
+ * Add a bare `encryption:` to the esphome OTA item and drop its `password:` lines.
+ *
+ * `null` when there is no item or it already has `encryption:`. Comment
+ * lines stay where they are.
  */
 export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0 || item.multiLine) return null;
   if (item.passwordLine === item.line) {
-    // The password sits inline on the item's dash: swap the key in place,
-    // keeping any trailing comment.
+    // Inline on the dash: swap the key in place.
     const match = /^(\s*-\s+)password\s*:(.*)$/.exec(lines[item.line]);
     if (match) {
       lines[item.line] = `${match[1]}encryption:${splitInlineComment(match[2]).comment}`;
     }
   }
-  // Duplicate keys are legal YAML (last wins), so every password line goes;
-  // the block lands where the first one was, else after `platform:` (which a
-  // bare-dash item carries on its own line, not on the dash).
+  // Every duplicate password line goes; the block lands where the first was.
   const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, item.line + 1);
   let insertAt = platform >= 0 ? platform + 1 : item.line + 1;
   for (
@@ -112,8 +96,7 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   return lines.join(yamlDocEol(yaml));
 }
 
-/** Drop the `key:` under the esphome OTA item's `encryption:` so the block
- *  inherits the api key; `null` when there is no such key. */
+/** Drop the `key:` lines under the item's `encryption:`; `null` when there are none. */
 export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
@@ -132,8 +115,7 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
   if (!section) return null;
   const line = section.fromLine - 1;
   const isListItem = section.parentKey !== undefined;
-  // A key written inline on the dash (`- password: x`) is a child too, but
-  // `findDirectChildLine` starts below the dash, so test the dash itself.
+  // `findDirectChildLine` starts below the dash, so test an inline dash key too.
   const dashKey = isListItem ? lines[line].replace(/^\s*-\s+/, "") : "";
   const childEncryption = findDirectChildLine(
     lines,
@@ -168,10 +150,7 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
   };
 }
 
-/** Whether the scalar on `idx` is a block scalar or continues on a deeper line.
- *  `floor` is the indent a continuation must exceed; for a key on the item's
- *  dash that is the item's child indent, since sibling keys sit deeper than
- *  the dash itself. */
+/** Whether the scalar on `idx` is a block scalar or continues past `floor`'s indent. */
 function continuesOnNextLine(lines: string[], idx: number, floor: string): boolean {
   const value = splitInlineComment(lines[idx].replace(/^[^:]*:/, "")).value.trim();
   if (/^[|>]/.test(value)) return true;

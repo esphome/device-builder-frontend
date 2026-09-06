@@ -1,10 +1,4 @@
-/**
- * Ordering for ESPHome version strings, for gating features on the
- * firmware a device runs or the esphome the dashboard bundles. A version
- * is `YYYY.M[.P]` plus an optional suffix (`b2`, `rc1`, `-dev`); any
- * suffix orders below the final release of its own line, which is all
- * the gates here need.
- */
+/** Ordering for ESPHome `YYYY.M[.P][suffix]` versions; a suffix orders below its release. */
 
 const VERSION_RE = /^(\d+)\.(\d+)(?:\.(\d+))?(.*)$/;
 
@@ -33,11 +27,7 @@ export function versionAtLeast(version: string, minimum: string): boolean {
 /** First esphome whose firmware offers OTA encryption with the api key. */
 export const OTA_ENCRYPTION_OFFER_VERSION = "2026.9.0";
 
-/**
- * Whether firmware at `deployed` offers OTA encryption with its api key:
- * a released 2026.9.0 or newer. Betas and dev builds are excluded, so
- * the nudge never proposes a block the running firmware can't serve.
- */
+/** Whether firmware at `deployed` offers OTA encryption: a released 2026.9.0 or newer. */
 export function firmwareOffersOtaEncryption(deployed: string): boolean {
   return (
     isReleaseVersion(deployed) && versionAtLeast(deployed, OTA_ENCRYPTION_OFFER_VERSION)

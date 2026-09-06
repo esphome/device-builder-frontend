@@ -1,13 +1,4 @@
-/**
- * Nudge shown when a device already offers OTA encryption with its API
- * key (released 2026.9.0+ firmware, Noise reported on the wire) but the
- * config does not yet require it, and when the config gives the OTA
- * platform its own key next to a static API key. The CTAs edit the draft
- * only: add a bare `encryption:` (dropping any `password:`), or drop the
- * redundant OTA `key:`. The gates live in `ota-encryption-nudge.ts` so a
- * device that cannot offer Noise is never pointed at a block that would
- * lock it out of OTA.
- */
+/** Nudge toward `ota: encryption:` for a device that already offers it; CTAs edit the draft only. */
 import { consume } from "@lit/context";
 import { mdiClose, mdiLockAlert } from "@mdi/js";
 import { css, LitElement, nothing, type PropertyValues } from "lit";
@@ -49,8 +40,7 @@ export class ESPHomeOtaEncryptionNotice extends LitElement {
 
   @state() private _dismissed = false;
 
-  /** Memoized nudge; the devices context is replaced on every fleet event,
-   *  so the draft is only rescanned when this device's row or the draft changed. */
+  /** Memoized so fleet events for other devices do not rescan the draft. */
   @state() private _nudge: OtaEncryptionNudge | null = null;
 
   private _device?: ConfiguredDevice;

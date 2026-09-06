@@ -1,10 +1,4 @@
-/**
- * Decide whether to nudge a device toward `ota: encryption:`. Once the
- * block is in the YAML the CLI never falls back to plaintext, so the
- * nudge fires only when the device itself reports Noise on the api over
- * mDNS and runs released 2026.9.0 or newer, the firmware that offers OTA
- * encryption with that key.
- */
+/** Decide whether to nudge a device toward `ota: encryption:`. */
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { deployedIdentityTrusted } from "./device-sync.js";
 import {
@@ -13,10 +7,8 @@ import {
 } from "./esphome-version.js";
 import { hasStaticApiKey, otaEsphomeFacts } from "./yaml-ota-encryption.js";
 
-/** `add` when the item has neither password nor encryption, `replace_password`
- *  when it still carries a password, `drop_own_key` when the block carries its
- *  own key next to a static api key (the device encrypts OTA with the api key,
- *  so the extra key is only a second copy to keep identical). */
+/** `add`: no password or encryption; `replace_password`: a password is set;
+ *  `drop_own_key`: an own OTA key next to a static api key. */
 export type OtaEncryptionNudge = "add" | "replace_password" | "drop_own_key";
 
 export interface OtaEncryptionNudgeInputs {
@@ -34,25 +26,16 @@ export function otaEncryptionNudge({
 }: OtaEncryptionNudgeInputs): OtaEncryptionNudge | null {
   const facts = otaEsphomeFacts(yaml);
   if (!facts.present || !facts.rewritable || !hasStaticApiKey(yaml)) return null;
-  // A redundant own key is a config shape, not a firmware capability, so no
-  // device gate and no key comparison: with a static api key esphome builds the
-  // OTA transport from that key and ignores the OTA `key:` (ota/__init__.py
-  // to_code, own key only without a static api key), and its validation
-  // rejects a differing pair (_resolve_encryption_key), so the running firmware
-  // never holds the OTA `key:` and dropping it cannot change what it requires.
+  // No device gate or key comparison: with a static api key the firmware
+  // encrypts OTA with that key and never holds the OTA `key:`.
   if (facts.hasEncryption) return facts.hasOwnKey ? "drop_own_key" : null;
   if (!device || !deviceOffersOtaEncryption(device)) return null;
   if (!toolchainAcceptsOtaEncryption(esphomeVersion)) return null;
   return facts.hasPassword ? "replace_password" : "add";
 }
 
-/** The device's mDNS TXT reports Noise active on the api and a released 2026.9.0+
- *  version, behind the trust gate so a sidecar-seeded value from a past session
- *  does not count as the device reporting it now. Deliberately no pending-changes
- *  or config-hash gate: what the device reports is the gate. A draft whose api key
- *  differs from the installed one is the key-rotation problem tracked upstream
- *  (esphome/backlog#161), and the install it breaks fails closed with a clear CLI
- *  error rather than locking the device out. */
+/** Trusted mDNS evidence of Noise on the api and a released 2026.9.0+ version.
+ *  No pending-changes gate by design; key rotation is esphome/backlog#161. */
 function deviceOffersOtaEncryption(device: ConfiguredDevice): boolean {
   const rt = device.runtime_state;
   return (
