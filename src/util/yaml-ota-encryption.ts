@@ -144,23 +144,32 @@ function locate(yaml: string, lines: string[]): OtaEsphomeItem | null {
     encryptionLine >= 0
       ? findDirectChildLine(lines, "ota", KEY_RE, encryptionLine + 1)
       : -1;
+  const childIndent = _detectSectionChildIndent(lines, line, isListItem);
   return {
     line,
-    childIndent: _detectSectionChildIndent(lines, line, isListItem),
+    childIndent,
     encryptionLine,
     passwordLine,
     keyLine,
     multiLine:
-      (passwordLine > line && continuesOnNextLine(lines, passwordLine)) ||
-      (keyLine >= 0 && continuesOnNextLine(lines, keyLine)),
+      (passwordLine >= 0 &&
+        continuesOnNextLine(
+          lines,
+          passwordLine,
+          passwordLine === line ? childIndent : ""
+        )) ||
+      (keyLine >= 0 && continuesOnNextLine(lines, keyLine, "")),
   };
 }
 
-/** Whether the scalar on `idx` is a block scalar or continues on a deeper line. */
-function continuesOnNextLine(lines: string[], idx: number): boolean {
+/** Whether the scalar on `idx` is a block scalar or continues on a deeper line.
+ *  `floor` is the indent a continuation must exceed; for a key on the item's
+ *  dash that is the item's child indent, since sibling keys sit deeper than
+ *  the dash itself. */
+function continuesOnNextLine(lines: string[], idx: number, floor: string): boolean {
   const value = splitInlineComment(lines[idx].replace(/^[^:]*:/, "")).value.trim();
   if (/^[|>]/.test(value)) return true;
-  const indent = _leadingIndent(lines[idx]).length;
+  const indent = Math.max(_leadingIndent(lines[idx]).length, floor.length);
   for (let i = idx + 1; i < lines.length; i++) {
     if (isBlankOrCommentLine(lines[i])) continue;
     return _leadingIndent(lines[i]).length > indent;

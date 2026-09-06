@@ -104,6 +104,17 @@ describe("otaEsphomeFacts", () => {
       )
     ).toMatchObject({ hasOwnKey: true, rewritable: false });
     expect(otaEsphomeFacts(PASSWORD_OTA)).toMatchObject({ rewritable: true });
+    expect(
+      otaEsphomeFacts("ota:\n  - password: >-\n      long\n    platform: esphome\n")
+    ).toMatchObject({ hasPassword: true, rewritable: false });
+    expect(
+      otaEsphomeFacts("ota:\n  - password:\n      long\n    platform: esphome\n")
+    ).toMatchObject({ hasPassword: true, rewritable: false });
+    expect(
+      otaEsphomeFacts("ota:\n  - password: x\n    platform: esphome\n")
+    ).toMatchObject({
+      rewritable: true,
+    });
   });
 
   it("does not read a sibling platform's password", () => {

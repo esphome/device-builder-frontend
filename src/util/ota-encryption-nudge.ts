@@ -48,7 +48,11 @@ export function otaEncryptionNudge({
 
 /** The device's mDNS TXT reports Noise active on the api and a released 2026.9.0+
  *  version, behind the trust gate so a sidecar-seeded value from a past session
- *  does not count as the device reporting it now. */
+ *  does not count as the device reporting it now. Deliberately no pending-changes
+ *  or config-hash gate: what the device reports is the gate. A draft whose api key
+ *  differs from the installed one is the key-rotation problem tracked upstream
+ *  (esphome/backlog#161), and the install it breaks fails closed with a clear CLI
+ *  error rather than locking the device out. */
 function deviceOffersOtaEncryption(device: ConfiguredDevice): boolean {
   const rt = device.runtime_state;
   return (
