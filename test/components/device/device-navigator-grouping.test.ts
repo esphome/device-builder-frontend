@@ -82,6 +82,17 @@ describe("device-navigator domain grouping", () => {
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
   });
 
+  it("reflects each subgroup's open state on aria-expanded", async () => {
+    const nav = await mountNavigator([1]);
+    const expanded = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].map((h) =>
+        h.getAttribute("aria-expanded")
+      );
+    expect(expanded()).toEqual(["true", "true"]);
+    await clickSubgroup(nav, "Sensor");
+    expect(expanded()).toEqual(["false", "true"]);
+  });
+
   it("leaves non-component sections flat (no subgroups)", async () => {
     const nav = await mountNavigator([0]); // Core open
     expect(nav.shadowRoot?.querySelector(".nav-subgroup-header")).toBeNull();
