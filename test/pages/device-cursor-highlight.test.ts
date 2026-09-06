@@ -50,7 +50,7 @@ function clickYamlLine(
 ) {
   internals(page)._onYamlCursorLine(
     new CustomEvent("yaml-cursor-line", {
-      detail: { line, path, indexedPath, pointer: true },
+      detail: { line, path, indexedPath, viaEdit: false, pointer: true },
     })
   );
 }

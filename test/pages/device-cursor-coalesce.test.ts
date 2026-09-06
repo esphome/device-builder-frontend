@@ -102,6 +102,14 @@ describe("cross-section caret moves coalesce", () => {
     expect(internals(page)._focusFieldPath).toEqual(["sda"]);
   });
 
+  it("a move onto a line with no section cancels the pending switch", () => {
+    const page = makePage();
+    cursor(page, 4);
+    cursor(page, 99);
+    vi.advanceTimersByTime(100);
+    expect(internals(page)._selectedSection).toBe("i2c");
+  });
+
   it("a navigator selection wins over a pending move", () => {
     const page = makePage();
     cursor(page, 4);

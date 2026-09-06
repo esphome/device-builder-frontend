@@ -1721,10 +1721,12 @@ export class ESPHomePageDevice extends LitElement {
     // The user is driving from the YAML pane now — drop any pending
     // form-field retry so it can't re-highlight after they've moved on.
     this._clearPendingFieldLine();
+    // Any caret move supersedes a pending switch, even one that resolves
+    // to no section.
+    this._cancelCursorSwitch();
     const detail = e.detail;
     const match = sectionForCursor(this._yaml, detail.line, detail.path ?? []);
     if (!match) return;
-    this._cancelCursorSwitch();
     // A click or an edit switches at once; a move within the current
     // section only retargets the field. Keyboard and find jumps across
     // sections coalesce so a run of matches rebuilds the pane once.
