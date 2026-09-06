@@ -35,7 +35,9 @@ export function _clearProvidesCache(): void {
   _providers.reset();
 }
 
-/** Providers of an interface, shared by every form for the session. */
+/** Providers of an interface, shared by every form for the session.
+ *  Board-agnostic on purpose: the id-reference candidates come from the
+ *  YAML, unlike the board-scoped ``providerIds`` above. */
 const _providers = createSessionBlobCache<readonly ComponentProvider[], [string]>({
   name: "interface-providers",
   key: (interfaceName) => interfaceName,

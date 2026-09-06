@@ -656,9 +656,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
     );
   }
 
-  /** Stable-partition so required entries lead. An exclusive_group is
-   *  treated atomically (required if any member is) so its members stay
-   *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
   connectedCallback() {
     super.connectedCallback();
     // Repaint the id-reference pickers once a shared provider fetch lands.
@@ -671,6 +668,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     this._unsubscribeProviders = undefined;
   }
 
+  /** Stable-partition so required entries lead. An exclusive_group is
+   *  treated atomically (required if any member is) so its members stay
+   *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
@@ -746,12 +746,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * rather than a dotted string keeps user-supplied map keys that
    * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
    *
-   * We wait for each select's `updateComplete` (and one frame after
-   * that) to make sure wa-select's own first-render bookkeeping —
-   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
-   * before we set `.value`. Otherwise our imperative set fights with
-   * wa-select's own initial value resolution and the displayed label
-   * stays blank.
+   * Before a select's first update we wait for its `updateComplete`, so
+   * wa-select's initial value resolution has run before we set `.value`
+   * and can't overwrite it. Later renders set synchronously: the options
+   * are connected, and wa-select re-derives its selection on any option
+   * change. A select already showing the value is skipped.
    */
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
@@ -847,8 +846,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   /**
-   * Push the option marked `selected` onto `select.value` after
-   * wa-select's first paint. Used for selects whose value isn't
+   * Push the option marked `selected` onto `select.value`, waiting for
+   * wa-select's first update only. Used for selects whose value isn't
    * bound to the form's path (FLOAT_WITH_UNIT's unit picker), where
    * the `?selected` Lit binding loses the race against wa-select's
    * own selectionChanged hook.
