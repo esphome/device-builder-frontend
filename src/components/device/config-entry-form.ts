@@ -812,7 +812,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const current = Array.isArray(select.value)
         ? (select.value[0] ?? "")
         : (select.value ?? "");
-      if (current === raw) continue;
+      if (this._showsValue(current, raw)) continue;
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
       // would silently drop the value. Look up the matching option
@@ -830,6 +830,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
         select.value = desired;
       }
     }
+  }
+
+  /** Whether a select's value is the raw value or its option spelling. */
+  private _showsValue(current: string, raw: string): boolean {
+    if (current === raw) return true;
+    if (!current || !raw) return false;
+    if (current.toLowerCase() === raw.toLowerCase()) return true;
+    const gpio = parseBoardGpio(raw);
+    return gpio !== null && parseBoardGpio(current) === gpio;
   }
 
   private _matchOptionValue(select: HTMLElement, raw: string): string {

@@ -105,6 +105,18 @@ describe("_syncSelectValues", () => {
     expect(select.value).toBe(expected);
   });
 
+  it.each([
+    ["GPIO9", 9],
+    ["ESP32C6", "esp32c6"],
+    ["P0.27", 27],
+    ["PB03", "GPIO19"],
+  ])("skips the scan when the select shows %s for %s", async (current, raw) => {
+    const select = fakeSelect({ value: current, options: ["x", current] });
+    await sync(select, raw);
+    expect(select.scans).toBe(0);
+    expect(select.value).toBe(current);
+  });
+
   it("leaves a pin with no matching option untouched", async () => {
     const select = fakeSelect({ value: "", options: ["GPIO1", "GPIO2"] });
     await sync(select, "P0.30");
