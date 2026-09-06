@@ -6,7 +6,7 @@
  * ``provides`` fetch shared by every form, and a failed fetch left uncached
  * so a later render can retry.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -47,6 +47,7 @@ function response(ids: string[]) {
 
 describe("config-entry-form _resolveInterfaceProviders", () => {
   beforeEach(() => _clearProvidesCache());
+  afterEach(() => vi.restoreAllMocks());
 
   it("returns null on the first miss, then the fetched providers, fetching once", async () => {
     const getComponents = vi

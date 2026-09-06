@@ -2,7 +2,7 @@
  * Session cache of interface providers: one shared fetch per interface,
  * subscribers notified on resolve, a failure warned once and left uncached.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
@@ -29,6 +29,7 @@ function response(ids: string[]) {
 
 describe("interface providers cache", () => {
   beforeEach(() => _clearProvidesCache());
+  afterEach(() => vi.restoreAllMocks());
 
   it("fetches once per interface and notifies subscribers", async () => {
     const getComponents = vi.fn().mockResolvedValue(response(["sensor.adc"]));
