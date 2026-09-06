@@ -268,13 +268,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   }
 
   get _showAdvanced(): boolean {
-    return this._advancedShownSections.has(this.sectionKey);
+    return this._advancedShownSections.has(this._renderedKey);
   }
 
   _setShowAdvanced(show: boolean) {
     const next = new Set(this._advancedShownSections);
-    if (show) next.add(this.sectionKey);
-    else next.delete(this.sectionKey);
+    if (show) next.add(this._renderedKey);
+    else next.delete(this._renderedKey);
     this._advancedShownSections = next;
   }
 
@@ -554,7 +554,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   _shortcutTarget(): ShortcutTarget {
     return resolveShortcutTarget(
       this.yaml,
-      this.sectionKey,
+      this._renderedKey,
       this._resolvedFromLine,
       (scopes) => this._triggerCatalog.hasTriggersFor(scopes)
     );
@@ -562,7 +562,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   /** Addressable id of the component instance this section edits, or null. */
   _resolveComponentId(): string | null {
-    return resolveComponentId(this.yaml, this.sectionKey, this._resolvedFromLine);
+    return resolveComponentId(this.yaml, this._renderedKey, this._resolvedFromLine);
   }
 
   _onOpenAddAutomation = () => {
