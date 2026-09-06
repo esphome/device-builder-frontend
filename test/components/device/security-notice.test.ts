@@ -66,6 +66,13 @@ describe("security-notice — detection", () => {
     ],
     ["ota: absent", "ota.esphome", "ota:\n  - platform: esphome\n", 2, false],
     [
+      "ota: password present in a CRLF document",
+      "ota.esphome",
+      "ota:\r\n  - platform: esphome\r\n    password: x\r\n",
+      2,
+      true,
+    ],
+    [
       "ota: encryption satisfies the setting",
       "ota.esphome",
       "ota:\n  - platform: esphome\n    encryption:\n",
@@ -171,6 +178,14 @@ describe("security-notice — ota password yields to the encryption nudge", () =
     expect(
       (await mountOta("2026.9.0", "")).shadowRoot!.querySelector(".notice")
     ).not.toBeNull();
+  });
+
+  it("recomputes when the notice is pointed at another configuration", async () => {
+    const el = await mountOta("2026.9.0", NOISE);
+    expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
+    el.configuration = "other.yaml";
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
   });
 
   it("hides the password nudge once the device offers encryption", async () => {

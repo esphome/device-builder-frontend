@@ -37,6 +37,7 @@ import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
+import { splitYamlDocLines } from "../../util/yaml-doc-lines.js";
 import { findDirectChildLine } from "../../util/yaml-section-reader.js";
 import { dispatchApplySectionValues } from "./notice-banner.js";
 import { noticeBannerStyles } from "./notice-banner.styles.js";
@@ -174,7 +175,10 @@ export class ESPHomeSecurityNotice extends LitElement {
   protected willUpdate(changed: PropertyValues) {
     const yamlDriven =
       changed.has("yaml") || changed.has("fromLine") || changed.has("sectionKey");
-    const deviceDriven = changed.has("_devices") || changed.has("_esphomeVersion");
+    const deviceDriven =
+      changed.has("_devices") ||
+      changed.has("_esphomeVersion") ||
+      changed.has("configuration");
     if (yamlDriven || (deviceDriven && this._setting?.suppressWhen)) {
       this._markerAbsent =
         !!this._setting && !this._markerPresent() && !this._suppressed();
@@ -217,7 +221,8 @@ export class ESPHomeSecurityNotice extends LitElement {
     const baseKey = this.sectionKey.split(".")[0];
     const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
     return (
-      findDirectChildLine(this.yaml.split("\n"), baseKey, marker, this.fromLine) >= 0
+      findDirectChildLine(splitYamlDocLines(this.yaml), baseKey, marker, this.fromLine) >=
+      0
     );
   }
 
