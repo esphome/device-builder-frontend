@@ -49,14 +49,16 @@ function makePage(): ESPHomePageDevice {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internals = (page: ESPHomePageDevice) => page as any;
 
+/** A click (pointer) unless the move is edit-driven. */
 function cursorEvent(
   page: ESPHomePageDevice,
   line: number,
   opts: { path?: string[]; viaEdit?: boolean } = {}
 ) {
+  const viaEdit = opts.viaEdit ?? false;
   internals(page)._onYamlCursorLine(
     new CustomEvent("yaml-cursor-line", {
-      detail: { line, path: opts.path ?? [], viaEdit: opts.viaEdit ?? false },
+      detail: { line, path: opts.path ?? [], viaEdit, pointer: !viaEdit },
     })
   );
 }

@@ -264,7 +264,7 @@ describe("synchronous section switch", () => {
 
     internals(page)._onYamlCursorLine(
       new CustomEvent("yaml-cursor-line", {
-        detail: { line: 4, path: [], viaEdit: false },
+        detail: { line: 4, path: [], viaEdit: false, pointer: true },
       })
     );
 

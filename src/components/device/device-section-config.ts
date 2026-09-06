@@ -257,6 +257,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
   );
 
+  /** A reload is in flight while the outgoing section is still on screen. */
+  get _reloading(): boolean {
+    return this._loading && this._config !== null;
+  }
+
   get _showAdvanced(): boolean {
     return this._advancedShownSections.has(this.sectionKey);
   }
@@ -293,11 +298,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     if (
       changedProperties.has("_resolvedComponents") &&
       this._config &&
+      !this._reloading &&
       this._fieldErrors.size
     ) {
       revalidateFields(this);
     }
-    // loadConfig synchronously flips _loading/_config/_error; running it in
+    // loadConfig synchronously flips _loading/_error; running it in
     // willUpdate folds those into the in-progress render rather than
     // scheduling a second one.
     if (
@@ -311,6 +317,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     }
     this._revealAdvancedForFocus(changedProperties);
     this._revealAdvancedForErrors(changedProperties);
+    // The outgoing section stays on screen through a reload but takes no
+    // input, so nothing writes its values under the incoming key.
+    this.inert = this._reloading;
   }
 
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {
@@ -323,7 +332,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
 
   updated() {
     this._triggerCatalog.ensure();
-    maybeFlashApiActionsList(this);
+    if (!this._reloading) maybeFlashApiActionsList(this);
   }
 
   connectedCallback() {
@@ -409,7 +418,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     applySectionValues(this, e.detail.changes);
 
   protected render() {
-    if (this._loading) {
+    // A reload keeps the previous form on screen until the next config lands.
+    if (this._loading && !this._config) {
       return html`<div class="loading"><wa-spinner></wa-spinner></div>`;
     }
 

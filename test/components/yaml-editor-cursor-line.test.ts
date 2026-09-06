@@ -8,18 +8,14 @@
  * section even though the line number never changes.
  */
 import { forceParsing } from "@codemirror/language";
-import { EditorSelection } from "@codemirror/state";
+import { EditorSelection, Transaction } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 
-import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
-
-interface CursorLineDetail {
-  line: number;
-  path: string[];
-  viaEdit?: boolean;
-  indexedPath?: (string | number)[];
-}
+import {
+  ESPHomeYamlEditor,
+  type YamlCursorLineDetail,
+} from "../../src/components/yaml-editor.js";
 
 async function mount(value: string): Promise<ESPHomeYamlEditor> {
   const el = new ESPHomeYamlEditor();
@@ -36,10 +32,10 @@ const viewOf = (el: ESPHomeYamlEditor): EditorView =>
 const parseAll = (view: EditorView) => forceParsing(view, view.state.doc.length, 60000);
 
 /** Capture every `yaml-cursor-line` the editor emits from now on. */
-function record(el: ESPHomeYamlEditor): CursorLineDetail[] {
-  const seen: CursorLineDetail[] = [];
+function record(el: ESPHomeYamlEditor): YamlCursorLineDetail[] {
+  const seen: YamlCursorLineDetail[] = [];
   el.addEventListener("yaml-cursor-line", (e) =>
-    seen.push((e as CustomEvent<CursorLineDetail>).detail)
+    seen.push((e as CustomEvent<YamlCursorLineDetail>).detail)
   );
   return seen;
 }
@@ -248,5 +244,24 @@ describe("yaml-editor cursor-line emission (#946)", () => {
     expect(events).toHaveLength(2);
     expect(events[0].path[0]).toBe("esphome");
     expect(events[1].path[0]).toBe("logger");
+  });
+});
+
+describe("yaml-editor cursor-line pointer flag", () => {
+  it("marks a mouse selection as pointer and a find jump as not", async () => {
+    const el = await mount("esp32:\n  board: a\nlogger:\n");
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    view.dispatch({
+      selection: EditorSelection.single(view.state.doc.line(3).to),
+      annotations: Transaction.userEvent.of("select.pointer"),
+    });
+    view.dispatch({
+      selection: EditorSelection.single(view.state.doc.line(1).to),
+      annotations: Transaction.userEvent.of("select.search"),
+    });
+    expect(events.map((e) => e.pointer)).toEqual([true, false]);
   });
 });

@@ -62,6 +62,7 @@ import type {
   AutomationLocation,
   AutomationTree,
   AvailableAutomations,
+  ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import type { BaseAutomationEditor } from "../../../../src/components/device/automation-editor/base-editor.js";
 
@@ -70,6 +71,19 @@ export const seedTree = (): AutomationTree => ({
   trigger_id: null,
   trigger_params: {},
   actions: [],
+});
+
+/** One ``automations/parse`` row, a script by default. */
+export const parsedAutomation = (
+  over: Partial<ParsedAutomation> = {}
+): ParsedAutomation => ({
+  location: { kind: "script", id: "s" },
+  label: "s",
+  automation: seedTree(),
+  from_line: 1,
+  to_line: 3,
+  raw_yaml: "",
+  ...over,
 });
 
 export const slimAvailable = (): AvailableAutomations => ({

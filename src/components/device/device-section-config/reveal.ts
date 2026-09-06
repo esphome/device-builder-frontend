@@ -20,7 +20,7 @@ export function revealAdvancedForErrors(
   if (!changedProperties.has("backendErrors") && !changedProperties.has("_config")) {
     return;
   }
-  if (!host.backendErrors.fields.size) return;
+  if (host._reloading || !host.backendErrors.fields.size) return;
   autoRevealAdvanced(
     host,
     [...host.backendErrors.fields.keys()].map((path) => path.split("."))
@@ -40,6 +40,7 @@ export function revealAdvancedForFocus(
   if (!changedProperties.has("focusFieldPath") && !changedProperties.has("_config")) {
     return;
   }
+  if (host._reloading) return;
   if (host.focusFieldPath?.length) autoRevealAdvanced(host, [host.focusFieldPath]);
 }
 

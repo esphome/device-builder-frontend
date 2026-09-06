@@ -32,7 +32,11 @@ import { esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { fireEvent } from "../util/fire-event.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
-import { cursorKeyPathAt, indexedKeyPathAt } from "../util/yaml-cursor-paths.js";
+import {
+  cursorKeyPathAt,
+  indexedKeyPathAt,
+  type YamlLinePaths,
+} from "../util/yaml-cursor-paths.js";
 import {
   emptyBlockFixKind,
   lineKeyToken,
@@ -105,6 +109,15 @@ const highlightField = StateField.define<DecorationSet>({
   },
   provide: (f) => EditorView.decorations.from(f),
 });
+
+/** Payload of the ``yaml-cursor-line`` event. */
+export interface YamlCursorLineDetail extends YamlLinePaths {
+  line: number;
+  /** A doc edit moved the caret here. */
+  viaEdit: boolean;
+  /** A mouse click moved the caret here. */
+  pointer: boolean;
+}
 
 @customElement("esphome-yaml-editor")
 export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
@@ -508,11 +521,16 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               // caret here — the page holds section switches onto a
               // half-typed unknown key only for edit-driven moves.
               viaEdit: update.docChanged,
+              // True for a mouse click; the page switches sections at
+              // once for those and coalesces keyboard and find jumps.
+              pointer: update.transactions.some((tr) =>
+                tr.annotation(Transaction.userEvent)?.startsWith("select.pointer")
+              ),
               // AST-only sibling of ``path`` carrying block-sequence
               // list indices — what the automation editor needs to
               // resolve a node inside a handler body.
               indexedPath: indexedKeyPathAt(update.state, head),
-            });
+            } satisfies YamlCursorLineDetail);
           }
         }
       }),

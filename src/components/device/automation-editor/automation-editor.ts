@@ -167,7 +167,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     const activeTrigger = effectiveTriggerId
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const focus = this._currentFocus();
     return html`
       ${renderAutomationHeader(
         this.location,
