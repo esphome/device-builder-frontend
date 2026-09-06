@@ -73,12 +73,11 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0 || item.multiLine) return null;
-  if (item.passwordLine === item.line) {
-    // Inline on the dash: swap the key in place.
-    const match = /^(\s*-\s+)password\s*:(.*)$/.exec(lines[item.line]);
-    if (match) {
-      lines[item.line] = `${match[1]}encryption:${splitInlineComment(match[2]).comment}`;
-    }
+  // A password inline on the dash is swapped in place, whether or not a
+  // duplicate child line exists too.
+  const dash = /^(\s*-\s+)password\s*:(.*)$/.exec(lines[item.line]);
+  if (dash) {
+    lines[item.line] = `${dash[1]}encryption:${splitInlineComment(dash[2]).comment}`;
   }
   // Every duplicate password line goes; the block lands where the first was.
   const platform = findDirectChildLine(lines, "ota", PLATFORM_RE, item.line + 1);
@@ -91,7 +90,7 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
     insertAt = line;
     line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
   }
-  if (item.passwordLine !== item.line) {
+  if (!dash) {
     lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
   }
   return lines.join(yamlDocEol(yaml));
