@@ -2,9 +2,8 @@
  * @vitest-environment happy-dom
  *
  * Pins the Components domain grouping: a subgroup header per domain with
- * its count, subgroups start collapsed except the selected row's domain,
- * a header click toggles the rows, and other sections stay flat. Dialog +
- * search children are no-oped so the element
+ * its count, collapsing a subgroup hides its rows, and other sections
+ * stay flat. Dialog + search children are no-oped so the element
  * constructs in happy-dom; see ``device-navigator-coalesce.test.ts``.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -16,7 +15,7 @@ vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
-import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
+import { clickSubgroup } from "./_navigator-fixtures.js";
 
 const YAML = [
   "esphome:",
@@ -53,10 +52,6 @@ const subCounts = (nav: ESPHomeDeviceNavigator) =>
   );
 const navItemCount = (nav: ESPHomeDeviceNavigator) =>
   nav.shadowRoot?.querySelectorAll(".nav-item").length ?? 0;
-const subExpanded = (nav: ESPHomeDeviceNavigator) =>
-  [...(nav.shadowRoot?.querySelectorAll(".nav-subgroup-header") ?? [])].map((el) =>
-    el.getAttribute("aria-expanded")
-  );
 
 async function setQuery(nav: ESPHomeDeviceNavigator, value: string): Promise<void> {
   const search = nav.shadowRoot!.querySelector("esphome-navigator-search")!;
@@ -71,83 +66,31 @@ async function setQuery(nav: ESPHomeDeviceNavigator, value: string): Promise<voi
 }
 
 describe("device-navigator domain grouping", () => {
-  it("renders a subgroup header per domain with its count, rows collapsed", async () => {
+  it("renders a subgroup header per domain with its count", async () => {
     const nav = await mountNavigator([1]); // Components open
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
     expect(subCounts(nav)).toEqual(["2", "2"]);
-    expect(subExpanded(nav)).toEqual(["false", "false"]);
-    expect(navItemCount(nav)).toBe(0);
+    expect(navItemCount(nav)).toBe(4);
   });
 
-  it("a header click shows the subgroup's rows, a second click hides them", async () => {
+  it("collapsing a subgroup hides its rows", async () => {
     const nav = await mountNavigator([1]);
     await clickSubgroup(nav, "Sensor");
-    expect(subExpanded(nav)).toEqual(["true", "false"]);
+    // The two Sensor rows are hidden; only the two Switch rows remain.
     expect(navItemCount(nav)).toBe(2);
-    await clickSubgroup(nav, "Sensor");
-    expect(navItemCount(nav)).toBe(0);
     // Headers themselves stay visible.
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
   });
 
-  it("opens only the selected row's domain", async () => {
+  it("reflects each subgroup's open state on aria-expanded", async () => {
     const nav = await mountNavigator([1]);
-    nav.selectedKey = "switch.template";
-    nav.selectedFromLine = sectionLine(YAML, "switch.template");
-    await nav.updateComplete;
-    expect(subExpanded(nav)).toEqual(["false", "true"]);
-    expect(navItemCount(nav)).toBe(2);
-    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
-  });
-
-  it("keeps the selected domain open after the selection clears", async () => {
-    const nav = await mountNavigator([1]);
-    nav.selectedKey = "switch.template";
-    nav.selectedFromLine = sectionLine(YAML, "switch.template");
-    await nav.updateComplete;
-    nav.selectedKey = "";
-    nav.selectedFromLine = undefined;
-    await nav.updateComplete;
-    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
-    expect(subExpanded(nav)).toEqual(["false", "true"]);
-  });
-
-  it("selecting a flat config block keeps the browsed domain open", async () => {
-    const nav = new ESPHomeDeviceNavigator();
-    const yaml = [...YAML.split("\n").slice(0, -1), "i2c:", "  sda: GPIO1", ""].join(
-      "\n"
-    );
-    nav.yaml = yaml;
-    nav.openSections = new Set([1]);
-    document.body.appendChild(nav);
-    await nav.updateComplete;
-    nav.selectedKey = "sensor.template";
-    nav.selectedFromLine = sectionLine(yaml, "sensor.template");
-    await nav.updateComplete;
-    expect(subExpanded(nav)).toEqual(["true", "false"]);
-    nav.selectedKey = "i2c";
-    nav.selectedFromLine = sectionLine(yaml, "i2c");
-    await nav.updateComplete;
-    expect(
-      nav.shadowRoot!.querySelector(".nav-items--single .nav-item--selected")
-    ).toBeTruthy();
-    expect(subExpanded(nav)).toEqual(["true", "false"]);
-  });
-
-  it("keeps an explicit toggle across a selection change", async () => {
-    const nav = await mountNavigator([1]);
-    // Open Switch by hand, then select a sensor row: both stay open.
-    await clickSubgroup(nav, "Switch");
-    nav.selectedKey = "sensor.template";
-    nav.selectedFromLine = sectionLine(YAML, "sensor.template");
-    await nav.updateComplete;
-    expect(subExpanded(nav)).toEqual(["true", "true"]);
-    // Collapse Sensor by hand; selecting its other row doesn't reopen it.
+    const expanded = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].map((h) =>
+        h.getAttribute("aria-expanded")
+      );
+    expect(expanded()).toEqual(["true", "true"]);
     await clickSubgroup(nav, "Sensor");
-    nav.selectedFromLine = sectionLine(YAML, "sensor.template", 1);
-    await nav.updateComplete;
-    expect(subExpanded(nav)).toEqual(["false", "true"]);
-    expect(navItemCount(nav)).toBe(2);
+    expect(expanded()).toEqual(["false", "true"]);
   });
 
   it("leaves non-component sections flat (no subgroups)", async () => {
@@ -178,8 +121,7 @@ describe("device-navigator domain grouping", () => {
     // i2c config block does not.
     expect(subTitles(nav)).toEqual(["Light"]);
     expect(subCounts(nav)).toEqual(["1"]);
-    // Once opened, the Light row still shows the instance name on its subtitle line.
-    await clickSubgroup(nav, "Light");
+    // The Light row still shows the instance name on its subtitle line.
     expect(
       [...nav.shadowRoot!.querySelectorAll(".nav-item-subtitle")].map((el) =>
         el.textContent?.trim()
@@ -223,7 +165,8 @@ describe("device-navigator domain grouping", () => {
 
   it("force-opens a collapsed domain while filtering and drops empty ones", async () => {
     const nav = await mountNavigator([1]);
-    // Sensor starts collapsed; filter for a Sensor id.
+    // Collapse Sensor, then filter for a Sensor id.
+    await clickSubgroup(nav, "Sensor");
     await setQuery(nav, "s1");
     // Sensor survives and shows its match despite being collapsed; Switch
     // (no match) drops out entirely.

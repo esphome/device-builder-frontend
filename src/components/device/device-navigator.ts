@@ -38,7 +38,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
-import { groupRowsByDomain, isFlatDomain } from "./navigator-groups.js";
+import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
 import { NavigatorRevealController } from "./navigator-reveal-controller.js";
@@ -224,15 +224,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
-  /** Domain subgroups the user toggled by hand; the rest follow the
-   *  selection (only the last selected row's domain is open). */
+  /** Domains collapsed by hand in the grouped Components list. */
   @state()
-  private _groupOverrides = new Map<string, boolean>();
-
-  /** Domain of the last selected component row; stays open after the
-   *  selection clears. */
-  @state()
-  private _openDomain: string | null = null;
+  private _collapsedGroups = new Set<string>();
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -286,17 +280,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
-        // Only a domain that renders a subgroup header takes the latch; a
-        // flat single row opens nothing and must not close the group the
-        // user was browsing.
-        const { components } = this._deriveBuckets(this.yaml);
-        const siblings = components.filter((s) => s.key === match.key);
-        if (
-          siblings.some((s) => s.fromLine === match.fromLine) &&
-          !isFlatDomain(siblings.length, match)
-        ) {
-          this._openDomain = match.key;
-        }
       }
     }
   }
@@ -304,8 +287,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
-    const isGroupOpen = (key: string) =>
-      this._groupOverrides.get(key) ?? key === this._openDomain;
+    const isGroupOpen = (key: string) => !this._collapsedGroups.has(key);
 
     interface NavSection {
       label: string;
@@ -549,9 +531,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
     fireEvent(this, "section-toggle", { index });
   }
 
-  /** Collapse/expand one domain subgroup (new Map so @state reacts). */
+  /** Collapse/expand one domain subgroup (new Set so @state reacts). */
   private _setGroupOpen(key: string, open: boolean) {
-    this._groupOverrides = new Map(this._groupOverrides).set(key, open);
+    const next = new Set(this._collapsedGroups);
+    if (open) next.delete(key);
+    else next.add(key);
+    this._collapsedGroups = next;
   }
 
   /** Ask the page to hide the navigator. The page decides between

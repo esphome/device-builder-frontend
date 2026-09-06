@@ -23,10 +23,6 @@ import {
   type RevealState,
   sectionIndexForLine,
 } from "../../../src/components/device/navigator-reveal-controller.js";
-import {
-  parseYamlTopLevelSections,
-  sectionKeyOf,
-} from "../../../src/util/yaml-sections.js";
 import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
 
 const YAML = [
@@ -47,13 +43,6 @@ const YAML = [
 
 /** fromLine of the sensor.template row (lives in the Components section). */
 const sensorLine = () => sectionLine(YAML, "sensor.template");
-
-/** Collapse the Sensor subgroup by hand (open, then close) so the selection
- *  can't auto-open it. */
-const collapseSensorByHand = async (nav: ESPHomeDeviceNavigator) => {
-  await clickSubgroup(nav, "Sensor");
-  await clickSubgroup(nav, "Sensor");
-};
 
 let scrollSpy: ReturnType<typeof vi.fn>;
 let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
@@ -189,8 +178,9 @@ describe("device-navigator reveal-selected", () => {
   // render, so it retries once the subgroup expands and the row mounts.
   it("retries the scroll after a collapsed subgroup is expanded", async () => {
     const { nav } = await mount(new Set([1]));
+
     // Collapse the Sensor subgroup, then select the sensor row it hides.
-    await collapseSensorByHand(nav);
+    await clickSubgroup(nav, "Sensor");
     nav.selectedKey = "sensor.template";
     nav.selectedFromLine = sensorLine();
     await nav.updateComplete;
@@ -209,8 +199,9 @@ describe("device-navigator reveal-selected", () => {
   // reopened on every render and the user can't toggle anything else.
   it("does not re-reveal the cursor's section after the user opens another", async () => {
     const { nav, reveals } = await mount(new Set([1]));
+
     // Collapse the Sensor subgroup so the selected row can never scroll-latch.
-    await collapseSensorByHand(nav);
+    await clickSubgroup(nav, "Sensor");
     nav.openSections = new Set();
     await nav.updateComplete;
 
@@ -235,8 +226,9 @@ describe("device-navigator reveal-selected", () => {
   // section (by opening another) doesn't re-fire reveal and snap it back open.
   it("does not re-reveal a section that was already open when selected", async () => {
     const { nav, reveals } = await mount(new Set([1]));
+
     // Collapse the Sensor subgroup so the selected row can never scroll-latch.
-    await collapseSensorByHand(nav);
+    await clickSubgroup(nav, "Sensor");
 
     // Select the row while Components is already open: nothing to reveal.
     nav.selectedKey = "sensor.template";
@@ -254,13 +246,7 @@ describe("device-navigator reveal-selected", () => {
   // cursor away and clicking back to a line whose reveal never scroll-latched
   // (its section was left closed) must reveal it again.
   it("re-reveals a line after the selection moves away and returns", async () => {
-    const coreLine = () => {
-      const s = parseYamlTopLevelSections(YAML).find(
-        (sec) => sectionKeyOf(sec) === "wifi"
-      );
-      if (!s) throw new Error("fixture: wifi not found");
-      return s.fromLine;
-    };
+    const coreLine = () => sectionLine(YAML, "wifi");
     // Leave everything collapsed so no reveal ever scroll-latches.
     const { nav, reveals } = await mount(new Set());
 

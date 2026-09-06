@@ -4,12 +4,10 @@ import {
   sectionKeyOf,
 } from "../../../src/util/yaml-sections.js";
 
-/** fromLine of the nth ``key`` section in ``yaml``. */
-export function sectionLine(yaml: string, key: string, nth = 0): number {
-  const s = parseYamlTopLevelSections(yaml).filter((sec) => sectionKeyOf(sec) === key)[
-    nth
-  ];
-  if (!s) throw new Error(`fixture: ${key} #${nth} not found`);
+/** fromLine of the first ``key`` section in ``yaml``. */
+export function sectionLine(yaml: string, key: string): number {
+  const s = parseYamlTopLevelSections(yaml).find((sec) => sectionKeyOf(sec) === key);
+  if (!s) throw new Error(`fixture: ${key} not found`);
   return s.fromLine;
 }
 
