@@ -451,7 +451,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       ...(yamlOnly ? this.backendErrors.fieldMessages : []),
     ];
 
-    const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
+    const canDelete = !UNDELETABLE_SECTIONS.has(config.section_key);
 
     return html`
       ${renderSectionHeader(this, config, sectionAlerts)}
