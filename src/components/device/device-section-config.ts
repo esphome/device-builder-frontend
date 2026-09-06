@@ -387,7 +387,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     if (!this.sectionKey || !this.configuration) return;
     if (this._draftTimer !== null) return;
     if (this.yaml === this._lastSelfWrittenYaml) return;
-    this._retargeting = false;
+    // A refresh landing inside a retargeting load must not drop its fence.
+    if (!this._reloading) this._retargeting = false;
     void loadConfig(this);
   }
 

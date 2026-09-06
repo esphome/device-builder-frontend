@@ -153,6 +153,20 @@ describe("section reload keeps the form mounted", () => {
     expect(inner._loading).toBe(false);
   });
 
+  it("keeps the fence when a refresh lands inside a retargeting load", async () => {
+    const { c, inner, settle } = await firstLoad();
+    await switchToSwitch(c);
+    expect(inner._reloading).toBe(true);
+    c.reload();
+    await c.updateComplete;
+    expect(inner._reloading).toBe(true);
+    expect(c.inert).toBe(true);
+    await settle("switch.template");
+    expect(inner._reloading).toBe(false);
+    expect(inner._retargeting).toBe(false);
+    expect(c.inert).toBe(false);
+  });
+
   it("withholds the focus target from the stale form", async () => {
     const { c, settle } = await firstLoad();
     c.focusFieldPath = ["name"];
