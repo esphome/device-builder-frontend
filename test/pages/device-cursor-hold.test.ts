@@ -142,9 +142,9 @@ describe("mid-typing hold for an unknown top-level key (#2211)", () => {
   it("withholds only the held instance's navigator error chip", () => {
     const page = makePage();
     const errors: BackendFieldError[] = [
-      { sectionKey: "sendx", fromLine: 4, keyPath: [], message: "x" },
-      { sectionKey: "i2c", fromLine: 1, keyPath: [], message: "y" },
-    ] as never;
+      { sectionKey: "sendx", fromLine: 4, relPath: "", message: "x" },
+      { sectionKey: "i2c", fromLine: 1, relPath: "", message: "y" },
+    ];
     const counts = internals(page)._navErrorCounts(errors, "sendx@4");
     expect(counts.has("sendx@4")).toBe(false);
     expect(counts.get("i2c@1")).toBe(1);
