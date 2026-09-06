@@ -75,7 +75,7 @@ describe("navigator error badge", () => {
     const view = makeView({
       rows: [row(a), row(b)],
       groups: [{ key: "sensor", rows: [row(a), row(b)] }],
-      collapsedGroups: new Set(["sensor"]),
+      isGroupOpen: () => false,
       errorCount: () => 1,
     });
     const found = badges(view);
@@ -88,7 +88,7 @@ describe("navigator error badge", () => {
     const view = makeView({
       rows: [row(a)],
       groups: [{ key: "sensor", rows: [row(a), row(section("sensor", 12))] }],
-      collapsedGroups: new Set(),
+      isGroupOpen: () => true,
       errorCount: (item) => (item.fromLine === 9 ? 1 : 0),
     });
     const found = badges(view);

@@ -1,11 +1,13 @@
+import { mdiChevronDown, mdiChevronRight, mdiChevronUp } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { withBase } from "../../util/base-path.js";
+import { mdiSvg } from "../../util/mdi-svg.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
-import { iconForDomain } from "./navigator-row-icons.js";
+import { iconPathForDomain } from "./navigator-row-icons.js";
 
 /** A "+ Add X" affordance at the foot of a section. */
 export interface NavAction {
@@ -37,13 +39,18 @@ export interface NavSectionView {
   /** When set, ``rows`` are rendered under collapsible domain subgroups
    *  instead of as a flat list. */
   groups?: NavGroup[];
-  collapsedGroups?: Set<string>;
-  onToggleGroup?: (key: string) => void;
+  /** Whether a domain subgroup shows its rows; open when omitted. */
+  isGroupOpen?: (key: string) => boolean;
+  onSetGroupOpen?: (key: string, open: boolean) => void;
 }
+
+const ROW_CHEVRON = mdiSvg(mdiChevronRight, "nav-item-chevron");
+const GROUP_OPEN_CHEVRON = mdiSvg(mdiChevronUp, "nav-subgroup-chevron");
+const GROUP_CLOSED_CHEVRON = mdiSvg(mdiChevronDown, "nav-subgroup-chevron");
 
 /** Leading domain glyph for a flat row. The ``esphome`` core gets the brand
  *  logo instead of a generic chip (it would otherwise share ``esp32``'s chip);
- *  everything else uses its registered mdi glyph. The logo is the monochrome
+ *  everything else is its mdi glyph inlined. The logo is the monochrome
  *  ``currentColor`` mark so it mutes to the same quiet tone as the other
  *  glyphs. The title is the hover tooltip, the glyph being the only domain cue
  *  on a flat row. */
@@ -55,12 +62,7 @@ function renderRowGlyph(domain: string): TemplateResult {
       title="ESPHome"
     ></wa-icon>`;
   }
-  return html`<wa-icon
-    class="nav-item-icon"
-    library="mdi"
-    name=${iconForDomain(domain)}
-    title=${prettyDomain(domain)}
-  ></wa-icon>`;
+  return mdiSvg(iconPathForDomain(domain), "nav-item-icon", prettyDomain(domain));
 }
 
 /** One navigator row; shared by the filtered and unfiltered paths.
@@ -98,8 +100,7 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
             : nothing
         }
       </div>
-      ${errors > 0 ? renderErrorBadge(errors, v) : nothing}
-      <wa-icon class="nav-item-chevron" library="mdi" name="chevron-right"></wa-icon>
+      ${errors > 0 ? renderErrorBadge(errors, v) : nothing} ${ROW_CHEVRON}
     </div>
   `;
 }
@@ -118,7 +119,7 @@ function renderErrorBadge(count: number, v: NavSectionView): TemplateResult {
 function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   // Force open while filtering — you can't collapse a search result, so
   // the header is a static label there (no toggle, no focus, no chevron).
-  const open = v.filtering || !v.collapsedGroups?.has(group.key);
+  const open = v.filtering || (v.isGroupOpen?.(group.key) ?? true);
   const interactive = !v.filtering;
   // Only a collapsed group renders the header badge, so only then pay
   // for the per-row sum.
@@ -126,7 +127,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   const groupErrors =
     !open && count ? group.rows.reduce((sum, row) => sum + count(row.item), 0) : 0;
   const toggle = () => {
-    if (interactive) v.onToggleGroup?.(group.key);
+    if (interactive) v.onSetGroupOpen?.(group.key, !open);
   };
   const rowsId = `navgroup-${group.key}`;
   return html`
@@ -144,11 +145,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
         }
       }}
     >
-      <wa-icon
-        class="nav-subgroup-icon"
-        library="mdi"
-        name=${iconForDomain(group.key)}
-      ></wa-icon>
+      ${mdiSvg(iconPathForDomain(group.key), "nav-subgroup-icon")}
       <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
       <span class="nav-subgroup-count">${group.rows.length}</span>
       ${
@@ -156,15 +153,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
         // header so an errored component is findable without expanding.
         groupErrors > 0 ? renderErrorBadge(groupErrors, v) : nothing
       }
-      ${
-        interactive
-          ? html`<wa-icon
-              class="nav-subgroup-chevron"
-              library="mdi"
-              name=${open ? "chevron-up" : "chevron-down"}
-            ></wa-icon>`
-          : nothing
-      }
+      ${interactive ? (open ? GROUP_OPEN_CHEVRON : GROUP_CLOSED_CHEVRON) : nothing}
     </div>
     ${
       open

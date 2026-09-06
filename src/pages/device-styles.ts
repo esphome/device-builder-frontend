@@ -41,10 +41,6 @@ export const devicePageStyles = css`
     background: var(--wa-color-surface-default);
   }
 
-  .layout-grid.nav-collapsed .desktop-nav {
-    display: none;
-  }
-
   .drawer,
   .drawer-backdrop {
     display: none;
@@ -99,10 +95,6 @@ export const devicePageStyles = css`
       gap: 0;
       height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
       height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
-    }
-
-    .desktop-nav {
-      display: none !important;
     }
 
     .drawer-backdrop {

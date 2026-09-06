@@ -53,6 +53,12 @@ export function visitTemplates(root: unknown, visit: (t: TemplateResult) => void
   if (isTemplateResult(root)) {
     visit(root);
     visitTemplates(root.values, visit);
+    return;
+  }
+  // A directive result (``cache(...)``, ``keyed(...)``) carries its
+  // template in ``values``.
+  if (typeof root === "object" && "_$litDirective$" in root) {
+    visitTemplates((root as { values?: unknown }).values, visit);
   }
 }
 

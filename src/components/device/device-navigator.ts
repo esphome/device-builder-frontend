@@ -1,7 +1,6 @@
 import { consume } from "@lit/context";
 import {
   mdiChevronDown,
-  mdiChevronRight,
   mdiChevronUp,
   mdiCog,
   mdiMagnify,
@@ -62,7 +61,6 @@ import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
-  "chevron-right": mdiChevronRight,
   cog: mdiCog,
   magnify: mdiMagnify,
   menu: mdiMenu,
@@ -226,9 +224,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
-  /** Domains collapsed in the grouped Components list. */
+  /** Domain subgroups the user toggled by hand; the rest follow the
+   *  selection (only the selected row's domain is open). */
   @state()
-  private _collapsedGroups = new Set<string>();
+  private _groupOverrides = new Map<string, boolean>();
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -289,6 +288,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
+    const selectedDomain =
+      components.find((s) => s.fromLine === this._selectedLine)?.key ?? null;
+    const isGroupOpen = (key: string) =>
+      this._groupOverrides.get(key) ?? key === selectedDomain;
 
     interface NavSection {
       label: string;
@@ -476,8 +479,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     // Components group by domain; other sections stay flat.
                     groups:
                       category === "component" ? this._groupComponents(rows) : undefined,
-                    collapsedGroups: this._collapsedGroups,
-                    onToggleGroup: (key) => this._toggleGroup(key),
+                    isGroupOpen,
+                    onSetGroupOpen: (key, open) => this._setGroupOpen(key, open),
                     open: filtering ? true : this.openSections.has(i),
                     filtering,
                     selectedLine: this._selectedLine,
@@ -532,11 +535,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
     fireEvent(this, "section-toggle", { index });
   }
 
-  /** Collapse/expand one domain subgroup (new Set so @state reacts). */
-  private _toggleGroup(key: string) {
-    const next = new Set(this._collapsedGroups);
-    if (!next.delete(key)) next.add(key);
-    this._collapsedGroups = next;
+  /** Collapse/expand one domain subgroup (new Map so @state reacts). */
+  private _setGroupOpen(key: string, open: boolean) {
+    this._groupOverrides = new Map(this._groupOverrides).set(key, open);
   }
 
   /** Ask the page to hide the navigator. The page decides between
