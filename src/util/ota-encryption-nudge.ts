@@ -6,6 +6,7 @@
  * encryption with that key.
  */
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import { deployedIdentityTrusted } from "./device-sync.js";
 import {
   firmwareOffersOtaEncryption,
   toolchainAcceptsOtaEncryption,
@@ -41,8 +42,14 @@ export function otaEncryptionNudge({
   return facts.hasPassword ? "replace_password" : "add";
 }
 
-/** The device's mDNS TXT reports Noise active on the api and a released 2026.9.0+ version. */
+/** The device's mDNS TXT reports Noise active on the api and a released 2026.9.0+
+ *  version, behind the trust gate so a sidecar-seeded value from a past session
+ *  does not count as the device reporting it now. */
 function deviceOffersOtaEncryption(device: ConfiguredDevice): boolean {
   const rt = device.runtime_state;
-  return !!rt.api_encryption_active && firmwareOffersOtaEncryption(rt.deployed_version);
+  return (
+    deployedIdentityTrusted(device) &&
+    !!rt.api_encryption_active &&
+    firmwareOffersOtaEncryption(rt.deployed_version)
+  );
 }

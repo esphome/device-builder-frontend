@@ -31,10 +31,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { generateApiEncryptionKey } from "../../util/api-encryption-key.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
-import {
-  otaEncryptionNudge,
-  type OtaEncryptionNudgeInputs,
-} from "../../util/ota-encryption-nudge.js";
+import { otaEncryptionNudge } from "../../util/ota-encryption-nudge.js";
 import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
@@ -61,6 +58,13 @@ interface GeneratedField {
   secretField?: string;
 }
 
+/** What a suppression predicate can see about the device and the draft. */
+interface SuppressInputs {
+  device: ConfiguredDevice | undefined;
+  yaml: string;
+  esphomeVersion: string;
+}
+
 /** A recommended security setting and how to satisfy it. */
 interface SecuritySetting {
   /** Section name passed to `recommendedSecretKeys`; matches the field picker's
@@ -73,7 +77,7 @@ interface SecuritySetting {
   /** The value(s) to generate, store/inline, and reference. */
   fields: GeneratedField[];
   /** When true the nudge stays hidden even though the marker is absent. */
-  suppressWhen?: (inputs: OtaEncryptionNudgeInputs) => boolean;
+  suppressWhen?: (inputs: SuppressInputs) => boolean;
 }
 
 /** A 4-word passphrase (strong); a single random word (memorable, non-secret). */

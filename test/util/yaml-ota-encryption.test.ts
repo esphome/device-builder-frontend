@@ -68,6 +68,15 @@ describe("otaEsphomeFacts", () => {
     ).toMatchObject({ present: false });
   });
 
+  it("survives a bare dash placeholder while typing", () => {
+    expect(otaEsphomeFacts("ota:\n  -\n")).toMatchObject({ present: false });
+    expect(otaEsphomeFacts("ota:\n  - \n  - platform: esphome\n")).toMatchObject({
+      present: true,
+      hasEncryption: false,
+    });
+    expect(enableOtaEncryptionInYaml("ota:\n  -\n")).toBeNull();
+  });
+
   it("does not read a sibling platform's password", () => {
     const yaml =
       "ota:\n  - platform: esphome\n  - platform: http_request\n    password: y\n";

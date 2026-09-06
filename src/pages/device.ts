@@ -2052,6 +2052,7 @@ export class ESPHomePageDevice extends LitElement {
     const updated = enableOtaEncryptionInYaml(this._yaml);
     if (updated === null) return;
     this._setYaml(updated);
+    this._repinSelection(updated);
     notifySuccess(this._localize("device.ota_encryption_applied"));
   }
 
@@ -2059,6 +2060,7 @@ export class ESPHomePageDevice extends LitElement {
     const updated = dropOtaEncryptionKeyInYaml(this._yaml);
     if (updated === null) return;
     this._setYaml(updated);
+    this._repinSelection(updated);
     notifySuccess(this._localize("device.ota_encryption_key_dropped"));
   }
 

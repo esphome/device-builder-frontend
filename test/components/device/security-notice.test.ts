@@ -149,7 +149,7 @@ describe("security-notice — ota password yields to the encryption nudge", () =
     deployed_version: string,
     api_encryption_active: string | null
   ) {
-    const { el, inner } = make("ota.esphome", YAML, 4);
+    const { el, inner } = make("ota.esphome", YAML, 5);
     inner._esphomeVersion = "2026.9.0";
     inner._devices = [
       makeConfiguredDevice({

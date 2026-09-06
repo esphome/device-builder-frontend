@@ -66,6 +66,13 @@ describe("otaEncryptionNudge", () => {
     }
   });
 
+  it("stays silent when the deployed identity is not trusted", () => {
+    const device = eligible();
+    device.runtime_state.active_source = "ping";
+    device.runtime_state.deployed_identity_live = false;
+    expect(nudge({ device })).toBeNull();
+  });
+
   it("stays silent on firmware older than 2026.9.0 or not a release", () => {
     for (const deployed_version of ["", "2026.8.3", "2026.9.0b3", "2026.10.0-dev"]) {
       const device = eligible();
