@@ -56,7 +56,9 @@ export function hasStaticApiKey(yaml: string): boolean {
   const key = findDirectChildLine(lines, "api", KEY_VALUE_RE, encryption + 1);
   if (key < 0) return false;
   const raw = lines[key].replace(/^\s*key\s*:\s*/, "");
-  return stripQuotes(splitInlineComment(raw).value.trim()).length > 0;
+  const value = stripQuotes(splitInlineComment(raw).value.trim());
+  // A bare `!secret` with no name is not a usable reference.
+  return value.length > 0 && !/^!\S*$/.test(value);
 }
 
 /**
@@ -68,8 +70,14 @@ export function enableOtaEncryptionInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.encryptionLine >= 0) return null;
-  const insertAt = item.passwordLine >= 0 ? item.passwordLine : item.line + 1;
-  if (item.passwordLine >= 0) lines.splice(item.passwordLine, 1);
+  // Duplicate keys are legal YAML (last wins), so every password line goes;
+  // the block lands where the first one was.
+  let insertAt = item.line + 1;
+  for (let line = item.passwordLine; line >= 0;) {
+    lines.splice(line, 1);
+    insertAt = line;
+    line = findDirectChildLine(lines, "ota", PASSWORD_RE, item.line + 1);
+  }
   lines.splice(insertAt, 0, `${item.childIndent}encryption:`);
   return lines.join(yamlDocEol(yaml));
 }
@@ -80,7 +88,10 @@ export function dropOtaEncryptionKeyInYaml(yaml: string): string | null {
   const lines = splitYamlDocLines(yaml);
   const item = locate(yaml, lines);
   if (!item || item.keyLine < 0) return null;
-  lines.splice(item.keyLine, 1);
+  for (let line = item.keyLine; line >= 0;) {
+    lines.splice(line, 1);
+    line = findDirectChildLine(lines, "ota", KEY_RE, item.encryptionLine + 1);
+  }
   return lines.join(yamlDocEol(yaml));
 }
 

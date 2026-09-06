@@ -91,6 +91,13 @@ describe("hasStaticApiKey", () => {
     expect(hasStaticApiKey("api:\n  encryption:\n    key: ${api_key}\n")).toBe(true);
   });
 
+  it("rejects a bare !secret tag with no name", () => {
+    expect(hasStaticApiKey("api:\n  encryption:\n    key: !secret\n")).toBe(false);
+    expect(hasStaticApiKey("api:\n  encryption:\n    key: !secret  # todo\n")).toBe(
+      false
+    );
+  });
+
   it("rejects a runtime-provisioned block and a missing api", () => {
     expect(hasStaticApiKey("api:\n  encryption:\n")).toBe(false);
     expect(hasStaticApiKey("api:\n  encryption:\n    key:\n")).toBe(false);
@@ -110,6 +117,14 @@ describe("enableOtaEncryptionInYaml", () => {
   it("replaces the password line in place, keeping siblings", () => {
     expect(enableOtaEncryptionInYaml(PASSWORD_OTA)).toBe(
       "ota:\n  - platform: esphome\n    encryption:\n    port: 3232\n"
+    );
+  });
+
+  it("removes every duplicate password line", () => {
+    const yaml =
+      "ota:\n  - platform: esphome\n    password: a\n    port: 1\n    password: b\n";
+    expect(enableOtaEncryptionInYaml(yaml)).toBe(
+      "ota:\n  - platform: esphome\n    encryption:\n    port: 1\n"
     );
   });
 
@@ -137,6 +152,14 @@ describe("dropOtaEncryptionKeyInYaml", () => {
   it("removes only the key line, leaving a bare encryption block", () => {
     expect(dropOtaEncryptionKeyInYaml(OWN_KEY_OTA)).toBe(
       "ota:\n  - platform: esphome\n    encryption:\n    port: 3232\n"
+    );
+  });
+
+  it("removes every duplicate key line", () => {
+    const yaml =
+      "ota:\n  - platform: esphome\n    encryption:\n      key: a\n      key: b\n";
+    expect(dropOtaEncryptionKeyInYaml(yaml)).toBe(
+      "ota:\n  - platform: esphome\n    encryption:\n"
     );
   });
 
