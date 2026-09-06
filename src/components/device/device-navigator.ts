@@ -1,7 +1,6 @@
 import { consume } from "@lit/context";
 import {
   mdiChevronDown,
-  mdiChevronRight,
   mdiChevronUp,
   mdiCog,
   mdiMagnify,
@@ -39,7 +38,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
-import { groupRowsByDomain } from "./navigator-groups.js";
+import { groupRowsByDomain, isFlatDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
 import { NavigatorRevealController } from "./navigator-reveal-controller.js";
@@ -62,7 +61,6 @@ import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
-  "chevron-right": mdiChevronRight,
   cog: mdiCog,
   magnify: mdiMagnify,
   menu: mdiMenu,
@@ -226,9 +224,15 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
-  /** Domains collapsed in the grouped Components list. */
+  /** Domain subgroups the user toggled by hand; the rest follow the
+   *  selection (only the last selected row's domain is open). */
   @state()
-  private _collapsedGroups = new Set<string>();
+  private _groupOverrides = new Map<string, boolean>();
+
+  /** Domain of the last selected component row; stays open after the
+   *  selection clears. */
+  @state()
+  private _openDomain: string | null = null;
 
   static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
@@ -282,6 +286,17 @@ export class ESPHomeDeviceNavigator extends LitElement {
           fromLine: match.fromLine,
           toLine: match.toLine,
         };
+        // Only a domain that renders a subgroup header takes the latch; a
+        // flat single row opens nothing and must not close the group the
+        // user was browsing.
+        const { components } = this._deriveBuckets(this.yaml);
+        const siblings = components.filter((s) => s.key === match.key);
+        if (
+          siblings.some((s) => s.fromLine === match.fromLine) &&
+          !isFlatDomain(siblings.length, match)
+        ) {
+          this._openDomain = match.key;
+        }
       }
     }
   }
@@ -289,6 +304,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected render() {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
+    const isGroupOpen = (key: string) =>
+      this._groupOverrides.get(key) ?? key === this._openDomain;
 
     interface NavSection {
       label: string;
@@ -476,8 +493,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     // Components group by domain; other sections stay flat.
                     groups:
                       category === "component" ? this._groupComponents(rows) : undefined,
-                    collapsedGroups: this._collapsedGroups,
-                    onToggleGroup: (key) => this._toggleGroup(key),
+                    isGroupOpen,
+                    onSetGroupOpen: (key, open) => this._setGroupOpen(key, open),
                     open: filtering ? true : this.openSections.has(i),
                     filtering,
                     selectedLine: this._selectedLine,
@@ -532,11 +549,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
     fireEvent(this, "section-toggle", { index });
   }
 
-  /** Collapse/expand one domain subgroup (new Set so @state reacts). */
-  private _toggleGroup(key: string) {
-    const next = new Set(this._collapsedGroups);
-    if (!next.delete(key)) next.add(key);
-    this._collapsedGroups = next;
+  /** Collapse/expand one domain subgroup (new Map so @state reacts). */
+  private _setGroupOpen(key: string, open: boolean) {
+    this._groupOverrides = new Map(this._groupOverrides).set(key, open);
   }
 
   /** Ask the page to hide the navigator. The page decides between

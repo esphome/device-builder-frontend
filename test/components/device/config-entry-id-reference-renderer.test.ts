@@ -5,7 +5,7 @@
  * a selected option so it displays and round-trips instead of vanishing.
  */
 import { nothing } from "lit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
@@ -16,6 +16,9 @@ import {
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const LOCAL_SCRIPT_YAML = "script:\n  - id: local_script\n";
+
+const optionValues = (tmpl: unknown): unknown[] =>
+  findElementBindings(tmpl, "wa-option").map((o) => o.value);
 
 function renderFor(yaml: string, value: string) {
   const entry = makeEntry(ConfigEntryType.STRING, { references_component: "script" });
@@ -337,9 +340,6 @@ describe("renderIdReferenceField — revert-to-auto option (#2208)", () => {
     return renderIdReferenceField(entry, ["logger_id"], ctx);
   }
 
-  const optionValues = (tmpl: unknown): unknown[] =>
-    findElementBindings(tmpl, "wa-option").map((o) => o.value);
-
   it("offers Auto on an optional reference with a committed value", () => {
     // The dangling `logger_id: logger` older builds pre-filled has no other
     // visual-editor way out.
@@ -373,5 +373,53 @@ describe("renderIdReferenceField — revert-to-auto option (#2208)", () => {
     expect(optionValues(renderRef("logger", { required: true }))).not.toContain(
       AUTO_SENTINEL
     );
+  });
+});
+
+describe("renderIdReferenceField — lazy option list", () => {
+  const YAML = "script:\n  - id: s1\n  - id: s2\n  - id: s3\n";
+  const entry = makeEntry(ConfigEntryType.STRING, { references_component: "script" });
+
+  function renderLazy(value: string, overrides: Record<string, unknown> = {}) {
+    return renderIdReferenceField(
+      entry,
+      ["id"],
+      makeRenderCtx(
+        { id: value },
+        { overrides: { yaml: YAML, isOptionsExpanded: () => false, ...overrides } }
+      )
+    );
+  }
+
+  it("mounts only the selected candidate and the actions while closed", () => {
+    const opts = findElementBindings(renderLazy("s2"), "wa-option");
+    expect(opts.map((o) => o.value)).toEqual([AUTO_SENTINEL, "s2", ADD_NEW_SENTINEL]);
+    const selected = opts.find((o) => o.value === "s2")!;
+    expect(selected["?selected"]).toBe(true);
+    expect(selected[".label"]).toBe("s2");
+  });
+
+  it("mounts no candidate while closed and empty", () => {
+    expect(optionValues(renderLazy(""))).toEqual([ADD_NEW_SENTINEL]);
+  });
+
+  it("expands the list when the select opens", () => {
+    const expandOptions = vi.fn();
+    const select = findElementBindings(
+      renderLazy("s2", { expandOptions }),
+      "wa-select"
+    )[0];
+    (select["@wa-show"] as () => void)();
+    expect(expandOptions).toHaveBeenCalledWith(["id"]);
+  });
+
+  it("mounts every candidate once expanded", () => {
+    expect(optionValues(renderLazy("s2", { isOptionsExpanded: () => true }))).toEqual([
+      AUTO_SENTINEL,
+      "s1",
+      "s2",
+      "s3",
+      ADD_NEW_SENTINEL,
+    ]);
   });
 });

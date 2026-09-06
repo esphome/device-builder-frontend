@@ -2,21 +2,22 @@
  * @vitest-environment happy-dom
  *
  * ``_resolveInterfaceProviders`` backs the id-reference dropdown's
- * cross-domain lookup: a per-form cache fed by one paged ``provides``
- * fetch, deduped while in flight, and — crucially — NOT poisoned with
- * ``[]`` on a failed fetch so a later render can retry.
+ * cross-domain lookup through the session provider cache: one paged
+ * ``provides`` fetch shared by every form, and a failed fetch left uncached
+ * so a later render can retry.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
-import { flushMicrotasks } from "../../_dom.js";
+import { flush } from "../../_dom.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
 import type { ComponentProvider } from "../../../src/util/config-entry-yaml-scan.js";
 import { COMPONENT_FETCH_PAGE } from "../../../src/util/fetch-all-components.js";
+import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
 
 const resolve = (
   form: ESPHomeConfigEntryForm,
@@ -27,9 +28,6 @@ const resolve = (
       _resolveInterfaceProviders(n: string): readonly ComponentProvider[] | null;
     }
   )._resolveInterfaceProviders(name);
-
-// Let the getComponents promise's then/catch/finally chain settle.
-const flush = () => flushMicrotasks(3);
 
 function withApi(getComponents: ReturnType<typeof vi.fn>): ESPHomeConfigEntryForm {
   const form = new ESPHomeConfigEntryForm();
@@ -48,6 +46,12 @@ function response(ids: string[]) {
 }
 
 describe("config-entry-form _resolveInterfaceProviders", () => {
+  beforeEach(() => _clearProvidesCache());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    _clearProvidesCache();
+  });
+
   it("returns null on the first miss, then the fetched providers, fetching once", async () => {
     const getComponents = vi
       .fn()
@@ -91,7 +95,7 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
     const form = withApi(getComponents as unknown as ReturnType<typeof vi.fn>);
 
     resolve(form, "sensor");
-    await flushMicrotasks(8);
+    await flush();
 
     expect(getComponents).toHaveBeenCalledTimes(2);
     const providers = resolve(form, "sensor");
@@ -103,6 +107,7 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
   });
 
   it("does not cache [] on a failed fetch, so a later render retries", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const getComponents = vi
       .fn()
       .mockRejectedValueOnce(new Error("ws down"))
@@ -111,11 +116,27 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
 
     resolve(form, "voltage_sampler");
     await flush();
-    // Failure left the cache unset — the next call retries (still
+    // Failure left the cache unset; the next call retries (still
     // unsettled) rather than returning a poisoned empty list forever.
     expect(resolve(form, "voltage_sampler")).toBeNull();
     await flush();
     expect(getComponents).toHaveBeenCalledTimes(2);
     expect(resolve(form, "voltage_sampler")).toEqual([{ domain: "sensor", stem: "adc" }]);
+  });
+
+  it("shares one fetch across form instances", async () => {
+    const getComponents = vi.fn().mockResolvedValue(response(["sensor.adc"]));
+    const a = withApi(getComponents);
+    const b = withApi(getComponents);
+    expect(resolve(a, "voltage_sampler")).toBeNull();
+    expect(resolve(b, "voltage_sampler")).toBeNull();
+    await flush();
+    expect(getComponents).toHaveBeenCalledTimes(1);
+    expect(resolve(b, "voltage_sampler")).toEqual([{ domain: "sensor", stem: "adc" }]);
+    // A form built after the fetch settled reads the cache synchronously.
+    expect(resolve(withApi(getComponents), "voltage_sampler")).toEqual([
+      { domain: "sensor", stem: "adc" },
+    ]);
+    expect(getComponents).toHaveBeenCalledTimes(1);
   });
 });

@@ -101,10 +101,6 @@ export const devicePageStyles = css`
       height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     }
 
-    .desktop-nav {
-      display: none !important;
-    }
-
     .drawer-backdrop {
       display: none;
       position: fixed;

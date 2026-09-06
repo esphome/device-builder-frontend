@@ -1324,7 +1324,11 @@ export class ESPHomePageDevice extends LitElement {
         @yaml-draft=${this._onYamlDraft}
         @nav-collapse=${this._onNavCollapse}
       >
-        ${this._load.state === "ready" ? this._renderNavigator("drawer-nav") : nothing}
+        ${
+          this._load.state === "ready" && this._isMobile
+            ? this._renderNavigator("drawer-nav")
+            : nothing
+        }
       </div>
 
       <div class="page">
@@ -1477,8 +1481,8 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   /** Idempotently open the section holding an externally-selected row.
-   *  A set, not a toggle: two navigators fire this and a toggle would
-   *  race them into oscillating the section open/closed. */
+   *  A set, not a toggle, so a reveal that re-fires for the same row
+   *  can't close the section it just opened. */
   private _onSectionReveal(e: CustomEvent<{ index: number }>) {
     const { index } = e.detail;
     if (this._openSections.has(index)) return;
@@ -1532,16 +1536,13 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   /**
-   * Both nav instances (drawer + desktop) share the same prop set
-   * — only their CSS class differs. Pulled into a render helper
-   * so adding a prop touches one place instead of drifting
-   * across two copies.
+   * The drawer (mobile) and desktop navigators share the same prop set;
+   * only their CSS class differs. One is mounted per layout. Pulled into
+   * a render helper so adding a prop touches one place.
    */
   private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
     const isVisibleTourNavigator =
-      className === "desktop-nav"
-        ? !this._isMobile && !this._navCollapsed
-        : this._isMobile && this._drawerOpen;
+      className === "desktop-nav" ? !this._navCollapsed : this._drawerOpen;
     return html`<esphome-device-navigator
       class=${className}
       .tourAnchorId=${isVisibleTourNavigator ? "nav" : undefined}
@@ -1560,7 +1561,7 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _renderEditor(deviceTitle: string, showEdgeTab: boolean, backLabel: string) {
-    return html` ${this._renderNavigator("desktop-nav")}
+    return html` ${!this._isMobile ? this._renderNavigator("desktop-nav") : nothing}
       <esphome-device-editor
         .yaml=${this._yaml}
         .savedYaml=${this._savedYaml}
