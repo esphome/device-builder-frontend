@@ -69,7 +69,7 @@ export interface RenderCtx {
   requestAddComponent: (domain: string) => void;
   /**
    * Providers of a cross-domain interface reference. Returns synchronously
-   * from a per-form cache; a miss kicks an async catalog fetch and
+   * from the session cache; a miss kicks an async catalog fetch and
    * re-renders. ``null`` while unsettled (no api yet, fetch in flight, or
    * the last fetch failed) — the candidate list is incomplete then, not
    * empty. ``[]`` is a settled same-domain reference.
@@ -77,6 +77,10 @@ export interface RenderCtx {
   resolveInterfaceProviders: (
     interfaceName: string
   ) => ReadonlyArray<ComponentProvider> | null;
+  /** Whether a lazy option list at *path* has been opened once; the full
+   *  candidate set mounts only then, and stays for the form's lifetime. */
+  isOptionsExpanded: (path: string[]) => boolean;
+  expandOptions: (path: string[]) => void;
   scopeValues: (path: string[]) => Record<string, unknown>;
   filterRenderable: (
     entries: ConfigEntry[],

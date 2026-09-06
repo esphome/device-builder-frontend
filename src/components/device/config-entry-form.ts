@@ -33,23 +33,25 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
-import {
-  catalogEntryToProvider,
-  type ComponentProvider,
-} from "../../util/config-entry-yaml-scan.js";
+import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
-import { fetchAllComponents } from "../../util/fetch-all-components.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { parseBoardGpio } from "../../util/pin/gpio.js";
 import {
   fetchPinRegistryModes,
   getCachedPinRegistryModes,
   subscribePinRegistryModes,
 } from "../../util/pin/registry-modes-cache.js";
+import {
+  fetchInterfaceProviders,
+  getCachedInterfaceProviders,
+  subscribeInterfaceProviders,
+} from "../../util/provides-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
@@ -281,10 +283,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  once and a later user collapse isn't re-overridden. */
   private _seededNestedOpen: Set<string> = new Set();
 
-  /** Resolved providers per interface name, and the in-flight set, for the
-   *  id-reference dropdown's cross-domain lookup. */
-  private _interfaceProviders: Map<string, ComponentProvider[]> = new Map();
-  private _interfaceProvidersPending: Set<string> = new Set();
+  private _unsubscribeProviders?: () => void;
+
+  /** Field keys (``fieldKeyAttr``) of lazy option lists the user has opened. */
+  private _expandedOptionFields: Set<string> = new Set();
 
   /** Scrolls the YAML-cursor-selected field into view (the structured side
    *  of the field sync); driven from ``updated``. */
@@ -654,6 +656,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
     );
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    // Repaint the id-reference pickers once a shared provider fetch lands.
+    this._unsubscribeProviders = subscribeInterfaceProviders(() => this.requestUpdate());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._unsubscribeProviders?.();
+    this._unsubscribeProviders = undefined;
+  }
+
   /** Stable-partition so required entries lead. An exclusive_group is
    *  treated atomically (required if any member is) so its members stay
    *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
@@ -667,6 +681,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       this._editingMagnitudes.clear();
       this._openAdvancedPlacement.clear();
       this._constraintClusters.reset();
+      this._expandedOptionFields.clear();
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
       this._seededNestedOpen.clear();
@@ -731,12 +746,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * rather than a dotted string keeps user-supplied map keys that
    * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
    *
-   * We wait for each select's `updateComplete` (and one frame after
-   * that) to make sure wa-select's own first-render bookkeeping —
-   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
-   * before we set `.value`. Otherwise our imperative set fights with
-   * wa-select's own initial value resolution and the displayed label
-   * stays blank.
+   * Before a select's first update we wait for its `updateComplete`, so
+   * wa-select's initial value resolution has run before we set `.value`
+   * and can't overwrite it. Later renders set synchronously: the options
+   * are connected, and wa-select re-derives its selection on any option
+   * change. A select already showing the value is skipped.
    */
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
@@ -746,6 +760,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         | (HTMLElement & {
             value: string | string[] | null;
             updateComplete?: Promise<unknown>;
+            hasUpdated?: boolean;
           })
         | null;
       if (!select) continue;
@@ -762,7 +777,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // Let wa-select finish its own initial update before we set
       // anything — otherwise its post-render selectionChanged
       // overwrites whatever we wrote.
-      if (select.updateComplete) {
+      if (!select.hasUpdated && select.updateComplete) {
         try {
           await select.updateComplete;
         } catch {
@@ -794,6 +809,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
         continue;
       }
       const raw = String(value ?? "");
+      const current = Array.isArray(select.value)
+        ? (select.value[0] ?? "")
+        : (select.value ?? "");
+      // A select holding the raw value as its own spelling never re-syncs,
+      // so a late-mounting option list must always include the value's
+      // option (the lazy id-reference list keeps the selected one mounted).
+      if (this._showsValue(current, raw)) continue;
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
       // would silently drop the value. Look up the matching option
@@ -802,33 +824,42 @@ export class ESPHomeConfigEntryForm extends LitElement {
       //
       // Pin entries are a second mismatch: the seeded YAML value is
       // a bare int (`9`, from `seedBoardPinDefaults` reading the
-      // board manifest's pin features) or a string alias (`"SCL"`),
-      // but the option values are always `"GPIOn"`. Normalise both
-      // into the bare GPIO number for comparison so a freshly seeded
-      // i2c bus on ESP32-C3 lands on the right option instead of
-      // showing an empty select.
-      const options = Array.from(
-        select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
-      );
-      const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
-      const findByValue = (v: string) =>
-        options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
-      const matched = raw
-        ? (findByValue(raw) ?? (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
-        : null;
-      const desired = matched?.value ?? raw;
-      const current = Array.isArray(select.value)
-        ? (select.value[0] ?? "")
-        : (select.value ?? "");
+      // board manifest's pin features) or a board spelling (`"P0.27"`,
+      // `"PB03"`) that differs from the option's. Normalise both sides
+      // through the shared pin parser so a freshly seeded i2c bus lands
+      // on the right option instead of showing an empty select.
+      const desired = this._matchOptionValue(select, raw);
       if (current !== desired) {
         select.value = desired;
       }
     }
   }
 
+  /** Whether a select's value is the raw value or its option spelling. */
+  private _showsValue(current: string, raw: string): boolean {
+    if (current === raw) return true;
+    if (!current || !raw) return false;
+    if (current.toLowerCase() === raw.toLowerCase()) return true;
+    const gpio = parseBoardGpio(raw);
+    return gpio !== null && parseBoardGpio(current) === gpio;
+  }
+
+  private _matchOptionValue(select: HTMLElement, raw: string): string {
+    if (!raw) return raw;
+    const options = Array.from(
+      select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
+    );
+    const lower = raw.toLowerCase();
+    const exact = options.find((o) => o.value?.toLowerCase() === lower);
+    if (exact) return exact.value;
+    const gpio = parseBoardGpio(raw);
+    if (gpio === null) return raw;
+    return options.find((o) => parseBoardGpio(o.value) === gpio)?.value ?? raw;
+  }
+
   /**
-   * Push the option marked `selected` onto `select.value` after
-   * wa-select's first paint. Used for selects whose value isn't
+   * Push the option marked `selected` onto `select.value`, waiting for
+   * wa-select's first update only. Used for selects whose value isn't
    * bound to the form's path (FLOAT_WITH_UNIT's unit picker), where
    * the `?selected` Lit binding loses the race against wa-select's
    * own selectionChanged hook.
@@ -837,9 +868,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     select: HTMLElement & {
       value: string | string[] | null;
       updateComplete?: Promise<unknown>;
+      hasUpdated?: boolean;
     }
   ) {
-    if (select.updateComplete) {
+    if (!select.hasUpdated && select.updateComplete) {
       try {
         await select.updateComplete;
       } catch {
@@ -1066,6 +1098,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
+      isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
+      expandOptions: (path) => {
+        const key = fieldKeyAttr(path);
+        if (this._expandedOptionFields.has(key)) return;
+        this._expandedOptionFields.add(key);
+        this.requestUpdate();
+      },
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
       getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
@@ -1190,43 +1229,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   /**
-   * Providers of an interface reference, from a per-form cache.
+   * Providers of an interface reference, from the session cache shared by
+   * every form.
    *
-   * A miss fetches the catalog by ``provides`` once and re-renders on
-   * resolve; an empty *success* caches ``[]`` (a same-domain reference has
-   * no extra providers). A *failure* is logged and left uncached so a later
-   * render retries rather than permanently dropping candidates.
+   * A miss kicks the shared fetch and the subscription repaints on resolve;
+   * an empty *success* caches ``[]`` (a same-domain reference has no extra
+   * providers). A *failure* is left uncached so a later render retries
+   * rather than permanently dropping candidates.
    */
   private _resolveInterfaceProviders(
     interfaceName: string
   ): readonly ComponentProvider[] | null {
     if (!interfaceName) return [];
-    const cached = this._interfaceProviders.get(interfaceName);
+    const cached = getCachedInterfaceProviders(interfaceName);
     if (cached) return cached;
-    if (this._api && !this._interfaceProvidersPending.has(interfaceName)) {
-      this._interfaceProvidersPending.add(interfaceName);
-      // The full dropdown candidate set, distinct from the
-      // Add-component picker's paginated grid.
-      fetchAllComponents(this._api, { provides: interfaceName })
-        .then((components) => {
-          this._interfaceProviders.set(
-            interfaceName,
-            components.map((c) => catalogEntryToProvider(c, interfaceName))
-          );
-          this.requestUpdate();
-        })
-        .catch((err) =>
-          // Warn (not debug) so the dropped-candidate path is observable, and
-          // don't cache [] — that's indistinguishable from "no providers" and
-          // would silently omit candidates for the form's lifetime.
-          console.warn(
-            "[config-entry-form] provider fetch failed for",
-            interfaceName,
-            err
-          )
-        )
-        .finally(() => this._interfaceProvidersPending.delete(interfaceName));
-    }
+    // The full dropdown candidate set, distinct from the Add-component
+    // picker's paginated grid. The cache dedupes in-flight fetches and
+    // logs a failure once.
+    if (this._api) void fetchInterfaceProviders(this._api, interfaceName).catch(() => {});
     // Unsettled: no api yet, fetch in flight, or the last fetch failed.
     // Distinct from a cached [] so consumers don't treat an incomplete
     // candidate list as complete.
