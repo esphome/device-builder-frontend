@@ -96,6 +96,7 @@ describe("parseYamlAutomations — component triggers", () => {
     const lfRows = parseYamlAutomations(doc("\n"));
     const row = lfRows.find((r) => r.id === "temp_1");
     expect(row?.name).toBe("Temp One");
+    expect(row?.hostPlatform).toBeUndefined();
     expect(parseYamlAutomations(doc("\r\n"))).toEqual(lfRows);
   });
 

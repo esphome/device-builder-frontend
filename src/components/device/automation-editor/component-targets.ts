@@ -102,8 +102,9 @@ export function preFillIdParam(
   return { [idEntry.key]: device.id };
 }
 
-/** Component-level triggers valid for *device*, matched on its bare or
- *  qualified domain; empty when *device* is absent or a container. */
+/** Component-level triggers the picker offers *device*, matched on its bare
+ *  or qualified domain; empty when *device* is absent or a container, whose
+ *  own platform-scoped triggers the picker does not offer yet. */
 export function triggersForComponent(
   triggers: AutomationTrigger[],
   device: AvailableComponentInstance | undefined

@@ -146,10 +146,13 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
         id: componentId,
         name: displayName,
         // Domain (``key`` for a flat singleton) plus the host's platform:
-        // the trigger catalog scopes on either.
+        // the trigger catalog scopes on either. A sub-entity hosts only
+        // domain-level triggers, so it carries no platform scope.
         parentKey: host.parentKey ?? host.key,
         eventKey: eventName,
-        ...(host.platform !== undefined ? { hostPlatform: host.platform } : {}),
+        ...(host.platform !== undefined && parentComponentId === undefined
+          ? { hostPlatform: host.platform }
+          : {}),
         ...(parentComponentId !== undefined ? { parentComponentId } : {}),
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,
