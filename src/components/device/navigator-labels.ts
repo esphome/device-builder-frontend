@@ -5,7 +5,10 @@ import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
 import { sectionKeyOf, type YamlSection } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
-import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
+import {
+  handlerScopes,
+  type TriggerCatalogController,
+} from "./trigger-catalog-controller.js";
 
 export type NavCategory = "core" | "component" | "automation";
 
@@ -137,7 +140,7 @@ function automationLabels(
   if (item.parentKey === "esphome" && item.eventKey) {
     const primary = eventOnly(
       ctx.triggerCatalog.resolveName(
-        "esphome",
+        ["esphome"],
         item.eventKey,
         humanizeEvent(item.eventKey)
       )
@@ -150,7 +153,7 @@ function automationLabels(
   if (item.parentKey && item.eventKey) {
     const primary = eventOnly(
       ctx.triggerCatalog.resolveName(
-        item.parentKey,
+        handlerScopes(item.parentKey, item.platform),
         item.eventKey,
         humanizeEvent(item.eventKey)
       )

@@ -47,6 +47,7 @@ import {
   scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
+import { bareTriggerKey } from "./automation-editor/trigger-identity.js";
 import { dispatchAutomationAdded } from "./dispatch-automation-added.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
@@ -391,7 +392,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       // already have a handler here; list-capable ones stay offerable.
       const takenComponentTriggers = this._existingComponentTriggers(this._componentId);
       return triggersForComponent(all, device).filter(
-        (t) => !takenComponentTriggers.has(this._bareTrigger(t.id)) || t.supports_list
+        (t) => !takenComponentTriggers.has(bareTriggerKey(t.id)) || t.supports_list
       );
     }
     return [];
@@ -422,14 +423,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       if (s.id === componentId && s.eventKey) set.add(s.eventKey);
     }
     return set;
-  }
-
-  /** Strip the ``<domain>.`` prefix off a component-level catalog
-   *  trigger id (``switch.on_turn_on`` → ``on_turn_on``). The bare
-   *  key is what shows up under the component instance in YAML. */
-  private _bareTrigger(catalogId: string): string {
-    const dot = catalogId.indexOf(".");
-    return dot >= 0 ? catalogId.slice(dot + 1) : catalogId;
   }
 
   private _onKindChange(kind: string) {
@@ -528,12 +521,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       return { kind: "device_on", trigger: this._triggerId! };
     }
     if (this._kind === "component_on") {
-      // Strip the ``<domain>.`` prefix to get the bare YAML key
-      // the writer splices under the component. ``component_on``
-      // catalog ids are always ``<domain>.<key>`` for non-device
-      // triggers.
-      const dotIdx = this._triggerId!.indexOf(".");
-      const bare = dotIdx >= 0 ? this._triggerId!.slice(dotIdx + 1) : this._triggerId!;
+      // The bare YAML key the writer splices under the component:
+      // ``component_on`` catalog ids always end in it.
+      const bare = bareTriggerKey(this._triggerId!);
       // List-capable triggers append a new indexed entry; an un-indexed
       // location would overwrite the block. Index = existing entry
       // count on this instance (mirrors the interval path).

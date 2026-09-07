@@ -145,10 +145,11 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
       const base = {
         id: componentId,
         name: displayName,
-        // Domain (``key`` for a flat singleton) — the catalog is keyed
-        // ``<domain>.<event>``, so this resolves the trigger name.
+        // Domain (``key`` for a flat singleton) plus the host's platform:
+        // the trigger catalog scopes on either.
         parentKey: host.parentKey ?? host.key,
         eventKey: eventName,
+        ...(host.platform !== undefined ? { platform: host.platform } : {}),
         ...(parentComponentId !== undefined ? { parentComponentId } : {}),
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,

@@ -295,6 +295,14 @@ const ahtAvailable = (): AvailableAutomations =>
         supports_list: false,
         config_entries: [],
       },
+      {
+        id: "rotary_encoder.sensor.on_clockwise",
+        name: "On Clockwise",
+        applies_to: ["sensor.rotary_encoder"],
+        is_device_level: false,
+        supports_list: true,
+        config_entries: [],
+      },
     ],
     actions: [],
     conditions: [],
@@ -319,6 +327,7 @@ const ahtAvailable = (): AvailableAutomations =>
         parent_id: "aht20",
       },
       { id: "relay", name: "Relay", component_id: "switch.gpio" },
+      { id: "dial", name: "Dial", component_id: "sensor.rotary_encoder" },
     ],
   }) as unknown as AvailableAutomations;
 
@@ -370,6 +379,37 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
       component_id: "aht20_temperature",
       trigger: "on_value_range",
     });
+  });
+
+  it("builds a component_on location from a platform-scoped trigger id", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "dial";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "rotary_encoder.sensor.on_clockwise";
+    dialog.yaml =
+      "sensor:\n  - platform: rotary_encoder\n    id: dial\n    on_clockwise:\n      - logger.log: cw\n";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._buildLocation()).toEqual({
+      kind: "component_on",
+      component_id: "dial",
+      trigger: "on_clockwise",
+      index: 1,
+    });
+  });
+
+  it("offers a platform-scoped trigger and keeps it offerable when list-capable", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "dial";
+    dialog.yaml =
+      "sensor:\n  - platform: rotary_encoder\n    id: dial\n    on_clockwise:\n      - logger.log: cw\n";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offered = (dialog as any)._filteredTriggers() as Array<{ id: string }>;
+    expect(offered.map((t) => t.id)).toEqual([
+      "sensor.on_value_range",
+      "rotary_encoder.sensor.on_clockwise",
+    ]);
   });
 
   it("defaults the component to the first non-container instance", async () => {

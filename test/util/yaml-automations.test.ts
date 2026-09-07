@@ -73,6 +73,7 @@ describe("parseYamlAutomations — component triggers", () => {
     expect(press?.key).toBe("automation:component_on:my_button:on_press");
     expect(press?.displayLabel).toBe("My Button → on_press");
     expect(press?.id).toBe("my_button");
+    expect(press?.platform).toBe("gpio");
     expect(press?.eventKey).toBe("on_press");
   });
 

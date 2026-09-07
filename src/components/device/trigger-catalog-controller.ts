@@ -6,6 +6,7 @@ import {
   getCachedAutomationTriggers,
   subscribeAutomationCatalogCache,
 } from "../../util/automation-catalog-cache.js";
+import { triggerForKey } from "./automation-editor/trigger-identity.js";
 
 /** Host-supplied lookup keys, re-read per call since the host's
  *  api / platform / board can change after construction. */
@@ -13,6 +14,12 @@ export interface TriggerCatalogContext {
   api?: ESPHomeAPI;
   platform?: string;
   boardId?: string;
+}
+
+/** ``applies_to`` scopes of a handler row: its domain, plus
+ *  ``<domain>.<platform>`` when a platform item hosts it. */
+export function handlerScopes(parentKey: string, platform?: string): string[] {
+  return platform ? [parentKey, `${parentKey}.${platform}`] : [parentKey];
 }
 
 /**
@@ -57,14 +64,17 @@ export class TriggerCatalogController implements ReactiveController {
     });
   }
 
-  /** Catalog pretty name for ``<domain>.<event>`` (or the bare event
-   *  key for device-level ``esphome``), or ``fallback`` until cached. */
-  resolveName(domain: string, eventKey: string, fallback: string): string {
+  /** Catalog pretty name of the trigger hosting ``eventKey`` within
+   *  ``scopes`` (the bare event key is the id for device-level
+   *  ``esphome``), or ``fallback`` until cached. */
+  resolveName(scopes: readonly string[], eventKey: string, fallback: string): string {
     const { platform, boardId } = this._context();
     const triggers = getCachedAutomationTriggers(platform, boardId);
     if (!triggers) return fallback;
-    const catalogId = domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
-    return triggers.find((t) => t.id === catalogId)?.name || fallback;
+    const match = scopes.includes("esphome")
+      ? triggers.find((t) => t.id === eventKey)
+      : triggerForKey(triggers, scopes, eventKey);
+    return match?.name || fallback;
   }
 
   /** True when the catalog has a component trigger scoped to any of

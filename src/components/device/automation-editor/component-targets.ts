@@ -101,6 +101,19 @@ export function preFillIdParam(
   return { [idEntry.key]: device.id };
 }
 
+/** The ``applies_to`` scopes an instance matches: its qualified id and bare domain. */
+export function targetScopes(componentId: string): string[] {
+  return [componentId, componentDomain(componentId)];
+}
+
+/** True for a component-level trigger whose ``applies_to`` meets *scopes*. */
+export function triggerAppliesTo(
+  t: AutomationTrigger,
+  scopes: readonly string[]
+): boolean {
+  return !t.is_device_level && t.applies_to.some((a) => scopes.includes(a));
+}
+
 /** Component-level triggers valid for *device*, matched on its bare or
  *  qualified domain; empty when *device* is absent or a container. */
 export function triggersForComponent(
@@ -108,10 +121,6 @@ export function triggersForComponent(
   device: AvailableComponentInstance | undefined
 ): AutomationTrigger[] {
   if (!device || !isSelectableTarget(device)) return [];
-  const domain = componentDomain(device.component_id);
-  return triggers.filter(
-    (t) =>
-      !t.is_device_level &&
-      (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain))
-  );
+  const scopes = targetScopes(device.component_id);
+  return triggers.filter((t) => triggerAppliesTo(t, scopes));
 }

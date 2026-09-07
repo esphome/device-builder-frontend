@@ -163,7 +163,12 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
-    const effectiveTriggerId = effectiveTriggerIdFor(automation, target, devices);
+    const effectiveTriggerId = effectiveTriggerIdFor(
+      automation,
+      target,
+      devices,
+      triggers
+    );
     const activeTrigger = effectiveTriggerId
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
