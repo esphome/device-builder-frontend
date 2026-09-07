@@ -52,6 +52,7 @@ export function renderAddModePickers(opts: {
     <esphome-automation-target-picker
       .value=${opts.target}
       .devices=${opts.devices}
+      .triggers=${opts.triggers}
       .scripts=${opts.scripts}
       ?disabled=${opts.disabled}
       @target-change=${opts.onTargetChange}

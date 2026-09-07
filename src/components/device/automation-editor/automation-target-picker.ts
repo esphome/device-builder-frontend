@@ -31,6 +31,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type {
   AutomationLocation,
+  AutomationTrigger,
   AvailableComponentInstance,
   AvailableScript,
 } from "../../../api/types/automations.js";
@@ -86,6 +87,11 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
    *  ``component_on`` and ``light_effect`` pickers. */
   @property({ attribute: false })
   devices: AvailableComponentInstance[] = [];
+
+  /** Triggers offered on this device; decides whether a container is
+   *  itself a ``component_on`` target. */
+  @property({ attribute: false })
+  triggers: AutomationTrigger[] = [];
 
   /** Declared ``script:`` ids on this device. Empty list disables
    *  the ``script`` kind. */
@@ -164,9 +170,9 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
     if (kind === "component_on") {
       const selectedId =
         this.value?.kind === "component_on" ? this.value.component_id : "";
-      // A multi-entity container isn't a valid trigger target — its
-      // sub-entities are (offered as their own instances).
-      const index = indexTargets(this.devices);
+      // A multi-entity container is a trigger target only for its own
+      // platform-scoped triggers; its sub-entities carry the rest.
+      const index = indexTargets(this.devices, this.triggers);
       const targets = index.selectable;
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">
@@ -283,7 +289,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         case "interval":
           return { kind, index: 0 };
         case "component_on": {
-          const target = firstSelectableTarget(this.devices);
+          const target = firstSelectableTarget(this.devices, this.triggers);
           return target ? { kind, component_id: target.id, trigger: "" } : null;
         }
         case "script":

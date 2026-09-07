@@ -174,7 +174,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   /** The prefilled component when it's a multi-entity container (its
-   *  triggers live on its sub-entities), else undefined. */
+   *  entity triggers live on its sub-entities), else undefined. */
   private _prefillContainer(): AvailableComponentInstance | undefined {
     if (!this._prefilled || this._kind !== "component_on" || !this._prefillComponentId) {
       return undefined;
@@ -224,7 +224,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     const containerEmpty =
       !!prefillContainer &&
       !firstSelectableTarget(
-        scopeToContainer(this._available?.devices ?? [], prefillContainer)
+        scopeToContainer(this._available?.devices ?? [], prefillContainer),
+        this._available?.triggers ?? []
       );
     return html`
       <p class="intro">
@@ -294,6 +295,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     const devices = scopeToContainer(this._available?.devices ?? [], container);
     return html`<esphome-component-target-picker
       .devices=${devices}
+      .triggers=${this._available?.triggers ?? []}
       .value=${this._componentId}
       ?disabled=${this._saving}
       @component-change=${(e: CustomEvent<{ componentId: string }>) =>
@@ -431,9 +433,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._triggerId = null;
     if (k === "component_on") {
       const devices = this._available?.devices ?? [];
-      // A container isn't selectable (entity triggers go on its
-      // sub-entities); default to the first real target.
-      this._componentId = firstSelectableTarget(devices)?.id ?? "";
+      // A container is a target only for its own platform-scoped
+      // triggers; default to the first real target.
+      this._componentId =
+        firstSelectableTarget(devices, this._available?.triggers ?? [])?.id ?? "";
     } else {
       this._componentId = "";
     }

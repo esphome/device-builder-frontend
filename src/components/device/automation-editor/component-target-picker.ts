@@ -4,19 +4,27 @@
  * Emits ``component-change`` with the picked id; controlled via ``value``.
  */
 import { consume } from "@lit/context";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import type { AvailableComponentInstance } from "../../../api/types/automations.js";
+import type {
+  AutomationTrigger,
+  AvailableComponentInstance,
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
-import { instanceName } from "./component-targets.js";
+import { instanceName, isSelectableTarget } from "./component-targets.js";
 
-type Group = { header: AvailableComponentInstance; subs: AvailableComponentInstance[] };
+type Group = {
+  header: AvailableComponentInstance;
+  subs: AvailableComponentInstance[];
+  /** The container is itself a target (it hosts platform-scoped triggers). */
+  selectable: boolean;
+};
 
 /** Arrow key → step through the flat row order (Left/Up back, Right/Down on). */
 const ARROW_DELTA: Record<string, number> = {
@@ -33,6 +41,8 @@ export class ESPHomeComponentTargetPicker extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @property({ attribute: false }) devices: AvailableComponentInstance[] = [];
+  /** Offered triggers; decides whether a container is itself a target. */
+  @property({ attribute: false }) triggers: AutomationTrigger[] = [];
   @property() value = "";
   @property({ type: Boolean }) disabled = false;
 
@@ -63,10 +73,14 @@ export class ESPHomeComponentTargetPicker extends LitElement {
             role="group"
             aria-labelledby=${headerId}
           >
-            <p class="component-group" id=${headerId}>
-              ${instanceName(item.header)}
-              <span class="component-group-id">(${item.header.component_id})</span>
-            </p>
+            ${
+              item.selectable
+                ? this._renderChoice(item.header, order, headerId)
+                : html`<p class="component-group" id=${headerId}>
+                    ${instanceName(item.header)}
+                    <span class="component-group-id">(${item.header.component_id})</span>
+                  </p>`
+            }
             ${item.subs.map((s) => this._renderChoice(s, order))}
           </div>`;
         })}
@@ -92,8 +106,10 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     for (const d of this.devices) {
       if (d.is_entity_container) {
         const subs = subsByParent.get(d.id) ?? [];
-        if (subs.length === 0) continue;
-        plan.push({ header: d, subs });
+        const selectable = isSelectableTarget(d, this.triggers);
+        if (subs.length === 0 && !selectable) continue;
+        plan.push({ header: d, subs, selectable });
+        if (selectable) order.push(d.id);
         order.push(...subs.map((s) => s.id));
       } else if (!(d.parent_id && containerIds.has(d.parent_id))) {
         // Orphan sub (parent absent) or plain instance → standalone row.
@@ -104,13 +120,16 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     return { plan, order };
   }
 
-  private _renderChoice(d: AvailableComponentInstance, order: string[]) {
+  private _renderChoice(d: AvailableComponentInstance, order: string[], id?: string) {
     const selected = d.id === this.value;
     // Roving tabindex: the checked row is the single tab stop; before any
     // pick, the first selectable row holds it.
     const tabbable = selected || (!order.includes(this.value) && order[0] === d.id);
     return html`<div
-      class="component-choice ${selected ? "component-choice--selected" : ""}"
+      class="component-choice ${selected ? "component-choice--selected" : ""} ${
+        id ? "component-choice--group" : ""
+      }"
+      id=${id ?? nothing}
       role="radio"
       aria-checked=${selected ? "true" : "false"}
       aria-disabled=${this.disabled ? "true" : "false"}

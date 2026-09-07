@@ -72,6 +72,39 @@ describe("component-target-picker", () => {
     expect(el.shadowRoot!.querySelector(`#${headerId}`)!.textContent).toContain("AHT20");
   });
 
+  it("renders a container as a selectable row when a trigger is scoped to its platform", async () => {
+    const el = await mount([
+      {
+        id: "ltr",
+        name: "LTR501",
+        component_id: "sensor.ltr501",
+        is_entity_container: true,
+      },
+      { id: "ltr_als", name: "Ambient", component_id: "sensor", parent_id: "ltr" },
+    ]);
+    el.triggers = [
+      {
+        id: "ltr501.sensor.on_ps_high_threshold",
+        name: "On Ps High",
+        description: "",
+        docs_url: "",
+        applies_to: ["sensor.ltr501"],
+        is_device_level: false,
+        supports_list: false,
+        config_entries: [],
+      },
+    ];
+    await el.updateComplete;
+    expect(choiceIds(el)).toEqual(["ltr", "ltr_als"]);
+    expect(tabStops(el)).toEqual(["ltr"]);
+    const group = el.shadowRoot!.querySelector('[role="group"]')!;
+    const headerId = group.getAttribute("aria-labelledby")!;
+    expect(el.shadowRoot!.querySelector(`#${headerId}`)!.getAttribute("role")).toBe(
+      "radio"
+    );
+    expect(pressOn(el, "ltr", "Enter")).toBe("ltr");
+  });
+
   it("is a radiogroup of radios", async () => {
     const el = await mount(aht());
     expect(el.shadowRoot!.querySelector('[role="radiogroup"]')).not.toBeNull();

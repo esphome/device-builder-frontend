@@ -42,18 +42,33 @@ const trigger = (over: Partial<AutomationTrigger> & { id: string }): AutomationT
 
 const onValueRange = trigger({ id: "sensor.on_value_range", applies_to: ["sensor"] });
 const onBoot = trigger({ id: "on_boot", is_device_level: true });
+const ltr = inst({ id: "ltr", component_id: "sensor.ltr501", is_entity_container: true });
+const onPsHigh = trigger({
+  id: "ltr501.sensor.on_ps_high_threshold",
+  applies_to: ["sensor.ltr501"],
+});
 
 describe("component-targets", () => {
-  it("treats only non-containers as selectable", () => {
-    expect(isSelectableTarget(temp)).toBe(true);
-    expect(isSelectableTarget(relay)).toBe(true);
-    expect(isSelectableTarget(container)).toBe(false);
+  it("treats non-containers as selectable and containers only with their own triggers", () => {
+    expect(isSelectableTarget(temp, [onValueRange])).toBe(true);
+    expect(isSelectableTarget(relay, [])).toBe(true);
+    expect(isSelectableTarget(container, [onValueRange])).toBe(false);
+    expect(isSelectableTarget(ltr, [onValueRange])).toBe(false);
+    expect(isSelectableTarget(ltr, [onValueRange, onPsHigh])).toBe(true);
   });
 
-  it("drops containers from the selectable list and the first-selectable lookup", () => {
+  it("drops trigger-less containers from the selectable list and the first-selectable lookup", () => {
     const devices = [container, temp, relay];
-    expect(indexTargets(devices).selectable).toEqual([temp, relay]);
-    expect(firstSelectableTarget(devices)).toBe(temp);
+    expect(indexTargets(devices, [onValueRange]).selectable).toEqual([temp, relay]);
+    expect(firstSelectableTarget(devices, [onValueRange])).toBe(temp);
+    expect(indexTargets([ltr, temp], [onValueRange, onPsHigh]).selectable).toEqual([
+      ltr,
+      temp,
+    ]);
+  });
+
+  it("offers a container only the triggers scoped to its platform", () => {
+    expect(triggersForComponent([onValueRange, onPsHigh], ltr)).toEqual([onPsHigh]);
   });
 
   it("matches component triggers by bare sub-domain", () => {
@@ -66,7 +81,7 @@ describe("component-targets", () => {
     expect(triggersForComponent([onTurnOn], relay)).toEqual([onTurnOn]);
   });
 
-  it("offers nothing for a container or a missing device", () => {
+  it("offers nothing for a trigger-less container or a missing device", () => {
     expect(triggersForComponent([onValueRange], container)).toEqual([]);
     expect(triggersForComponent([onValueRange], undefined)).toEqual([]);
   });
@@ -109,7 +124,7 @@ describe("instance label helpers", () => {
       name: "AHT20",
       is_entity_container: true,
     });
-    const index = indexTargets([named, temp, relay]);
+    const index = indexTargets([named, temp, relay], []);
     expect(index.selectable).toEqual([temp, relay]);
     // Sub-entity → component id · parent label; plain instance → component id only.
     expect(index.context(temp)).toBe("sensor · AHT20");

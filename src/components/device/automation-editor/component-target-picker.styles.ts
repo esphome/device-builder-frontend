@@ -47,6 +47,9 @@ export const componentTargetPickerStyles = css`
   .component-group-wrap .component-choice {
     padding-left: var(--wa-space-m);
   }
+  .component-group-wrap .component-choice--group {
+    padding-left: var(--wa-space-2xs);
+  }
   .component-group {
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold);
