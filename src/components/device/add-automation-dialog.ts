@@ -40,6 +40,7 @@ import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { bareTriggerKey } from "../../util/trigger-scopes.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import {
@@ -47,7 +48,6 @@ import {
   scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
-import { bareTriggerKey } from "./automation-editor/trigger-identity.js";
 import { dispatchAutomationAdded } from "./dispatch-automation-added.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of

@@ -48,9 +48,9 @@ export interface YamlSection {
   displayLabel?: string;
   /**
    * Bare trigger event key (``on_press``, ``on_turn_on``) for
-   * automation entries. The navigator combines this with
-   * ``parentKey`` to look up the trigger's pretty name in the
-   * catalog (``binary_sensor.on_press`` → "Pressed").
+   * automation entries. The navigator resolves the trigger's pretty
+   * name by this key within the row's ``parentKey`` / ``platform``
+   * scopes (see ``util/trigger-scopes``).
    */
   eventKey?: string;
   /**

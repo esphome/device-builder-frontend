@@ -306,10 +306,14 @@ function _firstItemForListHeader(
  * if the platform is already namespaced); otherwise just `key`.
  */
 export function sectionKeyOf(section: YamlSection): string {
-  if (!section.platform) return section.key;
-  return section.platform.startsWith(`${section.key}.`)
-    ? section.platform
-    : `${section.key}.${section.platform}`;
+  return qualifiedSectionKey(section.key, section.platform);
+}
+
+/** `<key>.<platform>` for a platform list item (de-duplicating an already
+ *  namespaced platform); the bare key otherwise. */
+export function qualifiedSectionKey(key: string, platform?: string): string {
+  if (!platform) return key;
+  return platform.startsWith(`${key}.`) ? platform : `${key}.${platform}`;
 }
 
 /**

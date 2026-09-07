@@ -3,12 +3,10 @@ import { actionFieldLabel } from "../../util/action-field-label.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
 import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
+import { handlerScopes } from "../../util/trigger-scopes.js";
 import { sectionKeyOf, type YamlSection } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
-import {
-  handlerScopes,
-  type TriggerCatalogController,
-} from "./trigger-catalog-controller.js";
+import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 export type NavCategory = "core" | "component" | "automation";
 

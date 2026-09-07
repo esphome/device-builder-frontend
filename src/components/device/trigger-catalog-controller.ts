@@ -6,7 +6,7 @@ import {
   getCachedAutomationTriggers,
   subscribeAutomationCatalogCache,
 } from "../../util/automation-catalog-cache.js";
-import { triggerForKey } from "./automation-editor/trigger-identity.js";
+import { triggerForKey } from "../../util/trigger-scopes.js";
 
 /** Host-supplied lookup keys, re-read per call since the host's
  *  api / platform / board can change after construction. */
@@ -14,12 +14,6 @@ export interface TriggerCatalogContext {
   api?: ESPHomeAPI;
   platform?: string;
   boardId?: string;
-}
-
-/** ``applies_to`` scopes of a handler row: its domain, plus
- *  ``<domain>.<platform>`` when a platform item hosts it. */
-export function handlerScopes(parentKey: string, platform?: string): string[] {
-  return platform ? [parentKey, `${parentKey}.${platform}`] : [parentKey];
 }
 
 /**

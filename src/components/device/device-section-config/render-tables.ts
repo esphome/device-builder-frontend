@@ -3,9 +3,9 @@
  */
 import { html, nothing } from "lit";
 import { actionFieldLabel } from "../../../util/action-field-label.js";
+import { handlerScopes } from "../../../util/trigger-scopes.js";
 import { parseYamlAutomations, type YamlSection } from "../../../util/yaml-sections.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
-import { handlerScopes } from "../trigger-catalog-controller.js";
 import {
   selectActionFieldRows,
   selectApiActionRows,

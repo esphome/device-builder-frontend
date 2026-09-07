@@ -8,7 +8,6 @@ import type {
 } from "../../../../src/api/types/automations.js";
 import type { LocalizeFunc } from "../../../../src/common/localize.js";
 import {
-  bareTriggerKey,
   catalogTriggerIdFor,
   effectiveTriggerIdFor,
   targetMetadataValue,
@@ -45,7 +44,13 @@ const clockwise = trigger("rotary_encoder.sensor.on_clockwise", [
 ]);
 const valueRange = trigger("sensor.on_value_range", ["sensor"]);
 const turnOn = trigger("switch.on_turn_on", ["switch"]);
-const triggers = [clockwise, valueRange, turnOn];
+const container = inst({
+  id: "ltr",
+  component_id: "sensor.ltr501",
+  is_entity_container: true,
+});
+const psHigh = trigger("ltr501.sensor.on_ps_high_threshold", ["sensor.ltr501"]);
+const triggers = [clockwise, psHigh, valueRange, turnOn];
 
 const tree = (trigger_id: string | null = null): AutomationTree => ({
   trigger_id,
@@ -59,20 +64,6 @@ const componentOn = (trigger: string, component_id = "relay_1"): AutomationLocat
   trigger,
 });
 
-describe("bareTriggerKey", () => {
-  it("drops the domain prefix from a catalog id", () => {
-    expect(bareTriggerKey("switch.on_turn_on")).toBe("on_turn_on");
-  });
-
-  it("drops the platform and domain prefix from a platform-scoped id", () => {
-    expect(bareTriggerKey("rotary_encoder.sensor.on_clockwise")).toBe("on_clockwise");
-  });
-
-  it("passes an already-bare key through", () => {
-    expect(bareTriggerKey("on_boot")).toBe("on_boot");
-  });
-});
-
 describe("catalogTriggerIdFor", () => {
   it("qualifies a component_on trigger with the bound device's domain", () => {
     expect(catalogTriggerIdFor(componentOn("on_turn_on"), devices, triggers)).toBe(
@@ -84,6 +75,16 @@ describe("catalogTriggerIdFor", () => {
     expect(
       catalogTriggerIdFor(componentOn("on_clockwise", "dial"), [rotary], triggers)
     ).toBe("rotary_encoder.sensor.on_clockwise");
+  });
+
+  it("resolves a trigger hosted on a multi-entity container's own item", () => {
+    expect(
+      catalogTriggerIdFor(
+        componentOn("on_ps_high_threshold", "ltr"),
+        [container],
+        triggers
+      )
+    ).toBe("ltr501.sensor.on_ps_high_threshold");
   });
 
   it("resolves a sub-entity's trigger to the domain-level id", () => {

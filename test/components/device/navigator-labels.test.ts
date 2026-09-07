@@ -110,3 +110,26 @@ describe("resolveNavItemLabels substitution resolution", () => {
     expect(labels.secondary).toBe("gate_$upper_devicename");
   });
 });
+
+describe("resolveNavItemLabels trigger scopes", () => {
+  it("resolves a platform-hosted handler through its qualified and bare scopes", () => {
+    const resolveName = vi.fn(() => "Sensor.Rotary Encoder → On Clockwise");
+    const scoped: LabelContext = {
+      ...ctx,
+      triggerCatalog: { resolveName } as unknown as LabelContext["triggerCatalog"],
+    };
+    const row = {
+      key: "automation:component_on:dial:on_clockwise",
+      id: "dial",
+      parentKey: "sensor",
+      platform: "rotary_encoder",
+      eventKey: "on_clockwise",
+    } as unknown as YamlSection;
+    expect(resolveNavItemLabels(row, "automation", scoped).primary).toBe("On Clockwise");
+    expect(resolveName).toHaveBeenCalledWith(
+      ["sensor.rotary_encoder", "sensor"],
+      "on_clockwise",
+      "On Clockwise"
+    );
+  });
+});

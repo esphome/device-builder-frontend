@@ -133,6 +133,6 @@ describe("resolveShortcutTarget", () => {
       return true;
     });
     // parentKey (bare domain "output") first, then the section key.
-    expect(seen).toEqual([["output", "output.slow_pwm"]]);
+    expect(seen).toEqual([["output.slow_pwm", "output"]]);
   });
 });

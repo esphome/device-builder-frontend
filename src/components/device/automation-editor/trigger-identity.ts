@@ -9,10 +9,11 @@
  * ``"rotary_encoder.sensor.on_clockwise"`` — what
  * ``catalog.trigger_by_id`` returns a hit for), while
  * ``location.component_on.trigger`` is the BARE YAML key
- * (``"on_turn_on"``) the writer splices under the component; the
- * backend reconstructs the catalog id from the component's platform
- * and domain plus the bare key. Device-level catalog ids carry no
- * domain prefix, so the two forms coincide for ``device_on``.
+ * (``"on_turn_on"``, see ``util/trigger-scopes``) the writer splices
+ * under the component; the backend reconstructs the catalog id from
+ * the component's platform and domain plus the bare key. Device-level
+ * catalog ids carry no domain prefix, so the two forms coincide for
+ * ``device_on``.
  */
 import type {
   AutomationLocation,
@@ -21,39 +22,16 @@ import type {
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import {
-  instanceName,
-  isSelectableTarget,
-  targetScopes,
-  triggerAppliesTo,
-} from "./component-targets.js";
-
-/**
- * The bare YAML key of a catalog trigger id: its last segment.
- * ``"switch.on_turn_on"`` and ``"rotary_encoder.sensor.on_clockwise"``
- * both give their ``on_*`` key; ids without a prefix pass through.
- */
-export function bareTriggerKey(catalogId: string): string {
-  return catalogId.slice(catalogId.lastIndexOf(".") + 1);
-}
-
-/** The component trigger offered within *scopes* whose bare YAML key is *key*. */
-export function triggerForKey(
-  triggers: AutomationTrigger[],
-  scopes: readonly string[],
-  key: string
-): AutomationTrigger | undefined {
-  return triggers.find(
-    (t) => bareTriggerKey(t.id) === key && triggerAppliesTo(t, scopes)
-  );
-}
+import { targetScopes, triggerForKey } from "../../../util/trigger-scopes.js";
+import { instanceName } from "./component-targets.js";
 
 /**
  * The catalog-qualified trigger id for a ``component_on`` location:
  * the trigger offered to the bound device under that bare key. Returns
  * ``null`` for other location kinds or when no trigger is picked, and
  * the bare key itself while the device or its triggers are unknown so
- * the caller still has a usable id.
+ * the caller still has a usable id. Containers resolve too: a
+ * multi-entity platform can host triggers on its own list item.
  */
 export function catalogTriggerIdFor(
   loc: AutomationLocation,
@@ -62,7 +40,7 @@ export function catalogTriggerIdFor(
 ): string | null {
   if (loc.kind !== "component_on" || !loc.trigger) return null;
   const device = devices.find((d) => d.id === loc.component_id);
-  if (!device || !isSelectableTarget(device)) return loc.trigger;
+  if (!device) return loc.trigger;
   return (
     triggerForKey(triggers, targetScopes(device.component_id), loc.trigger)?.id ??
     loc.trigger
