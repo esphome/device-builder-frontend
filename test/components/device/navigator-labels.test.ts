@@ -122,7 +122,7 @@ describe("resolveNavItemLabels trigger scopes", () => {
       key: "automation:component_on:dial:on_clockwise",
       id: "dial",
       parentKey: "sensor",
-      platform: "rotary_encoder",
+      hostPlatform: "rotary_encoder",
       eventKey: "on_clockwise",
     } as unknown as YamlSection;
     expect(resolveNavItemLabels(row, "automation", scoped).primary).toBe("On Clockwise");

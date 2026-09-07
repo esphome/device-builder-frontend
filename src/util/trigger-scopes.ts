@@ -10,7 +10,7 @@
  */
 import type { AutomationTrigger } from "../api/types/automations.js";
 import { parseCatalogId } from "./config-entry-yaml-scan.js";
-import { qualifiedSectionKey } from "./yaml-sections.js";
+import { qualifiedSectionKey } from "./yaml-sections-core.js";
 
 /**
  * The bare YAML key of a catalog trigger id: its last segment.
@@ -23,7 +23,8 @@ export function bareTriggerKey(catalogId: string): string {
 
 /** Scopes an instance matches: its qualified id, then its bare domain. */
 export function targetScopes(componentId: string): string[] {
-  return [componentId, parseCatalogId(componentId).domain];
+  const { domain } = parseCatalogId(componentId);
+  return domain === componentId ? [componentId] : [componentId, domain];
 }
 
 /** Scopes of a handler row: ``<domain>.<platform>`` when a platform item

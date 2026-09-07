@@ -98,7 +98,7 @@ function triggerLabel(host: ESPHomeDeviceSectionConfig, item: YamlSection): stri
   const fallback = item.displayLabel || item.eventKey || "";
   if (!item.eventKey) return fallback;
   return host._triggerCatalog.resolveName(
-    handlerScopes(item.parentKey ?? "esphome", item.platform),
+    handlerScopes(item.parentKey ?? "esphome", item.hostPlatform),
     item.eventKey,
     fallback
   );

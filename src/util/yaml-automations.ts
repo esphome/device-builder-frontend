@@ -149,7 +149,7 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
         // the trigger catalog scopes on either.
         parentKey: host.parentKey ?? host.key,
         eventKey: eventName,
-        ...(host.platform !== undefined ? { platform: host.platform } : {}),
+        ...(host.platform !== undefined ? { hostPlatform: host.platform } : {}),
         ...(parentComponentId !== undefined ? { parentComponentId } : {}),
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,

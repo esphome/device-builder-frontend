@@ -151,7 +151,7 @@ function automationLabels(
   if (item.parentKey && item.eventKey) {
     const primary = eventOnly(
       ctx.triggerCatalog.resolveName(
-        handlerScopes(item.parentKey, item.platform),
+        handlerScopes(item.parentKey, item.hostPlatform),
         item.eventKey,
         humanizeEvent(item.eventKey)
       )

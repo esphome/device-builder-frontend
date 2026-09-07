@@ -31,6 +31,9 @@ export interface YamlSection {
   name?: string; // "name:" value from a YAML list item
   id?: string; // "id:" value from a YAML list item
   platform?: string; // "platform:" value from a YAML list item
+  /** The enclosing list item's ``platform:`` on an automation row, for
+   *  trigger scoping; never part of the row's section key. */
+  hostPlatform?: string;
   parentKey?: string; // top-level key when this is an expanded list item
   /**
    * For an automation on a nested sub-entity (``aht20_temperature`` under
@@ -570,4 +573,11 @@ export function collectIdsAtPath(
   const body = _sectionScanStart(lines, section);
   if (body !== null) walk(body.lo, body.hi, body.baseIndent, path);
   return out;
+}
+
+/** `<key>.<platform>` for a platform list item (de-duplicating an already
+ *  namespaced platform); the bare key otherwise. */
+export function qualifiedSectionKey(key: string, platform?: string): string {
+  if (!platform) return key;
+  return platform.startsWith(`${key}.`) ? platform : `${key}.${platform}`;
 }

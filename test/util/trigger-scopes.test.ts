@@ -48,7 +48,7 @@ describe("scopes", () => {
       "sensor.rotary_encoder",
       "sensor",
     ]);
-    expect(targetScopes("sensor")).toEqual(["sensor", "sensor"]);
+    expect(targetScopes("sensor")).toEqual(["sensor"]);
   });
 
   it("orders a handler row's scopes most specific first", () => {
