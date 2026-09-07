@@ -44,6 +44,7 @@ import {
   firstSelectableTarget,
   indexTargets,
   instanceName,
+  isSelectableTarget,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -172,7 +173,9 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         this.value?.kind === "component_on" ? this.value.component_id : "";
       // A multi-entity container is a trigger target only for its own
       // platform-scoped triggers; its sub-entities carry the rest.
-      const index = indexTargets(this.devices, this.triggers);
+      const index = indexTargets(this.devices, (d) =>
+        isSelectableTarget(d, this.triggers)
+      );
       const targets = index.selectable;
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">

@@ -3,7 +3,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { AvailableComponentInstance } from "../../../../src/api/types/automations.js";
+import type {
+  AutomationTrigger,
+  AvailableComponentInstance,
+} from "../../../../src/api/types/automations.js";
 import { ESPHomeComponentTargetPicker } from "../../../../src/components/device/automation-editor/component-target-picker.js";
 
 const aht = (): AvailableComponentInstance[] => [
@@ -21,10 +24,12 @@ const aht = (): AvailableComponentInstance[] => [
 async function mount(
   devices: AvailableComponentInstance[],
   value = "",
-  disabled = false
+  disabled = false,
+  triggers: AutomationTrigger[] = []
 ): Promise<ESPHomeComponentTargetPicker> {
   const el = new ESPHomeComponentTargetPicker();
   el.devices = devices;
+  el.triggers = triggers;
   el.value = value;
   el.disabled = disabled;
   document.body.appendChild(el);
@@ -73,28 +78,31 @@ describe("component-target-picker", () => {
   });
 
   it("renders a container as a selectable row when a trigger is scoped to its platform", async () => {
-    const el = await mount([
-      {
-        id: "ltr",
-        name: "LTR501",
-        component_id: "sensor.ltr501",
-        is_entity_container: true,
-      },
-      { id: "ltr_als", name: "Ambient", component_id: "sensor", parent_id: "ltr" },
-    ]);
-    el.triggers = [
-      {
-        id: "ltr501.sensor.on_ps_high_threshold",
-        name: "On Ps High",
-        description: "",
-        docs_url: "",
-        applies_to: ["sensor.ltr501"],
-        is_device_level: false,
-        supports_list: false,
-        config_entries: [],
-      },
-    ];
-    await el.updateComplete;
+    const el = await mount(
+      [
+        {
+          id: "ltr",
+          name: "LTR501",
+          component_id: "sensor.ltr501",
+          is_entity_container: true,
+        },
+        { id: "ltr_als", name: "Ambient", component_id: "sensor", parent_id: "ltr" },
+      ],
+      "",
+      false,
+      [
+        {
+          id: "ltr501.sensor.on_ps_high_threshold",
+          name: "On Ps High",
+          description: "",
+          docs_url: "",
+          applies_to: ["sensor.ltr501"],
+          is_device_level: false,
+          supports_list: false,
+          config_entries: [],
+        },
+      ]
+    );
     expect(choiceIds(el)).toEqual(["ltr", "ltr_als"]);
     expect(tabStops(el)).toEqual(["ltr"]);
     const group = el.shadowRoot!.querySelector('[role="group"]')!;

@@ -170,8 +170,8 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
       const componentId = this.target.component_id;
       const device = this.devices.find((d) => d.id === componentId);
       // Matches either the bare domain (``binary_sensor``) or the
-      // domain.platform tuple; a multi-entity container yields none (its
-      // triggers belong on its sub-entities).
+      // domain.platform tuple; a multi-entity container yields only the
+      // triggers scoped to its platform (the rest belong to its sub-entities).
       return triggersForComponent(this.triggers, device);
     }
     return [];

@@ -22,7 +22,7 @@ import type {
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { targetScopes, triggerForKey } from "../../../util/trigger-scopes.js";
+import { instanceScopes, triggerForKey } from "../../../util/trigger-scopes.js";
 import { instanceName } from "./component-targets.js";
 
 /**
@@ -30,8 +30,8 @@ import { instanceName } from "./component-targets.js";
  * the trigger offered to the bound device under that bare key. Returns
  * ``null`` for other location kinds or when no trigger is picked, and
  * the bare key itself while the device or its triggers are unknown so
- * the caller still has a usable id. Containers resolve too: a
- * multi-entity platform can host triggers on its own list item.
+ * the caller still has a usable id. A container resolves only the
+ * triggers scoped to its own platform.
  */
 export function catalogTriggerIdFor(
   loc: AutomationLocation,
@@ -41,10 +41,7 @@ export function catalogTriggerIdFor(
   if (loc.kind !== "component_on" || !loc.trigger) return null;
   const device = devices.find((d) => d.id === loc.component_id);
   if (!device) return loc.trigger;
-  return (
-    triggerForKey(triggers, targetScopes(device.component_id), loc.trigger)?.id ??
-    loc.trigger
-  );
+  return triggerForKey(triggers, instanceScopes(device), loc.trigger)?.id ?? loc.trigger;
 }
 
 /**

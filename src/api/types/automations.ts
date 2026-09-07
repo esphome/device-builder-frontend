@@ -303,7 +303,8 @@ export interface AvailableComponentInstance {
   /** Catalog title for ``component_id`` — the display name when ``name`` is unset. */
   title?: string;
   /** True for a multi-entity platform container; its sub-entities carry the
-   *  triggers, so the picker shows it as a non-selectable header. */
+   *  entity triggers, so the picker offers it only for triggers scoped to
+   *  its own platform. */
   is_entity_container?: boolean;
   /** A sub-entity's owning container id, for grouping it under that container. */
   parent_id?: string;

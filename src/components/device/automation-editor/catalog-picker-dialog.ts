@@ -69,6 +69,7 @@ import {
   componentDomain,
   indexTargets,
   instanceName,
+  isEntityTarget,
   preFillIdParam,
 } from "./component-targets.js";
 
@@ -282,7 +283,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances. The query matches
     // either axis: an entity hit lists all of that entity's actions.
-    const index = indexTargets(this.devices, []);
+    const index = indexTargets(this.devices, isEntityTarget);
     const sections = index.selectable.flatMap((device) => {
       const name = instanceName(device);
       const entityMatch = q !== "" && navItemMatches(q, name, device.id);

@@ -444,6 +444,18 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     });
   });
 
+  it("lands a container prefill on the container when it hosts its own trigger", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(ahtAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open({ kind: "component_on", componentId: "ltr" });
+    await dialog.updateComplete;
+    await flush();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("ltr");
+  });
+
   it("defaults the component to the first non-container instance", async () => {
     const dialog = await mountForComponentStep();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

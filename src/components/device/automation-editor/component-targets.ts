@@ -9,7 +9,7 @@ import type {
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { stripRedundantComponentSuffix } from "../../../util/component-title.js";
 import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
-import { targetScopes, triggerAppliesTo } from "../../../util/trigger-scopes.js";
+import { instanceScopes, triggerAppliesTo } from "../../../util/trigger-scopes.js";
 import { CORE_KEYS } from "../../../util/yaml-sections.js";
 
 /** The instance's display label: its ``name:`` when set, else the catalog
@@ -30,7 +30,7 @@ export function componentDomain(componentId: string): string {
 }
 
 export interface TargetIndex {
-  /** The instances a picker offers; containers are excluded. */
+  /** The instances a picker offers, per its ``selectable`` rule. */
   readonly selectable: AvailableComponentInstance[];
   /** The parenthetical context beside an instance's label: its component id,
    *  plus the owning container's name when it's a sub-entity, so two readings
@@ -39,14 +39,14 @@ export interface TargetIndex {
 }
 
 /** Index the full instance list once per render; ``context`` resolves parents
- *  against every instance, including the containers ``selectable`` drops. */
+ *  against every instance, including any container ``selectable`` drops. */
 export function indexTargets(
   devices: AvailableComponentInstance[],
-  triggers: AutomationTrigger[]
+  selectable: (device: AvailableComponentInstance) => boolean
 ): TargetIndex {
   const byId = new Map(devices.map((d) => [d.id, d]));
   return {
-    selectable: selectableTargets(devices, triggers),
+    selectable: devices.filter(selectable),
     context(device) {
       const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
       return parent
@@ -56,22 +56,21 @@ export function indexTargets(
   };
 }
 
-/** A multi-entity platform container is a target only when a trigger is
- *  scoped to its own platform (``sensor.ltr501``); the entity triggers
- *  belong to its sub-entities. */
+/** A trigger target: any instance but a multi-entity container, which
+ *  qualifies only when a trigger is scoped to its own platform
+ *  (``sensor.ltr501``); the entity triggers belong to its sub-entities. */
 export function isSelectableTarget(
   device: AvailableComponentInstance,
   triggers: AutomationTrigger[]
 ): boolean {
-  return !device.is_entity_container || triggersForComponent(triggers, device).length > 0;
+  if (!device.is_entity_container) return true;
+  const scopes = instanceScopes(device);
+  return triggers.some((t) => triggerAppliesTo(t, scopes));
 }
 
-/** The instances a picker may offer. */
-function selectableTargets(
-  devices: AvailableComponentInstance[],
-  triggers: AutomationTrigger[]
-): AvailableComponentInstance[] {
-  return devices.filter((d) => isSelectableTarget(d, triggers));
+/** A referenceable entity for actions: never a multi-entity container. */
+export function isEntityTarget(device: AvailableComponentInstance): boolean {
+  return !device.is_entity_container;
 }
 
 /** The first selectable instance, for defaulting a freshly-chosen kind. */
@@ -111,16 +110,13 @@ export function preFillIdParam(
   return { [idEntry.key]: device.id };
 }
 
-/** Component-level triggers the picker offers *device*: matched on its bare
- *  or qualified domain, or on the qualified domain alone for a container,
- *  whose entity triggers belong to its sub-entities. */
+/** Component-level triggers the picker offers *device*, matched on the
+ *  scopes it hosts triggers under. */
 export function triggersForComponent(
   triggers: AutomationTrigger[],
   device: AvailableComponentInstance | undefined
 ): AutomationTrigger[] {
   if (!device) return [];
-  const scopes = device.is_entity_container
-    ? [device.component_id]
-    : targetScopes(device.component_id);
+  const scopes = instanceScopes(device);
   return triggers.filter((t) => triggerAppliesTo(t, scopes));
 }

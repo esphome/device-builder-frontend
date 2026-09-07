@@ -19,6 +19,11 @@ import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
 import { instanceName, isSelectableTarget } from "./component-targets.js";
 
+/** The id ``aria-labelledby`` points a group at: its container's row or heading. */
+function groupHeaderId(container: AvailableComponentInstance): string {
+  return `component-group-${container.id}`;
+}
+
 type Group = {
   header: AvailableComponentInstance;
   subs: AvailableComponentInstance[];
@@ -67,7 +72,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
       >
         ${plan.map((item) => {
           if (!("header" in item)) return this._renderChoice(item, order);
-          const headerId = `component-group-${item.header.id}`;
+          const headerId = groupHeaderId(item.header);
           return html`<div
             class="component-group-wrap"
             role="group"
@@ -75,7 +80,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
           >
             ${
               item.selectable
-                ? this._renderChoice(item.header, order, headerId)
+                ? this._renderChoice(item.header, order, true)
                 : html`<p class="component-group" id=${headerId}>
                     ${instanceName(item.header)}
                     <span class="component-group-id">(${item.header.component_id})</span>
@@ -120,16 +125,16 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     return { plan, order };
   }
 
-  private _renderChoice(d: AvailableComponentInstance, order: string[], id?: string) {
+  private _renderChoice(d: AvailableComponentInstance, order: string[], header = false) {
     const selected = d.id === this.value;
     // Roving tabindex: the checked row is the single tab stop; before any
     // pick, the first selectable row holds it.
     const tabbable = selected || (!order.includes(this.value) && order[0] === d.id);
     return html`<div
       class="component-choice ${selected ? "component-choice--selected" : ""} ${
-        id ? "component-choice--group" : ""
+        header ? "component-choice--group" : ""
       }"
-      id=${id ?? nothing}
+      id=${header ? groupHeaderId(d) : nothing}
       role="radio"
       aria-checked=${selected ? "true" : "false"}
       aria-disabled=${this.disabled ? "true" : "false"}
