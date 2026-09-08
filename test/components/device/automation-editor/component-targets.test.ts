@@ -7,7 +7,7 @@ import type {
 import {
   componentDomain,
   firstTriggerTarget,
-  indexTargets,
+  instanceContext,
   instanceName,
   isActionTarget,
   isTriggerTarget,
@@ -61,13 +61,12 @@ describe("component-targets", () => {
   it("drops trigger-less containers from the selectable list and the first-selectable lookup", () => {
     const devices = [container, temp, relay];
     const hosting = (d: AvailableComponentInstance) => isTriggerTarget(d, [onValueRange]);
-    expect(indexTargets(devices, hosting).selectable).toEqual([temp, relay]);
+    expect(devices.filter(hosting)).toEqual([temp, relay]);
     expect(firstTriggerTarget(devices, [onValueRange])).toBe(temp);
     expect(
-      indexTargets([ltr, temp], (d) => isTriggerTarget(d, [onValueRange, onPsHigh]))
-        .selectable
+      [ltr, temp].filter((d) => isTriggerTarget(d, [onValueRange, onPsHigh]))
     ).toEqual([ltr, temp]);
-    expect(indexTargets([ltr, temp], isActionTarget).selectable).toEqual([temp]);
+    expect([ltr, temp].filter(isActionTarget)).toEqual([temp]);
   });
 
   it("offers a container only the triggers scoped to its platform", () => {
@@ -120,22 +119,21 @@ describe("instance label helpers", () => {
     expect(componentDomain("sensor")).toBe("sensor");
   });
 
-  it("indexTargets resolves a sub-entity's container even though selectable drops it", () => {
+  it("instanceContext resolves a sub-entity's container even when a picker drops it", () => {
     const named = inst({
       id: "aht20",
       component_id: "sensor.aht10",
       name: "AHT20",
       is_entity_container: true,
     });
-    const index = indexTargets([named, temp, relay], isActionTarget);
-    expect(index.selectable).toEqual([temp, relay]);
+    const context = instanceContext([named, temp, relay]);
     // Sub-entity → component id · parent label; plain instance → component id only.
-    expect(index.context(temp)).toBe("sensor · AHT20");
-    expect(index.context(relay)).toBe("switch.gpio");
+    expect(context(temp)).toBe("sensor · AHT20");
+    expect(context(relay)).toBe("switch.gpio");
     // A dangling parent_id (parent absent) degrades to the component id.
-    expect(
-      index.context(inst({ id: "o", component_id: "sensor", parent_id: "gone" }))
-    ).toBe("sensor");
+    expect(context(inst({ id: "o", component_id: "sensor", parent_id: "gone" }))).toBe(
+      "sensor"
+    );
   });
 });
 

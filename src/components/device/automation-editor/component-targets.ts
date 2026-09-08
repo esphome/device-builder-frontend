@@ -29,30 +29,21 @@ export function componentDomain(componentId: string): string {
   return parseCatalogId(componentId).domain;
 }
 
-export interface TargetIndex {
-  /** The instances a picker offers, per its ``selectable`` rule. */
-  readonly selectable: AvailableComponentInstance[];
-  /** The parenthetical context beside an instance's label: its component id,
-   *  plus the owning container's name when it's a sub-entity, so two readings
-   *  named alike (``Temperature``) read distinctly. */
-  context(device: AvailableComponentInstance): string;
-}
-
-/** Index the full instance list once per render; ``context`` resolves parents
- *  against every instance, including any container ``selectable`` drops. */
-export function indexTargets(
-  devices: AvailableComponentInstance[],
-  selectable: (device: AvailableComponentInstance) => boolean
-): TargetIndex {
+/**
+ * The parenthetical context beside an instance's label: its component id,
+ * plus the owning container's name when it's a sub-entity, so two readings
+ * named alike (``Temperature``) read distinctly. Resolves parents against
+ * every instance, including containers a picker filters out.
+ */
+export function instanceContext(
+  devices: AvailableComponentInstance[]
+): (device: AvailableComponentInstance) => string {
   const byId = new Map(devices.map((d) => [d.id, d]));
-  return {
-    selectable: devices.filter(selectable),
-    context(device) {
-      const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
-      return parent
-        ? `${device.component_id} · ${instanceName(parent)}`
-        : device.component_id;
-    },
+  return (device) => {
+    const parent = device.parent_id ? byId.get(device.parent_id) : undefined;
+    return parent
+      ? `${device.component_id} · ${instanceName(parent)}`
+      : device.component_id;
   };
 }
 

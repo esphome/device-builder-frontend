@@ -42,7 +42,7 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   firstTriggerTarget,
-  indexTargets,
+  instanceContext,
   instanceName,
   isTriggerTarget,
 } from "./component-targets.js";
@@ -173,8 +173,8 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         this.value?.kind === "component_on" ? this.value.component_id : "";
       // A multi-entity container is a trigger target only for its own
       // platform-scoped triggers; its sub-entities carry the rest.
-      const index = indexTargets(this.devices, (d) => isTriggerTarget(d, this.triggers));
-      const targets = index.selectable;
+      const targets = this.devices.filter((d) => isTriggerTarget(d, this.triggers));
+      const context = instanceContext(this.devices);
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">
           ${this._localize("device.automation_target_no_components")}
@@ -195,7 +195,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             (d) =>
               html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
                 >${instanceName(d)}
-                <span class="ae-muted">(${index.context(d)})</span></wa-option
+                <span class="ae-muted">(${context(d)})</span></wa-option
               >`
           )}
         </wa-select>

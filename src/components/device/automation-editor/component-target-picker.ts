@@ -1,6 +1,7 @@
 /**
  * Single-select radiogroup over configured component instances: a
- * multi-entity platform renders as a group header with its sub-entity rows.
+ * multi-entity platform renders as a group header with its sub-entity rows,
+ * or as its own row ahead of them when it hosts platform-scoped triggers.
  * Emits ``component-change`` with the picked id; controlled via ``value``.
  */
 import { consume } from "@lit/context";
