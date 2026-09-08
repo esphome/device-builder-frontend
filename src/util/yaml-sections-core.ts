@@ -53,7 +53,7 @@ export interface YamlSection {
   /**
    * Bare trigger event key (``on_press``, ``on_turn_on``) for
    * automation entries. The navigator resolves the trigger's pretty
-   * name by this key within the row's ``parentKey`` / ``platform``
+   * name by this key within the row's ``parentKey`` / ``hostPlatform``
    * scopes (see ``util/trigger-scopes``).
    */
   eventKey?: string;
