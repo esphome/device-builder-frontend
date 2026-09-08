@@ -67,8 +67,9 @@ import {
 } from "./catalog-picker-filter.js";
 import {
   componentDomain,
-  indexTargets,
+  instanceContext,
   instanceName,
+  isActionTarget,
   preFillIdParam,
 } from "./component-targets.js";
 
@@ -279,11 +280,11 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     const filteredByDomain = q
       ? new Map([...byDomain].map(([domain, list]) => [domain, filterItems(list, q)]))
       : byDomain;
-    const index = indexTargets(this.devices);
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances. The query matches
     // either axis: an entity hit lists all of that entity's actions.
-    const sections = index.selectable.flatMap((device) => {
+    const context = instanceContext(this.devices);
+    const sections = this.devices.filter(isActionTarget).flatMap((device) => {
       const name = instanceName(device);
       const entityMatch = q !== "" && navItemMatches(q, name, device.id);
       const matching = itemsForDevice(entityMatch ? byDomain : filteredByDomain, device);
@@ -305,7 +306,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         localize: this._localize,
         labelText: this._renderGroupLabel(
           name,
-          index.context(device),
+          context(device),
           q && !entityMatch ? matching.length : null
         ),
         body: () =>

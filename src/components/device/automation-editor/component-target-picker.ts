@@ -1,22 +1,37 @@
 /**
  * Single-select radiogroup over configured component instances: a
- * multi-entity platform renders as a group header with its sub-entity rows.
+ * multi-entity platform renders as a group header with its sub-entity rows,
+ * or as its own row ahead of them when it hosts platform-scoped triggers.
  * Emits ``component-change`` with the picked id; controlled via ``value``.
  */
 import { consume } from "@lit/context";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import type { AvailableComponentInstance } from "../../../api/types/automations.js";
+import type {
+  AutomationTrigger,
+  AvailableComponentInstance,
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
-import { instanceName } from "./component-targets.js";
+import { instanceName, isTriggerTarget } from "./component-targets.js";
 
-type Group = { header: AvailableComponentInstance; subs: AvailableComponentInstance[] };
+/** The id of a group's visible heading, for ``aria-labelledby``. */
+function groupHeaderId(container: AvailableComponentInstance): string {
+  return `component-group-${container.id}`;
+}
+
+type Group = {
+  header: AvailableComponentInstance;
+  subs: AvailableComponentInstance[];
+  /** Render the container as the group's heading; false when it is a
+   *  target itself and already rendered as the row preceding the group. */
+  heading: boolean;
+};
 
 /** Arrow key → step through the flat row order (Left/Up back, Right/Down on). */
 const ARROW_DELTA: Record<string, number> = {
@@ -33,6 +48,8 @@ export class ESPHomeComponentTargetPicker extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @property({ attribute: false }) devices: AvailableComponentInstance[] = [];
+  /** Offered triggers; decides whether a container is itself a target. */
+  @property({ attribute: false }) triggers: AutomationTrigger[] = [];
   @property() value = "";
   @property({ type: Boolean }) disabled = false;
 
@@ -57,16 +74,21 @@ export class ESPHomeComponentTargetPicker extends LitElement {
       >
         ${plan.map((item) => {
           if (!("header" in item)) return this._renderChoice(item, order);
-          const headerId = `component-group-${item.header.id}`;
+          const headerId = groupHeaderId(item.header);
           return html`<div
             class="component-group-wrap"
             role="group"
-            aria-labelledby=${headerId}
+            aria-labelledby=${item.heading ? headerId : nothing}
+            aria-label=${item.heading ? nothing : instanceName(item.header)}
           >
-            <p class="component-group" id=${headerId}>
-              ${instanceName(item.header)}
-              <span class="component-group-id">(${item.header.component_id})</span>
-            </p>
+            ${
+              item.heading
+                ? html`<p class="component-group" id=${headerId}>
+                    ${instanceName(item.header)}
+                    <span class="component-group-id">(${item.header.component_id})</span>
+                  </p>`
+                : nothing
+            }
             ${item.subs.map((s) => this._renderChoice(s, order))}
           </div>`;
         })}
@@ -92,8 +114,13 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     for (const d of this.devices) {
       if (d.is_entity_container) {
         const subs = subsByParent.get(d.id) ?? [];
+        const target = isTriggerTarget(d, this.triggers);
+        if (target) {
+          plan.push(d);
+          order.push(d.id);
+        }
         if (subs.length === 0) continue;
-        plan.push({ header: d, subs });
+        plan.push({ header: d, subs, heading: !target });
         order.push(...subs.map((s) => s.id));
       } else if (!(d.parent_id && containerIds.has(d.parent_id))) {
         // Orphan sub (parent absent) or plain instance → standalone row.

@@ -8,7 +8,10 @@
  * Scope lists are ordered most specific first so a platform-scoped
  * trigger wins over a domain-level one sharing the same key.
  */
-import type { AutomationTrigger } from "../api/types/automations.js";
+import type {
+  AutomationTrigger,
+  AvailableComponentInstance,
+} from "../api/types/automations.js";
 import { parseCatalogId } from "./config-entry-yaml-scan.js";
 import { qualifiedSectionKey } from "./yaml-sections-core.js";
 
@@ -25,6 +28,15 @@ export function bareTriggerKey(catalogId: string): string {
 export function targetScopes(componentId: string): string[] {
   const { domain } = parseCatalogId(componentId);
   return domain === componentId ? [componentId] : [componentId, domain];
+}
+
+/** Scopes an instance hosts triggers under. A multi-entity container's
+ *  list item is not an entity, so it drops the bare domain deliberately:
+ *  the entity triggers belong to its sub-entities. */
+export function instanceScopes(device: AvailableComponentInstance): string[] {
+  return device.is_entity_container
+    ? [device.component_id]
+    : targetScopes(device.component_id);
 }
 
 /** Scopes of a handler row: ``<domain>.<platform>`` when a platform item

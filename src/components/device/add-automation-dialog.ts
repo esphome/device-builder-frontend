@@ -44,7 +44,7 @@ import { bareTriggerKey } from "../../util/trigger-scopes.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import {
-  firstSelectableTarget,
+  firstTriggerTarget,
   scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
@@ -149,6 +149,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     void this._loadAvailable();
   }
 
+  private get _devices(): AvailableComponentInstance[] {
+    return this._available?.devices ?? [];
+  }
+
+  private get _triggers(): AutomationTrigger[] {
+    return this._available?.triggers ?? [];
+  }
+
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     this._loading = true;
@@ -158,12 +166,13 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         this.yaml
       );
       // A per-section shortcut on a multi-entity container prefills the
-      // container id, which has no triggers of its own; land on its first
-      // sub-entity so the user sees a real target instead of an empty list.
+      // container id; land on the first real target in it (the container
+      // itself when a trigger is scoped to its platform, else a sub-entity).
       const container = this._prefillContainer();
       if (container) {
         this._componentId =
-          this._available.devices.find((d) => d.parent_id === container.id)?.id ?? "";
+          firstTriggerTarget(scopeToContainer(this._devices, container), this._triggers)
+            ?.id ?? "";
       }
       this._preselectUniqueTrigger();
     } catch (err) {
@@ -174,7 +183,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   /** The prefilled component when it's a multi-entity container (its
-   *  triggers live on its sub-entities), else undefined. */
+   *  entity triggers live on its sub-entities), else undefined. */
   private _prefillContainer(): AvailableComponentInstance | undefined {
     if (!this._prefilled || this._kind !== "component_on" || !this._prefillComponentId) {
       return undefined;
@@ -223,8 +232,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     // explain instead of showing an empty picker with a dead Add button.
     const containerEmpty =
       !!prefillContainer &&
-      !firstSelectableTarget(
-        scopeToContainer(this._available?.devices ?? [], prefillContainer)
+      !firstTriggerTarget(
+        scopeToContainer(this._devices, prefillContainer),
+        this._triggers
       );
     return html`
       <p class="intro">
@@ -291,9 +301,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private _renderComponentRow(container?: AvailableComponentInstance) {
     // Scope the picker to one container's sub-entities when launched from
     // that component's section; otherwise offer every configured instance.
-    const devices = scopeToContainer(this._available?.devices ?? [], container);
+    const devices = scopeToContainer(this._devices, container);
     return html`<esphome-component-target-picker
       .devices=${devices}
+      .triggers=${this._triggers}
       .value=${this._componentId}
       ?disabled=${this._saving}
       @component-change=${(e: CustomEvent<{ componentId: string }>) =>
@@ -376,7 +387,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   private _filteredTriggers(): AutomationTrigger[] {
-    const all = this._available?.triggers ?? [];
+    const all = this._triggers;
     if (this._kind === "device_on") {
       // Device-level handlers fire once unless ESPHome accepts a list
       // (supports_list, e.g. multiple on_boot priorities); list-capable ones
@@ -430,10 +441,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._kind = k;
     this._triggerId = null;
     if (k === "component_on") {
-      const devices = this._available?.devices ?? [];
-      // A container isn't selectable (entity triggers go on its
-      // sub-entities); default to the first real target.
-      this._componentId = firstSelectableTarget(devices)?.id ?? "";
+      // A container is a target only for its own platform-scoped
+      // triggers; default to the first real target.
+      this._componentId = firstTriggerTarget(this._devices, this._triggers)?.id ?? "";
     } else {
       this._componentId = "";
     }

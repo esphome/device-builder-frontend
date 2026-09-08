@@ -303,6 +303,14 @@ const ahtAvailable = (): AvailableAutomations =>
         supports_list: true,
         config_entries: [],
       },
+      {
+        id: "ltr501.sensor.on_ps_high_threshold",
+        name: "On Ps High Threshold",
+        applies_to: ["sensor.ltr501"],
+        is_device_level: false,
+        supports_list: false,
+        config_entries: [],
+      },
     ],
     actions: [],
     conditions: [],
@@ -328,6 +336,13 @@ const ahtAvailable = (): AvailableAutomations =>
       },
       { id: "relay", name: "Relay", component_id: "switch.gpio" },
       { id: "dial", name: "Dial", component_id: "sensor.rotary_encoder" },
+      {
+        id: "ltr",
+        name: "LTR501",
+        component_id: "sensor.ltr501",
+        is_entity_container: true,
+      },
+      { id: "ltr_als", name: "Ambient", component_id: "sensor", parent_id: "ltr" },
     ],
   }) as unknown as AvailableAutomations;
 
@@ -410,6 +425,35 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
       "sensor.on_value_range",
       "rotary_encoder.sensor.on_clockwise",
     ]);
+  });
+
+  it("offers a container its own platform-scoped trigger and targets it directly", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "ltr";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offered = (dialog as any)._filteredTriggers() as Array<{ id: string }>;
+    expect(offered.map((t) => t.id)).toEqual(["ltr501.sensor.on_ps_high_threshold"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "ltr501.sensor.on_ps_high_threshold";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._buildLocation()).toEqual({
+      kind: "component_on",
+      component_id: "ltr",
+      trigger: "on_ps_high_threshold",
+    });
+  });
+
+  it("lands a container prefill on the container when it hosts its own trigger", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(ahtAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open({ kind: "component_on", componentId: "ltr" });
+    await dialog.updateComplete;
+    await flush();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("ltr");
   });
 
   it("defaults the component to the first non-container instance", async () => {

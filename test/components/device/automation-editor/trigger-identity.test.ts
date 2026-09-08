@@ -87,6 +87,12 @@ describe("catalogTriggerIdFor", () => {
     ).toBe("ltr501.sensor.on_ps_high_threshold");
   });
 
+  it("leaves a domain-level key unresolved on a container", () => {
+    expect(
+      catalogTriggerIdFor(componentOn("on_value_range", "ltr"), [container], triggers)
+    ).toBe("on_value_range");
+  });
+
   it("resolves a sub-entity's trigger to the domain-level id", () => {
     expect(
       catalogTriggerIdFor(

@@ -2,9 +2,10 @@ import { css } from "lit";
 
 /**
  * Styles for <esphome-component-target-picker>: a grouped radiogroup of
- * configured component instances (a multi-entity platform is a header, its
- * sub-entities the rows), mirroring the catalog by-target picker and the
- * nested-form domain badge.
+ * configured component instances (a multi-entity platform is a header, or a
+ * row of its own when it hosts platform-scoped triggers, its sub-entities the
+ * rows), mirroring the catalog by-target picker and the nested-form domain
+ * badge.
  */
 export const componentTargetPickerStyles = css`
   .field {
