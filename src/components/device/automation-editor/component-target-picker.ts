@@ -17,9 +17,9 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
-import { instanceName, isSelectableTarget } from "./component-targets.js";
+import { instanceName, isTriggerTarget } from "./component-targets.js";
 
-/** The id ``aria-labelledby`` points a group at: its container's row or heading. */
+/** The id of a group's visible heading, for ``aria-labelledby``. */
 function groupHeaderId(container: AvailableComponentInstance): string {
   return `component-group-${container.id}`;
 }
@@ -27,8 +27,9 @@ function groupHeaderId(container: AvailableComponentInstance): string {
 type Group = {
   header: AvailableComponentInstance;
   subs: AvailableComponentInstance[];
-  /** The container is itself a target (it hosts platform-scoped triggers). */
-  selectable: boolean;
+  /** Render the container as the group's heading; false when it is a
+   *  target itself and already rendered as the row preceding the group. */
+  heading: boolean;
 };
 
 /** Arrow key → step through the flat row order (Left/Up back, Right/Down on). */
@@ -76,15 +77,16 @@ export class ESPHomeComponentTargetPicker extends LitElement {
           return html`<div
             class="component-group-wrap"
             role="group"
-            aria-labelledby=${headerId}
+            aria-labelledby=${item.heading ? headerId : nothing}
+            aria-label=${item.heading ? nothing : instanceName(item.header)}
           >
             ${
-              item.selectable
-                ? this._renderChoice(item.header, order, true)
-                : html`<p class="component-group" id=${headerId}>
+              item.heading
+                ? html`<p class="component-group" id=${headerId}>
                     ${instanceName(item.header)}
                     <span class="component-group-id">(${item.header.component_id})</span>
                   </p>`
+                : nothing
             }
             ${item.subs.map((s) => this._renderChoice(s, order))}
           </div>`;
@@ -111,10 +113,13 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     for (const d of this.devices) {
       if (d.is_entity_container) {
         const subs = subsByParent.get(d.id) ?? [];
-        const selectable = isSelectableTarget(d, this.triggers);
-        if (subs.length === 0 && !selectable) continue;
-        plan.push({ header: d, subs, selectable });
-        if (selectable) order.push(d.id);
+        const target = isTriggerTarget(d, this.triggers);
+        if (target) {
+          plan.push(d);
+          order.push(d.id);
+        }
+        if (subs.length === 0) continue;
+        plan.push({ header: d, subs, heading: !target });
         order.push(...subs.map((s) => s.id));
       } else if (!(d.parent_id && containerIds.has(d.parent_id))) {
         // Orphan sub (parent absent) or plain instance → standalone row.
@@ -125,16 +130,13 @@ export class ESPHomeComponentTargetPicker extends LitElement {
     return { plan, order };
   }
 
-  private _renderChoice(d: AvailableComponentInstance, order: string[], header = false) {
+  private _renderChoice(d: AvailableComponentInstance, order: string[]) {
     const selected = d.id === this.value;
     // Roving tabindex: the checked row is the single tab stop; before any
     // pick, the first selectable row holds it.
     const tabbable = selected || (!order.includes(this.value) && order[0] === d.id);
     return html`<div
-      class="component-choice ${selected ? "component-choice--selected" : ""} ${
-        header ? "component-choice--group" : ""
-      }"
-      id=${header ? groupHeaderId(d) : nothing}
+      class="component-choice ${selected ? "component-choice--selected" : ""}"
       role="radio"
       aria-checked=${selected ? "true" : "false"}
       aria-disabled=${this.disabled ? "true" : "false"}

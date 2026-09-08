@@ -6,11 +6,11 @@ import type {
 } from "../../../../src/api/types/automations.js";
 import {
   componentDomain,
-  firstSelectableTarget,
+  firstTriggerTarget,
   indexTargets,
   instanceName,
-  isEntityTarget,
-  isSelectableTarget,
+  isActionTarget,
+  isTriggerTarget,
   preFillIdParam,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
@@ -51,24 +51,23 @@ const onPsHigh = trigger({
 
 describe("component-targets", () => {
   it("treats non-containers as selectable and containers only with their own triggers", () => {
-    expect(isSelectableTarget(temp, [onValueRange])).toBe(true);
-    expect(isSelectableTarget(relay, [])).toBe(true);
-    expect(isSelectableTarget(container, [onValueRange])).toBe(false);
-    expect(isSelectableTarget(ltr, [onValueRange])).toBe(false);
-    expect(isSelectableTarget(ltr, [onValueRange, onPsHigh])).toBe(true);
+    expect(isTriggerTarget(temp, [onValueRange])).toBe(true);
+    expect(isTriggerTarget(relay, [])).toBe(true);
+    expect(isTriggerTarget(container, [onValueRange])).toBe(false);
+    expect(isTriggerTarget(ltr, [onValueRange])).toBe(false);
+    expect(isTriggerTarget(ltr, [onValueRange, onPsHigh])).toBe(true);
   });
 
   it("drops trigger-less containers from the selectable list and the first-selectable lookup", () => {
     const devices = [container, temp, relay];
-    const hosting = (d: AvailableComponentInstance) =>
-      isSelectableTarget(d, [onValueRange]);
+    const hosting = (d: AvailableComponentInstance) => isTriggerTarget(d, [onValueRange]);
     expect(indexTargets(devices, hosting).selectable).toEqual([temp, relay]);
-    expect(firstSelectableTarget(devices, [onValueRange])).toBe(temp);
+    expect(firstTriggerTarget(devices, [onValueRange])).toBe(temp);
     expect(
-      indexTargets([ltr, temp], (d) => isSelectableTarget(d, [onValueRange, onPsHigh]))
+      indexTargets([ltr, temp], (d) => isTriggerTarget(d, [onValueRange, onPsHigh]))
         .selectable
     ).toEqual([ltr, temp]);
-    expect(indexTargets([ltr, temp], isEntityTarget).selectable).toEqual([temp]);
+    expect(indexTargets([ltr, temp], isActionTarget).selectable).toEqual([temp]);
   });
 
   it("offers a container only the triggers scoped to its platform", () => {
@@ -128,7 +127,7 @@ describe("instance label helpers", () => {
       name: "AHT20",
       is_entity_container: true,
     });
-    const index = indexTargets([named, temp, relay], isEntityTarget);
+    const index = indexTargets([named, temp, relay], isActionTarget);
     expect(index.selectable).toEqual([temp, relay]);
     // Sub-entity → component id · parent label; plain instance → component id only.
     expect(index.context(temp)).toBe("sensor · AHT20");

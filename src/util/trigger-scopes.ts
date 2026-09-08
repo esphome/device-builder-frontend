@@ -30,8 +30,9 @@ export function targetScopes(componentId: string): string[] {
   return domain === componentId ? [componentId] : [componentId, domain];
 }
 
-/** Scopes an instance hosts triggers under: a multi-entity container only
- *  its qualified id (its sub-entities carry the entity triggers). */
+/** Scopes an instance hosts triggers under. A multi-entity container's
+ *  list item is not an entity, so it drops the bare domain deliberately:
+ *  the entity triggers belong to its sub-entities. */
 export function instanceScopes(device: AvailableComponentInstance): string[] {
   return device.is_entity_container
     ? [device.component_id]

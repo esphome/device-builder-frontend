@@ -56,10 +56,12 @@ export function indexTargets(
   };
 }
 
-/** A trigger target: any instance but a multi-entity container, which
- *  qualifies only when a trigger is scoped to its own platform
- *  (``sensor.ltr501``); the entity triggers belong to its sub-entities. */
-export function isSelectableTarget(
+/** A ``component_on`` target: any instance but a multi-entity container,
+ *  which qualifies only when a trigger is scoped to its own platform
+ *  (``sensor.ltr501``); the entity triggers belong to its sub-entities.
+ *  A plain instance never has to prove it hosts a trigger, so a domain
+ *  without triggers still lists its instances. */
+export function isTriggerTarget(
   device: AvailableComponentInstance,
   triggers: AutomationTrigger[]
 ): boolean {
@@ -68,17 +70,17 @@ export function isSelectableTarget(
   return triggers.some((t) => triggerAppliesTo(t, scopes));
 }
 
-/** A referenceable entity for actions: never a multi-entity container. */
-export function isEntityTarget(device: AvailableComponentInstance): boolean {
+/** An entity an action can reference: never a multi-entity container. */
+export function isActionTarget(device: AvailableComponentInstance): boolean {
   return !device.is_entity_container;
 }
 
-/** The first selectable instance, for defaulting a freshly-chosen kind. */
-export function firstSelectableTarget(
+/** The first ``component_on`` target, for defaulting a freshly-chosen kind. */
+export function firstTriggerTarget(
   devices: AvailableComponentInstance[],
   triggers: AutomationTrigger[]
 ): AvailableComponentInstance | undefined {
-  return devices.find((d) => isSelectableTarget(d, triggers));
+  return devices.find((d) => isTriggerTarget(d, triggers));
 }
 
 /** *container* plus its direct sub-entities, for scoping a picker to one

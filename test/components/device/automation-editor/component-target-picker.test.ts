@@ -105,12 +105,42 @@ describe("component-target-picker", () => {
     );
     expect(choiceIds(el)).toEqual(["ltr", "ltr_als"]);
     expect(tabStops(el)).toEqual(["ltr"]);
+    // The container row stands outside the sub-entity group, which keeps
+    // the container's name as its accessible label but shows no heading.
     const group = el.shadowRoot!.querySelector('[role="group"]')!;
-    const headerId = group.getAttribute("aria-labelledby")!;
-    expect(el.shadowRoot!.querySelector(`#${headerId}`)!.getAttribute("role")).toBe(
-      "radio"
-    );
+    expect(group.querySelector('[data-id="ltr"]')).toBeNull();
+    expect(group.querySelector(".component-group")).toBeNull();
+    expect(group.getAttribute("aria-label")).toBe("LTR501");
     expect(pressOn(el, "ltr", "Enter")).toBe("ltr");
+  });
+
+  it("renders a lone platform-scoped container as a plain row with no group", async () => {
+    const el = await mount(
+      [
+        {
+          id: "ltr",
+          name: "LTR501",
+          component_id: "sensor.ltr501",
+          is_entity_container: true,
+        },
+      ],
+      "",
+      false,
+      [
+        {
+          id: "ltr501.sensor.on_ps_high_threshold",
+          name: "On Ps High",
+          description: "",
+          docs_url: "",
+          applies_to: ["sensor.ltr501"],
+          is_device_level: false,
+          supports_list: false,
+          config_entries: [],
+        },
+      ]
+    );
+    expect(choiceIds(el)).toEqual(["ltr"]);
+    expect(el.shadowRoot!.querySelector('[role="group"]')).toBeNull();
   });
 
   it("is a radiogroup of radios", async () => {

@@ -41,10 +41,10 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
-  firstSelectableTarget,
+  firstTriggerTarget,
   indexTargets,
   instanceName,
-  isSelectableTarget,
+  isTriggerTarget,
 } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -173,9 +173,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         this.value?.kind === "component_on" ? this.value.component_id : "";
       // A multi-entity container is a trigger target only for its own
       // platform-scoped triggers; its sub-entities carry the rest.
-      const index = indexTargets(this.devices, (d) =>
-        isSelectableTarget(d, this.triggers)
-      );
+      const index = indexTargets(this.devices, (d) => isTriggerTarget(d, this.triggers));
       const targets = index.selectable;
       if (targets.length === 0) {
         return html`<p class="ae-empty" role="status">
@@ -292,7 +290,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         case "interval":
           return { kind, index: 0 };
         case "component_on": {
-          const target = firstSelectableTarget(this.devices, this.triggers);
+          const target = firstTriggerTarget(this.devices, this.triggers);
           return target ? { kind, component_id: target.id, trigger: "" } : null;
         }
         case "script":

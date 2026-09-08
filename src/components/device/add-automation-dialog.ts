@@ -44,7 +44,7 @@ import { bareTriggerKey } from "../../util/trigger-scopes.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import {
-  firstSelectableTarget,
+  firstTriggerTarget,
   scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
@@ -171,10 +171,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       const container = this._prefillContainer();
       if (container) {
         this._componentId =
-          firstSelectableTarget(
-            scopeToContainer(this._devices, container),
-            this._triggers
-          )?.id ?? "";
+          firstTriggerTarget(scopeToContainer(this._devices, container), this._triggers)
+            ?.id ?? "";
       }
       this._preselectUniqueTrigger();
     } catch (err) {
@@ -234,7 +232,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     // explain instead of showing an empty picker with a dead Add button.
     const containerEmpty =
       !!prefillContainer &&
-      !firstSelectableTarget(
+      !firstTriggerTarget(
         scopeToContainer(this._devices, prefillContainer),
         this._triggers
       );
@@ -445,7 +443,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     if (k === "component_on") {
       // A container is a target only for its own platform-scoped
       // triggers; default to the first real target.
-      this._componentId = firstSelectableTarget(this._devices, this._triggers)?.id ?? "";
+      this._componentId = firstTriggerTarget(this._devices, this._triggers)?.id ?? "";
     } else {
       this._componentId = "";
     }
