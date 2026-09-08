@@ -31,8 +31,9 @@ export interface YamlSection {
   name?: string; // "name:" value from a YAML list item
   id?: string; // "id:" value from a YAML list item
   platform?: string; // "platform:" value from a YAML list item
-  /** The enclosing list item's ``platform:`` on an automation row, for
-   *  trigger scoping; never part of the row's section key. */
+  /** The hosting component's ``platform:`` on an automation row (a list
+   *  item's or a bare mapping's), for trigger scoping; never part of the
+   *  row's section key. */
   hostPlatform?: string;
   parentKey?: string; // top-level key when this is an expanded list item
   /**
