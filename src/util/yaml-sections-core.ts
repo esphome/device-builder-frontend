@@ -31,6 +31,10 @@ export interface YamlSection {
   name?: string; // "name:" value from a YAML list item
   id?: string; // "id:" value from a YAML list item
   platform?: string; // "platform:" value from a YAML list item
+  /** The hosting component's ``platform:`` on an automation row (a list
+   *  item's or a bare mapping's), for trigger scoping; never part of the
+   *  row's section key. */
+  hostPlatform?: string;
   parentKey?: string; // top-level key when this is an expanded list item
   /**
    * For an automation on a nested sub-entity (``aht20_temperature`` under
@@ -48,9 +52,9 @@ export interface YamlSection {
   displayLabel?: string;
   /**
    * Bare trigger event key (``on_press``, ``on_turn_on``) for
-   * automation entries. The navigator combines this with
-   * ``parentKey`` to look up the trigger's pretty name in the
-   * catalog (``binary_sensor.on_press`` → "Pressed").
+   * automation entries. The navigator resolves the trigger's pretty
+   * name by this key within the row's ``parentKey`` / ``hostPlatform``
+   * scopes (see ``util/trigger-scopes``).
    */
   eventKey?: string;
   /**
@@ -570,4 +574,11 @@ export function collectIdsAtPath(
   const body = _sectionScanStart(lines, section);
   if (body !== null) walk(body.lo, body.hi, body.baseIndent, path);
   return out;
+}
+
+/** `<key>.<platform>` for a platform list item (de-duplicating an already
+ *  namespaced platform); the bare key otherwise. */
+export function qualifiedSectionKey(key: string, platform?: string): string {
+  if (!platform) return key;
+  return platform.startsWith(`${key}.`) ? platform : `${key}.${platform}`;
 }

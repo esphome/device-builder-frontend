@@ -39,6 +39,7 @@ import type {
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import { automationHeaderTitle } from "../../../util/automation-header-title.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
+import { bareTriggerKey } from "../../../util/trigger-scopes.js";
 import { actionsFocus, entryFieldFocus } from "./automation-focus.js";
 import { BaseAutomationEditor } from "./base-editor.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
@@ -50,7 +51,7 @@ import {
   renderTriggerParamsForm,
 } from "./render-automation-sections.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
-import { bareTriggerKey, effectiveTriggerIdFor } from "./trigger-identity.js";
+import { effectiveTriggerIdFor } from "./trigger-identity.js";
 
 @customElement("esphome-automation-editor")
 export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLocation> {
@@ -163,7 +164,12 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
-    const effectiveTriggerId = effectiveTriggerIdFor(automation, target, devices);
+    const effectiveTriggerId = effectiveTriggerIdFor(
+      automation,
+      target,
+      devices,
+      triggers
+    );
     const activeTrigger = effectiveTriggerId
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;

@@ -9,6 +9,7 @@ import type {
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { stripRedundantComponentSuffix } from "../../../util/component-title.js";
 import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
+import { targetScopes, triggerAppliesTo } from "../../../util/trigger-scopes.js";
 import { CORE_KEYS } from "../../../util/yaml-sections.js";
 
 /** The instance's display label: its ``name:`` when set, else the catalog
@@ -101,17 +102,14 @@ export function preFillIdParam(
   return { [idEntry.key]: device.id };
 }
 
-/** Component-level triggers valid for *device*, matched on its bare or
- *  qualified domain; empty when *device* is absent or a container. */
+/** Component-level triggers the picker offers *device*, matched on its bare
+ *  or qualified domain; empty when *device* is absent or a container, whose
+ *  own platform-scoped triggers the picker does not offer yet. */
 export function triggersForComponent(
   triggers: AutomationTrigger[],
   device: AvailableComponentInstance | undefined
 ): AutomationTrigger[] {
   if (!device || !isSelectableTarget(device)) return [];
-  const domain = componentDomain(device.component_id);
-  return triggers.filter(
-    (t) =>
-      !t.is_device_level &&
-      (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain))
-  );
+  const scopes = targetScopes(device.component_id);
+  return triggers.filter((t) => triggerAppliesTo(t, scopes));
 }

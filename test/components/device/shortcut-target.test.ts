@@ -121,7 +121,7 @@ describe("resolveShortcutTarget", () => {
     expect(resolveShortcutTarget(yaml, "web_server", undefined, () => false)).toBeNull();
   });
 
-  it("passes the bare domain and qualified key to the gate", () => {
+  it("passes the qualified key and bare domain to the gate", () => {
     const yaml = `output:
   - platform: slow_pwm
     id: my_out
@@ -132,7 +132,7 @@ describe("resolveShortcutTarget", () => {
       seen.push(scopes);
       return true;
     });
-    // parentKey (bare domain "output") first, then the section key.
-    expect(seen).toEqual([["output", "output.slow_pwm"]]);
+    // Most specific first: the qualified section key, then the bare domain.
+    expect(seen).toEqual([["output.slow_pwm", "output"]]);
   });
 });

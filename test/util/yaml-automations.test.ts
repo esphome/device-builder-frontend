@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { parseYamlAutomations } from "../../src/util/yaml-automations.js";
 import { _clearYamlSectionsMemo } from "../../src/util/yaml-sections-core.js";
+import { sectionKeyOf } from "../../src/util/yaml-sections.js";
 
 // `parseYamlAutomations` leans on `parseYamlTopLevelSections`, which memoises on
 // the yaml string. Distinct fixtures key distinctly, but clear the memo between
@@ -73,6 +74,8 @@ describe("parseYamlAutomations — component triggers", () => {
     expect(press?.key).toBe("automation:component_on:my_button:on_press");
     expect(press?.displayLabel).toBe("My Button → on_press");
     expect(press?.id).toBe("my_button");
+    expect(press?.hostPlatform).toBe("gpio");
+    expect(sectionKeyOf(press!)).toBe("automation:component_on:my_button:on_press");
     expect(press?.eventKey).toBe("on_press");
   });
 
@@ -93,6 +96,7 @@ describe("parseYamlAutomations — component triggers", () => {
     const lfRows = parseYamlAutomations(doc("\n"));
     const row = lfRows.find((r) => r.id === "temp_1");
     expect(row?.name).toBe("Temp One");
+    expect(row?.hostPlatform).toBeUndefined();
     expect(parseYamlAutomations(doc("\r\n"))).toEqual(lfRows);
   });
 

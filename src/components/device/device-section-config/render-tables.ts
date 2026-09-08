@@ -3,6 +3,7 @@
  */
 import { html, nothing } from "lit";
 import { actionFieldLabel } from "../../../util/action-field-label.js";
+import { handlerScopes } from "../../../util/trigger-scopes.js";
 import { parseYamlAutomations, type YamlSection } from "../../../util/yaml-sections.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import {
@@ -97,7 +98,7 @@ function triggerLabel(host: ESPHomeDeviceSectionConfig, item: YamlSection): stri
   const fallback = item.displayLabel || item.eventKey || "";
   if (!item.eventKey) return fallback;
   return host._triggerCatalog.resolveName(
-    item.parentKey ?? "esphome",
+    handlerScopes(item.parentKey ?? "esphome", item.hostPlatform),
     item.eventKey,
     fallback
   );

@@ -5,47 +5,46 @@
  * CodeMirror.
  *
  * Wire-shape background: ``AutomationTree.trigger_id`` is the
- * catalog-qualified id (``"switch.on_turn_on"`` — what
+ * catalog-qualified id (``"switch.on_turn_on"``, or the platform-scoped
+ * ``"rotary_encoder.sensor.on_clockwise"`` — what
  * ``catalog.trigger_by_id`` returns a hit for), while
  * ``location.component_on.trigger`` is the BARE YAML key
- * (``"on_turn_on"``) the writer splices under the component; the
- * backend reconstructs the catalog id by combining the component's
- * domain with the bare key. Device-level catalog ids carry no domain
- * prefix, so the two forms coincide for ``device_on``.
+ * (``"on_turn_on"``, see ``util/trigger-scopes``) the writer splices
+ * under the component; the backend reconstructs the catalog id from
+ * the component's platform and domain plus the bare key. Device-level
+ * catalog ids carry no domain prefix, so the two forms coincide for
+ * ``device_on``.
  */
 import type {
   AutomationLocation,
   AutomationTree,
+  AutomationTrigger,
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { componentDomain, instanceName } from "./component-targets.js";
+import { targetScopes, triggerForKey } from "../../../util/trigger-scopes.js";
+import { instanceName } from "./component-targets.js";
 
 /**
- * Drop the ``<domain>.`` prefix from a catalog trigger id to get
- * the bare YAML key. ``"switch.on_turn_on"`` → ``"on_turn_on"``.
- * Ids that already lack a domain are passed through.
- */
-export function bareTriggerKey(catalogId: string): string {
-  const dotIdx = catalogId.indexOf(".");
-  return dotIdx >= 0 ? catalogId.slice(dotIdx + 1) : catalogId;
-}
-
-/**
- * Build the catalog-qualified trigger id for a ``component_on``
- * location, using the bound device's domain. Returns ``null``
- * for other location kinds or when no trigger is picked; while
- * the device list hasn't loaded yet the bare trigger key is
- * returned unqualified so the caller still has a usable id.
+ * The catalog-qualified trigger id for a ``component_on`` location:
+ * the trigger offered to the bound device under that bare key. Returns
+ * ``null`` for other location kinds or when no trigger is picked, and
+ * the bare key itself while the device or its triggers are unknown so
+ * the caller still has a usable id. Containers resolve too: a
+ * multi-entity platform can host triggers on its own list item.
  */
 export function catalogTriggerIdFor(
   loc: AutomationLocation,
-  devices: AvailableComponentInstance[]
+  devices: AvailableComponentInstance[],
+  triggers: AutomationTrigger[]
 ): string | null {
   if (loc.kind !== "component_on" || !loc.trigger) return null;
   const device = devices.find((d) => d.id === loc.component_id);
-  const domain = device ? componentDomain(device.component_id) : null;
-  return domain ? `${domain}.${loc.trigger}` : loc.trigger;
+  if (!device) return loc.trigger;
+  return (
+    triggerForKey(triggers, targetScopes(device.component_id), loc.trigger)?.id ??
+    loc.trigger
+  );
 }
 
 /**
@@ -59,14 +58,15 @@ export function catalogTriggerIdFor(
 export function effectiveTriggerIdFor(
   automation: AutomationTree,
   target: AutomationLocation | null,
-  devices: AvailableComponentInstance[]
+  devices: AvailableComponentInstance[],
+  triggers: AutomationTrigger[]
 ): string | null {
   return (
     automation.trigger_id ??
     (target?.kind === "device_on"
       ? target.trigger || null
       : target?.kind === "component_on"
-        ? catalogTriggerIdFor(target, devices) || null
+        ? catalogTriggerIdFor(target, devices, triggers) || null
         : null)
   );
 }

@@ -1,3 +1,4 @@
+import { handlerScopes } from "../../../util/trigger-scopes.js";
 import {
   instanceComponentId,
   parseYamlTopLevelSections,
@@ -84,8 +85,9 @@ export function resolveShortcutTarget(
   if (sectionKey === "esphome") return { kind: "device_on" };
   const matched = resolveComponentMatch(yaml, sectionKey, resolvedFromLine);
   if (matched === null) return null;
-  const scopes = [matched.match.parentKey ?? matched.match.key, sectionKey];
-  if (!hasTriggers(scopes)) return null;
+  const { match } = matched;
+  if (!hasTriggers(handlerScopes(match.parentKey ?? match.key, match.platform)))
+    return null;
   return {
     kind: "component_on",
     componentId: instanceComponentId(matched.sections, matched.match),

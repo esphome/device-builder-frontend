@@ -7,6 +7,7 @@ import {
   findFieldLine,
   instanceComponentId,
   parseYamlTopLevelSections,
+  qualifiedSectionKey,
   smallestContainingSection,
   type YamlSection,
 } from "./yaml-sections-core.js";
@@ -306,10 +307,7 @@ function _firstItemForListHeader(
  * if the platform is already namespaced); otherwise just `key`.
  */
 export function sectionKeyOf(section: YamlSection): string {
-  if (!section.platform) return section.key;
-  return section.platform.startsWith(`${section.key}.`)
-    ? section.platform
-    : `${section.key}.${section.platform}`;
+  return qualifiedSectionKey(section.key, section.platform);
 }
 
 /**
