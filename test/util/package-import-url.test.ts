@@ -5,9 +5,11 @@
  * The shorthand grammar mirrors ESPHome's
  * ``git.GitFile.from_shorthand`` (``esphome/git.py:289``). These
  * tests pin both halves: the recognised shapes resolve to a real
- * github.com / gitlab.com / codeberg.org ``blob/<ref>/<file>`` URL
- * the browser can open, and unrecognised values fall back to
- * ``browseUrl: null`` so the dialog renders them as plain text.
+ * github.com / gitlab.com / codeberg.org file-browse URL the browser
+ * can open (``blob/<ref>/<file>`` on GitHub and GitLab,
+ * ``src/<ref>/<file>`` on Codeberg), and unrecognised values fall
+ * back to ``browseUrl: null`` so the dialog renders them as plain
+ * text.
  */
 
 import { describe, expect, it } from "vitest";
