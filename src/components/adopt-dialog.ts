@@ -128,10 +128,10 @@ export class ESPHomeAdoptDialog extends LitElement {
       }
 
       /* Anchor variant of the URL block for when the value is a
-         recognised github / gitlab shorthand and we can resolve a
-         clickable browse URL. Same monospace + wrap shape as the
-         plain-text variant; just adds hover affordance and the
-         primary-colour underline so the user can tell it's
+         recognised github / gitlab / codeberg shorthand and we can
+         resolve a clickable browse URL. Same monospace + wrap shape
+         as the plain-text variant; just adds hover affordance and
+         the primary-colour underline so the user can tell it's
          interactive. */
       a.source-info-url {
         color: var(--esphome-primary);
