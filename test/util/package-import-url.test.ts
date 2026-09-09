@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import { previewPackageImportUrl } from "../../src/util/package-import-url.js";
 
-describe("previewPackageImportUrl — github://", () => {
+describe("previewPackageImportUrl - github://", () => {
   it("resolves a basic shorthand with @ref", () => {
     const out = previewPackageImportUrl(
       "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0"
@@ -72,7 +72,7 @@ describe("previewPackageImportUrl — github://", () => {
   });
 });
 
-describe("previewPackageImportUrl — gitlab://", () => {
+describe("previewPackageImportUrl - gitlab://", () => {
   it("resolves a basic shorthand with @ref", () => {
     // GitLab's blob route is ``-/blob/<ref>/<path>`` — note the
     // ``-/`` segment that GitHub doesn't have.
@@ -138,7 +138,7 @@ describe("previewPackageImportUrl - codeberg://", () => {
   });
 });
 
-describe("previewPackageImportUrl — fall-through to plain text", () => {
+describe("previewPackageImportUrl - fall-through to plain text", () => {
   it("returns null browseUrl for empty / null / undefined input", () => {
     expect(previewPackageImportUrl("").browseUrl).toBe(null);
     expect(previewPackageImportUrl(null).browseUrl).toBe(null);

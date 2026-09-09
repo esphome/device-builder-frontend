@@ -43,9 +43,10 @@ export interface PackageImportUrlPreview {
   /** A browser-friendly URL the user can click, or ``null`` when
    *  the raw URL isn't a recognised shorthand. */
   browseUrl: string | null;
-  /** Service the URL points at, when known. Used for the small
-   *  badge ("GitHub", "GitLab", "Codeberg") next to the URL.
-   *  ``null`` for unrecognised shorthands. */
+  /** Service the URL points at, when known. Intended for a small
+   *  badge ("GitHub", "GitLab", "Codeberg") next to the URL; no
+   *  consumer renders one yet. ``null`` for unrecognised
+   *  shorthands. */
   service: "github" | "gitlab" | "codeberg" | null;
 }
 
