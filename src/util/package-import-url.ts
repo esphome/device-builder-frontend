@@ -13,11 +13,12 @@
  * (Source: ``esphome/git.py:from_shorthand`` + ``GIT_DOMAINS`` —
  * keep this util's regex in lockstep with upstream.)
  *
- * Vendor stock firmware uses the short form heavily — Athom and
- * Apollo both ship ``github://…``. Showing only the raw shorthand in
+ * Vendor stock firmware uses the short form heavily; Athom and
+ * Apollo both ship github:// URLs. Showing only the raw shorthand in
  * the Take-Control dialog leaves the user without a way to actually
  * inspect what they're trusting; this helper resolves the shorthand
- * to a ``blob/<ref>/<file>`` URL the browser can render.
+ * to a file-browse URL the browser can render (blob/<ref>/<file> on
+ * GitHub and GitLab, src/<ref>/<file> on Codeberg).
  *
  * Returns ``browseUrl: null`` when the raw value isn't a recognised
  * shorthand — caller falls back to plain-text display rather than
@@ -35,6 +36,45 @@
 const SHORTHAND_RE =
   /^(?<domain>[a-zA-Z0-9-]+):\/\/(?<owner>[a-zA-Z0-9-]+)\/(?<repo>[a-zA-Z0-9\-_.]+)\/(?<filename>[a-zA-Z0-9\-_./]+?)(?:@(?<ref>[a-zA-Z0-9\-_./]+))?(?:\?(?<query>[a-zA-Z0-9\-_./]+))?$/;
 
+type BrowseUrlBuilder = (parts: {
+  owner: string;
+  repo: string;
+  ref: string;
+  filename: string;
+}) => string;
+
+/**
+ * Browse-URL template per shorthand domain. The key set is the list
+ * of hosts we resolve; PackageImportService derives from it, so a new
+ * host is one entry here plus a test.
+ */
+const BROWSE_URL_BUILDERS = {
+  github: ({ owner, repo, ref, filename }) =>
+    `https://github.com/${owner}/${repo}/blob/${ref}/${filename}`,
+  gitlab: ({ owner, repo, ref, filename }) =>
+    `https://gitlab.com/${owner}/${repo}/-/blob/${ref}/${filename}`,
+  // Forgejo's browse routes are typed (src/branch/<ref>, src/tag/<ref>,
+  // src/commit/<sha>) and the shorthand doesn't say which kind of ref
+  // it carries; src/branch/<tag> 404s. The untyped src/<ref>/<path>
+  // route makes Forgejo resolve the ref kind itself and redirect to
+  // the typed URL, and src/HEAD/<path> redirects to the default
+  // branch, so it also covers the HEAD fallback when @ref is omitted.
+  codeberg: ({ owner, repo, ref, filename }) =>
+    `https://codeberg.org/${owner}/${repo}/src/${ref}/${filename}`,
+} as const satisfies Record<string, BrowseUrlBuilder>;
+
+export type PackageImportService = keyof typeof BROWSE_URL_BUILDERS;
+
+/**
+ * An own-property check rather than the in operator: the shorthand
+ * grammar admits domains such as constructor or toString, which the
+ * in operator would find on the object prototype and hand back a
+ * function that is not a URL builder.
+ */
+function isKnownService(domain: string): domain is PackageImportService {
+  return Object.prototype.hasOwnProperty.call(BROWSE_URL_BUILDERS, domain);
+}
+
 export interface PackageImportUrlPreview {
   /** The original URL as the device advertised it. Always shown
    *  to the user verbatim; the converted ``browseUrl`` only adds
@@ -47,7 +87,7 @@ export interface PackageImportUrlPreview {
    *  badge ("GitHub", "GitLab", "Codeberg") next to the URL; no
    *  consumer renders one yet. ``null`` for unrecognised
    *  shorthands. */
-  service: "github" | "gitlab" | "codeberg" | null;
+  service: PackageImportService | null;
 }
 
 export function previewPackageImportUrl(
@@ -63,37 +103,20 @@ export function previewPackageImportUrl(
   }
 
   const { domain, owner, repo, filename, ref } = match.groups;
-  // GitHub's ``blob/<ref>/<path>`` route renders a file with
-  // syntax highlighting + commit history. Falls back to ``HEAD``
-  // when the shorthand omitted ``@ref``.
+  // Falls back to HEAD when the shorthand omits @ref; every host's
+  // browse route resolves HEAD to the default branch.
   const refSegment = ref ?? "HEAD";
 
-  if (domain === "github") {
+  if (isKnownService(domain)) {
     return {
       raw,
-      browseUrl: `https://github.com/${owner}/${repo}/blob/${refSegment}/${filename}`,
-      service: "github",
-    };
-  }
-  if (domain === "gitlab") {
-    return {
-      raw,
-      browseUrl: `https://gitlab.com/${owner}/${repo}/-/blob/${refSegment}/${filename}`,
-      service: "gitlab",
-    };
-  }
-  if (domain === "codeberg") {
-    // Forgejo's browse routes are typed (``src/branch/<ref>``,
-    // ``src/tag/<ref>``, ``src/commit/<sha>``) and the shorthand
-    // doesn't say which kind of ref it carries - ``src/branch/<tag>``
-    // 404s. The untyped ``src/<ref>/<path>`` route makes Forgejo
-    // resolve the ref kind itself and redirect to the typed URL,
-    // and ``src/HEAD/<path>`` redirects to the default branch, so
-    // it also covers the ``HEAD`` fallback when ``@ref`` is omitted.
-    return {
-      raw,
-      browseUrl: `https://codeberg.org/${owner}/${repo}/src/${refSegment}/${filename}`,
-      service: "codeberg",
+      browseUrl: BROWSE_URL_BUILDERS[domain]({
+        owner,
+        repo,
+        ref: refSegment,
+        filename,
+      }),
+      service: domain,
     };
   }
 

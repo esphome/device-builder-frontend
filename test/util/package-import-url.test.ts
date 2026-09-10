@@ -157,6 +157,22 @@ describe("previewPackageImportUrl - fall-through to plain text", () => {
     expect(out.raw).toBe("bitbucket://owner/repo/file.yaml@main");
   });
 
+  it("returns null browseUrl for domains that only exist on the object prototype", () => {
+    // The host table is a plain object keyed by domain. A shorthand
+    // whose domain names an inherited property must miss the table,
+    // not resolve to a prototype function.
+    for (const raw of [
+      "constructor://owner/repo/file.yaml@main",
+      "toString://owner/repo/file.yaml",
+      "hasOwnProperty://owner/repo/file.yaml",
+    ]) {
+      const out = previewPackageImportUrl(raw);
+      expect(out.browseUrl).toBe(null);
+      expect(out.service).toBe(null);
+      expect(out.raw).toBe(raw);
+    }
+  });
+
   it("returns null browseUrl for plain http(s) URLs", () => {
     // ``dashboard_import`` only accepts shorthand — plain
     // http(s) URLs would be rejected at adoption time. Don't
