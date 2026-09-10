@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiContentCopy, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
@@ -26,8 +26,8 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @property()
-  encryptionKey = "";
+  @state()
+  private _encryptionKey = "";
 
   @state()
   private _visible = false;
@@ -106,13 +106,9 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
   ];
 
   open(key: string) {
-    this.encryptionKey = key;
+    this._encryptionKey = key;
     this._visible = false;
     this._dialog.open = true;
-  }
-
-  close() {
-    this._dialog.requestClose();
   }
 
   protected render() {
@@ -123,18 +119,18 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
         @after-hide=${this._dialog.onAfterHide}
       >
         <div class="content">
-          ${this.encryptionKey ? this._renderKey() : this._renderNoKey()}
+          ${this._encryptionKey ? this._renderKey() : this._renderNoKey()}
         </div>
       </esphome-base-dialog>
     `;
   }
 
   private _renderKey() {
-    const masked = this._visible
-      ? this.encryptionKey
-      : this.encryptionKey.slice(0, 4) +
+    const display = this._visible
+      ? this._encryptionKey
+      : this._encryptionKey.slice(0, 4) +
         "••••••••••••••••" +
-        this.encryptionKey.slice(-4);
+        this._encryptionKey.slice(-4);
 
     const toggleLabel = this._localize(
       this._visible
@@ -145,7 +141,7 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
 
     return html`
       <div class="key-wrap">
-        <span class="key-value">${masked}</span>
+        <span class="key-value">${display}</span>
         <button
           class="key-btn"
           title=${toggleLabel}
@@ -179,7 +175,7 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
     // plain-HTTP origins where ``navigator.clipboard.writeText``
     // throws (HA-addon direct port, container-on-LAN deploys
     // reaching the dashboard via ``http://192.168.x.x:6052``).
-    if (await copyToClipboard(this.encryptionKey)) {
+    if (await copyToClipboard(this._encryptionKey)) {
       notifySuccess(this._localize("dashboard.action_encryption_key_copied"));
     }
     // No failure toast here: the eye toggle reveals the key in the

@@ -972,7 +972,8 @@ export class ESPHomePageDashboard extends LitElement {
   ) => void executeFriendlyName(this, e);
 
   _showEncryptionKey = async (device: ConfiguredDevice) => {
-    const key = await fetchEncryptionKey(device, this._api);
+    const key = await fetchEncryptionKey(device, this._api, this._localize);
+    if (key === null) return;
     this._encryptionKeyDialog.open(key);
   };
   _downloadFirmware = (device: ConfiguredDevice) =>

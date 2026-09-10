@@ -186,9 +186,8 @@ export interface ConfiguredDevice {
   api_encrypted: boolean;
   /**
    * True when the esphome OTA platform item declares ``encryption:``
-   * (its own key, or a bare block inheriting the api key). esphome
-   * shares one key between api and OTA, so with ``api_encrypted`` this
-   * gates the "Show encryption key" action.
+   * ("required" is esphome's word for an OTA client having to present
+   * the key). With ``api_encrypted`` this gates "Show encryption key".
    */
   ota_encryption_required: boolean;
   /** True when the ``esphome:`` block sets a truthy

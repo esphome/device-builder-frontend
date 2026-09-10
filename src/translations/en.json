@@ -176,6 +176,7 @@
     "action_encryption_key_copy": "Copy",
     "action_encryption_key_copied": "Encryption key copied to clipboard",
     "action_encryption_key_not_found": "Unable to automatically extract the encryption key. It may not be set. Open the configuration editor and look for an encryption key under api: or under the esphome OTA platform.",
+    "action_encryption_key_failed": "Failed to read the encryption key for \"{name}\": {error}",
     "logs_method_title": "How to get the logs for your device?",
     "logs_method_wireless": "On the network",
     "logs_method_wireless_desc": "Requires the device to be online",
