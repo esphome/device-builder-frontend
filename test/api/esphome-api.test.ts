@@ -2703,3 +2703,41 @@ describe("ESPHomeAPI — liveness (heartbeat + network events)", () => {
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 });
+
+describe("ESPHomeAPI — getEncryptionKey", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/get_encryption_key`` and returns the key", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.getEncryptionKey("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/get_encryption_key");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { key: "QUFB==" },
+    });
+    await expect(pending).resolves.toBe("QUFB==");
+  });
+
+  it("returns an empty string for a non-string key", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.getEncryptionKey("kitchen.yaml");
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { key: null },
+    });
+    await expect(pending).resolves.toBe("");
+  });
+});
