@@ -17,7 +17,7 @@ import { EnterController } from "../util/enter-controller.js";
 import { fireEvent } from "../util/fire-event.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
-import { notifyWarning } from "../util/notify.js";
+import { LONG_TOAST_DURATION_MS, notifyWarning } from "../util/notify.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
 import type { AdoptedDetail } from "./dashboard/actions-ui.js";
@@ -565,7 +565,7 @@ export class ESPHomeAdoptDialog extends LitElement {
       if (warning) {
         notifyWarning(this._localize("dashboard.adopt_package_warning"), {
           description: warning,
-          duration: 8000,
+          duration: LONG_TOAST_DURATION_MS,
         });
       }
       const detail: AdoptedDetail = {

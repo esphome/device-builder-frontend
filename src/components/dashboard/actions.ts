@@ -7,7 +7,12 @@ import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { navigate } from "../../util/navigation.js";
-import { notifyError, type NotifyOptions, notifySuccess } from "../../util/notify.js";
+import {
+  LONG_TOAST_DURATION_MS,
+  notifyError,
+  type NotifyOptions,
+  notifySuccess,
+} from "../../util/notify.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import {
   connectToPort,
@@ -76,7 +81,7 @@ export async function archiveDevice(
      support thread. */
   notifySuccess(localize("dashboard.action_archive_success", { name }), {
     description: localize("dashboard.action_archive_success_hint"),
-    duration: 8000,
+    duration: LONG_TOAST_DURATION_MS,
   });
   return true;
 }
@@ -247,7 +252,7 @@ export async function archiveBulkDevices(
       failureKey: "dashboard.action_archive_failed",
       successOptions: {
         description: localize("dashboard.action_archive_success_hint"),
-        duration: 8000,
+        duration: LONG_TOAST_DURATION_MS,
       },
     }
   );

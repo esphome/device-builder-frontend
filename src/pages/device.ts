@@ -1298,6 +1298,9 @@ export class ESPHomePageDevice extends LitElement {
     void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
+  private _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>
+    this._firmwareDialog.downloadArtifacts(e.detail);
+
   static styles = [espHomeStyles, loadMessageStyles, devicePageStyles];
 
   protected render() {
@@ -1378,6 +1381,7 @@ export class ESPHomePageDevice extends LitElement {
         <esphome-command-dialog
           @request-show-logs-after-install=${this._onPostInstallShowLogs}
           @request-open-editor=${this._onRequestOpenEditor}
+          @request-download-firmware=${this._onRequestDownloadFirmware}
         ></esphome-command-dialog>
         <esphome-firmware-install-dialog
           @request-show-logs-after-install=${this._onPostInstallShowLogs}

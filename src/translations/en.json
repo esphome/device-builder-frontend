@@ -418,6 +418,7 @@
     "retry": "Retry",
     "close": "Close",
     "download": "Download output",
+    "download_firmware": "Download firmware",
     "done": "Done",
     "failed": "Failed",
     "stopped": "Stopped by user.",
@@ -473,6 +474,7 @@
   "firmware": {
     "install_title": "Install — {name}",
     "download_title": "Download — {name}",
+    "compile_continues_background": "The build keeps running in the background. Find it under Firmware tasks.",
     "download_type_factory": "Factory image",
     "download_type_factory_desc": "Full image for ESPHome Web and other flashing tools.",
     "download_type_ota": "OTA update",
