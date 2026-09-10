@@ -596,6 +596,11 @@ export class ESPHomeApp extends LitElement {
         @open-guided-tour=${this._onOpenGuidedTour}
       >
         ${this._router.outlet()}
+        <!-- Inside the layout on purpose: its nested command and install
+             dialogs fire open-* events the layout listeners above handle. -->
+        <esphome-firmware-jobs-dialog
+          @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
+        ></esphome-firmware-jobs-dialog>
       </esphome-layout>
       <esphome-command-palette
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
@@ -635,11 +640,6 @@ export class ESPHomeApp extends LitElement {
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>
           onPairRequestSent(this, e)}
       ></esphome-settings-dialog>
-      <esphome-firmware-jobs-dialog
-        @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
-        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
-          this._settingsDialog?.open(e.detail?.section)}
-      ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
       <esphome-troubleshoot-dialog></esphome-troubleshoot-dialog>
       <esphome-onboarding-wifi-dialog></esphome-onboarding-wifi-dialog>
