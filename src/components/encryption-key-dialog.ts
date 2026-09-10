@@ -116,6 +116,7 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         .label=${this._localize("dashboard.action_encryption_key_title")}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="content">
@@ -126,7 +127,6 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
   }
 
   private _onAfterHide = () => {
-    this._dialog.onAfterHide();
     this._encryptionKey = "";
   };
 
