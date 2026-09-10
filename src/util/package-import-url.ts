@@ -36,12 +36,12 @@
 const SHORTHAND_RE =
   /^(?<domain>[a-zA-Z0-9-]+):\/\/(?<owner>[a-zA-Z0-9-]+)\/(?<repo>[a-zA-Z0-9\-_.]+)\/(?<filename>[a-zA-Z0-9\-_./]+?)(?:@(?<ref>[a-zA-Z0-9\-_./]+))?(?:\?(?<query>[a-zA-Z0-9\-_./]+))?$/;
 
-type BrowseUrlBuilder = (
-  owner: string,
-  repo: string,
-  ref: string,
-  filename: string
-) => string;
+type BrowseUrlBuilder = (parts: {
+  owner: string;
+  repo: string;
+  ref: string;
+  filename: string;
+}) => string;
 
 /**
  * Browse-URL template per shorthand domain. The key set is the list
@@ -49,9 +49,9 @@ type BrowseUrlBuilder = (
  * host is one entry here plus a test.
  */
 const BROWSE_URL_BUILDERS = {
-  github: (owner, repo, ref, filename) =>
+  github: ({ owner, repo, ref, filename }) =>
     `https://github.com/${owner}/${repo}/blob/${ref}/${filename}`,
-  gitlab: (owner, repo, ref, filename) =>
+  gitlab: ({ owner, repo, ref, filename }) =>
     `https://gitlab.com/${owner}/${repo}/-/blob/${ref}/${filename}`,
   // Forgejo's browse routes are typed (src/branch/<ref>, src/tag/<ref>,
   // src/commit/<sha>) and the shorthand doesn't say which kind of ref
@@ -59,7 +59,7 @@ const BROWSE_URL_BUILDERS = {
   // route makes Forgejo resolve the ref kind itself and redirect to
   // the typed URL, and src/HEAD/<path> redirects to the default
   // branch, so it also covers the HEAD fallback when @ref is omitted.
-  codeberg: (owner, repo, ref, filename) =>
+  codeberg: ({ owner, repo, ref, filename }) =>
     `https://codeberg.org/${owner}/${repo}/src/${ref}/${filename}`,
 } as const satisfies Record<string, BrowseUrlBuilder>;
 
@@ -110,7 +110,12 @@ export function previewPackageImportUrl(
   if (isKnownService(domain)) {
     return {
       raw,
-      browseUrl: BROWSE_URL_BUILDERS[domain](owner, repo, refSegment, filename),
+      browseUrl: BROWSE_URL_BUILDERS[domain]({
+        owner,
+        repo,
+        ref: refSegment,
+        filename,
+      }),
       service: domain,
     };
   }
