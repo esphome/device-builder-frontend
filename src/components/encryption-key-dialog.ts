@@ -112,7 +112,7 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
   }
 
   close() {
-    this._dialog.open = false;
+    this._dialog.requestClose();
   }
 
   protected render() {
@@ -177,11 +177,9 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
     if (await copyToClipboard(this.encryptionKey)) {
       notifySuccess(this._localize("dashboard.action_encryption_key_copied"));
     }
-    // No failure toast here — the dialog already
-    // displays the key in plain text inside the dialog body,
-    // so the user can select-and-copy manually if the button
-    // failed. Keeping the silent-on-failure contract that
-    // existed before the helper switch.
+    // No failure toast here: the eye toggle reveals the key in the
+    // dialog body, so the user can select and copy it by hand if
+    // the button failed.
   }
 }
 
