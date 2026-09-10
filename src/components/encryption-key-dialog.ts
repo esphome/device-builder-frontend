@@ -136,16 +136,20 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
         "••••••••••••••••" +
         this.encryptionKey.slice(-4);
 
+    const toggleLabel = this._localize(
+      this._visible
+        ? "dashboard.action_encryption_key_hide"
+        : "dashboard.action_encryption_key_show"
+    );
+    const copyLabel = this._localize("dashboard.action_encryption_key_copy");
+
     return html`
       <div class="key-wrap">
         <span class="key-value">${masked}</span>
         <button
           class="key-btn"
-          title=${this._localize(
-            this._visible
-              ? "dashboard.action_encryption_key_hide"
-              : "dashboard.action_encryption_key_show"
-          )}
+          title=${toggleLabel}
+          aria-label=${toggleLabel}
           @click=${() => {
             this._visible = !this._visible;
           }}
@@ -154,7 +158,8 @@ export class ESPHomeEncryptionKeyDialog extends LitElement {
         </button>
         <button
           class="key-btn"
-          title=${this._localize("dashboard.action_encryption_key_copy")}
+          title=${copyLabel}
+          aria-label=${copyLabel}
           @click=${this._copy}
         >
           <wa-icon library="mdi" name="content-copy"></wa-icon>

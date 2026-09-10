@@ -1179,10 +1179,11 @@ export class ESPHomeAPI {
    * OTA platform's own key (esphome shares one key between the two).
    *
    * Backend reads the YAML through ESPHome's loader so ``!secret`` /
-   * ``!include`` / packages all resolve like a real compile. Empty
-   * string when neither block carries a key, the resolution failed,
-   * or the key isn't a string. Callers use the empty value as the
-   * "open the editor and check" signal.
+   * ``!include`` / packages all resolve like a real compile. Resolves
+   * to an empty string when neither block carries a key or the reply's
+   * key isn't a string; transport and timeout errors reject like any
+   * other command. Callers use the empty value as the "open the editor
+   * and check" signal.
    */
   async getEncryptionKey(configuration: string): Promise<string> {
     // ``sendCommand`` resolves ``unknown`` — guard the shape so a
