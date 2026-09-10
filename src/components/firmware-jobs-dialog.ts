@@ -54,7 +54,6 @@ import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js"
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 import { canResetBuildEnv } from "./remote-build-hint.js";
-import type { Section } from "./settings-dialog/types.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./firmware-install-dialog.js";
 import "./logs-dialog.js";
@@ -155,20 +154,6 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._resetPeerConfirmDialog.open();
   }
 
-  // Catch open-reset-build-env from the inner command-dialog so the
-  // post-failure hint works when reviewing a past failed install from this
-  // list. The app-shell listener sits on esphome-layout, but this dialog is
-  // a sibling of that layout — without local handling the event bubbles past.
-  private _onLocalResetEvent = (e: Event) => {
-    e.stopPropagation();
-    this.openResetBuildEnv();
-  };
-
-  private _onRemoteResetEvent = (e: CustomEvent<{ pin_sha256: string }>) => {
-    e.stopPropagation();
-    this.openResetPeerBuildEnv(e.detail.pin_sha256);
-  };
-
   private _onRequestDownloadFirmware = async (e: CustomEvent<ConfiguredDevice>) => {
     e.stopPropagation();
     this._installDialogMounted = true;
@@ -182,18 +167,11 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
-  // The nested dialogs' open-settings would bubble past app-shell's
-  // layout listener (this dialog is a layout sibling); re-fire from here.
-  private _onOpenSettings = (e: CustomEvent<{ section?: Section } | undefined>) => {
-    e.stopPropagation();
-    this.close();
-    fireEvent(this, "open-settings", { section: e.detail?.section });
-  };
+  private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) =>
+    this._commandDialog.openForDevice(e.detail, "clean");
 
-  private _onOpenFirmwareJobs = (e: Event) => {
-    e.stopPropagation();
-    this.open();
-  };
+  // Step aside for Settings; the event keeps bubbling to the layout listener.
+  private _onOpenSettings = () => this.close();
 
   static styles = [
     espHomeStyles,
@@ -249,8 +227,6 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         ${hasJobs ? renderGroups(this, active, terminal) : renderEmpty(this._localize)}
       </esphome-base-dialog>
       <esphome-command-dialog
-        @open-reset-build-env=${this._onLocalResetEvent}
-        @open-reset-peer-build-env=${this._onRemoteResetEvent}
         @open-settings=${this._onOpenSettings}
         @request-open-editor=${this._onRequestOpenEditor}
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
@@ -259,13 +235,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       ${
         this._installDialogMounted
           ? html`<esphome-firmware-install-dialog
-              @open-reset-build-env=${this._onLocalResetEvent}
-              @open-reset-peer-build-env=${this._onRemoteResetEvent}
               @open-settings=${this._onOpenSettings}
-              @open-firmware-jobs=${this._onOpenFirmwareJobs}
               @request-open-editor=${this._onRequestOpenEditor}
-              @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
-                this._commandDialog.openForDevice(e.detail, "clean")}
+              @clean-build=${this._onCleanBuild}
             ></esphome-firmware-install-dialog>`
           : nothing
       }

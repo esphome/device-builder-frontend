@@ -1,6 +1,11 @@
 import { css } from "lit";
 
 export const firmwareJobsDialogStyles = css`
+  :host {
+    /* Contribute no box to the layout slot's flow (see base-dialog). */
+    display: contents;
+  }
+
   esphome-base-dialog {
     --width: min(620px, 95vw);
   }
