@@ -5,16 +5,18 @@
  * The shorthand grammar mirrors ESPHome's
  * ``git.GitFile.from_shorthand`` (``esphome/git.py:289``). These
  * tests pin both halves: the recognised shapes resolve to a real
- * github.com / gitlab.com ``blob/<ref>/<file>`` URL the browser
- * can open, and unrecognised values fall back to ``browseUrl: null``
- * so the dialog renders them as plain text.
+ * github.com / gitlab.com / codeberg.org file-browse URL the browser
+ * can open (``blob/<ref>/<file>`` on GitHub and GitLab,
+ * ``src/<ref>/<file>`` on Codeberg), and unrecognised values fall
+ * back to ``browseUrl: null`` so the dialog renders them as plain
+ * text.
  */
 
 import { describe, expect, it } from "vitest";
 
 import { previewPackageImportUrl } from "../../src/util/package-import-url.js";
 
-describe("previewPackageImportUrl — github://", () => {
+describe("previewPackageImportUrl - github://", () => {
   it("resolves a basic shorthand with @ref", () => {
     const out = previewPackageImportUrl(
       "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0"
@@ -70,7 +72,7 @@ describe("previewPackageImportUrl — github://", () => {
   });
 });
 
-describe("previewPackageImportUrl — gitlab://", () => {
+describe("previewPackageImportUrl - gitlab://", () => {
   it("resolves a basic shorthand with @ref", () => {
     // GitLab's blob route is ``-/blob/<ref>/<path>`` — note the
     // ``-/`` segment that GitHub doesn't have.
@@ -93,7 +95,50 @@ describe("previewPackageImportUrl — gitlab://", () => {
   });
 });
 
-describe("previewPackageImportUrl — fall-through to plain text", () => {
+describe("previewPackageImportUrl - codeberg://", () => {
+  it("resolves a basic shorthand with @ref", () => {
+    // Forgejo's browse routes are typed (``src/branch/<ref>`` vs
+    // ``src/tag/<ref>`` vs ``src/commit/<sha>``) and the shorthand
+    // doesn't say which kind of ref ``@v1.0.0`` is. We use the
+    // untyped ``src/<ref>/<path>`` form instead, which Forgejo
+    // resolves server-side and redirects to the right typed route -
+    // ``src/branch/<tag>`` would 404 for a tag ref.
+    const out = previewPackageImportUrl(
+      "codeberg://example-owner/example-repo/configs/device.yaml@v1.0.0"
+    );
+    expect(out.browseUrl).toBe(
+      "https://codeberg.org/example-owner/example-repo/src/v1.0.0/configs/device.yaml"
+    );
+    expect(out.service).toBe("codeberg");
+    expect(out.raw).toBe(
+      "codeberg://example-owner/example-repo/configs/device.yaml@v1.0.0"
+    );
+  });
+
+  it("falls back to HEAD when @ref is omitted", () => {
+    // Forgejo redirects ``src/HEAD/<path>`` to the repo's default
+    // branch, so ``HEAD`` works as the untyped-route fallback too.
+    const out = previewPackageImportUrl(
+      "codeberg://example-owner/example-repo/configs/device.yaml"
+    );
+    expect(out.browseUrl).toBe(
+      "https://codeberg.org/example-owner/example-repo/src/HEAD/configs/device.yaml"
+    );
+    expect(out.service).toBe("codeberg");
+  });
+
+  it("ignores ?query suffixes (?full_config)", () => {
+    const out = previewPackageImportUrl(
+      "codeberg://example-owner/example-repo/configs/device.yaml@v1.0.0?full_config"
+    );
+    expect(out.browseUrl).toBe(
+      "https://codeberg.org/example-owner/example-repo/src/v1.0.0/configs/device.yaml"
+    );
+    expect(out.service).toBe("codeberg");
+  });
+});
+
+describe("previewPackageImportUrl - fall-through to plain text", () => {
   it("returns null browseUrl for empty / null / undefined input", () => {
     expect(previewPackageImportUrl("").browseUrl).toBe(null);
     expect(previewPackageImportUrl(null).browseUrl).toBe(null);

@@ -8,6 +8,7 @@
  *
  *   * ``github://owner/repo/path/file.yaml[@ref][?query]``
  *   * ``gitlab://owner/repo/path/file.yaml[@ref][?query]``
+ *   * ``codeberg://owner/repo/path/file.yaml[@ref][?query]``
  *
  * (Source: ``esphome/git.py:from_shorthand`` + ``GIT_DOMAINS`` —
  * keep this util's regex in lockstep with upstream.)
@@ -42,10 +43,11 @@ export interface PackageImportUrlPreview {
   /** A browser-friendly URL the user can click, or ``null`` when
    *  the raw URL isn't a recognised shorthand. */
   browseUrl: string | null;
-  /** Service the URL points at, when known. Used for the small
-   *  badge ("GitHub", "GitLab") next to the URL. ``null`` for
-   *  unrecognised shorthands. */
-  service: "github" | "gitlab" | null;
+  /** Service the URL points at, when known. Intended for a small
+   *  badge ("GitHub", "GitLab", "Codeberg") next to the URL; no
+   *  consumer renders one yet. ``null`` for unrecognised
+   *  shorthands. */
+  service: "github" | "gitlab" | "codeberg" | null;
 }
 
 export function previewPackageImportUrl(
@@ -78,6 +80,20 @@ export function previewPackageImportUrl(
       raw,
       browseUrl: `https://gitlab.com/${owner}/${repo}/-/blob/${refSegment}/${filename}`,
       service: "gitlab",
+    };
+  }
+  if (domain === "codeberg") {
+    // Forgejo's browse routes are typed (``src/branch/<ref>``,
+    // ``src/tag/<ref>``, ``src/commit/<sha>``) and the shorthand
+    // doesn't say which kind of ref it carries - ``src/branch/<tag>``
+    // 404s. The untyped ``src/<ref>/<path>`` route makes Forgejo
+    // resolve the ref kind itself and redirect to the typed URL,
+    // and ``src/HEAD/<path>`` redirects to the default branch, so
+    // it also covers the ``HEAD`` fallback when ``@ref`` is omitted.
+    return {
+      raw,
+      browseUrl: `https://codeberg.org/${owner}/${repo}/src/${refSegment}/${filename}`,
+      service: "codeberg",
     };
   }
 
