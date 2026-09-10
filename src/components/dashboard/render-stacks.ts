@@ -15,6 +15,7 @@ export function renderRemoteStack(host: ESPHomePageDashboard): TemplateResult {
       .collapsed=${host._stacks.remoteCollapsed}
       .solo=${host._stacks.builderHidden}
       @toggle-collapsed=${host._stacks.swap}
+      @request-download-firmware=${host._onRequestDownloadFirmware}
     ></esphome-remote-build-panel>
   `;
 }

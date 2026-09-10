@@ -282,9 +282,8 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         // A never-flashed device can't come online by itself, so
         // "installs when it comes back online" would be a dead promise
         // — point at the USB first-install instead.
-        const device = host._devices.find((d) => d.configuration === host.configuration);
         host._statusMessage = host._localize(
-          isNeverFlashed(device)
+          isNeverFlashed(host._localDevice)
             ? "dashboard.queued_first_install"
             : "dashboard.queued_successfully"
         );

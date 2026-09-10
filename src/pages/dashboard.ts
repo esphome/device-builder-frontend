@@ -978,6 +978,8 @@ export class ESPHomePageDashboard extends LitElement {
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
     this._firmwareDialog.downloadArtifacts(device);
+  _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>
+    this._downloadFirmware(e.detail);
 
   _toggleDrawerForDevice(device: ConfiguredDevice) {
     if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {

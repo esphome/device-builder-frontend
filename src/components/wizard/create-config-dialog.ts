@@ -17,7 +17,7 @@ import { buildFeaturedId } from "../../util/featured-id.js";
 import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { navigate } from "../../util/navigation.js";
-import { notifyWarning } from "../../util/notify.js";
+import { LONG_TOAST_DURATION_MS, notifyWarning } from "../../util/notify.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -596,7 +596,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       if (warning) {
         notifyWarning(this._localize("dashboard.create_package_warning"), {
           description: warning,
-          duration: 8000,
+          duration: LONG_TOAST_DURATION_MS,
         });
       }
     } catch (err) {

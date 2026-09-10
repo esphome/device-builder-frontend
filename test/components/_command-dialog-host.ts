@@ -74,6 +74,11 @@ export function makeCommandDialogHost(
     configuration: "kitchen.yaml",
     name: "kitchen",
     _devices: [] as ConfiguredDevice[],
+    get _localDevice(): ConfiguredDevice | undefined {
+      return this._devices.find(
+        (d: ConfiguredDevice) => d.configuration === this.configuration
+      );
+    },
     _port: "OTA",
     _log: fakeLogBuffer(),
     _showLogsAfterInstall: true,

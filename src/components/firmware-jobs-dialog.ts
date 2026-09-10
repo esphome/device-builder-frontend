@@ -39,6 +39,7 @@ import { getErrorMessage } from "../util/error-message.js";
 import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { navigate } from "../util/navigation.js";
 import { notifyError } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
 import { pairingDisplayName } from "../util/pairing-display-name.js";
@@ -49,10 +50,13 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
 import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 import { canResetBuildEnv } from "./remote-build-hint.js";
+import type { Section } from "./settings-dialog/types.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
+import "./firmware-install-dialog.js";
 import "./logs-dialog.js";
 import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
 
@@ -96,6 +100,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   // Logs dialog for the post-install hand-off when reattaching from this
   // surface. Without one, request-show-logs-after-install would no-op. (#139)
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
+  // Download flow for a finished compile reviewed from this list. Mounted
+  // on first use, since most sessions never open it from here and it
+  // re-renders on every job progress tick once mounted.
+  @query("esphome-firmware-install-dialog")
+  private _firmwareInstallDialog?: ESPHomeFirmwareInstallDialog;
+  @state() private _installDialogMounted = false;
   @query("#reset-local-confirm") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("#reset-peer-confirm") private _resetPeerConfirmDialog!: ESPHomeConfirmDialog;
 
@@ -159,6 +169,32 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this.openResetPeerBuildEnv(e.detail.pin_sha256);
   };
 
+  private _onRequestDownloadFirmware = async (e: CustomEvent<ConfiguredDevice>) => {
+    e.stopPropagation();
+    this._installDialogMounted = true;
+    await this.updateComplete;
+    this._firmwareInstallDialog?.downloadArtifacts(e.detail);
+  };
+
+  private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
+    e.stopPropagation();
+    this.close();
+    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+  };
+
+  // The nested dialogs' open-settings would bubble past app-shell's
+  // layout listener (this dialog is a layout sibling); re-fire from here.
+  private _onOpenSettings = (e: CustomEvent<{ section?: Section } | undefined>) => {
+    e.stopPropagation();
+    this.close();
+    fireEvent(this, "open-settings", { section: e.detail?.section });
+  };
+
+  private _onOpenFirmwareJobs = (e: Event) => {
+    e.stopPropagation();
+    this.open();
+  };
+
   static styles = [
     espHomeStyles,
     primaryDialogHeaderStyles,
@@ -215,8 +251,24 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
         @open-reset-peer-build-env=${this._onRemoteResetEvent}
+        @open-settings=${this._onOpenSettings}
+        @request-open-editor=${this._onRequestOpenEditor}
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @request-download-firmware=${this._onRequestDownloadFirmware}
       ></esphome-command-dialog>
+      ${
+        this._installDialogMounted
+          ? html`<esphome-firmware-install-dialog
+              @open-reset-build-env=${this._onLocalResetEvent}
+              @open-reset-peer-build-env=${this._onRemoteResetEvent}
+              @open-settings=${this._onOpenSettings}
+              @open-firmware-jobs=${this._onOpenFirmwareJobs}
+              @request-open-editor=${this._onRequestOpenEditor}
+              @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
+                this._commandDialog.openForDevice(e.detail, "clean")}
+            ></esphome-firmware-install-dialog>`
+          : nothing
+      }
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-confirm-dialog
         id="reset-local-confirm"

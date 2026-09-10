@@ -67,7 +67,7 @@ import {
   themeIsDark,
 } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
-import { notifyInfo } from "../util/notify.js";
+import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
@@ -402,7 +402,7 @@ export class ESPHomeApp extends LitElement {
       // toast instead of stacking — defence in depth on top of the
       // time-window suppression above.
       id: "esphome-usb-device-connected",
-      duration: 8000,
+      duration: LONG_TOAST_DURATION_MS,
       action: {
         label: this._localize("layout.usb_device_setup"),
         onClick: () => {
@@ -637,6 +637,8 @@ export class ESPHomeApp extends LitElement {
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
+        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
+          this._settingsDialog?.open(e.detail?.section)}
       ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
       <esphome-troubleshoot-dialog></esphome-troubleshoot-dialog>

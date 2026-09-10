@@ -246,6 +246,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-command-dialog
       @request-show-logs-after-install=${host._onPostInstallShowLogs}
       @request-open-editor=${host._onRequestOpenEditor}
+      @request-download-firmware=${host._onRequestDownloadFirmware}
     ></esphome-command-dialog>
     <esphome-firmware-install-dialog
       @request-show-logs-after-install=${host._onPostInstallShowLogs}

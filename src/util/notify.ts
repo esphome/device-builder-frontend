@@ -6,6 +6,10 @@ import toast from "sonner-js";
 // directly instead of reaching through a wrapper's signature.
 export type NotifyOptions = NonNullable<Parameters<typeof toast.error>[1]>;
 
+// For toasts carrying a description or an action; sonner's default is
+// too short to read a sentence and click.
+export const LONG_TOAST_DURATION_MS = 8000;
+
 /**
  * Thin wrappers over sonner's toast helpers that default
  * `richColors: true`, the house style for every user-readable

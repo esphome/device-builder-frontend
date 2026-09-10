@@ -8,7 +8,7 @@ import {
   jobBuildServerDisplay,
   pairingDisplayNameForPin,
 } from "../../util/pairing-display-name.js";
-import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import {
   renderOffloadHint,
   shouldShowOffloadHint,
@@ -359,10 +359,18 @@ export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
   `;
 }
 
+// Command types whose success leaves downloadable build artifacts.
+const COMPILE_COMMANDS: ReadonlySet<CommandType> = new Set([
+  "compile",
+  "offline_compile",
+]);
+
 // Retry only makes sense for command types _start knows how to re-run.
 // RENAME jobs come in via followJob — the user originally launched from the
 // rename dialog; surfacing Retry would no-op.
-function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof nothing {
+export function renderActions(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
   const close = renderTermButton({
     label: host._localize("command.close"),
     onClick: host.close,
@@ -386,17 +394,25 @@ function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof noth
             onClick: () => void host._start(),
           })}
           ${close}`;
-    case "success":
+    case "success": {
       // Show-logs is a ghost (not term-btn--start) so it doesn't look like
       // the toolbar toggle "stayed on".
-      return host._commandType === "install"
-        ? html`${renderTermButton({
-            icon: "text-box-outline",
-            label: host._localize("command.show_logs"),
-            onClick: host._flipToLogs,
-          })}
-          ${close}`
-        : close;
+      const extra =
+        host._commandType === "install"
+          ? renderTermButton({
+              icon: "text-box-outline",
+              label: host._localize("command.show_logs"),
+              onClick: host._flipToLogs,
+            })
+          : COMPILE_COMMANDS.has(host._commandType) && host._localDevice
+            ? renderTermButton({
+                icon: "file-download-outline",
+                label: host._localize("command.download_firmware"),
+                onClick: host._requestDownloadFirmware,
+              })
+            : nothing;
+      return html`${extra} ${close}`;
+    }
     default:
       return nothing;
   }

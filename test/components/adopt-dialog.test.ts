@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/notify.js", () => ({
+  LONG_TOAST_DURATION_MS: 8000,
   notifyWarning: vi.fn(),
 }));
 

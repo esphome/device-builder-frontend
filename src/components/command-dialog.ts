@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiClose,
   mdiDownload,
+  mdiFileDownloadOutline,
   mdiKey,
   mdiKeyOutline,
   mdiPlaylistCheck,
@@ -88,6 +89,7 @@ registerMdiIcons({
   close: mdiClose,
   "text-box-outline": mdiTextBoxOutline,
   download: mdiDownload,
+  "file-download-outline": mdiFileDownloadOutline,
   key: mdiKey,
   "key-outline": mdiKeyOutline,
   stop: mdiStop,
@@ -467,6 +469,20 @@ export class ESPHomeCommandDialog extends LitElement {
     this.close();
     if (!configuration) return;
     fireEvent(this, "request-open-editor", { configuration });
+  };
+
+  // The device behind this dialog's configuration; undefined for a build
+  // whose YAML isn't on this dashboard (a receiver-side job).
+  get _localDevice(): ConfiguredDevice | undefined {
+    return this._devices.find((d) => d.configuration === this.configuration);
+  }
+
+  // Hand the finished build to the host's download flow (the three-dot
+  // Download path), which compiles only when nothing is built.
+  _requestDownloadFirmware = () => {
+    const device = this._localDevice;
+    this.close();
+    if (device) fireEvent(this, "request-download-firmware", device);
   };
 
   // Per-device clean: same dialog instance, same configuration. Non-

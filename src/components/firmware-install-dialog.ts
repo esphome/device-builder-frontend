@@ -31,7 +31,9 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
+import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { LogBuffer } from "../util/log-buffer.js";
+import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -305,10 +307,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   // Tear down active follow_job: client-side (drop local handler) and
   // backend-side (stop pushing lines). Settles a pending _compileAndWait so
-  // the parent flow doesn't hang. Cancels the underlying job so the backend
-  // stops working for a dismissed dialog, unless ``cancelJob: false`` —
-  // then the job is released to finish in the background queue.
-  _detachStream({ cancelJob = true }: { cancelJob?: boolean } = {}) {
+  // the parent flow doesn't hang. Pure teardown: the job itself keeps
+  // running in the background queue; only Stop (_cancel) cancels it.
+  _detachStream() {
     // Land any buffered lines before teardown so nothing streamed is lost.
     this._log.flush();
     // Tear down an in-flight USB-flasher hand-off (message listener + timers)
@@ -327,10 +328,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       this._compileReject = null;
       reject(new Error("Install dialog dismissed"));
     }
-    if (this._jobId) {
-      if (cancelJob) this._api.firmwareCancel(this._jobId).catch(() => {});
-      this._jobId = "";
-    }
+    this._jobId = "";
   }
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
@@ -343,13 +341,30 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   // Close the dialog and open Settings → Send builds. The install flow ends
-  // (the flash needs this dialog), but the compile itself is released to
-  // finish in the background queue, so its artifacts warm the next install.
+  // (the flash needs this dialog), but the compile itself finishes in the
+  // background queue, so its artifacts warm the next install.
   _tryOpenBuildOffloadSettings = () => {
-    this._detachStream({ cancelJob: false });
+    this._releaseJobToBackground();
     this._close();
     fireEvent(this, "open-settings", { section: "build_offload" });
   };
+
+  // Detach from a compile the dialog still owns and say where it went.
+  // Not folded into _detachStream: _init calls that on every reopen.
+  _releaseJobToBackground() {
+    const compiling = this._step === "queued" || this._step === "compiling";
+    if (this._jobId && compiling) {
+      notifyInfo(this._localize("firmware.compile_continues_background"), {
+        id: "esphome-compile-continues-background",
+        duration: LONG_TOAST_DURATION_MS,
+        action: {
+          label: this._localize("firmware_jobs.menu_item"),
+          onClick: () => fireEvent(this, "open-firmware-jobs"),
+        },
+      });
+    }
+    this._detachStream();
+  }
 
   // Drop into red error state. detail is optional — render skips it entirely
   // when empty so a single-string call doesn't paint the same text twice.
@@ -442,21 +457,19 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   };
 
   _cancel = async () => {
-    if (this._jobId) {
-      try {
-        await this._api.firmwareCancel(this._jobId);
-      } catch {
-        /* ignore */
-      }
-    }
+    // Stop owns the job from here: a dismissal racing the round-trip must
+    // not announce a build that is being cancelled.
+    const jobId = this._jobId;
+    this._jobId = "";
+    if (jobId) await cancelFirmwareJob(this._api, this._localize, jobId);
     this._close();
   };
 
   _close = () => {
     this._open = false;
     this._device = null;
-    // _detachStream already clears _jobId (and cancels the backend job +
-    // settles any pending compile promise) — no need to clear it here.
+    // _detachStream already clears _jobId and settles any pending compile
+    // promise — no need to clear it here.
     this._detachStream();
     fireEvent(this, "close");
   };
@@ -472,10 +485,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // base-dialog's after-hide fires once the dialog has fully hidden (header X,
   // Escape, or a programmatic close). Same stream teardown as _close —
   // otherwise a header-X-then-reopen leaves the prior followJob attached and
-  // lines duplicate into the new session.
+  // lines duplicate into the new session. A compile still attached here was
+  // dismissed mid-build (a programmatic close already detached).
   _onClose = () => {
     this._open = false;
-    this._detachStream();
+    this._releaseJobToBackground();
   };
 
   protected render() {
