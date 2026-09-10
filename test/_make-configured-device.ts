@@ -61,6 +61,7 @@ const _BASE = {
   migration_available: false,
   api_enabled: false,
   api_encrypted: false,
+  ota_encryption_required: false,
   name_add_mac_suffix: false,
   mdns_disabled: false,
   uses_mqtt: false,

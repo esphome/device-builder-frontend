@@ -181,9 +181,16 @@ export interface ConfiguredDevice {
    * resolution) declares an ``api: encryption:`` block. Flips the
    * indicator variant (filled lock vs open lock) when ``api_enabled``
    * is set. The actual key value is fetched on demand via
-   * ``devices/get_api_key``.
+   * ``devices/get_encryption_key``.
    */
   api_encrypted: boolean;
+  /**
+   * True when the esphome OTA platform item declares ``encryption:``
+   * (its own key, or a bare block inheriting the api key). esphome
+   * shares one key between api and OTA, so with ``api_encrypted`` this
+   * gates the "Show encryption key" action.
+   */
+  ota_encryption_required: boolean;
   /** True when the ``esphome:`` block sets a truthy
    *  ``name_add_mac_suffix`` — the suffixed broadcast never matches
    *  this config, so status tracking is unavailable. */

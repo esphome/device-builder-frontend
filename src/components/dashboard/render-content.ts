@@ -222,7 +222,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         host._openCommand(e.detail, "validate")}
       @install-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openInstallMethod(e.detail)}
-      @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => host._showApiKey(e.detail)}
+      @show-encryption-key=${(e: CustomEvent<ConfiguredDevice>) => host._showEncryptionKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}
@@ -341,7 +341,7 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openInstallMethod(e.detail)}
       @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
         host._showJobProgress(e.detail)}
-      @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => host._showApiKey(e.detail)}
+      @show-encryption-key=${(e: CustomEvent<ConfiguredDevice>) => host._showEncryptionKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}

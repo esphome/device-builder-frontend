@@ -239,7 +239,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
       @adopted=${host._onAdopted}
     ></esphome-adopt-dialog>
-    <esphome-api-key-dialog></esphome-api-key-dialog>
+    <esphome-encryption-key-dialog></esphome-encryption-key-dialog>
     <esphome-create-config-dialog
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
     ></esphome-create-config-dialog>
