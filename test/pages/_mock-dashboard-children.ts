@@ -9,7 +9,7 @@ import { vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../src/components/accept-peer-dialog.js", () => ({}));
 vi.mock("../../src/components/adopt-dialog.js", () => ({}));
-vi.mock("../../src/components/api-key-dialog.js", () => ({}));
+vi.mock("../../src/components/encryption-key-dialog.js", () => ({}));
 vi.mock("../../src/components/archived-devices-dialog.js", () => ({}));
 vi.mock("../../src/components/clone-device-dialog.js", () => ({}));
 vi.mock("../../src/components/command-dialog.js", () => ({}));

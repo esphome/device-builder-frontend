@@ -1175,23 +1175,22 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Resolve the Native API encryption key for a device.
-   *
-   * Backend reads the YAML through ESPHome's loader so ``!secret`` /
-   * ``!include`` / packages all resolve like a real compile. Empty
-   * string when the device has no ``api: encryption:`` block, the
-   * resolution failed, or the key isn't a string. Callers use the
-   * empty value as the "open the editor and check" signal.
+   * Resolve a device's encryption key: the api key, else the esphome
+   * OTA platform's own key (esphome shares one key between the two).
+   * The backend reads the YAML through ESPHome's loader so !secret,
+   * !include and packages resolve like a real compile. Resolves to an
+   * empty string when neither block carries a key or the reply's key
+   * isn't a string; transport and timeout errors reject like any other
+   * command. Callers use the empty value as the "open the editor and
+   * check" signal.
    */
-  async getApiKey(configuration: string): Promise<string> {
-    // ``sendCommand`` resolves ``unknown`` — guard the shape so a
-    // malformed payload (number / object / nullish) can't sneak past
-    // the dialog's string-only assumptions and surface as a runtime
-    // crash. The empty string is the same "no key here" signal the
-    // backend already produces for unencrypted / unparseable configs.
-    const result = await this.sendCommand<{ key: unknown }>("devices/get_api_key", {
-      configuration,
-    });
+  async getEncryptionKey(configuration: string): Promise<string> {
+    const result = await this.sendCommand<{ key: unknown }>(
+      "devices/get_encryption_key",
+      {
+        configuration,
+      }
+    );
     return typeof result?.key === "string" ? result.key : "";
   }
 

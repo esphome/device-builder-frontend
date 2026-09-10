@@ -761,6 +761,26 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     uninstallMockWebSocket();
   });
 
+  it("getEncryptionKey sends devices/get_encryption_key and returns the key", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const pending = api.getEncryptionKey("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("devices/get_encryption_key");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+    ws.receive({ message_id: sent.message_id, result: { key: "QUFB==" } });
+    await expect(pending).resolves.toBe("QUFB==");
+  });
+
+  it("getEncryptionKey returns an empty string for a non-string key", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const pending = api.getEncryptionKey("kitchen.yaml");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { key: null } });
+    await expect(pending).resolves.toBe("");
+  });
+
   it("listDevices sends devices/list and unwraps the result", async () => {
     const api = makeApi();
     const ws = await connect(api);

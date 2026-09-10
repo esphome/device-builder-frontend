@@ -215,10 +215,13 @@ export class ESPHomeTableRowMenu extends LitElement {
         ${this._renderVisitWebUi()}
         <div class="menu-divider"></div>
         ${
-          this.device?.api_encrypted
-            ? html`<div class="menu-item" @click=${() => this._emit("show-api-key")}>
+          this.device?.api_encrypted || this.device?.ota_encryption_required
+            ? html`<div
+                class="menu-item"
+                @click=${() => this._emit("show-encryption-key")}
+              >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
-                ${this._localize("dashboard.action_show_api_key")}
+                ${this._localize("dashboard.action_show_encryption_key")}
               </div>`
             : nothing
         }

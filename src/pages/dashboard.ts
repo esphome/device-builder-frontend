@@ -36,7 +36,7 @@ import {
   archiveDevice,
   deleteArchivedDevice,
   detectAndOpenWizard,
-  fetchApiKey,
+  fetchEncryptionKey,
   unarchiveDevice,
 } from "../components/dashboard/actions.js";
 import { deviceGridStyles } from "../components/dashboard/device-grid-styles.js";
@@ -137,22 +137,22 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/adopt-dialog.js";
 import type { ESPHomeAdoptDialog } from "../components/adopt-dialog.js";
-import "../components/api-key-dialog.js";
-import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
-import "../components/archived-devices-dialog.js";
 import type { ESPHomeArchivedDevicesDialog } from "../components/archived-devices-dialog.js";
-import "../components/clone-device-dialog.js";
+import "../components/archived-devices-dialog.js";
 import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
-import "../components/command-dialog.js";
+import "../components/clone-device-dialog.js";
 import type { CommandType, ESPHomeCommandDialog } from "../components/command-dialog.js";
-import "../components/confirm-dialog.js";
+import "../components/command-dialog.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
+import "../components/confirm-dialog.js";
+import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/device/board-reselect-dialog.js";
-import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
+import "../components/encryption-key-dialog.js";
+import type { ESPHomeEncryptionKeyDialog } from "../components/encryption-key-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
@@ -321,7 +321,8 @@ export class ESPHomePageDashboard extends LitElement {
     (catalog: Label[]) => new Map(catalog.map((l) => [l.id, l.name]))
   );
 
-  @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
+  @query("esphome-encryption-key-dialog")
+  _encryptionKeyDialog!: ESPHomeEncryptionKeyDialog;
   @query("esphome-archived-devices-dialog")
   _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") _confirmDialog!: ESPHomeConfirmDialog;
@@ -970,9 +971,10 @@ export class ESPHomePageDashboard extends LitElement {
     e: CustomEvent<{ newFriendlyName: string; install: boolean }>
   ) => void executeFriendlyName(this, e);
 
-  _showApiKey = async (device: ConfiguredDevice) => {
-    const key = await fetchApiKey(device, this._api);
-    this._apiKeyDialog.open(key);
+  _showEncryptionKey = async (device: ConfiguredDevice) => {
+    const key = await fetchEncryptionKey(device, this._api, this._localize);
+    if (key === null) return;
+    this._encryptionKeyDialog.open(key);
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
     this._firmwareDialog.downloadArtifacts(device);

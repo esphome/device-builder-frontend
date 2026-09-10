@@ -427,9 +427,9 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("show-progress", e.detail);
         }}
-        @show-api-key=${(e: CustomEvent) => {
+        @show-encryption-key=${(e: CustomEvent) => {
           e.stopPropagation();
-          this._forwardEvent("show-api-key", e.detail);
+          this._forwardEvent("show-encryption-key", e.detail);
         }}
         @download-yaml=${(e: CustomEvent) => {
           e.stopPropagation();

@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiContentCopy, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
@@ -20,14 +20,14 @@ registerMdiIcons({
   "eye-off": mdiEyeOff,
 });
 
-@customElement("esphome-api-key-dialog")
-export class ESPHomeApiKeyDialog extends LitElement {
+@customElement("esphome-encryption-key-dialog")
+export class ESPHomeEncryptionKeyDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @property()
-  apiKey = "";
+  @state()
+  private _encryptionKey = "";
 
   @state()
   private _visible = false;
@@ -106,44 +106,52 @@ export class ESPHomeApiKeyDialog extends LitElement {
   ];
 
   open(key: string) {
-    this.apiKey = key;
+    this._encryptionKey = key;
     this._visible = false;
     this._dialog.open = true;
-  }
-
-  close() {
-    this._dialog.open = false;
   }
 
   protected render() {
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize("dashboard.action_api_key_title")}
-        @after-hide=${this._dialog.onAfterHide}
+        .label=${this._localize("dashboard.action_encryption_key_title")}
+        @request-close=${this._dialog.onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="content">
-          ${this.apiKey ? this._renderKey() : this._renderNoKey()}
+          ${this._encryptionKey ? this._renderKey() : this._renderNoKey()}
         </div>
       </esphome-base-dialog>
     `;
   }
 
+  private _onAfterHide = () => {
+    this._encryptionKey = "";
+  };
+
   private _renderKey() {
-    const masked = this._visible
-      ? this.apiKey
-      : this.apiKey.slice(0, 4) + "••••••••••••••••" + this.apiKey.slice(-4);
+    const key = this._encryptionKey;
+    const display = this._visible
+      ? key
+      : key.length > 8
+        ? key.slice(0, 4) + "••••••••••••••••" + key.slice(-4)
+        : "••••••••••••••••";
+
+    const toggleLabel = this._localize(
+      this._visible
+        ? "dashboard.action_encryption_key_hide"
+        : "dashboard.action_encryption_key_show"
+    );
+    const copyLabel = this._localize("dashboard.action_encryption_key_copy");
 
     return html`
       <div class="key-wrap">
-        <span class="key-value">${masked}</span>
+        <span class="key-value">${display}</span>
         <button
           class="key-btn"
-          title=${this._localize(
-            this._visible
-              ? "dashboard.action_api_key_hide"
-              : "dashboard.action_api_key_show"
-          )}
+          title=${toggleLabel}
+          aria-label=${toggleLabel}
           @click=${() => {
             this._visible = !this._visible;
           }}
@@ -152,7 +160,8 @@ export class ESPHomeApiKeyDialog extends LitElement {
         </button>
         <button
           class="key-btn"
-          title=${this._localize("dashboard.action_api_key_copy")}
+          title=${copyLabel}
+          aria-label=${copyLabel}
           @click=${this._copy}
         >
           <wa-icon library="mdi" name="content-copy"></wa-icon>
@@ -163,7 +172,7 @@ export class ESPHomeApiKeyDialog extends LitElement {
 
   private _renderNoKey() {
     return html`
-      <p class="no-key">${this._localize("dashboard.action_api_key_not_found")}</p>
+      <p class="no-key">${this._localize("dashboard.action_encryption_key_not_found")}</p>
     `;
   }
 
@@ -172,19 +181,17 @@ export class ESPHomeApiKeyDialog extends LitElement {
     // plain-HTTP origins where ``navigator.clipboard.writeText``
     // throws (HA-addon direct port, container-on-LAN deploys
     // reaching the dashboard via ``http://192.168.x.x:6052``).
-    if (await copyToClipboard(this.apiKey)) {
-      notifySuccess(this._localize("dashboard.action_api_key_copied"));
+    if (await copyToClipboard(this._encryptionKey)) {
+      notifySuccess(this._localize("dashboard.action_encryption_key_copied"));
     }
-    // No failure toast here — the api-key dialog already
-    // displays the key in plain text inside the dialog body,
-    // so the user can select-and-copy manually if the button
-    // failed. Keeping the silent-on-failure contract that
-    // existed before the helper switch.
+    // No failure toast here: the eye toggle reveals the key in the
+    // dialog body, so the user can select and copy it by hand if
+    // the button failed.
   }
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    "esphome-api-key-dialog": ESPHomeApiKeyDialog;
+    "esphome-encryption-key-dialog": ESPHomeEncryptionKeyDialog;
   }
 }

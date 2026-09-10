@@ -3,7 +3,10 @@ import { identityLocalize } from "../../_dom.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
-import { deleteDevice } from "../../../src/components/dashboard/actions.js";
+import {
+  deleteDevice,
+  fetchEncryptionKey,
+} from "../../../src/components/dashboard/actions.js";
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
@@ -73,5 +76,32 @@ describe("deleteDevice", () => {
     expect(ok).toBe(false);
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(toastSuccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchEncryptionKey", () => {
+  beforeEach(() => {
+    toastSuccess.mockClear();
+    toastError.mockClear();
+  });
+
+  it("returns the resolved key", async () => {
+    const api = {
+      getEncryptionKey: vi.fn(async () => "QUFB=="),
+    } as unknown as ESPHomeAPI;
+
+    await expect(fetchEncryptionKey(makeDevice(), api, localize)).resolves.toBe("QUFB==");
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("toasts an error and returns null when the backend rejects", async () => {
+    const api = {
+      getEncryptionKey: vi.fn(async () => {
+        throw new Error("backend said no");
+      }),
+    } as unknown as ESPHomeAPI;
+
+    await expect(fetchEncryptionKey(makeDevice(), api, localize)).resolves.toBeNull();
+    expect(toastError).toHaveBeenCalledTimes(1);
   });
 });

@@ -391,18 +391,18 @@ export async function detectAndOpenWizard(
   }
 }
 
-export async function fetchApiKey(
+export async function fetchEncryptionKey(
   device: ConfiguredDevice,
-  api: ESPHomeAPI
-): Promise<string> {
-  // Server-side resolution — uses ESPHome's YAML loader so !secret /
-  // !include / packages all resolve the same way as a real compile.
-  // (Previously named ``extractApiKey`` when this was a regex on the
-  // raw YAML; the new name reflects that the work is on the backend.)
+  api: ESPHomeAPI,
+  localize: LocalizeFunc
+): Promise<string | null> {
   try {
-    return await api.getApiKey(device.configuration);
-  } catch {
-    return "";
+    return await api.getEncryptionKey(device.configuration);
+  } catch (err) {
+    const name = device.friendly_name || device.name;
+    const error = getErrorMessage(err);
+    notifyError(localize("dashboard.action_encryption_key_failed", { name, error }));
+    return null;
   }
 }
 
