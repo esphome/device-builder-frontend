@@ -296,10 +296,39 @@ export function createDeviceColumns(
       enableHiding: true,
     },
     {
+      // Raw wire value (``wifi`` / ``ethernet``) rather than a
+      // prettified label, for the same reason the platform column
+      // carries the raw stem: it's what the YAML and the docs call
+      // it, and an aliasing layer would lie about what the device
+      // actually announced over.
+      accessorKey: "network",
+      header: localize("dashboard.table_col_network"),
+      cell: (info) => valueCell("cell-badge", info.getValue() as string),
+      size: 120,
+      enableHiding: true,
+    },
+    {
       accessorKey: "version",
       header: localize("dashboard.table_col_version"),
       cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 150,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "project_name",
+      header: localize("dashboard.table_col_project_name"),
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
+      size: 200,
+      enableHiding: true,
+    },
+    {
+      // No custom sortFn: TanStack's auto-resolved ``alphanumeric``
+      // chunks digit runs, so ``2026.9.0`` sorts below ``2026.10.0``
+      // the way the firmware-version column above already does.
+      accessorKey: "project_version",
+      header: localize("dashboard.table_col_project_version"),
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
+      size: 180,
       enableHiding: true,
     },
     {

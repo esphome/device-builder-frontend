@@ -276,6 +276,13 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _selectedAreas: string[] = [];
   /** ``target_platform`` stems selected in the Platform facet. */
   @state() _selectedPlatforms: string[] = [];
+  /** Running firmware ``project_name`` values selected in the Project
+   *  facet. mDNS-observed (and backend-persisted), so an offline
+   *  device stays in its project's bucket. */
+  @state() _selectedProjects: string[] = [];
+  /** ``network`` values (``wifi`` / ``ethernet``) selected in the
+   *  Network facet. */
+  @state() _selectedNetworks: string[] = [];
   /** ``DeviceState`` values selected in the Status facet. */
   @state() _selectedStates: string[] = [];
   /** Update-status buckets (``update_available`` / ``modified``)
@@ -449,6 +456,8 @@ export class ESPHomePageDashboard extends LitElement {
     }
     if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
     if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
+    if (urlState.projects !== undefined) this._selectedProjects = urlState.projects;
+    if (urlState.networks !== undefined) this._selectedNetworks = urlState.networks;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
     // Normalize the user-editable URL to known buckets in canonical order,
     // deduped, so unknown or duplicate ids can't inflate the active-filter
@@ -468,6 +477,8 @@ export class ESPHomePageDashboard extends LitElement {
       if (urlState.labels === undefined) this._selectedLabels = saved.labels;
       if (urlState.areas === undefined) this._selectedAreas = saved.areas;
       if (urlState.platforms === undefined) this._selectedPlatforms = saved.platforms;
+      if (urlState.projects === undefined) this._selectedProjects = saved.projects;
+      if (urlState.networks === undefined) this._selectedNetworks = saved.networks;
       if (urlState.states === undefined) this._selectedStates = saved.states;
       if (urlState.updates === undefined)
         this._selectedUpdateStatus = normalizeUpdateBuckets(saved.updates);
@@ -503,6 +514,8 @@ export class ESPHomePageDashboard extends LitElement {
     "_selectedLabels",
     "_selectedAreas",
     "_selectedPlatforms",
+    "_selectedProjects",
+    "_selectedNetworks",
     "_selectedStates",
     "_selectedUpdateStatus",
     "_view",
@@ -533,6 +546,8 @@ export class ESPHomePageDashboard extends LitElement {
       labels: labelNames,
       areas: this._selectedAreas,
       platforms: this._selectedPlatforms,
+      projects: this._selectedProjects,
+      networks: this._selectedNetworks,
       states: this._selectedStates,
       updates: this._selectedUpdateStatus,
       view: this._view,
@@ -668,6 +683,8 @@ export class ESPHomePageDashboard extends LitElement {
         labels,
         areas: this._selectedAreas,
         platforms: this._selectedPlatforms,
+        projects: this._selectedProjects,
+        networks: this._selectedNetworks,
         states: this._selectedStates,
         updates: this._selectedUpdateStatus,
       });
@@ -771,13 +788,15 @@ export class ESPHomePageDashboard extends LitElement {
     return activeFacetCount(this._facetSelection);
   }
 
-  /** The five facet selections bundled for the pure ``device-filter``
+  /** The facet selections bundled for the pure ``device-filter``
    *  helpers. */
   private get _facetSelection(): FacetSelection {
     return {
       selectedLabels: this._selectedLabels,
       selectedAreas: this._selectedAreas,
       selectedPlatforms: this._selectedPlatforms,
+      selectedProjects: this._selectedProjects,
+      selectedNetworks: this._selectedNetworks,
       selectedStates: this._selectedStates,
       selectedUpdateStatus: this._selectedUpdateStatus,
     };
@@ -805,6 +824,8 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectedLabels = [];
     this._selectedAreas = [];
     this._selectedPlatforms = [];
+    this._selectedProjects = [];
+    this._selectedNetworks = [];
     this._selectedStates = [];
     this._selectedUpdateStatus = [];
   };
@@ -813,8 +834,8 @@ export class ESPHomePageDashboard extends LitElement {
    *  update-status use AND semantics (labels: a device must carry
    *  every selected label, the original "drill down by tag stack";
    *  updates: a device must satisfy every selected bucket); area,
-   *  platform, and status use OR within the facet and AND across
-   *  facets, the conventional faceted-search shape.
+   *  platform, project, network and status use OR within the facet
+   *  and AND across facets, the conventional faceted-search shape.
    *
    *  Memoised on the six upstream references (``devices`` plus
    *  the five selection arrays) so the two callers inside one
@@ -829,6 +850,8 @@ export class ESPHomePageDashboard extends LitElement {
       selectedLabels: string[],
       selectedAreas: string[],
       selectedPlatforms: string[],
+      selectedProjects: string[],
+      selectedNetworks: string[],
       selectedStates: string[],
       selectedUpdateStatus: string[]
     ): ConfiguredDevice[] =>
@@ -836,6 +859,8 @@ export class ESPHomePageDashboard extends LitElement {
         selectedLabels,
         selectedAreas,
         selectedPlatforms,
+        selectedProjects,
+        selectedNetworks,
         selectedStates,
         selectedUpdateStatus,
       })
@@ -847,12 +872,14 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels,
       this._selectedAreas,
       this._selectedPlatforms,
+      this._selectedProjects,
+      this._selectedNetworks,
       this._selectedStates,
       this._selectedUpdateStatus
     );
   }
 
-  // Card view: name match. Table view: also matches address/IP/platform/MAC
+  // Card view: name match. Table view: also matches address/IP/platform/project/MAC
   // so "Select all" tracks the table's global filter (device-table.ts
   // _globalFilterFn). The MAC predicate is shared so the two can't drift.
   _currentlyVisibleConfigurations(): string[] {
