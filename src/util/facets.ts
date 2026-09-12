@@ -91,6 +91,40 @@ export function computePlatformFacet(devices: ConfiguredDevice[]): FacetOption[]
   return tallyToFacet(counts, (raw) => raw);
 }
 
+/** Project facet — derived from the running firmware's
+ *  ``project_name``. Devices with no project (the common case for
+ *  hand-written YAML) are dropped rather than pooled into an
+ *  "unknown" bucket: the facet exists to pick out the distributor
+ *  builds in a mixed fleet, and a bucket holding "everything else"
+ *  answers no question the status facet doesn't already.
+ *
+ *  Read off ``runtime_state`` ungated by ``deployedIdentityTrusted``
+ *  — the value is persisted backend-side, so an offline device stays
+ *  in its project's bucket instead of silently dropping out of the
+ *  filter. */
+export function computeProjectFacet(devices: ConfiguredDevice[]): FacetOption[] {
+  const counts = new Map<string, number>();
+  for (const d of devices) {
+    const project = d.runtime_state.project_name?.trim();
+    if (!project) continue;
+    counts.set(project, (counts.get(project) ?? 0) + 1);
+  }
+  return tallyToFacet(counts, (raw) => raw);
+}
+
+/** Network facet — derived from the ``network`` TXT the device
+ *  announced over (``wifi`` / ``ethernet``). Raw wire values, like
+ *  the platform facet: that's what the YAML and docs call them. */
+export function computeNetworkFacet(devices: ConfiguredDevice[]): FacetOption[] {
+  const counts = new Map<string, number>();
+  for (const d of devices) {
+    const network = d.runtime_state.network?.trim();
+    if (!network) continue;
+    counts.set(network, (counts.get(network) ?? 0) + 1);
+  }
+  return tallyToFacet(counts, (raw) => raw);
+}
+
 /** State facet — one bucket per ``DeviceState`` enum value
  *  (online / offline / unknown) plus ``untracked``. Buckets are
  *  seeded at zero so the popover reads consistently across reloads

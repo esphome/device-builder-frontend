@@ -45,6 +45,28 @@ export interface DeviceRuntimeState {
    * mtime-based change detection.
    */
   deployed_config_hash: string;
+  /**
+   * The running firmware's ``esphome: project:`` pair, read from the
+   * ``project_name`` / ``project_version`` mDNS TXT records — e.g.
+   * ``"apollo.plt-1"`` / ``"2026.09.06.0"``. Descriptive, not
+   * identity: unlike ``deployed_version`` these gate no update
+   * verdict, so the table renders them ungated by
+   * ``deployedIdentityTrusted`` — the backend persists them, and a
+   * device that's currently offline should still report which project
+   * build it last announced.
+   *
+   * Empty string when the firmware declares no project, or when
+   * mDNS hasn't surfaced one yet.
+   */
+  project_name: string;
+  project_version: string;
+  /** The link the device announced itself over — ``"wifi"`` /
+   *  ``"ethernet"``. The wire truth for how a device is actually
+   *  attached, which the YAML can't always settle (a board carrying
+   *  both ``wifi:`` and ``ethernet:`` resolves to one only at
+   *  runtime). Empty string on pre-2023.6 firmware, which omits the
+   *  TXT key. */
+  network: string;
   /** Indicates if an offline update has been compiled and is waiting for the device to wake up */
   queued_update: boolean;
   /**

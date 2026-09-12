@@ -99,6 +99,9 @@ const DEFAULT_HIDDEN_COLUMNS: ColumnVisibilityState = {
   version: false,
   ip: false,
   mac_address: false,
+  project_name: false,
+  project_version: false,
+  network: false,
   build_size_bytes: false,
 };
 
@@ -271,6 +274,14 @@ export class ESPHomeDeviceTable extends LitElement {
           // belongs in the per-device drawer.
           platform: d.target_platform || "",
           version: deployedIdentityTrusted(d) ? rt.deployed_version : "",
+          // Ungated on purpose, unlike ``version`` above: the project
+          // pair and link drive no update / out-of-sync verdict, so a
+          // last-known value is strictly better than a blank — and the
+          // backend persists all three precisely so offline rows stay
+          // sortable and filterable.
+          project_name: rt.project_name || "",
+          project_version: rt.project_version || "",
+          network: rt.network || "",
           build_size_bytes: d.build_size_bytes || 0,
           comment: d.comment || "",
           area: d.area || "",
