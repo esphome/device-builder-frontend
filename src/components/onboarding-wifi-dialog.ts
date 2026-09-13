@@ -13,7 +13,8 @@ import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { secretValueFromYaml } from "../util/secret-eligibility.js";
+import { SECRETS_FILE, secretValueFromYaml } from "../util/secret-eligibility.js";
+import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
@@ -21,8 +22,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
 
 registerMdiIcons({ wifi: mdiWifi });
-
-const SECRETS_FILE = "secrets.yaml";
 
 /**
  * Wi-Fi credentials dialog — the kebab "Set up / Change Wi-Fi credentials"
@@ -46,6 +45,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _password = "";
   @state() private _saving = false;
   @state() private _loading = false;
+  @state() private _loadFailed = false;
   @state() private _error: string | null = null;
 
   private _loadToken = 0;
@@ -69,18 +69,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     this._dialog.open = true;
     this._enter.set(true);
-    // The fields are disabled until the stored values land, so focus after;
-    // a dismiss or re-open in the meantime owns focus instead.
-    void this._loadStored().then(async (token) => {
-      await this.updateComplete;
-      if (token !== this._loadToken || !this._dialog.open) return;
-      this._ssidInput?.focus();
-    });
+    void this._loadAndFocus();
   }
 
   close() {
-    this._loadToken++;
-    this._loading = false;
+    this._supersedeLoad();
     this._dialog.open = false;
   }
 
@@ -130,7 +123,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         ?open=${this._dialog.open}
         ?busy=${this._saving}
         .label=${this._localize("onboarding.wifi.title")}
-        @request-close=${this._dialog.onRequestClose}
+        @request-close=${this._onRequestClose}
         @after-hide=${() => this._enter.set(false)}
       >
         <div class="body">
@@ -142,7 +135,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             localize: this._localize,
             ssid: this._ssid,
             password: this._password,
-            disabled: this._saving || this._loading,
+            disabled: this._saving || this._loading || this._loadFailed,
             onSsidInput: (v) => {
               this._ssid = v;
             },
@@ -163,45 +156,89 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           >
             ${this._localize("onboarding.wifi.cancel")}
           </button>
-          <button
-            type="button"
-            class="btn btn--primary"
-            ?disabled=${
-              this._saving ||
-              this._loading ||
-              !this._ssid.trim() ||
-              this._passwordTooShort
-            }
-            @click=${this._save}
-          >
-            ${
-              this._saving
-                ? this._localize("onboarding.wifi.saving")
-                : this._localize("onboarding.wifi.save")
-            }
-          </button>
+          ${
+            this._loadFailed
+              ? html`<button type="button" class="btn btn--primary" @click=${this._retry}>
+                  ${this._localize("onboarding.wifi.retry")}
+                </button>`
+              : html`<button
+                  type="button"
+                  class="btn btn--primary"
+                  ?disabled=${
+                    this._saving ||
+                    this._loading ||
+                    !this._ssid.trim() ||
+                    this._passwordTooShort
+                  }
+                  @click=${this._save}
+                >
+                  ${
+                    this._saving
+                      ? this._localize("onboarding.wifi.saving")
+                      : this._localize("onboarding.wifi.save")
+                  }
+                </button>`
+          }
         </div>
       </esphome-base-dialog>
     `;
   }
 
-  /** Seed the fields from the stored credentials; a missing file or read error leaves them blank. */
+  // Escape / X / outside-click dismiss without close(), so drop an in-flight load here too.
+  private _onRequestClose = () => {
+    this._supersedeLoad();
+    this._dialog.onRequestClose();
+  };
+
+  private _supersedeLoad() {
+    this._loadToken++;
+    this._loading = false;
+    this._loadFailed = false;
+  }
+
+  private _retry = () => {
+    this._error = null;
+    void this._loadAndFocus();
+  };
+
+  // The fields are disabled until the stored values land, so focus after;
+  // a dismiss or re-open in the meantime owns focus instead.
+  private async _loadAndFocus(): Promise<void> {
+    const token = await this._loadStored();
+    await this.updateComplete;
+    if (token !== this._loadToken || !this._dialog.open || this._loadFailed) return;
+    this._ssidInput?.focus();
+  }
+
+  /** Seed the fields from the stored credentials; a read failure holds the form behind Retry,
+   *  and a value the form can't edit inline (alias, anchor, block, tag) stays blank. */
   private async _loadStored(): Promise<number> {
     const token = ++this._loadToken;
     this._loading = true;
-    let yaml: string | null = null;
+    this._loadFailed = false;
+    let yaml = "";
+    let failed = false;
     try {
       yaml = await this._api.getConfig(SECRETS_FILE);
     } catch {
-      yaml = null;
+      failed = true;
     }
-    // A re-open or close superseded this load; it owns the fields now.
+    // A re-open or dismiss superseded this load; it owns the fields now.
     if (token !== this._loadToken) return token;
     this._loading = false;
-    if (yaml !== null) {
-      this._ssid = secretValueFromYaml(yaml, "wifi_ssid") ?? "";
-      this._password = secretValueFromYaml(yaml, "wifi_password") ?? "";
+    if (failed) {
+      this._loadFailed = true;
+      this._error = this._localize("onboarding.wifi.load_failed");
+      return token;
     }
+    const entries = parseSecretsEntries(yaml);
+    const inline = (key: string) => entries.some((e) => e.key === key && e.editable);
+    this._ssid = inline("wifi_ssid")
+      ? (secretValueFromYaml(yaml, "wifi_ssid") ?? "")
+      : "";
+    this._password = inline("wifi_password")
+      ? (secretValueFromYaml(yaml, "wifi_password") ?? "")
+      : "";
     return token;
   }
 

@@ -21,7 +21,11 @@ import {
 } from "../../util/ensure-secret-with-toast.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { isSharedSecret, secretValueFromYaml } from "../../util/secret-eligibility.js";
+import {
+  isSharedSecret,
+  SECRETS_FILE,
+  secretValueFromYaml,
+} from "../../util/secret-eligibility.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { PasswordInputValueChange } from "./password-input-event.js";
 
@@ -30,8 +34,6 @@ import "../confirm-dialog.js";
 import "./password-input.js";
 
 registerMdiIcons({ alert: mdiAlert, "content-copy": mdiContentCopy });
-
-const SECRETS_FILE = "secrets.yaml";
 
 @customElement("esphome-secret-value")
 export class ESPHomeSecretValue extends LitElement {

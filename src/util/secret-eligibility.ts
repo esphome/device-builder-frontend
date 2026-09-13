@@ -1,6 +1,8 @@
 import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 
+export const SECRETS_FILE = "secrets.yaml";
+
 /**
  * Fields whose secret is shared across every device — the WiFi credentials —
  * use a fixed, non-scoped key. This doubles as the picker-eligibility

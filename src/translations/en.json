@@ -1149,6 +1149,8 @@
       "saving": "Saving…",
       "save_success": "Wi-Fi credentials saved",
       "save_failed": "Failed to save Wi-Fi credentials",
+      "load_failed": "Couldn't read the stored Wi-Fi credentials",
+      "retry": "Retry",
       "cancel": "Cancel"
     },
     "wizard": {

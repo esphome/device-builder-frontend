@@ -28,6 +28,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
+import { SECRETS_FILE } from "../util/secret-eligibility.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { ToastClearanceController } from "../util/toast-clearance-controller.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
@@ -48,8 +49,6 @@ registerMdiIcons({
   "eye-off": mdiEyeOff,
   "form-textbox": mdiFormTextbox,
 });
-
-const SECRETS_FILE = "secrets.yaml";
 
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
