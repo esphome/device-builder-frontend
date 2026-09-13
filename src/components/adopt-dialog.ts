@@ -406,6 +406,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                           localize: this._localize,
                           ssid: this._ssid,
                           password: this._password,
+                          tooShort: isWifiPasswordTooShort(this._password),
                           disabled: this._busy,
                           onSsidInput: (value) => {
                             this._ssid = value;

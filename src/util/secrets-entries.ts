@@ -6,9 +6,9 @@
  * keys, block / flow collections and nested mappings are read-only.
  */
 
-import { inlineSecretScalar, secretHostSlug } from "./secret-eligibility.js";
+import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitTrimmedInlineComment, stripQuotes } from "./yaml-scalar.js";
+import { splitTrimmedInlineComment, stripQuotes, unquoteScalar } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -111,22 +111,18 @@ function formatSecretValue(value: string): string {
   return formatYamlScalar(value);
 }
 
-export type StoredSecret =
-  { state: "absent" } | { state: "advanced" } | { state: "inline"; value: string };
-
-/** The first top-level *key* line: its inline scalar, or ``advanced`` when the form can't edit it. */
-export function storedSecret(yaml: string, key: string): StoredSecret {
+/** The first top-level *key* line's inline scalar: "" when absent, null when the form can't edit it. */
+export function storedSecret(yaml: string, key: string): string | null {
   const lines = yaml.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(TOP_LEVEL_KEY);
     if (!match) continue;
     const parts = keyParts(match);
     if (parts.key !== key) continue;
-    const { editable } = readValue(parts.rest, lines, i);
-    if (!editable || !isValidSecretKey(key)) return { state: "advanced" };
-    return { state: "inline", value: inlineSecretScalar(parts.rest ?? "") };
+    if (!readValue(parts.rest, lines, i).editable) return null;
+    return unquoteScalar(splitTrimmedInlineComment(parts.rest ?? "").value.trim());
   }
-  return { state: "absent" };
+  return "";
 }
 
 /** Parse *yaml* into one entry per top-level key line. */

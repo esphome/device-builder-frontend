@@ -154,6 +154,14 @@ export const coerceYamlScalar = (
   return text;
 };
 
+/** The literal string of an inline scalar: a double-quoted one unescaped, else quotes stripped, never type-coerced. */
+export function unquoteScalar(text: string): string {
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+    return unescapeYamlDoubleQuoted(text.slice(1, -1));
+  }
+  return stripQuotes(text);
+}
+
 export const parseFlowList = (raw: string): (string | number | boolean)[] => {
   const inner = raw.slice(1, -1).trim();
   if (inner === "") return [];

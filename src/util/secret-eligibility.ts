@@ -1,5 +1,4 @@
-import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+import { splitInlineComment, stripQuotes, unquoteScalar } from "./yaml-scalar.js";
 
 export const SECRETS_FILE = "secrets.yaml";
 
@@ -202,23 +201,10 @@ export function secretValueFromYaml(yaml: string, key: string): string | null {
     // so a key (or value) that itself contains a colon doesn't mis-match.
     const colon = line.search(/:(\s|$)/);
     if (colon < 0 || stripQuotes(line.slice(0, colon).trim()) !== key) continue;
-    return inlineSecretScalar(line.slice(colon + 1));
+    // A double-quoted scalar (what `formatYamlScalar` emits when escaping) is
+    // unescaped to invert the write; anything else keeps its text verbatim,
+    // never type-coerced (a hand-written `ota_pw: yes` must stay "yes").
+    return unquoteScalar(splitInlineComment(line.slice(colon + 1)).value.trim());
   }
   return null;
-}
-
-/** The literal string of an inline scalar *rhs* (the text after ``key:``), comment dropped. */
-export function inlineSecretScalar(rhs: string): string {
-  const value = splitInlineComment(rhs).value.trim();
-  // A double-quoted scalar (what `formatYamlScalar` emits when escaping) must
-  // be unescaped to invert the write — `parseScalar`/`stripQuotes` only slice
-  // the quotes, so a value containing `"` or `\` would otherwise round-trip
-  // corrupted (migrate → manual-revert).
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    return unescapeYamlDoubleQuoted(value.slice(1, -1));
-  }
-  // Plain or single-quoted: strip quotes WITHOUT YAML type coercion — a
-  // secret is an opaque string, so a hand-written `ota_pw: yes` must stay
-  // "yes", not be coerced to "true" by parseScalar.
-  return stripQuotes(value);
 }

@@ -29,10 +29,7 @@ interface DialogPrivateView extends EventTarget {
   _password: string;
   _dialog: { open: boolean; onRequestClose(): void };
   _saving: boolean;
-  _loading: boolean;
-  _loadFailed: boolean;
-  _advancedKey: string | null;
-  _storedPassword: string;
+  _loadState: "loading" | "ready" | "failed" | "advanced";
   _error: string | null;
   _api: {
     setWifiCredentials?: (ssid: string, password: string) => Promise<unknown>;
@@ -41,8 +38,7 @@ interface DialogPrivateView extends EventTarget {
   readonly _passwordTooShort: boolean;
   _enter: { set(active: boolean): void };
   _save(): Promise<void>;
-  _loadStored(): Promise<number>;
-  _onRequestClose(): void;
+  _loadStored(): Promise<void>;
   open(): void;
   close(): void;
 }
@@ -168,57 +164,54 @@ describe("onboarding-wifi-dialog close / error gating", () => {
   });
 });
 
+/** A dialog whose secrets.yaml read resolves to *yaml*. */
+function dialogWithSecrets(yaml: string): DialogPrivateView {
+  const dialog = makeDialog();
+  dialog._api = { getConfig: vi.fn().mockResolvedValue(yaml) };
+  return dialog;
+}
+
 describe("onboarding-wifi-dialog stored-credential prefill", () => {
   test("open seeds both fields from secrets.yaml", async () => {
-    const dialog = makeDialog();
-    const getConfig = vi
-      .fn()
-      .mockResolvedValue(
-        'api_key: abc\nwifi_ssid: "My Net"\nwifi_password: "p\\"ss word"\n'
-      );
-    dialog._api = { getConfig };
+    const dialog = dialogWithSecrets(
+      'api_key: abc\nwifi_ssid: "My Net"\nwifi_password: "p\\"ss word"\n'
+    );
 
     dialog.open();
     try {
-      expect(dialog._loading).toBe(true); // fields held until the read settles
-      await vi.waitFor(() => expect(dialog._loading).toBe(false));
+      expect(dialog._loadState).toBe("loading"); // fields held until the read settles
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
     } finally {
       dialog._enter.set(false); // drop the window Enter listener open() bound
     }
 
-    expect(getConfig).toHaveBeenCalledWith("secrets.yaml");
+    expect(dialog._api.getConfig).toHaveBeenCalledWith("secrets.yaml");
     expect(dialog._ssid).toBe("My Net");
     expect(dialog._password).toBe('p"ss word'); // double-quoted scalar unescaped
   });
 
-  test.each([
-    ["close()", (d: DialogPrivateView) => d.close()],
-    ["a request-close (Escape / X)", (d: DialogPrivateView) => d._onRequestClose()],
-  ])(
-    "a dismiss via %s while the read is in flight drops its result",
-    async (_, dismiss) => {
-      const dialog = makeDialog();
-      let resolveRead!: (yaml: string) => void;
-      dialog._api = {
-        getConfig: vi.fn(() => new Promise<string>((r) => (resolveRead = r))),
-      };
+  test("a dismiss while the read is in flight drops its result", async () => {
+    const dialog = makeDialog();
+    let resolveRead!: (yaml: string) => void;
+    dialog._api = {
+      getConfig: vi.fn(() => new Promise<string>((r) => (resolveRead = r))),
+    };
 
-      dialog.open();
-      try {
-        dismiss(dialog);
-        resolveRead("wifi_ssid: late\nwifi_password: latepw\n");
-        await Promise.resolve();
-        await Promise.resolve();
-      } finally {
-        dialog._enter.set(false);
-      }
-
-      expect(dialog._dialog.open).toBe(false);
-      expect(dialog._ssid).toBe("");
-      expect(dialog._password).toBe("");
-      expect(dialog._loading).toBe(false);
+    dialog.open();
+    try {
+      dialog.close(); // the request-close binding (Escape / X) routes here too
+      resolveRead("wifi_ssid: late\nwifi_password: latepw\n");
+      await Promise.resolve();
+      await Promise.resolve();
+    } finally {
+      dialog._enter.set(false);
     }
-  );
+
+    expect(dialog._dialog.open).toBe(false);
+    expect(dialog._ssid).toBe("");
+    expect(dialog._password).toBe("");
+    expect(dialog._loadState).toBe("ready");
+  });
 
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {
     const dialog = makeDialog();
@@ -230,49 +223,38 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
 
     await dialog._loadStored();
 
-    expect(dialog._loadFailed).toBe(false);
+    expect(dialog._loadState).toBe("ready");
     expect(dialog._error).toBeNull();
     expect(dialog._ssid).toBe("");
     expect(dialog._password).toBe("");
   });
 
   test("a duplicate key is gated on its first occurrence, the one that is read", async () => {
-    const dialog = makeDialog();
-    dialog._api = {
-      getConfig: vi
-        .fn()
-        .mockResolvedValue("wifi_ssid: home\nwifi_password: *pw\nwifi_password: plain\n"),
-    };
+    const dialog = dialogWithSecrets(
+      "wifi_ssid: home\nwifi_password: *pw\nwifi_password: plain\n"
+    );
 
     await dialog._loadStored();
 
-    expect(dialog._advancedKey).toBe("wifi_password"); // not "plain" via the second line
+    expect(dialog._loadState).toBe("advanced"); // not "plain" via the second line
     expect(dialog._password).toBe("");
   });
 
   test("a value the form can't edit inline holds the form instead of prefilling its marker", async () => {
-    const dialog = makeDialog();
-    dialog._api = {
-      getConfig: vi
-        .fn()
-        .mockResolvedValue(
-          "common: &pw sharedpass\nwifi_ssid: home\nwifi_password: *pw\n"
-        ),
-    };
+    const dialog = dialogWithSecrets(
+      "common: &pw sharedpass\nwifi_ssid: home\nwifi_password: *pw\n"
+    );
 
     await dialog._loadStored();
 
-    expect(dialog._advancedKey).toBe("wifi_password");
+    expect(dialog._loadState).toBe("advanced");
     expect(dialog._error).toBe("onboarding.wifi.advanced_value"); // localize stub echoes the key
     expect(dialog._ssid).toBe(""); // held: neither field is editable, so no Save can clobber *pw
     expect(dialog._password).toBe("");
   });
 
   test("a stored short password does not trip the length gate until it is edited", async () => {
-    const dialog = makeDialog();
-    dialog._api = {
-      getConfig: vi.fn().mockResolvedValue("wifi_ssid: home\nwifi_password: abc\n"),
-    };
+    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: abc\n");
 
     await dialog._loadStored();
 
@@ -283,8 +265,7 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
   });
 
   test("a missing key leaves that field blank", async () => {
-    const dialog = makeDialog();
-    dialog._api = { getConfig: vi.fn().mockResolvedValue("wifi_ssid: home\n") };
+    const dialog = dialogWithSecrets("wifi_ssid: home\n");
 
     await dialog._loadStored();
 
@@ -294,21 +275,21 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
 
   test("a failed read surfaces an error and a retry instead of an empty editable form", async () => {
     const dialog = makeDialog();
-    const getConfig = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("backend unavailable"))
-      .mockResolvedValueOnce("wifi_ssid: home\nwifi_password: hunter2pw\n");
-    dialog._api = { getConfig };
+    dialog._api = {
+      getConfig: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("backend unavailable"))
+        .mockResolvedValueOnce("wifi_ssid: home\nwifi_password: hunter2pw\n"),
+    };
 
     await dialog._loadStored();
 
-    expect(dialog._loadFailed).toBe(true); // Save swapped for Retry, fields held
+    expect(dialog._loadState).toBe("failed"); // Save swapped for Retry, fields held
     expect(dialog._error).toBeTruthy();
-    expect(dialog._loading).toBe(false);
 
     await dialog._loadStored();
 
-    expect(dialog._loadFailed).toBe(false);
+    expect(dialog._loadState).toBe("ready");
     expect(dialog._ssid).toBe("home");
     expect(dialog._password).toBe("hunter2pw");
   });
@@ -316,11 +297,12 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
   test("a load superseded by a newer one does not apply its result", async () => {
     const dialog = makeDialog();
     let resolveFirst!: (yaml: string) => void;
-    const getConfig = vi
-      .fn()
-      .mockImplementationOnce(() => new Promise<string>((r) => (resolveFirst = r)))
-      .mockResolvedValueOnce("wifi_ssid: second\nwifi_password: secondpw\n");
-    dialog._api = { getConfig };
+    dialog._api = {
+      getConfig: vi
+        .fn()
+        .mockImplementationOnce(() => new Promise<string>((r) => (resolveFirst = r)))
+        .mockResolvedValueOnce("wifi_ssid: second\nwifi_password: secondpw\n"),
+    };
 
     const first = dialog._loadStored();
     await dialog._loadStored();
@@ -329,6 +311,6 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
 
     expect(dialog._ssid).toBe("second");
     expect(dialog._password).toBe("secondpw");
-    expect(dialog._loading).toBe(false);
+    expect(dialog._loadState).toBe("ready");
   });
 });
