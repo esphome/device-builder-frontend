@@ -210,7 +210,6 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._dialog.open).toBe(false);
     expect(dialog._ssid).toBe("");
     expect(dialog._password).toBe("");
-    expect(dialog._loadState).toBe("ready");
   });
 
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {

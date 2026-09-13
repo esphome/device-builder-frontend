@@ -9,6 +9,7 @@ import {
   removeSecret,
   renameSecretKey,
   setSecretValue,
+  storedSecret,
 } from "../../src/util/secrets-entries.js";
 
 describe("parseSecretsEntries", () => {
@@ -89,6 +90,38 @@ describe("parseSecretsEntries", () => {
     const entries = parseSecretsEntries("<<: *base\nwifi_ssid: home\n");
     expect(entries[0]).toMatchObject({ key: "<<", editable: false });
     expect(entries[1]).toMatchObject({ key: "wifi_ssid", editable: true });
+  });
+});
+
+describe("storedSecret", () => {
+  test.each([
+    ["absent key", "other: x\n", ""],
+    ["bare key:", "wifi_ssid:\n", ""],
+    ["comment-only value", "wifi_ssid: # set me\n", ""],
+    ["plain scalar with trailing comment", "wifi_ssid: home # note\n", "home"],
+    ["single-quoted", "wifi_ssid: 'it''s home'\n", "it's home"],
+    ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
+    ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
+  ])("%s reads as an inline scalar", (_, yaml, expected) => {
+    expect(storedSecret(yaml, "wifi_ssid")).toBe(expected);
+  });
+
+  test.each([
+    ["alias", "common: &pw x\nwifi_ssid: *pw\n"],
+    ["anchor", "wifi_ssid: &home home\n"],
+    ["tag", "wifi_ssid: !secret other\n"],
+    ["block scalar", "wifi_ssid: |\n  home\n"],
+    ["flow collection", "wifi_ssid: [a, b]\n"],
+    ["indented block below", "wifi_ssid:\n  nested: 1\n"],
+    ["merge key", "<<: *base\n"],
+  ])("%s is not inline-editable", (_, yaml) => {
+    const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
+    expect(storedSecret(yaml, key)).toBeNull();
+  });
+
+  test("a duplicate key is classified by its first occurrence", () => {
+    expect(storedSecret("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")).toBeNull();
+    expect(storedSecret("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")).toBe("first");
   });
 });
 

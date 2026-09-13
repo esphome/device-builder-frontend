@@ -80,7 +80,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   close() {
-    this._supersedeLoad();
+    // Only drop an in-flight read; the held state stays put through the hide animation.
+    this._loadToken++;
     this._dialog.open = false;
   }
 
@@ -188,11 +189,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     >
       ${this._localize(label)}
     </button>`;
-  }
-
-  private _supersedeLoad() {
-    this._loadToken++;
-    this._loadState = "ready";
   }
 
   private _retry() {
