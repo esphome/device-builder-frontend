@@ -289,7 +289,7 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._password).toBe("");
   });
 
-  test("a duplicate key is gated on its first occurrence, the one that is read", async () => {
+  test("a duplicate key holds the form when its first line isn't inline-editable", async () => {
     const dialog = dialogWithSecrets(
       "wifi_ssid: home\nwifi_password: *pw\nwifi_password: plain\n"
     );

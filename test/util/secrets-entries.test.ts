@@ -172,7 +172,7 @@ describe("inlineSecretValue", () => {
     expect(inlineSecretValue(yaml, key)).toBeNull();
   });
 
-  test("a duplicate key is classified by its first occurrence", () => {
+  test("a duplicate key is classified by its first line, never reported as editable via a later one", () => {
     expect(
       inlineSecretValue("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")
     ).toBeNull();

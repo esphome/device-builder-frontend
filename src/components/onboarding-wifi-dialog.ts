@@ -19,6 +19,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
+import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SECRETS_FILE } from "../util/secret-eligibility.js";
 import { inlineSecretValue } from "../util/secrets-entries.js";
@@ -98,6 +99,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   // would flash empty inputs during the hide animation, and the values are
   // already shown on the Secrets page.
   close() {
+    // The base dialog re-emits request-close on the reactive open flip, so this re-enters once.
+    if (!this._dialog.open) return;
     this._generation++;
     this._enter.set(false);
     this._dialog.open = false;
@@ -198,7 +201,13 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private _renderPrimaryAction() {
     switch (this._loadState) {
       case "advanced":
-        return nothing;
+        return html`<button
+          type="button"
+          class="btn btn--primary"
+          @click=${this._openSecrets}
+        >
+          ${this._localize("wizard.open_secrets")}
+        </button>`;
       case "failed":
         return html`<button type="button" class="btn btn--primary" @click=${this._retry}>
           ${this._localize("command.retry")}
@@ -218,6 +227,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           ${this._localize(this._saving ? "onboarding.wifi.saving" : "onboarding.wifi.save")}
         </button>`;
     }
+  }
+
+  private async _openSecrets() {
+    if (await navigate("/secrets")) this.close();
   }
 
   private _retry() {
