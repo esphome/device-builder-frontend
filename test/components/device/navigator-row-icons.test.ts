@@ -29,6 +29,7 @@ import {
   mdiToggleSwitchOutline,
   mdiUsb,
   mdiVariable,
+  mdiWifiCog,
   mdiZWave,
 } from "@mdi/js";
 import { describe, expect, it } from "vitest";
@@ -66,6 +67,12 @@ describe("iconPathForDomain", () => {
   it("gives preferences a save-settings glyph, distinct from psram's memory", () => {
     expect(iconPathForDomain("preferences")).toBe(mdiContentSaveCogOutline);
     expect(iconPathForDomain("psram")).toBe(mdiMemory);
+  });
+
+  it("gives both Improv transports and the legacy esp32_improv key the wifi-cog glyph", () => {
+    for (const d of ["improv_serial", "improv_ble", "esp32_improv"]) {
+      expect(iconPathForDomain(d)).toBe(mdiWifiCog);
+    }
   });
 
   it("shares one glyph across related domains", () => {
