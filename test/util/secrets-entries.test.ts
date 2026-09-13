@@ -178,6 +178,7 @@ describe("inlineSecretValue", () => {
     ["double-quoted with an escaped line break", 'wifi_ssid: "a\\nb"\n'],
     ["double-quoted with an escaped tab", 'wifi_ssid: "a\\tb"\n'],
     ["double-quoted with a numeric control character", 'wifi_ssid: "a\\x07b"\n'],
+    ["double-quoted private-use glyph", 'wifi_ssid: "a\\U000F058Fb"\n'],
     ["double-quoted lone surrogate", 'wifi_ssid: "\\uD800"\n'],
     ["double-quoted out-of-range code point", 'wifi_ssid: "\\U00110000"\n'],
   ])("%s is not inline-editable", (_, yaml) => {
