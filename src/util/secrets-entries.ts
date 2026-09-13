@@ -7,8 +7,11 @@
  */
 
 import { secretHostSlug } from "./secret-eligibility.js";
-import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { decodeYamlDoubleQuoted, decodeYamlSingleQuoted } from "./yaml-escape.js";
+import {
+  decodeYamlDoubleQuoted,
+  decodeYamlSingleQuoted,
+  escapeYamlDoubleQuoted,
+} from "./yaml-escape.js";
 import { splitTrimmedInlineComment } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
@@ -205,7 +208,9 @@ function readValue(
   // rejects (open or escaped closing quote, stray inner quote, escape it can't
   // round-trip) is continued below or malformed, and a decoded control character
   // (a line break is stripped, a tab is invisible) can't be edited faithfully in
-  // the single-line input. All of those stay read-only.
+  // the single-line input. All of those stay read-only rather than rendering
+  // through escapeControlForInput: that would need the symmetric unescape on
+  // every write path, for credentials that never legitimately hold one.
   const closed = trimmed.length >= 2 && trimmed.endsWith(quote);
   const body = trimmed.slice(1, -1);
   const decoded = !closed
