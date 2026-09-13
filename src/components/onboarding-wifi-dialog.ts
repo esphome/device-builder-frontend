@@ -3,7 +3,9 @@ import { mdiWifi } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { isApiErrorCode } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
@@ -220,8 +222,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     let failed = false;
     try {
       yaml = await this._api.getConfig(SECRETS_FILE);
-    } catch {
-      failed = true;
+    } catch (err) {
+      // No secrets.yaml yet is the first-run case: a blank form, not an error.
+      failed = !isApiErrorCode(err, ErrorCode.NOT_FOUND);
     }
     // A re-open or dismiss superseded this load; it owns the fields now.
     if (token !== this._loadToken) return token;
@@ -231,8 +234,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._error = this._localize("onboarding.wifi.load_failed");
       return token;
     }
+    // Gate on the first occurrence, the one secretValueFromYaml reads.
     const entries = parseSecretsEntries(yaml);
-    const inline = (key: string) => entries.some((e) => e.key === key && e.editable);
+    const inline = (key: string) => entries.find((e) => e.key === key)?.editable === true;
     this._ssid = inline("wifi_ssid")
       ? (secretValueFromYaml(yaml, "wifi_ssid") ?? "")
       : "";

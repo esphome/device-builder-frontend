@@ -7,6 +7,8 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+import { APIError } from "../../src/api/api-error.js";
+import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomeOnboardingWifiDialog } from "../../src/components/onboarding-wifi-dialog.js";
 
 /**
@@ -213,6 +215,35 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
       expect(dialog._loading).toBe(false);
     }
   );
+
+  test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {
+    const dialog = makeDialog();
+    dialog._api = {
+      getConfig: vi
+        .fn()
+        .mockRejectedValue(new APIError(ErrorCode.NOT_FOUND, "no such file")),
+    };
+
+    await dialog._loadStored();
+
+    expect(dialog._loadFailed).toBe(false);
+    expect(dialog._error).toBeNull();
+    expect(dialog._ssid).toBe("");
+    expect(dialog._password).toBe("");
+  });
+
+  test("a duplicate key is gated on its first occurrence, the one that is read", async () => {
+    const dialog = makeDialog();
+    dialog._api = {
+      getConfig: vi
+        .fn()
+        .mockResolvedValue("wifi_ssid: home\nwifi_password: *pw\nwifi_password: plain\n"),
+    };
+
+    await dialog._loadStored();
+
+    expect(dialog._password).toBe(""); // not "*pw" via the editable second line
+  });
 
   test("a value the form can't edit inline stays blank instead of its marker text", async () => {
     const dialog = makeDialog();
