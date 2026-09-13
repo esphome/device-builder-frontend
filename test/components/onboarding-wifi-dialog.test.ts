@@ -9,6 +9,7 @@ vi.mock("sonner-js", () => ({
 
 import "../_mock-webawesome.js";
 
+import { mount } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomeOnboardingWifiDialog } from "../../src/components/onboarding-wifi-dialog.js";
@@ -225,6 +226,29 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
       await Promise.resolve();
     } finally {
       dialog._enter.set(false);
+    }
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+  });
+
+  test("the request-close binding (Escape / X) drops the load and unbinds Enter", async () => {
+    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api.setWifiCredentials = setWifiCredentials;
+    const el = dialog as unknown as HTMLElement;
+    await mount(el);
+    try {
+      dialog.open();
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+        new CustomEvent("request-close")
+      );
+      expect(dialog._dialog.open).toBe(false);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await Promise.resolve();
+    } finally {
+      dialog._enter.set(false);
+      el.remove();
     }
 
     expect(setWifiCredentials).not.toHaveBeenCalled();

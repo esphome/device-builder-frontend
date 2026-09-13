@@ -1,5 +1,3 @@
-import { splitInlineComment, stripQuotes, unquoteScalar } from "./yaml-scalar.js";
-
 export const SECRETS_FILE = "secrets.yaml";
 
 /**
@@ -188,23 +186,4 @@ export function recommendedSecretKeys(
     return tail ? scoped(host, tail) : [];
   }
   return [];
-}
-
-/** The literal value of a top-level ``key`` in a flat ``secrets.yaml``, or
- *  ``null`` when the key isn't found. Used to inline a secret's value back
- *  into a field when the user reverts to a manually typed value. */
-export function secretValueFromYaml(yaml: string, key: string): string | null {
-  for (const line of yaml.split("\n")) {
-    // Top-level `key: value` only — skip indentation, blanks, and comments.
-    if (!line || line[0] === " " || line[0] === "\t" || line[0] === "#") continue;
-    // The mapping separator is the first `:` followed by whitespace or EOL,
-    // so a key (or value) that itself contains a colon doesn't mis-match.
-    const colon = line.search(/:(\s|$)/);
-    if (colon < 0 || stripQuotes(line.slice(0, colon).trim()) !== key) continue;
-    // A double-quoted scalar (what `formatYamlScalar` emits when escaping) is
-    // unescaped to invert the write; anything else keeps its text verbatim,
-    // never type-coerced (a hand-written `ota_pw: yes` must stay "yes").
-    return unquoteScalar(splitInlineComment(line.slice(colon + 1)).value.trim());
-  }
-  return null;
 }

@@ -38,7 +38,7 @@ export interface SecretGroup {
 // kept verbatim (such a key is read-only anyway). Groups: double-quoted
 // name, single-quoted name, bare name, rest.
 const TOP_LEVEL_KEY =
-  /^(?:"((?:[^"\\\n]|\\.)+)"|'((?:[^'\n]|'')+)'|(<<|[A-Za-z_][A-Za-z0-9_.\-]*)):(?:[ \t]+([^\n]*))?$/;
+  /^(?:"((?:[^"\\\n]|\\.)+)"|'((?:[^'\n]|'')+)'|(<<|[A-Za-z_][A-Za-z0-9_.\-]*))[ \t]*:(?:[ \t]+([^\n]*))?$/;
 
 /** The key, its source quote (``"``, ``'`` or ``""``) and the rest of a matched line. */
 function keyParts(match: RegExpMatchArray): {

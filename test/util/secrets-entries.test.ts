@@ -84,6 +84,15 @@ describe("parseSecretsEntries", () => {
 
   test("key:value with no space after the colon is not an entry", () => {
     expect(parseSecretsEntries("notakey:value\n")).toEqual([]);
+    expect(parseSecretsEntries("notakey :value\n")).toEqual([]);
+  });
+
+  test("whitespace before the colon is still a mapping", () => {
+    const entries = parseSecretsEntries("wifi_ssid : home\nwifi_password\t: *pw\n");
+    expect(entries).toEqual([
+      { key: "wifi_ssid", value: "home", line: 0, editable: true },
+      { key: "wifi_password", value: "", line: 1, editable: false },
+    ]);
   });
 
   test("a top-level merge key surfaces as an advanced entry", () => {
@@ -102,6 +111,11 @@ describe("storedSecret", () => {
     ["single-quoted", "wifi_ssid: 'it''s home'\n", "it's home"],
     ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
     ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
+    ["quoted key", '"wifi_ssid": home\n', "home"],
+    ["whitespace before the colon", "wifi_ssid : home\n", "home"],
+    ["value containing a colon", "wifi_ssid: http://host:8080\n", "http://host:8080"],
+    ["key that is a colon-prefix of another line", "wifi_ssid:x: y\nwifi_ssid: z\n", "z"],
+    ["double-quoted hash and backslash", 'wifi_ssid: "a # b\\\\c"\n', "a # b\\c"],
   ])("%s reads as an inline scalar", (_, yaml, expected) => {
     expect(storedSecret(yaml, "wifi_ssid")).toBe(expected);
   });
@@ -114,6 +128,7 @@ describe("storedSecret", () => {
     ["flow collection", "wifi_ssid: [a, b]\n"],
     ["indented block below", "wifi_ssid:\n  nested: 1\n"],
     ["merge key", "<<: *base\n"],
+    ["alias behind whitespace before the colon", "wifi_ssid : *pw\n"],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(storedSecret(yaml, key)).toBeNull();

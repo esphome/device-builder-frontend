@@ -21,11 +21,8 @@ import {
 } from "../../util/ensure-secret-with-toast.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import {
-  isSharedSecret,
-  SECRETS_FILE,
-  secretValueFromYaml,
-} from "../../util/secret-eligibility.js";
+import { isSharedSecret, SECRETS_FILE } from "../../util/secret-eligibility.js";
+import { storedSecret } from "../../util/secrets-entries.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { PasswordInputValueChange } from "./password-input-event.js";
 
@@ -70,6 +67,8 @@ export class ESPHomeSecretValue extends LitElement {
   /** The stored-value read failed — show an error instead of an empty editable
    *  field, so a transient failure can't be saved over the real secret. */
   @state() private _loadError = false;
+  /** The stored value isn't an inline scalar (alias, anchor, block, tag) — read-only here. */
+  @state() private _advanced = false;
   /** Cancels a stale load when the target changes mid-fetch. */
   private _loadToken = 0;
   /** Bumped on every target change so a write (`_run`) that resolves after the
@@ -90,6 +89,7 @@ export class ESPHomeSecretValue extends LitElement {
       this._busy = false;
       this._loading = false;
       this._loadError = false;
+      this._advanced = false;
       this._loadToken++;
       this._opToken++;
     }
@@ -103,7 +103,8 @@ export class ESPHomeSecretValue extends LitElement {
       this._api &&
       this._stored === null &&
       !this._loading &&
-      !this._loadError
+      !this._loadError &&
+      !this._advanced
     ) {
       void this._loadStored();
     }
@@ -226,6 +227,7 @@ export class ESPHomeSecretValue extends LitElement {
   /** Existing secret: the value is directly editable; Save when it changes. */
   private _renderEdit() {
     if (this._loadError) return this._renderLoadError();
+    if (this._advanced) return this._renderAdvanced();
     return html`<div class="row">
         ${this._renderInput()}
         <button
@@ -267,6 +269,16 @@ export class ESPHomeSecretValue extends LitElement {
         <button class="retry link-button" type="button" @click=${this._retry}>
           ${this._localize("device.secret_picker_retry")}
         </button>
+      </span>
+    </div>`;
+  }
+
+  /** The stored value can't be edited inline; point at the Secrets page. */
+  private _renderAdvanced() {
+    return html`<div class="fix">
+      <span class="msg" role="alert">
+        <wa-icon library="mdi" name="alert"></wa-icon>
+        ${this._localize("device.secret_picker_advanced", { key: this.secretKey })}
       </span>
     </div>`;
   }
@@ -326,7 +338,7 @@ export class ESPHomeSecretValue extends LitElement {
     let failed = false;
     try {
       const yaml = await this._api!.getConfig(SECRETS_FILE);
-      value = secretValueFromYaml(yaml, this.secretKey);
+      value = storedSecret(yaml, this.secretKey);
     } catch {
       failed = true;
       notifyError(this._localize("device.secret_picker_reveal_error"));
@@ -342,7 +354,12 @@ export class ESPHomeSecretValue extends LitElement {
       this._loadError = true;
       return;
     }
-    this._stored = value ?? "";
+    // Same rule for a non-inline value: never an editable field over it.
+    if (value === null) {
+      this._advanced = true;
+      return;
+    }
+    this._stored = value;
     this._draftValue = this._stored;
   }
 
