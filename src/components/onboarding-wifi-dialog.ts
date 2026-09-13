@@ -59,7 +59,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _saving = false;
   // "failed" (read error, Retry) and "advanced" (a stored value the form can't
   // edit inline) both hold the form so Save can't overwrite the real secret.
-  @state() private _loadState: "loading" | "ready" | "failed" | "advanced" = "ready";
+  @state() private _loadState: "loading" | "retrying" | "ready" | "failed" | "advanced" =
+    "ready";
   @state() private _error: string | null = null;
   private _storedPassword = "";
   // Bumped by every open, close and retry. An async load applies only while it
@@ -210,12 +211,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         </button>`;
       // A retry keeps its label, and the error it is retrying, until the read settles.
       case "failed":
-      case "loading":
-        if (this._loadState === "loading" && this._error === null) break; // first load: Save
+      case "retrying":
         return html`<button
           type="button"
           class="btn btn--primary"
-          ?disabled=${this._loadState === "loading"}
+          ?disabled=${this._loadState === "retrying"}
           @click=${this._primaryAction}
         >
           ${this._localize("command.retry")}
@@ -232,7 +232,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       class="btn btn--primary"
       ?disabled=${
         this._saving ||
-        this._loadState === "loading" ||
+        this._loadState !== "ready" ||
         !this._ssid.trim() ||
         this._passwordTooShort
       }
@@ -277,7 +277,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   /** Seed the fields from the stored credentials, or hold the form (see `_loadState`). */
   private async _loadStored(): Promise<void> {
     const generation = ++this._generation;
-    this._loadState = "loading";
+    this._loadState = this._loadState === "failed" ? "retrying" : "loading";
     let yaml = "";
     let failed = false;
     try {

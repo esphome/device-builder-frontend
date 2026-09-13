@@ -16,7 +16,7 @@ import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { fireEvent } from "../../util/fire-event.js";
-import { navigate } from "../../util/navigation.js";
+import { navigateOrReload } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { secretHostSlug } from "../../util/secret-eligibility.js";
@@ -163,9 +163,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         @click=${(e: MouseEvent) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
-          // Fall back to a full navigation if the SPA router rejects, so the
-          // click is never a silent no-op.
-          navigate(path).catch(() => window.location.assign(href));
+          void navigateOrReload(path);
         }}
         >${device}</a
       >

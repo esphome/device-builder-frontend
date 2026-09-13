@@ -34,7 +34,7 @@ interface DialogPrivateView extends EventTarget {
   _password: string;
   _dialog: { open: boolean; onRequestClose(): void };
   _saving: boolean;
-  _loadState: "loading" | "ready" | "failed" | "advanced";
+  _loadState: "loading" | "retrying" | "ready" | "failed" | "advanced";
   _error: string | null;
   _api: {
     setWifiCredentials?: (ssid: string, password: string) => Promise<unknown>;
@@ -408,8 +408,8 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._error).toBeTruthy();
 
     const retry = dialog._loadStored();
-    expect(dialog._loadState).toBe("loading");
-    expect(dialog._error).toBeTruthy(); // the retry keeps its error (and label) until it settles
+    expect(dialog._loadState).toBe("retrying"); // its own state, so the footer keeps the Retry label
+    expect(dialog._error).toBeTruthy(); // and the error it is retrying, until it settles
     await retry;
 
     expect(dialog._error).toBeNull();
