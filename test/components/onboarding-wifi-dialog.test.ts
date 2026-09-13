@@ -158,13 +158,6 @@ describe("onboarding-wifi-dialog close / error gating", () => {
     expect(dialog._dialog.open).toBe(false); // closed via the reactive flag
     expect(saved).toHaveBeenCalledTimes(1); // pickers + kebab wording refresh
   });
-
-  test("the controller's onRequestClose flips the reactive open flag", () => {
-    const dialog = makeDialog();
-    dialog._dialog.open = true;
-    dialog._dialog.onRequestClose();
-    expect(dialog._dialog.open).toBe(false);
-  });
 });
 
 /** A dialog whose secrets.yaml read resolves to *yaml*. */

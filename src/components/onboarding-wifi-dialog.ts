@@ -93,7 +93,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   // The single teardown for every dismissal (Cancel, Save, Escape, X, outside-click):
-  // synchronous, so nothing that fires later can act on a dismissed dialog.
+  // synchronous, so nothing that fires later can act on a dismissed dialog. The
+  // fields keep their values until the next open() on purpose: blanking here
+  // would flash empty inputs during the hide animation, and the values are
+  // already shown on the Secrets page.
   close() {
     this._generation++;
     this._enter.set(false);
@@ -193,23 +196,28 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   private _renderPrimaryAction() {
-    if (this._loadState === "advanced") return nothing;
-    const failed = this._loadState === "failed";
-    const saveBlocked =
-      this._loadState !== "ready" || !this._ssid.trim() || this._passwordTooShort;
-    const label = failed
-      ? "command.retry"
-      : this._saving
-        ? "onboarding.wifi.saving"
-        : "onboarding.wifi.save";
-    return html`<button
-      type="button"
-      class="btn btn--primary"
-      ?disabled=${this._saving || (!failed && saveBlocked)}
-      @click=${failed ? this._retry : this._save}
-    >
-      ${this._localize(label)}
-    </button>`;
+    switch (this._loadState) {
+      case "advanced":
+        return nothing;
+      case "failed":
+        return html`<button type="button" class="btn btn--primary" @click=${this._retry}>
+          ${this._localize("command.retry")}
+        </button>`;
+      default:
+        return html`<button
+          type="button"
+          class="btn btn--primary"
+          ?disabled=${
+            this._saving ||
+            this._loadState === "loading" ||
+            !this._ssid.trim() ||
+            this._passwordTooShort
+          }
+          @click=${this._save}
+        >
+          ${this._localize(this._saving ? "onboarding.wifi.saving" : "onboarding.wifi.save")}
+        </button>`;
+    }
   }
 
   private _retry() {

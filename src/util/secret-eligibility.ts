@@ -191,8 +191,10 @@ export function recommendedSecretKeys(
 }
 
 /** The literal value of a top-level ``key`` in a flat ``secrets.yaml``, or
- *  ``null`` when the key isn't found. Used to inline a secret's value back
- *  into a field when the user reverts to a manually typed value. */
+ *  ``null`` when the key isn't found (an alias or block comes back as its
+ *  marker text; ``inlineSecretValue`` in secrets-entries is the accessor
+ *  whose ``null`` means "not inline-editable"). Used to inline a secret's
+ *  value back into a field when the user reverts to a manually typed value. */
 export function secretValueFromYaml(yaml: string, key: string): string | null {
   for (const line of yaml.split("\n")) {
     // Top-level `key: value` only — skip indentation, blanks, and comments.
