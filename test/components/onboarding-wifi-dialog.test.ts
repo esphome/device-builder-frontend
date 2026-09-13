@@ -32,8 +32,11 @@ interface DialogPrivateView extends EventTarget {
     getConfig?: (configuration: string) => Promise<string>;
   };
   readonly _passwordTooShort: boolean;
+  _enter: { set(active: boolean): void };
   _save(): Promise<void>;
-  _loadStored(): Promise<void>;
+  _loadStored(): Promise<number>;
+  open(): void;
+  close(): void;
 }
 
 function makeDialog(): DialogPrivateView {
@@ -167,11 +170,35 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
       );
     dialog._api = { getConfig };
 
-    await dialog._loadStored();
+    dialog.open();
+    try {
+      expect(dialog._loading).toBe(true); // fields held until the read settles
+      await vi.waitFor(() => expect(dialog._loading).toBe(false));
+    } finally {
+      dialog._enter.set(false); // drop the window Enter listener open() bound
+    }
 
     expect(getConfig).toHaveBeenCalledWith("secrets.yaml");
     expect(dialog._ssid).toBe("My Net");
     expect(dialog._password).toBe('p"ss word'); // double-quoted scalar unescaped
+  });
+
+  test("a dismiss while the read is in flight drops its result", async () => {
+    const dialog = makeDialog();
+    let resolveRead!: (yaml: string) => void;
+    dialog._api = {
+      getConfig: vi.fn(() => new Promise<string>((r) => (resolveRead = r))),
+    };
+
+    dialog.open();
+    dialog.close();
+    dialog._enter.set(false);
+    resolveRead("wifi_ssid: late\nwifi_password: latepw\n");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(dialog._ssid).toBe("");
+    expect(dialog._password).toBe("");
     expect(dialog._loading).toBe(false);
   });
 

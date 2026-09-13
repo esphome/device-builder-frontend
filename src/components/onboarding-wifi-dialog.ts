@@ -69,10 +69,13 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     this._dialog.open = true;
     this._enter.set(true);
-    // The fields are disabled until the stored values land, so focus after.
-    void this._loadStored()
-      .then(() => this.updateComplete)
-      .then(() => this._ssidInput?.focus());
+    // The fields are disabled until the stored values land, so focus after;
+    // a dismiss or re-open in the meantime owns focus instead.
+    void this._loadStored().then(async (token) => {
+      await this.updateComplete;
+      if (token !== this._loadToken || !this._dialog.open) return;
+      this._ssidInput?.focus();
+    });
   }
 
   close() {
@@ -183,7 +186,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   /** Seed the fields from the stored credentials; a missing file or read error leaves them blank. */
-  private async _loadStored(): Promise<void> {
+  private async _loadStored(): Promise<number> {
     const token = ++this._loadToken;
     this._loading = true;
     let yaml: string | null = null;
@@ -193,11 +196,13 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       yaml = null;
     }
     // A re-open or close superseded this load; it owns the fields now.
-    if (token !== this._loadToken) return;
+    if (token !== this._loadToken) return token;
     this._loading = false;
-    if (yaml === null) return;
-    this._ssid = secretValueFromYaml(yaml, "wifi_ssid") ?? "";
-    this._password = secretValueFromYaml(yaml, "wifi_password") ?? "";
+    if (yaml !== null) {
+      this._ssid = secretValueFromYaml(yaml, "wifi_ssid") ?? "";
+      this._password = secretValueFromYaml(yaml, "wifi_password") ?? "";
+    }
+    return token;
   }
 
   private async _save() {
