@@ -212,6 +212,24 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._password).toBe("");
   });
 
+  test("Enter during the hide animation after a dismiss does not save the prefilled fields", async () => {
+    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api.setWifiCredentials = setWifiCredentials;
+
+    dialog.open();
+    try {
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      dialog.close();
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await Promise.resolve();
+    } finally {
+      dialog._enter.set(false);
+    }
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+  });
+
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {
     const dialog = makeDialog();
     dialog._api = {

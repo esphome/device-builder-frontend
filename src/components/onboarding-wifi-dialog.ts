@@ -82,6 +82,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   close() {
     // Only drop an in-flight read; the held state stays put through the hide animation.
     this._loadToken++;
+    // Unbind now, not at after-hide: Enter during the animation must not save prefilled fields.
+    this._enter.set(false);
     this._dialog.open = false;
   }
 
