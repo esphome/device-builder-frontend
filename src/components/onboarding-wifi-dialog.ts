@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiWifi } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 import toast from "sonner-js";
 import { isApiErrorCode } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -52,6 +53,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _error: string | null = null;
   private _storedPassword = "";
   private _loadToken = 0;
+  // Keys the fields per open so the password input's reveal toggle starts hidden each time.
+  private _openCount = 0;
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -74,6 +77,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._storedPassword = "";
     this._saving = false;
     this._error = null;
+    this._openCount++;
     this._dialog.open = true;
     this._enter.set(true);
     void this._loadAndFocus();
@@ -134,26 +138,29 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         ?busy=${this._saving}
         .label=${this._localize("onboarding.wifi.title")}
         @request-close=${this.close}
-        @after-hide=${() => this._enter.set(false)}
+        @after-hide=${this._onAfterHide}
       >
         <div class="body">
           <p class="intro">
             <wa-icon library="mdi" name="wifi"></wa-icon>
             ${this._localize("onboarding.wifi.intro")}
           </p>
-          ${renderWifiFields({
-            localize: this._localize,
-            ssid: this._ssid,
-            password: this._password,
-            disabled: this._saving || this._loadState !== "ready",
-            tooShort: this._passwordTooShort,
-            onSsidInput: (v) => {
-              this._ssid = v;
-            },
-            onPasswordInput: (v) => {
-              this._password = v;
-            },
-          })}
+          ${keyed(
+            this._openCount,
+            renderWifiFields({
+              localize: this._localize,
+              ssid: this._ssid,
+              password: this._password,
+              disabled: this._saving || this._loadState !== "ready",
+              tooShort: this._passwordTooShort,
+              onSsidInput: (v) => {
+                this._ssid = v;
+              },
+              onPasswordInput: (v) => {
+                this._password = v;
+              },
+            })
+          )}
           ${
             this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing
           }
@@ -171,6 +178,14 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         </div>
       </esphome-base-dialog>
     `;
+  }
+
+  // Don't leave the credentials sitting in the hidden dialog's DOM.
+  private _onAfterHide() {
+    this._enter.set(false);
+    this._ssid = "";
+    this._password = "";
+    this._storedPassword = "";
   }
 
   private _renderPrimaryAction() {

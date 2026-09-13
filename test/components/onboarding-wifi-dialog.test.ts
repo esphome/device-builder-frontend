@@ -254,6 +254,33 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
+  test("after-hide blanks the credentials and a reopen gets fresh inputs", async () => {
+    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
+    const el = dialog as unknown as HTMLElement;
+    await mount(el);
+    const base = () => el.shadowRoot!.querySelector("esphome-base-dialog")!;
+    const passwordInput = () => el.shadowRoot!.querySelector("esphome-password-input");
+    try {
+      dialog.open();
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      const first = passwordInput();
+      expect(first).not.toBeNull();
+
+      dialog.close();
+      base().dispatchEvent(new CustomEvent("after-hide"));
+      expect(dialog._password).toBe(""); // nothing lingers in the hidden DOM
+
+      dialog.open();
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+      expect(passwordInput()).not.toBe(first); // keyed per open: reveal state starts hidden
+      expect(dialog._password).toBe("hunter2pw");
+    } finally {
+      dialog._enter.set(false);
+      el.remove();
+    }
+  });
+
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {
     const dialog = makeDialog();
     dialog._api = {

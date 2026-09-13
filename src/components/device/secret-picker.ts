@@ -26,13 +26,16 @@ import { ensureSecretWithToast } from "../../util/ensure-secret-with-toast.js";
 import { navigate } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { SECRETS_FILE, visibleSecretKeys } from "../../util/secret-eligibility.js";
+import {
+  SECRETS_FILE,
+  secretValueFromYaml,
+  visibleSecretKeys,
+} from "../../util/secret-eligibility.js";
 import {
   fetchSecretKeys,
   getCachedSecretKeys,
   subscribeSecretKeys,
 } from "../../util/secrets-cache.js";
-import { storedSecret } from "../../util/secrets-entries.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
@@ -446,16 +449,9 @@ export class ESPHomeSecretPicker extends LitElement {
     }
     try {
       const yaml = await this._api.getConfig(SECRETS_FILE);
-      // An absent key (e.g. deleted) is a legitimate empty inline value; a
-      // non-inline one (alias, anchor, block, tag) has no literal to inline.
-      const value = storedSecret(yaml, this.selectedKey);
-      if (value === null) {
-        notifyError(
-          this._localize("device.secret_picker_advanced", { key: this.selectedKey })
-        );
-        return;
-      }
-      this._emit(value);
+      // `null` means the key is genuinely absent (e.g. deleted) — a legitimate
+      // empty inline value. A read that *throws* is transient (below).
+      this._emit(secretValueFromYaml(yaml, this.selectedKey) ?? "");
     } catch {
       // Keep the `!secret` reference rather than replacing it with a blank
       // literal a save would persist as an empty credential; surface the error.

@@ -3,9 +3,11 @@ import {
   isSecretEligible,
   isSharedSecret,
   recommendedSecretKeys,
+  secretValueFromYaml,
   visibleSecretKeys,
   withoutForeignDeviceSecrets,
 } from "../../src/util/secret-eligibility.js";
+import { formatYamlScalar } from "../../src/util/yaml-serialize.js";
 
 describe("secret-eligibility", () => {
   it("flags the two WiFi credential fields", () => {
@@ -240,5 +242,69 @@ describe("visibleSecretKeys", () => {
         ["kitchen", "porch"]
       )
     ).toContain("porch__encryption_key");
+  });
+});
+describe("secretValueFromYaml", () => {
+  it("reads a quoted top-level key", () => {
+    expect(secretValueFromYaml('"wifi_ssid": home\n', "wifi_ssid")).toBe("home");
+    expect(secretValueFromYaml("'wifi_ssid': home\n", "wifi_ssid")).toBe("home");
+  });
+
+  const secrets = [
+    "# secrets",
+    'wifi_ssid: "my ssid"',
+    "ota_password: plainpw",
+    "kitchen__encryption_key: abc123==",
+  ].join("\n");
+
+  it("reads a quoted value", () => {
+    expect(secretValueFromYaml(secrets, "wifi_ssid")).toBe("my ssid");
+  });
+
+  it("reads an unquoted value", () => {
+    expect(secretValueFromYaml(secrets, "ota_password")).toBe("plainpw");
+    expect(secretValueFromYaml(secrets, "kitchen__encryption_key")).toBe("abc123==");
+  });
+
+  it("returns null when the key is absent", () => {
+    expect(secretValueFromYaml(secrets, "nope")).toBeNull();
+  });
+
+  it("reads a value that itself contains a colon", () => {
+    expect(secretValueFromYaml("endpoint: http://host:8080", "endpoint")).toBe(
+      "http://host:8080"
+    );
+  });
+
+  it("doesn't mis-match a key whose first colon isn't the separator", () => {
+    // `wifi:ssid:` is a single key; searching `wifi` must find the real
+    // top-level `wifi:` entry, not the colon-prefix of the other line.
+    expect(secretValueFromYaml("wifi:ssid: x\nwifi: y", "wifi")).toBe("y");
+  });
+
+  it("keeps a hand-written boolean spelling as an opaque string", () => {
+    // A secret is an opaque string — `ota_pw: yes` must not coerce to "true".
+    expect(secretValueFromYaml("ota_pw: yes", "ota_pw")).toBe("yes");
+    expect(secretValueFromYaml("ota_pw: off", "ota_pw")).toBe("off");
+  });
+
+  it("strips single quotes and the '' escape without type coercion", () => {
+    expect(secretValueFromYaml("k: 'it''s a secret'", "k")).toBe("it's a secret");
+    expect(secretValueFromYaml("k: 'no'", "k")).toBe("no");
+  });
+
+  it("unescapes a double-quoted value (inverts formatYamlScalar)", () => {
+    expect(secretValueFromYaml('k: "pa\\"ss "', "k")).toBe('pa"ss ');
+    expect(secretValueFromYaml('k: "a:b\\\\c"', "k")).toBe("a:b\\c");
+    expect(secretValueFromYaml('k: "a # b"', "k")).toBe("a # b");
+  });
+
+  it("round-trips values that need quoting and contain quotes/backslashes", () => {
+    // The migrate write (formatYamlScalar) and the manual-revert read
+    // (secretValueFromYaml) must be inverses, or a credential corrupts silently.
+    for (const value of ['pa"ss ', "a:b\\c", 'a:"b', "  spaced  ", "a # b", "x:y"]) {
+      const line = `k: ${formatYamlScalar(value)}`;
+      expect(secretValueFromYaml(line, "k")).toBe(value);
+    }
   });
 });
