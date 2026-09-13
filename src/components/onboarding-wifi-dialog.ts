@@ -259,7 +259,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private async _save() {
     // The Enter path bypasses the disabled Save button, so guard re-entry here
     // too or a held Enter double-submits during the await below.
-    if (this._saving || this._loadState !== "ready") return;
+    // The footer stays mounted through the hide animation, so a dismissed dialog must not save.
+    if (this._saving || this._loadState !== "ready" || !this._dialog.open) return;
     // IEEE 802.11 SSIDs may legally contain leading/trailing whitespace, so
     // don't trim the value being sent — mutating it would silently change the
     // network name. The Save button is disabled on all-whitespace input.

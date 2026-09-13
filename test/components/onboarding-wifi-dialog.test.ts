@@ -98,6 +98,7 @@ describe("onboarding-wifi-dialog password-length gate", () => {
     // path opens by bypassing the disabled Save button.
     const setWifiCredentials = vi.fn(() => new Promise<void>(() => {}));
     dialog._api = { setWifiCredentials };
+    dialog._dialog.open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
 
@@ -279,6 +280,23 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
       dialog._enter.set(false);
       el.remove();
     }
+  });
+
+  test("a Save click during the hide animation after a dismiss does not write", async () => {
+    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api.setWifiCredentials = setWifiCredentials;
+
+    dialog.open();
+    try {
+      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      dialog.close();
+      await dialog._save(); // the still-mounted footer button routes here
+    } finally {
+      dialog._enter.set(false);
+    }
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {
