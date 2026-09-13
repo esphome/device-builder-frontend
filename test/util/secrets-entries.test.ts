@@ -70,6 +70,12 @@ describe("parseSecretsEntries", () => {
     expect(entries).toEqual([{ key: "group", value: "", line: 0, editable: false }]);
   });
 
+  test("a quote left open on the key's line is advanced even when the next line starts with #", () => {
+    expect(parseSecretsEntries('wifi_ssid: "my\n  #network"\n')).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+    ]);
+  });
+
   test("a scalar wrapped onto an indented continuation line is advanced", () => {
     expect(parseSecretsEntries('wifi_ssid: "my\n  network"\nother: x\n')).toEqual([
       { key: "wifi_ssid", value: "", line: 0, editable: false },
@@ -156,6 +162,11 @@ describe("inlineSecretValue", () => {
     ["alias behind whitespace before the colon", "wifi_ssid : *pw\n"],
     ["quoted scalar continued on the next line", 'wifi_ssid: "my\n  network"\n'],
     ["plain scalar continued on the next line", "wifi_ssid: my\n  network\n"],
+    [
+      "quoted scalar whose continuation looks like a comment",
+      'wifi_ssid: "my\n  #network"\n',
+    ],
+    ["absent key beside a merge key that may supply it", "<<: *base\nother: x\n"],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(inlineSecretValue(yaml, key)).toBeNull();

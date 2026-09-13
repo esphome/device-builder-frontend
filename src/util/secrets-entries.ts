@@ -112,10 +112,12 @@ function formatSecretValue(value: string): string {
 }
 
 /** The inline scalar of the first top-level *key* entry ("" when absent), or null when the
- *  value isn't inline-editable (alias, anchor, block, tag, multiline). */
+ *  value isn't inline-editable (alias, anchor, block, tag, multiline, or possibly merged in). */
 export function inlineSecretValue(yaml: string, key: string): string | null {
-  const entry = parseSecretsEntries(yaml).find((e) => e.key === key);
-  if (!entry) return "";
+  const entries = parseSecretsEntries(yaml);
+  const entry = entries.find((e) => e.key === key);
+  // No direct line, but a merge key may supply it: don't report it as empty.
+  if (!entry) return entries.some((e) => e.key === "<<") ? null : "";
   return entry.editable ? entry.value : null;
 }
 
@@ -194,6 +196,15 @@ function readValue(
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable empty scalar.
   if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
+  // A quote left open on this line continues below (whatever the next line
+  // looks like), so the first-line fragment is not the value.
+  const quote = trimmed[0];
+  if (
+    (quote === '"' || quote === "'") &&
+    (trimmed.length < 2 || !trimmed.endsWith(quote))
+  ) {
+    return { value: "", editable: false };
+  }
   // Decode a double-quoted scalar so the form shows the literal and a save
   // re-escapes it once (the write side is `formatSecretValue`).
   return { value: unquoteScalar(trimmed), editable: true };
