@@ -193,12 +193,12 @@ function readValue(
 ): { value: string; editable: boolean } {
   const { value } = splitTrimmedInlineComment(rest ?? "");
   const trimmed = value.trim();
-  // A bare ``key:`` or a comment-only value (``key: # note``) is an editable
-  // empty scalar unless an indented block sits below it, which makes it
-  // advanced — editing it inline would orphan the nested children.
-  if (trimmed === "") {
-    return { value: "", editable: !hasIndentedChild(lines, index) };
-  }
+  // An indented line below continues this value (a nested block under a bare
+  // ``key:``, or a quoted / plain scalar wrapped onto more lines), so editing
+  // the first line alone would orphan or truncate it.
+  if (hasIndentedChild(lines, index)) return { value: "", editable: false };
+  // A bare ``key:`` or a comment-only value (``key: # note``) is an editable empty scalar.
+  if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
   return { value: stripQuotes(trimmed), editable: true };
 }

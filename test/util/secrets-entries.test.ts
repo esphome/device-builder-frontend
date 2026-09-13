@@ -70,6 +70,16 @@ describe("parseSecretsEntries", () => {
     expect(entries).toEqual([{ key: "group", value: "", line: 0, editable: false }]);
   });
 
+  test("a scalar wrapped onto an indented continuation line is advanced", () => {
+    expect(parseSecretsEntries('wifi_ssid: "my\n  network"\nother: x\n')).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+      { key: "other", value: "x", line: 2, editable: true },
+    ]);
+    expect(parseSecretsEntries("wifi_ssid: my\n  network\n")).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+    ]);
+  });
+
   test("a comment-only value with no block is an editable empty scalar", () => {
     const entries = parseSecretsEntries("wifi_ssid: # set me\n");
     expect(entries).toEqual([{ key: "wifi_ssid", value: "", line: 0, editable: true }]);
@@ -129,6 +139,8 @@ describe("storedSecret", () => {
     ["indented block below", "wifi_ssid:\n  nested: 1\n"],
     ["merge key", "<<: *base\n"],
     ["alias behind whitespace before the colon", "wifi_ssid : *pw\n"],
+    ["quoted scalar continued on the next line", 'wifi_ssid: "my\n  network"\n'],
+    ["plain scalar continued on the next line", "wifi_ssid: my\n  network\n"],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(storedSecret(yaml, key)).toBeNull();
