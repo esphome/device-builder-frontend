@@ -1,11 +1,15 @@
 // @vitest-environment happy-dom
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // The save-success path fires a toast; stub it so these unit tests
 // don't need a rendered toaster container.
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
+vi.mock("../../src/util/navigation.js", () => ({ navigate }));
+beforeEach(() => navigate.mockClear());
 
 import "../_mock-webawesome.js";
 
@@ -311,6 +315,47 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._error).toBe("onboarding.wifi.advanced_value"); // localize stub echoes the key
     expect(dialog._ssid).toBe(""); // held: neither field is editable, so no Save can clobber *pw
     expect(dialog._password).toBe("");
+  });
+
+  test("the advanced hold offers Open secrets, which navigates and closes", async () => {
+    const dialog = dialogWithSecrets(
+      "common: &pw x\nwifi_ssid: home\nwifi_password: *pw\n"
+    );
+    const el = dialog as unknown as HTMLElement;
+    await mount(el);
+    try {
+      dialog.open();
+      await vi.waitFor(() => expect(dialog._loadState).toBe("advanced"));
+      await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+      const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")!;
+      expect(primary.textContent!.trim()).toBe("wizard.open_secrets"); // localize stub echoes the key
+
+      primary.click();
+      await vi.waitFor(() => expect(dialog._dialog.open).toBe(false));
+      expect(navigate).toHaveBeenCalledWith("/secrets");
+    } finally {
+      dialog._enter.set(false);
+      el.remove();
+    }
+  });
+
+  test("Enter on a held form runs the hold's action, never a save", async () => {
+    const dialog = dialogWithSecrets(
+      "common: &pw x\nwifi_ssid: home\nwifi_password: *pw\n"
+    );
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api.setWifiCredentials = setWifiCredentials;
+
+    dialog.open();
+    try {
+      await vi.waitFor(() => expect(dialog._loadState).toBe("advanced"));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/secrets"));
+    } finally {
+      dialog._enter.set(false);
+    }
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
   test("Enter on a held form does not save", async () => {

@@ -16,6 +16,7 @@ import {
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { withBase } from "../util/base-path.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
@@ -79,8 +80,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     );
   }
 
-  // Enter submits; _save() self-guards on a blank SSID / too-short password.
-  private _enter = new EnterController(this, () => void this._save());
+  // Enter runs whatever the footer's primary button would; each action self-guards.
+  private _enter = new EnterController(this, () => void this._primaryAction());
 
   open() {
     this._ssid = "";
@@ -204,12 +205,16 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         return html`<button
           type="button"
           class="btn btn--primary"
-          @click=${this._openSecrets}
+          @click=${this._primaryAction}
         >
           ${this._localize("wizard.open_secrets")}
         </button>`;
       case "failed":
-        return html`<button type="button" class="btn btn--primary" @click=${this._retry}>
+        return html`<button
+          type="button"
+          class="btn btn--primary"
+          @click=${this._primaryAction}
+        >
           ${this._localize("command.retry")}
         </button>`;
       default:
@@ -222,19 +227,31 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             !this._ssid.trim() ||
             this._passwordTooShort
           }
-          @click=${this._save}
+          @click=${this._primaryAction}
         >
           ${this._localize(this._saving ? "onboarding.wifi.saving" : "onboarding.wifi.save")}
         </button>`;
     }
   }
 
-  private async _openSecrets() {
-    if (await navigate("/secrets")) this.close();
+  private _primaryAction(): Promise<void> {
+    switch (this._loadState) {
+      case "advanced":
+        return this._openSecrets();
+      case "failed":
+        return this._loadAndFocus();
+      default:
+        return this._save();
+    }
   }
 
-  private _retry() {
-    void this._loadAndFocus();
+  private async _openSecrets(): Promise<void> {
+    try {
+      if (await navigate("/secrets")) this.close();
+    } catch {
+      // Fall back to a full navigation so the click is never a silent no-op.
+      window.location.assign(withBase("/secrets"));
+    }
   }
 
   // The fields are disabled until the stored values land, so focus after;
