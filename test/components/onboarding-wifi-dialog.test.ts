@@ -81,6 +81,7 @@ describe("onboarding-wifi-dialog password-length gate", () => {
 
   test("_save bails out before hitting the API on a too-short password", async () => {
     const dialog = makeDialog();
+    dialog._dialog.open = true; // past the dismissed-dialog guard, so the length gate is what bails
     const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
     dialog._api = { setWifiCredentials };
     dialog._ssid = "MyNetwork";

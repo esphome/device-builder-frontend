@@ -220,9 +220,17 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   // The fields are disabled until the stored values land, so focus after;
   // a dismiss or re-open in the meantime owns focus instead.
   private async _loadAndFocus(): Promise<void> {
-    await this._loadStored();
+    const load = this._loadStored();
+    const generation = this._generation; // bumped synchronously by the load above
+    await load;
     await this.updateComplete;
-    if (!this._dialog.open || this._loadState !== "ready") return;
+    if (
+      generation !== this._generation ||
+      !this._dialog.open ||
+      this._loadState !== "ready"
+    ) {
+      return;
+    }
     this._ssidInput?.focus();
   }
 
