@@ -143,7 +143,6 @@ describe("inlineSecretValue", () => {
     ["single-quoted ending in an escaped quote", "wifi_ssid: 'abc'''\n", "abc'"],
     ["double-quoted ending in an escaped backslash", 'wifi_ssid: "abc\\\\"\n', "abc\\"],
     ["double-quoted numeric escape", 'wifi_ssid: "\\u0041b"\n', "Ab"],
-    ["double-quoted tab escape", 'wifi_ssid: "a\\tb"\n', "a\tb"],
     ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
     ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
     ["quoted key", '"wifi_ssid": home\n', "home"],
@@ -177,6 +176,8 @@ describe("inlineSecretValue", () => {
     ["double-quoted with a stray inner quote", 'wifi_ssid: "a"b"\n'],
     ["double-quoted with a short numeric escape", 'wifi_ssid: "\\u12"\n'],
     ["double-quoted with an escaped line break", 'wifi_ssid: "a\\nb"\n'],
+    ["double-quoted with an escaped tab", 'wifi_ssid: "a\\tb"\n'],
+    ["double-quoted with a numeric control character", 'wifi_ssid: "a\\x07b"\n'],
     ["double-quoted lone surrogate", 'wifi_ssid: "\\uD800"\n'],
     ["double-quoted out-of-range code point", 'wifi_ssid: "\\U00110000"\n'],
   ])("%s is not inline-editable", (_, yaml) => {

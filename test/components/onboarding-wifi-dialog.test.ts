@@ -358,7 +358,7 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
-  test("Enter on a held form does not save", async () => {
+  test("a direct save on a held form writes nothing", async () => {
     const dialog = dialogWithSecrets(
       "common: &pw x\nwifi_ssid: home\nwifi_password: *pw\n"
     );

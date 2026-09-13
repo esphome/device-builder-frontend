@@ -203,8 +203,9 @@ function readValue(
   if (quote !== '"' && quote !== "'") return { value: trimmed, editable: true };
   // The decoder is the authority on what a quoted scalar may hold; anything it
   // rejects (open or escaped closing quote, stray inner quote, escape it can't
-  // round-trip) is continued below or malformed, and a decoded line break can't
-  // survive the single-line input. All of those stay read-only.
+  // round-trip) is continued below or malformed, and a decoded control character
+  // (a line break is stripped, a tab is invisible) can't be edited faithfully in
+  // the single-line input. All of those stay read-only.
   const closed = trimmed.length >= 2 && trimmed.endsWith(quote);
   const body = trimmed.slice(1, -1);
   const decoded = !closed
@@ -212,9 +213,12 @@ function readValue(
     : quote === '"'
       ? decodeYamlDoubleQuoted(body)
       : decodeYamlSingleQuoted(body);
-  if (decoded === null || /[\n\r]/.test(decoded)) return { value: "", editable: false };
+  if (decoded === null || CONTROL_CHAR.test(decoded))
+    return { value: "", editable: false };
   return { value: decoded, editable: true };
 }
+
+const CONTROL_CHAR = /[\x00-\x1f\x7f]/;
 
 function hasIndentedChild(lines: string[], index: number): boolean {
   for (let i = index + 1; i < lines.length; i++) {
