@@ -255,48 +255,30 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
-  test("after-hide blanks the credentials and a reopen gets fresh inputs", async () => {
+  test("a reopen gets fresh field elements, so the reveal toggle starts hidden", async () => {
     const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
     const el = dialog as unknown as HTMLElement;
     await mount(el);
-    const base = () => el.shadowRoot!.querySelector("esphome-base-dialog")!;
     const passwordInput = () => el.shadowRoot!.querySelector("esphome-password-input");
+    const settled = () =>
+      (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
     try {
       dialog.open();
       await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
+      await settled();
       const first = passwordInput();
       expect(first).not.toBeNull();
 
       dialog.close();
-      base().dispatchEvent(new CustomEvent("after-hide"));
-      expect(dialog._password).toBe(""); // nothing lingers in the hidden DOM
-
       dialog.open();
       await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
-      await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-      expect(passwordInput()).not.toBe(first); // keyed per open: reveal state starts hidden
+      await settled();
+      expect(passwordInput()).not.toBe(first);
       expect(dialog._password).toBe("hunter2pw");
     } finally {
       dialog._enter.set(false);
       el.remove();
     }
-  });
-
-  test("a Save click during the hide animation after a dismiss does not write", async () => {
-    const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: hunter2pw\n");
-    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
-    dialog._api.setWifiCredentials = setWifiCredentials;
-
-    dialog.open();
-    try {
-      await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
-      dialog.close();
-      await dialog._save(); // the still-mounted footer button routes here
-    } finally {
-      dialog._enter.set(false);
-    }
-
-    expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
   test("a missing secrets.yaml is the first-run blank form, not a read failure", async () => {

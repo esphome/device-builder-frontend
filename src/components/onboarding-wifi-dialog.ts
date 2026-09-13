@@ -52,9 +52,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _loadState: "loading" | "ready" | "failed" | "advanced" = "ready";
   @state() private _error: string | null = null;
   private _storedPassword = "";
-  private _loadToken = 0;
-  // Keys the fields per open so the password input's reveal toggle starts hidden each time.
-  private _openCount = 0;
+  // Bumped by every open, close and retry. An async load applies only while it
+  // still matches, and the field elements are keyed on it so a reopen gets
+  // fresh inputs (the password input's reveal toggle starts hidden again).
+  private _generation = 0;
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -77,16 +78,15 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._storedPassword = "";
     this._saving = false;
     this._error = null;
-    this._openCount++;
     this._dialog.open = true;
     this._enter.set(true);
     void this._loadAndFocus();
   }
 
+  // The single teardown for every dismissal (Cancel, Save, Escape, X, outside-click):
+  // synchronous, so nothing that fires later can act on a dismissed dialog.
   close() {
-    // Only drop an in-flight read; the held state stays put through the hide animation.
-    this._loadToken++;
-    // Unbind now, not at after-hide: Enter during the animation must not save prefilled fields.
+    this._generation++;
     this._enter.set(false);
     this._dialog.open = false;
   }
@@ -138,7 +138,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         ?busy=${this._saving}
         .label=${this._localize("onboarding.wifi.title")}
         @request-close=${this.close}
-        @after-hide=${this._onAfterHide}
       >
         <div class="body">
           <p class="intro">
@@ -146,7 +145,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ${this._localize("onboarding.wifi.intro")}
           </p>
           ${keyed(
-            this._openCount,
+            this._generation,
             renderWifiFields({
               localize: this._localize,
               ssid: this._ssid,
@@ -178,14 +177,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         </div>
       </esphome-base-dialog>
     `;
-  }
-
-  // Don't leave the credentials sitting in the hidden dialog's DOM.
-  private _onAfterHide() {
-    this._enter.set(false);
-    this._ssid = "";
-    this._password = "";
-    this._storedPassword = "";
   }
 
   private _renderPrimaryAction() {
@@ -224,7 +215,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   /** Seed the fields from the stored credentials, or hold the form (see `_loadState`). */
   private async _loadStored(): Promise<void> {
-    const token = ++this._loadToken;
+    const generation = ++this._generation;
     this._loadState = "loading";
     let yaml = "";
     let failed = false;
@@ -235,7 +226,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       failed = !isApiErrorCode(err, ErrorCode.NOT_FOUND);
     }
     // A re-open or dismiss superseded this load; it owns the fields now.
-    if (token !== this._loadToken) return;
+    if (generation !== this._generation) return;
     if (failed) {
       this._loadState = "failed";
       this._error = this._localize("onboarding.wifi.load_failed");
