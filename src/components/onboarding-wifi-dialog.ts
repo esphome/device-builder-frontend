@@ -247,7 +247,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       case "advanced":
         return this._openSecrets();
       case "failed":
-        return this._loadAndFocus();
+        return this._loadAndFocus(true);
       default:
         return this._save();
     }
@@ -259,8 +259,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   // The fields are disabled until the stored values land, so focus after;
   // a dismiss or re-open in the meantime owns focus instead.
-  private async _loadAndFocus(): Promise<void> {
-    const load = this._loadStored();
+  private async _loadAndFocus(retry = false): Promise<void> {
+    const load = this._loadStored(retry);
     const generation = this._generation; // bumped synchronously by the load above
     await load;
     await this.updateComplete;
@@ -275,9 +275,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   /** Seed the fields from the stored credentials, or hold the form (see `_loadState`). */
-  private async _loadStored(): Promise<void> {
+  private async _loadStored(retry = false): Promise<void> {
     const generation = ++this._generation;
-    this._loadState = this._loadState === "failed" ? "retrying" : "loading";
+    this._loadState = retry ? "retrying" : "loading";
     let yaml = "";
     let failed = false;
     try {

@@ -43,7 +43,7 @@ interface DialogPrivateView extends EventTarget {
   readonly _passwordTooShort: boolean;
   _enter: { set(active: boolean): void };
   _save(): Promise<void>;
-  _loadStored(): Promise<void>;
+  _loadStored(retry?: boolean): Promise<void>;
   open(): void;
   close(): void;
 }
@@ -407,7 +407,7 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._loadState).toBe("failed"); // Save swapped for Retry, fields held
     expect(dialog._error).toBeTruthy();
 
-    const retry = dialog._loadStored();
+    const retry = dialog._loadStored(true);
     expect(dialog._loadState).toBe("retrying"); // its own state, so the footer keeps the Retry label
     expect(dialog._error).toBeTruthy(); // and the error it is retrying, until it settles
     await retry;
@@ -416,6 +416,26 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._loadState).toBe("ready");
     expect(dialog._ssid).toBe("home");
     expect(dialog._password).toBe("hunter2pw");
+  });
+
+  test("a reopen after a failed read is a fresh load, not a retry", async () => {
+    const dialog = makeDialog();
+    dialog._api = {
+      getConfig: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("backend unavailable"))
+        .mockImplementationOnce(() => new Promise<string>(() => {})),
+    };
+
+    await dialog._loadStored();
+    expect(dialog._loadState).toBe("failed");
+
+    dialog.open();
+    try {
+      expect(dialog._loadState).toBe("loading"); // no residual Retry label on the new session
+    } finally {
+      dialog._enter.set(false);
+    }
   });
 
   test("a load superseded by a newer one does not apply its result", async () => {
