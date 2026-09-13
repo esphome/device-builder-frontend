@@ -7,6 +7,8 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+import "../_mock-webawesome.js";
+
 import { APIError } from "../../src/api/api-error.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomeOnboardingWifiDialog } from "../../src/components/onboarding-wifi-dialog.js";
@@ -29,6 +31,8 @@ interface DialogPrivateView extends EventTarget {
   _saving: boolean;
   _loading: boolean;
   _loadFailed: boolean;
+  _advancedKey: string | null;
+  _storedPassword: string;
   _error: string | null;
   _api: {
     setWifiCredentials?: (ssid: string, password: string) => Promise<unknown>;
@@ -242,10 +246,11 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
 
     await dialog._loadStored();
 
-    expect(dialog._password).toBe(""); // not "*pw" via the editable second line
+    expect(dialog._advancedKey).toBe("wifi_password"); // not "plain" via the second line
+    expect(dialog._password).toBe("");
   });
 
-  test("a value the form can't edit inline stays blank instead of its marker text", async () => {
+  test("a value the form can't edit inline holds the form instead of prefilling its marker", async () => {
     const dialog = makeDialog();
     dialog._api = {
       getConfig: vi
@@ -257,8 +262,24 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
 
     await dialog._loadStored();
 
-    expect(dialog._ssid).toBe("home");
-    expect(dialog._password).toBe(""); // never "*pw", which Save would persist verbatim
+    expect(dialog._advancedKey).toBe("wifi_password");
+    expect(dialog._error).toBe("onboarding.wifi.advanced_value"); // localize stub echoes the key
+    expect(dialog._ssid).toBe(""); // held: neither field is editable, so no Save can clobber *pw
+    expect(dialog._password).toBe("");
+  });
+
+  test("a stored short password does not trip the length gate until it is edited", async () => {
+    const dialog = makeDialog();
+    dialog._api = {
+      getConfig: vi.fn().mockResolvedValue("wifi_ssid: home\nwifi_password: abc\n"),
+    };
+
+    await dialog._loadStored();
+
+    expect(dialog._password).toBe("abc");
+    expect(dialog._passwordTooShort).toBe(false); // SSID-only edit stays saveable
+    dialog._password = "abcd";
+    expect(dialog._passwordTooShort).toBe(true);
   });
 
   test("a missing key leaves that field blank", async () => {

@@ -18,6 +18,8 @@ export interface WifiFieldsProps {
   ssid: string;
   password: string;
   disabled: boolean;
+  /** Override the length gate (a stored short password the user hasn't touched). */
+  tooShort?: boolean;
   onSsidInput: (value: string) => void;
   onPasswordInput: (value: string) => void;
 }
@@ -28,7 +30,7 @@ export interface WifiFieldsProps {
  */
 export function renderWifiFields(props: WifiFieldsProps): TemplateResult {
   const { localize, ssid, password, disabled } = props;
-  const tooShort = isWifiPasswordTooShort(password);
+  const tooShort = props.tooShort ?? isWifiPasswordTooShort(password);
   return html`
     <div class="field">
       <label for="onboarding-ssid">${localize("onboarding.wifi.ssid_label")}</label>

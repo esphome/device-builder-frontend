@@ -15,8 +15,8 @@ import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { SECRETS_FILE, secretValueFromYaml } from "../util/secret-eligibility.js";
-import { parseSecretsEntries } from "../util/secrets-entries.js";
+import { SECRETS_FILE } from "../util/secret-eligibility.js";
+import { storedSecret } from "../util/secrets-entries.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
@@ -48,6 +48,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _saving = false;
   @state() private _loading = false;
   @state() private _loadFailed = false;
+  // The stored key the form can't edit inline (alias, anchor, block, tag), if any.
+  @state() private _advancedKey: string | null = null;
+  private _storedPassword = "";
   @state() private _error: string | null = null;
 
   private _loadToken = 0;
@@ -57,8 +60,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @query("#onboarding-ssid")
   private _ssidInput?: HTMLInputElement;
 
+  // A stored short password the user hasn't touched must not block an SSID-only edit.
   private get _passwordTooShort(): boolean {
-    return isWifiPasswordTooShort(this._password);
+    return (
+      isWifiPasswordTooShort(this._password) && this._password !== this._storedPassword
+    );
   }
 
   // Enter submits; _save() self-guards on a blank SSID / too-short password.
@@ -67,6 +73,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   open() {
     this._ssid = "";
     this._password = "";
+    this._storedPassword = "";
     this._saving = false;
     this._error = null;
     this._dialog.open = true;
@@ -137,7 +144,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             localize: this._localize,
             ssid: this._ssid,
             password: this._password,
-            disabled: this._saving || this._loading || this._loadFailed,
+            disabled: this._saving || this._loading || this._held,
+            tooShort: this._passwordTooShort,
             onSsidInput: (v) => {
               this._ssid = v;
             },
@@ -159,27 +167,33 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ${this._localize("onboarding.wifi.cancel")}
           </button>
           ${
-            this._loadFailed
-              ? html`<button type="button" class="btn btn--primary" @click=${this._retry}>
-                  ${this._localize("onboarding.wifi.retry")}
-                </button>`
-              : html`<button
-                  type="button"
-                  class="btn btn--primary"
-                  ?disabled=${
-                    this._saving ||
-                    this._loading ||
-                    !this._ssid.trim() ||
-                    this._passwordTooShort
-                  }
-                  @click=${this._save}
-                >
-                  ${
-                    this._saving
-                      ? this._localize("onboarding.wifi.saving")
-                      : this._localize("onboarding.wifi.save")
-                  }
-                </button>`
+            this._advancedKey !== null
+              ? nothing
+              : this._loadFailed
+                ? html`<button
+                    type="button"
+                    class="btn btn--primary"
+                    @click=${this._retry}
+                  >
+                    ${this._localize("onboarding.wifi.retry")}
+                  </button>`
+                : html`<button
+                    type="button"
+                    class="btn btn--primary"
+                    ?disabled=${
+                      this._saving ||
+                      this._loading ||
+                      !this._ssid.trim() ||
+                      this._passwordTooShort
+                    }
+                    @click=${this._save}
+                  >
+                    ${
+                      this._saving
+                        ? this._localize("onboarding.wifi.saving")
+                        : this._localize("onboarding.wifi.save")
+                    }
+                  </button>`
           }
         </div>
       </esphome-base-dialog>
@@ -196,6 +210,12 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._loadToken++;
     this._loading = false;
     this._loadFailed = false;
+    this._advancedKey = null;
+  }
+
+  /** The form is held (no editing, no Save) after a failed read or on an advanced stored value. */
+  private get _held(): boolean {
+    return this._loadFailed || this._advancedKey !== null;
   }
 
   private _retry = () => {
@@ -208,16 +228,18 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private async _loadAndFocus(): Promise<void> {
     const token = await this._loadStored();
     await this.updateComplete;
-    if (token !== this._loadToken || !this._dialog.open || this._loadFailed) return;
+    if (token !== this._loadToken || !this._dialog.open || this._held) return;
     this._ssidInput?.focus();
   }
 
   /** Seed the fields from the stored credentials; a read failure holds the form behind Retry,
-   *  and a value the form can't edit inline (alias, anchor, block, tag) stays blank. */
+   *  and a value the form can't edit inline (alias, anchor, block, tag) holds it with a pointer
+   *  to the Secrets page, so Save can never overwrite either. */
   private async _loadStored(): Promise<number> {
     const token = ++this._loadToken;
     this._loading = true;
     this._loadFailed = false;
+    this._advancedKey = null;
     let yaml = "";
     let failed = false;
     try {
@@ -234,15 +256,22 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._error = this._localize("onboarding.wifi.load_failed");
       return token;
     }
-    // Gate on the first occurrence, the one secretValueFromYaml reads.
-    const entries = parseSecretsEntries(yaml);
-    const inline = (key: string) => entries.find((e) => e.key === key)?.editable === true;
-    this._ssid = inline("wifi_ssid")
-      ? (secretValueFromYaml(yaml, "wifi_ssid") ?? "")
-      : "";
-    this._password = inline("wifi_password")
-      ? (secretValueFromYaml(yaml, "wifi_password") ?? "")
-      : "";
+    const ssid = storedSecret(yaml, "wifi_ssid");
+    const password = storedSecret(yaml, "wifi_password");
+    const advanced =
+      ssid.state === "advanced"
+        ? "wifi_ssid"
+        : password.state === "advanced"
+          ? "wifi_password"
+          : null;
+    if (advanced !== null) {
+      this._advancedKey = advanced;
+      this._error = this._localize("onboarding.wifi.advanced_value", { key: advanced });
+      return token;
+    }
+    this._ssid = ssid.state === "inline" ? ssid.value : "";
+    this._password = password.state === "inline" ? password.value : "";
+    this._storedPassword = this._password;
     return token;
   }
 
