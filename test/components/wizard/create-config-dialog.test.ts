@@ -21,7 +21,10 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
-vi.mock("../../../src/util/navigation.js", () => ({ navigate }));
+vi.mock("../../../src/util/navigation.js", () => ({
+  navigate,
+  navigateOrReload: navigate,
+}));
 beforeEach(() => navigate.mockClear());
 
 import { IntlMessageFormat } from "intl-messageformat";

@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   goBackOrHome,
   navigate,
+  navigateOrReload,
   runLeaveGuard,
   setLeaveGuard,
 } from "../../src/util/navigation.js";
@@ -378,5 +379,49 @@ describe("goBackOrHome", () => {
 
     expect(backSpy).not.toHaveBeenCalled();
     expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("navigateOrReload", () => {
+  let pushStateSpy: ReturnType<typeof vi.fn>;
+  let assignSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    pushStateSpy = vi.fn();
+    assignSpy = vi.fn();
+    (globalThis as Record<string, unknown>).window = {
+      history: { pushState: pushStateSpy },
+      dispatchEvent: vi.fn(),
+      location: { assign: assignSpy },
+    };
+    (globalThis as Record<string, unknown>).PopStateEvent = Event;
+  });
+
+  afterEach(() => {
+    setLeaveGuard(null);
+    delete (globalThis as Record<string, unknown>).window;
+    delete (globalThis as Record<string, unknown>).PopStateEvent;
+    vi.restoreAllMocks();
+  });
+
+  it("resolves true and never reloads when the SPA navigation succeeds", async () => {
+    expect(await navigateOrReload("/secrets")).toBe(true);
+    expect(pushStateSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a full load when the history push throws", async () => {
+    pushStateSpy.mockImplementation(() => {
+      throw new Error("pushState refused");
+    });
+    expect(await navigateOrReload("/secrets")).toBe(false);
+    expect(assignSpy).toHaveBeenCalledWith("/secrets");
+  });
+
+  it("stays put, without a reload, when the leave guard keeps the page", async () => {
+    setLeaveGuard(() => Promise.resolve(false));
+    expect(await navigateOrReload("/secrets")).toBe(false);
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
   });
 });

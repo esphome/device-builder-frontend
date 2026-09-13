@@ -26,7 +26,11 @@ import { ensureSecretWithToast } from "../../util/ensure-secret-with-toast.js";
 import { navigate } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { secretValueFromYaml, visibleSecretKeys } from "../../util/secret-eligibility.js";
+import {
+  SECRETS_FILE,
+  secretValueFromYaml,
+  visibleSecretKeys,
+} from "../../util/secret-eligibility.js";
 import {
   fetchSecretKeys,
   getCachedSecretKeys,
@@ -49,7 +53,6 @@ registerMdiIcons({
   "shield-key-outline": mdiShieldKeyOutline,
 });
 
-const SECRETS_FILE = "secrets.yaml";
 /** ``wa-dropdown-item`` value flagging the "Create new secret…" action. */
 const CREATE_SENTINEL = "__esphome_create_secret__";
 /** Revert to a typed value (drop the `!secret` reference). */

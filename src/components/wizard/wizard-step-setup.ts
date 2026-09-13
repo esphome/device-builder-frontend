@@ -526,6 +526,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
                 localize: this._localize,
                 ssid: this._wifiSsid,
                 password: this._wifiPassword,
+                tooShort: isWifiPasswordTooShort(this._wifiPassword),
                 disabled: false,
                 onSsidInput: (v) => {
                   this._wifiSsid = v;

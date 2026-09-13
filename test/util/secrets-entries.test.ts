@@ -4,6 +4,7 @@ import {
   addSecret,
   duplicateSecretKeys,
   groupSecretsByDevice,
+  inlineSecretValue,
   isValidSecretKey,
   parseSecretsEntries,
   removeSecret,
@@ -69,6 +70,37 @@ describe("parseSecretsEntries", () => {
     expect(entries).toEqual([{ key: "group", value: "", line: 0, editable: false }]);
   });
 
+  test("a quote left open on the key's line is advanced even when the next line starts with #", () => {
+    expect(parseSecretsEntries('wifi_ssid: "my\n  #network"\n')).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+    ]);
+  });
+
+  test("a scalar wrapped onto an indented continuation line is advanced", () => {
+    expect(parseSecretsEntries('wifi_ssid: "my\n  network"\nother: x\n')).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+      { key: "other", value: "x", line: 2, editable: true },
+    ]);
+    expect(parseSecretsEntries("wifi_ssid: my\n  network\n")).toEqual([
+      { key: "wifi_ssid", value: "", line: 0, editable: false },
+    ]);
+  });
+
+  test("a double-quoted value is decoded and re-escaped once on write", () => {
+    const yaml = 'wifi_password: "p\\"ss\\\\word"\n';
+    const [entry] = parseSecretsEntries(yaml);
+    expect(entry).toEqual({
+      key: "wifi_password",
+      value: 'p"ss\\word',
+      line: 0,
+      editable: true,
+    });
+    // The write side may spell it differently (a plain scalar is fine here), but it must parse back.
+    expect(parseSecretsEntries(setSecretValue(yaml, 0, entry.value)!)[0].value).toBe(
+      entry.value
+    );
+  });
+
   test("a comment-only value with no block is an editable empty scalar", () => {
     const entries = parseSecretsEntries("wifi_ssid: # set me\n");
     expect(entries).toEqual([{ key: "wifi_ssid", value: "", line: 0, editable: true }]);
@@ -83,12 +115,85 @@ describe("parseSecretsEntries", () => {
 
   test("key:value with no space after the colon is not an entry", () => {
     expect(parseSecretsEntries("notakey:value\n")).toEqual([]);
+    expect(parseSecretsEntries("notakey :value\n")).toEqual([]);
+  });
+
+  test("whitespace before the colon is still a mapping", () => {
+    const entries = parseSecretsEntries("wifi_ssid : home\nwifi_password\t: *pw\n");
+    expect(entries).toEqual([
+      { key: "wifi_ssid", value: "home", line: 0, editable: true },
+      { key: "wifi_password", value: "", line: 1, editable: false },
+    ]);
   });
 
   test("a top-level merge key surfaces as an advanced entry", () => {
     const entries = parseSecretsEntries("<<: *base\nwifi_ssid: home\n");
     expect(entries[0]).toMatchObject({ key: "<<", editable: false });
     expect(entries[1]).toMatchObject({ key: "wifi_ssid", editable: true });
+  });
+});
+
+describe("inlineSecretValue", () => {
+  test.each([
+    ["absent key", "other: x\n", ""],
+    ["bare key:", "wifi_ssid:\n", ""],
+    ["comment-only value", "wifi_ssid: # set me\n", ""],
+    ["plain scalar with trailing comment", "wifi_ssid: home # note\n", "home"],
+    ["single-quoted", "wifi_ssid: 'it''s home'\n", "it's home"],
+    ["single-quoted ending in an escaped quote", "wifi_ssid: 'abc'''\n", "abc'"],
+    ["double-quoted ending in an escaped backslash", 'wifi_ssid: "abc\\\\"\n', "abc\\"],
+    ["double-quoted numeric escape", 'wifi_ssid: "\\u0041b"\n', "Ab"],
+    ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
+    ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
+    ["quoted key", '"wifi_ssid": home\n', "home"],
+    ["whitespace before the colon", "wifi_ssid : home\n", "home"],
+    ["value containing a colon", "wifi_ssid: http://host:8080\n", "http://host:8080"],
+    ["key that is a colon-prefix of another line", "wifi_ssid:x: y\nwifi_ssid: z\n", "z"],
+    ["double-quoted hash and backslash", 'wifi_ssid: "a # b\\\\c"\n', "a # b\\c"],
+  ])("%s reads as an inline scalar", (_, yaml, expected) => {
+    expect(inlineSecretValue(yaml, "wifi_ssid")).toBe(expected);
+  });
+
+  test.each([
+    ["alias", "common: &pw x\nwifi_ssid: *pw\n"],
+    ["anchor", "wifi_ssid: &home home\n"],
+    ["tag", "wifi_ssid: !secret other\n"],
+    ["block scalar", "wifi_ssid: |\n  home\n"],
+    ["flow collection", "wifi_ssid: [a, b]\n"],
+    ["indented block below", "wifi_ssid:\n  nested: 1\n"],
+    ["merge key", "<<: *base\n"],
+    ["alias behind whitespace before the colon", "wifi_ssid : *pw\n"],
+    ["quoted scalar continued on the next line", 'wifi_ssid: "my\n  network"\n'],
+    ["plain scalar continued on the next line", "wifi_ssid: my\n  network\n"],
+    [
+      "quoted scalar whose continuation looks like a comment",
+      'wifi_ssid: "my\n  #network"\n',
+    ],
+    ["absent key beside a merge key that may supply it", "<<: *base\nother: x\n"],
+    ["double-quoted with an escaped closing quote", 'wifi_ssid: "abc\\"\n'],
+    ["single-quoted ending in a doubled-quote escape", "wifi_ssid: 'abc''\n"],
+    ["double-quoted with an escape the decoder can't round-trip", 'wifi_ssid: "a\\ab"\n'],
+    ["double-quoted with a stray inner quote", 'wifi_ssid: "a"b"\n'],
+    ["double-quoted with a short numeric escape", 'wifi_ssid: "\\u12"\n'],
+    ["double-quoted with an escaped line break", 'wifi_ssid: "a\\nb"\n'],
+    ["double-quoted with an escaped tab", 'wifi_ssid: "a\\tb"\n'],
+    ["double-quoted with a numeric control character", 'wifi_ssid: "a\\x07b"\n'],
+    ["double-quoted private-use glyph", 'wifi_ssid: "a\\U000F058Fb"\n'],
+    ["double-quoted lone surrogate", 'wifi_ssid: "\\uD800"\n'],
+    ["double-quoted out-of-range code point", 'wifi_ssid: "\\U00110000"\n'],
+  ])("%s is not inline-editable", (_, yaml) => {
+    const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
+    expect(inlineSecretValue(yaml, key)).toBeNull();
+  });
+
+  test("a duplicate key is never inline-editable, whichever line is plain", () => {
+    expect(
+      inlineSecretValue("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")
+    ).toBeNull();
+    expect(
+      inlineSecretValue("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")
+    ).toBeNull();
+    expect(inlineSecretValue("wifi_ssid: a\nwifi_ssid: b\n", "wifi_ssid")).toBeNull();
   });
 });
 

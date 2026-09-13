@@ -18,6 +18,8 @@ export interface WifiFieldsProps {
   ssid: string;
   password: string;
   disabled: boolean;
+  /** The caller's length verdict, so its Save gate and the inline error can't disagree. */
+  tooShort: boolean;
   onSsidInput: (value: string) => void;
   onPasswordInput: (value: string) => void;
 }
@@ -27,8 +29,7 @@ export interface WifiFieldsProps {
  * standalone credential-rotation dialog so the two never drift.
  */
 export function renderWifiFields(props: WifiFieldsProps): TemplateResult {
-  const { localize, ssid, password, disabled } = props;
-  const tooShort = isWifiPasswordTooShort(password);
+  const { localize, ssid, password, disabled, tooShort } = props;
   return html`
     <div class="field">
       <label for="onboarding-ssid">${localize("onboarding.wifi.ssid_label")}</label>

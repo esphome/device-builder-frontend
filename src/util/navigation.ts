@@ -46,6 +46,16 @@ export async function runLeaveGuard(): Promise<boolean> {
   }
 }
 
+/** ``navigate``, falling back to a full load so the call is never a silent no-op. */
+export async function navigateOrReload(url: string): Promise<boolean> {
+  try {
+    return await navigate(url);
+  } catch {
+    window.location.assign(withBase(url));
+    return false;
+  }
+}
+
 /** True when the current entry carries a non-null object state (a
  *  ``navigate()`` stamp or a guard's re-push) rather than a fresh page
  *  load, so there is a same-session entry to pop back to. */

@@ -1,5 +1,6 @@
-import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+import { splitInlineComment, stripQuotes, unquoteScalar } from "./yaml-scalar.js";
+
+export const SECRETS_FILE = "secrets.yaml";
 
 /**
  * Fields whose secret is shared across every device — the WiFi credentials —
@@ -190,8 +191,10 @@ export function recommendedSecretKeys(
 }
 
 /** The literal value of a top-level ``key`` in a flat ``secrets.yaml``, or
- *  ``null`` when the key isn't found. Used to inline a secret's value back
- *  into a field when the user reverts to a manually typed value. */
+ *  ``null`` when the key isn't found (an alias or block comes back as its
+ *  marker text; ``inlineSecretValue`` in secrets-entries is the accessor
+ *  whose ``null`` means "not inline-editable"). Used to inline a secret's
+ *  value back into a field when the user reverts to a manually typed value. */
 export function secretValueFromYaml(yaml: string, key: string): string | null {
   for (const line of yaml.split("\n")) {
     // Top-level `key: value` only — skip indentation, blanks, and comments.
@@ -200,18 +203,7 @@ export function secretValueFromYaml(yaml: string, key: string): string | null {
     // so a key (or value) that itself contains a colon doesn't mis-match.
     const colon = line.search(/:(\s|$)/);
     if (colon < 0 || stripQuotes(line.slice(0, colon).trim()) !== key) continue;
-    const rhs = splitInlineComment(line.slice(colon + 1)).value.trim();
-    // A double-quoted scalar (what `formatYamlScalar` emits when escaping) must
-    // be unescaped to invert the write — `parseScalar`/`stripQuotes` only slice
-    // the quotes, so a value containing `"` or `\` would otherwise round-trip
-    // corrupted (migrate → manual-revert).
-    if (rhs.length >= 2 && rhs.startsWith('"') && rhs.endsWith('"')) {
-      return unescapeYamlDoubleQuoted(rhs.slice(1, -1));
-    }
-    // Plain or single-quoted: strip quotes WITHOUT YAML type coercion — a
-    // secret is an opaque string, so a hand-written `ota_pw: yes` must stay
-    // "yes", not be coerced to "true" by parseScalar.
-    return stripQuotes(rhs);
+    return unquoteScalar(splitInlineComment(line.slice(colon + 1)).value.trim());
   }
   return null;
 }
