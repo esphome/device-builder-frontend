@@ -13,6 +13,7 @@ import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { secretValueFromYaml } from "../util/secret-eligibility.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
@@ -21,10 +22,13 @@ import "./base-dialog.js";
 
 registerMdiIcons({ wifi: mdiWifi });
 
+const SECRETS_FILE = "secrets.yaml";
+
 /**
  * Wi-Fi credentials dialog — the kebab "Set up / Change Wi-Fi credentials"
  * action. Manual, on-demand only (never auto-popped; the create wizard collects
- * Wi-Fi per device). Saves the shared ``wifi_ssid`` / ``wifi_password`` to
+ * Wi-Fi per device). Opens prefilled from the stored values and saves the
+ * shared ``wifi_ssid`` / ``wifi_password`` to
  * ``secrets.yaml`` via ``config/set_wifi_credentials`` and dispatches
  * ``secrets-saved`` so secret pickers and the kebab wording refresh. Plain
  * Save / Cancel — no onboarding decline / acknowledgement.
@@ -41,7 +45,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _ssid = "";
   @state() private _password = "";
   @state() private _saving = false;
+  @state() private _loading = false;
   @state() private _error: string | null = null;
+
+  private _loadToken = 0;
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -62,11 +69,15 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     this._dialog.open = true;
     this._enter.set(true);
-    // autofocus is unreliable for a shadow-DOM input shown after first paint.
-    void this.updateComplete.then(() => this._ssidInput?.focus());
+    // The fields are disabled until the stored values land, so focus after.
+    void this._loadStored()
+      .then(() => this.updateComplete)
+      .then(() => this._ssidInput?.focus());
   }
 
   close() {
+    this._loadToken++;
+    this._loading = false;
     this._dialog.open = false;
   }
 
@@ -128,7 +139,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             localize: this._localize,
             ssid: this._ssid,
             password: this._password,
-            disabled: this._saving,
+            disabled: this._saving || this._loading,
             onSsidInput: (v) => {
               this._ssid = v;
             },
@@ -152,7 +163,12 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           <button
             type="button"
             class="btn btn--primary"
-            ?disabled=${this._saving || !this._ssid.trim() || this._passwordTooShort}
+            ?disabled=${
+              this._saving ||
+              this._loading ||
+              !this._ssid.trim() ||
+              this._passwordTooShort
+            }
             @click=${this._save}
           >
             ${
@@ -164,6 +180,24 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         </div>
       </esphome-base-dialog>
     `;
+  }
+
+  /** Seed the fields from the stored credentials; a missing file or read error leaves them blank. */
+  private async _loadStored(): Promise<void> {
+    const token = ++this._loadToken;
+    this._loading = true;
+    let yaml: string | null = null;
+    try {
+      yaml = await this._api.getConfig(SECRETS_FILE);
+    } catch {
+      yaml = null;
+    }
+    // A re-open or close superseded this load; it owns the fields now.
+    if (token !== this._loadToken) return;
+    this._loading = false;
+    if (yaml === null) return;
+    this._ssid = secretValueFromYaml(yaml, "wifi_ssid") ?? "";
+    this._password = secretValueFromYaml(yaml, "wifi_password") ?? "";
   }
 
   private async _save() {
