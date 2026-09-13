@@ -111,8 +111,9 @@ function formatSecretValue(value: string): string {
   return formatYamlScalar(value);
 }
 
-/** The first top-level *key* entry's inline scalar: "" when absent, null when the form can't edit it. */
-export function storedSecret(yaml: string, key: string): string | null {
+/** The inline scalar of the first top-level *key* entry ("" when absent), or null when the
+ *  value isn't inline-editable (alias, anchor, block, tag, multiline). */
+export function inlineSecretValue(yaml: string, key: string): string | null {
   const entry = parseSecretsEntries(yaml).find((e) => e.key === key);
   if (!entry) return "";
   return entry.editable ? entry.value : null;

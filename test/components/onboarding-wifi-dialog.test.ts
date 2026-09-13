@@ -9,7 +9,7 @@ vi.mock("sonner-js", () => ({
 
 import "../_mock-webawesome.js";
 
-import { mount } from "../_dom.js";
+import { baseDialog, mount } from "../_dom.js";
 import { APIError } from "../../src/api/api-error.js";
 import { ErrorCode } from "../../src/api/types/protocol.js";
 import { ESPHomeOnboardingWifiDialog } from "../../src/components/onboarding-wifi-dialog.js";
@@ -241,9 +241,7 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     try {
       dialog.open();
       await vi.waitFor(() => expect(dialog._loadState).toBe("ready"));
-      el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
-        new CustomEvent("request-close")
-      );
+      baseDialog(el).dispatchEvent(new CustomEvent("request-close"));
       expect(dialog._dialog.open).toBe(false);
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
       await Promise.resolve();

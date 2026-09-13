@@ -4,12 +4,12 @@ import {
   addSecret,
   duplicateSecretKeys,
   groupSecretsByDevice,
+  inlineSecretValue,
   isValidSecretKey,
   parseSecretsEntries,
   removeSecret,
   renameSecretKey,
   setSecretValue,
-  storedSecret,
 } from "../../src/util/secrets-entries.js";
 
 describe("parseSecretsEntries", () => {
@@ -127,7 +127,7 @@ describe("parseSecretsEntries", () => {
   });
 });
 
-describe("storedSecret", () => {
+describe("inlineSecretValue", () => {
   test.each([
     ["absent key", "other: x\n", ""],
     ["bare key:", "wifi_ssid:\n", ""],
@@ -142,7 +142,7 @@ describe("storedSecret", () => {
     ["key that is a colon-prefix of another line", "wifi_ssid:x: y\nwifi_ssid: z\n", "z"],
     ["double-quoted hash and backslash", 'wifi_ssid: "a # b\\\\c"\n', "a # b\\c"],
   ])("%s reads as an inline scalar", (_, yaml, expected) => {
-    expect(storedSecret(yaml, "wifi_ssid")).toBe(expected);
+    expect(inlineSecretValue(yaml, "wifi_ssid")).toBe(expected);
   });
 
   test.each([
@@ -158,12 +158,16 @@ describe("storedSecret", () => {
     ["plain scalar continued on the next line", "wifi_ssid: my\n  network\n"],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
-    expect(storedSecret(yaml, key)).toBeNull();
+    expect(inlineSecretValue(yaml, key)).toBeNull();
   });
 
   test("a duplicate key is classified by its first occurrence", () => {
-    expect(storedSecret("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")).toBeNull();
-    expect(storedSecret("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")).toBe("first");
+    expect(
+      inlineSecretValue("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")
+    ).toBeNull();
+    expect(inlineSecretValue("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")).toBe(
+      "first"
+    );
   });
 });
 

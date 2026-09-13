@@ -8,7 +8,11 @@ import { isApiErrorCode } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  onboardingPendingContext,
+} from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -17,7 +21,7 @@ import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SECRETS_FILE } from "../util/secret-eligibility.js";
-import { storedSecret } from "../util/secrets-entries.js";
+import { inlineSecretValue } from "../util/secrets-entries.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
@@ -43,6 +47,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
+
+  // Same signal as the kebab label, so the title says "Set up" or "Change" to match.
+  @consume({ context: onboardingPendingContext, subscribe: true })
+  @state()
+  private _onboardingPending = false;
 
   @state() private _ssid = "";
   @state() private _password = "";
@@ -136,7 +145,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         ?busy=${this._saving}
-        .label=${this._localize("onboarding.wifi.title")}
+        .label=${this._localize(
+          this._onboardingPending
+            ? "onboarding.wifi.title"
+            : "onboarding.wifi.title_change"
+        )}
         @request-close=${this.close}
       >
         <div class="body">
@@ -234,7 +247,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     }
     const values: string[] = [];
     for (const key of ["wifi_ssid", "wifi_password"]) {
-      const value = storedSecret(yaml, key);
+      const value = inlineSecretValue(yaml, key);
       if (value === null) {
         this._loadState = "advanced";
         this._error = this._localize("onboarding.wifi.advanced_value", { key });
