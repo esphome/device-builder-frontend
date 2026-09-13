@@ -142,6 +142,8 @@ describe("inlineSecretValue", () => {
     ["single-quoted", "wifi_ssid: 'it''s home'\n", "it's home"],
     ["single-quoted ending in an escaped quote", "wifi_ssid: 'abc'''\n", "abc'"],
     ["double-quoted ending in an escaped backslash", 'wifi_ssid: "abc\\\\"\n', "abc\\"],
+    ["double-quoted numeric escape", 'wifi_ssid: "\\u0041b"\n', "Ab"],
+    ["double-quoted tab escape", 'wifi_ssid: "a\\tb"\n', "a\tb"],
     ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
     ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
     ["quoted key", '"wifi_ssid": home\n', "home"],
@@ -172,6 +174,9 @@ describe("inlineSecretValue", () => {
     ["double-quoted with an escaped closing quote", 'wifi_ssid: "abc\\"\n'],
     ["single-quoted ending in a doubled-quote escape", "wifi_ssid: 'abc''\n"],
     ["double-quoted with an escape the decoder can't round-trip", 'wifi_ssid: "a\\ab"\n'],
+    ["double-quoted with a stray inner quote", 'wifi_ssid: "a"b"\n'],
+    ["double-quoted with a short numeric escape", 'wifi_ssid: "\\u12"\n'],
+    ["double-quoted with an escaped line break", 'wifi_ssid: "a\\nb"\n'],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(inlineSecretValue(yaml, key)).toBeNull();

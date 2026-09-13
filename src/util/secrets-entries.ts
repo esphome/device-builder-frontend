@@ -198,35 +198,32 @@ function readValue(
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable empty scalar.
   if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
-  // A quote left open on this line continues below (whatever the next line
-  // looks like) or is simply malformed; either way the fragment is not the value.
-  if (isOpenQuotedScalar(trimmed)) return { value: "", editable: false };
-  // A double-quoted escape the decoder doesn't know (\a, \0, \e, ...) would prefill
-  // mis-decoded text and a save would rewrite the credential from it.
-  if (trimmed[0] === '"' && !DECODABLE_DQ_BODY.test(trimmed.slice(1, -1))) {
+  // A quoted scalar that isn't well formed on this line (open quote, escaped
+  // closing quote, stray inner quote, escape the decoder can't round-trip)
+  // continues below or is malformed; either way the fragment is not the value.
+  if (/^["']/.test(trimmed) && !isWellFormedQuotedScalar(trimmed)) {
     return { value: "", editable: false };
   }
   // Decode a double-quoted scalar so the form shows the literal and a save
-  // re-escapes it once (the write side is `formatSecretValue`).
-  return { value: unquoteScalar(trimmed), editable: true };
+  // re-escapes it once (the write side is `formatSecretValue`). A decoded line
+  // break can't survive the single-line input, so that value stays read-only.
+  const decoded = unquoteScalar(trimmed);
+  if (/[\n\r]/.test(decoded)) return { value: "", editable: false };
+  return { value: decoded, editable: true };
 }
 
-// Only these escapes round-trip through ``unquoteScalar`` / ``formatSecretValue``.
-const DECODABLE_DQ_BODY = /^(?:[^\\]|\\[\\"nrtxuU])*$/;
+// The double-quoted body the decoder round-trips: the short escapes it knows and
+// full-width numeric escapes. Single-quoted bodies only escape ``''``.
+const WELL_FORMED_DQ_BODY =
+  /^(?:[^"\\]|\\(?:["\\nrt]|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}))*$/;
+const WELL_FORMED_SQ_BODY = /^(?:[^']|'')*$/;
 
-/** A quoted scalar whose closing quote is missing or escaped (``"a\\"``, ``'a''``). */
-function isOpenQuotedScalar(text: string): boolean {
+/** A complete, decodable quoted scalar on one line (``"a\\"b"``, ``'it''s'``, never ``"a"b"``). */
+function isWellFormedQuotedScalar(text: string): boolean {
   const quote = text[0];
-  if (quote !== '"' && quote !== "'") return false;
-  if (text.length < 2 || !text.endsWith(quote)) return true;
-  if (quote === '"') {
-    // Closed unless the final quote sits behind an odd run of backslashes.
-    const backslashes = text.slice(1, -1).match(/\\*$/)?.[0].length ?? 0;
-    return backslashes % 2 === 1;
-  }
-  // Single-quoted: an even trailing run of quotes is all ``''`` escapes, so the scalar is open.
-  const quotes = text.slice(1).match(/'*$/)?.[0].length ?? 0;
-  return quotes % 2 === 0;
+  if (text.length < 2 || !text.endsWith(quote)) return false;
+  const body = text.slice(1, -1);
+  return quote === '"' ? WELL_FORMED_DQ_BODY.test(body) : WELL_FORMED_SQ_BODY.test(body);
 }
 
 function hasIndentedChild(lines: string[], index: number): boolean {
