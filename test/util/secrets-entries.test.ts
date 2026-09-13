@@ -80,6 +80,21 @@ describe("parseSecretsEntries", () => {
     ]);
   });
 
+  test("a double-quoted value is decoded and re-escaped once on write", () => {
+    const yaml = 'wifi_password: "p\\"ss\\\\word"\n';
+    const [entry] = parseSecretsEntries(yaml);
+    expect(entry).toEqual({
+      key: "wifi_password",
+      value: 'p"ss\\word',
+      line: 0,
+      editable: true,
+    });
+    // The write side may spell it differently (a plain scalar is fine here), but it must parse back.
+    expect(parseSecretsEntries(setSecretValue(yaml, 0, entry.value)!)[0].value).toBe(
+      entry.value
+    );
+  });
+
   test("a comment-only value with no block is an editable empty scalar", () => {
     const entries = parseSecretsEntries("wifi_ssid: # set me\n");
     expect(entries).toEqual([{ key: "wifi_ssid", value: "", line: 0, editable: true }]);

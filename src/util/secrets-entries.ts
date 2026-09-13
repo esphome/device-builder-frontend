@@ -8,7 +8,7 @@
 
 import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitTrimmedInlineComment, stripQuotes, unquoteScalar } from "./yaml-scalar.js";
+import { splitTrimmedInlineComment, unquoteScalar } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -111,18 +111,11 @@ function formatSecretValue(value: string): string {
   return formatYamlScalar(value);
 }
 
-/** The first top-level *key* line's inline scalar: "" when absent, null when the form can't edit it. */
+/** The first top-level *key* entry's inline scalar: "" when absent, null when the form can't edit it. */
 export function storedSecret(yaml: string, key: string): string | null {
-  const lines = yaml.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(TOP_LEVEL_KEY);
-    if (!match) continue;
-    const parts = keyParts(match);
-    if (parts.key !== key) continue;
-    if (!readValue(parts.rest, lines, i).editable) return null;
-    return unquoteScalar(splitTrimmedInlineComment(parts.rest ?? "").value.trim());
-  }
-  return "";
+  const entry = parseSecretsEntries(yaml).find((e) => e.key === key);
+  if (!entry) return "";
+  return entry.editable ? entry.value : null;
 }
 
 /** Parse *yaml* into one entry per top-level key line. */
@@ -200,7 +193,9 @@ function readValue(
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable empty scalar.
   if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
-  return { value: stripQuotes(trimmed), editable: true };
+  // Decode a double-quoted scalar so the form shows the literal and a save
+  // re-escapes it once (the write side is `formatSecretValue`).
+  return { value: unquoteScalar(trimmed), editable: true };
 }
 
 function hasIndentedChild(lines: string[], index: number): boolean {
