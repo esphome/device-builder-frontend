@@ -158,6 +158,40 @@ export function unescapeYamlDoubleQuoted(s: string): string {
 }
 
 /**
+ * Strictly decode a double-quoted YAML body: ``null`` for an unescaped inner
+ * quote, a trailing backslash, or any escape ``unescapeYamlDoubleQuoted`` would
+ * leave literal (unknown, short, out of range, lone surrogate).
+ */
+export function decodeYamlDoubleQuoted(s: string): string | null {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"') return null;
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    if (i + 1 >= s.length) return null;
+    const num = decodeNumeric(s, i + 1);
+    if (num) {
+      out += num[0];
+      i += num[1];
+      continue;
+    }
+    const mapped = YAML_SHORT_UNESCAPE[s[i + 1]];
+    if (mapped === undefined) return null;
+    out += mapped;
+    i += 1;
+  }
+  return out;
+}
+
+/** Strictly decode a single-quoted YAML body: ``null`` for a lone inner quote. */
+export function decodeYamlSingleQuoted(s: string): string | null {
+  return /^(?:[^']|'')*$/.test(s) ? s.replace(/''/g, "'") : null;
+}
+
+/**
  * Show a stored value in a form input: double ``\`` and render
  * escape-worthy code points as ``\x`` / ``\u`` / ``\U`` so an invisible
  * glyph is editable. Unlike the YAML variant it leaves quotes and short

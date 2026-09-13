@@ -177,6 +177,8 @@ describe("inlineSecretValue", () => {
     ["double-quoted with a stray inner quote", 'wifi_ssid: "a"b"\n'],
     ["double-quoted with a short numeric escape", 'wifi_ssid: "\\u12"\n'],
     ["double-quoted with an escaped line break", 'wifi_ssid: "a\\nb"\n'],
+    ["double-quoted lone surrogate", 'wifi_ssid: "\\uD800"\n'],
+    ["double-quoted out-of-range code point", 'wifi_ssid: "\\U00110000"\n'],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(inlineSecretValue(yaml, key)).toBeNull();

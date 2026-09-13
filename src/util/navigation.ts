@@ -36,6 +36,16 @@ export async function navigate(url: string): Promise<boolean> {
  * navigating through unsaved state on a broken guard would lose it
  * silently, so staying put is the fail-safe.
  */
+/** ``navigate``, falling back to a full load so the call is never a silent no-op. */
+export async function navigateOrReload(url: string): Promise<boolean> {
+  try {
+    return await navigate(url);
+  } catch {
+    window.location.assign(withBase(url));
+    return false;
+  }
+}
+
 export async function runLeaveGuard(): Promise<boolean> {
   if (!activeGuard) return true;
   try {

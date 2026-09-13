@@ -8,7 +8,7 @@ vi.mock("sonner-js", () => ({
 }));
 
 const { navigate } = vi.hoisted(() => ({ navigate: vi.fn(async () => true) }));
-vi.mock("../../src/util/navigation.js", () => ({ navigate }));
+vi.mock("../../src/util/navigation.js", () => ({ navigate, navigateOrReload: navigate }));
 beforeEach(() => navigate.mockClear());
 
 import "../_mock-webawesome.js";

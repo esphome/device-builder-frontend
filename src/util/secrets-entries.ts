@@ -8,7 +8,8 @@
 
 import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
-import { splitTrimmedInlineComment, unquoteScalar } from "./yaml-scalar.js";
+import { decodeYamlDoubleQuoted, decodeYamlSingleQuoted } from "./yaml-escape.js";
+import { splitTrimmedInlineComment } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
 export interface SecretEntry {
@@ -198,32 +199,21 @@ function readValue(
   // A bare ``key:`` or a comment-only value (``key: # note``) is an editable empty scalar.
   if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
-  // A quoted scalar that isn't well formed on this line (open quote, escaped
-  // closing quote, stray inner quote, escape the decoder can't round-trip)
-  // continues below or is malformed; either way the fragment is not the value.
-  if (/^["']/.test(trimmed) && !isWellFormedQuotedScalar(trimmed)) {
-    return { value: "", editable: false };
-  }
-  // Decode a double-quoted scalar so the form shows the literal and a save
-  // re-escapes it once (the write side is `formatSecretValue`). A decoded line
-  // break can't survive the single-line input, so that value stays read-only.
-  const decoded = unquoteScalar(trimmed);
-  if (/[\n\r]/.test(decoded)) return { value: "", editable: false };
+  const quote = trimmed[0];
+  if (quote !== '"' && quote !== "'") return { value: trimmed, editable: true };
+  // The decoder is the authority on what a quoted scalar may hold; anything it
+  // rejects (open or escaped closing quote, stray inner quote, escape it can't
+  // round-trip) is continued below or malformed, and a decoded line break can't
+  // survive the single-line input. All of those stay read-only.
+  const closed = trimmed.length >= 2 && trimmed.endsWith(quote);
+  const body = trimmed.slice(1, -1);
+  const decoded = !closed
+    ? null
+    : quote === '"'
+      ? decodeYamlDoubleQuoted(body)
+      : decodeYamlSingleQuoted(body);
+  if (decoded === null || /[\n\r]/.test(decoded)) return { value: "", editable: false };
   return { value: decoded, editable: true };
-}
-
-// The double-quoted body the decoder round-trips: the short escapes it knows and
-// full-width numeric escapes. Single-quoted bodies only escape ``''``.
-const WELL_FORMED_DQ_BODY =
-  /^(?:[^"\\]|\\(?:["\\nrt]|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}))*$/;
-const WELL_FORMED_SQ_BODY = /^(?:[^']|'')*$/;
-
-/** A complete, decodable quoted scalar on one line (``"a\\"b"``, ``'it''s'``, never ``"a"b"``). */
-function isWellFormedQuotedScalar(text: string): boolean {
-  const quote = text[0];
-  if (text.length < 2 || !text.endsWith(quote)) return false;
-  const body = text.slice(1, -1);
-  return quote === '"' ? WELL_FORMED_DQ_BODY.test(body) : WELL_FORMED_SQ_BODY.test(body);
 }
 
 function hasIndentedChild(lines: string[], index: number): boolean {

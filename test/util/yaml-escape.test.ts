@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  decodeYamlDoubleQuoted,
+  decodeYamlSingleQuoted,
   escapeControlForInput,
   escapeForInput,
   escapeYamlDoubleQuoted,
@@ -72,6 +74,32 @@ describe("escapeYamlDoubleQuoted / unescapeYamlDoubleQuoted", () => {
     for (const s of ["C:\\x41bc", "a\\U0001F600b", "\\u0041", "plain", MDI]) {
       expect(unescapeYamlDoubleQuoted(escapeYamlDoubleQuoted(s))).toBe(s);
     }
+  });
+});
+
+describe("decodeYamlDoubleQuoted / decodeYamlSingleQuoted (strict)", () => {
+  it("decodes what the lenient decoder decodes", () => {
+    expect(decodeYamlDoubleQuoted('a\\"b\\\\c\\tд\\u0041\\x41\\U0001F600')).toBe(
+      'a"b\\c\tдAA😀'
+    );
+    expect(decodeYamlSingleQuoted("it''s")).toBe("it's");
+    expect(decodeYamlDoubleQuoted("")).toBe("");
+  });
+
+  it("rejects what the lenient decoder would leave literal, plus stray quotes", () => {
+    for (const body of [
+      'a"b',
+      "abc\\",
+      "\\u12",
+      "\\uD800",
+      "\\U00110000",
+      "a\\ab",
+      "\\/",
+    ]) {
+      expect(decodeYamlDoubleQuoted(body)).toBeNull();
+    }
+    expect(decodeYamlSingleQuoted("a'b")).toBeNull();
+    expect(decodeYamlSingleQuoted("abc'")).toBeNull();
   });
 });
 

@@ -10,13 +10,12 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { withBase } from "../../util/base-path.js";
 import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
 import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
-import { navigate } from "../../util/navigation.js";
+import { navigate, navigateOrReload } from "../../util/navigation.js";
 import { LONG_TOAST_DURATION_MS, notifyWarning } from "../../util/notify.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -326,12 +325,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _openSecrets = async () => {
-    try {
-      if (await navigate("/secrets")) this.close();
-    } catch {
-      // Fall back to a full navigation so the click is never a silent no-op.
-      window.location.assign(withBase("/secrets"));
-    }
+    if (await navigateOrReload("/secrets")) this.close();
   };
 
   private _renderStep() {

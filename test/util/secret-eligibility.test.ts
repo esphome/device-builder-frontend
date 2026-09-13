@@ -244,6 +244,7 @@ describe("visibleSecretKeys", () => {
     ).toContain("porch__encryption_key");
   });
 });
+
 describe("secretValueFromYaml", () => {
   it("reads a quoted top-level key", () => {
     expect(secretValueFromYaml('"wifi_ssid": home\n', "wifi_ssid")).toBe("home");

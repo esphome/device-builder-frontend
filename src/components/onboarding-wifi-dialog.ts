@@ -16,11 +16,10 @@ import {
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { withBase } from "../util/base-path.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
-import { navigate } from "../util/navigation.js";
+import { navigateOrReload } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SECRETS_FILE } from "../util/secret-eligibility.js";
 import { inlineSecretValue } from "../util/secrets-entries.js";
@@ -255,12 +254,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   private async _openSecrets(): Promise<void> {
-    try {
-      if (await navigate("/secrets")) this.close();
-    } catch {
-      // Fall back to a full navigation so the click is never a silent no-op.
-      window.location.assign(withBase("/secrets"));
-    }
+    if (await navigateOrReload("/secrets")) this.close();
   }
 
   // The fields are disabled until the stored values land, so focus after;
