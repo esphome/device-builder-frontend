@@ -156,11 +156,13 @@ export const coerceYamlScalar = (
 
 /** The literal string of an inline scalar: a double-quoted one unescaped, else quotes stripped, never type-coerced. */
 export function unquoteScalar(text: string): string {
-  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
-    return unescapeYamlDoubleQuoted(text.slice(1, -1));
-  }
-  return stripQuotes(text);
+  return isClosedDoubleQuoted(text)
+    ? unescapeYamlDoubleQuoted(text.slice(1, -1))
+    : stripQuotes(text);
 }
+
+const isClosedDoubleQuoted = (text: string): boolean =>
+  text.length >= 2 && text.startsWith('"') && text.endsWith('"');
 
 export const parseFlowList = (raw: string): (string | number | boolean)[] => {
   const inner = raw.slice(1, -1).trim();
@@ -172,9 +174,7 @@ export const parseFlowList = (raw: string): (string | number | boolean)[] => {
   // literal backslash text (device-builder#1232).
   return splitTopLevelCommas(inner).map((p) => {
     const t = p.trim();
-    if (t.length >= 2 && t.startsWith('"') && t.endsWith('"')) {
-      return unescapeYamlDoubleQuoted(t.slice(1, -1));
-    }
+    if (isClosedDoubleQuoted(t)) return unquoteScalar(t);
     return coerceYamlScalar(stripQuotes(t), isQuotedScalar(t));
   });
 };

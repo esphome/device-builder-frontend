@@ -407,8 +407,12 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._loadState).toBe("failed"); // Save swapped for Retry, fields held
     expect(dialog._error).toBeTruthy();
 
-    await dialog._loadStored();
+    const retry = dialog._loadStored();
+    expect(dialog._loadState).toBe("loading");
+    expect(dialog._error).toBeTruthy(); // the retry keeps its error (and label) until it settles
+    await retry;
 
+    expect(dialog._error).toBeNull();
     expect(dialog._loadState).toBe("ready");
     expect(dialog._ssid).toBe("home");
     expect(dialog._password).toBe("hunter2pw");

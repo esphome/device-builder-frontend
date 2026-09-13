@@ -209,29 +209,38 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         >
           ${this._localize("wizard.open_secrets")}
         </button>`;
+      // A retry keeps its label, and the error it is retrying, until the read settles.
       case "failed":
+      case "loading":
+        if (this._loadState === "loading" && this._error === null) break; // first load: Save
         return html`<button
           type="button"
           class="btn btn--primary"
+          ?disabled=${this._loadState === "loading"}
           @click=${this._primaryAction}
         >
           ${this._localize("command.retry")}
         </button>`;
       default:
-        return html`<button
-          type="button"
-          class="btn btn--primary"
-          ?disabled=${
-            this._saving ||
-            this._loadState === "loading" ||
-            !this._ssid.trim() ||
-            this._passwordTooShort
-          }
-          @click=${this._primaryAction}
-        >
-          ${this._localize(this._saving ? "onboarding.wifi.saving" : "onboarding.wifi.save")}
-        </button>`;
+        break;
     }
+    return this._renderSave();
+  }
+
+  private _renderSave() {
+    return html`<button
+      type="button"
+      class="btn btn--primary"
+      ?disabled=${
+        this._saving ||
+        this._loadState === "loading" ||
+        !this._ssid.trim() ||
+        this._passwordTooShort
+      }
+      @click=${this._primaryAction}
+    >
+      ${this._localize(this._saving ? "onboarding.wifi.saving" : "onboarding.wifi.save")}
+    </button>`;
   }
 
   private _primaryAction(): Promise<void> {
@@ -275,7 +284,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private async _loadStored(): Promise<void> {
     const generation = ++this._generation;
     this._loadState = "loading";
-    this._error = null;
     let yaml = "";
     let failed = false;
     try {
@@ -303,6 +311,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     }
     [this._ssid, this._password] = values;
     this._storedPassword = this._password;
+    this._error = null;
     this._loadState = "ready";
   }
 
