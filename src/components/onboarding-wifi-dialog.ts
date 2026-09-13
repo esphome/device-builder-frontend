@@ -234,7 +234,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   private _retry() {
-    this._error = null;
     void this._loadAndFocus();
   }
 
@@ -259,6 +258,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private async _loadStored(): Promise<void> {
     const generation = ++this._generation;
     this._loadState = "loading";
+    this._error = null;
     let yaml = "";
     let failed = false;
     try {

@@ -140,6 +140,8 @@ describe("inlineSecretValue", () => {
     ["comment-only value", "wifi_ssid: # set me\n", ""],
     ["plain scalar with trailing comment", "wifi_ssid: home # note\n", "home"],
     ["single-quoted", "wifi_ssid: 'it''s home'\n", "it's home"],
+    ["single-quoted ending in an escaped quote", "wifi_ssid: 'abc'''\n", "abc'"],
+    ["double-quoted ending in an escaped backslash", 'wifi_ssid: "abc\\\\"\n', "abc\\"],
     ["double-quoted with escapes", 'wifi_ssid: "p\\"ss word"\n', 'p"ss word'],
     ["hand-written boolean spelling stays text", "wifi_ssid: yes\n", "yes"],
     ["quoted key", '"wifi_ssid": home\n', "home"],
@@ -167,18 +169,22 @@ describe("inlineSecretValue", () => {
       'wifi_ssid: "my\n  #network"\n',
     ],
     ["absent key beside a merge key that may supply it", "<<: *base\nother: x\n"],
+    ["double-quoted with an escaped closing quote", 'wifi_ssid: "abc\\"\n'],
+    ["single-quoted ending in a doubled-quote escape", "wifi_ssid: 'abc''\n"],
+    ["double-quoted with an escape the decoder can't round-trip", 'wifi_ssid: "a\\ab"\n'],
   ])("%s is not inline-editable", (_, yaml) => {
     const key = yaml.startsWith("<<") ? "<<" : "wifi_ssid";
     expect(inlineSecretValue(yaml, key)).toBeNull();
   });
 
-  test("a duplicate key is classified by its first line, never reported as editable via a later one", () => {
+  test("a duplicate key is never inline-editable, whichever line is plain", () => {
     expect(
       inlineSecretValue("wifi_ssid: *pw\nwifi_ssid: plain\n", "wifi_ssid")
     ).toBeNull();
-    expect(inlineSecretValue("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")).toBe(
-      "first"
-    );
+    expect(
+      inlineSecretValue("wifi_ssid: first\nwifi_ssid: *pw\n", "wifi_ssid")
+    ).toBeNull();
+    expect(inlineSecretValue("wifi_ssid: a\nwifi_ssid: b\n", "wifi_ssid")).toBeNull();
   });
 });
 

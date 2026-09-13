@@ -115,10 +115,12 @@ function formatSecretValue(value: string): string {
  *  value isn't inline-editable (alias, anchor, block, tag, multiline, or possibly merged in). */
 export function inlineSecretValue(yaml: string, key: string): string | null {
   const entries = parseSecretsEntries(yaml);
-  const entry = entries.find((e) => e.key === key);
+  const matches = entries.filter((e) => e.key === key);
   // No direct line, but a merge key may supply it: don't report it as empty.
-  if (!entry) return entries.some((e) => e.key === "<<") ? null : "";
-  return entry.editable ? entry.value : null;
+  if (matches.length === 0) return entries.some((e) => e.key === "<<") ? null : "";
+  // YAML resolves a duplicate last-wins and ESPHome rejects the file; neither line is the value.
+  if (matches.length > 1) return null;
+  return matches[0].editable ? matches[0].value : null;
 }
 
 /** Parse *yaml* into one entry per top-level key line. */
@@ -197,17 +199,34 @@ function readValue(
   if (trimmed === "") return { value: "", editable: true };
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
   // A quote left open on this line continues below (whatever the next line
-  // looks like), so the first-line fragment is not the value.
-  const quote = trimmed[0];
-  if (
-    (quote === '"' || quote === "'") &&
-    (trimmed.length < 2 || !trimmed.endsWith(quote))
-  ) {
+  // looks like) or is simply malformed; either way the fragment is not the value.
+  if (isOpenQuotedScalar(trimmed)) return { value: "", editable: false };
+  // A double-quoted escape the decoder doesn't know (\a, \0, \e, ...) would prefill
+  // mis-decoded text and a save would rewrite the credential from it.
+  if (trimmed[0] === '"' && !DECODABLE_DQ_BODY.test(trimmed.slice(1, -1))) {
     return { value: "", editable: false };
   }
   // Decode a double-quoted scalar so the form shows the literal and a save
   // re-escapes it once (the write side is `formatSecretValue`).
   return { value: unquoteScalar(trimmed), editable: true };
+}
+
+// Only these escapes round-trip through ``unquoteScalar`` / ``formatSecretValue``.
+const DECODABLE_DQ_BODY = /^(?:[^\\]|\\[\\"nrtxuU])*$/;
+
+/** A quoted scalar whose closing quote is missing or escaped (``"a\\"``, ``'a''``). */
+function isOpenQuotedScalar(text: string): boolean {
+  const quote = text[0];
+  if (quote !== '"' && quote !== "'") return false;
+  if (text.length < 2 || !text.endsWith(quote)) return true;
+  if (quote === '"') {
+    // Closed unless the final quote sits behind an odd run of backslashes.
+    const backslashes = text.slice(1, -1).match(/\\*$/)?.[0].length ?? 0;
+    return backslashes % 2 === 1;
+  }
+  // Single-quoted: an even trailing run of quotes is all ``''`` escapes, so the scalar is open.
+  const quotes = text.slice(1).match(/'*$/)?.[0].length ?? 0;
+  return quotes % 2 === 0;
 }
 
 function hasIndentedChild(lines: string[], index: number): boolean {

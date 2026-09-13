@@ -313,6 +313,21 @@ describe("onboarding-wifi-dialog stored-credential prefill", () => {
     expect(dialog._password).toBe("");
   });
 
+  test("Enter on a held form does not save", async () => {
+    const dialog = dialogWithSecrets(
+      "common: &pw x\nwifi_ssid: home\nwifi_password: *pw\n"
+    );
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api.setWifiCredentials = setWifiCredentials;
+    dialog._dialog.open = true;
+
+    await dialog._loadStored();
+    expect(dialog._loadState).toBe("advanced");
+    await dialog._save(); // the Enter path calls this directly, bypassing the missing button
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+  });
+
   test("a stored short password does not trip the length gate until it is edited", async () => {
     const dialog = dialogWithSecrets("wifi_ssid: home\nwifi_password: abc\n");
 
