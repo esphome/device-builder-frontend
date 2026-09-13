@@ -103,6 +103,7 @@ const DOMAIN_ICON: Record<string, string> = {
   http_request: mdiWeb,
   captive_portal: mdiWifiLock,
   improv_serial: mdiWifiCog,
+  improv_ble: mdiWifiCog,
   esp32_improv: mdiWifiCog,
   mqtt: mdiSwapHorizontal,
   wireguard: mdiVpn,
