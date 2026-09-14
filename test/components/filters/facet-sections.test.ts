@@ -40,6 +40,8 @@ function emptySelection(): FacetSelection {
     selectedLabels: [],
     selectedAreas: [],
     selectedPlatforms: [],
+    selectedProjects: [],
+    selectedNetworks: [],
     selectedStates: [],
     selectedUpdateStatus: [],
   };
@@ -68,13 +70,67 @@ const keys = (sections: HTMLElement[]) => sections.map((s) => s.dataset.facetKey
 describe("renderFacetSections", () => {
   it("renders labels + area + platform + status + updates when the fleet warrants", () => {
     const { sections } = mount();
-    // Two distinct platforms (>1), one named area (>0), both update buckets.
+    // Two distinct platforms (>1), one named area (>0), both update
+    // buckets. No fixture declares a project or a network, so neither
+    // of those sections surfaces.
     expect(keys(sections)).toEqual(["labels", "area", "platform", "status", "updates"]);
   });
 
   it("suppresses labels / status / updates in YAML mode, keeps area + platform", () => {
     const { sections } = mount({ yamlMode: true });
     expect(keys(sections)).toEqual(["area", "platform"]);
+  });
+
+  it("surfaces the project section from a single bucket up", () => {
+    const devices = [
+      makeConfiguredDevice({
+        configuration: "p.yaml",
+        runtime_state: { project_name: "apollo.plt-1" },
+      }),
+    ];
+    expect(keys(mount({ devices }).sections)).toContain("project");
+  });
+
+  it("needs two networks before the network section is worth a pill", () => {
+    const oneLink = [
+      makeConfiguredDevice({
+        configuration: "a.yaml",
+        runtime_state: { network: "wifi" },
+      }),
+      makeConfiguredDevice({
+        configuration: "b.yaml",
+        runtime_state: { network: "wifi" },
+      }),
+    ];
+    expect(keys(mount({ devices: oneLink }).sections)).not.toContain("network");
+
+    const mixed = [
+      makeConfiguredDevice({
+        configuration: "a.yaml",
+        runtime_state: { network: "wifi" },
+      }),
+      makeConfiguredDevice({
+        configuration: "b.yaml",
+        runtime_state: { network: "ethernet" },
+      }),
+    ];
+    expect(keys(mount({ devices: mixed }).sections)).toContain("network");
+  });
+
+  it("suppresses project / network in YAML mode — both are mDNS-observed", () => {
+    const devices = [
+      makeConfiguredDevice({
+        configuration: "a.yaml",
+        runtime_state: { project_name: "apollo.plt-1", network: "wifi" },
+      }),
+      makeConfiguredDevice({
+        configuration: "b.yaml",
+        runtime_state: { project_name: "apollo.plt-1", network: "ethernet" },
+      }),
+    ];
+    const rendered = keys(mount({ devices, yamlMode: true }).sections);
+    expect(rendered).not.toContain("project");
+    expect(rendered).not.toContain("network");
   });
 
   it("forwards manageLabels to the labels section's managed property", () => {
