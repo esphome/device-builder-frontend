@@ -6,6 +6,14 @@
 
 - fixes <link to issue>
 
+## Screenshots
+
+<!--
+For any UI feature or change, add before/after screenshots (or a short
+screen recording) showing the affected views in both light and dark
+mode. Not applicable to non-UI changes; remove this section if so.
+-->
+
 ## Types of changes
 
 <!--
@@ -28,6 +36,7 @@ next release notes.
 ## Checklist
 
 - [ ] The code change is tested and works locally.
+- [ ] Screenshots (or a recording) are included for any UI feature or change.
 - [ ] `pnpm run lint` passes.
 - [ ] `pnpm run test` passes.
 - [ ] Tests have been added to verify that the new code works (where applicable).
