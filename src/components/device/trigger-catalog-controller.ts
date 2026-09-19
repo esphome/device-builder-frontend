@@ -80,6 +80,6 @@ export class TriggerCatalogController implements ReactiveController {
     const { platform, boardId } = this._context();
     const triggers = getCachedAutomationTriggers(platform, boardId);
     if (!triggers) return true;
-    return triggers.some((t) => t.applies_to.some((a) => scopes.includes(a)));
+    return triggers.some((t) => (t.applies_to ?? []).some((a) => scopes.includes(a)));
   }
 }

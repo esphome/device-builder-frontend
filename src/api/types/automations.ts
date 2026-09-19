@@ -18,6 +18,11 @@ import type { ConfigEntry, RequiredGroup } from "./config-entries.js";
 // The backend owns YAML parse/write; the frontend exchanges
 // ``AutomationTree`` blobs and applies a ``YamlDiff`` to the editor
 // pane on each save.
+//
+// A catalog field holding its declared default is absent from the
+// wire: read an absent flag as false and an absent list as empty.
+// The API client backfills ``config_entries`` on every body and
+// available-automation row, so that one stays required here.
 
 /** A trigger that can start an automation. */
 export interface AutomationTrigger {
@@ -29,12 +34,12 @@ export interface AutomationTrigger {
    *  Empty list = device-level (``on_boot``, ``on_loop``,
    *  ``on_shutdown``) — always available regardless of which
    *  components are configured. */
-  applies_to: string[];
-  is_device_level: boolean;
+  applies_to?: string[];
+  is_device_level?: boolean;
   /** True when ESPHome accepts a list of handlers (single=False): the
    *  trigger stays offerable past the first handler and appends an indexed
    *  entry. Deterministic replacement for the old 'repeatable' heuristic. */
-  supports_list: boolean;
+  supports_list?: boolean;
   /** Parameter schema (e.g. ``on_click`` has ``min_length`` /
    *  ``max_length`` time-period fields). */
   config_entries: ConfigEntry[];
@@ -51,14 +56,14 @@ export interface AutomationAction {
   /** True for ``if`` / ``while`` / ``repeat`` / ``wait_until`` —
    *  the action embeds nested action lists addressed by the keys in
    *  ``accepts_action_list``. */
-  is_control_flow: boolean;
-  has_else_branch: boolean;
+  is_control_flow?: boolean;
+  has_else_branch?: boolean;
   /** Names of fields whose value is itself a list of actions
    *  (``["then"]`` for ``while``, ``["then", "else"]`` for ``if``).
    *  These are stripped from ``config_entries`` server-side so the
    *  frontend renders them as recursive action lists, not as form
    *  fields. */
-  accepts_action_list: string[];
+  accepts_action_list?: string[];
   /** Cross-field cardinality constraints over ``config_entries``
    *  (``homeassistant.service`` requires exactly one of ``service`` /
    *  ``action``). Members are never advanced. */
@@ -77,7 +82,7 @@ export interface AutomationCondition {
   /** True for ``and`` / ``or`` / ``all`` / ``any`` / ``not`` /
    *  ``xor`` — the condition embeds a recursive list of child
    *  conditions. */
-  accepts_condition_list: boolean;
+  accepts_condition_list?: boolean;
   /** See ``AutomationAction.required_groups`` — e.g. ``sensor.in_range``
    *  requires at least one of ``above`` / ``below``. */
   required_groups?: RequiredGroup[] | null;
@@ -100,7 +105,7 @@ export interface RegistryCatalogEntry {
   id: string;
   name: string;
   config_entries: ConfigEntry[];
-  applies_to: string[];
+  applies_to?: string[];
   /** Set when the entry takes a single scalar at the polymorphic
    *  key position (``- throttle: 10s``, ``- delayed_on: 50ms``)
    *  rather than a nested mapping. The renderer mounts the matching

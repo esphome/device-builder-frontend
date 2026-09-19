@@ -50,7 +50,7 @@ export function triggerAppliesTo(
   t: AutomationTrigger,
   scopes: readonly string[]
 ): boolean {
-  return !t.is_device_level && t.applies_to.some((a) => scopes.includes(a));
+  return !t.is_device_level && (t.applies_to ?? []).some((a) => scopes.includes(a));
 }
 
 /** The component trigger for bare key *key*, preferring the earliest scope. */

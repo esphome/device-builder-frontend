@@ -1792,10 +1792,12 @@ export class ESPHomeAPI {
     refs: { type: AutomationCatalogBodyType; id: string }[]
   ): Promise<Record<string, AutomationCatalogBody>> {
     if (refs.length === 0) return {};
-    return this.sendCommand<Record<string, AutomationCatalogBody>>(
+    const bodies = await this.sendCommand<Record<string, AutomationCatalogBody>>(
       "automations/get_bodies",
       { refs }
     );
+    for (const body of Object.values(bodies)) body.config_entries ??= [];
+    return bodies;
   }
 
   /**

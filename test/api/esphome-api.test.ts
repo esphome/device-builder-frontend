@@ -1929,6 +1929,50 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 });
 
+describe("ESPHomeAPI — getAutomationBodies", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("backfills config_entries on a body the wire sent without one", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const refs = [
+      { type: "actions" as const, id: "delay" },
+      { type: "actions" as const, id: "logger.log" },
+    ];
+    const pending = api.getAutomationBodies(refs);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("automations/get_bodies");
+    expect(sent.args).toEqual({ refs });
+
+    const entries = [{ key: "format", type: "string", label: "Format" }];
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: {
+        "actions/delay": { id: "delay", name: "Delay", domain: "core" },
+        "actions/logger.log": { id: "logger.log", name: "Log", config_entries: entries },
+      },
+    });
+    await expect(pending).resolves.toEqual({
+      "actions/delay": { id: "delay", name: "Delay", domain: "core", config_entries: [] },
+      "actions/logger.log": { id: "logger.log", name: "Log", config_entries: entries },
+    });
+  });
+
+  it("short-circuits on an empty ref list without touching the socket", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    expect(await api.getAutomationBodies([])).toEqual({});
+    expect(ws.sent).toHaveLength(0);
+  });
+});
+
 describe("ESPHomeAPI — getCompatibleBoards", () => {
   beforeEach(() => {
     installMockWebSocket();

@@ -241,7 +241,7 @@ export class ESPHomeRegistryList extends LitElement {
     const catalog = (this._catalog ?? []).filter(
       (entry) =>
         !parentToken ||
-        entry.applies_to.length === 0 ||
+        !entry.applies_to?.length ||
         entry.applies_to.includes(parentToken)
     );
     // Four discriminated states for the picker affordance:
