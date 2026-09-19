@@ -1838,6 +1838,8 @@ export class ESPHomeAPI {
     for (const e of raw.triggers) e.config_entries ??= [];
     for (const e of raw.actions) e.config_entries ??= [];
     for (const e of raw.conditions) e.config_entries ??= [];
+    // A script's empty parameter list is omitted from the wire the same way.
+    for (const s of raw.scripts) s.parameters ??= [];
     return raw;
   }
 
