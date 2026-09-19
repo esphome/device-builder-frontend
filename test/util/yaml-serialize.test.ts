@@ -150,7 +150,7 @@ describe("formatYamlScalar", () => {
     ",comma",
     "?q",
     "!secretx",
-    "!secrets",
+    "!secret\u00a0nbsp",
   ])("quotes a value starting with the YAML indicator in %s", (value) => {
     expect(formatYamlScalar(value)).toBe(`"${value}"`);
   });

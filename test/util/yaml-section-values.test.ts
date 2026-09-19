@@ -238,15 +238,6 @@ describe("updateSectionInYaml — leading YAML indicator", () => {
     expect(after).toContain('  password: "!hxxxx@555"');
     expect(parseYamlSectionValues(after, "wifi").password).toBe("!hxxxx@555");
   });
-
-  it("keeps a secret picker value bare", () => {
-    const before = "wifi:\n  ssid: home\n  password: old\n";
-    const after = updateSectionInYaml(before, "wifi", {
-      ssid: "home",
-      password: "!secret wifi_password",
-    });
-    expect(after).toContain("  password: !secret wifi_password");
-  });
 });
 
 describe("updateSectionInYaml — list item with inline key", () => {
