@@ -517,10 +517,11 @@ const YAML_FLOAT =
   /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|[-+]?\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
 const YAML_NULL = /^(?:~|null|Null|NULL)$/;
 // esphome's own tags (yaml_util.py constructors) stay bare so a picker
-// value like ``!secret <key>`` round-trips; the loader ends a tag only
-// at a plain space or end of input.
+// value like ``!secret <key>`` round-trips; every tag but ``!remove``
+// needs an argument after a plain space, which is where the loader ends
+// the tag.
 const ESPHOME_TAG =
-  /^!(?:secret|include|include_dir_list|include_dir_merge_list|include_dir_named|include_dir_merge_named|lambda|literal|extend|remove|env_var)(?: |$)/;
+  /^!(?:remove$|(?:secret|include|include_dir_list|include_dir_merge_list|include_dir_named|include_dir_merge_named|lambda|literal|extend|remove|env_var) \S)/;
 const YAML_TIMESTAMP =
   /^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?)$/;
 
