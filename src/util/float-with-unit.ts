@@ -274,7 +274,7 @@ const METRIC_PREFIX_MULTIPLIERS: Record<string, number> = {
  */
 export function visibleUnitOptions(
   unitOptions: readonly string[],
-  range: readonly [number, number] | null,
+  range: readonly [number, number] | null | undefined,
   mustKeep: readonly string[]
 ): string[] {
   const all = [...unitOptions];

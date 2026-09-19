@@ -95,6 +95,14 @@ describe("visibleComponents platform gate", () => {
     expect(ids).toEqual([]);
   });
 
+  it("keeps a core-locked dotted entry that arrives without dependencies", () => {
+    // Wire shape: an index row with no dependencies omits the field.
+    const slim = { id: "ota.esphome" } as unknown as ComponentCatalogEntry;
+    expect(
+      visibleComponents(host([slim], "esp32", { lockedCategories: ["core"] }))
+    ).toEqual([slim]);
+  });
+
   it("counts a package-resolved dep as satisfied when core-locked", () => {
     const locked = [entry("time.foo", [], ["esp32"])];
     const ids = visibleComponents(

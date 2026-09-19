@@ -1879,15 +1879,20 @@ describe("ESPHomeAPI — getComponentBodies", () => {
     expect(sent.command).toBe("components/get_component_bodies");
     expect(sent.args).toEqual({ component_ids: ["wifi", "api"] });
 
-    const payload = {
-      wifi: { id: "wifi", name: "Wi-Fi" },
-      api: { id: "api", name: "API" },
-    };
+    // Wire shape: a field holding its default is not sent, so a component
+    // with no fields arrives without 'config_entries'.
+    const entries = [{ key: "fast_connect", type: "boolean", label: "Fast Connect" }];
     ws.receive({
       message_id: ws.sentAs<{ message_id: string }>(0).message_id,
-      result: payload,
+      result: {
+        wifi: { id: "wifi", name: "Wi-Fi", config_entries: entries },
+        api: { id: "api", name: "API" },
+      },
     });
-    await expect(pending).resolves.toEqual(payload);
+    await expect(pending).resolves.toEqual({
+      wifi: { id: "wifi", name: "Wi-Fi", config_entries: entries },
+      api: { id: "api", name: "API", config_entries: [] },
+    });
   });
 
   it("forwards platform / board_id as snake_case when provided", async () => {

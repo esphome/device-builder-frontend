@@ -76,9 +76,9 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         section_type: "core",
         title: component.name,
         description: component.description,
-        docs_url: component.docs_url,
+        docs_url: component.docs_url ?? "",
         icon: "",
-        image_url: component.image_url,
+        image_url: component.image_url ?? "",
         entries: component.config_entries,
         required_groups: component.required_groups ?? [],
       };

@@ -1598,7 +1598,7 @@ export class ESPHomeAPI {
     boardId?: string
   ): Promise<Record<string, ComponentCatalogEntry>> {
     if (componentIds.length === 0) return {};
-    return this.sendCommand<Record<string, ComponentCatalogEntry>>(
+    const bodies = await this.sendCommand<Record<string, ComponentCatalogEntry>>(
       "components/get_component_bodies",
       {
         component_ids: componentIds,
@@ -1606,6 +1606,10 @@ export class ESPHomeAPI {
         ...(boardId ? { board_id: boardId } : {}),
       }
     );
+    // A component with no fields arrives without 'config_entries' (the
+    // backend omits defaults); consumers read the list directly.
+    for (const body of Object.values(bodies)) body.config_entries ??= [];
+    return bodies;
   }
 
   /**

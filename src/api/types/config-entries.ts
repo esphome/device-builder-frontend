@@ -67,6 +67,11 @@ export interface RequiredGroup {
   keys: string[];
 }
 
+/**
+ * The backend omits a field that holds its default, so everything but
+ * 'key', 'type' and 'label' can be absent: read an absent flag as false,
+ * an absent nullable as null and an absent list as empty.
+ */
 export interface ConfigEntry {
   // === core ===
   /** YAML key name. */
@@ -76,9 +81,9 @@ export interface ConfigEntry {
   /** Short human-readable label shown next to the input. */
   label: string;
   /** Longer help text shown as a tooltip or below the input. */
-  description: string | null;
+  description?: string | null;
   /** When True the YAML is invalid without this field set. */
-  required: boolean;
+  required?: boolean;
   /**
    * Default value. For multi_value entries this is the default list.
    * The backend pre-resolves `cv.SplitDefault` fields against the
@@ -86,20 +91,20 @@ export interface ConfigEntry {
    * for the current device — the frontend doesn't need to know about
    * per-platform variants.
    */
-  default_value: ConfigPrimitive | ConfigPrimitive[] | null;
+  default_value?: ConfigPrimitive | ConfigPrimitive[] | null;
 
   // === value constraints ===
   /** Constrains the value to a fixed set of choices. */
-  options: ConfigValueOption[] | null;
+  options?: ConfigValueOption[] | null;
   /**
    * When `true`, `options` are treated as suggestions rather than the
    * exhaustive set of allowed values — the frontend should render a
    * combobox/autocomplete that lets the user pick a suggested value
    * or type a custom one. Has no effect when `options` is empty.
    */
-  allow_custom_value: boolean;
+  allow_custom_value?: boolean;
   /** Min/max bounds for INTEGER / FLOAT entries. */
-  range: [number, number] | null;
+  range?: [number, number] | null;
   /**
    * Display-formatting hint for INTEGER entries.
    *
@@ -111,7 +116,7 @@ export interface ConfigEntry {
    * round-trips as `0x76`. `null` (the default for plain
    * `cv.int_range` integers) → decimal display.
    */
-  display_format: "hex" | null;
+  display_format?: "hex" | null;
   /**
    * Catalog name for `REGISTRY_LIST` entries. Currently
    * ``"light_effects"`` (light.effects) and ``"filter"``
@@ -119,7 +124,7 @@ export interface ConfigEntry {
    * registries plug into the frontend's REGISTRY_OPS table. Null
    * on every other entry type.
    */
-  registry: string | null;
+  registry?: string | null;
   /**
    * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
    * a unit picker populated from this list; each option's string is
@@ -129,9 +134,9 @@ export interface ConfigEntry {
    * user-typed bare number default to it. Null for non-FLOAT_WITH_UNIT
    * entries.
    */
-  unit_options: string[] | null;
+  unit_options?: string[] | null;
   /** When True the field accepts a list of values. */
-  multi_value: boolean;
+  multi_value?: boolean;
   /**
    * For NESTED entries validated by esphome's `maybe_simple_value`: the
    * child key a bare scalar value expands into
@@ -141,7 +146,7 @@ export interface ConfigEntry {
    */
   maybe_key?: string | null;
   /** When True accepts either a literal value OR a !lambda block. */
-  templatable: boolean;
+  templatable?: boolean;
   /**
    * Sibling entries sharing a non-null value are mutually exclusive:
    * exactly one may be set (e.g. a remote_receiver binary_sensor's
@@ -169,14 +174,14 @@ export interface ConfigEntry {
    * disables the input — the value comes from a board-side preset and
    * the backend rejects deviating user input on add.
    */
-  locked: boolean;
+  locked?: boolean;
   /**
    * Backend-baked, only populated on materialised featured-component
    * entries. When non-null, restricts the input to this short list of
    * allowed values — used most often for PIN entries on addon modules
    * whose pin can land on one of a few GPIOs.
    */
-  suggestions: ConfigPrimitive[] | null;
+  suggestions?: ConfigPrimitive[] | null;
   /**
    * Backend-baked, only on materialised featured-component entries. True
    * when this field carries a board-side preset value (locked, suggestion,
@@ -188,19 +193,19 @@ export interface ConfigEntry {
 
   // === conditional visibility ===
   /** Key of another entry this one depends on. */
-  depends_on: string | null;
+  depends_on?: string | null;
   /** Show only when dependency value equals this. */
-  depends_on_value: ConfigPrimitive | null;
+  depends_on_value?: ConfigPrimitive | null;
   /** Show only when dependency value does NOT equal this. */
-  depends_on_value_not: ConfigPrimitive | null;
+  depends_on_value_not?: ConfigPrimitive | null;
   /** Show only when dependency value is in this list. */
-  depends_on_value_any: ConfigPrimitive[] | null;
+  depends_on_value_any?: ConfigPrimitive[] | null;
   /**
    * Hide this entry unless the named component is configured on the
    * same device (e.g. `qos` only matters when an `mqtt:` block exists).
    * null = always visible.
    */
-  depends_on_component: string | null;
+  depends_on_component?: string | null;
   /**
    * For `type === "id"` entries: identifies the component domain the
    * value must reference. The frontend should render a dropdown of
@@ -208,7 +213,7 @@ export interface ConfigEntry {
    * `rtttl.output` → "output", many sensors reference "i2c" / "spi" /
    * "uart" buses. null = free-form ID input.
    */
-  references_component: string | null;
+  references_component?: string | null;
   /**
    * Target chips this field is valid on. Empty list (or omitted) =
    * no restriction (the common case); non-empty = the field is
@@ -226,9 +231,9 @@ export interface ConfigEntry {
 
   // === pin selection (only meaningful when type == PIN) ===
   /** Pin capabilities required for this field. */
-  pin_features: PinFeature[];
+  pin_features?: PinFeature[];
   /** Direction the pin will be used in. */
-  pin_mode: PinMode | null;
+  pin_mode?: PinMode | null;
 
   // === UI / i18n ===
   /**
@@ -243,7 +248,7 @@ export interface ConfigEntry {
    * as upstream adoption grows, the heuristic shrinks toward
    * zero.
    */
-  advanced: boolean;
+  advanced?: boolean;
   /**
    * When True frontend hides the entry entirely.
    *
@@ -258,20 +263,20 @@ export interface ConfigEntry {
    * descendants with it (otherwise the editor would render an
    * unrooted control with no surrounding context).
    */
-  hidden: boolean;
+  hidden?: boolean;
   /** Optional URL pointing to documentation specific to this field. */
-  help_link: string | null;
+  help_link?: string | null;
   /** i18n override key. */
-  translation_key: string | null;
+  translation_key?: string | null;
   /** Substitution params for the translation string. */
-  translation_params: Record<string, unknown> | null;
+  translation_params?: Record<string, unknown> | null;
 
   // === nested groups (only meaningful when type === "nested") ===
   /**
    * Inner schema when this entry is a nested group. Recursive — these
    * entries can themselves be `nested`. Always null for non-nested types.
    */
-  config_entries: ConfigEntry[] | null;
+  config_entries?: ConfigEntry[] | null;
   /**
    * When the nested group represents an ESPHome entity sub-reading
    * (e.g. a DHT sensor's "temperature" / "humidity" outputs), this is
@@ -280,7 +285,7 @@ export interface ConfigEntry {
    * device_class, ...) on top of `config_entries`. null = plain
    * nested form, render only the inner fields.
    */
-  platform_type: string | null;
+  platform_type?: string | null;
 }
 
 export enum ConfigEntryType {
