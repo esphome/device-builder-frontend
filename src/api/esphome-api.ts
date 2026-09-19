@@ -1034,8 +1034,8 @@ export class ESPHomeAPI {
    *
    *  Returns the new configuration filename. ``CommandError(INVALID_ARGS)``
    *  surfaces user-correctable failures (collision, empty / equal
-   *  name, missing source) so the dialog can show a specific
-   *  message.
+   *  name) and NOT_FOUND a missing source, so the dialog can show a
+   *  specific message.
    */
   async cloneDevice(
     configuration: string,
@@ -1066,9 +1066,9 @@ export class ESPHomeAPI {
    *  install in that case.
    *
    *  ``CommandError(INVALID_ARGS)`` surfaces user-correctable
-   *  failures (blank name, missing device, package-driven
-   *  friendly_name with no inline leaf) so the dialog can show a
-   *  specific message.
+   *  failures (blank name, package-driven friendly_name with no
+   *  inline leaf) and NOT_FOUND a missing device, so the dialog can
+   *  show a specific message.
    */
   async editFriendlyName(
     configuration: string,
