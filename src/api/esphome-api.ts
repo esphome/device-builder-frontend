@@ -1606,10 +1606,8 @@ export class ESPHomeAPI {
         ...(boardId ? { board_id: boardId } : {}),
       }
     );
-    // The backend omits a field that holds its default, so a component
-    // with no fields arrives without 'config_entries'. Every consumer
-    // reads that list directly; backfill it once here, as
-    // 'getAvailableAutomations' does for the automation index shapes.
+    // A component with no fields arrives without 'config_entries' (the
+    // backend omits defaults); consumers read the list directly.
     for (const body of Object.values(bodies)) body.config_entries ??= [];
     return bodies;
   }
