@@ -91,7 +91,7 @@ describe("add-component-form requestSubmit (#2400)", () => {
 
   it("submits when the unmet group has no member the form paints", () => {
     const advancedOnly = {
-      id: "emc2101",
+      id: "example",
       required_groups: [{ kind: "exactly_one", keys: ["pwm", "dac"] }],
       config_entries: [
         makeConfigEntry({ key: "pwm", type: ConfigEntryType.STRING, advanced: true }),

@@ -251,12 +251,27 @@ describe("an unmet constraint cluster box", () => {
     expect(unmet(members({ locked: true }), {})).toBe(false);
   });
 
-  it("does not hold Add on an all-advanced box the form cannot reveal", () => {
-    expect(unmet(members({ advanced: true }), {})).toBe(false);
+  it("holds Add on an all-advanced box, which the flat paint still draws", () => {
+    expect(unmet(members({ advanced: true }), {})).toBe(true);
   });
 
   it("leaves an exactly_one radio cluster to its forced choice", () => {
     const radio = [{ kind: "exactly_one" as const, keys: ["identity", "certificate"] }];
     expect(addFormHasUnsatisfiedConstraint(members(), {}, radio, null, NONE)).toBe(false);
+  });
+});
+
+describe("an unmet banner whose painted members are all board-locked", () => {
+  it("does not hold Add, since nothing on screen can be changed", () => {
+    const entries = [
+      makeConfigEntry({ key: "a", locked: true }),
+      makeConfigEntry({ key: "b", locked: true }),
+    ];
+    const groups = [{ kind: "exactly_one" as const, keys: ["a", "b"] }];
+    const values = { a: "x", b: "y" };
+    expect(addFormRenderablePaths(entries, values, groups, null, NONE).size).toBe(2);
+    expect(addFormHasUnsatisfiedConstraint(entries, values, groups, null, NONE)).toBe(
+      false
+    );
   });
 });

@@ -91,9 +91,9 @@ export interface RenderFilterOptions {
   rootValues?: Record<string, unknown>;
   /**
    * The ``required_groups`` of the scope *entries* belong to. In
-   * ``requiredOnly`` mode the members of a group that demands a value
+   * ``requiredOnly`` mode the leaf members of a group that demands a value
    * (``exactly_one`` / ``at_least_one``) stay visible so the user can
-   * satisfy it. Scope-local: not forwarded into NESTED children, whose
+   * satisfy it; a NESTED member still needs a renderable child. Scope-local: not forwarded into NESTED children, whose
    * own groups only bind once that optional block is in use.
    */
   requiredGroups?: RequiredGroup[];
