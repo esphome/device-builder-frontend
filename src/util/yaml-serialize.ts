@@ -516,6 +516,13 @@ const YAML_INT = /^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*))$/;
 const YAML_FLOAT =
   /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|[-+]?\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
 const YAML_NULL = /^(?:~|null|Null|NULL)$/;
+// A leading indicator reparses as a tag / anchor / alias / block scalar /
+// flow collection / reserved char, so the value must be quoted.
+const LEADING_INDICATOR = /^[!&*|>[\]{}@`%,?]/;
+// esphome's own tags stay bare: a form value holds the secret picker's
+// ``!secret <key>`` literal verbatim.
+const ESPHOME_TAG =
+  /^!(?:secret|include|include_dir_list|include_dir_merge_list|include_dir_named|include_dir_merge_named|lambda|literal|extend|remove|env_var)(?:\s|$)/;
 const YAML_TIMESTAMP =
   /^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?)$/;
 
@@ -535,6 +542,7 @@ function yamlNeedsQuoting(s: string): boolean {
     s === "" ||
     /[:#]/.test(s) ||
     /^[-\s'"]/.test(s) ||
+    (LEADING_INDICATOR.test(s) && !ESPHOME_TAG.test(s)) ||
     /\s$/.test(s) ||
     /[\n\r\t]/.test(s) ||
     hasEscapeWorthyChar(s) ||

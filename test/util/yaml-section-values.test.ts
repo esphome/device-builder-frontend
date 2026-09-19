@@ -228,6 +228,27 @@ describe("parseYamlSectionValues — prototype pollution defense", () => {
   });
 });
 
+describe("updateSectionInYaml — leading YAML indicator", () => {
+  it("quotes a password starting with ! and reads it back as the same string", () => {
+    const before = "wifi:\n  ssid: home\n  password: old\n";
+    const after = updateSectionInYaml(before, "wifi", {
+      ssid: "home",
+      password: "!hxxxx@555",
+    });
+    expect(after).toContain('  password: "!hxxxx@555"');
+    expect(parseYamlSectionValues(after, "wifi").password).toBe("!hxxxx@555");
+  });
+
+  it("keeps a secret picker value bare", () => {
+    const before = "wifi:\n  ssid: home\n  password: old\n";
+    const after = updateSectionInYaml(before, "wifi", {
+      ssid: "home",
+      password: "!secret wifi_password",
+    });
+    expect(after).toContain("  password: !secret wifi_password");
+  });
+});
+
 describe("updateSectionInYaml — list item with inline key", () => {
   it("does not duplicate the inline key when adding a sibling field", () => {
     // The OTA section as the wizard emits it: a list with one
