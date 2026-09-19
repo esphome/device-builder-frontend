@@ -4,7 +4,10 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import type {
+  ComponentCatalogEntry,
+  ComponentCatalogIndexEntry,
+} from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
@@ -389,7 +392,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   private async _onComponentSelected(
-    e: CustomEvent<{ component: ComponentCatalogEntry }>
+    e: CustomEvent<{ component: ComponentCatalogIndexEntry }>
   ) {
     e.stopPropagation();
     // The catalog list endpoint returns slim index entries (no

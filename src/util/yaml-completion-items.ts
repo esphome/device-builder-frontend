@@ -14,7 +14,7 @@
  */
 import { type Completion, startCompletion } from "@codemirror/autocomplete";
 import type { EditorView } from "@codemirror/view";
-import type { ComponentCatalogEntry } from "../api/types/components.js";
+import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
 import { type ConfigEntry, ConfigEntryType } from "../api/types/config-entries.js";
 import type {
   SchemaAction,
@@ -65,7 +65,7 @@ function buildEntryInfo(entry: ConfigEntry): () => HTMLElement | null {
   };
 }
 
-function buildComponentInfo(c: ComponentCatalogEntry): () => HTMLElement | null {
+function buildComponentInfo(c: ComponentCatalogIndexEntry): () => HTMLElement | null {
   return () => {
     if (!c.description && !c.category) return null;
     const dom = document.createElement("div");
@@ -117,7 +117,7 @@ export function entryToCompletion(entry: ConfigEntry): Completion {
   };
 }
 
-function componentToCompletion(c: ComponentCatalogEntry): Completion {
+function componentToCompletion(c: ComponentCatalogIndexEntry): Completion {
   return {
     label: c.id,
     apply: `${c.id}:\n${ESPHOME_YAML_INDENT}`,
@@ -217,7 +217,7 @@ export function knownTopLevelKeys(catalog: CatalogIndex): Set<string> | null {
   return keys;
 }
 
-export function platformValueCompletion(c: ComponentCatalogEntry): Completion {
+export function platformValueCompletion(c: ComponentCatalogIndexEntry): Completion {
   // ``c.id`` is the dotted catalog id (``binary_sensor.gpio``);
   // YAML's ``platform:`` value is just the stem (``gpio``).
   // Strip the domain prefix so the inserted text is valid YAML —

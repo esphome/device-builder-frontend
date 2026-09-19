@@ -17,7 +17,10 @@ import type { EditorState } from "@codemirror/state";
 import { hoverTooltip, type Tooltip } from "@codemirror/view";
 import { html, nothing, render } from "lit";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { ComponentCatalogEntry } from "../api/types/components.js";
+import type {
+  ComponentCatalogEntry,
+  ComponentCatalogIndexEntry,
+} from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import {
@@ -80,7 +83,7 @@ function docsTarget(docs: string | null | undefined): HoverTarget | null {
 }
 
 /** Catalog description for a top-level component, with its docs link. */
-function componentTarget(c: ComponentCatalogEntry): HoverTarget | null {
+function componentTarget(c: ComponentCatalogIndexEntry): HoverTarget | null {
   if (!c.description && !c.docs_url) return null;
   return {
     description: c.description || null,

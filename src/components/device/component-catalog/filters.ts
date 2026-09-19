@@ -5,7 +5,7 @@ import type {
   FeaturedComponent,
 } from "../../../api/types/boards.js";
 import {
-  type ComponentCatalogEntry,
+  type ComponentCatalogIndexEntry,
   ComponentCategory,
 } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -77,7 +77,7 @@ function featuredPinsTaken(fc: FeaturedComponent, yaml: string): boolean {
 
 export function visibleComponents(
   host: ESPHomeComponentCatalog
-): ComponentCatalogEntry[] {
+): ComponentCatalogIndexEntry[] {
   const present = memoPresent(host.yaml);
   const presentPlatforms = memoPlatforms(host.yaml);
   const lockedToCore = host.lockedCategories.length > 0;
@@ -131,8 +131,8 @@ export function visibleComponents(
 // both inherit the domain's docs-page name. Keying on category as well as
 // name leaves cross-category collisions (sensor.debug / text_sensor.debug)
 // out: the category chip already separates those, and their stems match.
-export function ambiguousNameIds(components: ComponentCatalogEntry[]): Set<string> {
-  const byKey = new Map<string, ComponentCatalogEntry[]>();
+export function ambiguousNameIds(components: ComponentCatalogIndexEntry[]): Set<string> {
+  const byKey = new Map<string, ComponentCatalogIndexEntry[]>();
   for (const c of components) {
     const key = JSON.stringify([c.category, c.name]);
     const group = byKey.get(key);
