@@ -93,7 +93,7 @@ registerMdiIcons({
  * field stays read-only even when the rest of the form is editable.
  */
 export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
-  return ctx.disabled || entry.locked;
+  return ctx.disabled || entry.locked === true;
 }
 
 /** Serialize a field path into the ``data-field-key`` attribute. JSON

@@ -115,8 +115,9 @@ export function visibleComponents(
     if (!c.multi_conf && isComponentPresent(refId, present, presentPlatforms)) {
       return false;
     }
-    if (coreCompatible && c.id.includes(".") && c.dependencies.length > 0) {
-      const allSatisfied = c.dependencies.every(
+    const dependencies = c.dependencies ?? [];
+    if (coreCompatible && c.id.includes(".") && dependencies.length > 0) {
+      const allSatisfied = dependencies.every(
         (dep) => coreCompatible.has(dep) || hasComponentKey(depPresent, dep)
       );
       if (!allSatisfied) return false;

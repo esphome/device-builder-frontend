@@ -296,7 +296,7 @@ export function renderFloatWithUnitField(
   );
   // Narrow the picker to the field's scale; keep canonical/default/in-use so a
   // trimmed unit a value uses is never hidden (parsing uses the full list).
-  const pickerUnitOptions = visibleUnitOptions(unitOptions, entry.range, [
+  const pickerUnitOptions = visibleUnitOptions(unitOptions, entry.range ?? null, [
     canonicalUnit,
     defaultUnitForFloatWithUnit(entry.default_value, unitOptions),
     unit,

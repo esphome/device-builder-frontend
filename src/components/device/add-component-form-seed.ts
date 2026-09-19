@@ -193,7 +193,7 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   if (idEntry && next["id"] === undefined) {
     const seeded = generateDefaultComponentId(
       component.id,
-      component.multi_conf,
+      component.multi_conf === true,
       collectTakenIds(yaml)
     );
     if (seeded !== null) next = { ...next, id: seeded };

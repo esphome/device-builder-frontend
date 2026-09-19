@@ -100,14 +100,14 @@ export interface ComponentCatalogEntry {
   name: string;
   description: string;
   category: ComponentCategory;
-  docs_url: string;
-  image_url: string;
+  docs_url?: string;
+  image_url?: string;
   /** Other components this one requires to be configured. */
-  dependencies: string[];
+  dependencies?: string[];
   /** Whether the same component can be added multiple times. */
-  multi_conf: boolean;
+  multi_conf?: boolean;
   /** Empty list = works on every target platform. Non-empty = restricted to those. */
-  supported_platforms: string[];
+  supported_platforms?: string[];
   /** Interfaces this component can be referenced *as* beyond its own domain
    *  (an `adc` sensor provides `voltage_sampler`). */
   provides?: string[];

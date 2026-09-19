@@ -1598,7 +1598,7 @@ export class ESPHomeAPI {
     boardId?: string
   ): Promise<Record<string, ComponentCatalogEntry>> {
     if (componentIds.length === 0) return {};
-    return this.sendCommand<Record<string, ComponentCatalogEntry>>(
+    const bodies = await this.sendCommand<Record<string, ComponentCatalogEntry>>(
       "components/get_component_bodies",
       {
         component_ids: componentIds,
@@ -1606,6 +1606,12 @@ export class ESPHomeAPI {
         ...(boardId ? { board_id: boardId } : {}),
       }
     );
+    // The backend omits a field that holds its default, so a component
+    // with no fields arrives without 'config_entries'. Every consumer
+    // reads that list directly; backfill it once here, as
+    // 'getAvailableAutomations' does for the automation index shapes.
+    for (const body of Object.values(bodies)) body.config_entries ??= [];
+    return bodies;
   }
 
   /**
