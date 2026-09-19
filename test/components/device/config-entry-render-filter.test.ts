@@ -494,7 +494,7 @@ describe("filterRenderable", () => {
     expect(paths({ type: "local" })).toHaveLength(1);
     expect(paths({ type: "local" })[0].required).toBe(true);
     expect(paths({ type: "git" })).toHaveLength(1);
-    expect(paths({ type: "git" })[0].required).toBeFalsy();
+    expect(paths({ type: "git" })[0].required).toBeUndefined();
     expect(paths({ type: "other" })).toHaveLength(0);
   });
 

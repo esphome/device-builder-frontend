@@ -16,7 +16,7 @@
  * collapses the worst case (paste a multi-thousand-line config,
  * type into a field) from O(N) per keystroke to O(1).
  */
-import type { ComponentCatalogEntry } from "../api/types/components.js";
+import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
@@ -334,7 +334,7 @@ export function parseCatalogId(id: string): ComponentProvider {
  *  Single source of truth for the visual picker and YAML autocomplete so
  *  the two surfaces can't drift on what counts as a candidate. */
 export function catalogEntryToProvider(
-  entry: ComponentCatalogEntry,
+  entry: ComponentCatalogIndexEntry,
   interfaceName: string
 ): ComponentProvider {
   const provider = parseCatalogId(entry.id);

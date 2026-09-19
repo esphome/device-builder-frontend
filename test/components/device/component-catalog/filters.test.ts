@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { identityLocalize } from "../../../_dom.js";
 import type { BoardCatalogEntry } from "../../../../src/api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../../../src/api/types/components.js";
+import {
+  type ComponentCatalogIndexEntry,
+  ComponentCategory,
+} from "../../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
 import {
   availableFeaturedCount,
@@ -15,17 +18,17 @@ function entry(
   supported_platforms: string[] = [],
   dependencies: string[] = [],
   multi_conf = true
-): ComponentCatalogEntry {
-  return {
-    id,
-    multi_conf,
-    dependencies,
-    supported_platforms,
-  } as unknown as ComponentCatalogEntry;
+): ComponentCatalogIndexEntry {
+  return { ...row(id), multi_conf, dependencies, supported_platforms };
+}
+
+/** A list row as the backend sends it when every optional field holds its default. */
+function row(id: string): ComponentCatalogIndexEntry {
+  return { id, name: id, description: "", category: ComponentCategory.MISC };
 }
 
 function host(
-  components: ComponentCatalogEntry[],
+  components: ComponentCatalogIndexEntry[],
   platform: string,
   {
     lockedCategories = [],
@@ -97,7 +100,7 @@ describe("visibleComponents platform gate", () => {
 
   it("keeps a core-locked dotted entry that arrives without dependencies", () => {
     // Wire shape: an index row with no dependencies omits the field.
-    const slim = { id: "ota.esphome" } as unknown as ComponentCatalogEntry;
+    const slim = row("ota.esphome");
     expect(
       visibleComponents(host([slim], "esp32", { lockedCategories: ["core"] }))
     ).toEqual([slim]);

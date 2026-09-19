@@ -8,7 +8,7 @@ import {
 } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import type { FeaturedBundle } from "../../../api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../../api/types/components.js";
+import type { ComponentCatalogIndexEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import { mdiSvg } from "../../../util/mdi-svg.js";
@@ -135,7 +135,7 @@ export function renderBundleCard(
 
 export function renderCard(
   host: ESPHomeComponentCatalog,
-  component: ComponentCatalogEntry,
+  component: ComponentCatalogIndexEntry,
   expanded: boolean,
   featured: boolean,
   localize: LocalizeFunc,

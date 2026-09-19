@@ -95,7 +95,8 @@ export const CORE_CATEGORIES: ComponentCategory[] = [
   ComponentCategory.UPDATE,
 ];
 
-export interface ComponentCatalogEntry {
+/** A catalog list row; the body fields exist only on the full entry. */
+export interface ComponentCatalogIndexEntry {
   id: string;
   name: string;
   description: string;
@@ -125,6 +126,9 @@ export interface ComponentCatalogEntry {
    *  `spi`), so the card can chip its type alongside its recommendation
    *  status. Null/absent on regular entries. */
   underlying_category?: ComponentCategory | null;
+}
+
+export interface ComponentCatalogEntry extends ComponentCatalogIndexEntry {
   /** Cross-field cardinality constraints over the top-level `config_entries`
    *  (from ESPHome's `cv.has_*_one_key` validators). Nested-scope constraints
    *  live on the owning `nested` entry's `required_groups`. */
@@ -135,7 +139,7 @@ export interface ComponentCatalogEntry {
 }
 
 export interface PagedComponentsResponse extends PagedResponse {
-  components: ComponentCatalogEntry[];
+  components: ComponentCatalogIndexEntry[];
   categories: Array<{ id: string; name: string; count: number }>;
 }
 
