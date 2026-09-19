@@ -152,6 +152,7 @@ describe("formatYamlScalar", () => {
     "!secretx",
     "!secret\u00a0nbsp",
     "!secret",
+    "!secret key extra",
     "!lambda",
   ])("quotes a value starting with the YAML indicator in %s", (value) => {
     expect(formatYamlScalar(value)).toBe(`"${value}"`);
@@ -163,6 +164,7 @@ describe("formatYamlScalar", () => {
     "!include common.yaml",
     "!include_dir_merge_named dir",
     "!lambda return 1;",
+    "!lambda return id(a) + id(b);",
     "!extend my_id",
     "!remove",
     "!env_var HOME",
