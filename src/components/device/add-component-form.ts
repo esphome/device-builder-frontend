@@ -569,13 +569,6 @@ export class ESPHomeAddComponentForm extends LitElement {
     return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
 
-  /**
-   * True when at least one error in the map lands on an entry the
-   * shared ``esphome-config-entry-form`` actually renders. Built on
-   * ``addFormRenderablePaths`` so the visibility check stays in
-   * lockstep with the add-form's render filter — without that lockstep
-   * an error on a hidden field would bail the submit silently.
-   */
   /** The form's banner already names the unmet group; Add stays off until it clears. */
   private _hasUnsatisfiedConstraint(presentComponents: ReadonlySet<string>): boolean {
     return addFormHasUnsatisfiedConstraint(
@@ -587,6 +580,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     );
   }
 
+  /**
+   * True when at least one error in the map lands on an entry the
+   * shared ``esphome-config-entry-form`` actually renders. Built on
+   * ``addFormRenderablePaths`` so the visibility check stays in
+   * lockstep with the add-form's render filter — without that lockstep
+   * an error on a hidden field would bail the submit silently.
+   */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
     presentComponents: ReadonlySet<string>

@@ -158,6 +158,11 @@ export function renderFilterOptions(
   return opts;
 }
 
+/** Required groups are scope-local; NESTED children don't inherit them. */
+function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
+  return opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+}
+
 /** Keys of the groups in *requiredGroups* that demand a value be set. */
 function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
   const keys = new Set<string>();
@@ -174,10 +179,8 @@ export function filterRenderable(
   opts: RenderFilterOptions
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
-  const demanded = opts.requiredOnly
-    ? demandedKeys(opts.requiredGroups)
-    : new Set<string>();
-  const childOpts = opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+  const demanded = demandedKeys(opts.requiredGroups);
+  const childOpts = nestedOpts(opts);
   for (const entry of entries) {
     if (
       !isEntryVisible(
@@ -255,7 +258,7 @@ export function collectRenderablePaths(
   pathPrefix: string[] = [],
   out: Set<string> = new Set()
 ): Set<string> {
-  const childOpts = opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+  const childOpts = nestedOpts(opts);
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
       const childSchema = entry.config_entries ?? [];

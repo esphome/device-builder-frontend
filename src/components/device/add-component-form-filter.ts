@@ -8,6 +8,7 @@ import {
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
 import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
+import { buildConstraintClusters } from "./config-entry-renderers/constraint-cluster.js";
 
 /**
  * The add-component form's fixed render filter: required-only, no advanced
@@ -56,32 +57,21 @@ export function addFormHasUnsatisfiedConstraint(
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): boolean {
-  const opts = addFormFilterOptions(values, board, presentComponents);
-  const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
-  return (
-    unsatisfiedBanners(entries, values, requiredGroups, opts, plan.memberKeys).length > 0
-  );
-}
-
-function unsatisfiedBanners(
-  entries: ConfigEntry[],
-  values: Record<string, unknown>,
-  requiredGroups: RequiredGroup[],
-  opts: RenderFilterOptions,
-  memberKeys: Set<string>
-) {
+  const { memberKeys } = buildConstraintClusters(entries, requiredGroups);
   // Pure-cardinality groups with no cluster box surface a banner only when
   // unsatisfied; keys are irrelevant to presence, so format to "".
-  return collectUnsatisfiedConstraints(
-    {
-      entries,
-      requiredGroups,
-      values,
-      presentComponents: opts.presentComponents ?? new Set(),
-      targetPlatform: opts.targetPlatform ?? null,
-      formatKeys: () => "",
-    },
-    memberKeys
+  return (
+    collectUnsatisfiedConstraints(
+      {
+        entries,
+        requiredGroups,
+        values,
+        presentComponents,
+        targetPlatform: board?.esphome.platform ?? null,
+        formatKeys: () => "",
+      },
+      memberKeys
+    ).length > 0
   );
 }
 
@@ -116,7 +106,11 @@ export function addFormNeedsUserInput(
       entries
     );
   if (planNeedsUserInput(plan, isVisible)) return true;
-  return (
-    unsatisfiedBanners(entries, values, requiredGroups, opts, plan.memberKeys).length > 0
+  return addFormHasUnsatisfiedConstraint(
+    entries,
+    values,
+    requiredGroups,
+    board,
+    presentComponents
   );
 }
