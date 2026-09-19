@@ -22,7 +22,7 @@
  */
 
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import { advancedGated } from "../../util/material-value.js";
@@ -89,6 +89,14 @@ export interface RenderFilterOptions {
    * Omit and ``depends_on`` stays sibling-scoped.
    */
   rootValues?: Record<string, unknown>;
+  /**
+   * The ``required_groups`` of the scope *entries* belong to. In
+   * ``requiredOnly`` mode the leaf members of a group that demands a value
+   * (``exactly_one`` / ``at_least_one``) stay visible so the user can
+   * satisfy it; a NESTED member still needs a renderable child. Scope-local: not forwarded into NESTED children, whose
+   * own groups only bind once that optional block is in use.
+   */
+  requiredGroups?: RequiredGroup[];
 }
 
 /** The form-level inputs to ``filterRenderable``. Both the form element
@@ -150,12 +158,29 @@ export function renderFilterOptions(
   return opts;
 }
 
+/** Required groups are scope-local; NESTED children don't inherit them. */
+function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
+  return opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+}
+
+/** Keys of the groups in *requiredGroups* that demand a value be set. */
+function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
+  const keys = new Set<string>();
+  for (const group of requiredGroups ?? []) {
+    if (group.kind !== "exactly_one" && group.kind !== "at_least_one") continue;
+    group.keys.forEach((key) => keys.add(key));
+  }
+  return keys;
+}
+
 export function filterRenderable(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   opts: RenderFilterOptions
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
+  const demanded = demandedKeys(opts.requiredGroups);
+  const childOpts = nestedOpts(opts);
   for (const entry of entries) {
     if (
       !isEntryVisible(
@@ -182,7 +207,7 @@ export function filterRenderable(
         const renderableChildren = filterRenderable(
           entry.config_entries ?? [],
           asRecord(values[entry.key]),
-          opts
+          childOpts
         );
         // Drop a group with nothing to render. A scalar shorthand at the
         // group key (e.g. ``pin: GPIO5``) still renders the user's value
@@ -196,7 +221,8 @@ export function filterRenderable(
     } else if (
       opts.requiredOnly &&
       !entry.required &&
-      !ALWAYS_SHOWN_KEYS.has(entry.key)
+      !ALWAYS_SHOWN_KEYS.has(entry.key) &&
+      !demanded.has(entry.key)
     ) {
       // In required-only mode, drop optional leaves outright unless
       // they're on the always-shown allowlist (e.g. ``name``, which
@@ -232,6 +258,7 @@ export function collectRenderablePaths(
   pathPrefix: string[] = [],
   out: Set<string> = new Set()
 ): Set<string> {
+  const childOpts = nestedOpts(opts);
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
       const childSchema = entry.config_entries ?? [];
@@ -244,7 +271,7 @@ export function collectRenderablePaths(
           collectRenderablePaths(
             childSchema,
             itemValues,
-            opts,
+            childOpts,
             [...pathPrefix, entry.key, String(idx)],
             out
           );
@@ -253,7 +280,7 @@ export function collectRenderablePaths(
         collectRenderablePaths(
           childSchema,
           asRecord(values[entry.key]),
-          opts,
+          childOpts,
           [...pathPrefix, entry.key],
           out
         );

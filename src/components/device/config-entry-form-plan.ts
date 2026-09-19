@@ -45,7 +45,9 @@ export function buildFormRenderPlan(
   const nonExclusive = entries.filter(
     (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
   );
-  const visible = new Set(filterRenderable(nonExclusive, values, opts));
+  const visible = new Set(
+    filterRenderable(nonExclusive, values, { ...opts, requiredGroups })
+  );
   return { ordered, clusters, memberKeys, clusterByFirstKey, visible };
 }
 
@@ -82,6 +84,14 @@ export function unitAdvancedGate(
   };
 }
 
+/** Whether any of *entries* is one the user can set: unlocked and visible. */
+export function hasActionableEntry(
+  entries: ConfigEntry[],
+  isVisible: (entry: ConfigEntry) => boolean
+): boolean {
+  return entries.some((entry) => !entry.locked && isVisible(entry));
+}
+
 /**
  * Whether the plan paints anything the user can act on: an unlocked plain
  * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
@@ -98,7 +108,7 @@ export function planNeedsUserInput(
   isVisible: (entry: ConfigEntry) => boolean
 ): boolean {
   const anyActionable = (entries: ConfigEntry[]): boolean =>
-    entries.some((e) => !e.locked && isVisible(e));
+    hasActionableEntry(entries, isVisible);
   // A pinned selector (group dropdown, exactly_one radios) is disabled, so
   // an unlocked member behind it is unreachable — don't let it hold the
   // form open. Box clusters paint their members directly and stay gated on

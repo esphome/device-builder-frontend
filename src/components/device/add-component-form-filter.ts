@@ -1,13 +1,23 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
-import { buildFormRenderPlan, planNeedsUserInput } from "./config-entry-form-plan.js";
+import type { ConstraintKind } from "../../util/constraint-groups.js";
+import {
+  buildFormRenderPlan,
+  hasActionableEntry,
+  planNeedsUserInput,
+} from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
   renderFilterOptions,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
 import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
+import {
+  buildConstraintClusters,
+  clusterRulesMet,
+  isRadioCluster,
+} from "./config-entry-renderers/constraint-cluster.js";
 
 /**
  * The add-component form's fixed render filter: required-only, no advanced
@@ -38,14 +48,103 @@ function addFormFilterOptions(
 export function addFormRenderablePaths(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): Set<string> {
-  return collectRenderablePaths(
+  return collectRenderablePaths(entries, values, {
+    ...addFormFilterOptions(values, board, presentComponents),
+    requiredGroups,
+  });
+}
+
+/**
+ * The add form's unmet constraint banners. One is ``actionable`` when the form
+ * paints an unlocked member the user can set.
+ */
+function unmetConstraints(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
+  board: BoardCatalogEntry | null,
+  presentComponents: ReadonlySet<string>
+): { kind: ConstraintKind; actionable: boolean }[] {
+  const { memberKeys } = buildConstraintClusters(entries, requiredGroups);
+  const locked = new Set(entries.filter((e) => e.locked).map((e) => e.key));
+  const painted = addFormRenderablePaths(
+    entries,
+    values,
+    requiredGroups,
+    board,
+    presentComponents
+  );
+  // Pure-cardinality groups with no cluster box surface a banner only when
+  // unsatisfied.
+  return collectUnsatisfiedConstraints(
+    {
+      entries,
+      requiredGroups,
+      values,
+      presentComponents,
+      targetPlatform: board?.esphome.platform ?? null,
+      // The label slot carries the settable keys; this path never renders it.
+      formatKeys: (keys) =>
+        keys.filter((key) => painted.has(key) && !locked.has(key)).join(","),
+    },
+    memberKeys
+  ).map(({ kind, keys }) => ({ kind, actionable: keys !== "" }));
+}
+
+function addFormVisibility(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions
+): (entry: ConfigEntry) => boolean {
+  return (entry) =>
+    isEntryVisible(
+      entry,
+      values,
+      opts.presentComponents,
+      opts.targetPlatform ?? null,
+      opts.rootValues,
+      entries
+    );
+}
+
+/**
+ * Whether an unmet constraint should hold the Add button. Only one the user
+ * can act on here counts: a member hidden by the required-only paint (an
+ * advanced leaf, a NESTED block with no required children) must not leave
+ * the component impossible to add.
+ */
+export function addFormHasUnsatisfiedConstraint(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
+  board: BoardCatalogEntry | null,
+  presentComponents: ReadonlySet<string>
+): boolean {
+  const banner = unmetConstraints(
+    entries,
+    values,
+    requiredGroups,
+    board,
+    presentComponents
+  ).some((constraint) => constraint.actionable);
+  if (banner) return true;
+  // A static cluster box carries its own warning header instead of a banner,
+  // and paints every visible member, advanced or not. Radios force a choice.
+  const isVisible = addFormVisibility(
     entries,
     values,
     addFormFilterOptions(values, board, presentComponents)
   );
+  return buildConstraintClusters(entries, requiredGroups).clusters.some((cluster) => {
+    if (isRadioCluster(cluster)) return false;
+    const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
+    if (cardinalityOk && inclusiveOk) return false;
+    return hasActionableEntry(cluster.members, isVisible);
+  });
 }
 
 /**
@@ -69,29 +168,10 @@ export function addFormNeedsUserInput(
   // Group/cluster members are unfiltered in the plan; gate them on the same
   // visibility the form uses so a hidden unlocked member can't keep the form
   // open when every rendered field is board-locked.
-  const isVisible = (entry: ConfigEntry): boolean =>
-    isEntryVisible(
-      entry,
-      values,
-      opts.presentComponents,
-      opts.targetPlatform ?? null,
-      opts.rootValues,
-      entries
-    );
+  const isVisible = addFormVisibility(entries, values, opts);
   if (planNeedsUserInput(plan, isVisible)) return true;
-  // Pure-cardinality groups with no cluster box surface a banner only when
-  // unsatisfied; keys are irrelevant to presence, so format to "".
+  // Any banner keeps the form open, actionable or not, so the user sees it.
   return (
-    collectUnsatisfiedConstraints(
-      {
-        entries,
-        requiredGroups,
-        values,
-        presentComponents,
-        targetPlatform: opts.targetPlatform ?? null,
-        formatKeys: () => "",
-      },
-      plan.memberKeys
-    ).length > 0
+    unmetConstraints(entries, values, requiredGroups, board, presentComponents).length > 0
   );
 }

@@ -958,3 +958,37 @@ describe("collectRenderablePaths — scalar multi_value index paths (#1348)", ()
     expect([...paths].sort()).toEqual(["codes", "codes.0", "codes.1"]);
   });
 });
+
+describe("filterRenderable requiredGroups", () => {
+  const groups = [{ kind: "at_least_one" as const, keys: ["identity", "certificate"] }];
+  const members = [makeEntry({ key: "identity" }), makeEntry({ key: "certificate" })];
+
+  it("keeps a demanded group's optional members in required-only mode", () => {
+    const out = filterRenderable(
+      members,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+        requiredGroups: groups,
+      }
+    );
+    expect(out.map((e) => e.key)).toEqual(["identity", "certificate"]);
+  });
+
+  it("does not apply the scope's groups inside a nested block", () => {
+    const nested = [
+      makeEntry({ key: "eap", type: ConfigEntryType.NESTED, config_entries: members }),
+    ];
+    const out = filterRenderable(
+      nested,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+        requiredGroups: groups,
+      }
+    );
+    expect(out).toEqual([]);
+  });
+});

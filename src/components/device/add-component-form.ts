@@ -37,7 +37,10 @@ import {
 } from "./add-component-deps.js";
 import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
-import { addFormRenderablePaths } from "./add-component-form-filter.js";
+import {
+  addFormHasUnsatisfiedConstraint,
+  addFormRenderablePaths,
+} from "./add-component-form-filter.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues, findReferencePath } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
@@ -402,7 +405,9 @@ export class ESPHomeAddComponentForm extends LitElement {
       presentComponents,
       this.board?.esphome.platform ?? null
     );
-    const isComplete = !this._hasRequiredErrors(validation);
+    const isComplete =
+      !this._hasRequiredErrors(validation) &&
+      !this._hasUnsatisfiedConstraint(presentComponents);
 
     return html`
       <div class="form">
@@ -564,6 +569,17 @@ export class ESPHomeAddComponentForm extends LitElement {
     return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
 
+  /** The form's banner already names the unmet group; Add stays off until it clears. */
+  private _hasUnsatisfiedConstraint(presentComponents: ReadonlySet<string>): boolean {
+    return addFormHasUnsatisfiedConstraint(
+      this._entries,
+      this._values,
+      this.component.required_groups ?? [],
+      this.board,
+      presentComponents
+    );
+  }
+
   /**
    * True when at least one error in the map lands on an entry the
    * shared ``esphome-config-entry-form`` actually renders. Built on
@@ -582,6 +598,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     const renderedPaths = addFormRenderablePaths(
       this._entries,
       this._values,
+      this.component.required_groups ?? [],
       this.board,
       presentComponents
     );
@@ -673,6 +690,9 @@ export class ESPHomeAddComponentForm extends LitElement {
       this._localBlockMessage = `${this._depsBlockTitle(missingDeps)} (${missingDeps.join(", ")})`;
       return;
     }
+
+    // The banner names the unmet group; Enter must not slip past the disabled button.
+    if (this._hasUnsatisfiedConstraint(presentComponents)) return;
 
     // Validate the entire schema. If anything fails, surface the
     // errors inline (the shared form will pick them up by path).
