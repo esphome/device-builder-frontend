@@ -193,3 +193,33 @@ describe("a required group whose members are all optional", () => {
     expect([...paths]).toEqual(["clk_pin"]);
   });
 });
+
+describe("a required group the add form cannot paint", () => {
+  // emc2101: exactly one of two optional NESTED blocks whose children are all
+  // optional, so required-only mode paints neither.
+  const entries = [
+    makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution" })]),
+    makeNestedEntry("dac", [makeConfigEntry({ key: "conversion_rate" })]),
+  ];
+  const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
+
+  it("still opens the form so the banner is seen", () => {
+    expect(addFormNeedsUserInput(entries, {}, groups, null, NONE)).toBe(true);
+  });
+
+  it("does not hold Add on a group with no painted member", () => {
+    expect(addFormRenderablePaths(entries, {}, groups, null, NONE).size).toBe(0);
+    expect(addFormHasUnsatisfiedConstraint(entries, {}, groups, null, NONE)).toBe(false);
+  });
+
+  it("does not hold Add on a group whose members are all advanced", () => {
+    const advanced = [
+      makeConfigEntry({ key: "a", advanced: true }),
+      makeConfigEntry({ key: "b", advanced: true }),
+    ];
+    const atLeast = [{ kind: "at_least_one" as const, keys: ["a", "b"] }];
+    expect(addFormHasUnsatisfiedConstraint(advanced, {}, atLeast, null, NONE)).toBe(
+      false
+    );
+  });
+});

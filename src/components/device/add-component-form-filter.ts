@@ -49,7 +49,49 @@ export function addFormRenderablePaths(
   });
 }
 
-/** Whether a *requiredGroups* constraint the add form shows is still unmet. */
+/** The ``keys`` an unmet banner carries when the form paints one of its members. */
+const ACTIONABLE = "actionable";
+
+/**
+ * The add form's unmet constraint banners. Each one's ``keys`` is
+ * ``ACTIONABLE`` when the form paints a member the user can set, else "".
+ */
+function unmetConstraints(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
+  board: BoardCatalogEntry | null,
+  presentComponents: ReadonlySet<string>
+) {
+  const { memberKeys } = buildConstraintClusters(entries, requiredGroups);
+  const painted = addFormRenderablePaths(
+    entries,
+    values,
+    requiredGroups,
+    board,
+    presentComponents
+  );
+  // Pure-cardinality groups with no cluster box surface a banner only when
+  // unsatisfied.
+  return collectUnsatisfiedConstraints(
+    {
+      entries,
+      requiredGroups,
+      values,
+      presentComponents,
+      targetPlatform: board?.esphome.platform ?? null,
+      formatKeys: (keys) => (keys.some((key) => painted.has(key)) ? ACTIONABLE : ""),
+    },
+    memberKeys
+  );
+}
+
+/**
+ * Whether an unmet constraint should hold the Add button. Only one the user
+ * can act on here counts: a member hidden by the required-only paint (an
+ * advanced leaf, a NESTED block with no required children) must not leave
+ * the component impossible to add.
+ */
 export function addFormHasUnsatisfiedConstraint(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
@@ -57,21 +99,8 @@ export function addFormHasUnsatisfiedConstraint(
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): boolean {
-  const { memberKeys } = buildConstraintClusters(entries, requiredGroups);
-  // Pure-cardinality groups with no cluster box surface a banner only when
-  // unsatisfied; keys are irrelevant to presence, so format to "".
-  return (
-    collectUnsatisfiedConstraints(
-      {
-        entries,
-        requiredGroups,
-        values,
-        presentComponents,
-        targetPlatform: board?.esphome.platform ?? null,
-        formatKeys: () => "",
-      },
-      memberKeys
-    ).length > 0
+  return unmetConstraints(entries, values, requiredGroups, board, presentComponents).some(
+    (constraint) => constraint.keys === ACTIONABLE
   );
 }
 
@@ -106,11 +135,8 @@ export function addFormNeedsUserInput(
       entries
     );
   if (planNeedsUserInput(plan, isVisible)) return true;
-  return addFormHasUnsatisfiedConstraint(
-    entries,
-    values,
-    requiredGroups,
-    board,
-    presentComponents
+  // Any banner keeps the form open, actionable or not, so the user sees it.
+  return (
+    unmetConstraints(entries, values, requiredGroups, board, presentComponents).length > 0
   );
 }

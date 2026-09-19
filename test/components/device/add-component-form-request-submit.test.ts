@@ -41,6 +41,41 @@ function makeForm(component?: ComponentCatalogEntry): {
 }
 
 describe("add-component-form requestSubmit (#2400)", () => {
+  it("ignores Enter while a required group the form paints is unmet", () => {
+    const spi = {
+      id: "spi",
+      required_groups: [{ kind: "at_least_one", keys: ["miso_pin", "mosi_pin"] }],
+      config_entries: [
+        makeConfigEntry({ key: "miso_pin", type: ConfigEntryType.STRING }),
+        makeConfigEntry({ key: "mosi_pin", type: ConfigEntryType.STRING }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(spi);
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    // The inner form's banner already names the group; no second message.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((form as any)._localBlockMessage).toBe("");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._values = { miso_pin: "GPIO7" };
+    form.requestSubmit();
+    expect(submits).toEqual([{ miso_pin: "GPIO7" }]);
+  });
+
+  it("submits when the unmet group has no member the form paints", () => {
+    const advancedOnly = {
+      id: "emc2101",
+      required_groups: [{ kind: "exactly_one", keys: ["pwm", "dac"] }],
+      config_entries: [
+        makeConfigEntry({ key: "pwm", type: ConfigEntryType.STRING, advanced: true }),
+        makeConfigEntry({ key: "dac", type: ConfigEntryType.STRING, advanced: true }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(advancedOnly);
+    form.requestSubmit();
+    expect(submits).toHaveLength(1);
+  });
+
   it("fires form-submit with the coerced fields on a complete form", () => {
     const { form, submits } = makeForm();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
