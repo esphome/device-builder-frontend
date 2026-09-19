@@ -1929,6 +1929,46 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 });
 
+describe("ESPHomeAPI — getAvailableAutomations", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("backfills config_entries on rows and parameters on scripts the wire omitted", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("automations/get_available");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: {
+        triggers: [{ id: "on_boot", name: "On Boot", description: "", docs_url: "" }],
+        actions: [],
+        conditions: [],
+        scripts: [
+          { id: "blink" },
+          { id: "fade", parameters: [{ name: "ms", type: "int" }] },
+        ],
+        devices: [{ component_id: "wifi", id: "wifi" }],
+      },
+    });
+    const result = await pending;
+    expect(result.triggers[0].config_entries).toEqual([]);
+    expect(result.scripts).toEqual([
+      { id: "blink", parameters: [] },
+      { id: "fade", parameters: [{ name: "ms", type: "int" }] },
+    ]);
+    expect(result.devices).toEqual([{ component_id: "wifi", id: "wifi" }]);
+  });
+});
+
 describe("ESPHomeAPI — getAutomationBodies", () => {
   beforeEach(() => {
     installMockWebSocket();
