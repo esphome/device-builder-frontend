@@ -38,13 +38,50 @@ function addFormFilterOptions(
 export function addFormRenderablePaths(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): Set<string> {
-  return collectRenderablePaths(
-    entries,
-    values,
-    addFormFilterOptions(values, board, presentComponents)
+  return collectRenderablePaths(entries, values, {
+    ...addFormFilterOptions(values, board, presentComponents),
+    requiredGroups,
+  });
+}
+
+/** Whether a *requiredGroups* constraint the add form shows is still unmet. */
+export function addFormHasUnsatisfiedConstraint(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
+  board: BoardCatalogEntry | null,
+  presentComponents: ReadonlySet<string>
+): boolean {
+  const opts = addFormFilterOptions(values, board, presentComponents);
+  const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
+  return (
+    unsatisfiedBanners(entries, values, requiredGroups, opts, plan.memberKeys).length > 0
+  );
+}
+
+function unsatisfiedBanners(
+  entries: ConfigEntry[],
+  values: Record<string, unknown>,
+  requiredGroups: RequiredGroup[],
+  opts: RenderFilterOptions,
+  memberKeys: Set<string>
+) {
+  // Pure-cardinality groups with no cluster box surface a banner only when
+  // unsatisfied; keys are irrelevant to presence, so format to "".
+  return collectUnsatisfiedConstraints(
+    {
+      entries,
+      requiredGroups,
+      values,
+      presentComponents: opts.presentComponents ?? new Set(),
+      targetPlatform: opts.targetPlatform ?? null,
+      formatKeys: () => "",
+    },
+    memberKeys
   );
 }
 
@@ -79,19 +116,7 @@ export function addFormNeedsUserInput(
       entries
     );
   if (planNeedsUserInput(plan, isVisible)) return true;
-  // Pure-cardinality groups with no cluster box surface a banner only when
-  // unsatisfied; keys are irrelevant to presence, so format to "".
   return (
-    collectUnsatisfiedConstraints(
-      {
-        entries,
-        requiredGroups,
-        values,
-        presentComponents,
-        targetPlatform: opts.targetPlatform ?? null,
-        formatKeys: () => "",
-      },
-      plan.memberKeys
-    ).length > 0
+    unsatisfiedBanners(entries, values, requiredGroups, opts, plan.memberKeys).length > 0
   );
 }

@@ -45,7 +45,9 @@ export function buildFormRenderPlan(
   const nonExclusive = entries.filter(
     (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
   );
-  const visible = new Set(filterRenderable(nonExclusive, values, opts));
+  const visible = new Set(
+    filterRenderable(nonExclusive, values, { ...opts, requiredGroups })
+  );
   return { ordered, clusters, memberKeys, clusterByFirstKey, visible };
 }
 
