@@ -159,6 +159,7 @@ describe("formatYamlScalar", () => {
 
   it.each([
     "!secret wifi_password",
+    "!secret  wifi_password",
     "!include common.yaml",
     "!include_dir_merge_named dir",
     "!lambda return 1;",
@@ -167,6 +168,10 @@ describe("formatYamlScalar", () => {
     "!env_var HOME",
   ])("keeps the esphome tag %s bare", (value) => {
     expect(formatYamlScalar(value)).toBe(value);
+  });
+
+  it("quotes a tag separated by a tab", () => {
+    expect(formatYamlScalar("!secret\twifi_password")).toBe('"!secret\\twifi_password"');
   });
 
   it("keeps an interior indicator bare", () => {
