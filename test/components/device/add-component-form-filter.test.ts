@@ -194,24 +194,30 @@ describe("a required group whose members are all optional", () => {
   });
 });
 
-describe("a required group the add form cannot paint", () => {
+describe("a required group whose members are blocks with no required child", () => {
   // emc2101: exactly one of two optional NESTED blocks whose children are all
-  // optional, so required-only mode paints neither.
+  // optional. Each paints as a block with an enable switch.
   const entries = [
     makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution" })]),
     makeNestedEntry("dac", [makeConfigEntry({ key: "conversion_rate" })]),
   ];
   const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
 
-  it("still opens the form so the banner is seen", () => {
-    expect(addFormNeedsUserInput(entries, {}, groups, null, NONE)).toBe(true);
+  it("paints the blocks so one can be switched on", () => {
+    const paths = addFormRenderablePaths(entries, {}, groups, null, NONE);
+    expect([...paths].sort()).toEqual(["dac", "pwm"]);
   });
 
-  it("does not hold Add on a group with no painted member", () => {
-    expect(addFormRenderablePaths(entries, {}, groups, null, NONE).size).toBe(0);
-    expect(addFormHasUnsatisfiedConstraint(entries, {}, groups, null, NONE)).toBe(false);
+  it("holds Add until exactly one block is set", () => {
+    const unmet = (values: Record<string, unknown>) =>
+      addFormHasUnsatisfiedConstraint(entries, values, groups, null, NONE);
+    expect(unmet({})).toBe(true);
+    expect(unmet({ pwm: { resolution: 23 } })).toBe(false);
+    expect(unmet({ pwm: { resolution: 23 }, dac: { conversion_rate: "16" } })).toBe(true);
   });
+});
 
+describe("a required group the add form cannot paint", () => {
   it("does not hold Add on a group whose members are all advanced", () => {
     const advanced = [
       makeConfigEntry({ key: "a", advanced: true }),

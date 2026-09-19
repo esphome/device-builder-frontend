@@ -63,6 +63,18 @@ describe("renderNestedField enable switch", () => {
     ).toHaveLength(0);
   });
 
+  it("renders the switch for a plain block a required group demands", () => {
+    const entry = makeSensorEntry({ key: "pwm", platform_type: null });
+    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    expect(switchesOf(renderNestedField(entry, ["pwm"], ctx))).toHaveLength(1);
+  });
+
+  it("omits it for a same-named block below the top level", () => {
+    const entry = makeSensorEntry({ key: "pwm", platform_type: null });
+    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    expect(switchesOf(renderNestedField(entry, ["fan", "pwm"], ctx))).toHaveLength(0);
+  });
+
   it("omits the switch for a required entity group", () => {
     const entry = makeSensorEntry({ required: true });
     expect(
@@ -241,6 +253,47 @@ describe("onEnableToggle", () => {
       ctx,
     });
     expect(ctx.emitChange).toHaveBeenCalledWith(["t_set", "id"], "t_set_1");
+  });
+
+  it("seeds a child's own default when the block has no name or id", () => {
+    // emc2101's pwm: only defaulted tuning fields, none of them identity.
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({
+          key: "divider",
+          type: ConfigEntryType.INTEGER,
+          default_value: "1",
+        }),
+      ],
+    });
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry,
+      path: ["pwm"],
+      key: "pwm",
+      isOpen: false,
+      checked: true,
+      label: "PWM",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pwm", "divider"], "1");
+  });
+
+  it("leaves a block collapsed when enabling it paints no field", () => {
+    const entry = makeSensorEntry({ key: "pwm" });
+    const ctx = makeRenderCtx({}, { overrides: { filterRenderable: () => [] } });
+    onEnableToggle({
+      entry,
+      path: ["pwm"],
+      key: "pwm",
+      isOpen: false,
+      checked: true,
+      label: "PWM",
+      ctx,
+    });
+    expect(ctx.toggleNested).not.toHaveBeenCalled();
   });
 
   it("writes no field when the schema offers neither a name nor an id", () => {

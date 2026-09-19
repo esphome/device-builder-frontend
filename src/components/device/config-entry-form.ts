@@ -58,6 +58,7 @@ import { SessionBlobCacheController } from "../../util/session-blob-cache-contro
 import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
 import {
   _isStructuralType,
+  demandedKeys,
   filterRenderable,
   renderFilterOptions,
 } from "./config-entry-render-filter.js";
@@ -1088,6 +1089,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
       reactiveConstraintKeys,
+      demandedKeys: demandedKeys(this.requiredGroups),
       entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),

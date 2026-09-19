@@ -13,7 +13,7 @@ import {
   renderHelpLink,
   renderLabel,
 } from "../config-entry-renderers-shared.js";
-import { hasNameChild, seedIdFor } from "./seed-identity.js";
+import { defaultedChild, hasNameChild, seedIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
 // turned off, keyed by the form's ``stashOwner`` (the host element,
@@ -70,14 +70,19 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // an explicit enable switch; plain nested forms (platform_type === null)
   // and required groups keep the bare collapsible header.
   const isOptionalEntity = entry.platform_type != null && !entry.required;
-  const enabled = isOptionalEntity && hasSerializableValue(raw);
+  // A plain block a required group demands (emc2101's pwm / dac) has no
+  // required child to fill in, so the switch is the only way to pick it.
+  const isDemanded =
+    path.length === 1 && !entry.required && ctx.demandedKeys.has(entry.key);
+  const hasSwitch = isOptionalEntity || isDemanded;
+  const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
   return html`
     <div class="nested-group" data-field-key=${fieldKeyAttr(path)}>
       <div class="nested-header">
         ${
-          isOptionalEntity
+          hasSwitch
             ? html`<wa-switch
                 class="nested-enable"
                 .checked=${enabled}
@@ -147,9 +152,13 @@ export function onEnableToggle(opts: {
   const { entry, path, key, isOpen, checked, label, ctx } = opts;
   const stash = _enableStash(ctx);
   if (checked) {
+    // What the block will hold once this change lands; ``ctx.getAt`` still
+    // reads the old value until the host re-renders.
+    let next: Record<string, unknown> = {};
     const restored = stash.get(key);
     if (restored && hasSerializableValue(restored)) {
       stash.delete(key);
+      next = restored;
       ctx.emitChange(path, restored);
     } else if (hasNameChild(entry)) {
       // Seed the *localized* label the user is looking at, so the
@@ -157,12 +166,16 @@ export function onEnableToggle(opts: {
       // reads natively in their dashboard locale. It's a plain
       // editable value, not locale-pinned state — don't "fix" this
       // to the entry key.
+      next = { name: label };
       ctx.emitChange([...path, "name"], label);
     } else {
       // A nameless group (pipsolar's output sub-entities, opentherm's)
       // rejects ``name:`` outright, so seed its id instead — required or
       // not, it's the only identity the group has to serialize on.
       const seed = seedIdFor(entry, ctx);
+      // No identity at all (emc2101's pwm): write a child's own default, the
+      // smallest value that makes the block serialize without changing it.
+      const defaulted = seed ? undefined : defaultedChild(entry);
       // With neither (a light's ``initial_state``) there's nothing valid to
       // write, so re-emit the still-absent group: the switch the user just
       // clicked has no backing value, and only a re-render walks it back to
@@ -170,10 +183,18 @@ export function onEnableToggle(opts: {
       // leans on the host handing itself a fresh values object for every
       // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
       // an identity-preserving fast path there would strand the switch on.
-      if (seed) ctx.emitChange([...path, seed.key], seed.id);
-      else ctx.emitChange(path, undefined);
+      if (seed) {
+        next = { [seed.key]: seed.id };
+        ctx.emitChange([...path, seed.key], seed.id);
+      } else if (defaulted) {
+        next = { [defaulted.key]: defaulted.default_value };
+        ctx.emitChange([...path, defaulted.key], defaulted.default_value);
+      } else ctx.emitChange(path, undefined);
     }
-    if (!isOpen) ctx.toggleNested(key);
+    // Expand for editing, unless the block has nothing to show here (the add
+    // form drops emc2101's advanced-only children): an empty body reads broken.
+    const hasFields = ctx.filterRenderable(entry.config_entries ?? [], next).length > 0;
+    if (!isOpen && hasFields) ctx.toggleNested(key);
   } else {
     // A sub-reading's value is always a plain object; narrow on that
     // (not the broader hasSerializableValue, which is also true for

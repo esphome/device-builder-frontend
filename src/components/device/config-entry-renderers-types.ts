@@ -48,6 +48,10 @@ export interface RenderCtx {
    *  members). ``_fieldDescription`` strips the baked prose only for these, so
    *  nested-scope members keep theirs. */
   reactiveConstraintKeys: Set<string>;
+  /** Top-level keys a ``required_groups`` entry demands a value from
+   *  (``exactly_one`` / ``at_least_one``). A demanded optional NESTED block
+   *  gets an enable switch so the group can be satisfied. */
+  demandedKeys: ReadonlySet<string>;
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
    *  ``exclusive_group`` member is dropped from the cluster), and fed to

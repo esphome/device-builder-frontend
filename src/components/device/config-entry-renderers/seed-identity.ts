@@ -22,6 +22,18 @@ export function hasNameChild(entry: ConfigEntry): boolean {
   );
 }
 
+/** The first plain child of *entry* that carries a catalog default. */
+export function defaultedChild(entry: ConfigEntry): ConfigEntry | undefined {
+  return (entry.config_entries ?? []).find(
+    (c) =>
+      !c.hidden &&
+      !c.multi_value &&
+      c.default_value != null &&
+      c.type !== ConfigEntryType.NESTED &&
+      c.type !== ConfigEntryType.MAP
+  );
+}
+
 /**
  * A unique id for a subtree materializing under *entry*, or null when its
  * schema declares no id to seed.

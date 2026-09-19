@@ -164,7 +164,7 @@ function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
 }
 
 /** Keys of the groups in *requiredGroups* that demand a value be set. */
-function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
+export function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
   const keys = new Set<string>();
   for (const group of requiredGroups ?? []) {
     if (group.kind !== "exactly_one" && group.kind !== "at_least_one") continue;
@@ -216,7 +216,15 @@ export function filterRenderable(
         const own = values[entry.key];
         const isScalarShorthand =
           typeof own === "string" || typeof own === "number" || typeof own === "boolean";
-        if (renderableChildren.length === 0 && !isScalarShorthand) continue;
+        // A demanded block still paints: its enable switch is how the user
+        // satisfies the group when none of its children are required.
+        if (
+          renderableChildren.length === 0 &&
+          !isScalarShorthand &&
+          !demanded.has(entry.key)
+        ) {
+          continue;
+        }
       }
     } else if (
       opts.requiredOnly &&

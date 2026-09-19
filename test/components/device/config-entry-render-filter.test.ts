@@ -992,3 +992,30 @@ describe("filterRenderable requiredGroups", () => {
     expect(out).toEqual([]);
   });
 });
+
+describe("filterRenderable demanded NESTED members", () => {
+  const block = (key: string) =>
+    makeEntry({
+      key,
+      type: ConfigEntryType.NESTED,
+      config_entries: [makeEntry({ key: "resolution" })],
+    });
+  const opts = { requiredOnly: true, showAdvanced: false };
+
+  it("keeps a demanded block that has no renderable child", () => {
+    const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
+    const out = filterRenderable(
+      [block("pwm"), block("dac")],
+      {},
+      {
+        ...opts,
+        requiredGroups: groups,
+      }
+    );
+    expect(out.map((e) => e.key)).toEqual(["pwm", "dac"]);
+  });
+
+  it("still drops an undemanded block with no renderable child", () => {
+    expect(filterRenderable([block("pwm")], {}, opts)).toEqual([]);
+  });
+});
