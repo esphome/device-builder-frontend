@@ -133,6 +133,50 @@ describe("formatYamlScalar", () => {
   it("escapes a Private-Use glyph with an uppercase \\U sequence", () => {
     expect(formatYamlScalar(MDI)).toBe('"\\U000F058F"');
   });
+
+  it.each([
+    "!hxxxx@555",
+    "&anchor",
+    "*alias",
+    "|block",
+    ">fold",
+    "[flow",
+    "]x",
+    "{flow",
+    "}x",
+    "@home",
+    "%pct",
+    "`tick",
+    ",comma",
+    "?q",
+    "!secretx",
+    "!secret\u00a0nbsp",
+    "!secret",
+    "!lambda",
+  ])("quotes a value starting with the YAML indicator in %s", (value) => {
+    expect(formatYamlScalar(value)).toBe(`"${value}"`);
+  });
+
+  it.each([
+    "!secret wifi_password",
+    "!secret  wifi_password",
+    "!include common.yaml",
+    "!include_dir_merge_named dir",
+    "!lambda return 1;",
+    "!extend my_id",
+    "!remove",
+    "!env_var HOME",
+  ])("keeps the esphome tag %s bare", (value) => {
+    expect(formatYamlScalar(value)).toBe(value);
+  });
+
+  it("quotes a tag separated by a tab", () => {
+    expect(formatYamlScalar("!secret\twifi_password")).toBe('"!secret\\twifi_password"');
+  });
+
+  it("keeps an interior indicator bare", () => {
+    expect(formatYamlScalar("p@ss!w0rd")).toBe("p@ss!w0rd");
+  });
 });
 
 describe("hasSerializableValue", () => {

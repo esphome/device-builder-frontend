@@ -273,6 +273,7 @@ describe("splice operations preserve the rest of the document", () => {
     "{flow",
     "@home",
     "%pct",
+    "!secret other",
   ])(
     "a value starting with the YAML indicator %s is quoted and round-trips editable",
     (value) => {

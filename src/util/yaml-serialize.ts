@@ -516,6 +516,12 @@ const YAML_INT = /^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*))$/;
 const YAML_FLOAT =
   /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|[-+]?\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
 const YAML_NULL = /^(?:~|null|Null|NULL)$/;
+// esphome's own tags (yaml_util.py constructors) stay bare so a picker
+// value like ``!secret <key>`` round-trips; every tag but ``!remove``
+// needs an argument after plain spaces, which is where the loader ends
+// the tag (a tab there is a loader error).
+const ESPHOME_TAG =
+  /^!(?:remove$|(?:secret|include|include_dir_list|include_dir_merge_list|include_dir_named|include_dir_merge_named|lambda|literal|extend|remove|env_var) +\S)/;
 const YAML_TIMESTAMP =
   /^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?)$/;
 
@@ -534,7 +540,7 @@ function yamlNeedsQuoting(s: string): boolean {
   return (
     s === "" ||
     /[:#]/.test(s) ||
-    /^[-\s'"]/.test(s) ||
+    (/^[-\s'"!&*|>[\]{}@`%,?]/.test(s) && !isEsphomeTag(s)) ||
     /\s$/.test(s) ||
     /[\n\r\t]/.test(s) ||
     hasEscapeWorthyChar(s) ||
@@ -553,6 +559,11 @@ function yamlNeedsQuoting(s: string): boolean {
  */
 function yamlDoubleQuote(s: string): string {
   return `"${escapeYamlDoubleQuoted(s)}"`;
+}
+
+/** Whether *s* is one of esphome's custom YAML tags, which serialize bare. */
+export function isEsphomeTag(s: string): boolean {
+  return ESPHOME_TAG.test(s);
 }
 
 /** Format a single scalar value, quoting when needed. */

@@ -14,7 +14,7 @@ import {
   hasEscapeWorthyChar,
 } from "./yaml-escape.js";
 import { splitTrimmedInlineComment } from "./yaml-scalar.js";
-import { formatYamlScalar } from "./yaml-serialize.js";
+import { formatYamlScalar, isEsphomeTag } from "./yaml-serialize.js";
 
 export interface SecretEntry {
   /** Top-level key name. */
@@ -64,13 +64,6 @@ const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 // collection ([ ] / { }).
 const ADVANCED_VALUE_START = /^[!&*|>[{]/;
 
-// ``formatYamlScalar`` quotes most unsafe scalars (``:`` ``#`` leading
-// ``-`` / space / quote, booleans, numbers …) but not a value that
-// *starts* with a YAML indicator (``! & * | > [ ] { } @ \` %``). Written
-// bare, such a value reparses as a tag / anchor / block marker and
-// vanishes from the form, so force-quote it.
-const LEADING_INDICATOR = /^[!&*|>[\]{}@`%]/;
-
 /** Keys defined on more than one line; ESPHome rejects the file while any exist. */
 export function duplicateSecretKeys(entries: SecretEntry[]): Set<string> {
   const seen = new Set<string>();
@@ -109,10 +102,10 @@ export function groupSecretsByDevice(entries: SecretEntry[]): SecretGroup[] {
   return ordered.map((device) => ({ device, entries: byDevice.get(device)! }));
 }
 
+// A secret value is never a tag, so the esphome tags the shared
+// formatter keeps bare are force-quoted here.
 function formatSecretValue(value: string): string {
-  if (value !== "" && LEADING_INDICATOR.test(value)) {
-    return `"${escapeYamlDoubleQuoted(value)}"`;
-  }
+  if (isEsphomeTag(value)) return `"${escapeYamlDoubleQuoted(value)}"`;
   return formatYamlScalar(value);
 }
 
