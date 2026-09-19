@@ -253,15 +253,25 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   `;
 }
 
+/** Whether *values* meet a cluster's cardinality rule and its all-or-none rule. */
+export function clusterRulesMet(
+  cluster: ConstraintCluster,
+  values: Record<string, unknown>
+): { cardinalityOk: boolean; inclusiveOk: boolean } {
+  return {
+    cardinalityOk: cluster.cardinality
+      ? evaluateGroup(cluster.cardinality.kind, cluster.cardinality.keys, values)
+      : true,
+    inclusiveOk: evaluateGroup("all_or_none", cluster.inclusiveKeys, values),
+  };
+}
+
 /** Render one cluster as a bordered `.nested-group` box: a reactive
  *  constraint header (warning until satisfied) over its member fields. */
 export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: RenderCtx) {
   const values = ctx.scopeValues([]);
   const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const cardinalityOk = cluster.cardinality
-    ? evaluateGroup(cluster.cardinality.kind, cluster.cardinality.keys, values)
-    : true;
-  const inclusiveOk = evaluateGroup("all_or_none", cluster.inclusiveKeys, values);
+  const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
 
   // Lead with whichever rule is currently unmet; once both hold, keep the
   // cardinality summary as a muted caption so the grouping stays legible.

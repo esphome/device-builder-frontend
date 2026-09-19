@@ -223,3 +223,40 @@ describe("a required group the add form cannot paint", () => {
     );
   });
 });
+
+describe("an unmet constraint cluster box", () => {
+  // wifi eap: at least one of identity / certificate, where certificate and
+  // key share an inclusive group, so the three render as one cluster box whose
+  // header carries the warning instead of a banner.
+  const members = (over: Record<string, unknown> = {}) => [
+    makeConfigEntry({ key: "identity", ...over }),
+    makeConfigEntry({ key: "certificate", group: "cert_and_key", ...over }),
+    makeConfigEntry({ key: "key", group: "cert_and_key", ...over }),
+  ];
+  const groups = [{ kind: "at_least_one" as const, keys: ["identity", "certificate"] }];
+  const unmet = (entries: ReturnType<typeof members>, values: Record<string, unknown>) =>
+    addFormHasUnsatisfiedConstraint(entries, values, groups, null, NONE);
+
+  it("holds Add until the cardinality rule is met", () => {
+    expect(unmet(members(), {})).toBe(true);
+    expect(unmet(members(), { identity: "me" })).toBe(false);
+  });
+
+  it("holds Add while the all-or-none pair is half set", () => {
+    expect(unmet(members(), { certificate: "cert.pem" })).toBe(true);
+    expect(unmet(members(), { certificate: "cert.pem", key: "key.pem" })).toBe(false);
+  });
+
+  it("does not hold Add when every member is board-locked", () => {
+    expect(unmet(members({ locked: true }), {})).toBe(false);
+  });
+
+  it("does not hold Add on an all-advanced box the form cannot reveal", () => {
+    expect(unmet(members({ advanced: true }), {})).toBe(false);
+  });
+
+  it("leaves an exactly_one radio cluster to its forced choice", () => {
+    const radio = [{ kind: "exactly_one" as const, keys: ["identity", "certificate"] }];
+    expect(addFormHasUnsatisfiedConstraint(members(), {}, radio, null, NONE)).toBe(false);
+  });
+});

@@ -62,6 +62,33 @@ describe("add-component-form requestSubmit (#2400)", () => {
     expect(submits).toEqual([{ miso_pin: "GPIO7" }]);
   });
 
+  it("ignores Enter while a constraint cluster box is unmet", () => {
+    const eap = {
+      id: "eap",
+      required_groups: [{ kind: "at_least_one", keys: ["identity", "certificate"] }],
+      config_entries: [
+        makeConfigEntry({ key: "identity", type: ConfigEntryType.STRING }),
+        makeConfigEntry({
+          key: "certificate",
+          type: ConfigEntryType.STRING,
+          group: "cert_and_key",
+        }),
+        makeConfigEntry({
+          key: "key",
+          type: ConfigEntryType.STRING,
+          group: "cert_and_key",
+        }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const { form, submits } = makeForm(eap);
+    form.requestSubmit();
+    expect(submits).toHaveLength(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._values = { identity: "me" };
+    form.requestSubmit();
+    expect(submits).toEqual([{ identity: "me" }]);
+  });
+
   it("submits when the unmet group has no member the form paints", () => {
     const advancedOnly = {
       id: "emc2101",
