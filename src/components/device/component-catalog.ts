@@ -3,7 +3,7 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, queryAll, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import type { ComponentCatalogIndexEntry } from "../../api/types/components.js";
 import { ComponentCategory } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -67,12 +67,12 @@ export class ESPHomeComponentCatalog extends LitElement {
   // Ignored when lockedCategories is set.
   @property({ attribute: false }) excludeCategories: string[] = [];
 
-  private _list = new PagedListController<ComponentCatalogEntry>(this);
+  private _list = new PagedListController<ComponentCatalogIndexEntry>(this);
 
   // ``_components`` / ``_total`` read straight off the paged list so the
   // client-side filter helpers (visibleComponents, buildCategories) keep
   // their existing ``host._components`` / ``host._total`` access.
-  get _components(): ComponentCatalogEntry[] {
+  get _components(): ComponentCatalogIndexEntry[] {
     return this._list.items;
   }
 
@@ -420,7 +420,7 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._debouncedSearch();
   };
 
-  _onAdd(component: ComponentCatalogEntry) {
+  _onAdd(component: ComponentCatalogIndexEntry) {
     fireEvent(this, "add-component", { component });
   }
 

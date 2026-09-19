@@ -134,8 +134,14 @@ export interface ComponentCatalogEntry {
   config_entries: ConfigEntry[];
 }
 
+/** A catalog list row; the body fields exist only on the full entry. */
+export type ComponentCatalogIndexEntry = Omit<
+  ComponentCatalogEntry,
+  "config_entries" | "required_groups"
+>;
+
 export interface PagedComponentsResponse extends PagedResponse {
-  components: ComponentCatalogEntry[];
+  components: ComponentCatalogIndexEntry[];
   categories: Array<{ id: string; name: string; count: number }>;
 }
 

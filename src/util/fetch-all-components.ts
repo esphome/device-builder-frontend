@@ -1,5 +1,5 @@
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { ComponentCatalogEntry } from "../api/types/components.js";
+import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
 
 /** Page size for the fetch-all sweeps below — a stride, not a ceiling.
  *  Sized so today's full catalog (~940 entries) still lands in one
@@ -21,8 +21,8 @@ type ComponentQuery = Omit<
 export async function fetchAllComponents(
   api: ESPHomeAPI,
   args: ComponentQuery = {}
-): Promise<ComponentCatalogEntry[]> {
-  const components: ComponentCatalogEntry[] = [];
+): Promise<ComponentCatalogIndexEntry[]> {
+  const components: ComponentCatalogIndexEntry[] = [];
   for (;;) {
     const resp = await api.getComponents({
       ...args,
