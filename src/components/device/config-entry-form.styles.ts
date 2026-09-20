@@ -198,6 +198,13 @@ export const configEntryFormStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* A block with no field to expand: a title, not a control. */
+  .nested-toggle--static,
+  .nested-toggle--static:hover {
+    color: var(--wa-color-text-normal);
+    cursor: default;
+  }
+
   .nested-toggle wa-icon {
     font-size: 18px;
   }

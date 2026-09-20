@@ -180,7 +180,7 @@ export function selectClusterAlternative(
  *  unsatisfied/warning state. */
 /** A member paints when it holds a value or is visible, unless it is a
  *  block with nothing in it. */
-function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
+export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
   const values = ctx.scopeValues([]);
   const shown =
     ctx.getAt([member.key]) !== undefined ||

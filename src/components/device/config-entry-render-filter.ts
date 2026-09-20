@@ -28,10 +28,6 @@ import { isEntryVisible } from "../../util/config-validation.js";
 import { advancedGated } from "../../util/material-value.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
 import { hasSerializableValue } from "../../util/yaml-serialize.js";
-import {
-  declaringIdChild,
-  hasNameChild,
-} from "./config-entry-renderers/seed-identity.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -178,6 +174,29 @@ function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> 
     group.keys.forEach((key) => keys.add(key));
   }
   return keys;
+}
+
+/** Whether *entry*'s schema carries a `name` field to seed a label into. */
+function hasNameChild(entry: ConfigEntry): boolean {
+  return (entry.config_entries ?? []).some(
+    (c) => c.key === "name" && c.type === ConfigEntryType.STRING
+  );
+}
+
+// A declaring id, never a `references_component` pointer. A *required* one
+// counts under any key (tca9548a declares through ``bus_id``); an optional one
+// only when literally ``id``, so a catalog entry missing its
+// `references_component` flag can't take a generated id into a pointer field.
+export function declaringIdChild(
+  entry: ConfigEntry,
+  requiredOnly: boolean
+): ConfigEntry | undefined {
+  return (entry.config_entries ?? []).find(
+    (c) =>
+      c.type === ConfigEntryType.ID &&
+      !c.references_component &&
+      (c.required || (!requiredOnly && c.key === "id"))
+  );
 }
 
 /** The child switching *entry* on writes, and its value when that is fixed. */

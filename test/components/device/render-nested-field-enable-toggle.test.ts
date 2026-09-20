@@ -369,6 +369,17 @@ describe("onEnableToggle", () => {
     expect(body({ ...open, filterRenderable: () => [] })).toBe(false);
   });
 
+  it("drops the disclosure button from a block with no field to expand", () => {
+    const entry = makeSensorEntry({ key: "pwm" });
+    const buttons = (overrides: Partial<RenderCtx>) =>
+      findElementBindings(
+        renderNestedField(entry, ["pwm"], makeRenderCtx({}, { overrides })),
+        "button"
+      );
+    expect(buttons({})).toHaveLength(1);
+    expect(buttons({ filterRenderable: () => [] })).toHaveLength(0);
+  });
+
   it("writes no field when the schema offers neither a name nor an id", () => {
     // A light's ``initial_state`` has only colour/brightness fields; it
     // persists once the user sets one, and must not get an invalid ``name:``.

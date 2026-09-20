@@ -36,7 +36,7 @@ export interface RenderCtx {
   pinRegistryModes?: Record<string, string[]>;
   requiredOnly: boolean;
   /** Whether the section's advanced fields are shown. Read by
-   *  ``renderChildEntries({ includeAdvanced })`` so an exclusive-group's
+   *  ``renderExclusiveMemberChildren`` so an exclusive-group's
    *  chosen member can reveal all its fields regardless of the toggle. */
   showAdvanced: boolean;
   /** Effective top-level component presence (literal scan, widened via

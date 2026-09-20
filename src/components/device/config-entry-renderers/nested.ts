@@ -86,6 +86,10 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
+  // With nothing to expand, the header is a plain title: the switch is the
+  // block's only control.
+  const title = html`<span class="nested-title">${label}</span>
+    ${entry.platform_type ? html`<span class="nested-platform">${entry.platform_type}</span>` : nothing}`;
   return html`
     <div class="nested-group" data-field-key=${fieldKeyAttr(path)}>
       <div class="nested-header">
@@ -110,20 +114,22 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
               ></wa-switch>`
             : nothing
         }
-        <button
-          type="button"
-          class="nested-toggle"
-          aria-expanded=${isOpen}
-          @click=${() => ctx.toggleNested(key)}
-        >
-          <wa-icon library="mdi" name=${isOpen ? "chevron-up" : "chevron-down"}></wa-icon>
-          <span class="nested-title">${label}</span>
-          ${
-            entry.platform_type
-              ? html`<span class="nested-platform">${entry.platform_type}</span>`
-              : nothing
-          }
-        </button>
+        ${
+          hasFields
+            ? html`<button
+                type="button"
+                class="nested-toggle"
+                aria-expanded=${isOpen}
+                @click=${() => ctx.toggleNested(key)}
+              >
+                <wa-icon
+                  library="mdi"
+                  name=${isOpen ? "chevron-up" : "chevron-down"}
+                ></wa-icon>
+                ${title}
+              </button>`
+            : html`<span class="nested-toggle nested-toggle--static">${title}</span>`
+        }
         ${renderHelpLink(entry, ctx)}
       </div>
       ${

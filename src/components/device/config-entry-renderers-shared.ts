@@ -540,9 +540,6 @@ export function renderSuggestionSelect(
   `;
 }
 
-// Shared child rendering for the nested renderer and the exclusive-group
-// dropdown. ``includeAdvanced`` forces advanced children visible — a picked
-// exclusive member's fields must all show, as it has no per-member toggle.
 /** The filter options for the form's own top-level scope, required groups
  *  included. */
 export function topLevelFilterOptions(ctx: RenderCtx): RenderFilterOptions {
@@ -552,19 +549,17 @@ export function topLevelFilterOptions(ctx: RenderCtx): RenderFilterOptions {
   });
 }
 
-export function renderChildEntries(
+// A picked exclusive member's children, advanced ones forced visible: the
+// member has no per-member toggle, so all of its fields must show.
+export function renderExclusiveMemberChildren(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
-  opts: { includeAdvanced?: boolean } = {}
+  ctx: RenderCtx
 ) {
-  const values = ctx.scopeValues(path);
-  const children = opts.includeAdvanced
-    ? filterRenderable(
-        entry.config_entries ?? [],
-        values,
-        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
-      )
-    : ctx.filterRenderable(entry.config_entries ?? [], values);
+  const children = filterRenderable(
+    entry.config_entries ?? [],
+    ctx.scopeValues(path),
+    renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
+  );
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }
