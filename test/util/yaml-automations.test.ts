@@ -237,6 +237,36 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
     expect(script?.key).toBe("automation:script:my_script");
   });
 
+  it("keeps a dash at the mapping's own indent from flipping the form", () => {
+    const yaml = [
+      "interval:",
+      "  interval: 60s",
+      "  then:",
+      "  - delay: 1s",
+      "logger:",
+      "",
+    ].join("\n");
+    const interval = parseYamlAutomations(yaml).find((r) =>
+      r.key.startsWith("automation:interval")
+    );
+    expect(interval?.key).toBe("automation:interval:0");
+    expect(interval?.meta?.every).toBe("60s");
+    expect(interval?.fromLine).toBe(1);
+    expect(interval?.toLine).toBe(4);
+  });
+
+  it("emits no row for a script whose id is not typed yet", () => {
+    const yaml = [
+      "script:",
+      "  then:",
+      "    - delay: 1s",
+      "interval:",
+      "  - interval: 5s",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual(["automation:interval:0"]);
+  });
+
   it("keys a mapping-form script block by the id in its body", () => {
     const yaml = ["script:", "  id: my_script", "  then:", "    - delay: 1s", ""].join(
       "\n"

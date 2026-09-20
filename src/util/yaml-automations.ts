@@ -284,6 +284,9 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
       : enumerateListItems(lines, block.fromLine, block.toLine);
     items.forEach((item, idx) => {
       const itemId = top === "script" ? readKeyOnLine(lines, item.fromLine, "id") : null;
+      // A script has no row until its id is typed: the script location is
+      // keyed by id, so an index key would borrow the interval key space.
+      if (top === "script" && !itemId) return;
       const key =
         top === "script" && itemId
           ? `automation:script:${itemId}`

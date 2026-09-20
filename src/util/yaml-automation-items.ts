@@ -10,9 +10,26 @@ import { lineIndent } from "./yaml-sections-core.js";
  *  content column. */
 const _DASH_CONTENT_RE = /^\s*-\s+(?=\S)/;
 
-/** Compiled once per key: the dash-line form ('- id: my_alarm') and the
- *  indented sibling form of a key with its value's quotes peeled. */
-const _KEY_VALUE_RES = new Map<string, { dash: RegExp; sibling: RegExp }>();
+/** The keys the parser reads off an item line; the set is closed, so the
+ *  patterns are built once and never from user text. */
+export type ItemKey = "id" | "interval" | "action" | "service";
+
+function _keyValueRes(key: ItemKey): { dash: RegExp; sibling: RegExp } {
+  // The value's quotes are peeled; the dash-line form ('- id: my_alarm')
+  // and the indented sibling form share it.
+  const value = `${key}:\\s*["']?([^"'\\s]+)["']?`;
+  return {
+    dash: new RegExp(`^\\s*-\\s*${value}`),
+    sibling: new RegExp(`^\\s+${value}`),
+  };
+}
+
+const _KEY_VALUE_RES: Record<ItemKey, { dash: RegExp; sibling: RegExp }> = {
+  id: _keyValueRes("id"),
+  interval: _keyValueRes("interval"),
+  action: _keyValueRes("action"),
+  service: _keyValueRes("service"),
+};
 
 /** The whole block as one item when its first body line is not a list
  *  row (a mapping-form block), else null; the reader takes the header line
@@ -67,26 +84,13 @@ function _dashIndent(line: string): number {
   return line.match(/^(\s*)-/)?.[1].length ?? 0;
 }
 
-function _keyValueRes(key: string): { dash: RegExp; sibling: RegExp } {
-  let res = _KEY_VALUE_RES.get(key);
-  if (!res) {
-    const value = `${key}:\\s*["']?([^"'\\s]+)["']?`;
-    res = {
-      dash: new RegExp(`^\\s*-\\s*${value}`),
-      sibling: new RegExp(`^\\s+${value}`),
-    };
-    _KEY_VALUE_RES.set(key, res);
-  }
-  return res;
-}
-
 export function readKeyOnLine(
   lines: string[],
   fromLine: number,
-  key: string
+  key: ItemKey
 ): string | null {
   const target = lines[fromLine - 1];
-  const { dash, sibling: siblingRe } = _keyValueRes(key);
+  const { dash, sibling: siblingRe } = _KEY_VALUE_RES[key];
   const m = target.match(dash);
   if (m) return m[1];
   const dashIndent = _dashIndent(target);
