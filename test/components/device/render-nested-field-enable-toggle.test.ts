@@ -512,7 +512,7 @@ describe("onEnableToggle", () => {
             auth: {
               username: "admin",
               password: "hunter2",
-              ota_password: "s3cret",
+              ota_password: 's3cret # tail"quoted',
               ap_password: "0pen",
             },
           },
@@ -533,6 +533,8 @@ describe("onEnableToggle", () => {
     // A credential under a key the catalog does not declare is masked too.
     expect(spoken).toContain("ota_password: ••••••");
     expect(spoken).not.toContain("s3cret");
+    // A comment character or a quote in the value can't leak its tail.
+    expect(spoken).not.toContain("tail");
     expect(spoken).toContain("AP password: ••••••");
     expect(spoken).not.toContain("0pen");
   });

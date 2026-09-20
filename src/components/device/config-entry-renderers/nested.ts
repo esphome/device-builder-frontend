@@ -276,10 +276,8 @@ function shownValue(
   child: ConfigEntry | undefined
 ): string {
   if (child?.type === ConfigEntryType.SECURE_STRING) return MASKED_VALUE;
-  const text = String(value).replace(/\s+/g, " ");
-  const [, line] = maskSensitiveLines(
-    [`${parentKey}:`, `  ${key}: ${text}`],
-    MASKED_VALUE
-  );
-  return line.trimStart().slice(key.length + 2);
+  // Ask about the key with a stand-in value: the real one never enters the
+  // synthetic YAML, so a ``#`` or a quote in it can't escape the mask.
+  const [, probe] = maskSensitiveLines([`${parentKey}:`, `  ${key}: x`], MASKED_VALUE);
+  return probe.includes(MASKED_VALUE) ? MASKED_VALUE : String(value).replace(/\s+/g, " ");
 }
