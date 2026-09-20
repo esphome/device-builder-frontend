@@ -235,7 +235,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    this._warmCatalogIndex();
+    void loadCatalog(this._api); // a selection awaits it; start early
     void this.updateComplete.then(() => this._catalog?.load());
   }
 
@@ -252,13 +252,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    this._warmCatalogIndex();
+    void loadCatalog(this._api); // a selection awaits it; start early
     void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
-  }
-
-  /** Start the index load a selection awaits, so picking a card rarely waits. */
-  private _warmCatalogIndex() {
-    if (this._api) void loadCatalog(this._api);
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */
@@ -584,15 +579,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._resolvedPlatforms
     );
     if (missing.length > 0) return null;
-    if (
-      classReferenceNeedsForm(
-        entry.config_entries,
-        live,
-        seeded,
-        this.yaml,
-        getCachedCatalogIndex()
-      )
-    )
+    if (classReferenceNeedsForm(entry.config_entries, live, seeded, this.yaml))
       return null;
     if (
       addFormNeedsUserInput(

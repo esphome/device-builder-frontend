@@ -13,7 +13,10 @@ import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import { classVerdict } from "../../util/reference-class.js";
-import type { CatalogIndex } from "../../util/yaml-completion-catalog.js";
+import {
+  type CatalogIndex,
+  getCachedCatalogIndex,
+} from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -231,7 +234,7 @@ export function classReferenceNeedsForm(
   live: readonly string[],
   values: Record<string, unknown>,
   yaml: string,
-  index: Pick<CatalogIndex, "components" | "byId"> | null
+  index: Pick<CatalogIndex, "components" | "byId"> | null = getCachedCatalogIndex()
 ): boolean {
   if (!index) return hasClassReference(entries);
   return wrongKindDependencies(entries, live, values, yaml, index).length > 0;
