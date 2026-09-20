@@ -140,6 +140,16 @@ describe("noneMatchClass", () => {
     expect(noneMatchClass(yaml, [], server, byId)).toBe(expected);
   });
 
+  it("counts an id-less block of the right variant beside a failing id", () => {
+    const yaml = "modbus:\n  - id: a\n  - role: server\n    uart_id: bus\n";
+    expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(false);
+  });
+
+  it("cannot judge a block whose keys merge inside a flow mapping", () => {
+    const yaml = "modbus: [{ <<: *defaults, uart_id: bus }]\n";
+    expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
+  });
+
   it("is true when every offered id fails, false once one passes", () => {
     const yaml = "modbus:\n  - id: a\n  - id: b\n    role: server\n";
     expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(true);

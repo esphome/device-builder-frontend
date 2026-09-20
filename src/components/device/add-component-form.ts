@@ -287,8 +287,10 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** Net-missing deps driving the banner and submit gate: the widened
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a live bus dep present but with no attachable bus (`_busBlockedDep`)
-   *  and any present only as the wrong kind (`_wrongKindDeps`). */
-  private _missingDeps(present: ReadonlySet<string>): string[] {
+   *  and any present only as the wrong kind (`_wrongKindDeps`). *copy* is
+   *  the banner's copy family: present but unusable reads differently from
+   *  absent. */
+  private _missingDeps(present: ReadonlySet<string>): { deps: string[]; copy: string } {
     const live = liveDependencies(this.component, this._values);
     const missing = findMissingDependencies(
       live,
@@ -296,14 +298,24 @@ export class ESPHomeAddComponentForm extends LitElement {
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
-    const unusable = new Set(this._wrongKindDeps(live));
+    const wrongKind = this._wrongKindDeps(live);
+    const unusable = new Set(wrongKind);
     const blocked = this._busBlockedDep;
     if (blocked && live.includes(blocked)) unusable.add(blocked);
-    return [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
+    const deps = [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
+    const copy =
+      deps.length === 1 && deps[0] === blocked
+        ? "device.bus_dependency_in_use"
+        : deps.every((d) => wrongKind.includes(d))
+          ? "device.wrong_kind_dependency"
+          : "device.missing_dependencies";
+    return { deps, copy };
   }
 
   /** Deps present only as the wrong kind. The index is read, never loaded:
-   *  the dialog awaits it before mounting this form (`hydrateForSelection`). */
+   *  the dialog awaits it before mounting this form (`hydrateForSelection`).
+   *  `_providedDeps` only covers absent deps; a provider's ids count here
+   *  through the candidate scan instead. */
   private _wrongKindDeps(live: readonly string[]): string[] {
     return wrongKindDependencies(
       this._entries,
@@ -311,7 +323,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       this._values,
       this.yaml,
       getCachedCatalogIndex()
-    ).filter((d) => !this._providedDeps.has(d));
+    );
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -409,7 +421,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // configured platform for hub-style deps (`atm90e32` under
     // `sensor:`). Surface these instead of letting the user submit a
     // config that won't validate.
-    const missingDeps = this._missingDeps(presentComponents);
+    const { deps: missingDeps, copy: depsCopy } = this._missingDeps(presentComponents);
 
     // The shared form filters its own visibility — but we still need
     // to know whether everything required is filled in to enable the
@@ -428,7 +440,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     return html`
       <div class="form">
         <p class="form-desc">${renderMarkdown(this.component.description)}</p>
-        ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps) : nothing}
+        ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps, depsCopy) : nothing}
         <esphome-config-entry-form
           .entries=${this._entries}
           .requiredGroups=${this.component.required_groups ?? []}
@@ -502,37 +514,16 @@ export class ESPHomeAddComponentForm extends LitElement {
    * back to the raw id until the cache lookup lands (kicked off in
    * ``willUpdate``).
    */
-  /** True when the only outstanding dep is the bus-blocked one, so the
-   *  banner and the Enter-key submit bail speak of an unavailable bus
-   *  rather than a missing component. */
-  private _allDepsBusBlocked(missing: string[]): boolean {
-    const blocked = this._busBlockedDep;
-    return blocked !== null && missing.length === 1 && missing[0] === blocked;
+  private _depsBlockTitle(copy: string): string {
+    return this._localize(`${copy}_title`, { name: this.component.name });
   }
 
-  /** The copy family for *missing*: present but unusable reads differently
-   *  from absent. */
-  private _depsBlockCopy(missing: string[]): string {
-    if (this._allDepsBusBlocked(missing)) return "device.bus_dependency_in_use";
-    const wrongKind = this._wrongKindDeps(liveDependencies(this.component, this._values));
-    return missing.every((d) => wrongKind.includes(d))
-      ? "device.wrong_kind_dependency"
-      : "device.missing_dependencies";
-  }
-
-  private _depsBlockTitle(missing: string[]): string {
-    return this._localize(`${this._depsBlockCopy(missing)}_title`, {
-      name: this.component.name,
-    });
-  }
-
-  private _renderMissingDeps(missing: string[]) {
-    const copy = this._depsBlockCopy(missing);
+  private _renderMissingDeps(missing: string[], copy: string) {
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
-          <div class="deps-warning-title">${this._depsBlockTitle(missing)}</div>
+          <div class="deps-warning-title">${this._depsBlockTitle(copy)}</div>
           <div>${this._localize(`${copy}_body`)}</div>
           <div class="deps-warning-actions">
             ${missing.map(
@@ -700,11 +691,11 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Block submit when a declared dependency isn't satisfied. The Add
     // button is disabled in that case, but Enter (requestSubmit) still
     // lands here.
-    const missingDeps = this._missingDeps(presentComponents);
+    const { deps: missingDeps, copy: depsCopy } = this._missingDeps(presentComponents);
     if (missingDeps.length > 0) {
       // Surface a visible message that names the missing domain(s) so
       // the user can act, instead of returning silently.
-      this._localBlockMessage = `${this._depsBlockTitle(missingDeps)} (${missingDeps.join(", ")})`;
+      this._localBlockMessage = `${this._depsBlockTitle(depsCopy)} (${missingDeps.join(", ")})`;
       return;
     }
 

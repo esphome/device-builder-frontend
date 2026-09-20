@@ -41,8 +41,8 @@ export function classCandidates<T extends { id: string }>(
 
 /**
  * Whether the referenced domain is configured, but every block of it is
- * known to be the wrong class: each offered id fails, or, with none offered,
- * each id-less block esphome would auto-resolve to fails.
+ * known to be the wrong class: each offered id fails, and so does each
+ * id-less block esphome could auto-resolve to.
  */
 export function noneMatchClass(
   yaml: string,
@@ -53,14 +53,12 @@ export function noneMatchClass(
   const required = entry.references_class;
   // A merged source may hold a matching block the scan can't see.
   if (!required || !byId || yamlHasExternalIdSources(yaml)) return false;
-  if (allCandidates.length) {
-    return classCandidates(yaml, allCandidates, entry, byId).length === 0;
-  }
+  if (classCandidates(yaml, allCandidates, entry, byId).length) return false;
   const judge = sectionJudge(yaml, required, byId);
-  const blocks = parseYamlTopLevelSections(yaml).filter(
-    (section) => section.key === entry.references_component
+  const idless = parseYamlTopLevelSections(yaml).filter(
+    (section) => !section.id && section.key === entry.references_component
   );
-  return blocks.length > 0 && !blocks.some(judge);
+  return (allCandidates.length > 0 || idless.length > 0) && !idless.some(judge);
 }
 
 /** A verdict per section: false only when its classes are known to lack

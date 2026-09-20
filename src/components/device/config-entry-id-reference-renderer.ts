@@ -44,13 +44,12 @@ export function renderIdReferenceField(
   const domain = entry.references_component || "";
   const providers = ctx.resolveInterfaceProviders(domain);
   const allCandidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
-  const candidates = entry.references_class
-    ? classCandidates(ctx.yaml, allCandidates, entry, ctx.catalogById())
-    : allCandidates;
+  // Only a class-restricted reference needs the catalog index.
+  const byId = entry.references_class ? ctx.catalogById() : null;
+  const candidates = classCandidates(ctx.yaml, allCandidates, entry, byId);
   // An unsettled provider fetch may still bring a matching candidate.
   const noneMatch =
-    providers !== null &&
-    noneMatchClass(ctx.yaml, allCandidates, entry, ctx.catalogById());
+    providers !== null && noneMatchClass(ctx.yaml, allCandidates, entry, byId);
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;

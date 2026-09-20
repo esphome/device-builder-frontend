@@ -152,14 +152,17 @@ export function wrongKindDependencies(
 ): string[] {
   if (!index) return [];
   const wrong = new Set<string>();
+  // Most forms carry no class-restricted reference: build providers lazily.
+  const providersFor = (domain: string) =>
+    index.components
+      .filter((c) => c.provides?.includes(domain))
+      .map((c) => catalogEntryToProvider(c, domain));
   for (const entry of entries) {
     const domain = entry.references_component;
     if (!domain || !entry.references_class || entry.locked) continue;
     if (!live.includes(domain) || valueGateHides(entry, values, entries)) continue;
-    const providers = index.components
-      .filter((c) => c.provides?.includes(domain))
-      .map((c) => catalogEntryToProvider(c, domain));
-    const configured = findReferenceCandidates(yaml, domain, providers);
+    if (wrong.has(domain)) continue;
+    const configured = findReferenceCandidates(yaml, domain, providersFor(domain));
     if (noneMatchClass(yaml, configured, entry, index.byId)) wrong.add(domain);
   }
   return [...wrong];

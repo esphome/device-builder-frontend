@@ -33,7 +33,10 @@ import { formatApiError } from "../../util/format-api-error.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
+import {
+  getCachedCatalogIndex,
+  loadCatalog,
+} from "../../util/yaml-completion-catalog.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import {
@@ -232,6 +235,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
+    this._warmCatalogIndex();
     void this.updateComplete.then(() => this._catalog?.load());
   }
 
@@ -248,7 +252,13 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
+    this._warmCatalogIndex();
     void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
+  }
+
+  /** Start the index load a selection awaits, so picking a card rarely waits. */
+  private _warmCatalogIndex() {
+    if (this._api) void loadCatalog(this._api);
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */
