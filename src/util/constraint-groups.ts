@@ -14,7 +14,7 @@ import type {
   RequiredGroupKind,
 } from "../api/types/config-entries.js";
 import { isValuePresent } from "./config-validation.js";
-import { isPlainObject } from "./nested-values.js";
+import { isIndexSegment, isPlainObject } from "./nested-values.js";
 import { hasSerializableValue } from "./yaml-serialize.js";
 
 /** A `required_groups` kind, plus `all_or_none` for inclusive `group` ids. */
@@ -113,5 +113,5 @@ export function constraintMemberPaths(
 
 /** *path* as ``constraintMemberPaths`` spells it: a row's index is not schema. */
 export function schemaPathOf(path: string[]): string {
-  return path.filter((segment) => !/^\d+$/.test(segment)).join(".");
+  return path.filter((segment) => !isIndexSegment(segment)).join(".");
 }
