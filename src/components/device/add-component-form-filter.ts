@@ -144,8 +144,8 @@ export function addFormHasUnsatisfiedConstraint(
     requiredGroups,
   });
   return buildConstraintClusters(entries, requiredGroups).clusters.some((cluster) => {
-    // Picking a radio side does not switch a block on, so a block side can
-    // still be empty; a leaf side is left to its forced choice.
+    // Picking a radio side does not switch a block on, so a radio with a block
+    // side is judged like a box; an all-leaf radio is left to its forced choice.
     const hasBlock = cluster.members.some((m) => m.type === ConfigEntryType.NESTED);
     if (isRadioCluster(cluster) && !hasBlock) return false;
     const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);

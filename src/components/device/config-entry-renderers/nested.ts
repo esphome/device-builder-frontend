@@ -197,7 +197,14 @@ function seedFor(
   label: string,
   ctx: RenderCtx
 ): void {
-  const seed = enableSeed(entry, topLevelFilterOptions(ctx));
+  const opts = topLevelFilterOptions(ctx);
+  const found = enableSeed(entry, opts);
+  // A child's default is only written for a block a group demands; an entity
+  // sub-reading with no identity keeps its no-op.
+  const seed =
+    found?.from === "default" && !(path.length === 1 && isSwitchable(entry, opts))
+      ? null
+      : found;
   // The *localized* label the user is looking at seeds an entity's name, so
   // it matches the switch they clicked (WYSIWYG) and reads natively in their
   // dashboard locale. It's a plain editable value, not locale-pinned state —

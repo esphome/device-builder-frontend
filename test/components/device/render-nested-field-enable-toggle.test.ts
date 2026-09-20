@@ -303,7 +303,7 @@ describe("onEnableToggle", () => {
         }),
       ],
     });
-    const ctx = makeRenderCtx({});
+    const ctx = makeRenderCtx({}, { overrides: { requiredGroups: DEMANDS } });
     onEnableToggle({
       entry,
       path: ["pwm"],
@@ -314,6 +314,30 @@ describe("onEnableToggle", () => {
       ctx,
     });
     expect(ctx.emitChange).toHaveBeenCalledWith(["pwm", "divider"], "1");
+  });
+
+  it("keeps the no-op for an undemanded entity block that only has a defaulted child", () => {
+    const entry = makeSensorEntry({
+      key: "level",
+      config_entries: [
+        makeConfigEntry({
+          key: "accuracy_decimals",
+          type: ConfigEntryType.INTEGER,
+          default_value: "1",
+        }),
+      ],
+    });
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry,
+      path: ["level"],
+      key: "level",
+      isOpen: false,
+      checked: true,
+      label: "Level",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["level"], undefined);
   });
 
   it("never seeds the label into a plain block's name", () => {

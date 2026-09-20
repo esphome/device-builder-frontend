@@ -205,6 +205,11 @@ export const configEntryFormStyles = css`
     cursor: default;
   }
 
+  /* Hold the chevron's slot so the title does not shift when fields appear. */
+  .nested-toggle--static {
+    padding-left: calc(18px + var(--wa-space-2xs));
+  }
+
   .nested-toggle wa-icon {
     font-size: 18px;
   }
