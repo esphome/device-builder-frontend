@@ -71,7 +71,9 @@ describe("renderFacets", () => {
 
   // The popover's "Clear filters" clears facets only. It sits beside the
   // search box, and its badge never counted the search term, so wiping the
-  // search from here would clear something the menu never showed (#1160).
+  // search from here would clear something the menu never showed
+  // (esphome/device-builder#1160, the issue the bare #1160 in the comments
+  // around here points at).
   it("clears facets only, leaving the search term to the search box's own x", () => {
     const host = makeHost({ _activeFacetCount: 2 });
     const popover = renderInto(renderFacets(host)).querySelector(

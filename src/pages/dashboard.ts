@@ -800,8 +800,9 @@ export class ESPHomePageDashboard extends LitElement {
    *  the Filters popover's "Clear filters", which lives next to the search
    *  box rather than inside it: its badge counts facet selections only, so
    *  a lone search term is something that menu never showed, and wiping it
-   *  from there reads as the button doing more than it said (#1160). The
-   *  search box keeps its own × for that. */
+   *  from there reads as the button doing more than it said
+   *  (esphome/device-builder#1160). The search box keeps its own × for
+   *  that. */
   _clearFacets = () => {
     this._selectedLabels = [];
     this._selectedAreas = [];

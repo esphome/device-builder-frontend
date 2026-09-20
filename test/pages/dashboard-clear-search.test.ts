@@ -4,7 +4,7 @@
  * Pins the three clear paths on ESPHomePageDashboard: ``_clearSearch``
  * empties the search term and resyncs YAML mode, ``_clearFacets`` drops the
  * facet selections and keeps the search, and ``_clearAllFilters`` (the
- * no-results escape hatch) does both (issue #1160).
+ * no-results escape hatch) does both (esphome/device-builder#1160).
  */
 import { describe, expect, it, vi } from "vitest";
 
