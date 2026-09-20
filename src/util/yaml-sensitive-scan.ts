@@ -89,7 +89,8 @@ export function isBuiltinSensitiveKey(parent: string | undefined, key: string): 
   const folded = key.toLowerCase();
   return (
     ALWAYS_SENSITIVE_KEYS.has(folded) ||
-    PARENT_SCOPED_SENSITIVE_KEYS.get(parent?.toLowerCase() ?? "")?.has(folded) === true
+    (parent !== undefined &&
+      PARENT_SCOPED_SENSITIVE_KEYS.get(parent.toLowerCase())?.has(folded) === true)
   );
 }
 
@@ -192,6 +193,12 @@ function isLineSource(value: string | LineSource): value is LineSource {
  * maskers rely on this to apply replacements right-to-left without
  * invalidating earlier offsets on the same line.
  */
+/** One live key on the scanner's ancestor chain. */
+interface AncestorEntry {
+  indent: number;
+  key: string;
+}
+
 export function findSensitiveValueRanges(
   yaml: string | LineSource,
   options: FindSensitiveValueRangesOptions = {}
@@ -223,7 +230,7 @@ export function findSensitiveValueRanges(
   // Stack of (indent, key) entries representing the current ancestor
   // chain. When we encounter a key at indent N, every entry with
   // indent >= N is no longer an ancestor and is popped.
-  const stack: Array<{ indent: number; key: string }> = [];
+  const stack: AncestorEntry[] = [];
 
   // Trim trailing whitespace off [from, to) and push the range when
   // anything remains.
@@ -310,20 +317,21 @@ export function findSensitiveValueRanges(
     const sm = shadow.match(KEY_LINE);
     if (!sm) return lineIdx + 1;
     const [, sLeading, sDash = "", sKey, sPreColon, sSep, sRest] = sm;
-    // Parent scope comes from the live ancestor stack, read at the
-    // commented key's column: a `# key:` under a live `encryption:` is
-    // the same leak as its uncommented form. Commented keys never push
-    // onto the stack themselves.
+    // Parent scope comes from the live ancestor stack: a `# key:` under a
+    // live `encryption:` is the same leak as its uncommented form. A comment
+    // pops nothing, so the top of the stack may be a live *sibling*
+    // (`algorithm:` just above), and where the marker sits says little about
+    // depth; any ancestor left of the key's column may be the parent. The
+    // stack is one chain, so this only ever over-masks. Commented keys never
+    // push onto the stack themselves.
     const column = markerLen + sLeading.length + sDash.length;
-    let parent: string | undefined;
-    for (let s = stack.length - 1; s >= 0; s--) {
-      if (stack[s].indent >= column) continue;
-      parent = stack[s].key;
-      break;
-    }
     const sensitive =
       maskAllValues ||
-      isBuiltinSensitiveKey(parent, sKey) ||
+      isBuiltinSensitiveKey(undefined, sKey) ||
+      stack.some(
+        (ancestor) =>
+          ancestor.indent < column && isBuiltinSensitiveKey(ancestor.key, sKey)
+      ) ||
       sensitiveKeyPredicate?.(sKey) === true;
     if (!sensitive) return lineIdx + 1;
 
@@ -407,7 +415,7 @@ export function findSensitiveValueRanges(
       sensitive = true;
     } else {
       // The stack is empty for a top-level key, so the lookup must stay optional.
-      const parent: { key: string } | undefined = stack[stack.length - 1];
+      const parent: AncestorEntry | undefined = stack[stack.length - 1];
       sensitive = isBuiltinSensitiveKey(parent?.key, key);
       if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);
     }

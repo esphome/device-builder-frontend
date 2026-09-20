@@ -315,6 +315,33 @@ describe("maskSensitiveYaml", () => {
   });
 });
 
+describe("a commented-out parent scoped credential", () => {
+  it.each([
+    ["first under its parent", "api:\n  encryption:\n    # key: c2VjcmV0\n"],
+    [
+      "after a live sibling, which a comment does not pop",
+      "api:\n  encryption:\n    algorithm: aes\n    # key: c2VjcmV0\n",
+    ],
+    ["commented at column zero", "api:\n  encryption:\n#    key: c2VjcmV0\n"],
+  ])("is masked: %s", (_label, yaml) => {
+    expect(maskSensitiveYaml(yaml)).not.toContain("c2VjcmV0");
+  });
+
+  it.each([
+    [
+      "once its parent's block has ended",
+      "api:\n  encryption:\n    key: abc\n  port: 6053\n  # key: visible\n",
+    ],
+    ["at the top level", "api:\n  encryption:\n    key: abc\n# key: visible\n"],
+    [
+      "under a parent that does not scope it",
+      "remote_receiver:\n  pin: 5\n  # key: visible\n",
+    ],
+  ])("is left alone: %s", (_label, yaml) => {
+    expect(maskSensitiveYaml(yaml)).toContain("visible");
+  });
+});
+
 describe("isSensitiveKeyUnder", () => {
   it.each([
     [undefined, "password", true],
