@@ -162,7 +162,7 @@ describe("renderConstraintClusterField", () => {
 // Stateful ctx: emitChange mutates a backing values dict (delete on undefined)
 // and the cluster choice/stash live in real Maps, so a full radio switch can
 // be driven and the resulting values inspected.
-function statefulCtx(initial: Record<string, unknown>) {
+function statefulCtx(initial: Record<string, unknown>, entries: ConfigEntry[] = ENTRIES) {
   const values: Record<string, unknown> = { ...initial };
   const stash = new Map<string, unknown>();
   const choice = new Map<string, string>();
@@ -178,7 +178,7 @@ function statefulCtx(initial: Record<string, unknown>) {
     },
     board: null,
     presentComponents: new Set<string>(),
-    entries: ENTRIES,
+    entries,
     renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
     getClusterChoice: (id: string) => choice.get(id),
     setClusterChoice: (id: string, alt: string) => choice.set(id, alt),
@@ -318,6 +318,27 @@ describe("renderConstraintRadioField", () => {
     );
     expect(out).toContain("<entry:chipset>");
     expect(out).not.toContain("<entry:bit0_high>");
+  });
+
+  it("does not infer a side from an emptied block the serializer would prune", () => {
+    const side = (key: string, group?: string): ConfigEntry =>
+      makeConfigEntry({
+        key,
+        type: ConfigEntryType.NESTED,
+        group,
+        config_entries: [makeConfigEntry({ key: "rate", default_value: "1" })],
+      });
+    const members = [side("fan"), side("pwm", "out"), side("dac", "out")];
+    const groups = [{ kind: "exactly_one" as const, keys: ["fan", "pwm"] }];
+    const [blocks] = buildConstraintClusters(members, groups).clusters;
+    const out = serialize(
+      renderConstraintRadioField(
+        blocks,
+        statefulCtx({ fan: {}, pwm: { rate: "16" } }, members).ctx
+      )
+    );
+    expect(out).toContain("<entry:pwm>");
+    expect(out).not.toContain("<entry:fan>");
   });
 
   it("shows the timing fields and never a warning, even when partial", () => {

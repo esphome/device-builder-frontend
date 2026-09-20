@@ -297,6 +297,21 @@ describe("a cluster box whose members are blocks", () => {
     ).toBe(true);
   });
 
+  it("holds Add on a radio of blocks until the picked one is switched on", () => {
+    const radio = [{ kind: "exactly_one" as const, keys: ["fan", "pwm"] }];
+    const unmet = (values: Record<string, unknown>) =>
+      addFormHasUnsatisfiedConstraint(
+        blocks({ default_value: "1" }),
+        values,
+        radio,
+        null,
+        NONE
+      );
+    expect(unmet({})).toBe(true);
+    expect(unmet({ fan: {} })).toBe(true);
+    expect(unmet({ fan: { speed: "1" } })).toBe(false);
+  });
+
   it("does not hold Add on blocks with no field and nothing to switch on", () => {
     expect(addFormHasUnsatisfiedConstraint(blocks({}), {}, groups, null, NONE)).toBe(
       false

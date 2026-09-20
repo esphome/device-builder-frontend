@@ -42,17 +42,22 @@ export function stripConstraintProse(description: string): string {
   return paragraphs.slice(start).join("\n\n").trim();
 }
 
+/**
+ * Whether *raw* counts as a set group member. A block counts only when it
+ * would reach the YAML: the serializer prunes an object with nothing in it,
+ * so an emptied ``pwm: {}`` is not set.
+ */
+export function isMemberSet(raw: unknown): boolean {
+  return isPlainObject(raw) ? hasSerializableValue(raw) : isValuePresent(raw);
+}
+
 /** Does the cardinality constraint *kind* hold over *keys* in *values*? */
 export function evaluateGroup(
   kind: ConstraintKind,
   keys: string[],
   values: Record<string, unknown>
 ): boolean {
-  // A block counts only when it would reach the YAML: the serializer prunes an
-  // object with nothing in it, so an emptied ``pwm: {}`` is not a set member.
-  const isSet = (raw: unknown): boolean =>
-    isPlainObject(raw) ? hasSerializableValue(raw) : isValuePresent(raw);
-  const present = keys.filter((key) => isSet(values[key])).length;
+  const present = keys.filter((key) => isMemberSet(values[key])).length;
   switch (kind) {
     case "exactly_one":
       return present === 1;

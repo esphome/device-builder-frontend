@@ -1,5 +1,9 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+  type RequiredGroup,
+} from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import type { ConstraintKind } from "../../util/constraint-groups.js";
 import {
@@ -140,7 +144,10 @@ export function addFormHasUnsatisfiedConstraint(
     requiredGroups,
   });
   return buildConstraintClusters(entries, requiredGroups).clusters.some((cluster) => {
-    if (isRadioCluster(cluster)) return false;
+    // Picking a radio side does not switch a block on, so a block side can
+    // still be empty; a leaf side is left to its forced choice.
+    const hasBlock = cluster.members.some((m) => m.type === ConfigEntryType.NESTED);
+    if (isRadioCluster(cluster) && !hasBlock) return false;
     const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
     if (cardinalityOk && inclusiveOk) return false;
     return hasActionableEntry(cluster.members, isVisible);
