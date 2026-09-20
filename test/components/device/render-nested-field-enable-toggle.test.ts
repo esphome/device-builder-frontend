@@ -413,6 +413,27 @@ describe("onEnableToggle", () => {
       ).includes("device.enabled_block_sets");
     expect(shown({ pwm: { divider: "1" } })).toBe(true);
     expect(shown({})).toBe(false);
+    // Only nested values: nothing primitive to name, so no bare label.
+    expect(shown({ pwm: { curve: { a: 1 } } })).toBe(false);
+    // The sentence itself names the child by its label.
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["pwm"],
+        makeRenderCtx(
+          { pwm: { divider: "1" } },
+          {
+            overrides: {
+              filterRenderable: () => [],
+              requiredGroups: DEMANDS,
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("device.enabled_block_sets|Divider: 1");
   });
 
   it("drops the disclosure button from a block with no field to expand", () => {

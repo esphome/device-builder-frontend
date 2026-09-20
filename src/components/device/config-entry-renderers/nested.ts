@@ -86,6 +86,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
+  // Nothing to say for a block that holds only nested values.
+  const setValues = !hasFields && enabled ? setValuesOf(entry, raw, ctx) : "";
   // With nothing to expand, the header is a plain title: the switch is the
   // block's only control.
   const title = html`<span class="nested-title">${label}</span>
@@ -138,9 +140,9 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
           : nothing
       }
       ${
-        !hasFields && enabled
+        setValues
           ? html`<p class="nested-desc">
-              ${ctx.localize("device.enabled_block_sets", { values: setValuesOf(entry, raw, ctx) })}
+              ${ctx.localize("device.enabled_block_sets", { values: setValues })}
             </p>`
           : nothing
       }
