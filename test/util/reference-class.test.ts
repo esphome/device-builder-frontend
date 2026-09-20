@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentCatalogIndexEntry } from "../../src/api/types/components.js";
 import { findReferenceCandidates } from "../../src/util/config-entry-yaml-scan.js";
-import { classCandidates, noneMatchClass } from "../../src/util/reference-class.js";
+import { classVerdict } from "../../src/util/reference-class.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
 import { makeConfigEntry } from "./_make-config-entry.js";
 
@@ -22,14 +22,14 @@ const offered = (
   byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null,
   providers: Parameters<typeof findReferenceCandidates>[2] = []
 ) =>
-  classCandidates(
+  classVerdict(
     yaml,
     findReferenceCandidates(yaml, domain, providers),
     reference(domain, cls),
     byId
-  ).map((c) => c.id);
+  ).candidates.map((c) => c.id);
 
-describe("classCandidates", () => {
+describe("classVerdict candidates", () => {
   const OUTPUTS = [
     "output:",
     "  - platform: gpio",
@@ -62,7 +62,7 @@ describe("classCandidates", () => {
   });
 });
 
-describe("classCandidates on a typed hub", () => {
+describe("classVerdict candidates on a typed hub", () => {
   const byId = index(
     makeComponentEntry("modbus", {
       // The default variant's classes: what a block with no ``role:`` declares.
@@ -112,7 +112,7 @@ describe("classCandidates on a typed hub", () => {
   });
 });
 
-describe("noneMatchClass", () => {
+describe("classVerdict none match", () => {
   const byId = index(
     makeComponentEntry("modbus", {
       id_classes: ["modbus::ModbusClientHub"],
@@ -137,12 +137,12 @@ describe("noneMatchClass", () => {
       false,
     ],
   ])("%s", (_label, yaml, expected) => {
-    expect(noneMatchClass(yaml, [], server, byId)).toBe(expected);
+    expect(classVerdict(yaml, [], server, byId).noneMatch).toBe(expected);
   });
 
   it("counts an id-less block of the right variant beside a failing id", () => {
     const yaml = "modbus:\n  - id: a\n  - role: server\n    uart_id: bus\n";
-    expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(false);
+    expect(classVerdict(yaml, [{ id: "a" }], server, byId).noneMatch).toBe(false);
   });
 
   it.each([
@@ -156,22 +156,24 @@ describe("noneMatchClass", () => {
       "modbus:\n  - &server { uart_id: bus, role: server }\n",
     ],
   ])("cannot judge %s", (_label, yaml) => {
-    expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
+    expect(classVerdict(yaml, [], server, byId).noneMatch).toBe(false);
   });
 
   it("cannot judge a block whose keys merge inside a flow mapping", () => {
     const yaml = "modbus: [{ <<: *defaults, uart_id: bus }]\n";
-    expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
+    expect(classVerdict(yaml, [], server, byId).noneMatch).toBe(false);
   });
 
   it("is true when every offered id fails, false once one passes", () => {
     const yaml = "modbus:\n  - id: a\n  - id: b\n    role: server\n";
-    expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(true);
-    expect(noneMatchClass(yaml, [{ id: "a" }, { id: "b" }], server, byId)).toBe(false);
+    expect(classVerdict(yaml, [{ id: "a" }], server, byId).noneMatch).toBe(true);
+    expect(classVerdict(yaml, [{ id: "a" }, { id: "b" }], server, byId).noneMatch).toBe(
+      false
+    );
   });
 });
 
-describe("classCandidates on a hub with more than one discriminator", () => {
+describe("classVerdict candidates on a hub with more than one discriminator", () => {
   it("keeps the hub: only a single discriminator can be judged", () => {
     const byId = index(
       makeComponentEntry("modbus", {
@@ -187,7 +189,7 @@ describe("classCandidates on a hub with more than one discriminator", () => {
   });
 });
 
-describe("classCandidates leaves nested interface ids alone", () => {
+describe("classVerdict candidates leaves nested interface ids alone", () => {
   it("keeps a multi-entity platform's sub-entity id", () => {
     const yaml = [
       "sensor:",

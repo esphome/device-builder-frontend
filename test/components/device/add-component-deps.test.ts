@@ -8,6 +8,7 @@ import {
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
+  hasClassReference,
   liveDependencies,
   resolveDepVerdict,
   wrongKindDependencies,
@@ -430,6 +431,25 @@ describe("wrongKindDependencies", () => {
 
   it("judges nothing before the catalog index has loaded", () => {
     expect(wrongKindDependencies(entries, ["modbus"], {}, CLIENT_ONLY, null)).toEqual([]);
+  });
+});
+
+describe("hasClassReference", () => {
+  const ref = makeConfigEntry({
+    key: "modbus_id",
+    references_component: "modbus",
+    references_class: "modbus::ModbusServerHub",
+  });
+
+  it("finds a class-restricted reference inside a nested block, as seeding does", () => {
+    const nested = makeConfigEntry({
+      key: "hub",
+      type: ConfigEntryType.NESTED,
+      config_entries: [ref],
+    });
+    expect(hasClassReference([nested])).toBe(true);
+    expect(hasClassReference([ref])).toBe(true);
+    expect(hasClassReference([{ ...ref, references_class: null }])).toBe(false);
   });
 });
 

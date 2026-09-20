@@ -17,7 +17,7 @@ import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
-import { type CatalogById, classCandidates } from "../../util/reference-class.js";
+import { type CatalogById, classVerdict } from "../../util/reference-class.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
@@ -127,7 +127,7 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const candidates = classCandidates(
+      const { candidates } = classVerdict(
         yaml,
         findReferenceCandidates(yaml, entry.references_component, []),
         entry,

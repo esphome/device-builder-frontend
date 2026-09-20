@@ -12,7 +12,7 @@ import {
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
-import { noneMatchClass } from "../../util/reference-class.js";
+import { classVerdict } from "../../util/reference-class.js";
 import type { CatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
@@ -163,7 +163,7 @@ export function wrongKindDependencies(
     if (!live.includes(domain) || valueGateHides(entry, values, entries)) continue;
     if (wrong.has(domain)) continue;
     const configured = findReferenceCandidates(yaml, domain, providersFor(domain));
-    if (noneMatchClass(yaml, configured, entry, index.byId)) wrong.add(domain);
+    if (classVerdict(yaml, configured, entry, index.byId).noneMatch) wrong.add(domain);
   }
   return [...wrong];
 }
@@ -220,8 +220,12 @@ export function resolveDepVerdict(opts: {
   return { deps, copy };
 }
 
-/** Whether a top-level entry needs a specific id class, so adding without the
- *  catalog index would be adding blind. */
+/** Whether any entry, nested ones included since seeding walks them, needs a
+ *  specific id class, so adding without the catalog index would be adding blind. */
 export function hasClassReference(entries: ConfigEntry[]): boolean {
-  return entries.some((e) => e.references_component && e.references_class);
+  return entries.some(
+    (e) =>
+      Boolean(e.references_component && e.references_class) ||
+      hasClassReference(e.config_entries ?? [])
+  );
 }

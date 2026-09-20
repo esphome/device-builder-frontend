@@ -17,7 +17,7 @@ import {
   isCertainlyDanglingId,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
-import { classCandidates, noneMatchClass } from "../../util/reference-class.js";
+import { classVerdict } from "../../util/reference-class.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
@@ -46,10 +46,10 @@ export function renderIdReferenceField(
   const allCandidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
   // Only a class-restricted reference needs the catalog index.
   const byId = entry.references_class ? ctx.catalogById() : null;
-  const candidates = classCandidates(ctx.yaml, allCandidates, entry, byId);
+  const verdict = classVerdict(ctx.yaml, allCandidates, entry, byId);
+  const candidates = verdict.candidates;
   // An unsettled provider fetch may still bring a matching candidate.
-  const noneMatch =
-    providers !== null && noneMatchClass(ctx.yaml, allCandidates, entry, byId);
+  const noneMatch = providers !== null && verdict.noneMatch;
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;

@@ -18,53 +18,57 @@ import {
 
 export type CatalogById = ReadonlyMap<string, ComponentCatalogIndexEntry>;
 
-/** The *candidates* whose id may inherit the class *entry* requires. Only a
- *  top-level section id whose component's known classes lack it is dropped. */
-export function classCandidates<T extends { id: string }>(
-  yaml: string,
-  candidates: T[],
-  entry: ConfigEntry,
-  byId: CatalogById | null | undefined
-): T[] {
-  const required = entry.references_class;
-  if (!required || !byId || !candidates.length) return candidates;
-  const judge = sectionJudge(yaml, required, byId);
-  const sections = new Map<string, YamlSection>();
-  for (const section of parseYamlTopLevelSections(yaml)) {
-    if (section.id) sections.set(section.id, section);
-  }
-  return candidates.filter((candidate) => {
-    const section = sections.get(candidate.id);
-    return !section || judge(section);
-  });
+/** What the class check makes of a reference's candidates. */
+export interface ClassVerdict<T> {
+  /** The candidates whose id may inherit the required class. Only a
+   *  top-level section id whose component's known classes lack it is dropped. */
+  candidates: T[];
+  /** The domain is configured, but every block of it is known to be the wrong
+   *  class: each offered id fails, and so does each id-less block esphome
+   *  could auto-resolve to. */
+  noneMatch: boolean;
 }
 
 /**
- * Whether the referenced domain is configured, but every block of it is
- * known to be the wrong class: each offered id fails, and so does each
- * id-less block esphome could auto-resolve to.
+ * Judge *all*, the unfiltered candidates of the reference *entry*, in one pass.
+ * An entry with no ``references_class``, or no index yet, keeps every
+ * candidate and never reports none match.
  */
-export function noneMatchClass(
+export function classVerdict<T extends { id: string }>(
   yaml: string,
-  allCandidates: { id: string }[],
+  all: T[],
   entry: ConfigEntry,
   byId: CatalogById | null | undefined
-): boolean {
+): ClassVerdict<T> {
   const required = entry.references_class;
-  // A merged source may hold a matching block the scan can't see.
-  if (!required || !byId || yamlHasExternalIdSources(yaml)) return false;
-  if (classCandidates(yaml, allCandidates, entry, byId).length) return false;
+  if (!required || !byId) return { candidates: all, noneMatch: false };
   const judge = sectionJudge(yaml, required, byId);
+  const byIdSection = new Map<string, YamlSection>();
+  const idless: YamlSection[] = [];
+  for (const section of parseYamlTopLevelSections(yaml)) {
+    if (section.id) byIdSection.set(section.id, section);
+    else idless.push(section);
+  }
+  const candidates = all.filter((candidate) => {
+    const section = byIdSection.get(candidate.id);
+    return !section || judge(section);
+  });
+  // A merged source may hold a matching block the scan can't see.
+  if (candidates.length || yamlHasExternalIdSources(yaml)) {
+    return { candidates, noneMatch: false };
+  }
   const domain = entry.references_component;
-  const idless = parseYamlTopLevelSections(yaml).filter((section) => !section.id);
   // An id-less provider block (``modbus_bridge:``) may be what Auto resolves to.
   const provides = (section: YamlSection): boolean =>
     byId
       .get(qualifiedSectionKey(section.key, section.platform))
       ?.provides?.includes(domain ?? "") ?? false;
-  if (idless.some(provides)) return false;
+  if (idless.some(provides)) return { candidates, noneMatch: false };
   const own = idless.filter((section) => section.key === domain);
-  return (allCandidates.length > 0 || own.length > 0) && !own.some(judge);
+  return {
+    candidates,
+    noneMatch: (all.length > 0 || own.length > 0) && !own.some(judge),
+  };
 }
 
 /** A verdict per section: false only when its classes are known to lack
