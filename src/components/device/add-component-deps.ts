@@ -1,10 +1,15 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import {
   type ComponentCatalogEntry,
+  type ComponentCatalogIndexEntry,
   ComponentCategory,
 } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import {
+  findReferenceCandidates,
+  referenceClassFilter,
+} from "../../util/config-entry-yaml-scan.js";
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
@@ -123,4 +128,37 @@ export async function depsSatisfiedByProvides(
     })
   );
   return satisfied;
+}
+
+/**
+ * Live dependencies configured only as the wrong kind: *entries* reference
+ * the dependency with a ``references_class`` that none of its configured
+ * blocks provides (hoermann_hcp needs a ``role: server`` modbus hub and only a
+ * client one exists). Such a block must not count as satisfying the dependency.
+ */
+export function wrongKindDependencies(
+  entries: ConfigEntry[],
+  live: readonly string[],
+  yaml: string,
+  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
+): string[] {
+  const wrong = new Set<string>();
+  const visit = (list: ConfigEntry[]): void => {
+    for (const entry of list) {
+      const domain = entry.references_component;
+      const filter = referenceClassFilter(entry, byId);
+      if (domain && filter && live.includes(domain)) {
+        const configured = findReferenceCandidates(yaml, domain, []);
+        if (
+          configured.length > 0 &&
+          findReferenceCandidates(yaml, domain, [], filter).length === 0
+        ) {
+          wrong.add(domain);
+        }
+      }
+      visit(entry.config_entries ?? []);
+    }
+  };
+  visit(entries);
+  return [...wrong];
 }

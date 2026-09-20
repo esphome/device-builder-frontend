@@ -423,3 +423,50 @@ describe("renderIdReferenceField — lazy option list", () => {
     ]);
   });
 });
+
+describe("renderIdReferenceField — candidates of the wrong id class", () => {
+  const OUTPUTS =
+    "output:\n  - platform: gpio\n    id: relay_out\n  - platform: ledc\n    id: pwm_out\n";
+  const entry = makeEntry(ConfigEntryType.STRING, {
+    references_component: "output",
+    references_class: "output::FloatOutput",
+  });
+  // Drops the gpio block, the way the form's index-backed filter would.
+  const filterDropping =
+    (...dropped: string[]) =>
+    () => ({
+      requiredClass: "output::FloatOutput",
+      indexLoaded: true,
+      entryById: (id: string) =>
+        dropped.includes(id)
+          ? ({ id, id_classes: ["output::BinaryOutput"] } as never)
+          : undefined,
+    });
+  const render = (yaml: string, value: string, ...dropped: string[]) =>
+    renderIdReferenceField(
+      entry,
+      ["output"],
+      makeRenderCtx(
+        { output: value },
+        { overrides: { yaml, referenceClassFilter: filterDropping(...dropped) } }
+      )
+    );
+
+  it("offers only the blocks whose id inherits the required class", () => {
+    const values = optionValues(render(OUTPUTS, "", "output.gpio"));
+    expect(values).toContain("pwm_out");
+    expect(values).not.toContain("relay_out");
+  });
+
+  it("says none match when every configured block is the wrong class", () => {
+    const tmpl = render(OUTPUTS, "", "output.gpio", "output.ledc");
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).toBe(
+      "device.id_reference_none_match"
+    );
+  });
+
+  it("does not call a real but filtered-out id unknown", () => {
+    const html = JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"));
+    expect(html).not.toContain("device.id_reference_unknown_error");
+  });
+});

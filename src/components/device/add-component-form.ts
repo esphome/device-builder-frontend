@@ -26,6 +26,7 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseTopLevelComponents,
   serializeYamlValues,
@@ -34,6 +35,7 @@ import {
   depsSatisfiedByProvides,
   findMissingDependencies,
   liveDependencies,
+  wrongKindDependencies,
 } from "./add-component-deps.js";
 import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
@@ -284,7 +286,8 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   /** Net-missing deps driving the banner and submit gate: the widened
    *  scan minus those a present component provides (`_providedDeps`), plus
-   *  a live bus dep present but with no attachable bus (`_busBlockedDep`). */
+   *  a live bus dep present but with no attachable bus (`_busBlockedDep`)
+   *  and any present only as the wrong kind (`wrongKindDependencies`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
     const live = liveDependencies(this.component, this._values);
     const missing = findMissingDependencies(
@@ -294,9 +297,16 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
     const blocked = this._busBlockedDep;
-    return blocked && live.includes(blocked) && !missing.includes(blocked)
-      ? [...missing, blocked]
-      : missing;
+    const unusable = [
+      ...(blocked && live.includes(blocked) ? [blocked] : []),
+      ...wrongKindDependencies(
+        this._entries,
+        live,
+        this.yaml,
+        getCachedCatalogIndex()?.byId
+      ),
+    ].filter((d) => !missing.includes(d));
+    return unusable.length ? [...missing, ...new Set(unusable)] : missing;
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping

@@ -33,9 +33,14 @@ import { formatApiError } from "../../util/format-api-error.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
-import { findMissingDependencies, liveDependencies } from "./add-component-deps.js";
+import {
+  findMissingDependencies,
+  liveDependencies,
+  wrongKindDependencies,
+} from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   type DepNavHost,
@@ -568,6 +573,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._resolvedPlatforms
     );
     if (missing.length > 0) return null;
+    // A dependency present only as the wrong kind still needs the form's
+    // callout (hoermann_hcp with a client-only modbus hub).
+    if (
+      wrongKindDependencies(
+        entry.config_entries,
+        live,
+        this.yaml,
+        getCachedCatalogIndex()?.byId
+      ).length > 0
+    )
+      return null;
     if (
       addFormNeedsUserInput(
         entry.config_entries,

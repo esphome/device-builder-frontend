@@ -26,6 +26,7 @@ import { ConfigEntryType } from "../api/types/config-entries.js";
 import {
   catalogEntryToProvider,
   findReferenceCandidates,
+  referenceClassFilter,
 } from "./config-entry-yaml-scan.js";
 import { getConfigVarValueOptions } from "./esphome-schema.js";
 import {
@@ -222,7 +223,8 @@ export function createYamlCompletionSource(
         const candidates = findReferenceCandidates(
           state.doc.toString(),
           domain,
-          providers
+          providers,
+          referenceClassFilter(entry, catalog.byId)
         );
         if (candidates.length > 0) {
           return {

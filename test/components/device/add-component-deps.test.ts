@@ -9,6 +9,7 @@ import {
   depsSatisfiedByProvides,
   findMissingDependencies,
   liveDependencies,
+  wrongKindDependencies,
 } from "../../../src/components/device/add-component-deps.js";
 import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
@@ -325,5 +326,49 @@ describe("liveDependencies", () => {
     };
     expect(liveDependencies(ethernet, { type: "W5500" })).toEqual(["spi"]);
     expect(liveDependencies(ethernet, { type: "IP101" })).toEqual([]);
+  });
+});
+
+describe("wrongKindDependencies", () => {
+  const entries = [
+    makeConfigEntry({
+      key: "modbus_id",
+      references_component: "modbus",
+      references_class: "modbus::ModbusServerHub",
+    }),
+  ];
+  const byId = new Map([
+    [
+      "modbus",
+      makeComponentEntry("modbus", {
+        id_classes: ["modbus::ModbusClientHub"],
+        id_classes_by_variant: {
+          role: {
+            client: ["modbus::ModbusClientHub"],
+            server: ["modbus::ModbusServerHub"],
+          },
+        },
+      }),
+    ],
+  ]);
+  const CLIENT_ONLY = "modbus:\n  - id: client_hub\n";
+
+  it("reports a dependency configured only as the wrong variant", () => {
+    expect(wrongKindDependencies(entries, ["modbus"], CLIENT_ONLY, byId)).toEqual([
+      "modbus",
+    ]);
+  });
+
+  it("is satisfied once a matching hub exists", () => {
+    const yaml = `${CLIENT_ONLY}  - id: server_hub\n    role: server\n`;
+    expect(wrongKindDependencies(entries, ["modbus"], yaml, byId)).toEqual([]);
+  });
+
+  it("leaves an absent dependency to the missing-dependency check", () => {
+    expect(wrongKindDependencies(entries, ["modbus"], "logger:\n", byId)).toEqual([]);
+  });
+
+  it("judges nothing before the catalog index has loaded", () => {
+    expect(wrongKindDependencies(entries, ["modbus"], CLIENT_ONLY, null)).toEqual([]);
   });
 });

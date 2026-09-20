@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import {
   findReferenceCandidates,
   findUsedPins,
+  referenceClassFilter,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
@@ -17,6 +18,7 @@ import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
@@ -116,7 +118,12 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const candidates = findReferenceCandidates(yaml, entry.references_component, []);
+      const candidates = findReferenceCandidates(
+        yaml,
+        entry.references_component,
+        [],
+        referenceClassFilter(entry, getCachedCatalogIndex()?.byId)
+      );
       // A featured preset that names a component actually present in the live
       // config (a sibling just added in the same bundle, e.g. `output_blue`)
       // wins — `resolveSoleCandidate` can't pick among several same-domain

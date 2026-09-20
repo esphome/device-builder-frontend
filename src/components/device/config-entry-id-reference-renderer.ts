@@ -42,7 +42,14 @@ export function renderIdReferenceField(
 ) {
   const domain = entry.references_component || "";
   const providers = ctx.resolveInterfaceProviders(domain);
-  const candidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
+  // Every configured id of the domain, for the dangling-id verdict below.
+  const allCandidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
+  const classFilter = ctx.referenceClassFilter(entry);
+  // The ones whose id inherits the class this field needs.
+  const candidates = classFilter
+    ? findReferenceCandidates(ctx.yaml, domain, providers ?? [], classFilter)
+    : allCandidates;
+  const noneMatchClass = candidates.length === 0 && allCandidates.length > 0;
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
@@ -90,7 +97,7 @@ export function renderIdReferenceField(
   const unknownId =
     !fieldError &&
     providers !== null &&
-    isCertainlyDanglingId(value, candidates, ctx.yaml);
+    isCertainlyDanglingId(value, allCandidates, ctx.yaml);
   const invalid = fieldError || unknownId;
   const unknownIdError = unknownId
     ? renderInlineError(ctx.localize("device.id_reference_unknown_error", { id: value }))
@@ -105,8 +112,13 @@ export function renderIdReferenceField(
   // is the honest empty state. Scanned from the YAML rather than
   // ctx.presentComponents, which not every form host wires up (the
   // automation action form doesn't).
+  // Not when every configured id was the wrong class: auto-resolution would
+  // land on one of those and fail.
   const emptyButConfigured =
-    empty && !entry.required && parseTopLevelComponents(ctx.yaml).has(domain);
+    empty &&
+    !noneMatchClass &&
+    !entry.required &&
+    parseTopLevelComponents(ctx.yaml).has(domain);
 
   const onChange = (e: Event) => {
     const select = e.target as HTMLSelectElement;
@@ -165,7 +177,9 @@ export function renderIdReferenceField(
           placeholder=${ctx.localize(
             emptyButConfigured
               ? "device.id_reference_auto_configured"
-              : "device.id_reference_empty",
+              : noneMatchClass
+                ? "device.id_reference_none_match"
+                : "device.id_reference_empty",
             { domain }
           )}
           @change=${onChange}

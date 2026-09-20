@@ -8,7 +8,10 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
+import type {
+  ComponentProvider,
+  ReferenceClassFilter,
+} from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
 
 export interface RenderCtx {
@@ -67,6 +70,9 @@ export interface RenderCtx {
    *  values), without overriding a later explicit user collapse. */
   seedNestedOpen: (key: string) => void;
   requestAddComponent: (domain: string) => void;
+  /** The class filter for a reference entry that carries ``references_class``,
+   *  backed by the slim catalog index; undefined when the entry has none. */
+  referenceClassFilter: (entry: ConfigEntry) => ReferenceClassFilter | undefined;
   /**
    * Providers of a cross-domain interface reference. Returns synchronously
    * from the session cache; a miss kicks an async catalog fetch and

@@ -33,7 +33,11 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
-import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
+import {
+  type ComponentProvider,
+  type ReferenceClassFilter,
+  referenceClassFilter,
+} from "../../util/config-entry-yaml-scan.js";
 import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -56,6 +60,10 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
+import {
+  getCachedCatalogIndex,
+  loadCatalog,
+} from "../../util/yaml-completion-catalog.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -1098,6 +1106,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
+      referenceClassFilter: (entry) => this._referenceClassFilter(entry),
       isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
         const key = fieldKeyAttr(path);
@@ -1237,6 +1246,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * providers). A *failure* is left uncached so a later render retries
    * rather than permanently dropping candidates.
    */
+  /** Unfiltered until the catalog index lands, then one re-render applies it. */
+  private _referenceClassFilter(entry: ConfigEntry): ReferenceClassFilter | undefined {
+    if (!entry.references_class) return undefined;
+    const index = getCachedCatalogIndex();
+    if (!index && this._api) {
+      void loadCatalog(this._api).then(() => this.requestUpdate());
+    }
+    return referenceClassFilter(entry, index?.byId);
+  }
+
   private _resolveInterfaceProviders(
     interfaceName: string
   ): readonly ComponentProvider[] | null {

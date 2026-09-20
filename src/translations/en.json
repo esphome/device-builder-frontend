@@ -1076,6 +1076,7 @@
     "bus_dependency_in_use_title": "No available bus for {name}",
     "bus_dependency_in_use_body": "No existing bus can host this component; each is already in use by another component or configured incompatibly. Add a new one for it:",
     "id_reference_empty": "No {domain} configured yet",
+    "id_reference_none_match": "No configured {domain} is the kind this needs",
     "id_reference_auto_configured": "Auto (uses the configured {domain})",
     "id_reference_add": "Add {domain}",
     "id_reference_auto": "Auto",
