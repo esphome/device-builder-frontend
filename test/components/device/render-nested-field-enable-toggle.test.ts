@@ -454,6 +454,40 @@ describe("onEnableToggle", () => {
     expect(ctx.toggleNested).toHaveBeenCalledWith("pwm");
   });
 
+  it("names a seeded child the form drops even when the block paints other fields", () => {
+    const divider = makeConfigEntry({
+      key: "divider",
+      label: "Divider",
+      advanced: true,
+      default_value: "1",
+    });
+    const mode = makeConfigEntry({ key: "mode", label: "Mode", required: true });
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [divider, mode],
+    });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["pwm"],
+        makeRenderCtx(
+          { pwm: { divider: "1", mode: "fast" } },
+          {
+            overrides: {
+              filterRenderable: () => [mode],
+              requiredGroups: DEMANDS,
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("device.enabled_block_sets|Divider: 1");
+    expect(spoken).not.toContain("Mode: fast");
+  });
+
   it("masks a secure child's value in the summary of what a block holds", () => {
     const entry = makeSensorEntry({
       key: "auth",
@@ -472,7 +506,7 @@ describe("onEnableToggle", () => {
         entry,
         ["auth"],
         makeRenderCtx(
-          { auth: { username: "admin", password: "hunter2" } },
+          { auth: { username: "admin", password: "hunter2", ota_password: "s3cret" } },
           {
             overrides: {
               filterRenderable: () => [],
@@ -487,6 +521,9 @@ describe("onEnableToggle", () => {
     expect(spoken).toContain("Username: admin");
     expect(spoken).toContain("Password: ••••••");
     expect(spoken).not.toContain("hunter2");
+    // A credential under a key the catalog does not declare is masked too.
+    expect(spoken).toContain("ota_password: ••••••");
+    expect(spoken).not.toContain("s3cret");
   });
 
   it("drops the disclosure button from a block with no field to expand", () => {

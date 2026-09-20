@@ -3,6 +3,7 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
+import { maskSensitiveLine } from "../../../util/yaml-sensitive-redact.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
 import {
@@ -90,8 +91,12 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
-  // Nothing to say for a block that holds only nested values.
-  const setValues = !hasFields && enabled ? setValuesOf(entry, raw, ctx) : "";
+  // Name what the block holds that the form does not paint: everything in a
+  // fieldless block, and in a demanded one also a seeded child the filter
+  // drops. Nothing to say when only nested values are left.
+  const painted = new Set(children.map((c) => c.key));
+  const setValues =
+    enabled && (!hasFields || isDemanded) ? setValuesOf(entry, raw, ctx, painted) : "";
   // With nothing to expand, the header is a plain title: the switch is the
   // block's only control.
   const title = html`<span class="nested-title">${label}</span>
@@ -240,17 +245,28 @@ const MASKED_VALUE = "••••••";
 
 // What a block with no field to show holds, so a value the switch wrote on
 // the user's behalf is visible where it was written.
-function setValuesOf(entry: ConfigEntry, raw: unknown, ctx: RenderCtx): string {
+function setValuesOf(
+  entry: ConfigEntry,
+  raw: unknown,
+  ctx: RenderCtx,
+  painted: ReadonlySet<string>
+): string {
   if (!isPlainObject(raw)) return "";
   const children = new Map((entry.config_entries ?? []).map((c) => [c.key, c]));
   return Object.entries(raw)
-    .filter(([, value]) => isPrimitiveOrNullish(value) && hasSerializableValue(value))
+    .filter(
+      ([key, value]) =>
+        !painted.has(key) && isPrimitiveOrNullish(value) && hasSerializableValue(value)
+    )
     .map(([key, value]) => {
       const child = children.get(key);
+      // A key the catalog doesn't declare goes through the YAML credential
+      // masker, which knows the undeclared secret spellings.
+      if (!child) return maskSensitiveLine(`${key}: ${String(value)}`, MASKED_VALUE);
       // A credential is masked in its own field; never spell it out here.
       const shown =
-        child?.type === ConfigEntryType.SECURE_STRING ? MASKED_VALUE : String(value);
-      return `${child ? labelFor(child, ctx) : key}: ${shown}`;
+        child.type === ConfigEntryType.SECURE_STRING ? MASKED_VALUE : String(value);
+      return `${labelFor(child, ctx)}: ${shown}`;
     })
     .join(", ");
 }
