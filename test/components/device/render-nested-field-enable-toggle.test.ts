@@ -454,6 +454,41 @@ describe("onEnableToggle", () => {
     expect(ctx.toggleNested).toHaveBeenCalledWith("pwm");
   });
 
+  it("masks a secure child's value in the summary of what a block holds", () => {
+    const entry = makeSensorEntry({
+      key: "auth",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({ key: "username", label: "Username", default_value: "admin" }),
+        makeConfigEntry({
+          key: "password",
+          label: "Password",
+          type: ConfigEntryType.SECURE_STRING,
+        }),
+      ],
+    });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["auth"],
+        makeRenderCtx(
+          { auth: { username: "admin", password: "hunter2" } },
+          {
+            overrides: {
+              filterRenderable: () => [],
+              requiredGroups: [{ kind: "at_least_one", keys: ["auth"] }],
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("Username: admin");
+    expect(spoken).toContain("Password: ••••••");
+    expect(spoken).not.toContain("hunter2");
+  });
+
   it("drops the disclosure button from a block with no field to expand", () => {
     const entry = makeSensorEntry({ key: "pwm" });
     const buttons = (overrides: Partial<RenderCtx>) =>

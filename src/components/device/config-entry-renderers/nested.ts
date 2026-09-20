@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
@@ -235,6 +236,8 @@ function seedFor(
   else ctx.emitChange([...path, seed.key], value);
 }
 
+const MASKED_VALUE = "••••••";
+
 // What a block with no field to show holds, so a value the switch wrote on
 // the user's behalf is visible where it was written.
 function setValuesOf(entry: ConfigEntry, raw: unknown, ctx: RenderCtx): string {
@@ -244,7 +247,10 @@ function setValuesOf(entry: ConfigEntry, raw: unknown, ctx: RenderCtx): string {
     .filter(([, value]) => isPrimitiveOrNullish(value) && hasSerializableValue(value))
     .map(([key, value]) => {
       const child = children.get(key);
-      return `${child ? labelFor(child, ctx) : key}: ${String(value)}`;
+      // A credential is masked in its own field; never spell it out here.
+      const shown =
+        child?.type === ConfigEntryType.SECURE_STRING ? MASKED_VALUE : String(value);
+      return `${child ? labelFor(child, ctx) : key}: ${shown}`;
     })
     .join(", ");
 }
