@@ -99,8 +99,9 @@ function sectionJudge(
 }
 
 // A flow mapping / sequence or a whole-value alias (``modbus: [{ ... }]``,
-// ``- { ... }``, ``modbus: *hub``) holds keys a line scan can't read.
-const OPAQUE_VALUE_RE = /^\s*(?:-\s+|[\w.]+\s*:\s*)+[[{*]/;
+// ``- { ... }``, ``modbus: *hub``), anchored or tagged or not, holds keys a
+// line scan can't read.
+const OPAQUE_VALUE_RE = /^\s*(?:-\s+|[\w.]+\s*:\s*)+(?:[&!]\S+\s+)*[[{*]/;
 
 function isOpaque(lines: string[], section: YamlSection): boolean {
   return OPAQUE_VALUE_RE.test(lines[section.fromLine - 1] ?? "");

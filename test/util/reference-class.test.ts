@@ -150,6 +150,11 @@ describe("noneMatchClass", () => {
     ["a flow mapping", "modbus: { uart_id: bus, role: server }\n"],
     ["a flow mapping list item", "modbus:\n  - { uart_id: bus, role: server }\n"],
     ["a whole-value alias", "modbus: *server_hub\n"],
+    ["an anchored flow mapping", "modbus: &server { uart_id: bus, role: server }\n"],
+    [
+      "an anchored flow list item",
+      "modbus:\n  - &server { uart_id: bus, role: server }\n",
+    ],
   ])("cannot judge %s", (_label, yaml) => {
     expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
   });
