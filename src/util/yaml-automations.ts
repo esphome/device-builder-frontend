@@ -274,9 +274,19 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   for (const top of ["script", "interval"] as const) {
     const block = _findTopLevelBlock(lines, top);
     if (!block) continue;
-    const items = _enumerateListItems(lines, block.fromLine, block.toLine);
+    // A mapping-form block is one entry to esphome, and the backend lists it
+    // as index 0 (or the script's id) spanning the whole block.
+    const mapped = _mappingFormItem(lines, block.fromLine, block.toLine);
+    const items = mapped
+      ? [mapped]
+      : _enumerateListItems(lines, block.fromLine, block.toLine);
     items.forEach((item, idx) => {
-      const itemId = top === "script" ? _readKeyOnLine(lines, item.fromLine, "id") : null;
+      const itemId =
+        top === "script"
+          ? mapped
+            ? _readKeyInBody(lines, item.fromLine, item.toLine, "id")
+            : _readKeyOnLine(lines, item.fromLine, "id")
+          : null;
       const key =
         top === "script" && itemId
           ? `automation:script:${itemId}`
@@ -289,7 +299,9 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
         // it so the navigator can render "Every 60s" instead of
         // a generic "interval #N". Optional; we fall back to the
         // index when the field is missing or unparseable.
-        const every = _readKeyOnLine(lines, item.fromLine, "interval");
+        const every = mapped
+          ? _readKeyInBody(lines, item.fromLine, item.toLine, "interval")
+          : _readKeyOnLine(lines, item.fromLine, "interval");
         if (every) meta.every = every;
       }
       automations.push({
@@ -449,6 +461,44 @@ function _findTopLevelBlock(
     const m = lines[i].match(new RegExp(`^${key}\\s*:`));
     if (!m) continue;
     return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, 0) };
+  }
+  return null;
+}
+
+/** The whole block as one item when its body is a mapping rather than a
+ *  list (no ``- `` row at the body indent), or ``null``. */
+function _mappingFormItem(
+  lines: string[],
+  blockFromLine: number,
+  blockToLine: number
+): { fromLine: number; toLine: number } | null {
+  let bodyIndent: number | null = null;
+  for (let i = blockFromLine; i < blockToLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    if (bodyIndent === null) bodyIndent = lineIndent(line);
+    if (lineIndent(line) === bodyIndent && /^\s*-\s/.test(line)) return null;
+  }
+  return bodyIndent === null ? null : { fromLine: blockFromLine, toLine: blockToLine };
+}
+
+/** ``<key>: value`` on a body line at the block's child indent, the first
+ *  match between *fromLine* and *toLine*, quotes peeled, else ``null``. */
+function _readKeyInBody(
+  lines: string[],
+  fromLine: number,
+  toLine: number,
+  key: string
+): string | null {
+  let bodyIndent: number | null = null;
+  const re = new RegExp(`^(\\s*)${key}:\\s*["']?([^"'\\s]+)["']?`);
+  for (let i = fromLine; i < toLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    if (bodyIndent === null) bodyIndent = lineIndent(line);
+    if (lineIndent(line) !== bodyIndent) continue;
+    const m = line.match(re);
+    if (m) return m[2];
   }
   return null;
 }
