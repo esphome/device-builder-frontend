@@ -436,6 +436,24 @@ describe("onEnableToggle", () => {
     expect(spoken).toContain("device.enabled_block_sets|Divider: 1");
   });
 
+  it("hands the toggle the raw open state of a fieldless block, so off collapses it", () => {
+    const entry = makeSensorEntry({ key: "pwm" });
+    const ctx = makeRenderCtx(
+      { pwm: { name: "PWM" } },
+      {
+        overrides: {
+          filterRenderable: () => [],
+          nestedOpenSections: new Set(["pwm"]),
+        },
+      }
+    );
+    const [sw] = switchesOf(renderNestedField(entry, ["pwm"], ctx));
+    (sw["@change"] as (e: Event) => void)({
+      target: { checked: false },
+    } as unknown as Event);
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pwm");
+  });
+
   it("drops the disclosure button from a block with no field to expand", () => {
     const entry = makeSensorEntry({ key: "pwm" });
     const buttons = (overrides: Partial<RenderCtx>) =>

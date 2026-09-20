@@ -71,7 +71,10 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   );
   const hasFields = children.length > 0;
   if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
-  const isOpen = hasFields && ctx.nestedOpenSections.has(key);
+  // The toggle keeps its books on the raw set; only the paint is gated, so a
+  // block that later gains a field opens as the user last left it.
+  const userOpen = ctx.nestedOpenSections.has(key);
+  const isOpen = hasFields && userOpen;
   // Optional entity sub-readings (a debug component's per-metric sensors,
   // a DHT's temperature/humidity, …) are only written to YAML once their
   // group holds a value, so an untouched one is silently "off". Give those
@@ -108,7 +111,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                     entry,
                     path,
                     key,
-                    isOpen,
+                    isOpen: userOpen,
                     checked: (e.target as unknown as { checked: boolean }).checked,
                     label,
                     ctx,
