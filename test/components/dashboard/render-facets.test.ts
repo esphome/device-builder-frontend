@@ -28,6 +28,7 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
     _selectedUpdateStatus: [],
     _activeFacetCount: 0,
     _hasActiveFilters: false,
+    _clearFacets: vi.fn(),
     _clearAllFilters: vi.fn(),
     _computeLabelUsage: () => ({}),
     _openConfirm: vi.fn(),
@@ -66,6 +67,21 @@ describe("renderFacets", () => {
     ).querySelector("esphome-filters-popover");
     expect(popover?.getAttribute("count-label")).toBe("dashboard.filter_menu_active");
     expect(calls).toContainEqual(["dashboard.filter_menu_active", { count }]);
+  });
+
+  // The popover's "Clear filters" clears facets only. It sits beside the
+  // search box, and its badge never counted the search term, so wiping the
+  // search from here would clear something the menu never showed (#1160).
+  it("clears facets only, leaving the search term to the search box's own x", () => {
+    const host = makeHost({ _activeFacetCount: 2 });
+    const popover = renderInto(renderFacets(host)).querySelector(
+      "esphome-filters-popover"
+    )!;
+
+    popover.dispatchEvent(new CustomEvent("clear-filters"));
+
+    expect(host._clearFacets).toHaveBeenCalledOnce();
+    expect(host._clearAllFilters).not.toHaveBeenCalled();
   });
 
   // _localize echoes its key, so sections are identifiable by their

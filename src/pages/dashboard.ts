@@ -796,17 +796,27 @@ export class ESPHomePageDashboard extends LitElement {
     refocusSearchInput(this);
   };
 
-  /** Wipe search + every facet selection in one shot. Wired to the
-   *  empty-state's "Clear filters" button, which only renders when
-   *  ``_hasActiveFilters`` — so this is always doing something
-   *  visible from the user's perspective. */
-  _clearAllFilters = () => {
-    this._resetSearch();
+  /** Clear every facet selection, leaving the search term alone. Wired to
+   *  the Filters popover's "Clear filters", which lives next to the search
+   *  box rather than inside it: its badge counts facet selections only, so
+   *  a lone search term is something that menu never showed, and wiping it
+   *  from there reads as the button doing more than it said (#1160). The
+   *  search box keeps its own × for that. */
+  _clearFacets = () => {
     this._selectedLabels = [];
     this._selectedAreas = [];
     this._selectedPlatforms = [];
     this._selectedStates = [];
     this._selectedUpdateStatus = [];
+  };
+
+  /** Wipe search + every facet selection in one shot. Wired to the
+   *  empty-state's "Clear filters" button, which only renders when
+   *  ``_hasActiveFilters`` — there the search term is one of the things
+   *  hiding every device, so clearing it is the point of the button. */
+  _clearAllFilters = () => {
+    this._resetSearch();
+    this._clearFacets();
   };
 
   /** Apply every active facet filter to the device list. Labels and
