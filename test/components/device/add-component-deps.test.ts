@@ -6,9 +6,9 @@ import {
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
 import {
+  classReferenceNeedsForm,
   depsSatisfiedByProvides,
   findMissingDependencies,
-  hasClassReference,
   liveDependencies,
   resolveDepVerdict,
   wrongKindDependencies,
@@ -434,22 +434,25 @@ describe("wrongKindDependencies", () => {
   });
 });
 
-describe("hasClassReference", () => {
+describe("classReferenceNeedsForm", () => {
   const ref = makeConfigEntry({
     key: "modbus_id",
     references_component: "modbus",
     references_class: "modbus::ModbusServerHub",
   });
+  const needsForm = (entries: ConfigEntry[]) =>
+    classReferenceNeedsForm(entries, ["modbus"], {}, "logger:\n", null);
 
-  it("finds a class-restricted reference inside a nested block, as seeding does", () => {
+  it("shows the form when the index is missing and a reference needs a class", () => {
     const nested = makeConfigEntry({
       key: "hub",
       type: ConfigEntryType.NESTED,
       config_entries: [ref],
     });
-    expect(hasClassReference([nested])).toBe(true);
-    expect(hasClassReference([ref])).toBe(true);
-    expect(hasClassReference([{ ...ref, references_class: null }])).toBe(false);
+    // Nested ones count too, as seeding walks them.
+    expect(needsForm([nested])).toBe(true);
+    expect(needsForm([ref])).toBe(true);
+    expect(needsForm([{ ...ref, references_class: null }])).toBe(false);
   });
 });
 

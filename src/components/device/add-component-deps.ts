@@ -220,9 +220,26 @@ export function resolveDepVerdict(opts: {
   return { deps, copy };
 }
 
+/**
+ * Whether the dialog's skip-the-form path must yield to the form over a
+ * class-restricted reference: a dependency present only as the wrong kind
+ * needs the form's callout, and with no *index* (a failed load) that can't be
+ * judged, so adding would be adding blind.
+ */
+export function classReferenceNeedsForm(
+  entries: ConfigEntry[],
+  live: readonly string[],
+  values: Record<string, unknown>,
+  yaml: string,
+  index: Pick<CatalogIndex, "components" | "byId"> | null
+): boolean {
+  if (!index) return hasClassReference(entries);
+  return wrongKindDependencies(entries, live, values, yaml, index).length > 0;
+}
+
 /** Whether any entry, nested ones included since seeding walks them, needs a
  *  specific id class, so adding without the catalog index would be adding blind. */
-export function hasClassReference(entries: ConfigEntry[]): boolean {
+function hasClassReference(entries: ConfigEntry[]): boolean {
   return entries.some(
     (e) =>
       Boolean(e.references_component && e.references_class) ||

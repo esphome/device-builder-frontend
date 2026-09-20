@@ -90,8 +90,11 @@ function sectionJudge(
       const [key, byValue] = variant;
       lines ??= splitYamlDocLines(yaml);
       if (hasHiddenKeys(lines, section) || isOpaque(lines, section)) return true;
-      const value = parseYamlSectionValues(yaml, section.key, section.fromLine)[key];
-      // Unset keeps ``id_classes``, the default variant's.
+      const values = parseYamlSectionValues(yaml, section.key, section.fromLine);
+      const value = values[key];
+      // A key present with no value yet (``role:`` mid-edit) can't be judged.
+      if (value == null && Object.prototype.hasOwnProperty.call(values, key)) return true;
+      // Absent keeps ``id_classes``, the default variant's.
       if (value != null) {
         // A substitution or a value the catalog doesn't know: can't judge.
         if (!Object.prototype.hasOwnProperty.call(byValue, String(value))) return true;

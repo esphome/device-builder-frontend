@@ -26,7 +26,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ComponentCatalogIndexEntry } from "../../api/types/components.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
@@ -57,10 +56,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
-import {
-  getCachedCatalogIndex,
-  loadCatalog,
-} from "../../util/yaml-completion-catalog.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -140,9 +136,6 @@ export interface ConfigEntryValueChange {
 /** How long a clicked advanced-control anchor stays valid awaiting the
  *  host's ``showAdvanced`` round-trip (normally one render, milliseconds). */
 export const ADVANCED_ANCHOR_TTL_MS = 2000;
-
-/** How long a failed catalog index load waits before a render retries it. */
-const CATALOG_RETRY_MS = 30_000;
 
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
@@ -336,6 +329,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  post-render radio-group sync; kept in a controller so this file doesn't
    *  grow. */
   private _constraintClusters = new ConstraintClusterController(this);
+  private _catalogIndex = new CatalogIndexController(this, () => this._api);
 
   /** gateAdvanced unit placement (key → paints inline, else gated) frozen
    *  while the section is open, so a value landing mid-edit doesn't re-home
@@ -1106,7 +1100,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
-      catalogById: () => this._catalogById(),
+      catalogById: () => this._catalogIndex.byId(),
       isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
         const key = fieldKeyAttr(path);
@@ -1260,23 +1254,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // Distinct from a cached [] so consumers don't treat an incomplete
     // candidate list as complete.
     return null;
-  }
-
-  /** No catalog load before this time: set while one is in flight, and pushed
-   *  out after a failure so a down backend isn't swept on every render. */
-  private _catalogRetryAt = 0;
-
-  /** A failed load re-renders nothing; a render after the backoff retries. */
-  private _catalogById(): ReadonlyMap<string, ComponentCatalogIndexEntry> | null {
-    const index = getCachedCatalogIndex();
-    if (!index && this._api && Date.now() >= this._catalogRetryAt) {
-      this._catalogRetryAt = Infinity;
-      void loadCatalog(this._api).then(() => {
-        if (getCachedCatalogIndex()) this.requestUpdate();
-        else this._catalogRetryAt = Date.now() + CATALOG_RETRY_MS;
-      });
-    }
-    return index?.byId ?? null;
   }
 }
 

@@ -101,6 +101,7 @@ describe("classVerdict candidates on a typed hub", () => {
   it.each([
     ["a substituted role", "modbus:\n  - id: hub\n    role: ${modbus_role}\n"],
     ["a role the catalog doesn't know", "modbus:\n  - id: hub\n    role: gateway\n"],
+    ["a role key with no value yet", "modbus:\n  - id: hub\n    role:\n"],
     [
       "a role named like an Object member",
       "modbus:\n  - id: hub\n    role: constructor\n",

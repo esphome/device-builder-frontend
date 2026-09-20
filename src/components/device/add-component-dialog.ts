@@ -40,10 +40,9 @@ import {
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import {
+  classReferenceNeedsForm,
   findMissingDependencies,
-  hasClassReference,
   liveDependencies,
-  wrongKindDependencies,
 } from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
@@ -585,14 +584,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._resolvedPlatforms
     );
     if (missing.length > 0) return null;
-    // A dependency present only as the wrong kind still needs the form's
-    // callout (hoermann_hcp with a client-only modbus hub). With no index (a
-    // failed load) that can't be judged, so show the form rather than add blind.
-    const index = getCachedCatalogIndex();
-    if (!index && hasClassReference(entry.config_entries)) return null;
     if (
-      wrongKindDependencies(entry.config_entries, live, seeded, this.yaml, index).length >
-      0
+      classReferenceNeedsForm(
+        entry.config_entries,
+        live,
+        seeded,
+        this.yaml,
+        getCachedCatalogIndex()
+      )
     )
       return null;
     if (
