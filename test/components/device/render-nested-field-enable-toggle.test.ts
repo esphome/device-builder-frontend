@@ -454,6 +454,40 @@ describe("onEnableToggle", () => {
     expect(ctx.toggleNested).toHaveBeenCalledWith("pwm");
   });
 
+  it("names a seeded child the form drops even when the block paints other fields", () => {
+    const divider = makeConfigEntry({
+      key: "divider",
+      label: "Divider",
+      advanced: true,
+      default_value: "1",
+    });
+    const mode = makeConfigEntry({ key: "mode", label: "Mode", required: true });
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [divider, mode],
+    });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["pwm"],
+        makeRenderCtx(
+          { pwm: { divider: "1", mode: "fast" } },
+          {
+            overrides: {
+              filterRenderable: () => [mode],
+              requiredGroups: DEMANDS,
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("device.enabled_block_sets|Divider: 1");
+    expect(spoken).not.toContain("Mode: fast");
+  });
+
   it("masks a secure child's value in the summary of what a block holds", () => {
     const entry = makeSensorEntry({
       key: "auth",
@@ -465,6 +499,8 @@ describe("onEnableToggle", () => {
           label: "Password",
           type: ConfigEntryType.SECURE_STRING,
         }),
+        // Declared, but typed as a plain string: the spelling still masks it.
+        makeConfigEntry({ key: "ap_password", label: "AP password" }),
       ],
     });
     const spoken = JSON.stringify(
@@ -472,7 +508,14 @@ describe("onEnableToggle", () => {
         entry,
         ["auth"],
         makeRenderCtx(
-          { auth: { username: "admin", password: "hunter2" } },
+          {
+            auth: {
+              username: "admin",
+              password: "hunter2",
+              ota_password: 's3cret # tail"quoted',
+              ap_password: "0pen",
+            },
+          },
           {
             overrides: {
               filterRenderable: () => [],
@@ -487,6 +530,41 @@ describe("onEnableToggle", () => {
     expect(spoken).toContain("Username: admin");
     expect(spoken).toContain("Password: ••••••");
     expect(spoken).not.toContain("hunter2");
+    // A credential under a key the catalog does not declare is masked too.
+    expect(spoken).toContain("ota_password: ••••••");
+    expect(spoken).not.toContain("s3cret");
+    // A comment character or a quote in the value can't leak its tail.
+    expect(spoken).not.toContain("tail");
+    expect(spoken).toContain("AP password: ••••••");
+    expect(spoken).not.toContain("0pen");
+  });
+
+  it("masks a key that is only a credential under its parent block", () => {
+    // ``key:`` is a secret under ``encryption:``; the masker needs that parent.
+    const entry = makeSensorEntry({
+      key: "encryption",
+      platform_type: null,
+      config_entries: [makeConfigEntry({ key: "mode", default_value: "noise" })],
+    });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["encryption"],
+        makeRenderCtx(
+          { encryption: { mode: "noise", key: "c2VjcmV0" } },
+          {
+            overrides: {
+              filterRenderable: () => [],
+              requiredGroups: [{ kind: "at_least_one", keys: ["encryption"] }],
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("key: ••••••");
+    expect(spoken).not.toContain("c2VjcmV0");
   });
 
   it("drops the disclosure button from a block with no field to expand", () => {
