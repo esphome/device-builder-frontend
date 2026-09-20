@@ -6,9 +6,9 @@ import { evaluateGroup, isMemberSet } from "../../../util/constraint-groups.js";
 import { isEmptyBlock } from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
+  filterOptionsAt,
   labelFor,
   type RenderCtx,
-  topLevelFilterOptions,
 } from "../config-entry-renderers-shared.js";
 
 /** An either/or constraint rendered as one bordered box: an inclusive
@@ -192,7 +192,7 @@ export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boo
       undefined,
       ctx.entries
     );
-  return shown && !isEmptyBlock(member, values, topLevelFilterOptions(ctx));
+  return shown && !isEmptyBlock(member, values, filterOptionsAt(ctx, [member.key]));
 }
 
 export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {

@@ -7,14 +7,14 @@ import { enableSeed, isSwitchable } from "../config-entry-render-filter.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
+  filterOptionsAt,
   labelFor,
   type RenderCtx,
   renderFieldError,
   renderHelpLink,
   renderLabel,
-  topLevelFilterOptions,
 } from "../config-entry-renderers-shared.js";
-import { seedIdFor } from "./seed-identity.js";
+import { nextIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
 // turned off, keyed by the form's ``stashOwner`` (the host element,
@@ -81,7 +81,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // A plain block a required group demands (emc2101's pwm / dac) may have no
   // field the form paints, so the switch is how the user picks it. Offered
   // only when it has something to write.
-  const isDemanded = path.length === 1 && isSwitchable(entry, topLevelFilterOptions(ctx));
+  const isDemanded = isSwitchable(entry, filterOptionsAt(ctx, path));
   const hasSwitch = isOptionalEntity || isDemanded;
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
@@ -197,14 +197,7 @@ function seedFor(
   label: string,
   ctx: RenderCtx
 ): void {
-  const opts = topLevelFilterOptions(ctx);
-  const found = enableSeed(entry, opts);
-  // A child's default is only written for a block a group demands; an entity
-  // sub-reading with no identity keeps its no-op.
-  const seed =
-    found?.from === "default" && !(path.length === 1 && isSwitchable(entry, opts))
-      ? null
-      : found;
+  const seed = enableSeed(entry, filterOptionsAt(ctx, path));
   // The *localized* label the user is looking at seeds an entity's name, so
   // it matches the switch they clicked (WYSIWYG) and reads natively in their
   // dashboard locale. It's a plain editable value, not locale-pinned state —
@@ -217,7 +210,7 @@ function seedFor(
     seed?.from === "name"
       ? label
       : seed?.from === "id"
-        ? seedIdFor(entry, ctx)?.id
+        ? nextIdFor(entry, ctx)
         : seed?.value;
   // With none of these (a light's ``initial_state``) there's nothing valid to
   // write, so re-emit the still-absent group: the switch the user just

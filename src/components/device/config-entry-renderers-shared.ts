@@ -540,12 +540,12 @@ export function renderSuggestionSelect(
   `;
 }
 
-/** The filter options for the form's own top-level scope, required groups
- *  included. */
-export function topLevelFilterOptions(ctx: RenderCtx): RenderFilterOptions {
+/** The filter options for the scope *path* sits in. Required groups bind
+ *  only the form's top level, as ``filterRenderable`` strips them on recursion. */
+export function filterOptionsAt(ctx: RenderCtx, path: string[]): RenderFilterOptions {
   return renderFilterOptions(ctx, {
     rootValues: ctx.scopeValues([]),
-    requiredGroups: ctx.requiredGroups,
+    requiredGroups: path.length === 1 ? ctx.requiredGroups : undefined,
   });
 }
 

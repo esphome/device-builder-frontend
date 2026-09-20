@@ -34,8 +34,12 @@ export function seedIdFor(
   { requiredOnly = false }: { requiredOnly?: boolean } = {}
 ): { key: string; id: string } | null {
   const idChild = declaringIdChild(entry, requiredOnly);
-  if (!idChild) return null;
+  return idChild ? { key: idChild.key, id: nextIdFor(entry, ctx) } : null;
+}
+
+/** A fresh id for *entry*, unique across the document and the form values. */
+export function nextIdFor(entry: ConfigEntry, ctx: RenderCtx): string {
   const taken = collectTakenIds(ctx.yaml);
   addTakenIdsFromValues(ctx.getAt([]), taken);
-  return { key: idChild.key, id: generateNestedItemId(entry.key, taken) };
+  return generateNestedItemId(entry.key, taken);
 }

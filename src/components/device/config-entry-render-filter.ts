@@ -209,9 +209,10 @@ export interface EnableSeed {
 /**
  * What switching the still-empty block *entry* on writes, or null.
  *
- * An entity's ``name``, else a declaring id, else the first child the form
- * would show whose default serializes. The paint, the switch and the toggle
- * all read this, so none can offer what the others can't do.
+ * An entity's ``name``, else a declaring id, else, only for a block a group
+ * in ``opts.requiredGroups`` demands, the first child the form would show
+ * whose default serializes. The paint, the switch and the toggle all read
+ * this, so none can offer what the others can't do.
  */
 export function enableSeed(
   entry: ConfigEntry,
@@ -223,6 +224,9 @@ export function enableSeed(
     return { from: "name", key: "name" };
   const id = declaringIdChild(entry, false);
   if (id) return { from: "id", key: id.key };
+  // A child's default is written only to satisfy a group; an undemanded
+  // entity sub-reading with no identity keeps its no-op.
+  if (!isDemanded(entry, opts)) return null;
   const defaulted = children.find(
     (c) =>
       !c.hidden &&
@@ -247,14 +251,18 @@ export function enableSeed(
 }
 
 /** Whether *entry* is an optional block a group in ``opts.requiredGroups``
- *  demands and whose enable switch has something to write. */
-export function isSwitchable(entry: ConfigEntry, opts: RenderFilterOptions): boolean {
+ *  demands. Groups are scope-local, so only the scope that owns them sets them. */
+function isDemanded(entry: ConfigEntry, opts: RenderFilterOptions): boolean {
   return (
     !entry.required &&
     opts.requiredGroups !== undefined &&
-    demandedKeys(opts.requiredGroups).has(entry.key) &&
-    enableSeed(entry, opts) != null
+    demandedKeys(opts.requiredGroups).has(entry.key)
   );
+}
+
+/** Whether *entry* is a demanded block whose enable switch has something to write. */
+export function isSwitchable(entry: ConfigEntry, opts: RenderFilterOptions): boolean {
+  return isDemanded(entry, opts) && enableSeed(entry, opts) != null;
 }
 
 /**
