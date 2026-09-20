@@ -3,7 +3,7 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
-import { maskSensitiveLine } from "../../../util/yaml-sensitive-redact.js";
+import { maskSensitiveLines } from "../../../util/yaml-sensitive-redact.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
 import {
@@ -92,11 +92,10 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
   // Name what the block holds that the form does not paint: everything in a
-  // fieldless block, and in a demanded one also a seeded child the filter
-  // drops. Nothing to say when only nested values are left.
+  // fieldless block, else a valued child the filter drops (a seeded default
+  // in required-only mode). Nothing to say when only nested values are left.
   const painted = new Set(children.map((c) => c.key));
-  const setValues =
-    enabled && (!hasFields || isDemanded) ? setValuesOf(entry, raw, ctx, painted) : "";
+  const setValues = enabled ? setValuesOf(entry, raw, ctx, painted) : "";
   // With nothing to expand, the header is a plain title: the switch is the
   // block's only control.
   const title = html`<span class="nested-title">${label}</span>
@@ -243,8 +242,8 @@ function seedFor(
 
 const MASKED_VALUE = "••••••";
 
-// What a block with no field to show holds, so a value the switch wrote on
-// the user's behalf is visible where it was written.
+// What a block holds that the form does not paint, so a value the switch
+// wrote on the user's behalf is visible where it was written.
 function setValuesOf(
   entry: ConfigEntry,
   raw: unknown,
@@ -260,13 +259,27 @@ function setValuesOf(
     )
     .map(([key, value]) => {
       const child = children.get(key);
-      // A key the catalog doesn't declare goes through the YAML credential
-      // masker, which knows the undeclared secret spellings.
-      if (!child) return maskSensitiveLine(`${key}: ${String(value)}`, MASKED_VALUE);
-      // A credential is masked in its own field; never spell it out here.
-      const shown =
-        child.type === ConfigEntryType.SECURE_STRING ? MASKED_VALUE : String(value);
-      return `${labelFor(child, ctx)}: ${shown}`;
+      const shown = shownValue(entry.key, key, value, child);
+      return `${child ? labelFor(child, ctx) : key}: ${shown}`;
     })
     .join(", ");
+}
+
+// A credential is masked in its own field; never spell it out here. The type
+// says so for a secure child; for any other key the YAML credential masker
+// decides from its spelling, with the block as parent (``key:`` under
+// ``encryption:``), so a mistyped or undeclared secret is covered too.
+function shownValue(
+  parentKey: string,
+  key: string,
+  value: unknown,
+  child: ConfigEntry | undefined
+): string {
+  if (child?.type === ConfigEntryType.SECURE_STRING) return MASKED_VALUE;
+  const text = String(value).replace(/\s+/g, " ");
+  const [, line] = maskSensitiveLines(
+    [`${parentKey}:`, `  ${key}: ${text}`],
+    MASKED_VALUE
+  );
+  return line.trimStart().slice(key.length + 2);
 }

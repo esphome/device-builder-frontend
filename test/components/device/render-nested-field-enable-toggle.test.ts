@@ -499,6 +499,8 @@ describe("onEnableToggle", () => {
           label: "Password",
           type: ConfigEntryType.SECURE_STRING,
         }),
+        // Declared, but typed as a plain string: the spelling still masks it.
+        makeConfigEntry({ key: "ap_password", label: "AP password" }),
       ],
     });
     const spoken = JSON.stringify(
@@ -506,7 +508,14 @@ describe("onEnableToggle", () => {
         entry,
         ["auth"],
         makeRenderCtx(
-          { auth: { username: "admin", password: "hunter2", ota_password: "s3cret" } },
+          {
+            auth: {
+              username: "admin",
+              password: "hunter2",
+              ota_password: "s3cret",
+              ap_password: "0pen",
+            },
+          },
           {
             overrides: {
               filterRenderable: () => [],
@@ -524,6 +533,36 @@ describe("onEnableToggle", () => {
     // A credential under a key the catalog does not declare is masked too.
     expect(spoken).toContain("ota_password: ••••••");
     expect(spoken).not.toContain("s3cret");
+    expect(spoken).toContain("AP password: ••••••");
+    expect(spoken).not.toContain("0pen");
+  });
+
+  it("masks a key that is only a credential under its parent block", () => {
+    // ``key:`` is a secret under ``encryption:``; the masker needs that parent.
+    const entry = makeSensorEntry({
+      key: "encryption",
+      platform_type: null,
+      config_entries: [makeConfigEntry({ key: "mode", default_value: "noise" })],
+    });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["encryption"],
+        makeRenderCtx(
+          { encryption: { mode: "noise", key: "c2VjcmV0" } },
+          {
+            overrides: {
+              filterRenderable: () => [],
+              requiredGroups: [{ kind: "at_least_one", keys: ["encryption"] }],
+              localize: (key: string, params?: Record<string, unknown>) =>
+                params?.values ? `${key}|${String(params.values)}` : key,
+            },
+          }
+        )
+      )
+    );
+    expect(spoken).toContain("key: ••••••");
+    expect(spoken).not.toContain("c2VjcmV0");
   });
 
   it("drops the disclosure button from a block with no field to expand", () => {
