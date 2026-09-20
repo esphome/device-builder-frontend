@@ -27,7 +27,11 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import { advancedGated } from "../../util/material-value.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
-import { type EnableSeed, enableSeedOf } from "./config-entry-renderers/seed-identity.js";
+import { hasSerializableValue } from "../../util/yaml-serialize.js";
+import {
+  declaringIdChild,
+  hasNameChild,
+} from "./config-entry-renderers/seed-identity.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -167,7 +171,7 @@ function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
 }
 
 /** Keys of the groups in *requiredGroups* that demand a value be set. */
-export function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
+function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
   const keys = new Set<string>();
   for (const group of requiredGroups ?? []) {
     if (group.kind !== "exactly_one" && group.kind !== "at_least_one") continue;
@@ -176,21 +180,95 @@ export function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<s
   return keys;
 }
 
-/** What switching the still-empty block *entry* on writes, or null. */
+/** The child switching *entry* on writes, and its value when that is fixed. */
+export interface EnableSeed {
+  from: "name" | "id" | "default";
+  key: string;
+  value?: unknown;
+}
+
+/**
+ * What switching the still-empty block *entry* on writes, or null.
+ *
+ * An entity's ``name``, else a declaring id, else the first child the form
+ * would show whose default serializes. The paint, the switch and the toggle
+ * all read this, so none can offer what the others can't do.
+ */
 export function enableSeed(
   entry: ConfigEntry,
   opts: RenderFilterOptions
 ): EnableSeed | null {
-  return enableSeedOf(entry, (child) =>
-    isEntryVisible(
-      child,
-      {},
-      opts.presentComponents,
-      opts.targetPlatform,
-      opts.rootValues,
-      entry.config_entries ?? []
-    )
+  const children = entry.config_entries ?? [];
+  // A plain block's ``name`` need not be a display label.
+  if (entry.platform_type != null && hasNameChild(entry))
+    return { from: "name", key: "name" };
+  const id = declaringIdChild(entry, false);
+  if (id) return { from: "id", key: id.key };
+  const defaulted = children.find(
+    (c) =>
+      !c.hidden &&
+      !c.locked &&
+      !c.multi_value &&
+      !c.references_component &&
+      c.type !== ConfigEntryType.NESTED &&
+      c.type !== ConfigEntryType.MAP &&
+      hasSerializableValue(c.default_value) &&
+      isEntryVisible(
+        c,
+        {},
+        opts.presentComponents,
+        opts.targetPlatform,
+        opts.rootValues,
+        children
+      )
   );
+  return defaulted
+    ? { from: "default", key: defaulted.key, value: defaulted.default_value }
+    : null;
+}
+
+/** Whether *entry* is an optional block a group in ``opts.requiredGroups``
+ *  demands and whose enable switch has something to write. */
+export function isSwitchable(entry: ConfigEntry, opts: RenderFilterOptions): boolean {
+  return (
+    !entry.required &&
+    opts.requiredGroups !== undefined &&
+    demandedKeys(opts.requiredGroups).has(entry.key) &&
+    enableSeed(entry, opts) != null
+  );
+}
+
+/**
+ * Whether the NESTED block *entry* would paint as a bare header: no renderable
+ * child, no scalar shorthand to show, and no enable switch worth offering.
+ */
+export function isEmptyBlock(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions
+): boolean {
+  // List-form NESTED always renders — the renderer paints the
+  // Add button even with zero items, and ``filterRenderable``
+  // is called per-item at render time with the item's own
+  // scope. Skipping based on the parent ``values`` shape would
+  // hide the field exactly when the user needs it.
+  if (entry.type !== ConfigEntryType.NESTED || entry.multi_value) return false;
+  // A scalar shorthand at the group key (e.g. ``pin: GPIO5``) still renders
+  // the user's value read-only; an object/null whose children all filtered
+  // out (seeded optional/advanced leaves in required-only mode) leaves an
+  // empty box.
+  const own = values[entry.key];
+  if (typeof own === "string" || typeof own === "number" || typeof own === "boolean") {
+    return false;
+  }
+  const children = filterRenderable(
+    entry.config_entries ?? [],
+    asRecord(own),
+    nestedOpts(opts)
+  );
+  // A demanded block still paints when its enable switch can write a value:
+  // that switch is how the user satisfies the group.
+  return children.length === 0 && !isSwitchable(entry, opts);
 }
 
 export function filterRenderable(
@@ -199,8 +277,8 @@ export function filterRenderable(
   opts: RenderFilterOptions
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
-  const demanded = demandedKeys(opts.requiredGroups);
-  const childOpts = nestedOpts(opts);
+  // Leaves stay for any demanding group; a block also needs a usable switch.
+  const demanded = opts.requiredGroups ? demandedKeys(opts.requiredGroups) : null;
   for (const entry of entries) {
     if (
       !isEntryVisible(
@@ -218,36 +296,12 @@ export function filterRenderable(
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
-      // List-form NESTED always renders — the renderer paints the
-      // Add button even with zero items, and ``filterRenderable``
-      // is called per-item at render time with the item's own
-      // scope. Skipping based on the parent ``values`` shape would
-      // hide the field exactly when the user needs it.
-      if (!entry.multi_value) {
-        const renderableChildren = filterRenderable(
-          entry.config_entries ?? [],
-          asRecord(values[entry.key]),
-          childOpts
-        );
-        // Drop a group with nothing to render. A scalar shorthand at the
-        // group key (e.g. ``pin: GPIO5``) still renders the user's value
-        // read-only; an object/null whose children all filtered out (seeded
-        // optional/advanced leaves in required-only mode) leaves an empty box.
-        const own = values[entry.key];
-        const isScalarShorthand =
-          typeof own === "string" || typeof own === "number" || typeof own === "boolean";
-        // A demanded block still paints when its enable switch can write a
-        // value: that switch is how the user satisfies the group.
-        const switchable = demanded.has(entry.key) && enableSeed(entry, opts) != null;
-        if (renderableChildren.length === 0 && !isScalarShorthand && !switchable) {
-          continue;
-        }
-      }
+      if (isEmptyBlock(entry, values, opts)) continue;
     } else if (
       opts.requiredOnly &&
       !entry.required &&
       !ALWAYS_SHOWN_KEYS.has(entry.key) &&
-      !demanded.has(entry.key)
+      !demanded?.has(entry.key)
     ) {
       // In required-only mode, drop optional leaves outright unless
       // they're on the always-shown allowlist (e.g. ``name``, which

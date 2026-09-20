@@ -48,7 +48,11 @@ import {
 } from "../../util/yaml-escape.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
-import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
+import {
+  filterRenderable,
+  type RenderFilterOptions,
+  renderFilterOptions,
+} from "./config-entry-render-filter.js";
 import type { RenderCtx } from "./config-entry-renderers-types.js";
 import { constraintClusterStyles } from "./config-entry-renderers/constraint-cluster.styles.js";
 import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
@@ -539,6 +543,15 @@ export function renderSuggestionSelect(
 // Shared child rendering for the nested renderer and the exclusive-group
 // dropdown. ``includeAdvanced`` forces advanced children visible — a picked
 // exclusive member's fields must all show, as it has no per-member toggle.
+/** The filter options for the form's own top-level scope, required groups
+ *  included. */
+export function topLevelFilterOptions(ctx: RenderCtx): RenderFilterOptions {
+  return renderFilterOptions(ctx, {
+    rootValues: ctx.scopeValues([]),
+    requiredGroups: ctx.requiredGroups,
+  });
+}
+
 export function renderChildEntries(
   entry: ConfigEntry,
   path: string[],

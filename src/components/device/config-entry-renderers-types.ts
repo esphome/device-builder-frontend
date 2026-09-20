@@ -6,11 +6,10 @@
  */
 
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import type { EnableSeed } from "./config-entry-renderers/seed-identity.js";
 
 export interface RenderCtx {
   localize: LocalizeFunc;
@@ -49,10 +48,6 @@ export interface RenderCtx {
    *  members). ``_fieldDescription`` strips the baked prose only for these, so
    *  nested-scope members keep theirs. */
   reactiveConstraintKeys: Set<string>;
-  /** Top-level keys a ``required_groups`` entry demands a value from
-   *  (``exactly_one`` / ``at_least_one``). A demanded optional NESTED block
-   *  gets an enable switch so the group can be satisfied. */
-  demandedKeys: ReadonlySet<string>;
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
    *  ``exclusive_group`` member is dropped from the cluster), and fed to
@@ -91,8 +86,9 @@ export interface RenderCtx {
     entries: ConfigEntry[],
     values: Record<string, unknown>
   ) => ConfigEntry[];
-  /** What switching the still-empty block *entry* on writes, or null. */
-  enableSeed: (entry: ConfigEntry) => EnableSeed | null;
+  /** The form's ``required_groups``. A top-level optional block one of them
+   *  demands gets an enable switch so the group can be satisfied. */
+  requiredGroups: RequiredGroup[];
   renderEntry: (entry: ConfigEntry, path: string[]) => unknown;
   /**
    * FLOAT_WITH_UNIT-only: stash a unit choice that the user picked

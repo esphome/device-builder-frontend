@@ -13,7 +13,6 @@ import {
   collectTakenIds,
   generateNestedItemId,
 } from "../../../util/default-component-id.js";
-import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import type { RenderCtx } from "../config-entry-renderers-shared.js";
 
 /** Whether *entry*'s schema carries a `name` field to seed a label into. */
@@ -21,42 +20,6 @@ export function hasNameChild(entry: ConfigEntry): boolean {
   return (entry.config_entries ?? []).some(
     (c) => c.key === "name" && c.type === ConfigEntryType.STRING
   );
-}
-
-/** Which child enabling *entry* writes so the block holds a value. */
-export type EnableSeed =
-  | { from: "name"; key: "name" }
-  | { from: "default" | "id"; key: string; child: ConfigEntry };
-
-/**
- * What switching *entry* on writes, or null when nothing valid can be written.
- *
- * An entity's ``name``, else a declaring id, else the first child the form
- * would show that carries a default which serializes. One answer for the
- * paint, the switch and the toggle, so none can offer what the others can't do.
- */
-export function enableSeedOf(
-  entry: ConfigEntry,
-  isVisible: (child: ConfigEntry) => boolean
-): EnableSeed | null {
-  // A plain block's ``name`` need not be a display label.
-  if (entry.platform_type != null && hasNameChild(entry)) {
-    return { from: "name", key: "name" };
-  }
-  const id = declaringIdChild(entry, false);
-  if (id) return { from: "id", key: id.key, child: id };
-  const defaulted = (entry.config_entries ?? []).find(
-    (c) =>
-      !c.hidden &&
-      !c.locked &&
-      !c.multi_value &&
-      !c.references_component &&
-      c.type !== ConfigEntryType.NESTED &&
-      c.type !== ConfigEntryType.MAP &&
-      hasSerializableValue(c.default_value) &&
-      isVisible(c)
-  );
-  return defaulted ? { from: "default", key: defaulted.key, child: defaulted } : null;
 }
 
 /**
@@ -88,7 +51,7 @@ export function seedIdFor(
 // counts under any key (tca9548a declares through ``bus_id``); an optional one
 // only when literally ``id``, so a catalog entry missing its
 // `references_component` flag can't take a generated id into a pointer field.
-function declaringIdChild(
+export function declaringIdChild(
   entry: ConfigEntry,
   requiredOnly: boolean
 ): ConfigEntry | undefined {

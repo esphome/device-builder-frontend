@@ -15,6 +15,7 @@ import {
   type ConfigEntry,
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
 import { onEnableToggle } from "../../../src/components/device/config-entry-renderers/nested.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
@@ -50,6 +51,8 @@ function makeInitialStateEntry(): ConfigEntry {
 
 const switchesOf = (tpl: unknown) => findElementBindings(tpl, "wa-switch");
 
+const DEMANDS = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
+
 describe("renderNestedField enable switch", () => {
   it("renders the switch for an optional entity sub-reading", () => {
     const tpl = renderNestedField(makeSensorEntry(), ["min_free"], makeRenderCtx({}));
@@ -75,7 +78,7 @@ describe("renderNestedField enable switch", () => {
         }),
       ],
     });
-    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    const ctx = makeRenderCtx({}, { overrides: { requiredGroups: DEMANDS } });
     expect(switchesOf(renderNestedField(entry, ["pwm"], ctx))).toHaveLength(1);
   });
 
@@ -87,7 +90,7 @@ describe("renderNestedField enable switch", () => {
         makeConfigEntry({ key: "divider", type: ConfigEntryType.INTEGER }),
       ],
     });
-    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    const ctx = makeRenderCtx({}, { overrides: { requiredGroups: DEMANDS } });
     expect(switchesOf(renderNestedField(entry, ["pwm"], ctx))).toHaveLength(0);
   });
 
@@ -103,7 +106,7 @@ describe("renderNestedField enable switch", () => {
 
   it("omits it for a same-named block below the top level", () => {
     const entry = makeSensorEntry({ key: "pwm", platform_type: null });
-    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    const ctx = makeRenderCtx({}, { overrides: { requiredGroups: DEMANDS } });
     expect(switchesOf(renderNestedField(entry, ["fan", "pwm"], ctx))).toHaveLength(0);
   });
 
@@ -355,19 +358,15 @@ describe("onEnableToggle", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["pwm"], undefined);
   });
 
-  it("leaves a block collapsed when enabling it paints no field", () => {
+  it("renders a block with no paintable field closed even when marked open", () => {
     const entry = makeSensorEntry({ key: "pwm" });
-    const ctx = makeRenderCtx({}, { overrides: { filterRenderable: () => [] } });
-    onEnableToggle({
-      entry,
-      path: ["pwm"],
-      key: "pwm",
-      isOpen: false,
-      checked: true,
-      label: "PWM",
-      ctx,
-    });
-    expect(ctx.toggleNested).not.toHaveBeenCalled();
+    const open = { nestedOpenSections: new Set(["pwm"]) };
+    const body = (overrides: Partial<RenderCtx>) =>
+      JSON.stringify(
+        renderNestedField(entry, ["pwm"], makeRenderCtx({}, { overrides }))
+      ).includes("nested-fields");
+    expect(body(open)).toBe(true);
+    expect(body({ ...open, filterRenderable: () => [] })).toBe(false);
   });
 
   it("writes no field when the schema offers neither a name nor an id", () => {

@@ -3,15 +3,16 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { isPlainObject } from "../../../util/nested-values.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
+import { enableSeed, isSwitchable } from "../config-entry-render-filter.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
-  renderChildEntries,
   type RenderCtx,
   renderFieldError,
   renderHelpLink,
   renderLabel,
+  topLevelFilterOptions,
 } from "../config-entry-renderers-shared.js";
 import { seedIdFor } from "./seed-identity.js";
 
@@ -64,9 +65,11 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // one-shot, so a later user collapse sticks.
   // A block with nothing to show here (the add form drops emc2101's
   // advanced-only children) never opens: an empty body reads broken.
-  const hasFields =
-    ctx.filterRenderable(entry.config_entries ?? [], isPlainObject(raw) ? raw : {})
-      .length > 0;
+  const children = ctx.filterRenderable(
+    entry.config_entries ?? [],
+    ctx.scopeValues(path)
+  );
+  const hasFields = children.length > 0;
   if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
   const isOpen = hasFields && ctx.nestedOpenSections.has(key);
   // Optional entity sub-readings (a debug component's per-metric sensors,
@@ -78,11 +81,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // A plain block a required group demands (emc2101's pwm / dac) may have no
   // field the form paints, so the switch is how the user picks it. Offered
   // only when it has something to write.
-  const isDemanded =
-    path.length === 1 &&
-    !entry.required &&
-    ctx.demandedKeys.has(entry.key) &&
-    ctx.enableSeed(entry) != null;
+  const isDemanded = path.length === 1 && isSwitchable(entry, topLevelFilterOptions(ctx));
   const hasSwitch = isOptionalEntity || isDemanded;
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
@@ -134,7 +133,9 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
       }
       ${
         isOpen
-          ? html`<div class="nested-fields">${renderChildEntries(entry, path, ctx)}</div>`
+          ? html`<div class="nested-fields">
+              ${children.map((child) => ctx.renderEntry(child, [...path, child.key]))}
+            </div>`
           : nothing
       }
     </div>
@@ -161,20 +162,15 @@ export function onEnableToggle(opts: {
   const { entry, path, key, isOpen, checked, label, ctx } = opts;
   const stash = _enableStash(ctx);
   if (checked) {
-    // What the block will hold once this change lands; ``ctx.getAt`` still
-    // reads the old value until the host re-renders.
-    let next: Record<string, unknown> = {};
     const restored = stash.get(key);
     if (restored && hasSerializableValue(restored)) {
       stash.delete(key);
-      next = restored;
       ctx.emitChange(path, restored);
     } else {
-      next = seedFor(entry, path, label, ctx);
+      seedFor(entry, path, label, ctx);
     }
-    // Expand for editing, unless the block has nothing to show here.
-    const hasFields = ctx.filterRenderable(entry.config_entries ?? [], next).length > 0;
-    if (!isOpen && hasFields) ctx.toggleNested(key);
+    // A block with no paintable field renders closed whatever this says.
+    if (!isOpen) ctx.toggleNested(key);
   } else {
     // A sub-reading's value is always a plain object; narrow on that
     // (not the broader hasSerializableValue, which is also true for
@@ -188,44 +184,35 @@ export function onEnableToggle(opts: {
   }
 }
 
-// Writes the seed switching *entry* on calls for and returns the block it
-// leaves behind.
+// Writes the seed switching *entry* on calls for.
 function seedFor(
   entry: ConfigEntry,
   path: string[],
   label: string,
   ctx: RenderCtx
-): Record<string, unknown> {
-  const seed = ctx.enableSeed(entry);
-  let value: unknown;
-  if (seed?.from === "name") {
-    // Seed the *localized* label the user is looking at, so the
-    // name they get matches the switch they clicked (WYSIWYG) and
-    // reads natively in their dashboard locale. It's a plain
-    // editable value, not locale-pinned state — don't "fix" this
-    // to the entry key.
-    value = label;
-  } else if (seed?.from === "id") {
-    // A nameless group (pipsolar's output sub-entities, opentherm's)
-    // rejects ``name:`` outright, so seed its id instead — required or
-    // not, it's the only identity the group has to serialize on.
-    value = seedIdFor(entry, ctx)?.id;
-  } else if (seed) {
-    // No identity at all (emc2101's pwm): write a child's own default, the
-    // smallest value that makes the block serialize without changing it.
-    value = seed.child.default_value;
-  }
-  if (!seed || value === undefined) {
-    // With none of these (a light's ``initial_state``) there's nothing valid to
-    // write, so re-emit the still-absent group: the switch the user just
-    // clicked has no backing value, and only a re-render walks it back to
-    // off. The group persists once they set one of its own fields. This
-    // leans on the host handing itself a fresh values object for every
-    // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
-    // an identity-preserving fast path there would strand the switch on.
-    ctx.emitChange(path, undefined);
-    return {};
-  }
-  ctx.emitChange([...path, seed.key], value);
-  return { [seed.key]: value };
+): void {
+  const seed = enableSeed(entry, topLevelFilterOptions(ctx));
+  // The *localized* label the user is looking at seeds an entity's name, so
+  // it matches the switch they clicked (WYSIWYG) and reads natively in their
+  // dashboard locale. It's a plain editable value, not locale-pinned state —
+  // don't "fix" this to the entry key. A nameless group (pipsolar's output
+  // sub-entities, opentherm's) rejects ``name:`` outright, so it seeds its id
+  // instead — required or not, it's the only identity the group has to
+  // serialize on. With no identity at all (emc2101's pwm) a child's own
+  // default is the smallest value that makes the block serialize.
+  const value =
+    seed?.from === "name"
+      ? label
+      : seed?.from === "id"
+        ? seedIdFor(entry, ctx)?.id
+        : seed?.value;
+  // With none of these (a light's ``initial_state``) there's nothing valid to
+  // write, so re-emit the still-absent group: the switch the user just
+  // clicked has no backing value, and only a re-render walks it back to
+  // off. The group persists once they set one of its own fields. This
+  // leans on the host handing itself a fresh values object for every
+  // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
+  // an identity-preserving fast path there would strand the switch on.
+  if (!seed || value === undefined) ctx.emitChange(path, undefined);
+  else ctx.emitChange([...path, seed.key], value);
 }

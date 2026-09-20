@@ -269,6 +269,41 @@ describe("an unmet constraint cluster box", () => {
   });
 });
 
+describe("a cluster box whose members are blocks", () => {
+  // At least one of fan / pwm, where pwm and dac share an inclusive group, so
+  // the three blocks render as one cluster box.
+  const blocks = (child: Record<string, unknown>) => [
+    makeNestedEntry("fan", [makeConfigEntry({ key: "speed", ...child })]),
+    {
+      ...makeNestedEntry("pwm", [makeConfigEntry({ key: "divider", ...child })]),
+      group: "out",
+    },
+    {
+      ...makeNestedEntry("dac", [makeConfigEntry({ key: "rate", ...child })]),
+      group: "out",
+    },
+  ];
+  const groups = [{ kind: "at_least_one" as const, keys: ["fan", "pwm"] }];
+
+  it("holds Add while a block's switch can satisfy it", () => {
+    expect(
+      addFormHasUnsatisfiedConstraint(
+        blocks({ default_value: "1" }),
+        {},
+        groups,
+        null,
+        NONE
+      )
+    ).toBe(true);
+  });
+
+  it("does not hold Add on blocks with no field and nothing to switch on", () => {
+    expect(addFormHasUnsatisfiedConstraint(blocks({}), {}, groups, null, NONE)).toBe(
+      false
+    );
+  });
+});
+
 describe("an unmet banner whose painted members are all board-locked", () => {
   it("does not hold Add, since nothing on screen can be changed", () => {
     const entries = [

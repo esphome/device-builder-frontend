@@ -9,6 +9,7 @@ import {
 } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
+  isEmptyBlock,
   renderFilterOptions,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
@@ -108,7 +109,7 @@ function addFormVisibility(
       opts.targetPlatform ?? null,
       opts.rootValues,
       entries
-    );
+    ) && !isEmptyBlock(entry, values, opts);
 }
 
 /**
@@ -134,11 +135,10 @@ export function addFormHasUnsatisfiedConstraint(
   if (banner) return true;
   // A static cluster box carries its own warning header instead of a banner,
   // and paints every visible member, advanced or not. Radios force a choice.
-  const isVisible = addFormVisibility(
-    entries,
-    values,
-    addFormFilterOptions(values, board, presentComponents)
-  );
+  const isVisible = addFormVisibility(entries, values, {
+    ...addFormFilterOptions(values, board, presentComponents),
+    requiredGroups,
+  });
   return buildConstraintClusters(entries, requiredGroups).clusters.some((cluster) => {
     if (isRadioCluster(cluster)) return false;
     const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
@@ -168,7 +168,7 @@ export function addFormNeedsUserInput(
   // Group/cluster members are unfiltered in the plan; gate them on the same
   // visibility the form uses so a hidden unlocked member can't keep the form
   // open when every rendered field is board-locked.
-  const isVisible = addFormVisibility(entries, values, opts);
+  const isVisible = addFormVisibility(entries, values, { ...opts, requiredGroups });
   if (planNeedsUserInput(plan, isVisible)) return true;
   // Any banner keeps the form open, actionable or not, so the user sees it.
   return (

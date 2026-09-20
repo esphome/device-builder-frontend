@@ -278,6 +278,23 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
     const [gated] = buildConstraintClusters(hidden, []).clusters;
     expect(renderConstraintClusterField(gated, ctxFor({}))).toBe(nothing);
   });
+
+  it("leaves out a block member with no field and nothing to switch on", () => {
+    const block = (key: string, child: Partial<ConfigEntry>): ConfigEntry =>
+      makeConfigEntry({
+        key,
+        type: ConfigEntryType.NESTED,
+        group: "g",
+        config_entries: [makeConfigEntry({ key: "rate", advanced: true, ...child })],
+      });
+    const members = [block("pwm", {}), block("dac", {})];
+    const [cluster] = buildConstraintClusters(members, []).clusters;
+    expect(renderConstraintClusterField(cluster, ctxFor({}, members))).toBe(nothing);
+    const set = ctxFor({ pwm: { rate: "1" } }, members);
+    expect(JSON.stringify(renderConstraintClusterField(cluster, set))).toContain(
+      "<entry:pwm>"
+    );
+  });
 });
 
 describe("renderConstraintRadioField", () => {

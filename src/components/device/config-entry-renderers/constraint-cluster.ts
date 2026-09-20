@@ -3,10 +3,12 @@ import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entri
 import { choicePinned } from "../../../util/config-entry-tree.js";
 import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
 import { evaluateGroup } from "../../../util/constraint-groups.js";
+import { isEmptyBlock } from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
   labelFor,
   type RenderCtx,
+  topLevelFilterOptions,
 } from "../config-entry-renderers-shared.js";
 
 /** An either/or constraint rendered as one bordered box: an inclusive
@@ -176,20 +178,26 @@ export function selectClusterAlternative(
  *  per alternative, and only the selected alternative's fields. The radio
  *  enforces the choice and only the picked side is ever saved, so there is no
  *  unsatisfied/warning state. */
-export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
-  const clusterId = cluster.members[0].key;
+/** A member paints when it holds a value, or is visible and not a block
+ *  with nothing in it. */
+function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
+  if (ctx.getAt([member.key]) !== undefined) return true;
   const values = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const isRenderable = (m: ConfigEntry): boolean =>
-    ctx.getAt([m.key]) !== undefined ||
+  return (
     isEntryVisible(
-      m,
+      member,
       values,
       ctx.presentComponents,
-      targetPlatform,
+      ctx.board?.esphome.platform ?? null,
       undefined,
       ctx.entries
-    );
+    ) && !isEmptyBlock(member, values, topLevelFilterOptions(ctx))
+  );
+}
+
+export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
+  const clusterId = cluster.members[0].key;
+  const isRenderable = (m: ConfigEntry): boolean => isClusterMemberPainted(m, ctx);
 
   // Gate alternatives on renderability (a board / platform / depends_on can hide
   // a side at runtime) and fall back to the static box when fewer than two real
@@ -270,7 +278,6 @@ export function clusterRulesMet(
  *  constraint header (warning until satisfied) over its member fields. */
 export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: RenderCtx) {
   const values = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
   const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
 
   // Lead with whichever rule is currently unmet; once both hold, keep the
@@ -295,18 +302,7 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
     keys: formatConstraintKeys(prompt.keys, ctx.entries, ctx),
   });
 
-  const visibleMembers = cluster.members.filter(
-    (m) =>
-      ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(
-        m,
-        values,
-        ctx.presentComponents,
-        targetPlatform,
-        undefined,
-        ctx.entries
-      )
-  );
+  const visibleMembers = cluster.members.filter((m) => isClusterMemberPainted(m, ctx));
   // All members gated off (depends_on / platform / hidden): skip the box rather
   // than render an empty bordered card with just a header.
   if (!visibleMembers.length) return nothing;
