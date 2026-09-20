@@ -105,7 +105,7 @@ export function assessBusHostability(
     return {
       id: s.id ?? null,
       values,
-      readable: Object.keys(values).length > 0 && !_hasHiddenKeys(lines, s),
+      readable: Object.keys(values).length > 0 && !hasHiddenKeys(lines, s),
       claimed: new Set<string>(),
     };
   });
@@ -189,7 +189,7 @@ function _canHost(
  *  an anchor merge (`<<:` at any position, including the dash line) or an
  *  include tag. Flow-mapping items parse to zero keys and are caught by
  *  the empty-values half of the `readable` rule instead. */
-function _hasHiddenKeys(lines: string[], section: YamlSection): boolean {
+export function hasHiddenKeys(lines: string[], section: YamlSection): boolean {
   for (let i = section.fromLine - 1; i < section.toLine && i < lines.length; i++) {
     const line = lines[i];
     if (/^\s*(?:-\s+)?<<\s*:/.test(line) || line.includes("!include")) return true;

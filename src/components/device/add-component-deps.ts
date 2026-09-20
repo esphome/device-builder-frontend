@@ -7,8 +7,9 @@ import {
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import {
+  classCandidates,
   findReferenceCandidates,
-  referenceClassFilter,
+  yamlHasExternalIdSources,
 } from "../../util/config-entry-yaml-scan.js";
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
@@ -130,6 +131,13 @@ export async function depsSatisfiedByProvides(
   return satisfied;
 }
 
+/** Whether any of *entries*, at any depth, is a class-restricted reference. */
+export function hasClassReference(entries: ConfigEntry[]): boolean {
+  return entries.some(
+    (entry) => !!entry.references_class || hasClassReference(entry.config_entries ?? [])
+  );
+}
+
 /**
  * Live dependencies configured only as the wrong kind: *entries* reference
  * the dependency with a ``references_class`` that none of its configured
@@ -142,16 +150,17 @@ export function wrongKindDependencies(
   yaml: string,
   byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
 ): string[] {
+  // A merged source may hold the matching block the scan can't see.
+  if (!byId || yamlHasExternalIdSources(yaml)) return [];
   const wrong = new Set<string>();
   const visit = (list: ConfigEntry[]): void => {
     for (const entry of list) {
       const domain = entry.references_component;
-      const filter = referenceClassFilter(entry, byId);
-      if (domain && filter && live.includes(domain)) {
+      if (domain && entry.references_class && live.includes(domain)) {
         const configured = findReferenceCandidates(yaml, domain, []);
         if (
           configured.length > 0 &&
-          findReferenceCandidates(yaml, domain, [], filter).length === 0
+          classCandidates(yaml, configured, entry, byId).length === 0
         ) {
           wrong.add(domain);
         }

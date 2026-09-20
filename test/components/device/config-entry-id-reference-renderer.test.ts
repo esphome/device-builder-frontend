@@ -431,24 +431,25 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
     references_component: "output",
     references_class: "output::FloatOutput",
   });
-  // Drops the gpio block, the way the form's index-backed filter would.
-  const filterDropping =
-    (...dropped: string[]) =>
-    () => ({
-      requiredClass: "output::FloatOutput",
-      indexLoaded: true,
-      entryById: (id: string) =>
-        dropped.includes(id)
-          ? ({ id, id_classes: ["output::BinaryOutput"] } as never)
-          : undefined,
-    });
+  // The catalog index marks each *dropped* component as binary only.
   const render = (yaml: string, value: string, ...dropped: string[]) =>
     renderIdReferenceField(
       entry,
       ["output"],
       makeRenderCtx(
         { output: value },
-        { overrides: { yaml, referenceClassFilter: filterDropping(...dropped) } }
+        {
+          overrides: {
+            yaml,
+            catalogById: () =>
+              new Map(
+                dropped.map((id) => [
+                  id,
+                  { id, id_classes: ["output::BinaryOutput"] } as never,
+                ])
+              ),
+          },
+        }
       )
     );
 
@@ -468,5 +469,17 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
   it("does not call a real but filtered-out id unknown", () => {
     const html = JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"));
     expect(html).not.toContain("device.id_reference_unknown_error");
+  });
+
+  it("does not claim none match when a merged source may hold one", () => {
+    const tmpl = render(
+      `packages:\n  base: !include base.yaml\n${OUTPUTS}`,
+      "",
+      "output.gpio",
+      "output.ledc"
+    );
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).not.toBe(
+      "device.id_reference_none_match"
+    );
   });
 });

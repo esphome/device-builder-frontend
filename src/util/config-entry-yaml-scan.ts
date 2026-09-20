@@ -18,6 +18,7 @@
  */
 import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
+import { hasHiddenKeys } from "./bus-availability.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
@@ -30,10 +31,12 @@ import {
   TOP_LEVEL_KEY_RE,
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
+import { parseYamlSectionValues } from "./yaml-section-reader.js";
 import {
   collectIdsAtPath,
   findFieldLine,
   parseYamlTopLevelSections,
+  qualifiedSectionKey,
   type YamlSection,
 } from "./yaml-sections-core.js";
 
@@ -343,55 +346,6 @@ export function catalogEntryToProvider(
   return idPaths?.length ? { ...provider, idPaths } : provider;
 }
 
-/** Restricts candidates to blocks whose own id inherits *requiredClass*.
- *  ``entryById`` returns nothing for an unknown component or while the index
- *  is loading; such a candidate is kept. ``indexLoaded`` keys the memo so a
- *  scan made before the index arrived is not reused. */
-export interface ReferenceClassFilter {
-  requiredClass: string;
-  entryById: (componentId: string) => ComponentCatalogIndexEntry | undefined;
-  indexLoaded: boolean;
-}
-
-/** The class filter for *entry* over the slim catalog index *byId* (absent
- *  while it loads); undefined when the entry carries no ``references_class``. */
-export function referenceClassFilter(
-  entry: ConfigEntry,
-  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
-): ReferenceClassFilter | undefined {
-  if (!entry.references_class) return undefined;
-  return {
-    requiredClass: entry.references_class,
-    entryById: (componentId) => byId?.get(componentId),
-    indexLoaded: !!byId,
-  };
-}
-
-/** Whether *section*'s own id may satisfy *filter*. Unknown classes pass: only
- *  a component the catalog marks with classes lacking the required one fails. */
-function sectionIdSatisfies(
-  yaml: string,
-  lines: string[],
-  section: YamlSection,
-  filter: ReferenceClassFilter
-): boolean {
-  // A list-form hub item (``modbus:`` / ``- id:``) has a parent key but no
-  // platform; only a platform-domain item is ``<domain>.<platform>``.
-  const domain = section.parentKey ?? section.key;
-  const componentId = section.platform ? `${domain}.${section.platform}` : domain;
-  const entry = filter.entryById(componentId);
-  if (!entry) return true;
-  let classes = entry.id_classes;
-  // A typed hub declares a different class per variant; an unset
-  // discriminator keeps ``id_classes``, the default variant's.
-  for (const [key, variants] of Object.entries(entry.id_classes_by_variant ?? {})) {
-    const lineNo = findFieldLine(yaml, section, [key]);
-    const value = lineNo === null ? null : readInstanceScalar(lines[lineNo - 1], key);
-    if (value != null && variants[value]) classes = variants[value];
-  }
-  return !classes?.length || classes.includes(filter.requiredClass);
-}
-
 interface ProviderKey {
   yaml: string;
   signature: string;
@@ -414,20 +368,15 @@ const providerMemo = createScanMemo<ProviderKey, Array<{ id: string; name: strin
  */
 export function findComponentsByProviders(
   yaml: string,
-  providers: ReadonlyArray<ComponentProvider>,
-  classFilter?: ReferenceClassFilter
+  providers: ReadonlyArray<ComponentProvider>
 ): Array<{ id: string; name: string }> {
   if (!providers.length) return [];
   // JSON-encode each provider so the cache key can't collide on a separator
   // char inside a domain / stem / path segment.
-  const signature =
-    providers
-      .map((p) => JSON.stringify([p.domain, p.stem, p.idPaths ?? []]))
-      .sort()
-      .join(",") +
-    (classFilter
-      ? JSON.stringify([classFilter.requiredClass, classFilter.indexLoaded])
-      : "");
+  const signature = providers
+    .map((p) => JSON.stringify([p.domain, p.stem, p.idPaths ?? []]))
+    .sort()
+    .join(",");
   const probe: ProviderKey = { yaml, signature };
   const cached = providerMemo.get(probe);
   if (cached) return cached;
@@ -478,12 +427,7 @@ export function findComponentsByProviders(
     // already arrived through its ["id"] path.
     if (ownIdMatched && !hasIdPathProvider) {
       if (section.id) {
-        // Only the section's own id is class-checked; a nested interface id
-        // above is already the entity the reference wants.
-        lines ??= splitYamlDocLines(yaml);
-        if (!classFilter || sectionIdSatisfies(yaml, lines, section, classFilter)) {
-          add(section.id, section.name ?? "");
-        }
+        add(section.id, section.name ?? "");
       } else if (LIST_SECTIONS.has(section.key)) {
         // A LIST_SECTIONS block stays un-expanded (no per-item sections
         // carrying an id), so enumerate its item ids directly.
@@ -557,15 +501,56 @@ export function domainOccupiesPins(
 export function findReferenceCandidates(
   yaml: string,
   domain: string,
-  providers: ReadonlyArray<ComponentProvider>,
-  classFilter?: ReferenceClassFilter
+  providers: ReadonlyArray<ComponentProvider>
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
-  return findComponentsByProviders(
-    yaml,
-    [{ domain, stem: "" }, ...providers],
-    classFilter
-  );
+  return findComponentsByProviders(yaml, [{ domain, stem: "" }, ...providers]);
+}
+
+/**
+ * The *candidates* whose id may inherit the class *entry* requires.
+ *
+ * Fails open: a candidate is dropped only when it is a top-level section's own
+ * id, the catalog knows that component's id classes, and they lack the class.
+ * A nested interface id (a ``dht`` temperature), an unknown component, an
+ * unloaded index (*byId* absent) and an unreadable typed-hub discriminator all
+ * stay offered.
+ */
+export function classCandidates<T extends { id: string }>(
+  yaml: string,
+  candidates: T[],
+  entry: ConfigEntry,
+  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
+): T[] {
+  const required = entry.references_class;
+  if (!required || !byId || !candidates.length) return candidates;
+  const sections = new Map<string, YamlSection>();
+  for (const section of parseYamlTopLevelSections(yaml)) {
+    if (section.id) sections.set(section.id, section);
+  }
+  let lines: string[] | null = null;
+  return candidates.filter((candidate) => {
+    const section = sections.get(candidate.id);
+    const component =
+      section && byId.get(qualifiedSectionKey(section.key, section.platform));
+    if (!section || !component) return true;
+    let classes = component.id_classes;
+    const variants = Object.entries(component.id_classes_by_variant ?? {});
+    if (variants.length) {
+      lines ??= splitYamlDocLines(yaml);
+      if (hasHiddenKeys(lines, section)) return true;
+      const values = parseYamlSectionValues(yaml, section.key, section.fromLine);
+      for (const [key, byValue] of variants) {
+        // Unset keeps ``id_classes``, the default variant's.
+        if (values[key] == null) continue;
+        const variant = byValue[String(values[key])];
+        // A substitution or a value the catalog doesn't know: can't judge.
+        if (!variant) return true;
+        classes = variant;
+      }
+    }
+    return !classes?.length || classes.includes(required);
+  });
 }
 
 // A top-level (zero-indent) `packages:` block or `<<:` merge key — the two

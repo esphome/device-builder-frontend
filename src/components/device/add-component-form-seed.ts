@@ -4,9 +4,9 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
+  classCandidates,
   findReferenceCandidates,
   findUsedPins,
-  referenceClassFilter,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
@@ -118,11 +118,11 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const candidates = findReferenceCandidates(
+      const candidates = classCandidates(
         yaml,
-        entry.references_component,
-        [],
-        referenceClassFilter(entry, getCachedCatalogIndex()?.byId)
+        findReferenceCandidates(yaml, entry.references_component, []),
+        entry,
+        getCachedCatalogIndex()?.byId
       );
       // A featured preset that names a component actually present in the live
       // config (a sibling just added in the same bundle, e.g. `output_blue`)

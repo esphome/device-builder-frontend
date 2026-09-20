@@ -13,9 +13,11 @@ import { mdiPlus } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import {
+  classCandidates,
   findReferenceCandidates,
   isCertainlyDanglingId,
   resolveSoleCandidate,
+  yamlHasExternalIdSources,
 } from "../../util/config-entry-yaml-scan.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
@@ -42,14 +44,15 @@ export function renderIdReferenceField(
 ) {
   const domain = entry.references_component || "";
   const providers = ctx.resolveInterfaceProviders(domain);
-  // Every configured id of the domain, for the dangling-id verdict below.
   const allCandidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
-  const classFilter = ctx.referenceClassFilter(entry);
-  // The ones whose id inherits the class this field needs.
-  const candidates = classFilter
-    ? findReferenceCandidates(ctx.yaml, domain, providers ?? [], classFilter)
+  const candidates = entry.references_class
+    ? classCandidates(ctx.yaml, allCandidates, entry, ctx.catalogById())
     : allCandidates;
-  const noneMatchClass = candidates.length === 0 && allCandidates.length > 0;
+  // A merged source may hold a matching block the scan can't see.
+  const noneMatchClass =
+    candidates.length === 0 &&
+    allCandidates.length > 0 &&
+    !yamlHasExternalIdSources(ctx.yaml);
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;

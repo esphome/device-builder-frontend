@@ -6,12 +6,10 @@
  */
 
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ComponentCatalogIndexEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type {
-  ComponentProvider,
-  ReferenceClassFilter,
-} from "../../util/config-entry-yaml-scan.js";
+import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
 
 export interface RenderCtx {
@@ -70,9 +68,9 @@ export interface RenderCtx {
    *  values), without overriding a later explicit user collapse. */
   seedNestedOpen: (key: string) => void;
   requestAddComponent: (domain: string) => void;
-  /** The class filter for a reference entry that carries ``references_class``,
-   *  backed by the slim catalog index; undefined when the entry has none. */
-  referenceClassFilter: (entry: ConfigEntry) => ReferenceClassFilter | undefined;
+  /** The slim catalog index by component id, for judging a reference's
+   *  ``references_class``; null until it loads (asking kicks the load). */
+  catalogById: () => ReadonlyMap<string, ComponentCatalogIndexEntry> | null;
   /**
    * Providers of a cross-domain interface reference. Returns synchronously
    * from the session cache; a miss kicks an async catalog fetch and

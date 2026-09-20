@@ -26,6 +26,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ComponentCatalogIndexEntry } from "../../api/types/components.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
@@ -33,11 +34,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
-import {
-  type ComponentProvider,
-  type ReferenceClassFilter,
-  referenceClassFilter,
-} from "../../util/config-entry-yaml-scan.js";
+import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -1106,7 +1103,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
-      referenceClassFilter: (entry) => this._referenceClassFilter(entry),
+      catalogById: () => this._catalogById(),
       isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
         const key = fieldKeyAttr(path);
@@ -1246,16 +1243,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * providers). A *failure* is left uncached so a later render retries
    * rather than permanently dropping candidates.
    */
-  /** Unfiltered until the catalog index lands, then one re-render applies it. */
-  private _referenceClassFilter(entry: ConfigEntry): ReferenceClassFilter | undefined {
-    if (!entry.references_class) return undefined;
-    const index = getCachedCatalogIndex();
-    if (!index && this._api) {
-      void loadCatalog(this._api).then(() => this.requestUpdate());
-    }
-    return referenceClassFilter(entry, index?.byId);
-  }
-
   private _resolveInterfaceProviders(
     interfaceName: string
   ): readonly ComponentProvider[] | null {
@@ -1270,6 +1257,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // Distinct from a cached [] so consumers don't treat an incomplete
     // candidate list as complete.
     return null;
+  }
+
+  private _catalogRequested = false;
+
+  /** One load per form: a failed fetch must not re-kick on every render. */
+  private _catalogById(): ReadonlyMap<string, ComponentCatalogIndexEntry> | null {
+    const index = getCachedCatalogIndex();
+    if (!index && this._api && !this._catalogRequested) {
+      this._catalogRequested = true;
+      void loadCatalog(this._api).then(() => this.requestUpdate());
+    }
+    return index?.byId ?? null;
   }
 }
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentCatalogIndexEntry } from "../../src/api/types/components.js";
 import {
+  classCandidates,
   findReferenceCandidates,
-  referenceClassFilter,
 } from "../../src/util/config-entry-yaml-scan.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
 import { makeConfigEntry } from "./_make-config-entry.js";
@@ -10,9 +10,28 @@ import { makeConfigEntry } from "./_make-config-entry.js";
 const index = (...entries: ComponentCatalogIndexEntry[]) =>
   new Map(entries.map((e) => [e.id, e]));
 
-const ids = (list: Array<{ id: string }>) => list.map((c) => c.id);
+const reference = (domain: string, cls: string | null) =>
+  makeConfigEntry({
+    key: `${domain}_id`,
+    references_component: domain,
+    references_class: cls,
+  });
 
-describe("findReferenceCandidates with a required id class", () => {
+const offered = (
+  yaml: string,
+  domain: string,
+  cls: string | null,
+  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null,
+  providers: Parameters<typeof findReferenceCandidates>[2] = []
+) =>
+  classCandidates(
+    yaml,
+    findReferenceCandidates(yaml, domain, providers),
+    reference(domain, cls),
+    byId
+  ).map((c) => c.id);
+
+describe("classCandidates", () => {
   const OUTPUTS = [
     "output:",
     "  - platform: gpio",
@@ -23,11 +42,6 @@ describe("findReferenceCandidates with a required id class", () => {
     "    id: unknown_out",
     "",
   ].join("\n");
-  const floatRef = makeConfigEntry({
-    key: "output",
-    references_component: "output",
-    references_class: "output::FloatOutput",
-  });
   const byId = index(
     makeComponentEntry("output.gpio", { id_classes: ["output::BinaryOutput"] }),
     // ledc satisfies every reference, so the catalog sends it no classes.
@@ -35,51 +49,22 @@ describe("findReferenceCandidates with a required id class", () => {
   );
 
   it("drops only a block whose known classes lack the required one", () => {
-    const filter = referenceClassFilter(floatRef, byId);
-    expect(ids(findReferenceCandidates(OUTPUTS, "output", [], filter))).toEqual([
+    expect(offered(OUTPUTS, "output", "output::FloatOutput", byId)).toEqual([
       "pwm_out",
       "unknown_out",
     ]);
   });
 
   it("keeps everything until the catalog index has loaded", () => {
-    const filter = referenceClassFilter(floatRef, null);
-    expect(ids(findReferenceCandidates(OUTPUTS, "output", [], filter))).toHaveLength(3);
+    expect(offered(OUTPUTS, "output", "output::FloatOutput", null)).toHaveLength(3);
   });
 
-  it("builds no filter for a reference without a class", () => {
-    const plain = makeConfigEntry({ key: "output", references_component: "output" });
-    expect(referenceClassFilter(plain, byId)).toBeUndefined();
-  });
-
-  it("does not reuse a scan memoised before the index loaded", () => {
-    const before = findReferenceCandidates(
-      OUTPUTS,
-      "output",
-      [],
-      referenceClassFilter(floatRef, null)
-    );
-    const after = findReferenceCandidates(
-      OUTPUTS,
-      "output",
-      [],
-      referenceClassFilter(floatRef, byId)
-    );
-    expect(before).toHaveLength(3);
-    expect(after).toHaveLength(2);
+  it("keeps everything for a reference without a class", () => {
+    expect(offered(OUTPUTS, "output", null, byId)).toHaveLength(3);
   });
 });
 
-describe("a typed hub is judged by the block's own variant", () => {
-  const HUBS = [
-    "modbus:",
-    "  - id: client_hub",
-    "  - id: server_hub",
-    "    role: server",
-    "  - id: explicit_client",
-    "    role: client",
-    "",
-  ].join("\n");
+describe("classCandidates on a typed hub", () => {
   const byId = index(
     makeComponentEntry("modbus", {
       // The default variant's classes: what a block with no ``role:`` declares.
@@ -92,30 +77,40 @@ describe("a typed hub is judged by the block's own variant", () => {
       },
     })
   );
-  const ref = (cls: string) =>
-    referenceClassFilter(
-      makeConfigEntry({
-        key: "modbus_id",
-        references_component: "modbus",
-        references_class: cls,
-      }),
-      byId
-    );
+  const HUBS = [
+    "modbus:",
+    "  - id: client_hub",
+    "  - id: server_hub",
+    "    role: server",
+    "  - id: explicit_client",
+    "    role: client",
+    "",
+  ].join("\n");
 
   it("offers only the server hub to a reference that needs one", () => {
-    expect(
-      ids(findReferenceCandidates(HUBS, "modbus", [], ref("modbus::ModbusServerHub")))
-    ).toEqual(["server_hub"]);
+    expect(offered(HUBS, "modbus", "modbus::ModbusServerHub", byId)).toEqual([
+      "server_hub",
+    ]);
   });
 
   it("offers the default and the explicit client hubs to a client reference", () => {
-    expect(
-      ids(findReferenceCandidates(HUBS, "modbus", [], ref("modbus::ModbusClientHub")))
-    ).toEqual(["client_hub", "explicit_client"]);
+    expect(offered(HUBS, "modbus", "modbus::ModbusClientHub", byId)).toEqual([
+      "client_hub",
+      "explicit_client",
+    ]);
+  });
+
+  it.each([
+    ["a substituted role", "modbus:\n  - id: hub\n    role: ${modbus_role}\n"],
+    ["a role the catalog doesn't know", "modbus:\n  - id: hub\n    role: gateway\n"],
+    ["keys merged from an anchor", "modbus:\n  - id: hub\n    <<: *modbus_defaults\n"],
+    ["an included block", "modbus:\n  - id: hub\n    settings: !include hub.yaml\n"],
+  ])("keeps a hub it cannot judge: %s", (_label, yaml) => {
+    expect(offered(yaml, "modbus", "modbus::ModbusServerHub", byId)).toEqual(["hub"]);
   });
 });
 
-describe("nested interface ids are never class filtered", () => {
+describe("classCandidates leaves nested interface ids alone", () => {
   it("keeps a multi-entity platform's sub-entity id", () => {
     const yaml = [
       "sensor:",
@@ -126,18 +121,10 @@ describe("nested interface ids are never class filtered", () => {
       "",
     ].join("\n");
     const byId = index(makeComponentEntry("sensor.dht", { id_classes: ["dht::DHT"] }));
-    const filter = referenceClassFilter(
-      makeConfigEntry({
-        key: "sensor",
-        references_component: "sensor",
-        references_class: "sensor::Sensor",
-      }),
-      byId
-    );
     const providers = [
       { domain: "sensor", stem: "dht", idPaths: [["temperature", "id"]] },
     ];
-    expect(ids(findReferenceCandidates(yaml, "sensor", providers, filter))).toEqual([
+    expect(offered(yaml, "sensor", "sensor::Sensor", byId, providers)).toEqual([
       "room_temp",
     ]);
   });
