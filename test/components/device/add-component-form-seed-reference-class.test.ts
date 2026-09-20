@@ -57,6 +57,15 @@ describe("seedDefaults with a class-restricted reference", () => {
     });
   });
 
+  it("leaves a class-restricted field unseeded while the index is missing", () => {
+    expect(seedDefaults(entries, CLIENT_ONLY, identityLocalize)).toEqual({});
+    // A reference with no class keeps the sole-candidate pick.
+    const plain = [{ ...entries[0], references_class: null }];
+    expect(seedDefaults(plain, CLIENT_ONLY, identityLocalize)).toEqual({
+      modbus_id: "client_hub",
+    });
+  });
+
   it("auto-picks the sole hub of the right variant", () => {
     const yaml = `${CLIENT_ONLY}  - id: server_hub\n    role: server\n`;
     expect(seedDefaults(entries, yaml, identityLocalize, false, byId)).toEqual({

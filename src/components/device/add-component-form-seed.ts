@@ -152,7 +152,11 @@ export function seedDefaults(
         candidates.some((c) => c.id === entry.default_value)
           ? entry.default_value
           : undefined;
-      const ref = presetId ?? resolveSoleCandidate(candidates, yaml)?.id;
+      // With no index a class-restricted field can't tell a lone candidate of
+      // the wrong class from a right one, so leave the pick to the user.
+      const unjudged = Boolean(entry.references_class) && !catalogById;
+      const ref =
+        presetId ?? (unjudged ? undefined : resolveSoleCandidate(candidates, yaml)?.id);
       if (ref !== undefined) {
         out[entry.key] = entry.multi_value ? [ref] : ref;
       } else if (entry.multi_value && entry.required) {

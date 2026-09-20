@@ -152,6 +152,10 @@ describe("classVerdict none match", () => {
     ["a flow mapping", "modbus: { uart_id: bus, role: server }\n"],
     ["a flow mapping list item", "modbus:\n  - { uart_id: bus, role: server }\n"],
     ["a whole-value alias", "modbus: *server_hub\n"],
+    [
+      "a flow sequence on the next line",
+      "modbus:\n  # hubs\n  [{ uart_id: bus, role: server }]\n",
+    ],
     ["an anchored flow mapping", "modbus: &server { uart_id: bus, role: server }\n"],
     [
       "an anchored flow list item",
