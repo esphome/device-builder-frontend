@@ -35,6 +35,7 @@ import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { constraintMemberPaths } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
@@ -90,7 +91,6 @@ import {
 } from "./config-entry-form-plan.js";
 import {
   fieldRendererStyles,
-  formatConstraintKeys,
   isRadioCluster,
   labelFor,
   renderBooleanField,
@@ -114,7 +114,7 @@ import {
   renderTextareaField,
   renderTimePeriodField,
 } from "./config-entry-renderers.js";
-import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
+import { renderConstraintBanners } from "./config-entry-renderers/constraint-banner-view.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
@@ -371,8 +371,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
-    values: Record<string, unknown>
-  ): ConfigEntry[] => filterRenderable(entries, values, renderFilterOptions(this));
+    values: Record<string, unknown>,
+    requiredGroups?: RequiredGroup[]
+  ): ConfigEntry[] =>
+    filterRenderable(entries, values, renderFilterOptions(this, { requiredGroups }));
 
   protected render() {
     const ctx = this._buildCtx();
@@ -625,26 +627,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  whose members render inside a `constraint-cluster` box are skipped — the
    *  box header carries their prompt. */
   private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
-    const unsatisfied = collectUnsatisfiedConstraints(
-      {
-        entries: this.entries,
-        requiredGroups: this.requiredGroups,
-        values: this.values,
-        presentComponents: this.presentComponents,
-        targetPlatform: ctx.board?.esphome.platform ?? null,
-        formatKeys: (keys) => formatConstraintKeys(keys, this.entries, ctx),
-      },
-      clusteredKeys
-    );
-    if (unsatisfied.length === 0) return nothing;
-    return unsatisfied.map(
-      ({ kind, keys }) => html`
-        <div class="warning-banner constraint-banner">
-          <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-          <span>${ctx.localize(`device.constraint_${kind}`, { keys })}</span>
-        </div>
-      `
-    );
+    const scope = {
+      entries: this.entries,
+      requiredGroups: this.requiredGroups,
+      values: this.values,
+      // As the paint resolves them, board-implied values included.
+      rootValues: renderFilterOptions(this).rootValues,
+    };
+    return renderConstraintBanners(scope, clusteredKeys, ctx);
   }
 
   connectedCallback() {
@@ -1055,16 +1045,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  not once per render or per referencing field. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
+  /** Walks the whole entry tree, so once per schema, not per render. */
+  private _constraintMemberPaths = memoizeOne(
+    (entries: ConfigEntry[], groups: RequiredGroup[]) =>
+      constraintMemberPaths(entries, groups)
+  );
+
   private _buildCtx(): RenderCtx {
-    // Top-level keys whose baked constraint prose a banner/cluster replaces;
-    // _fieldDescription strips only these so nested members keep their prose.
-    const reactiveConstraintKeys = new Set<string>();
-    for (const group of this.requiredGroups) {
-      for (const key of group.keys) reactiveConstraintKeys.add(key);
-    }
-    for (const entry of this.entries) {
-      if (entry.group) reactiveConstraintKeys.add(entry.key);
-    }
     const ctx: RenderCtx = {
       localize: this._localize,
       disabled: this.disabled,
@@ -1078,7 +1065,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
-      reactiveConstraintKeys,
+      reactiveConstraintPaths: this._constraintMemberPaths(
+        this.entries,
+        this.requiredGroups
+      ),
       entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),

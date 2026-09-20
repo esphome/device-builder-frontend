@@ -6,7 +6,9 @@ import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values
 import { isSensitiveKeyUnder } from "../../../util/yaml-sensitive-redact.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
+import { ownRequiredGroups } from "../config-entry-render-filter.js";
 import {
+  describedText,
   effectiveDisabled,
   fieldKeyAttr,
   filterOptionsAt,
@@ -16,6 +18,7 @@ import {
   renderHelpLink,
   renderLabel,
 } from "../config-entry-renderers-shared.js";
+import { renderConstraintBanners } from "./constraint-banner-view.js";
 import { nextIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
@@ -67,12 +70,14 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // one-shot, so a later user collapse sticks.
   // A block with nothing to show here (the add form drops emc2101's
   // advanced-only children) never opens: an empty body reads broken.
-  const children = ctx.filterRenderable(
-    entry.config_entries ?? [],
-    ctx.scopeValues(path)
-  );
+  // The block's own required groups bind once it is in use: their members
+  // stay visible and an unmet one is named inside the box.
+  const scope = ctx.scopeValues(path);
+  const inUse = hasSerializableValue(raw);
+  const ownGroups = ownRequiredGroups(entry, raw);
+  const children = ctx.filterRenderable(entry.config_entries ?? [], scope, ownGroups);
   const hasFields = children.length > 0;
-  if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
+  if (hasFields && (entry.required || inUse)) ctx.seedNestedOpen(key);
   // The toggle keeps its books on the raw set; only the paint is gated, so a
   // block that later gains a field opens as the user last left it.
   const userOpen = ctx.nestedOpenSections.has(key);
@@ -88,9 +93,11 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // only when it has something to write.
   const isDemanded = isSwitchable(entry, filterOptionsAt(ctx, path));
   const hasSwitch = isOptionalEntity || isDemanded;
-  const enabled = hasSwitch && hasSerializableValue(raw);
+  const enabled = hasSwitch && inUse;
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
+  // A demanded block's own baked prose goes too (emc2101's pwm / dac).
+  const description = describedText(entry, path, ctx);
   // Name what the block holds that the form does not paint: everything in a
   // fieldless block, else a valued child the filter drops (a seeded default
   // in required-only mode). Nothing to say when only nested values are left.
@@ -143,8 +150,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
         ${renderHelpLink(entry, ctx)}
       </div>
       ${
-        entry.description
-          ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
+        description
+          ? html`<p class="nested-desc">${renderMarkdown(description)}</p>`
           : nothing
       }
       ${
@@ -157,6 +164,21 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
       ${
         isOpen
           ? html`<div class="nested-fields">
+              ${
+                inUse
+                  ? renderConstraintBanners(
+                      {
+                        entries: entry.config_entries ?? [],
+                        requiredGroups: ownGroups,
+                        values: scope,
+                        // As the paint resolves them, board-implied values included.
+                        rootValues: filterOptionsAt(ctx, path).rootValues,
+                      },
+                      NO_CLUSTERS,
+                      ctx
+                    )
+                  : nothing
+              }
               ${children.map((child) => ctx.renderEntry(child, [...path, child.key]))}
             </div>`
           : nothing
@@ -239,6 +261,9 @@ function seedFor(
   if (!seed || value === undefined) ctx.emitChange(path, undefined);
   else ctx.emitChange([...path, seed.key], value);
 }
+
+// A nested scope paints no cluster boxes, so every unmet group gets a banner.
+const NO_CLUSTERS: ReadonlySet<string> = new Set();
 
 const MASKED_VALUE = "••••••";
 const WHITESPACE_RUN_RE = /\s+/g;

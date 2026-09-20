@@ -44,11 +44,10 @@ export interface RenderCtx {
    *  ``withMergedSourcePresence``) — for the ``depends_on_component``
    *  visibility predicate when filtering directly. */
   presentComponents: ReadonlySet<string>;
-  /** Top-level keys whose backend constraint prose the form replaces with a
-   *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``
-   *  members). ``_fieldDescription`` strips the baked prose only for these, so
-   *  nested-scope members keep theirs. */
-  reactiveConstraintKeys: Set<string>;
+  /** Schema paths of the members whose backend constraint prose the form
+   *  replaces with a reactive banner/cluster (``constraintMemberPaths``).
+   *  ``_fieldDescription`` strips the baked prose only for these. */
+  reactiveConstraintPaths: ReadonlySet<string>;
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
    *  ``exclusive_group`` member is dropped from the cluster), and fed to
@@ -86,9 +85,12 @@ export interface RenderCtx {
   isOptionsExpanded: (path: string[]) => boolean;
   expandOptions: (path: string[]) => void;
   scopeValues: (path: string[]) => Record<string, unknown>;
+  /** *requiredGroups* are the groups of the scope *entries* belong to; their
+   *  demanded members stay visible in required-only mode. */
   filterRenderable: (
     entries: ConfigEntry[],
-    values: Record<string, unknown>
+    values: Record<string, unknown>,
+    requiredGroups?: RequiredGroup[]
   ) => ConfigEntry[];
   /** The form's ``required_groups``. A top-level optional block one of them
    *  demands gets an enable switch so the group can be satisfied. */

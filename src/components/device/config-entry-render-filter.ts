@@ -162,9 +162,28 @@ export function renderFilterOptions(
   return opts;
 }
 
-/** Required groups are scope-local; NESTED children don't inherit them. */
-function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
-  return opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+/**
+ * The ``required_groups`` of the NESTED block *entry* that bind: its own, and
+ * only once the block is in use, so an untouched optional block
+ * (``wifi.eap``) demands nothing.
+ */
+export function ownRequiredGroups(
+  entry: ConfigEntry,
+  blockValues: unknown
+): RequiredGroup[] {
+  return hasSerializableValue(blockValues) ? (entry.required_groups ?? []) : [];
+}
+
+/** The options for the children of the NESTED block *entry*. Required groups
+ *  are scope-local: the parent's never reach the children. */
+export function nestedOpts(
+  opts: RenderFilterOptions,
+  entry: ConfigEntry,
+  blockValues: unknown
+): RenderFilterOptions {
+  const own = ownRequiredGroups(entry, blockValues);
+  const requiredGroups = own.length ? own : undefined;
+  return requiredGroups || opts.requiredGroups ? { ...opts, requiredGroups } : opts;
 }
 
 /**
@@ -194,7 +213,7 @@ export function isEmptyBlock(
   const children = filterRenderable(
     entry.config_entries ?? [],
     asRecord(own),
-    nestedOpts(opts)
+    nestedOpts(opts, entry, own)
   );
   // A demanded block still paints when its enable switch can write a value:
   // that switch is how the user satisfies the group.
@@ -208,7 +227,9 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   // Leaves stay for any demanding group; a block also needs a usable switch.
-  const demanded = opts.requiredGroups ? demandedKeys(opts.requiredGroups) : null;
+  const demanded = opts.requiredGroups
+    ? demandedKeys(opts.requiredGroups, entries)
+    : null;
   for (const entry of entries) {
     if (
       !isEntryVisible(
@@ -267,7 +288,6 @@ export function collectRenderablePaths(
   pathPrefix: string[] = [],
   out: Set<string> = new Set()
 ): Set<string> {
-  const childOpts = nestedOpts(opts);
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
       const childSchema = entry.config_entries ?? [];
@@ -280,7 +300,8 @@ export function collectRenderablePaths(
           collectRenderablePaths(
             childSchema,
             itemValues,
-            childOpts,
+            // The list renderer paints no groups for a row; bind none here either.
+            nestedOpts(opts, entry, undefined),
             [...pathPrefix, entry.key, String(idx)],
             out
           );
@@ -289,7 +310,7 @@ export function collectRenderablePaths(
         collectRenderablePaths(
           childSchema,
           asRecord(values[entry.key]),
-          childOpts,
+          nestedOpts(opts, entry, values[entry.key]),
           [...pathPrefix, entry.key],
           out
         );

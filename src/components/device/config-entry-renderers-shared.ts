@@ -25,7 +25,7 @@ import {
   isValidApiEncryptionKey,
 } from "../../util/api-encryption-key.js";
 import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
-import { stripConstraintProse } from "../../util/constraint-groups.js";
+import { schemaPathOf, stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -46,6 +46,7 @@ import {
   hasEscapeWorthyChar,
   unescapeControlForInput,
 } from "../../util/yaml-escape.js";
+import { hasSerializableValue } from "../../util/yaml-serialize.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
@@ -237,7 +238,7 @@ export function renderLabel(
       ${entry.locked ? renderLockIcon(entry, ctx, path) : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
-    ${_fieldDescription(entry, ctx)}
+    ${_fieldDescription(entry, path, ctx)}
   `;
 }
 
@@ -259,18 +260,31 @@ function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
 }
 
 /** The field's description, with the backend's baked constraint-prose paragraph
- *  removed only for members the form replaces with a reactive banner/cluster
- *  (top-level constraint keys). Nested-scope members keep their prose until
- *  nested banners land, and a field whose docs merely start with bold "Set …"
- *  isn't stripped by accident. */
-function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
-  const raw = entry.description ?? "";
-  const description = ctx.reactiveConstraintKeys?.has(entry.key)
-    ? stripConstraintProse(raw)
-    : raw;
+ *  removed only for members the form replaces with a reactive banner/cluster,
+ *  so a field whose docs merely start with bold "Set …" isn't stripped by accident. */
+function _fieldDescription(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+  const description = describedText(entry, path, ctx);
   return description
     ? html`<p class="field-description">${renderMarkdown(description)}</p>`
     : nothing;
+}
+
+/**
+ * *entry*'s description, minus the baked constraint prose when a reactive
+ * banner or cluster speaks for the member at *path*. A nested block's banner
+ * only paints once the block is in use, so until then its members keep the
+ * static prose: the user is never left with neither.
+ */
+export function describedText(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx
+): string {
+  const raw = entry.description ?? "";
+  const spokenFor =
+    ctx.reactiveConstraintPaths.has(schemaPathOf(path)) &&
+    (path.length === 1 || hasSerializableValue(ctx.getAt(path.slice(0, -1))));
+  return spokenFor ? stripConstraintProse(raw) : raw;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {
@@ -540,8 +554,9 @@ export function renderSuggestionSelect(
   `;
 }
 
-/** The filter options for the scope *path* sits in. Required groups bind
- *  only the form's top level, as ``filterRenderable`` strips them on recursion. */
+/** The filter options for the scope *path* sits in, carrying the form's own
+ *  required groups at the top level only. A nested block's groups reach its
+ *  children through ``ownRequiredGroups``, not through here. */
 export function filterOptionsAt(ctx: RenderCtx, path: string[]): RenderFilterOptions {
   return renderFilterOptions(ctx, {
     rootValues: ctx.scopeValues([]),

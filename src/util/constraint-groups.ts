@@ -8,9 +8,13 @@
  * optional member whose group is already satisfied by a sibling (e.g.
  * `esp32_rmt_led_strip` timings once `chipset` is set) stops reading "Required".
  */
-import type { RequiredGroupKind } from "../api/types/config-entries.js";
+import type {
+  ConfigEntry,
+  RequiredGroup,
+  RequiredGroupKind,
+} from "../api/types/config-entries.js";
 import { isValuePresent } from "./config-validation.js";
-import { isPlainObject } from "./nested-values.js";
+import { isIndexSegment, isPlainObject } from "./nested-values.js";
 import { hasSerializableValue } from "./yaml-serialize.js";
 
 /** A `required_groups` kind, plus `all_or_none` for inclusive `group` ids. */
@@ -73,4 +77,41 @@ export function evaluateGroup(
   // here and fails the build. No runtime fallback — lockstep deployment means
   // only known kinds ever reach this.
   kind satisfies never;
+}
+
+/**
+ * The schema paths (dotted keys, list indices dropped) of the members a
+ * reactive banner or cluster speaks for: those a scope's ``required_groups``
+ * name or that share an inclusive ``group``, at the root and in every nested
+ * block. A list row's own members are left out, since a row paints no banner.
+ * Paths, not entries: the form paints copies of board-locked entries.
+ */
+export function constraintMemberPaths(
+  entries: ConfigEntry[],
+  requiredGroups: RequiredGroup[],
+  prefix: string[] = [],
+  paintsBanner = true,
+  out: Set<string> = new Set()
+): Set<string> {
+  const named = new Set(requiredGroups.flatMap((group) => group.keys));
+  for (const entry of entries) {
+    const path = [...prefix, entry.key];
+    if (paintsBanner && (entry.group || named.has(entry.key))) out.add(path.join("."));
+    const children = entry.config_entries;
+    if (children?.length) {
+      constraintMemberPaths(
+        children,
+        entry.required_groups ?? [],
+        path,
+        !entry.multi_value,
+        out
+      );
+    }
+  }
+  return out;
+}
+
+/** *path* as ``constraintMemberPaths`` spells it: a row's index is not schema. */
+export function schemaPathOf(path: string[]): string {
+  return path.filter((segment) => !isIndexSegment(segment)).join(".");
 }

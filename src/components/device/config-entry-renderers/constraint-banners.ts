@@ -12,6 +12,9 @@ export interface ConstraintBannerInputs {
   values: Record<string, unknown>;
   presentComponents: ReadonlySet<string>;
   targetPlatform: string | null;
+  /** The component-root values, so a nested member's ``depends_on`` on a
+   *  top-level field resolves as it does in the paint. */
+  rootValues?: Record<string, unknown>;
   formatKeys: (keys: string[]) => string;
 }
 
@@ -32,7 +35,7 @@ export interface UnsatisfiedConstraint {
  */
 export function collectUnsatisfiedConstraints(
   inputs: ConstraintBannerInputs,
-  clusteredKeys: Set<string>
+  clusteredKeys: ReadonlySet<string>
 ): UnsatisfiedConstraint[] {
   const {
     entries,
@@ -40,8 +43,11 @@ export function collectUnsatisfiedConstraints(
     values,
     presentComponents,
     targetPlatform,
+    rootValues,
     formatKeys,
   } = inputs;
+  // Most scopes carry neither kind of constraint.
+  if (requiredGroups.length === 0 && !entries.some((e) => e.group)) return [];
   const messages: UnsatisfiedConstraint[] = [];
   // Skip a banner when none of its members currently render (gated off by
   // hidden / depends_on / platform, or simply not a rendered entry), matching
@@ -57,7 +63,7 @@ export function collectUnsatisfiedConstraints(
           values,
           presentComponents,
           targetPlatform,
-          undefined,
+          rootValues,
           entries
         ))
     );
@@ -78,11 +84,12 @@ export function collectUnsatisfiedConstraints(
       keys: formatKeys(namedKeys(group.kind, group.keys)),
     });
   }
-  // buildConstraintClusters folds every *non-exclusive* inclusive group into
-  // a cluster (whose members land in clusteredKeys), so this loop only fires
-  // for the residual case it skips: an inclusive group whose members are all
-  // also exclusive_group members. The collection here is deliberately broader
-  // (entry.group, no !exclusive_group guard) to still surface that banner.
+  // At the form root buildConstraintClusters folds every *non-exclusive*
+  // inclusive group into a cluster (its members land in clusteredKeys), so
+  // this loop only fires there for the residual case it skips: an inclusive
+  // group whose members are all also exclusive_group members. A nested scope
+  // paints no clusters, so there it carries every inclusive group. The
+  // collection is deliberately broad (entry.group, no !exclusive_group guard).
   const inclusive = new Map<string, string[]>();
   for (const entry of entries) {
     if (entry.group) {
