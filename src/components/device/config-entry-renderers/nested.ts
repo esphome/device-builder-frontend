@@ -3,7 +3,7 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
-import { maskSensitiveLines } from "../../../util/yaml-sensitive-redact.js";
+import { isSensitiveKeyUnder } from "../../../util/yaml-sensitive-redact.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
 import {
@@ -266,8 +266,8 @@ function setValuesOf(
 }
 
 // A credential is masked in its own field; never spell it out here. The type
-// says so for a secure child; for any other key the YAML credential masker
-// decides from its spelling, with the block as parent (``key:`` under
+// says so for a secure child; for any other key the editor's credential rules
+// decide from its spelling, with the block as parent (``key:`` under
 // ``encryption:``), so a mistyped or undeclared secret is covered too.
 function shownValue(
   parentKey: string,
@@ -275,9 +275,7 @@ function shownValue(
   value: unknown,
   child: ConfigEntry | undefined
 ): string {
-  if (child?.type === ConfigEntryType.SECURE_STRING) return MASKED_VALUE;
-  // Ask about the key with a stand-in value: the real one never enters the
-  // synthetic YAML, so a ``#`` or a quote in it can't escape the mask.
-  const [, probe] = maskSensitiveLines([`${parentKey}:`, `  ${key}: x`], MASKED_VALUE);
-  return probe.includes(MASKED_VALUE) ? MASKED_VALUE : String(value).replace(/\s+/g, " ");
+  const secret =
+    child?.type === ConfigEntryType.SECURE_STRING || isSensitiveKeyUnder(parentKey, key);
+  return secret ? MASKED_VALUE : String(value).replace(/\s+/g, " ");
 }

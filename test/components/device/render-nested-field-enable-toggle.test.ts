@@ -488,6 +488,18 @@ describe("onEnableToggle", () => {
     expect(spoken).not.toContain("Mode: fast");
   });
 
+  it("says nothing for an ordinary enabled entity block whose fields are painted", () => {
+    const entry = makeSensorEntry({ key: "temperature" });
+    const spoken = JSON.stringify(
+      renderNestedField(
+        entry,
+        ["temperature"],
+        makeRenderCtx({ temperature: { name: "Temp" } })
+      )
+    );
+    expect(spoken).not.toContain("device.enabled_block_sets");
+  });
+
   it("masks a secure child's value in the summary of what a block holds", () => {
     const entry = makeSensorEntry({
       key: "auth",

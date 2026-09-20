@@ -80,6 +80,17 @@ const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
   ["encryption", new Set(["key"])],
 ]);
 
+/**
+ * Whether *key*, case-folded by the caller, is a credential by the built-in
+ * rules: always, or only directly under *parent* (``key`` under ``encryption``).
+ */
+export function isBuiltinSensitiveKey(parent: string | undefined, key: string): boolean {
+  return (
+    ALWAYS_SENSITIVE_KEYS.has(key) ||
+    (parent !== undefined && PARENT_SCOPED_SENSITIVE_KEYS.get(parent)?.has(key) === true)
+  );
+}
+
 // Plain-scalar key matcher. Permits hyphens and dots inside the
 // key so user-defined secret names like `wifi-password:` or
 // `mqtt.user:` are recognised — important for the secrets editor's
@@ -306,13 +317,13 @@ export function findSensitiveValueRanges(
     let scoped = false;
     for (let s = stack.length - 1; s >= 0 && !scoped; s--) {
       if (stack[s].indent >= column) continue;
-      scoped = PARENT_SCOPED_SENSITIVE_KEYS.get(stack[s].key)?.has(sKeyFolded) === true;
+      scoped = isBuiltinSensitiveKey(stack[s].key, sKeyFolded);
       break;
     }
     const sensitive =
       maskAllValues ||
       scoped ||
-      ALWAYS_SENSITIVE_KEYS.has(sKeyFolded) ||
+      isBuiltinSensitiveKey(undefined, sKeyFolded) ||
       sensitiveKeyPredicate?.(sKey) === true;
     if (!sensitive) return lineIdx + 1;
 
@@ -395,12 +406,7 @@ export function findSensitiveValueRanges(
     if (maskAllValues) {
       sensitive = true;
     } else {
-      sensitive = ALWAYS_SENSITIVE_KEYS.has(keyFolded);
-      if (!sensitive && stack.length > 0) {
-        const parent = stack[stack.length - 1].key;
-        const allowed = PARENT_SCOPED_SENSITIVE_KEYS.get(parent);
-        if (allowed && allowed.has(keyFolded)) sensitive = true;
-      }
+      sensitive = isBuiltinSensitiveKey(stack[stack.length - 1]?.key, keyFolded);
       if (!sensitive && sensitiveKeyPredicate) sensitive = sensitiveKeyPredicate(key);
     }
 
