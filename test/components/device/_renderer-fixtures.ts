@@ -114,6 +114,7 @@ export function makeRenderCtx(
     expandOptions: vi.fn(),
     scopeValues: () => ({}),
     filterRenderable: (entries) => entries,
+    requiredGroups: [],
     renderEntry: vi.fn(),
     getPendingUnit: () => undefined,
     setPendingUnit: vi.fn(),

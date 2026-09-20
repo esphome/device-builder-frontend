@@ -34,7 +34,7 @@ import { apiContext, devicesContext, localizeContext } from "../../context/index
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
-import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
+import type { ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
@@ -66,6 +66,7 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
+import { isClusterMemberPainted } from "./config-entry-renderers/constraint-cluster.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
@@ -434,22 +435,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // "(N)" count or tip the all-advanced check. An exclusive group is one
     // dropdown. A constraint cluster is one box painted at its *first* member's
     // slot, and only when a member is renderable — ``renderConstraintClusterField``
-    // returns nothing when every member is gated off, so mirror that predicate
+    // returns nothing when every member is gated off, so read its own predicate
     // here or a fully-gated cluster still counts.
-    const targetPlatform = ctx.board?.esphome.platform ?? null;
     const clusterRenders = (cluster: (typeof plan.clusters)[number]): boolean =>
-      cluster.members.some(
-        (m) =>
-          getIn(this.values, [m.key]) !== undefined ||
-          isEntryVisible(
-            m,
-            this.values,
-            this.presentComponents,
-            targetPlatform,
-            undefined,
-            this.entries
-          )
-      );
+      cluster.members.some((m) => isClusterMemberPainted(m, ctx));
     const renderedClusterKeys = new Set(
       plan.clusters.filter(clusterRenders).map((c) => c.members[0].key)
     );
@@ -1107,6 +1096,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       },
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
+      requiredGroups: this.requiredGroups,
       getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
       setPendingUnit: (path, unit) => {
         this._pendingUnits.set(path.join("."), unit);

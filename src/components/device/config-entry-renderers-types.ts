@@ -6,7 +6,7 @@
  */
 
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
@@ -36,7 +36,7 @@ export interface RenderCtx {
   pinRegistryModes?: Record<string, string[]>;
   requiredOnly: boolean;
   /** Whether the section's advanced fields are shown. Read by
-   *  ``renderChildEntries({ includeAdvanced })`` so an exclusive-group's
+   *  ``renderExclusiveMemberChildren`` so an exclusive-group's
    *  chosen member can reveal all its fields regardless of the toggle. */
   showAdvanced: boolean;
   /** Effective top-level component presence (literal scan, widened via
@@ -86,6 +86,9 @@ export interface RenderCtx {
     entries: ConfigEntry[],
     values: Record<string, unknown>
   ) => ConfigEntry[];
+  /** The form's ``required_groups``. A top-level optional block one of them
+   *  demands gets an enable switch so the group can be satisfied. */
+  requiredGroups: RequiredGroup[];
   renderEntry: (entry: ConfigEntry, path: string[]) => unknown;
   /**
    * FLOAT_WITH_UNIT-only: stash a unit choice that the user picked

@@ -770,6 +770,7 @@
     "show_advanced": "Show advanced settings",
     "show_advanced_count": "Show advanced settings ({count})",
     "enable_entity": "Enable {name}",
+    "enabled_block_sets": "Sets {values}",
     "multi_value_empty": "No items yet — click + to add one.",
     "multi_value_add": "Add",
     "multi_value_remove": "Remove",

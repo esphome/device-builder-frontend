@@ -194,24 +194,32 @@ describe("a required group whose members are all optional", () => {
   });
 });
 
-describe("a required group the add form cannot paint", () => {
+describe("a required group whose members are blocks with no required child", () => {
   // emc2101: exactly one of two optional NESTED blocks whose children are all
-  // optional, so required-only mode paints neither.
+  // optional. Each paints as a block with an enable switch.
   const entries = [
-    makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution" })]),
-    makeNestedEntry("dac", [makeConfigEntry({ key: "conversion_rate" })]),
+    makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution", default_value: "23" })]),
+    makeNestedEntry("dac", [
+      makeConfigEntry({ key: "conversion_rate", default_value: "16" }),
+    ]),
   ];
   const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
 
-  it("still opens the form so the banner is seen", () => {
-    expect(addFormNeedsUserInput(entries, {}, groups, null, NONE)).toBe(true);
+  it("paints the blocks so one can be switched on", () => {
+    const paths = addFormRenderablePaths(entries, {}, groups, null, NONE);
+    expect([...paths].sort()).toEqual(["dac", "pwm"]);
   });
 
-  it("does not hold Add on a group with no painted member", () => {
-    expect(addFormRenderablePaths(entries, {}, groups, null, NONE).size).toBe(0);
-    expect(addFormHasUnsatisfiedConstraint(entries, {}, groups, null, NONE)).toBe(false);
+  it("holds Add until exactly one block is set", () => {
+    const unmet = (values: Record<string, unknown>) =>
+      addFormHasUnsatisfiedConstraint(entries, values, groups, null, NONE);
+    expect(unmet({})).toBe(true);
+    expect(unmet({ pwm: { resolution: 23 } })).toBe(false);
+    expect(unmet({ pwm: { resolution: 23 }, dac: { conversion_rate: "16" } })).toBe(true);
   });
+});
 
+describe("a required group the add form cannot paint", () => {
   it("does not hold Add on a group whose members are all advanced", () => {
     const advanced = [
       makeConfigEntry({ key: "a", advanced: true }),
@@ -258,6 +266,56 @@ describe("an unmet constraint cluster box", () => {
   it("leaves an exactly_one radio cluster to its forced choice", () => {
     const radio = [{ kind: "exactly_one" as const, keys: ["identity", "certificate"] }];
     expect(addFormHasUnsatisfiedConstraint(members(), {}, radio, null, NONE)).toBe(false);
+  });
+});
+
+describe("a cluster box whose members are blocks", () => {
+  // At least one of fan / pwm, where pwm and dac share an inclusive group, so
+  // the three blocks render as one cluster box.
+  const blocks = (child: Record<string, unknown>) => [
+    makeNestedEntry("fan", [makeConfigEntry({ key: "speed", ...child })]),
+    {
+      ...makeNestedEntry("pwm", [makeConfigEntry({ key: "divider", ...child })]),
+      group: "out",
+    },
+    {
+      ...makeNestedEntry("dac", [makeConfigEntry({ key: "rate", ...child })]),
+      group: "out",
+    },
+  ];
+  const groups = [{ kind: "at_least_one" as const, keys: ["fan", "pwm"] }];
+
+  it("holds Add while a block's switch can satisfy it", () => {
+    expect(
+      addFormHasUnsatisfiedConstraint(
+        blocks({ default_value: "1" }),
+        {},
+        groups,
+        null,
+        NONE
+      )
+    ).toBe(true);
+  });
+
+  it("holds Add on a radio of blocks until the picked one is switched on", () => {
+    const radio = [{ kind: "exactly_one" as const, keys: ["fan", "pwm"] }];
+    const unmet = (values: Record<string, unknown>) =>
+      addFormHasUnsatisfiedConstraint(
+        blocks({ default_value: "1" }),
+        values,
+        radio,
+        null,
+        NONE
+      );
+    expect(unmet({})).toBe(true);
+    expect(unmet({ fan: {} })).toBe(true);
+    expect(unmet({ fan: { speed: "1" } })).toBe(false);
+  });
+
+  it("does not hold Add on blocks with no field and nothing to switch on", () => {
+    expect(addFormHasUnsatisfiedConstraint(blocks({}), {}, groups, null, NONE)).toBe(
+      false
+    );
   });
 });
 

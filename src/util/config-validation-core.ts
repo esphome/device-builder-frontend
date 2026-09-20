@@ -48,7 +48,8 @@ export function nearCanonicalOption(
  * A value counts as "present" for required / constraint-group purposes
  * unless it's nullish, a blank/whitespace string, or an empty array.
  * Shared so `validateEntry` and the constraint-group evaluator agree on
- * what "set" means.
+ * what "set" means; the evaluator also discounts a block the serializer
+ * would prune.
  */
 export function isValuePresent(raw: unknown): boolean {
   return !(

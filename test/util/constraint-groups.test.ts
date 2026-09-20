@@ -77,3 +77,27 @@ describe("stripConstraintProse", () => {
     );
   });
 });
+
+describe("evaluateGroup with NESTED block members", () => {
+  const keys = ["pwm", "dac"];
+
+  it("counts a block that holds a value", () => {
+    expect(evaluateGroup("exactly_one", keys, { pwm: { divider: 1 } })).toBe(true);
+  });
+
+  it("ignores a block the serializer would prune", () => {
+    expect(evaluateGroup("exactly_one", keys, { pwm: {} })).toBe(false);
+    expect(evaluateGroup("exactly_one", keys, { pwm: { divider: undefined } })).toBe(
+      false
+    );
+    expect(evaluateGroup("at_least_one", keys, { pwm: {}, dac: { rate: "" } })).toBe(
+      false
+    );
+  });
+
+  it("does not let an emptied block break exactly_one for its sibling", () => {
+    expect(evaluateGroup("exactly_one", keys, { pwm: {}, dac: { rate: "16" } })).toBe(
+      true
+    );
+  });
+});
