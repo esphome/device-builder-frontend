@@ -117,9 +117,7 @@ function isSensitiveKey(key: string): boolean {
 /** Whether a UI surface masks the value of *key* sitting directly under
  *  *parent*: the editor's own rules, asked about a key rather than a line. */
 export function isSensitiveKeyUnder(parent: string | undefined, key: string): boolean {
-  return (
-    isBuiltinSensitiveKey(parent?.toLowerCase(), key.toLowerCase()) || isSensitiveKey(key)
-  );
+  return isBuiltinSensitiveKey(parent, key) || isSensitiveKey(key);
 }
 
 function isReportSensitiveKey(key: string): boolean {
