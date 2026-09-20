@@ -110,6 +110,7 @@ export function makeRenderCtx(
     seedNestedOpen: vi.fn(),
     requestAddComponent: vi.fn(),
     resolveInterfaceProviders: () => [],
+    catalogById: () => null,
     isOptionsExpanded: () => true,
     expandOptions: vi.fn(),
     scopeValues: () => ({}),

@@ -17,6 +17,7 @@ import {
   isCertainlyDanglingId,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
+import { classVerdict } from "../../util/reference-class.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
@@ -42,7 +43,13 @@ export function renderIdReferenceField(
 ) {
   const domain = entry.references_component || "";
   const providers = ctx.resolveInterfaceProviders(domain);
-  const candidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
+  const allCandidates = findReferenceCandidates(ctx.yaml, domain, providers ?? []);
+  // Only a class-restricted reference needs the catalog index.
+  const byId = entry.references_class ? ctx.catalogById() : null;
+  const verdict = classVerdict(ctx.yaml, allCandidates, entry, byId);
+  const candidates = verdict.candidates;
+  // An unsettled provider fetch may still bring a matching candidate.
+  const noneMatch = providers !== null && verdict.noneMatch;
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
@@ -79,8 +86,13 @@ export function renderIdReferenceField(
     : selected
       ? [selected]
       : [];
+  // Declared in this file but the wrong class: say so, not "not defined here".
+  const wrongKind = hasOrphanValue && allCandidates.some((c) => c.id === value);
+  const orphanCopy = wrongKind
+    ? "device.id_reference_wrong_kind"
+    : "device.id_reference_unresolved";
   const orphanOption = hasOrphanValue
-    ? idOption(value, value, ctx.localize("device.id_reference_unresolved", { domain }))
+    ? idOption(value, value, ctx.localize(orphanCopy, { domain }))
     : nothing;
   // A dangling reference we can be sure about gets an inline error without
   // waiting for the backend lint round trip. The renderer gates on its own
@@ -90,11 +102,16 @@ export function renderIdReferenceField(
   const unknownId =
     !fieldError &&
     providers !== null &&
-    isCertainlyDanglingId(value, candidates, ctx.yaml);
-  const invalid = fieldError || unknownId;
+    isCertainlyDanglingId(value, allCandidates, ctx.yaml);
+  // A wrong-class id is as provable as a dangling one; the closed select shows
+  // only the bare id, so say it inline too.
+  const wrongKindError = !fieldError && wrongKind;
+  const invalid = fieldError || unknownId || wrongKindError;
   const unknownIdError = unknownId
     ? renderInlineError(ctx.localize("device.id_reference_unknown_error", { id: value }))
-    : nothing;
+    : wrongKindError
+      ? renderInlineError(ctx.localize("device.id_reference_wrong_kind", { domain }))
+      : nothing;
   // Solo "Add new" CTA only when there's genuinely nothing to show.
   const empty = candidates.length === 0 && !hasOrphanValue;
   // An id-less singleton (plain logger:, wifi:, ...) yields no candidates
@@ -105,8 +122,13 @@ export function renderIdReferenceField(
   // is the honest empty state. Scanned from the YAML rather than
   // ctx.presentComponents, which not every form host wires up (the
   // automation action form doesn't).
+  // Not when every configured id was the wrong class: auto-resolution would
+  // land on one of those and fail.
   const emptyButConfigured =
-    empty && !entry.required && parseTopLevelComponents(ctx.yaml).has(domain);
+    empty &&
+    !noneMatch &&
+    !entry.required &&
+    parseTopLevelComponents(ctx.yaml).has(domain);
 
   const onChange = (e: Event) => {
     const select = e.target as HTMLSelectElement;
@@ -129,8 +151,10 @@ export function renderIdReferenceField(
   // ``logger_id: logger`` older builds pre-filled, #2208). An empty field
   // already reads as auto via the default-candidate placeholder, so the
   // option only appears once a value is set.
+  // Not when every configured block is the wrong class: auto-resolution would
+  // land on one of those and fail.
   const autoOption =
-    !entry.required && value !== ""
+    !entry.required && value !== "" && !noneMatch
       ? idOption(
           AUTO_SENTINEL,
           ctx.localize("device.id_reference_auto"),
@@ -165,7 +189,9 @@ export function renderIdReferenceField(
           placeholder=${ctx.localize(
             emptyButConfigured
               ? "device.id_reference_auto_configured"
-              : "device.id_reference_empty",
+              : noneMatch
+                ? "device.id_reference_none_match"
+                : "device.id_reference_empty",
             { domain }
           )}
           @change=${onChange}

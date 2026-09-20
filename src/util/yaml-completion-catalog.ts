@@ -125,6 +125,12 @@ export interface CompletionTarget {
 }
 
 let catalogPromise: Promise<CatalogIndex> | null = null;
+let catalogIndex: CatalogIndex | null = null;
+
+/** The loaded index, or null until ``loadCatalog`` resolves with components. */
+export function getCachedCatalogIndex(): CatalogIndex | null {
+  return catalogIndex;
+}
 
 /**
  * Load the component catalog once per session. The list is small enough
@@ -143,9 +149,11 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
       list.push(c);
       byCategory.set(c.category, list);
     }
-    return { components, byId, byCategory };
+    catalogIndex = { components, byId, byCategory };
+    return catalogIndex;
   })().catch((err) => {
-    console.debug("[yaml-completion] failed to load catalog:", err);
+    // Class filtering of reference pickers rides on this index: say so loudly.
+    console.warn("[yaml-completion] failed to load catalog:", err);
     catalogPromise = null;
     return { components: [], byId: new Map(), byCategory: new Map() };
   });
@@ -154,6 +162,7 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
 
 export function _clearCatalogCache(): void {
   catalogPromise = null;
+  catalogIndex = null;
 }
 
 /**

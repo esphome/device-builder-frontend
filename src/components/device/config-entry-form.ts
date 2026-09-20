@@ -56,6 +56,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -329,6 +330,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  post-render radio-group sync; kept in a controller so this file doesn't
    *  grow. */
   private _constraintClusters = new ConstraintClusterController(this);
+  private _catalogIndex = new CatalogIndexController(this, () => this._api);
 
   /** gateAdvanced unit placement (key → paints inline, else gated) frozen
    *  while the section is open, so a value landing mid-edit doesn't re-home
@@ -1087,6 +1089,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
+      catalogById: () => this._catalogIndex.byId(),
       isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
         const key = fieldKeyAttr(path);

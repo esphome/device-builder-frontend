@@ -215,6 +215,11 @@ export interface ConfigEntry {
    */
   references_component?: string | null;
   /**
+   * The C++ class the referenced id must inherit (`output::FloatOutput`), sent
+   * only when some candidate of `references_component` fails it.
+   */
+  references_class?: string | null;
+  /**
    * Target chips this field is valid on. Empty list (or omitted) =
    * no restriction (the common case); non-empty = the field is
    * restricted to the listed chips. Same wire shape as

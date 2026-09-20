@@ -5,9 +5,18 @@ import {
 } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
+import {
+  catalogEntryToProvider,
+  findReferenceCandidates,
+} from "../../util/config-entry-yaml-scan.js";
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
+import { classVerdict } from "../../util/reference-class.js";
+import {
+  type CatalogIndex,
+  getCachedCatalogIndex,
+} from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -29,14 +38,19 @@ export function liveDependencies(
   values: Record<string, unknown>
 ): string[] {
   const entries = component.config_entries;
-  const valueGateHides = (entry: ConfigEntry): boolean => {
-    const gate = resolveDependsOn(entry, values, undefined, entries);
-    return gate != null && !gateAccepts(entry, gate);
-  };
   return (component.dependencies ?? []).filter((dep) => {
     const refs = entries.filter((e) => e.references_component === dep);
-    return refs.length === 0 || !refs.every(valueGateHides);
+    return refs.length === 0 || !refs.every((e) => valueGateHides(e, values, entries));
   });
+}
+
+function valueGateHides(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+  entries: ConfigEntry[]
+): boolean {
+  const gate = resolveDependsOn(entry, values, undefined, entries);
+  return gate != null && !gateAccepts(entry, gate);
 }
 
 /**
@@ -123,4 +137,116 @@ export async function depsSatisfiedByProvides(
     })
   );
   return satisfied;
+}
+
+/**
+ * Live dependencies configured only as the wrong kind: a top-level entry the
+ * form asks for references the dependency with a ``references_class`` none of
+ * the picker's candidates provides (hoermann_hcp needs a ``role: server``
+ * modbus hub and only a client one exists). Nested entries are not walked,
+ * as in ``liveDependencies``. Judges nothing until *index* has loaded.
+ */
+export function wrongKindDependencies(
+  entries: ConfigEntry[],
+  live: readonly string[],
+  values: Record<string, unknown>,
+  yaml: string,
+  index: Pick<CatalogIndex, "components" | "byId"> | null
+): string[] {
+  if (!index) return [];
+  const wrong = new Set<string>();
+  // Most forms carry no class-restricted reference: build providers lazily.
+  const providersFor = (domain: string) =>
+    index.components
+      .filter((c) => c.provides?.includes(domain))
+      .map((c) => catalogEntryToProvider(c, domain));
+  for (const entry of entries) {
+    const domain = entry.references_component;
+    if (!domain || !entry.references_class || entry.locked) continue;
+    if (!live.includes(domain) || valueGateHides(entry, values, entries)) continue;
+    if (wrong.has(domain)) continue;
+    const configured = findReferenceCandidates(yaml, domain, providersFor(domain));
+    if (classVerdict(yaml, configured, entry, index.byId).noneMatch) wrong.add(domain);
+  }
+  return [...wrong];
+}
+
+/** The banner copy family: present but unusable reads differently from absent. */
+export type DepsCopy =
+  | "device.bus_dependency_in_use"
+  | "device.missing_dependencies"
+  | "device.wrong_kind_dependency";
+
+/**
+ * The add form's dependency verdict: the net-missing deps driving the banner
+ * and submit gate, plus the copy that describes them. *provided* deps (absent
+ * ones a present component supplies) are dropped; a live bus dep with no
+ * attachable bus (*busBlocked*) and deps present only as the wrong kind are
+ * added. A lone bus-blocked dep takes the bus copy even when it is also the
+ * wrong kind. Reads *index*, never loads it: the dialog awaits it before the
+ * form mounts (``hydrateForSelection``).
+ */
+export function resolveDepVerdict(opts: {
+  component: Pick<ComponentCatalogEntry, "dependencies" | "config_entries">;
+  entries: ConfigEntry[];
+  values: Record<string, unknown>;
+  yaml: string;
+  present: ReadonlySet<string>;
+  resolvedPlatforms: readonly string[];
+  provided: ReadonlySet<string>;
+  busBlocked: string | null;
+  index: Pick<CatalogIndex, "components" | "byId"> | null;
+}): { deps: string[]; copy: DepsCopy } {
+  const live = liveDependencies(opts.component, opts.values);
+  const missing = findMissingDependencies(
+    live,
+    opts.yaml,
+    opts.present,
+    opts.resolvedPlatforms
+  ).filter((d) => !opts.provided.has(d));
+  const wrongKind = wrongKindDependencies(
+    opts.entries,
+    live,
+    opts.values,
+    opts.yaml,
+    opts.index
+  );
+  const unusable = new Set(wrongKind);
+  if (opts.busBlocked && live.includes(opts.busBlocked)) unusable.add(opts.busBlocked);
+  const deps = [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
+  const copy: DepsCopy =
+    deps.length === 1 && deps[0] === opts.busBlocked
+      ? "device.bus_dependency_in_use"
+      : deps.every((d) => wrongKind.includes(d))
+        ? "device.wrong_kind_dependency"
+        : "device.missing_dependencies";
+  return { deps, copy };
+}
+
+/**
+ * Whether the dialog's skip-the-form path must yield to the form over a
+ * class-restricted reference: a dependency present only as the wrong kind
+ * needs the form's callout, and with no *index* (a failed load) that can't be
+ * judged, so adding would be adding blind.
+ */
+export function classReferenceNeedsForm(
+  entries: ConfigEntry[],
+  live: readonly string[],
+  values: Record<string, unknown>,
+  yaml: string,
+  index: Pick<CatalogIndex, "components" | "byId"> | null = getCachedCatalogIndex()
+): boolean {
+  if (!index) return hasClassReference(entries);
+  return wrongKindDependencies(entries, live, values, yaml, index).length > 0;
+}
+
+/** Whether any entry, nested ones included since seeding walks them, needs a
+ *  specific id class, so adding without the catalog index would be adding blind. */
+function hasClassReference(entries: ConfigEntry[]): boolean {
+  return entries.some(
+    (e) =>
+      // A locked reference is a deliberate pin the form never asks about.
+      Boolean(e.references_component && e.references_class && !e.locked) ||
+      hasClassReference(e.config_entries ?? [])
+  );
 }

@@ -26,14 +26,16 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import {
+  type DepsCopy,
   depsSatisfiedByProvides,
   findMissingDependencies,
-  liveDependencies,
+  resolveDepVerdict,
 } from "./add-component-deps.js";
 import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
@@ -44,6 +46,7 @@ import {
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues, findReferencePath } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { resolveEntryLabel } from "./config-entry-renderers-shared.js";
@@ -60,6 +63,10 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
+
+  /** Re-renders the form when a late catalog index lands, so the dependency
+   *  verdict is not stuck on a failed first load. */
+  private _catalogIndex = new CatalogIndexController(this, () => this._api);
 
   @property({ attribute: false })
   component!: ComponentCatalogEntry;
@@ -282,21 +289,18 @@ export class ESPHomeAddComponentForm extends LitElement {
     return this._widenPresence(this.yaml, this.resolvedComponents);
   }
 
-  /** Net-missing deps driving the banner and submit gate: the widened
-   *  scan minus those a present component provides (`_providedDeps`), plus
-   *  a live bus dep present but with no attachable bus (`_busBlockedDep`). */
-  private _missingDeps(present: ReadonlySet<string>): string[] {
-    const live = liveDependencies(this.component, this._values);
-    const missing = findMissingDependencies(
-      live,
-      this.yaml,
+  private _missingDeps(present: ReadonlySet<string>): { deps: string[]; copy: DepsCopy } {
+    return resolveDepVerdict({
+      component: this.component,
+      entries: this._entries,
+      values: this._values,
+      yaml: this.yaml,
       present,
-      this.resolvedPlatforms
-    ).filter((d) => !this._providedDeps.has(d));
-    const blocked = this._busBlockedDep;
-    return blocked && live.includes(blocked) && !missing.includes(blocked)
-      ? [...missing, blocked]
-      : missing;
+      resolvedPlatforms: this.resolvedPlatforms,
+      provided: this._providedDeps,
+      busBlocked: this._busBlockedDep,
+      index: this._catalogIndex.index(),
+    });
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -382,6 +386,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       prefillFields: this.prefillFields,
       restoredValues: this.restoredValues,
       localize: this._localize,
+      catalogById: getCachedCatalogIndex()?.byId,
     });
   }
 
@@ -393,7 +398,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // configured platform for hub-style deps (`atm90e32` under
     // `sensor:`). Surface these instead of letting the user submit a
     // config that won't validate.
-    const missingDeps = this._missingDeps(presentComponents);
+    const { deps: missingDeps, copy: depsCopy } = this._missingDeps(presentComponents);
 
     // The shared form filters its own visibility — but we still need
     // to know whether everything required is filled in to enable the
@@ -412,7 +417,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     return html`
       <div class="form">
         <p class="form-desc">${renderMarkdown(this.component.description)}</p>
-        ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps) : nothing}
+        ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps, depsCopy) : nothing}
         <esphome-config-entry-form
           .entries=${this._entries}
           .requiredGroups=${this.component.required_groups ?? []}
@@ -486,37 +491,17 @@ export class ESPHomeAddComponentForm extends LitElement {
    * back to the raw id until the cache lookup lands (kicked off in
    * ``willUpdate``).
    */
-  /** True when the only outstanding dep is the bus-blocked one, so the
-   *  banner and the Enter-key submit bail speak of an unavailable bus
-   *  rather than a missing component. */
-  private _allDepsBusBlocked(missing: string[]): boolean {
-    const blocked = this._busBlockedDep;
-    return blocked !== null && missing.length === 1 && missing[0] === blocked;
+  private _depsBlockTitle(copy: DepsCopy): string {
+    return this._localize(`${copy}_title`, { name: this.component.name });
   }
 
-  private _depsBlockTitle(missing: string[]): string {
-    return this._localize(
-      this._allDepsBusBlocked(missing)
-        ? "device.bus_dependency_in_use_title"
-        : "device.missing_dependencies_title",
-      { name: this.component.name }
-    );
-  }
-
-  private _renderMissingDeps(missing: string[]) {
-    const allBlocked = this._allDepsBusBlocked(missing);
+  private _renderMissingDeps(missing: string[], copy: DepsCopy) {
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
-          <div class="deps-warning-title">${this._depsBlockTitle(missing)}</div>
-          <div>
-            ${
-              allBlocked
-                ? this._localize("device.bus_dependency_in_use_body")
-                : this._localize("device.missing_dependencies_body")
-            }
-          </div>
+          <div class="deps-warning-title">${this._depsBlockTitle(copy)}</div>
+          <div>${this._localize(`${copy}_body`)}</div>
           <div class="deps-warning-actions">
             ${missing.map(
               (d) =>
@@ -683,11 +668,11 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Block submit when a declared dependency isn't satisfied. The Add
     // button is disabled in that case, but Enter (requestSubmit) still
     // lands here.
-    const missingDeps = this._missingDeps(presentComponents);
+    const { deps: missingDeps, copy: depsCopy } = this._missingDeps(presentComponents);
     if (missingDeps.length > 0) {
       // Surface a visible message that names the missing domain(s) so
       // the user can act, instead of returning silently.
-      this._localBlockMessage = `${this._depsBlockTitle(missingDeps)} (${missingDeps.join(", ")})`;
+      this._localBlockMessage = `${this._depsBlockTitle(depsCopy)} (${missingDeps.join(", ")})`;
       return;
     }
 
