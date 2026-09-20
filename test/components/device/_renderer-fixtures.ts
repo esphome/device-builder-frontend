@@ -23,6 +23,7 @@ import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { getIn } from "../../../src/util/nested-values.js";
 import { parseSubstitutions } from "../../../src/util/substitutions.js";
 
 /** Build a minimal ``BoardPin``. Defaults to a generic
@@ -113,7 +114,13 @@ export function makeRenderCtx(
     catalogById: () => null,
     isOptionsExpanded: () => true,
     expandOptions: vi.fn(),
-    scopeValues: () => ({}),
+    // As the form does: the mapping at *path*, else an empty scope.
+    scopeValues: (path: string[]) => {
+      const at = getIn(values as Record<string, unknown>, path);
+      return at && typeof at === "object" && !Array.isArray(at)
+        ? (at as Record<string, unknown>)
+        : {};
+    },
     filterRenderable: (entries) => entries,
     requiredGroups: [],
     renderEntry: vi.fn(),

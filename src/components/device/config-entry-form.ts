@@ -90,7 +90,6 @@ import {
 } from "./config-entry-form-plan.js";
 import {
   fieldRendererStyles,
-  formatConstraintKeys,
   isRadioCluster,
   labelFor,
   renderBooleanField,
@@ -114,7 +113,7 @@ import {
   renderTextareaField,
   renderTimePeriodField,
 } from "./config-entry-renderers.js";
-import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
+import { renderConstraintBanners } from "./config-entry-renderers/constraint-banner-view.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
@@ -371,8 +370,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
-    values: Record<string, unknown>
-  ): ConfigEntry[] => filterRenderable(entries, values, renderFilterOptions(this));
+    values: Record<string, unknown>,
+    requiredGroups?: RequiredGroup[]
+  ): ConfigEntry[] =>
+    filterRenderable(entries, values, renderFilterOptions(this, { requiredGroups }));
 
   protected render() {
     const ctx = this._buildCtx();
@@ -625,26 +626,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  whose members render inside a `constraint-cluster` box are skipped — the
    *  box header carries their prompt. */
   private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
-    const unsatisfied = collectUnsatisfiedConstraints(
-      {
-        entries: this.entries,
-        requiredGroups: this.requiredGroups,
-        values: this.values,
-        presentComponents: this.presentComponents,
-        targetPlatform: ctx.board?.esphome.platform ?? null,
-        formatKeys: (keys) => formatConstraintKeys(keys, this.entries, ctx),
-      },
-      clusteredKeys
-    );
-    if (unsatisfied.length === 0) return nothing;
-    return unsatisfied.map(
-      ({ kind, keys }) => html`
-        <div class="warning-banner constraint-banner">
-          <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-          <span>${ctx.localize(`device.constraint_${kind}`, { keys })}</span>
-        </div>
-      `
-    );
+    const scope = {
+      entries: this.entries,
+      requiredGroups: this.requiredGroups,
+      values: this.values,
+    };
+    return renderConstraintBanners(scope, clusteredKeys, ctx);
   }
 
   connectedCallback() {

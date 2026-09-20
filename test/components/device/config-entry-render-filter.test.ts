@@ -6,6 +6,7 @@ import {
   collectRenderablePaths,
   filterRenderable,
   renderFilterOptions,
+  type RenderFilterOptions,
   type RenderFilterSource,
 } from "../../../src/components/device/config-entry-render-filter.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
@@ -1070,5 +1071,43 @@ describe("filterRenderable demanded NESTED members", () => {
 
   it("still drops an undemanded block with no renderable child", () => {
     expect(filterRenderable([block("pwm")], {}, opts)).toEqual([]);
+  });
+});
+
+describe("filterRenderable with a nested block's own required groups", () => {
+  const eap = makeEntry({
+    key: "eap",
+    type: ConfigEntryType.NESTED,
+    required_groups: [{ kind: "at_least_one", keys: ["identity", "certificate"] }],
+    config_entries: [
+      makeEntry({ key: "identity" }),
+      makeEntry({ key: "certificate" }),
+      makeEntry({ key: "username", required: true }),
+    ],
+  });
+  const opts = { requiredOnly: true, showAdvanced: false };
+  const paths = (
+    values: Record<string, unknown>,
+    extra: Partial<RenderFilterOptions> = {}
+  ) => [...collectRenderablePaths([eap], values, { ...opts, ...extra })].sort();
+
+  it("keeps the demanded members visible once the block is in use", () => {
+    expect(paths({ eap: { username: "me" } })).toEqual([
+      "eap",
+      "eap.certificate",
+      "eap.identity",
+      "eap.username",
+    ]);
+  });
+
+  it("demands nothing of an untouched block", () => {
+    expect(paths({})).toEqual(["eap", "eap.username"]);
+  });
+
+  it("never applies the parent scope's groups inside the block", () => {
+    const parent = {
+      requiredGroups: [{ kind: "at_least_one" as const, keys: ["identity"] }],
+    };
+    expect(paths({}, parent)).toEqual(["eap", "eap.username"]);
   });
 });

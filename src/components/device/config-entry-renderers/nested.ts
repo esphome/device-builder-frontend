@@ -16,6 +16,7 @@ import {
   renderHelpLink,
   renderLabel,
 } from "../config-entry-renderers-shared.js";
+import { renderConstraintBanners } from "./constraint-banner-view.js";
 import { nextIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
@@ -67,10 +68,11 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // one-shot, so a later user collapse sticks.
   // A block with nothing to show here (the add form drops emc2101's
   // advanced-only children) never opens: an empty body reads broken.
-  const children = ctx.filterRenderable(
-    entry.config_entries ?? [],
-    ctx.scopeValues(path)
-  );
+  // The block's own required groups bind once it is in use: their members
+  // stay visible and an unmet one is named inside the box.
+  const scope = ctx.scopeValues(path);
+  const ownGroups = hasSerializableValue(raw) ? (entry.required_groups ?? []) : [];
+  const children = ctx.filterRenderable(entry.config_entries ?? [], scope, ownGroups);
   const hasFields = children.length > 0;
   if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
   // The toggle keeps its books on the raw set; only the paint is gated, so a
@@ -157,6 +159,19 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
       ${
         isOpen
           ? html`<div class="nested-fields">
+              ${
+                hasSerializableValue(raw)
+                  ? renderConstraintBanners(
+                      {
+                        entries: entry.config_entries ?? [],
+                        requiredGroups: ownGroups,
+                        values: scope,
+                      },
+                      NO_CLUSTERS,
+                      ctx
+                    )
+                  : nothing
+              }
               ${children.map((child) => ctx.renderEntry(child, [...path, child.key]))}
             </div>`
           : nothing
@@ -239,6 +254,9 @@ function seedFor(
   if (!seed || value === undefined) ctx.emitChange(path, undefined);
   else ctx.emitChange([...path, seed.key], value);
 }
+
+// A nested scope paints no cluster boxes, so every unmet group gets a banner.
+const NO_CLUSTERS: Set<string> = new Set();
 
 const MASKED_VALUE = "••••••";
 

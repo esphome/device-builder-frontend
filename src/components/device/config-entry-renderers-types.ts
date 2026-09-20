@@ -86,9 +86,12 @@ export interface RenderCtx {
   isOptionsExpanded: (path: string[]) => boolean;
   expandOptions: (path: string[]) => void;
   scopeValues: (path: string[]) => Record<string, unknown>;
+  /** *requiredGroups* are the groups of the scope *entries* belong to; their
+   *  demanded members stay visible in required-only mode. */
   filterRenderable: (
     entries: ConfigEntry[],
-    values: Record<string, unknown>
+    values: Record<string, unknown>,
+    requiredGroups?: RequiredGroup[]
   ) => ConfigEntry[];
   /** The form's ``required_groups``. A top-level optional block one of them
    *  demands gets an enable switch so the group can be satisfied. */

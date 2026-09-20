@@ -162,9 +162,20 @@ export function renderFilterOptions(
   return opts;
 }
 
-/** Required groups are scope-local; NESTED children don't inherit them. */
-function nestedOpts(opts: RenderFilterOptions): RenderFilterOptions {
-  return opts.requiredGroups ? { ...opts, requiredGroups: undefined } : opts;
+/**
+ * The options for the children of the NESTED block *entry*. Required groups
+ * are scope-local: the parent's never reach the children, and the block's own
+ * bind only once it is in use, so an untouched optional block (``wifi.eap``)
+ * demands nothing.
+ */
+export function nestedOpts(
+  opts: RenderFilterOptions,
+  entry: ConfigEntry,
+  blockValues: unknown
+): RenderFilterOptions {
+  const own = hasSerializableValue(blockValues) ? entry.required_groups : null;
+  const requiredGroups = own?.length ? own : undefined;
+  return requiredGroups || opts.requiredGroups ? { ...opts, requiredGroups } : opts;
 }
 
 /**
@@ -194,7 +205,7 @@ export function isEmptyBlock(
   const children = filterRenderable(
     entry.config_entries ?? [],
     asRecord(own),
-    nestedOpts(opts)
+    nestedOpts(opts, entry, own)
   );
   // A demanded block still paints when its enable switch can write a value:
   // that switch is how the user satisfies the group.
@@ -267,7 +278,6 @@ export function collectRenderablePaths(
   pathPrefix: string[] = [],
   out: Set<string> = new Set()
 ): Set<string> {
-  const childOpts = nestedOpts(opts);
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
       const childSchema = entry.config_entries ?? [];
@@ -280,7 +290,7 @@ export function collectRenderablePaths(
           collectRenderablePaths(
             childSchema,
             itemValues,
-            childOpts,
+            nestedOpts(opts, entry, itemValues),
             [...pathPrefix, entry.key, String(idx)],
             out
           );
@@ -289,7 +299,7 @@ export function collectRenderablePaths(
         collectRenderablePaths(
           childSchema,
           asRecord(values[entry.key]),
-          childOpts,
+          nestedOpts(opts, entry, values[entry.key]),
           [...pathPrefix, entry.key],
           out
         );
