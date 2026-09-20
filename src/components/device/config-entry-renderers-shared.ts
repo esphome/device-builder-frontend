@@ -25,7 +25,7 @@ import {
   isValidApiEncryptionKey,
 } from "../../util/api-encryption-key.js";
 import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
-import { stripConstraintProse } from "../../util/constraint-groups.js";
+import { schemaPathOf, stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -237,7 +237,7 @@ export function renderLabel(
       ${entry.locked ? renderLockIcon(entry, ctx, path) : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
-    ${_fieldDescription(entry, ctx)}
+    ${_fieldDescription(entry, path, ctx)}
   `;
 }
 
@@ -261,9 +261,9 @@ function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
 /** The field's description, with the backend's baked constraint-prose paragraph
  *  removed only for members the form replaces with a reactive banner/cluster,
  *  so a field whose docs merely start with bold "Set …" isn't stripped by accident. */
-function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
+function _fieldDescription(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = entry.description ?? "";
-  const description = ctx.reactiveConstraintEntries?.has(entry)
+  const description = ctx.reactiveConstraintPaths?.has(schemaPathOf(path))
     ? stripConstraintProse(raw)
     : raw;
   return description

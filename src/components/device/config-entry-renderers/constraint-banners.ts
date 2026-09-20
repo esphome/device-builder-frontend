@@ -84,11 +84,12 @@ export function collectUnsatisfiedConstraints(
       keys: formatKeys(namedKeys(group.kind, group.keys)),
     });
   }
-  // buildConstraintClusters folds every *non-exclusive* inclusive group into
-  // a cluster (whose members land in clusteredKeys), so this loop only fires
-  // for the residual case it skips: an inclusive group whose members are all
-  // also exclusive_group members. The collection here is deliberately broader
-  // (entry.group, no !exclusive_group guard) to still surface that banner.
+  // At the form root buildConstraintClusters folds every *non-exclusive*
+  // inclusive group into a cluster (its members land in clusteredKeys), so
+  // this loop only fires there for the residual case it skips: an inclusive
+  // group whose members are all also exclusive_group members. A nested scope
+  // paints no clusters, so there it carries every inclusive group. The
+  // collection is deliberately broad (entry.group, no !exclusive_group guard).
   const inclusive = new Map<string, string[]>();
   for (const entry of entries) {
     if (entry.group) {

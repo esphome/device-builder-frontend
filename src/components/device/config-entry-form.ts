@@ -35,7 +35,7 @@ import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
-import { constraintMembers } from "../../util/constraint-groups.js";
+import { constraintMemberPaths } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
@@ -1044,7 +1044,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
   /** Walks the whole entry tree, so once per schema, not per render. */
-  private _constraintMembers = memoizeOne(constraintMembers);
+  private _constraintMemberPaths = memoizeOne(
+    (entries: ConfigEntry[], groups: RequiredGroup[]) =>
+      constraintMemberPaths(entries, groups)
+  );
 
   private _buildCtx(): RenderCtx {
     const ctx: RenderCtx = {
@@ -1060,7 +1063,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
-      reactiveConstraintEntries: this._constraintMembers(
+      reactiveConstraintPaths: this._constraintMemberPaths(
         this.entries,
         this.requiredGroups
       ),
