@@ -97,7 +97,7 @@ export function readKeyOnLine(
   let childIndent = target.match(_DASH_CONTENT_RE)?.[0].length ?? null;
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     const indent = lineIndent(line);
     if (indent <= dashIndent) break;
     childIndent ??= indent;

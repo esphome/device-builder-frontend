@@ -6,13 +6,13 @@
  */
 
 import { joinActionFieldPath } from "./action-field-path.js";
-import { splitYamlDocLines } from "./yaml-doc-lines.js";
-import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import {
   enumerateListItems,
   mappingFormItem,
   readKeyOnLine,
 } from "./yaml-automation-items.js";
+import { splitYamlDocLines } from "./yaml-doc-lines.js";
+import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
 import {
   BARE_MAPPING_KEY_RE,

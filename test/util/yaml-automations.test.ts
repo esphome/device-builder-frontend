@@ -222,6 +222,21 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
     expect(interval?.toLine).toBe(7);
   });
 
+  it("ignores an over-indented comment above a mapping-form script's id", () => {
+    const yaml = [
+      "script:",
+      "    # note",
+      "  id: my_script",
+      "  then:",
+      "    - delay: 1s",
+      "",
+    ].join("\n");
+    const script = parseYamlAutomations(yaml).find((r) =>
+      r.key.startsWith("automation:script")
+    );
+    expect(script?.key).toBe("automation:script:my_script");
+  });
+
   it("keys a mapping-form script block by the id in its body", () => {
     const yaml = ["script:", "  id: my_script", "  then:", "    - delay: 1s", ""].join(
       "\n"
