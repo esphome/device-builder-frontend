@@ -10,6 +10,8 @@
  */
 import type { RequiredGroupKind } from "../api/types/config-entries.js";
 import { isValuePresent } from "./config-validation.js";
+import { isPlainObject } from "./nested-values.js";
+import { hasSerializableValue } from "./yaml-serialize.js";
 
 /** A `required_groups` kind, plus `all_or_none` for inclusive `group` ids. */
 export type ConstraintKind = RequiredGroupKind | "all_or_none";
@@ -46,7 +48,11 @@ export function evaluateGroup(
   keys: string[],
   values: Record<string, unknown>
 ): boolean {
-  const present = keys.filter((key) => isValuePresent(values[key])).length;
+  // A block counts only when it would reach the YAML: the serializer prunes an
+  // object with nothing in it, so an emptied ``pwm: {}`` is not a set member.
+  const isSet = (raw: unknown): boolean =>
+    isPlainObject(raw) ? hasSerializableValue(raw) : isValuePresent(raw);
+  const present = keys.filter((key) => isSet(values[key])).length;
   switch (kind) {
     case "exactly_one":
       return present === 1;
