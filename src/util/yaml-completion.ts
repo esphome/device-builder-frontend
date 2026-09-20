@@ -25,10 +25,10 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import {
   catalogEntryToProvider,
-  classCandidates,
   findReferenceCandidates,
 } from "./config-entry-yaml-scan.js";
 import { getConfigVarValueOptions } from "./esphome-schema.js";
+import { classCandidates } from "./reference-class.js";
 import {
   collectSiblingKeys,
   collectSubstitutionKeys,

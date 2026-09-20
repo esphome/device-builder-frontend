@@ -355,6 +355,13 @@ describe("wrongKindDependencies", () => {
     ]);
   });
 
+  it("reports an id-less hub of the wrong variant, which auto would resolve to", () => {
+    const yaml = "modbus:\n  role: client\n";
+    expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, index)).toEqual([
+      "modbus",
+    ]);
+  });
+
   it("is satisfied once a matching hub exists", () => {
     const yaml = `${CLIENT_ONLY}  - id: server_hub\n    role: server\n`;
     expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, index)).toEqual([]);

@@ -17,7 +17,6 @@
  * type into a field) from O(N) per keystroke to O(1).
  */
 import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
-import type { ConfigEntry } from "../api/types/config-entries.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
@@ -30,13 +29,10 @@ import {
   TOP_LEVEL_KEY_RE,
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
-import { parseYamlSectionValues } from "./yaml-section-reader.js";
 import {
   collectIdsAtPath,
   findFieldLine,
-  hasHiddenKeys,
   parseYamlTopLevelSections,
-  qualifiedSectionKey,
   type YamlSection,
 } from "./yaml-sections-core.js";
 
@@ -505,47 +501,6 @@ export function findReferenceCandidates(
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
   return findComponentsByProviders(yaml, [{ domain, stem: "" }, ...providers]);
-}
-
-/** The *candidates* whose id may inherit the class *entry* requires. Fails
- *  open: only a top-level section id whose component's known classes lack it
- *  is dropped. */
-export function classCandidates<T extends { id: string }>(
-  yaml: string,
-  candidates: T[],
-  entry: ConfigEntry,
-  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
-): T[] {
-  const required = entry.references_class;
-  if (!required || !byId || !candidates.length) return candidates;
-  const sections = new Map<string, YamlSection>();
-  for (const section of parseYamlTopLevelSections(yaml)) {
-    if (section.id) sections.set(section.id, section);
-  }
-  let lines: string[] | null = null;
-  return candidates.filter((candidate) => {
-    const section = sections.get(candidate.id);
-    const component =
-      section && byId.get(qualifiedSectionKey(section.key, section.platform));
-    if (!section || !component) return true;
-    let classes = component.id_classes;
-    // A typed schema has one discriminator; more than one can't be judged.
-    const [variant, ...others] = Object.entries(component.id_classes_by_variant ?? {});
-    if (others.length) return true;
-    if (variant) {
-      const [key, byValue] = variant;
-      lines ??= splitYamlDocLines(yaml);
-      if (hasHiddenKeys(lines, section)) return true;
-      const value = parseYamlSectionValues(yaml, section.key, section.fromLine)[key];
-      // Unset keeps ``id_classes``, the default variant's.
-      if (value != null) {
-        // A substitution or a value the catalog doesn't know: can't judge.
-        if (!Object.prototype.hasOwnProperty.call(byValue, String(value))) return true;
-        classes = byValue[String(value)];
-      }
-    }
-    return !classes?.length || classes.includes(required);
-  });
 }
 
 // A top-level (zero-indent) `packages:` block or `<<:` merge key — the two

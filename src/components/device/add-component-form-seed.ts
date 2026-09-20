@@ -1,13 +1,9 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type {
-  ComponentCatalogEntry,
-  ComponentCatalogIndexEntry,
-} from "../../api/types/components.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  classCandidates,
   findReferenceCandidates,
   findUsedPins,
   resolveSoleCandidate,
@@ -21,10 +17,9 @@ import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
+import { type CatalogById, classCandidates } from "../../util/reference-class.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
-type CatalogById = ReadonlyMap<string, ComponentCatalogIndexEntry>;
-
 export interface SeedContext {
   /** Schema entries after required/option overlays are applied. */
   entries: ConfigEntry[];

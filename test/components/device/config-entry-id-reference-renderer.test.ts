@@ -478,6 +478,16 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
     expect(html).not.toContain("device.id_reference_unresolved");
   });
 
+  it("does not offer Auto when it would resolve to a wrong-class block", () => {
+    const html = JSON.stringify(
+      render(OUTPUTS, "relay_out", "output.gpio", "output.ledc")
+    );
+    expect(html).not.toContain("device.id_reference_auto");
+    expect(JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"))).toContain(
+      "device.id_reference_auto"
+    );
+  });
+
   it("does not claim none match while interface providers are unsettled", () => {
     const tmpl = renderIdReferenceField(
       entry,

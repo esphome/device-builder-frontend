@@ -7,13 +7,12 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import {
   catalogEntryToProvider,
-  classCandidates,
   findReferenceCandidates,
-  yamlHasExternalIdSources,
 } from "../../util/config-entry-yaml-scan.js";
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
+import { noneMatchClass } from "../../util/reference-class.js";
 import type { CatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
@@ -151,8 +150,7 @@ export function wrongKindDependencies(
   yaml: string,
   index: Pick<CatalogIndex, "components" | "byId"> | null
 ): string[] {
-  // A merged source may hold the matching block the scan can't see.
-  if (!index || yamlHasExternalIdSources(yaml)) return [];
+  if (!index) return [];
   const wrong = new Set<string>();
   for (const entry of entries) {
     const domain = entry.references_component;
@@ -162,12 +160,7 @@ export function wrongKindDependencies(
       .filter((c) => c.provides?.includes(domain))
       .map((c) => catalogEntryToProvider(c, domain));
     const configured = findReferenceCandidates(yaml, domain, providers);
-    if (
-      configured.length > 0 &&
-      classCandidates(yaml, configured, entry, index.byId).length === 0
-    ) {
-      wrong.add(domain);
-    }
+    if (noneMatchClass(yaml, configured, entry, index.byId)) wrong.add(domain);
   }
   return [...wrong];
 }

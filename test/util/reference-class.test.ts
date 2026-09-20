@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentCatalogIndexEntry } from "../../src/api/types/components.js";
-import {
-  classCandidates,
-  findReferenceCandidates,
-} from "../../src/util/config-entry-yaml-scan.js";
+import { findReferenceCandidates } from "../../src/util/config-entry-yaml-scan.js";
+import { classCandidates, noneMatchClass } from "../../src/util/reference-class.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
 import { makeConfigEntry } from "./_make-config-entry.js";
 
@@ -111,6 +109,41 @@ describe("classCandidates on a typed hub", () => {
     ["an included block", "modbus:\n  - id: hub\n    settings: !include hub.yaml\n"],
   ])("keeps a hub it cannot judge: %s", (_label, yaml) => {
     expect(offered(yaml, "modbus", "modbus::ModbusServerHub", byId)).toEqual(["hub"]);
+  });
+});
+
+describe("noneMatchClass", () => {
+  const byId = index(
+    makeComponentEntry("modbus", {
+      id_classes: ["modbus::ModbusClientHub"],
+      id_classes_by_variant: {
+        role: {
+          client: ["modbus::ModbusClientHub"],
+          server: ["modbus::ModbusServerHub"],
+        },
+      },
+    })
+  );
+  const server = reference("modbus", "modbus::ModbusServerHub");
+
+  it.each([
+    ["an id-less block of the wrong variant", "modbus:\n  role: client\n", true],
+    ["an id-less block on the default variant", "modbus:\n  uart_id: bus\n", true],
+    ["an id-less block of the right variant", "modbus:\n  role: server\n", false],
+    ["no block at all", "logger:\n", false],
+    [
+      "a merged source that may hold a match",
+      "packages:\n  base: !include base.yaml\nmodbus:\n  role: client\n",
+      false,
+    ],
+  ])("%s", (_label, yaml, expected) => {
+    expect(noneMatchClass(yaml, [], server, byId)).toBe(expected);
+  });
+
+  it("is true when every offered id fails, false once one passes", () => {
+    const yaml = "modbus:\n  - id: a\n  - id: b\n    role: server\n";
+    expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(true);
+    expect(noneMatchClass(yaml, [{ id: "a" }, { id: "b" }], server, byId)).toBe(false);
   });
 });
 

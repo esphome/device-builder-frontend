@@ -13,12 +13,11 @@ import { mdiPlus } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import {
-  classCandidates,
   findReferenceCandidates,
   isCertainlyDanglingId,
   resolveSoleCandidate,
-  yamlHasExternalIdSources,
 } from "../../util/config-entry-yaml-scan.js";
+import { classCandidates, noneMatchClass } from "../../util/reference-class.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
@@ -48,13 +47,10 @@ export function renderIdReferenceField(
   const candidates = entry.references_class
     ? classCandidates(ctx.yaml, allCandidates, entry, ctx.catalogById())
     : allCandidates;
-  // A merged source may hold a matching block the scan can't see, and an
-  // unsettled provider fetch may still bring one.
-  const noneMatchClass =
+  // An unsettled provider fetch may still bring a matching candidate.
+  const noneMatch =
     providers !== null &&
-    candidates.length === 0 &&
-    allCandidates.length > 0 &&
-    !yamlHasExternalIdSources(ctx.yaml);
+    noneMatchClass(ctx.yaml, allCandidates, entry, ctx.catalogById());
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
@@ -125,7 +121,7 @@ export function renderIdReferenceField(
   // land on one of those and fail.
   const emptyButConfigured =
     empty &&
-    !noneMatchClass &&
+    !noneMatch &&
     !entry.required &&
     parseTopLevelComponents(ctx.yaml).has(domain);
 
@@ -150,8 +146,10 @@ export function renderIdReferenceField(
   // ``logger_id: logger`` older builds pre-filled, #2208). An empty field
   // already reads as auto via the default-candidate placeholder, so the
   // option only appears once a value is set.
+  // Not when every configured block is the wrong class: auto-resolution would
+  // land on one of those and fail.
   const autoOption =
-    !entry.required && value !== ""
+    !entry.required && value !== "" && !noneMatch
       ? idOption(
           AUTO_SENTINEL,
           ctx.localize("device.id_reference_auto"),
@@ -186,7 +184,7 @@ export function renderIdReferenceField(
           placeholder=${ctx.localize(
             emptyButConfigured
               ? "device.id_reference_auto_configured"
-              : noneMatchClass
+              : noneMatch
                 ? "device.id_reference_none_match"
                 : "device.id_reference_empty",
             { domain }
