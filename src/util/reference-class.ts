@@ -85,7 +85,7 @@ function sectionJudge(
     if (variant) {
       const [key, byValue] = variant;
       lines ??= splitYamlDocLines(yaml);
-      if (hasHiddenKeys(lines, section)) return true;
+      if (hasHiddenKeys(lines, section) || isOpaque(lines, section)) return true;
       const value = parseYamlSectionValues(yaml, section.key, section.fromLine)[key];
       // Unset keeps ``id_classes``, the default variant's.
       if (value != null) {
@@ -96,4 +96,12 @@ function sectionJudge(
     }
     return !classes?.length || classes.includes(required);
   };
+}
+
+// A flow mapping / sequence or a whole-value alias (``modbus: [{ ... }]``,
+// ``- { ... }``, ``modbus: *hub``) holds keys a line scan can't read.
+const OPAQUE_VALUE_RE = /^\s*(?:-\s+|[\w.]+\s*:\s*)+[[{*]/;
+
+function isOpaque(lines: string[], section: YamlSection): boolean {
+  return OPAQUE_VALUE_RE.test(lines[section.fromLine - 1] ?? "");
 }

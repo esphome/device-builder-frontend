@@ -145,6 +145,15 @@ describe("noneMatchClass", () => {
     expect(noneMatchClass(yaml, [{ id: "a" }], server, byId)).toBe(false);
   });
 
+  it.each([
+    ["a flow sequence", "modbus: [{ uart_id: bus, role: server }]\n"],
+    ["a flow mapping", "modbus: { uart_id: bus, role: server }\n"],
+    ["a flow mapping list item", "modbus:\n  - { uart_id: bus, role: server }\n"],
+    ["a whole-value alias", "modbus: *server_hub\n"],
+  ])("cannot judge %s", (_label, yaml) => {
+    expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
+  });
+
   it("cannot judge a block whose keys merge inside a flow mapping", () => {
     const yaml = "modbus: [{ <<: *defaults, uart_id: bus }]\n";
     expect(noneMatchClass(yaml, [], server, byId)).toBe(false);
