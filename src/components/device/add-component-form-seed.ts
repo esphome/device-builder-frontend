@@ -275,11 +275,12 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     // As in seedDefaults: with no index a class-restricted field can't tell a
     // wrong-class block from a right one, so it is left for the picker.
     const unjudged = Boolean(target?.references_class) && !ctx.catalogById;
+    // An entry the path can't resolve is not judged: the prefill applies.
     if (
       targetPath &&
-      target &&
       !unjudged &&
-      classVerdict(yaml, prefill, target, ctx.catalogById).candidates.length > 0
+      (!target ||
+        classVerdict(yaml, prefill, target, ctx.catalogById).candidates.length > 0)
     ) {
       next = setIn(next, targetPath, prefillReference.id);
     }
