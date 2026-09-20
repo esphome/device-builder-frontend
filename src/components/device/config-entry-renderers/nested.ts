@@ -8,6 +8,7 @@ import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
 import { ownRequiredGroups } from "../config-entry-render-filter.js";
 import {
+  describedText,
   effectiveDisabled,
   fieldKeyAttr,
   filterOptionsAt,
@@ -95,6 +96,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const enabled = hasSwitch && inUse;
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
+  // A demanded block's own baked prose goes too (emc2101's pwm / dac).
+  const description = describedText(entry, path, ctx);
   // Name what the block holds that the form does not paint: everything in a
   // fieldless block, else a valued child the filter drops (a seeded default
   // in required-only mode). Nothing to say when only nested values are left.
@@ -147,8 +150,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
         ${renderHelpLink(entry, ctx)}
       </div>
       ${
-        entry.description
-          ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
+        description
+          ? html`<p class="nested-desc">${renderMarkdown(description)}</p>`
           : nothing
       }
       ${
@@ -168,7 +171,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                         entries: entry.config_entries ?? [],
                         requiredGroups: ownGroups,
                         values: scope,
-                        rootValues: ctx.scopeValues([]),
+                        // As the paint resolves them, board-implied values included.
+                        rootValues: filterOptionsAt(ctx, path).rootValues,
                       },
                       NO_CLUSTERS,
                       ctx

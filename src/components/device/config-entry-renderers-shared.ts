@@ -262,13 +262,23 @@ function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
  *  removed only for members the form replaces with a reactive banner/cluster,
  *  so a field whose docs merely start with bold "Set …" isn't stripped by accident. */
 function _fieldDescription(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const raw = entry.description ?? "";
-  const description = ctx.reactiveConstraintPaths?.has(schemaPathOf(path))
-    ? stripConstraintProse(raw)
-    : raw;
+  const description = describedText(entry, path, ctx);
   return description
     ? html`<p class="field-description">${renderMarkdown(description)}</p>`
     : nothing;
+}
+
+/** *entry*'s description, minus the baked constraint prose when a reactive
+ *  banner or cluster speaks for the member at *path*. */
+export function describedText(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx
+): string {
+  const raw = entry.description ?? "";
+  return ctx.reactiveConstraintPaths.has(schemaPathOf(path))
+    ? stripConstraintProse(raw)
+    : raw;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {

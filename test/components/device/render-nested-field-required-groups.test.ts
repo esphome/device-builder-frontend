@@ -57,3 +57,31 @@ describe("renderNestedField with its own required groups", () => {
     expect(out).not.toContain("device.constraint_at_least_one");
   });
 });
+
+describe("renderNestedField header description", () => {
+  const PROSE = "**Required — set exactly one of:** `pwm`, `dac`.\n\nEnable PWM output.";
+  const pwm: ConfigEntry = makeConfigEntry({
+    key: "pwm",
+    type: ConfigEntryType.NESTED,
+    description: PROSE,
+    config_entries: [makeConfigEntry({ key: "divider" })],
+  });
+  const header = (paths: string[]): string =>
+    JSON.stringify(
+      renderNestedField(
+        pwm,
+        ["pwm"],
+        makeRenderCtx({}, { overrides: { reactiveConstraintPaths: new Set(paths) } })
+      )
+    );
+
+  it("drops the baked constraint prose when a banner speaks for the block", () => {
+    const out = header(["pwm"]);
+    expect(out).toContain("Enable PWM output.");
+    expect(out).not.toContain("set exactly one of");
+  });
+
+  it("keeps it for a block no reactive constraint covers", () => {
+    expect(header([])).toContain("set exactly one of");
+  });
+});
