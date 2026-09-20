@@ -631,6 +631,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       entries: this.entries,
       requiredGroups: this.requiredGroups,
       values: this.values,
+      // As the paint resolves them, board-implied values included.
+      rootValues: renderFilterOptions(this).rootValues,
     };
     return renderConstraintBanners(scope, clusteredKeys, ctx);
   }

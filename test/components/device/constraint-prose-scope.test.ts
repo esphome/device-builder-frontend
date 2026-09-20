@@ -52,9 +52,24 @@ describe("constraint-prose strip scoping", () => {
     expect(out).not.toContain("Set together");
   });
 
+  it("keeps a nested member's prose until its block is in use, so the banner and the prose never both miss", () => {
+    const paths = new Set(["eap.client_certificate"]);
+    const path = ["eap", "client_certificate"];
+    const untouched = makeRenderCtx(
+      {},
+      { overrides: { reactiveConstraintPaths: paths } }
+    );
+    expect(serialize(renderLabel(entry, untouched, { path }))).toContain("Set together");
+    const inUse = makeRenderCtx(
+      { eap: { username: "me" } },
+      { overrides: { reactiveConstraintPaths: paths } }
+    );
+    expect(serialize(renderLabel(entry, inUse, { path }))).not.toContain("Set together");
+  });
+
   it("matches a member inside a list row by its schema path", () => {
     const ctx = makeRenderCtx(
-      {},
+      { networks: [{ eap: { username: "me" } }] },
       {
         overrides: {
           reactiveConstraintPaths: new Set(["networks.eap.client_certificate"]),

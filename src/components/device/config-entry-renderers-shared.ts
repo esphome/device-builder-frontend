@@ -46,6 +46,7 @@ import {
   hasEscapeWorthyChar,
   unescapeControlForInput,
 } from "../../util/yaml-escape.js";
+import { hasSerializableValue } from "../../util/yaml-serialize.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
@@ -268,17 +269,22 @@ function _fieldDescription(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
     : nothing;
 }
 
-/** *entry*'s description, minus the baked constraint prose when a reactive
- *  banner or cluster speaks for the member at *path*. */
+/**
+ * *entry*'s description, minus the baked constraint prose when a reactive
+ * banner or cluster speaks for the member at *path*. A nested block's banner
+ * only paints once the block is in use, so until then its members keep the
+ * static prose: the user is never left with neither.
+ */
 export function describedText(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx
 ): string {
   const raw = entry.description ?? "";
-  return ctx.reactiveConstraintPaths.has(schemaPathOf(path))
-    ? stripConstraintProse(raw)
-    : raw;
+  const spokenFor =
+    ctx.reactiveConstraintPaths.has(schemaPathOf(path)) &&
+    (path.length === 1 || hasSerializableValue(ctx.getAt(path.slice(0, -1))));
+  return spokenFor ? stripConstraintProse(raw) : raw;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {
