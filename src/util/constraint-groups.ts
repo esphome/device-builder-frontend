@@ -8,7 +8,11 @@
  * optional member whose group is already satisfied by a sibling (e.g.
  * `esp32_rmt_led_strip` timings once `chipset` is set) stops reading "Required".
  */
-import type { RequiredGroupKind } from "../api/types/config-entries.js";
+import type {
+  ConfigEntry,
+  RequiredGroup,
+  RequiredGroupKind,
+} from "../api/types/config-entries.js";
 import { isValuePresent } from "./config-validation.js";
 import { isPlainObject } from "./nested-values.js";
 import { hasSerializableValue } from "./yaml-serialize.js";
@@ -73,4 +77,23 @@ export function evaluateGroup(
   // here and fails the build. No runtime fallback — lockstep deployment means
   // only known kinds ever reach this.
   kind satisfies never;
+}
+
+/**
+ * The entries of a scope, and of every nested block under it, that a
+ * ``required_groups`` entry names or that share an inclusive ``group``: the
+ * members a reactive banner or cluster speaks for.
+ */
+export function constraintMembers(
+  entries: ConfigEntry[],
+  requiredGroups: RequiredGroup[],
+  out: Set<ConfigEntry> = new Set()
+): Set<ConfigEntry> {
+  const named = new Set(requiredGroups.flatMap((group) => group.keys));
+  for (const entry of entries) {
+    if (entry.group || named.has(entry.key)) out.add(entry);
+    const children = entry.config_entries;
+    if (children?.length) constraintMembers(children, entry.required_groups ?? [], out);
+  }
+  return out;
 }

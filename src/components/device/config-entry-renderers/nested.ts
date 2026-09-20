@@ -168,6 +168,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                         entries: entry.config_entries ?? [],
                         requiredGroups: ownGroups,
                         values: scope,
+                        rootValues: ctx.scopeValues([]),
                       },
                       NO_CLUSTERS,
                       ctx

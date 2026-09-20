@@ -227,7 +227,9 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   // Leaves stay for any demanding group; a block also needs a usable switch.
-  const demanded = opts.requiredGroups ? demandedKeys(opts.requiredGroups) : null;
+  const demanded = opts.requiredGroups
+    ? demandedKeys(opts.requiredGroups, entries)
+    : null;
   for (const entry of entries) {
     if (
       !isEntryVisible(

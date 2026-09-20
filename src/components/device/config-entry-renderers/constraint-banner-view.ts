@@ -9,6 +9,8 @@ export interface ConstraintScope {
   entries: ConfigEntry[];
   requiredGroups: RequiredGroup[];
   values: Record<string, unknown>;
+  /** The component-root values, when *values* is a nested block's. */
+  rootValues?: Record<string, unknown>;
 }
 
 /** A warning banner per unmet constraint of *scope* that no cluster box carries. */

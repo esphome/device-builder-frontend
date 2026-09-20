@@ -35,6 +35,7 @@ import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { constraintMembers } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
@@ -1042,16 +1043,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  not once per render or per referencing field. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
+  /** Walks the whole entry tree, so once per schema, not per render. */
+  private _constraintMembers = memoizeOne(constraintMembers);
+
   private _buildCtx(): RenderCtx {
-    // Top-level keys whose baked constraint prose a banner/cluster replaces;
-    // _fieldDescription strips only these so nested members keep their prose.
-    const reactiveConstraintKeys = new Set<string>();
-    for (const group of this.requiredGroups) {
-      for (const key of group.keys) reactiveConstraintKeys.add(key);
-    }
-    for (const entry of this.entries) {
-      if (entry.group) reactiveConstraintKeys.add(entry.key);
-    }
     const ctx: RenderCtx = {
       localize: this._localize,
       disabled: this.disabled,
@@ -1065,7 +1060,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
-      reactiveConstraintKeys,
+      reactiveConstraintEntries: this._constraintMembers(
+        this.entries,
+        this.requiredGroups
+      ),
       entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),

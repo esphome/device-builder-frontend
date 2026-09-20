@@ -44,11 +44,11 @@ export interface RenderCtx {
    *  ``withMergedSourcePresence``) — for the ``depends_on_component``
    *  visibility predicate when filtering directly. */
   presentComponents: ReadonlySet<string>;
-  /** Top-level keys whose backend constraint prose the form replaces with a
-   *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``
-   *  members). ``_fieldDescription`` strips the baked prose only for these, so
-   *  nested-scope members keep theirs. */
-  reactiveConstraintKeys: Set<string>;
+  /** Entries whose backend constraint prose the form replaces with a reactive
+   *  banner/cluster: the members of a scope's ``required_groups`` and of its
+   *  inclusive ``group``s, at the root or in a nested block.
+   *  ``_fieldDescription`` strips the baked prose only for these. */
+  reactiveConstraintEntries: ReadonlySet<ConfigEntry>;
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
    *  ``exclusive_group`` member is dropped from the cluster), and fed to

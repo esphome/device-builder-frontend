@@ -10,12 +10,21 @@ import { hasSerializableValue } from "../../util/yaml-serialize.js";
 import type { RenderFilterOptions } from "./config-entry-render-filter.js";
 
 /** Keys of the groups in *requiredGroups* that demand a value be set. */
-export function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<string> {
+export function demandedKeys(
+  requiredGroups: RequiredGroup[] | undefined,
+  entries: ConfigEntry[] = []
+): Set<string> {
   const keys = new Set<string>();
   for (const group of requiredGroups ?? []) {
     if (group.kind !== "exactly_one" && group.kind !== "at_least_one") continue;
     group.keys.forEach((key) => keys.add(key));
   }
+  // An all-or-none companion of a demanded key is needed to satisfy it
+  // (``eap``'s ``key`` beside ``certificate``).
+  const groups = new Set(
+    entries.filter((e) => e.group && keys.has(e.key)).map((e) => e.group)
+  );
+  for (const entry of entries) if (groups.has(entry.group)) keys.add(entry.key);
   return keys;
 }
 

@@ -259,13 +259,11 @@ function renderLockIcon(entry: ConfigEntry, ctx: RenderCtx, path: string[]) {
 }
 
 /** The field's description, with the backend's baked constraint-prose paragraph
- *  removed only for members the form replaces with a reactive banner/cluster
- *  (top-level constraint keys). Nested-scope members keep their prose until
- *  nested banners land, and a field whose docs merely start with bold "Set …"
- *  isn't stripped by accident. */
+ *  removed only for members the form replaces with a reactive banner/cluster,
+ *  so a field whose docs merely start with bold "Set …" isn't stripped by accident. */
 function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
   const raw = entry.description ?? "";
-  const description = ctx.reactiveConstraintKeys?.has(entry.key)
+  const description = ctx.reactiveConstraintEntries?.has(entry)
     ? stripConstraintProse(raw)
     : raw;
   return description

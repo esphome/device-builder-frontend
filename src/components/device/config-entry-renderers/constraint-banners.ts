@@ -12,6 +12,9 @@ export interface ConstraintBannerInputs {
   values: Record<string, unknown>;
   presentComponents: ReadonlySet<string>;
   targetPlatform: string | null;
+  /** The component-root values, so a nested member's ``depends_on`` on a
+   *  top-level field resolves as it does in the paint. */
+  rootValues?: Record<string, unknown>;
   formatKeys: (keys: string[]) => string;
 }
 
@@ -40,6 +43,7 @@ export function collectUnsatisfiedConstraints(
     values,
     presentComponents,
     targetPlatform,
+    rootValues,
     formatKeys,
   } = inputs;
   // Most scopes carry neither kind of constraint.
@@ -59,7 +63,7 @@ export function collectUnsatisfiedConstraints(
           values,
           presentComponents,
           targetPlatform,
-          undefined,
+          rootValues,
           entries
         ))
     );

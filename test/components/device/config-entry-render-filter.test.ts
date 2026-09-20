@@ -1104,6 +1104,22 @@ describe("filterRenderable with a nested block's own required groups", () => {
     expect(paths({})).toEqual(["eap", "eap.username"]);
   });
 
+  it("keeps the all-or-none companion of a demanded member visible", () => {
+    const pair = makeEntry({
+      key: "eap",
+      type: ConfigEntryType.NESTED,
+      required_groups: [{ kind: "at_least_one", keys: ["identity", "certificate"] }],
+      config_entries: [
+        makeEntry({ key: "identity" }),
+        makeEntry({ key: "certificate", group: "cert_and_key" }),
+        makeEntry({ key: "key", group: "cert_and_key" }),
+        makeEntry({ key: "username" }),
+      ],
+    });
+    const shown = [...collectRenderablePaths([pair], { eap: { username: "me" } }, opts)];
+    expect(shown.sort()).toEqual(["eap", "eap.certificate", "eap.identity", "eap.key"]);
+  });
+
   it("never applies the parent scope's groups inside the block", () => {
     const parent = {
       requiredGroups: [{ kind: "at_least_one" as const, keys: ["identity"] }],
