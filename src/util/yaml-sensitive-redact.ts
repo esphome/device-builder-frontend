@@ -9,7 +9,10 @@
  * applies the placeholder to the ranges the scanner emits.
  */
 
-import { findSensitiveValueRanges } from "./yaml-sensitive-scan.js";
+import {
+  findSensitiveValueRanges,
+  isBuiltinSensitiveKey,
+} from "./yaml-sensitive-scan.js";
 
 // UI surfaces (search labels, snippets) show a full row of dots so a
 // masked value reads unmistakably as a mask.
@@ -109,6 +112,14 @@ export function maskSensitiveYaml(yaml: string): string {
  */
 function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_SUFFIX.test(key);
+}
+
+/** Whether a UI surface masks the value of *key* sitting directly under
+ *  *parent*: the editor's own rules, asked about a key rather than a line. */
+export function isSensitiveKeyUnder(parent: string | undefined, key: string): boolean {
+  return (
+    isBuiltinSensitiveKey(parent?.toLowerCase(), key.toLowerCase()) || isSensitiveKey(key)
+  );
 }
 
 function isReportSensitiveKey(key: string): boolean {
