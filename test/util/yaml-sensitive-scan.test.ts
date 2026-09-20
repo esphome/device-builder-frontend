@@ -23,18 +23,16 @@ wifi:
     expect(findSensitiveValueRanges(yaml)).toEqual([]);
   });
 
-  it("masks eap key material, inline and block scalar", () => {
+  it("leaves the eap key visible: it is a path to a PEM file, not the key", () => {
     const yaml = [
       "wifi:",
       "  eap:",
       "    username: alice",
-      "    key: inlinekey",
-      "    certificate: certbody",
+      "    password: hunter2",
+      "    key: client.key",
+      "    certificate: client.pem",
     ].join("\n");
-    expect(valuesAt(yaml, findSensitiveValueRanges(yaml))).toEqual(["inlinekey"]);
-
-    const block = "wifi:\n  eap:\n    key: |\n      pemline";
-    expect(valuesAt(block, findSensitiveValueRanges(block))).toEqual(["pemline"]);
+    expect(valuesAt(yaml, findSensitiveValueRanges(yaml))).toEqual(["hunter2"]);
   });
 
   it("case-folds keys for the allowlist and parent scoping", () => {

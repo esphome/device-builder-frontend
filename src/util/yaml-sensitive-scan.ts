@@ -75,11 +75,9 @@ const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
 // arbitrary user key like `constructor:` can't resolve a prototype
 // member.
 const PARENT_SCOPED_SENSITIVE_KEYS = new Map<string, Set<string>>([
+  // Not ``eap``: WPA2-Enterprise ``key`` is a path to a PEM file (esphome
+  // runs it through ``cv.file_``), not the key itself.
   ["encryption", new Set(["key"])],
-  // WPA2-Enterprise `key` is the client private key (often a whole PEM
-  // block scalar). Its sibling certificates are public material and stay
-  // visible in UI surfaces; the crash report masks them separately.
-  ["eap", new Set(["key"])],
 ]);
 
 // Plain-scalar key matcher. Permits hyphens and dots inside the

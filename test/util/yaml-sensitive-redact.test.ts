@@ -214,22 +214,20 @@ describe("maskSensitiveYaml", () => {
     expect(masked).not.toContain("abcdef");
   });
 
-  it("masks eap key material including block-scalar PEMs", () => {
+  it("masks the eap password and certificate but not the key path", () => {
     const yaml = [
       "wifi:",
       "  eap:",
       "    username: alice",
       "    password: hunter2",
-      "    key: |",
-      "      -----BEGIN PRIVATE KEY-----",
-      "      pemsecret",
+      "    key: client.key",
       "    certificate: certbody",
     ].join("\n");
     const masked = maskSensitiveYaml(yaml);
     expect(masked).not.toContain("hunter2");
-    expect(masked).not.toContain("pemsecret");
     expect(masked).not.toContain("certbody");
     expect(masked).toContain("    username: alice");
+    expect(masked).toContain("    key: client.key");
   });
 
   it("masks certificate material in reports regardless of parent", () => {
