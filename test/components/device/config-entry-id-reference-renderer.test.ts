@@ -472,6 +472,38 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
     expect(html).not.toContain("device.id_reference_unknown_error");
   });
 
+  it("says a committed id of the wrong class is the wrong kind, not undefined here", () => {
+    const html = JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"));
+    expect(html).toContain("device.id_reference_wrong_kind");
+    expect(html).not.toContain("device.id_reference_unresolved");
+  });
+
+  it("does not claim none match while interface providers are unsettled", () => {
+    const tmpl = renderIdReferenceField(
+      entry,
+      ["output"],
+      makeRenderCtx(
+        { output: "" },
+        {
+          overrides: {
+            yaml: OUTPUTS,
+            resolveInterfaceProviders: () => null,
+            catalogById: () =>
+              new Map(
+                ["output.gpio", "output.ledc"].map((id) => [
+                  id,
+                  makeComponentEntry(id, { id_classes: ["output::BinaryOutput"] }),
+                ])
+              ),
+          },
+        }
+      )
+    );
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).not.toBe(
+      "device.id_reference_none_match"
+    );
+  });
+
   it("does not claim none match when a merged source may hold one", () => {
     const tmpl = render(
       `packages:\n  base: !include base.yaml\n${OUTPUTS}`,

@@ -1,12 +1,12 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import {
   type ComponentCatalogEntry,
-  type ComponentCatalogIndexEntry,
   ComponentCategory,
 } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import {
+  catalogEntryToProvider,
   classCandidates,
   findReferenceCandidates,
   yamlHasExternalIdSources,
@@ -14,6 +14,7 @@ import {
 import { gateAccepts, resolveDependsOn } from "../../util/config-validation.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
+import type { CatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -35,14 +36,19 @@ export function liveDependencies(
   values: Record<string, unknown>
 ): string[] {
   const entries = component.config_entries;
-  const valueGateHides = (entry: ConfigEntry): boolean => {
-    const gate = resolveDependsOn(entry, values, undefined, entries);
-    return gate != null && !gateAccepts(entry, gate);
-  };
   return (component.dependencies ?? []).filter((dep) => {
     const refs = entries.filter((e) => e.references_component === dep);
-    return refs.length === 0 || !refs.every(valueGateHides);
+    return refs.length === 0 || !refs.every((e) => valueGateHides(e, values, entries));
   });
+}
+
+function valueGateHides(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+  entries: ConfigEntry[]
+): boolean {
+  const gate = resolveDependsOn(entry, values, undefined, entries);
+  return gate != null && !gateAccepts(entry, gate);
 }
 
 /**
@@ -132,35 +138,36 @@ export async function depsSatisfiedByProvides(
 }
 
 /**
- * Live dependencies configured only as the wrong kind: *entries* reference
- * the dependency with a ``references_class`` that none of its configured
- * blocks provides (hoermann_hcp needs a ``role: server`` modbus hub and only a
- * client one exists).
+ * Live dependencies configured only as the wrong kind: a top-level entry the
+ * form asks for references the dependency with a ``references_class`` none of
+ * the picker's candidates provides (hoermann_hcp needs a ``role: server``
+ * modbus hub and only a client one exists). Nested entries are not walked,
+ * as in ``liveDependencies``. Judges nothing until *index* has loaded.
  */
 export function wrongKindDependencies(
   entries: ConfigEntry[],
   live: readonly string[],
+  values: Record<string, unknown>,
   yaml: string,
-  byId: ReadonlyMap<string, ComponentCatalogIndexEntry> | null | undefined
+  index: Pick<CatalogIndex, "components" | "byId"> | null
 ): string[] {
   // A merged source may hold the matching block the scan can't see.
-  if (!byId || yamlHasExternalIdSources(yaml)) return [];
+  if (!index || yamlHasExternalIdSources(yaml)) return [];
   const wrong = new Set<string>();
-  const visit = (list: ConfigEntry[]): void => {
-    for (const entry of list) {
-      const domain = entry.references_component;
-      if (domain && entry.references_class && live.includes(domain)) {
-        const configured = findReferenceCandidates(yaml, domain, []);
-        if (
-          configured.length > 0 &&
-          classCandidates(yaml, configured, entry, byId).length === 0
-        ) {
-          wrong.add(domain);
-        }
-      }
-      visit(entry.config_entries ?? []);
+  for (const entry of entries) {
+    const domain = entry.references_component;
+    if (!domain || !entry.references_class || entry.locked) continue;
+    if (!live.includes(domain) || valueGateHides(entry, values, entries)) continue;
+    const providers = index.components
+      .filter((c) => c.provides?.includes(domain))
+      .map((c) => catalogEntryToProvider(c, domain));
+    const configured = findReferenceCandidates(yaml, domain, providers);
+    if (
+      configured.length > 0 &&
+      classCandidates(yaml, configured, entry, index.byId).length === 0
+    ) {
+      wrong.add(domain);
     }
-  };
-  visit(entries);
+  }
   return [...wrong];
 }

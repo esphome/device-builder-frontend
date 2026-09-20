@@ -103,10 +103,30 @@ describe("classCandidates on a typed hub", () => {
   it.each([
     ["a substituted role", "modbus:\n  - id: hub\n    role: ${modbus_role}\n"],
     ["a role the catalog doesn't know", "modbus:\n  - id: hub\n    role: gateway\n"],
+    [
+      "a role named like an Object member",
+      "modbus:\n  - id: hub\n    role: constructor\n",
+    ],
     ["keys merged from an anchor", "modbus:\n  - id: hub\n    <<: *modbus_defaults\n"],
     ["an included block", "modbus:\n  - id: hub\n    settings: !include hub.yaml\n"],
   ])("keeps a hub it cannot judge: %s", (_label, yaml) => {
     expect(offered(yaml, "modbus", "modbus::ModbusServerHub", byId)).toEqual(["hub"]);
+  });
+});
+
+describe("classCandidates on a hub with more than one discriminator", () => {
+  it("keeps the hub: only a single discriminator can be judged", () => {
+    const byId = index(
+      makeComponentEntry("modbus", {
+        id_classes: ["modbus::ModbusClientHub"],
+        id_classes_by_variant: {
+          role: { server: ["modbus::ModbusServerHub"] },
+          mode: { rtu: ["modbus::ModbusClientHub"] },
+        },
+      })
+    );
+    const yaml = "modbus:\n  - id: hub\n    role: server\n    mode: rtu\n";
+    expect(offered(yaml, "modbus", "modbus::ModbusClientHub", byId)).toEqual(["hub"]);
   });
 });
 

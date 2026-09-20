@@ -1,5 +1,8 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import type {
+  ComponentCatalogEntry,
+  ComponentCatalogIndexEntry,
+} from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -18,9 +21,10 @@ import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
-import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
+type CatalogById = ReadonlyMap<string, ComponentCatalogIndexEntry>;
+
 export interface SeedContext {
   /** Schema entries after required/option overlays are applied. */
   entries: ConfigEntry[];
@@ -35,6 +39,9 @@ export interface SeedContext {
    *  still wins for the reference field. */
   restoredValues: Record<string, unknown> | null;
   localize: LocalizeFunc;
+  /** The loaded catalog index, so a class-restricted reference never
+   *  auto-picks a wrong-class id. Absent: nothing is filtered. */
+  catalogById?: CatalogById | null;
 }
 
 /**
@@ -92,12 +99,19 @@ export function seedDefaults(
   entries: ConfigEntry[],
   yaml: string,
   localize: LocalizeFunc,
-  seedPresets: boolean = false
+  seedPresets: boolean = false,
+  catalogById: CatalogById | null = null
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const entry of entries) {
     if (entry.type === ConfigEntryType.NESTED) {
-      const sub = seedDefaults(entry.config_entries ?? [], yaml, localize, seedPresets);
+      const sub = seedDefaults(
+        entry.config_entries ?? [],
+        yaml,
+        localize,
+        seedPresets,
+        catalogById
+      );
       // A required entity sub-reading (ags10's tvoc) serializes only
       // once it holds a value; seed its name (the label) so an
       // untouched Add still produces a valid sensor, matching the
@@ -122,7 +136,7 @@ export function seedDefaults(
         yaml,
         findReferenceCandidates(yaml, entry.references_component, []),
         entry,
-        getCachedCatalogIndex()?.byId
+        catalogById
       );
       // A featured preset that names a component actually present in the live
       // config (a sibling just added in the same bundle, e.g. `output_blue`)
@@ -193,7 +207,13 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   const seedPresets = isFeaturedId(component.id);
   // Snapshot what seeding owns so a later prefill skips exactly those refs
   // (not every preset-flagged one), without treating a restored value as seeded.
-  const seededDefaults = seedDefaults(entries, yaml, localize, seedPresets);
+  const seededDefaults = seedDefaults(
+    entries,
+    yaml,
+    localize,
+    seedPresets,
+    ctx.catalogById
+  );
   let next = seededDefaults;
 
   const idEntry = entries.find((e) => e.key === "id" && e.type === ConfigEntryType.ID);

@@ -48,8 +48,10 @@ export function renderIdReferenceField(
   const candidates = entry.references_class
     ? classCandidates(ctx.yaml, allCandidates, entry, ctx.catalogById())
     : allCandidates;
-  // A merged source may hold a matching block the scan can't see.
+  // A merged source may hold a matching block the scan can't see, and an
+  // unsettled provider fetch may still bring one.
   const noneMatchClass =
+    providers !== null &&
     candidates.length === 0 &&
     allCandidates.length > 0 &&
     !yamlHasExternalIdSources(ctx.yaml);
@@ -89,8 +91,12 @@ export function renderIdReferenceField(
     : selected
       ? [selected]
       : [];
+  // Declared in this file but the wrong class: say so, not "not defined here".
+  const orphanCopy = allCandidates.some((c) => c.id === value)
+    ? "device.id_reference_wrong_kind"
+    : "device.id_reference_unresolved";
   const orphanOption = hasOrphanValue
-    ? idOption(value, value, ctx.localize("device.id_reference_unresolved", { domain }))
+    ? idOption(value, value, ctx.localize(orphanCopy, { domain }))
     : nothing;
   // A dangling reference we can be sure about gets an inline error without
   // waiting for the backend lint round trip. The renderer gates on its own

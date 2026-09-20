@@ -560,6 +560,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       prefillFields: null,
       restoredValues: null,
       localize: this._localize,
+      catalogById: getCachedCatalogIndex()?.byId,
     });
     const live = liveDependencies(entry, seeded);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
@@ -579,8 +580,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
       wrongKindDependencies(
         entry.config_entries,
         live,
+        seeded,
         this.yaml,
-        getCachedCatalogIndex()?.byId
+        getCachedCatalogIndex()
       ).length > 0
     )
       return null;

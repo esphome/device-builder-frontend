@@ -529,8 +529,9 @@ export function classCandidates<T extends { id: string }>(
       section && byId.get(qualifiedSectionKey(section.key, section.platform));
     if (!section || !component) return true;
     let classes = component.id_classes;
-    // A typed schema has one discriminator, so the map has one key.
-    const [variant] = Object.entries(component.id_classes_by_variant ?? {});
+    // A typed schema has one discriminator; more than one can't be judged.
+    const [variant, ...others] = Object.entries(component.id_classes_by_variant ?? {});
+    if (others.length) return true;
     if (variant) {
       const [key, byValue] = variant;
       lines ??= splitYamlDocLines(yaml);
@@ -539,7 +540,7 @@ export function classCandidates<T extends { id: string }>(
       // Unset keeps ``id_classes``, the default variant's.
       if (value != null) {
         // A substitution or a value the catalog doesn't know: can't judge.
-        if (!byValue[String(value)]) return true;
+        if (!Object.prototype.hasOwnProperty.call(byValue, String(value))) return true;
         classes = byValue[String(value)];
       }
     }

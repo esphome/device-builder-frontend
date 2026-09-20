@@ -287,7 +287,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** Net-missing deps driving the banner and submit gate: the widened
    *  scan minus those a present component provides (`_providedDeps`), plus
    *  a live bus dep present but with no attachable bus (`_busBlockedDep`)
-   *  and any present only as the wrong kind (`wrongKindDependencies`). */
+   *  and any present only as the wrong kind (`_wrongKindDeps`). */
   private _missingDeps(present: ReadonlySet<string>): string[] {
     const live = liveDependencies(this.component, this._values);
     const missing = findMissingDependencies(
@@ -296,12 +296,22 @@ export class ESPHomeAddComponentForm extends LitElement {
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
-    const unusable = new Set(
-      wrongKindDependencies(this._entries, live, this.yaml, getCachedCatalogIndex()?.byId)
-    );
+    const unusable = new Set(this._wrongKindDeps(live));
     const blocked = this._busBlockedDep;
     if (blocked && live.includes(blocked)) unusable.add(blocked);
     return [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
+  }
+
+  /** Deps present only as the wrong kind. The index is read, never loaded:
+   *  the dialog awaits it before mounting this form (`hydrateForSelection`). */
+  private _wrongKindDeps(live: readonly string[]): string[] {
+    return wrongKindDependencies(
+      this._entries,
+      live,
+      this._values,
+      this.yaml,
+      getCachedCatalogIndex()
+    ).filter((d) => !this._providedDeps.has(d));
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -387,6 +397,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       prefillFields: this.prefillFields,
       restoredValues: this.restoredValues,
       localize: this._localize,
+      catalogById: getCachedCatalogIndex()?.byId,
     });
   }
 
@@ -499,29 +510,30 @@ export class ESPHomeAddComponentForm extends LitElement {
     return blocked !== null && missing.length === 1 && missing[0] === blocked;
   }
 
+  /** The copy family for *missing*: present but unusable reads differently
+   *  from absent. */
+  private _depsBlockCopy(missing: string[]): string {
+    if (this._allDepsBusBlocked(missing)) return "device.bus_dependency_in_use";
+    const wrongKind = this._wrongKindDeps(liveDependencies(this.component, this._values));
+    return missing.every((d) => wrongKind.includes(d))
+      ? "device.wrong_kind_dependency"
+      : "device.missing_dependencies";
+  }
+
   private _depsBlockTitle(missing: string[]): string {
-    return this._localize(
-      this._allDepsBusBlocked(missing)
-        ? "device.bus_dependency_in_use_title"
-        : "device.missing_dependencies_title",
-      { name: this.component.name }
-    );
+    return this._localize(`${this._depsBlockCopy(missing)}_title`, {
+      name: this.component.name,
+    });
   }
 
   private _renderMissingDeps(missing: string[]) {
-    const allBlocked = this._allDepsBusBlocked(missing);
+    const copy = this._depsBlockCopy(missing);
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div class="deps-warning-body">
           <div class="deps-warning-title">${this._depsBlockTitle(missing)}</div>
-          <div>
-            ${
-              allBlocked
-                ? this._localize("device.bus_dependency_in_use_body")
-                : this._localize("device.missing_dependencies_body")
-            }
-          </div>
+          <div>${this._localize(`${copy}_body`)}</div>
           <div class="deps-warning-actions">
             ${missing.map(
               (d) =>

@@ -1259,14 +1259,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
     return null;
   }
 
-  private _catalogRequested = false;
+  private _catalogLoading = false;
 
-  /** One load per form: a failed fetch must not re-kick on every render. */
+  /** A failed load re-renders nothing, so a later render retries without looping. */
   private _catalogById(): ReadonlyMap<string, ComponentCatalogIndexEntry> | null {
     const index = getCachedCatalogIndex();
-    if (!index && this._api && !this._catalogRequested) {
-      this._catalogRequested = true;
-      void loadCatalog(this._api).then(() => this.requestUpdate());
+    if (!index && this._api && !this._catalogLoading) {
+      this._catalogLoading = true;
+      void loadCatalog(this._api).then(() => {
+        this._catalogLoading = false;
+        if (getCachedCatalogIndex()) this.requestUpdate();
+      });
     }
     return index?.byId ?? null;
   }

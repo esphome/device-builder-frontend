@@ -337,43 +337,77 @@ describe("wrongKindDependencies", () => {
       references_class: "modbus::ModbusServerHub",
     }),
   ];
-  const byId = new Map([
-    [
-      "modbus",
-      makeComponentEntry("modbus", {
-        id_classes: ["modbus::ModbusClientHub"],
-        id_classes_by_variant: {
-          role: {
-            client: ["modbus::ModbusClientHub"],
-            server: ["modbus::ModbusServerHub"],
-          },
-        },
-      }),
-    ],
-  ]);
+  const hub = makeComponentEntry("modbus", {
+    id_classes: ["modbus::ModbusClientHub"],
+    id_classes_by_variant: {
+      role: {
+        client: ["modbus::ModbusClientHub"],
+        server: ["modbus::ModbusServerHub"],
+      },
+    },
+  });
+  const index = { components: [hub], byId: new Map([[hub.id, hub]]) };
   const CLIENT_ONLY = "modbus:\n  - id: client_hub\n";
 
   it("reports a dependency configured only as the wrong variant", () => {
-    expect(wrongKindDependencies(entries, ["modbus"], CLIENT_ONLY, byId)).toEqual([
+    expect(wrongKindDependencies(entries, ["modbus"], {}, CLIENT_ONLY, index)).toEqual([
       "modbus",
     ]);
   });
 
   it("is satisfied once a matching hub exists", () => {
     const yaml = `${CLIENT_ONLY}  - id: server_hub\n    role: server\n`;
-    expect(wrongKindDependencies(entries, ["modbus"], yaml, byId)).toEqual([]);
+    expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, index)).toEqual([]);
   });
 
   it("leaves an absent dependency to the missing-dependency check", () => {
-    expect(wrongKindDependencies(entries, ["modbus"], "logger:\n", byId)).toEqual([]);
+    expect(wrongKindDependencies(entries, ["modbus"], {}, "logger:\n", index)).toEqual(
+      []
+    );
   });
 
   it("defers to a merged source that may hold the matching hub", () => {
     const yaml = `packages:\n  base: !include base.yaml\n${CLIENT_ONLY}`;
-    expect(wrongKindDependencies(entries, ["modbus"], yaml, byId)).toEqual([]);
+    expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, index)).toEqual([]);
+  });
+
+  it("skips a reference the form will not ask for", () => {
+    const gated = [
+      makeConfigEntry({ key: "mode", default_value: "off" }),
+      { ...entries[0], depends_on: "mode", depends_on_value: "on" },
+    ];
+    expect(wrongKindDependencies(gated, ["modbus"], {}, CLIENT_ONLY, index)).toEqual([]);
+    const locked = [{ ...entries[0], locked: true }];
+    expect(wrongKindDependencies(locked, ["modbus"], {}, CLIENT_ONLY, index)).toEqual([]);
+    const nested = [
+      makeConfigEntry({
+        key: "hubs",
+        type: ConfigEntryType.NESTED,
+        config_entries: entries,
+      }),
+    ];
+    expect(wrongKindDependencies(nested, ["modbus"], {}, CLIENT_ONLY, index)).toEqual([]);
+  });
+
+  it("counts a matching id a cross-domain provider supplies", () => {
+    const bridge = makeComponentEntry("bridge", {
+      provides: ["modbus"],
+      provides_id_paths: { modbus: [["hub", "id"]] },
+    });
+    const withProvider = {
+      components: [hub, bridge],
+      byId: new Map([
+        [hub.id, hub],
+        [bridge.id, bridge],
+      ]),
+    };
+    const yaml = `${CLIENT_ONLY}bridge:\n  hub:\n    id: bridged_hub\n`;
+    expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, withProvider)).toEqual(
+      []
+    );
   });
 
   it("judges nothing before the catalog index has loaded", () => {
-    expect(wrongKindDependencies(entries, ["modbus"], CLIENT_ONLY, null)).toEqual([]);
+    expect(wrongKindDependencies(entries, ["modbus"], {}, CLIENT_ONLY, null)).toEqual([]);
   });
 });
