@@ -117,6 +117,12 @@ export interface ComponentCatalogIndexEntry {
    *  key-paths to descend, keyed by interface (one per nested location).
    *  Absent for own-id providers. */
   provides_id_paths?: Record<string, string[][]>;
+  /** Classes this component's own top-level id inherits, sent only when some
+   *  `references_class` rejects it. For a typed hub, the default variant's. */
+  id_classes?: string[];
+  /** The same per variant of a typed hub, keyed by discriminator key then
+   *  value (modbus: `{ role: { client: [...], server: [...] } }`). */
+  id_classes_by_variant?: Record<string, Record<string, string[]>>;
   /** Requirements this component imposes on the bus it attaches to, keyed
    *  by bus id ('i2c' / 'spi' / 'uart'): exact-match values (baud_rate,
    *  parity, ...), range bounds (min/max_frequency in Hz) and required

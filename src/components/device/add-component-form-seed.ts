@@ -17,6 +17,7 @@ import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { seedBoardPinDefaults } from "../../util/pin/board-defaults.js";
+import { type CatalogById, classVerdict } from "../../util/reference-class.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
@@ -33,6 +34,9 @@ export interface SeedContext {
    *  still wins for the reference field. */
   restoredValues: Record<string, unknown> | null;
   localize: LocalizeFunc;
+  /** The loaded catalog index, so a class-restricted reference never
+   *  auto-picks a wrong-class id. Absent: nothing is filtered. */
+  catalogById?: CatalogById | null;
 }
 
 /**
@@ -72,6 +76,13 @@ export function findReferencePath(
   return null;
 }
 
+/** The entry a `findReferencePath` result names, descending NESTED blocks. */
+function entryAtPath(entries: ConfigEntry[], path: string[]): ConfigEntry | undefined {
+  const [key, ...rest] = path;
+  const entry = entries.find((e) => e.key === key);
+  return rest.length && entry ? entryAtPath(entry.config_entries ?? [], rest) : entry;
+}
+
 /**
  * Seed initial form values. By default only required fields' defaults
  * are pre-filled — pre-filling optional fields the user can't see
@@ -90,12 +101,19 @@ export function seedDefaults(
   entries: ConfigEntry[],
   yaml: string,
   localize: LocalizeFunc,
-  seedPresets: boolean = false
+  seedPresets: boolean = false,
+  catalogById: CatalogById | null = null
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const entry of entries) {
     if (entry.type === ConfigEntryType.NESTED) {
-      const sub = seedDefaults(entry.config_entries ?? [], yaml, localize, seedPresets);
+      const sub = seedDefaults(
+        entry.config_entries ?? [],
+        yaml,
+        localize,
+        seedPresets,
+        catalogById
+      );
       // A required entity sub-reading (ags10's tvoc) serializes only
       // once it holds a value; seed its name (the label) so an
       // untouched Add still produces a valid sensor, matching the
@@ -116,7 +134,12 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const candidates = findReferenceCandidates(yaml, entry.references_component, []);
+      const { candidates } = classVerdict(
+        yaml,
+        findReferenceCandidates(yaml, entry.references_component, []),
+        entry,
+        catalogById
+      );
       // A featured preset that names a component actually present in the live
       // config (a sibling just added in the same bundle, e.g. `output_blue`)
       // wins — `resolveSoleCandidate` can't pick among several same-domain
@@ -129,7 +152,11 @@ export function seedDefaults(
         candidates.some((c) => c.id === entry.default_value)
           ? entry.default_value
           : undefined;
-      const ref = presetId ?? resolveSoleCandidate(candidates, yaml)?.id;
+      // With no index a class-restricted field can't tell a lone candidate of
+      // the wrong class from a right one, so leave the pick to the user.
+      const unjudged = Boolean(entry.references_class) && !catalogById;
+      const ref =
+        presetId ?? (unjudged ? undefined : resolveSoleCandidate(candidates, yaml)?.id);
       if (ref !== undefined) {
         out[entry.key] = entry.multi_value ? [ref] : ref;
       } else if (entry.multi_value && entry.required) {
@@ -186,7 +213,13 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   const seedPresets = isFeaturedId(component.id);
   // Snapshot what seeding owns so a later prefill skips exactly those refs
   // (not every preset-flagged one), without treating a restored value as seeded.
-  const seededDefaults = seedDefaults(entries, yaml, localize, seedPresets);
+  const seededDefaults = seedDefaults(
+    entries,
+    yaml,
+    localize,
+    seedPresets,
+    ctx.catalogById
+  );
   let next = seededDefaults;
 
   const idEntry = entries.find((e) => e.key === "id" && e.type === ConfigEntryType.ID);
@@ -235,7 +268,20 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
       [],
       seededDefaults
     );
-    if (targetPath) {
+    // A detour can add a block of the wrong class (a ``gpio`` output for a
+    // float reference); leave the field for the picker rather than prefill it.
+    const target = targetPath && entryAtPath(entries, targetPath);
+    const prefill = [{ id: prefillReference.id }];
+    // As in seedDefaults: with no index a class-restricted field can't tell a
+    // wrong-class block from a right one, so it is left for the picker.
+    const unjudged = Boolean(target?.references_class) && !ctx.catalogById;
+    // An entry the path can't resolve is not judged: the prefill applies.
+    if (
+      targetPath &&
+      !unjudged &&
+      (!target ||
+        classVerdict(yaml, prefill, target, ctx.catalogById).candidates.length > 0)
+    ) {
       next = setIn(next, targetPath, prefillReference.id);
     }
   }

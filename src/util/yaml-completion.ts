@@ -28,6 +28,7 @@ import {
   findReferenceCandidates,
 } from "./config-entry-yaml-scan.js";
 import { getConfigVarValueOptions } from "./esphome-schema.js";
+import { classVerdict } from "./reference-class.js";
 import {
   collectSiblingKeys,
   collectSubstitutionKeys,
@@ -219,10 +220,12 @@ export function createYamlCompletionSource(
         const providers = catalog.components
           .filter((c) => c.provides?.includes(domain))
           .map((c) => catalogEntryToProvider(c, domain));
-        const candidates = findReferenceCandidates(
-          state.doc.toString(),
-          domain,
-          providers
+        const doc = state.doc.toString();
+        const { candidates } = classVerdict(
+          doc,
+          findReferenceCandidates(doc, domain, providers),
+          entry,
+          catalog.byId
         );
         if (candidates.length > 0) {
           return {

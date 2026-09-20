@@ -13,6 +13,7 @@ import {
   AUTO_SENTINEL,
   renderIdReferenceField,
 } from "../../../src/components/device/config-entry-id-reference-renderer.js";
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const LOCAL_SCRIPT_YAML = "script:\n  - id: local_script\n";
@@ -421,5 +422,113 @@ describe("renderIdReferenceField — lazy option list", () => {
       "s3",
       ADD_NEW_SENTINEL,
     ]);
+  });
+});
+
+describe("renderIdReferenceField — candidates of the wrong id class", () => {
+  const OUTPUTS =
+    "output:\n  - platform: gpio\n    id: relay_out\n  - platform: ledc\n    id: pwm_out\n";
+  const entry = makeEntry(ConfigEntryType.STRING, {
+    references_component: "output",
+    references_class: "output::FloatOutput",
+  });
+  // The catalog index marks each *dropped* component as binary only.
+  const render = (yaml: string, value: string, ...dropped: string[]) =>
+    renderIdReferenceField(
+      entry,
+      ["output"],
+      makeRenderCtx(
+        { output: value },
+        {
+          overrides: {
+            yaml,
+            catalogById: () =>
+              new Map(
+                dropped.map((id) => [
+                  id,
+                  makeComponentEntry(id, { id_classes: ["output::BinaryOutput"] }),
+                ])
+              ),
+          },
+        }
+      )
+    );
+
+  it("offers only the blocks whose id inherits the required class", () => {
+    const values = optionValues(render(OUTPUTS, "", "output.gpio"));
+    expect(values).toContain("pwm_out");
+    expect(values).not.toContain("relay_out");
+  });
+
+  it("says none match when every configured block is the wrong class", () => {
+    const tmpl = render(OUTPUTS, "", "output.gpio", "output.ledc");
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).toBe(
+      "device.id_reference_none_match"
+    );
+  });
+
+  it("does not call a real but filtered-out id unknown", () => {
+    const html = JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"));
+    expect(html).not.toContain("device.id_reference_unknown_error");
+  });
+
+  it("says a committed id of the wrong class is the wrong kind, not undefined here", () => {
+    const html = JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"));
+    expect(html).toContain("device.id_reference_wrong_kind");
+    expect(html).not.toContain("device.id_reference_unresolved");
+  });
+
+  it("does not offer Auto when it would resolve to a wrong-class block", () => {
+    expect(
+      optionValues(render(OUTPUTS, "relay_out", "output.gpio", "output.ledc"))
+    ).not.toContain(AUTO_SENTINEL);
+    expect(optionValues(render(OUTPUTS, "relay_out", "output.gpio"))).toContain(
+      AUTO_SENTINEL
+    );
+  });
+
+  it("marks a committed wrong-class id invalid with an inline message", () => {
+    const selectClass = (value: string) =>
+      findElementBindings(render(OUTPUTS, value, "output.gpio"), "wa-select")[0]?.class;
+    expect(selectClass("relay_out")).toContain("invalid");
+    expect(selectClass("pwm_out")).not.toContain("invalid");
+  });
+
+  it("does not claim none match while interface providers are unsettled", () => {
+    const tmpl = renderIdReferenceField(
+      entry,
+      ["output"],
+      makeRenderCtx(
+        { output: "" },
+        {
+          overrides: {
+            yaml: OUTPUTS,
+            resolveInterfaceProviders: () => null,
+            catalogById: () =>
+              new Map(
+                ["output.gpio", "output.ledc"].map((id) => [
+                  id,
+                  makeComponentEntry(id, { id_classes: ["output::BinaryOutput"] }),
+                ])
+              ),
+          },
+        }
+      )
+    );
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).not.toBe(
+      "device.id_reference_none_match"
+    );
+  });
+
+  it("does not claim none match when a merged source may hold one", () => {
+    const tmpl = render(
+      `packages:\n  base: !include base.yaml\n${OUTPUTS}`,
+      "",
+      "output.gpio",
+      "output.ledc"
+    );
+    expect(findElementBindings(tmpl, "wa-select")[0]?.placeholder).not.toBe(
+      "device.id_reference_none_match"
+    );
   });
 });

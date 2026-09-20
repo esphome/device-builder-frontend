@@ -33,9 +33,17 @@ import { formatApiError } from "../../util/format-api-error.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  getCachedCatalogIndex,
+  loadCatalog,
+} from "../../util/yaml-completion-catalog.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
-import { findMissingDependencies, liveDependencies } from "./add-component-deps.js";
+import {
+  classReferenceNeedsForm,
+  findMissingDependencies,
+  liveDependencies,
+} from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   type DepNavHost,
@@ -227,6 +235,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
+    void loadCatalog(this._api); // a selection awaits it; start early
     void this.updateComplete.then(() => this._catalog?.load());
   }
 
@@ -243,6 +252,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
+    void loadCatalog(this._api); // a selection awaits it; start early
     void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
@@ -555,6 +565,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       prefillFields: null,
       restoredValues: null,
       localize: this._localize,
+      catalogById: getCachedCatalogIndex()?.byId,
     });
     const live = liveDependencies(entry, seeded);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
@@ -568,6 +579,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._resolvedPlatforms
     );
     if (missing.length > 0) return null;
+    if (classReferenceNeedsForm(entry.config_entries, live, seeded, this.yaml))
+      return null;
     if (
       addFormNeedsUserInput(
         entry.config_entries,
