@@ -71,7 +71,7 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
         count-label=${host._localize("dashboard.filter_menu_active", {
           count: host._activeFacetCount,
         })}
-        @clear-filters=${host._clearAllFilters}
+        @clear-filters=${host._clearFacets}
       >
         ${facetSections}
       </esphome-filters-popover>
