@@ -184,7 +184,7 @@ export function onEnableToggle(opts: {
   }
 }
 
-// Writes the seed switching *entry* on calls for.
+// Writes the value that switching *entry* on seeds it with.
 function seedFor(
   entry: ConfigEntry,
   path: string[],

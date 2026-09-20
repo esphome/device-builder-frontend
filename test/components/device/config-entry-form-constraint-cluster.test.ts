@@ -290,6 +290,10 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
     const members = [block("pwm", {}), block("dac", {})];
     const [cluster] = buildConstraintClusters(members, []).clusters;
     expect(renderConstraintClusterField(cluster, ctxFor({}, members))).toBe(nothing);
+    // An emptied block is still nothing to paint; a set one shows its value.
+    expect(renderConstraintClusterField(cluster, ctxFor({ pwm: {} }, members))).toBe(
+      nothing
+    );
     const set = ctxFor({ pwm: { rate: "1" } }, members);
     expect(JSON.stringify(renderConstraintClusterField(cluster, set))).toContain(
       "<entry:pwm>"

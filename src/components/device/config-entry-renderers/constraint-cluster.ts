@@ -178,12 +178,12 @@ export function selectClusterAlternative(
  *  per alternative, and only the selected alternative's fields. The radio
  *  enforces the choice and only the picked side is ever saved, so there is no
  *  unsatisfied/warning state. */
-/** A member paints when it holds a value, or is visible and not a block
- *  with nothing in it. */
+/** A member paints when it holds a value or is visible, unless it is a
+ *  block with nothing in it. */
 function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
-  if (ctx.getAt([member.key]) !== undefined) return true;
   const values = ctx.scopeValues([]);
-  return (
+  const shown =
+    ctx.getAt([member.key]) !== undefined ||
     isEntryVisible(
       member,
       values,
@@ -191,8 +191,8 @@ function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
       ctx.board?.esphome.platform ?? null,
       undefined,
       ctx.entries
-    ) && !isEmptyBlock(member, values, topLevelFilterOptions(ctx))
-  );
+    );
+  return shown && !isEmptyBlock(member, values, topLevelFilterOptions(ctx));
 }
 
 export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
