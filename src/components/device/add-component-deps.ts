@@ -142,7 +142,7 @@ export function hasClassReference(entries: ConfigEntry[]): boolean {
  * Live dependencies configured only as the wrong kind: *entries* reference
  * the dependency with a ``references_class`` that none of its configured
  * blocks provides (hoermann_hcp needs a ``role: server`` modbus hub and only a
- * client one exists). Such a block must not count as satisfying the dependency.
+ * client one exists).
  */
 export function wrongKindDependencies(
   entries: ConfigEntry[],

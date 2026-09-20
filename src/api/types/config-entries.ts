@@ -216,8 +216,7 @@ export interface ConfigEntry {
   references_component?: string | null;
   /**
    * The C++ class the referenced id must inherit (`output::FloatOutput`), sent
-   * only when some candidate of `references_component` fails it. A candidate
-   * is dropped when its component's id classes are known and lack it.
+   * only when some candidate of `references_component` fails it.
    */
   references_class?: string | null;
   /**

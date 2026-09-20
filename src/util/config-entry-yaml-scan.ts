@@ -18,7 +18,6 @@
  */
 import type { ComponentCatalogIndexEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
-import { hasHiddenKeys } from "./bus-availability.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin/gpio.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
@@ -35,6 +34,7 @@ import { parseYamlSectionValues } from "./yaml-section-reader.js";
 import {
   collectIdsAtPath,
   findFieldLine,
+  hasHiddenKeys,
   parseYamlTopLevelSections,
   qualifiedSectionKey,
   type YamlSection,
@@ -507,15 +507,9 @@ export function findReferenceCandidates(
   return findComponentsByProviders(yaml, [{ domain, stem: "" }, ...providers]);
 }
 
-/**
- * The *candidates* whose id may inherit the class *entry* requires.
- *
- * Fails open: a candidate is dropped only when it is a top-level section's own
- * id, the catalog knows that component's id classes, and they lack the class.
- * A nested interface id (a ``dht`` temperature), an unknown component, an
- * unloaded index (*byId* absent) and an unreadable typed-hub discriminator all
- * stay offered.
- */
+/** The *candidates* whose id may inherit the class *entry* requires. Fails
+ *  open: only a top-level section id whose component's known classes lack it
+ *  is dropped. */
 export function classCandidates<T extends { id: string }>(
   yaml: string,
   candidates: T[],

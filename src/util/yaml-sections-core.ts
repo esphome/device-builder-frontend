@@ -582,3 +582,13 @@ export function qualifiedSectionKey(key: string, platform?: string): string {
   if (!platform) return key;
   return platform.startsWith(`${key}.`) ? platform : `${key}.${platform}`;
 }
+
+/** Whether *section*'s keys may come from a source a line scan can't see: an
+ *  anchor merge (`<<:` at any position, including the dash line) or an include. */
+export function hasHiddenKeys(lines: string[], section: YamlSection): boolean {
+  for (let i = section.fromLine - 1; i < section.toLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(?:-\s+)?<<\s*:/.test(line) || line.includes("!include")) return true;
+  }
+  return false;
+}

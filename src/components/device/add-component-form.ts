@@ -305,17 +305,12 @@ export class ESPHomeAddComponentForm extends LitElement {
       present,
       this.resolvedPlatforms
     ).filter((d) => !this._providedDeps.has(d));
+    const unusable = new Set(
+      wrongKindDependencies(this._entries, live, this.yaml, getCachedCatalogIndex()?.byId)
+    );
     const blocked = this._busBlockedDep;
-    const unusable = [
-      ...(blocked && live.includes(blocked) ? [blocked] : []),
-      ...wrongKindDependencies(
-        this._entries,
-        live,
-        this.yaml,
-        getCachedCatalogIndex()?.byId
-      ),
-    ].filter((d) => !missing.includes(d));
-    return unusable.length ? [...missing, ...new Set(unusable)] : missing;
+    if (blocked && live.includes(blocked)) unusable.add(blocked);
+    return [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping

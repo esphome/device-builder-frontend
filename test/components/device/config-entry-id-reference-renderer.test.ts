@@ -13,6 +13,7 @@ import {
   AUTO_SENTINEL,
   renderIdReferenceField,
 } from "../../../src/components/device/config-entry-id-reference-renderer.js";
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const LOCAL_SCRIPT_YAML = "script:\n  - id: local_script\n";
@@ -445,7 +446,7 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
               new Map(
                 dropped.map((id) => [
                   id,
-                  { id, id_classes: ["output::BinaryOutput"] } as never,
+                  makeComponentEntry(id, { id_classes: ["output::BinaryOutput"] }),
                 ])
               ),
           },
