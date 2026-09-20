@@ -141,6 +141,9 @@ export interface ConfigEntryValueChange {
  *  host's ``showAdvanced`` round-trip (normally one render, milliseconds). */
 export const ADVANCED_ANCHOR_TTL_MS = 2000;
 
+/** How long a failed catalog index load waits before a render retries it. */
+const CATALOG_RETRY_MS = 30_000;
+
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -1259,16 +1262,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
     return null;
   }
 
-  private _catalogLoading = false;
+  /** No catalog load before this time: set while one is in flight, and pushed
+   *  out after a failure so a down backend isn't swept on every render. */
+  private _catalogRetryAt = 0;
 
-  /** A failed load re-renders nothing, so a later render retries without looping. */
+  /** A failed load re-renders nothing; a render after the backoff retries. */
   private _catalogById(): ReadonlyMap<string, ComponentCatalogIndexEntry> | null {
     const index = getCachedCatalogIndex();
-    if (!index && this._api && !this._catalogLoading) {
-      this._catalogLoading = true;
+    if (!index && this._api && Date.now() >= this._catalogRetryAt) {
+      this._catalogRetryAt = Infinity;
       void loadCatalog(this._api).then(() => {
-        this._catalogLoading = false;
         if (getCachedCatalogIndex()) this.requestUpdate();
+        else this._catalogRetryAt = Date.now() + CATALOG_RETRY_MS;
       });
     }
     return index?.byId ?? null;
