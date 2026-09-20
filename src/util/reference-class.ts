@@ -96,6 +96,8 @@ function sectionJudge(
       if (value == null && Object.prototype.hasOwnProperty.call(values, key)) return true;
       // Absent keeps ``id_classes``, the default variant's.
       if (value != null) {
+        // A list or mapping (``role: [server]``) would stringify to a variant name.
+        if (typeof value === "object") return true;
         // A substitution or a value the catalog doesn't know: can't judge.
         if (!Object.prototype.hasOwnProperty.call(byValue, String(value))) return true;
         classes = byValue[String(value)];
