@@ -28,6 +28,7 @@ export function defaultedChild(entry: ConfigEntry): ConfigEntry | undefined {
     (c) =>
       !c.hidden &&
       !c.multi_value &&
+      !c.references_component &&
       c.default_value != null &&
       c.type !== ConfigEntryType.NESTED &&
       c.type !== ConfigEntryType.MAP

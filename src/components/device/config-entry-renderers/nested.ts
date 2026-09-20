@@ -70,8 +70,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // an explicit enable switch; plain nested forms (platform_type === null)
   // and required groups keep the bare collapsible header.
   const isOptionalEntity = entry.platform_type != null && !entry.required;
-  // A plain block a required group demands (emc2101's pwm / dac) has no
-  // required child to fill in, so the switch is the only way to pick it.
+  // A plain block a required group demands (emc2101's pwm / dac) may have no
+  // field the form paints, so the switch is how the user picks it.
   const isDemanded =
     path.length === 1 && !entry.required && ctx.demandedKeys.has(entry.key);
   const hasSwitch = isOptionalEntity || isDemanded;
@@ -176,7 +176,7 @@ export function onEnableToggle(opts: {
       // No identity at all (emc2101's pwm): write a child's own default, the
       // smallest value that makes the block serialize without changing it.
       const defaulted = seed ? undefined : defaultedChild(entry);
-      // With neither (a light's ``initial_state``) there's nothing valid to
+      // With none of these (a light's ``initial_state``) there's nothing valid to
       // write, so re-emit the still-absent group: the switch the user just
       // clicked has no backing value, and only a re-render walks it back to
       // off. The group persists once they set one of its own fields. This

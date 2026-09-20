@@ -281,6 +281,32 @@ describe("onEnableToggle", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["pwm", "divider"], "1");
   });
 
+  it("never seeds a reference child's default", () => {
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({
+          key: "output_id",
+          type: ConfigEntryType.STRING,
+          default_value: "out_1",
+          references_component: "output",
+        }),
+      ],
+    });
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry,
+      path: ["pwm"],
+      key: "pwm",
+      isOpen: false,
+      checked: true,
+      label: "PWM",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pwm"], undefined);
+  });
+
   it("leaves a block collapsed when enabling it paints no field", () => {
     const entry = makeSensorEntry({ key: "pwm" });
     const ctx = makeRenderCtx({}, { overrides: { filterRenderable: () => [] } });

@@ -1015,6 +1015,24 @@ describe("filterRenderable demanded NESTED members", () => {
     expect(out.map((e) => e.key)).toEqual(["pwm", "dac"]);
   });
 
+  it("keeps it outside required-only mode too, when only advanced children hide it", () => {
+    // A flat host with the advanced toggle off: a banner demanding a block
+    // that does not paint is the same dead end as in the add form.
+    const advancedOnly = makeEntry({
+      key: "pwm",
+      type: ConfigEntryType.NESTED,
+      config_entries: [makeEntry({ key: "divider", advanced: true })],
+    });
+    const flat = { requiredOnly: false, showAdvanced: false };
+    const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
+    expect(filterRenderable([advancedOnly], {}, flat)).toEqual([]);
+    expect(
+      filterRenderable([advancedOnly], {}, { ...flat, requiredGroups: groups }).map(
+        (e) => e.key
+      )
+    ).toEqual(["pwm"]);
+  });
+
   it("still drops an undemanded block with no renderable child", () => {
     expect(filterRenderable([block("pwm")], {}, opts)).toEqual([]);
   });
