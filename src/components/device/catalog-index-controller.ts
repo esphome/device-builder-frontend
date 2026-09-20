@@ -2,6 +2,7 @@ import type { ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ComponentCatalogIndexEntry } from "../../api/types/components.js";
 import {
+  type CatalogIndex,
   getCachedCatalogIndex,
   loadCatalog,
 } from "../../util/yaml-completion-catalog.js";
@@ -25,6 +26,10 @@ export class CatalogIndexController {
   ) {}
 
   byId(): ReadonlyMap<string, ComponentCatalogIndexEntry> | null {
+    return this.index()?.byId ?? null;
+  }
+
+  index(): CatalogIndex | null {
     const index = getCachedCatalogIndex();
     const api = this._api();
     if (!index && api && Date.now() >= this._retryAt) {
@@ -39,6 +44,6 @@ export class CatalogIndexController {
         this._host.requestUpdate();
       }, backOff);
     }
-    return index?.byId ?? null;
+    return index;
   }
 }

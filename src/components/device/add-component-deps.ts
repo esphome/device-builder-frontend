@@ -245,7 +245,8 @@ export function classReferenceNeedsForm(
 function hasClassReference(entries: ConfigEntry[]): boolean {
   return entries.some(
     (e) =>
-      Boolean(e.references_component && e.references_class) ||
+      // A locked reference is a deliberate pin the form never asks about.
+      Boolean(e.references_component && e.references_class && !e.locked) ||
       hasClassReference(e.config_entries ?? [])
   );
 }

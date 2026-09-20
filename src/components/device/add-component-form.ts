@@ -46,6 +46,7 @@ import {
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues, findReferencePath } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { resolveEntryLabel } from "./config-entry-renderers-shared.js";
@@ -62,6 +63,10 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
+
+  /** Re-renders the form when a late catalog index lands, so the dependency
+   *  verdict is not stuck on a failed first load. */
+  private _catalogIndex = new CatalogIndexController(this, () => this._api);
 
   @property({ attribute: false })
   component!: ComponentCatalogEntry;
@@ -294,7 +299,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       resolvedPlatforms: this.resolvedPlatforms,
       provided: this._providedDeps,
       busBlocked: this._busBlockedDep,
-      index: getCachedCatalogIndex(),
+      index: this._catalogIndex.index(),
     });
   }
 

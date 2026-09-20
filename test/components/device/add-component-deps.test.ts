@@ -453,6 +453,7 @@ describe("classReferenceNeedsForm", () => {
     expect(needsForm([nested])).toBe(true);
     expect(needsForm([ref])).toBe(true);
     expect(needsForm([{ ...ref, references_class: null }])).toBe(false);
+    expect(needsForm([{ ...ref, locked: true }])).toBe(false);
   });
 });
 
