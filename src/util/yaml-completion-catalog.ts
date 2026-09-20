@@ -152,7 +152,8 @@ export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
     catalogIndex = { components, byId, byCategory };
     return catalogIndex;
   })().catch((err) => {
-    console.debug("[yaml-completion] failed to load catalog:", err);
+    // Class filtering of reference pickers rides on this index: say so loudly.
+    console.warn("[yaml-completion] failed to load catalog:", err);
     catalogPromise = null;
     return { components: [], byId: new Map(), byCategory: new Map() };
   });

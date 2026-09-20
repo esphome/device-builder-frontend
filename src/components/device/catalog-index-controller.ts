@@ -29,10 +29,15 @@ export class CatalogIndexController {
     const api = this._api();
     if (!index && api && Date.now() >= this._retryAt) {
       this._retryAt = Infinity;
-      void loadCatalog(api).then(() => {
-        if (getCachedCatalogIndex()) this._host.requestUpdate();
-        else this._retryAt = Date.now() + RETRY_MS;
-      });
+      const backOff = () => {
+        this._retryAt = Date.now() + RETRY_MS;
+      };
+      loadCatalog(api).then(() => {
+        if (!getCachedCatalogIndex()) return backOff();
+        // Reloads if the cache is ever cleared.
+        this._retryAt = 0;
+        this._host.requestUpdate();
+      }, backOff);
     }
     return index?.byId ?? null;
   }
