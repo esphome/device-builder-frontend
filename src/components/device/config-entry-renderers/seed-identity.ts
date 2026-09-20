@@ -12,7 +12,7 @@ import {
   collectTakenIds,
   generateNestedItemId,
 } from "../../../util/default-component-id.js";
-import { declaringIdChild } from "../config-entry-render-filter.js";
+import { declaringIdChild } from "../config-entry-enable-seed.js";
 import type { RenderCtx } from "../config-entry-renderers-shared.js";
 
 /**

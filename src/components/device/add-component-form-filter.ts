@@ -113,7 +113,9 @@ function addFormVisibility(
       opts.targetPlatform ?? null,
       opts.rootValues,
       entries
-    ) && !isEmptyBlock(entry, values, opts);
+      // An exclusive-group member paints as a dropdown option whatever it holds.
+    ) &&
+    (Boolean(entry.exclusive_group) || !isEmptyBlock(entry, values, opts));
 }
 
 /**

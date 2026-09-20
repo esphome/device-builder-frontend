@@ -1,9 +1,9 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { isPlainObject } from "../../../util/nested-values.js";
+import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
-import { enableSeed, isSwitchable } from "../config-entry-render-filter.js";
+import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -138,6 +138,13 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
           : nothing
       }
       ${
+        !hasFields && enabled
+          ? html`<p class="nested-desc">
+              ${ctx.localize("device.enabled_block_sets", { values: setValuesOf(entry, raw, ctx) })}
+            </p>`
+          : nothing
+      }
+      ${
         isOpen
           ? html`<div class="nested-fields">
               ${children.map((child) => ctx.renderEntry(child, [...path, child.key]))}
@@ -221,4 +228,18 @@ function seedFor(
   // an identity-preserving fast path there would strand the switch on.
   if (!seed || value === undefined) ctx.emitChange(path, undefined);
   else ctx.emitChange([...path, seed.key], value);
+}
+
+// What a block with no field to show holds, so a value the switch wrote on
+// the user's behalf is visible where it was written.
+function setValuesOf(entry: ConfigEntry, raw: unknown, ctx: RenderCtx): string {
+  if (!isPlainObject(raw)) return "";
+  const children = new Map((entry.config_entries ?? []).map((c) => [c.key, c]));
+  return Object.entries(raw)
+    .filter(([, value]) => isPrimitiveOrNullish(value) && hasSerializableValue(value))
+    .map(([key, value]) => {
+      const child = children.get(key);
+      return `${child ? labelFor(child, ctx) : key}: ${String(value)}`;
+    })
+    .join(", ");
 }

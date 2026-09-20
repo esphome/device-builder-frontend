@@ -174,10 +174,6 @@ export function selectClusterAlternative(
   ctx.setClusterChoice(clusterId, newAltId);
 }
 
-/** Render an `exactly_one` cluster as a radio chooser: a muted prompt, a radio
- *  per alternative, and only the selected alternative's fields. The radio
- *  enforces the choice and only the picked side is ever saved, so there is no
- *  unsatisfied/warning state. */
 /** A member paints when it holds a value or is visible, unless it is a
  *  block with nothing in it. */
 export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
@@ -195,6 +191,10 @@ export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boo
   return shown && !isEmptyBlock(member, values, filterOptionsAt(ctx, [member.key]));
 }
 
+/** Render an `exactly_one` cluster as a radio chooser: a muted prompt, a radio
+ *  per alternative, and only the selected alternative's fields. The radio
+ *  enforces the choice and only the picked side is ever saved, so there is no
+ *  unsatisfied/warning state. */
 export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
   const clusterId = cluster.members[0].key;
   const isRenderable = (m: ConfigEntry): boolean => isClusterMemberPainted(m, ctx);

@@ -393,6 +393,28 @@ describe("onEnableToggle", () => {
     expect(body({ ...open, filterRenderable: () => [] })).toBe(false);
   });
 
+  it("says what an enabled block with no field to show holds", () => {
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({ key: "divider", label: "Divider", default_value: "1" }),
+      ],
+    });
+    const shown = (values: Record<string, unknown>) =>
+      JSON.stringify(
+        renderNestedField(
+          entry,
+          ["pwm"],
+          makeRenderCtx(values, {
+            overrides: { filterRenderable: () => [], requiredGroups: DEMANDS },
+          })
+        )
+      ).includes("device.enabled_block_sets");
+    expect(shown({ pwm: { divider: "1" } })).toBe(true);
+    expect(shown({})).toBe(false);
+  });
+
   it("drops the disclosure button from a block with no field to expand", () => {
     const entry = makeSensorEntry({ key: "pwm" });
     const buttons = (overrides: Partial<RenderCtx>) =>
