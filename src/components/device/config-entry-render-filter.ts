@@ -163,18 +163,26 @@ export function renderFilterOptions(
 }
 
 /**
- * The options for the children of the NESTED block *entry*. Required groups
- * are scope-local: the parent's never reach the children, and the block's own
- * bind only once it is in use, so an untouched optional block (``wifi.eap``)
- * demands nothing.
+ * The ``required_groups`` of the NESTED block *entry* that bind: its own, and
+ * only once the block is in use, so an untouched optional block
+ * (``wifi.eap``) demands nothing.
  */
+export function ownRequiredGroups(
+  entry: ConfigEntry,
+  blockValues: unknown
+): RequiredGroup[] {
+  return hasSerializableValue(blockValues) ? (entry.required_groups ?? []) : [];
+}
+
+/** The options for the children of the NESTED block *entry*. Required groups
+ *  are scope-local: the parent's never reach the children. */
 export function nestedOpts(
   opts: RenderFilterOptions,
   entry: ConfigEntry,
   blockValues: unknown
 ): RenderFilterOptions {
-  const own = hasSerializableValue(blockValues) ? entry.required_groups : null;
-  const requiredGroups = own?.length ? own : undefined;
+  const own = ownRequiredGroups(entry, blockValues);
+  const requiredGroups = own.length ? own : undefined;
   return requiredGroups || opts.requiredGroups ? { ...opts, requiredGroups } : opts;
 }
 
@@ -290,7 +298,8 @@ export function collectRenderablePaths(
           collectRenderablePaths(
             childSchema,
             itemValues,
-            nestedOpts(opts, entry, itemValues),
+            // The list renderer paints no groups for a row; bind none here either.
+            nestedOpts(opts, entry, undefined),
             [...pathPrefix, entry.key, String(idx)],
             out
           );

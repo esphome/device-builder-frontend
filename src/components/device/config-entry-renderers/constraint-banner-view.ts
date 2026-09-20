@@ -14,7 +14,7 @@ export interface ConstraintScope {
 /** A warning banner per unmet constraint of *scope* that no cluster box carries. */
 export function renderConstraintBanners(
   scope: ConstraintScope,
-  clusteredKeys: Set<string>,
+  clusteredKeys: ReadonlySet<string>,
   ctx: RenderCtx
 ) {
   const unsatisfied = collectUnsatisfiedConstraints(

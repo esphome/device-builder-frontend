@@ -540,8 +540,9 @@ export function renderSuggestionSelect(
   `;
 }
 
-/** The filter options for the scope *path* sits in. Required groups bind
- *  only the form's top level, as ``filterRenderable`` strips them on recursion. */
+/** The filter options for the scope *path* sits in, carrying the form's own
+ *  required groups at the top level only. A nested block's groups reach its
+ *  children through ``ownRequiredGroups``, not through here. */
 export function filterOptionsAt(ctx: RenderCtx, path: string[]): RenderFilterOptions {
   return renderFilterOptions(ctx, {
     rootValues: ctx.scopeValues([]),

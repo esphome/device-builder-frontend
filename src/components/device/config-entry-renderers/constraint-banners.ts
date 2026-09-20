@@ -32,7 +32,7 @@ export interface UnsatisfiedConstraint {
  */
 export function collectUnsatisfiedConstraints(
   inputs: ConstraintBannerInputs,
-  clusteredKeys: Set<string>
+  clusteredKeys: ReadonlySet<string>
 ): UnsatisfiedConstraint[] {
   const {
     entries,
@@ -42,6 +42,8 @@ export function collectUnsatisfiedConstraints(
     targetPlatform,
     formatKeys,
   } = inputs;
+  // Most scopes carry neither kind of constraint.
+  if (requiredGroups.length === 0 && !entries.some((e) => e.group)) return [];
   const messages: UnsatisfiedConstraint[] = [];
   // Skip a banner when none of its members currently render (gated off by
   // hidden / depends_on / platform, or simply not a rendered entry), matching

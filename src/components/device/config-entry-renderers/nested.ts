@@ -6,6 +6,7 @@ import { isPlainObject, isPrimitiveOrNullish } from "../../../util/nested-values
 import { maskSensitiveLines } from "../../../util/yaml-sensitive-redact.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import { enableSeed, isSwitchable } from "../config-entry-enable-seed.js";
+import { ownRequiredGroups } from "../config-entry-render-filter.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -71,10 +72,11 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // The block's own required groups bind once it is in use: their members
   // stay visible and an unmet one is named inside the box.
   const scope = ctx.scopeValues(path);
-  const ownGroups = hasSerializableValue(raw) ? (entry.required_groups ?? []) : [];
+  const inUse = hasSerializableValue(raw);
+  const ownGroups = ownRequiredGroups(entry, raw);
   const children = ctx.filterRenderable(entry.config_entries ?? [], scope, ownGroups);
   const hasFields = children.length > 0;
-  if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
+  if (hasFields && (entry.required || inUse)) ctx.seedNestedOpen(key);
   // The toggle keeps its books on the raw set; only the paint is gated, so a
   // block that later gains a field opens as the user last left it.
   const userOpen = ctx.nestedOpenSections.has(key);
@@ -90,7 +92,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // only when it has something to write.
   const isDemanded = isSwitchable(entry, filterOptionsAt(ctx, path));
   const hasSwitch = isOptionalEntity || isDemanded;
-  const enabled = hasSwitch && hasSerializableValue(raw);
+  const enabled = hasSwitch && inUse;
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
   // Name what the block holds that the form does not paint: everything in a
@@ -160,7 +162,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
         isOpen
           ? html`<div class="nested-fields">
               ${
-                hasSerializableValue(raw)
+                inUse
                   ? renderConstraintBanners(
                       {
                         entries: entry.config_entries ?? [],
@@ -256,7 +258,7 @@ function seedFor(
 }
 
 // A nested scope paints no cluster boxes, so every unmet group gets a banner.
-const NO_CLUSTERS: Set<string> = new Set();
+const NO_CLUSTERS: ReadonlySet<string> = new Set();
 
 const MASKED_VALUE = "••••••";
 
