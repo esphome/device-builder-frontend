@@ -8,7 +8,6 @@ import {
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
-  hasClassReference,
   liveDependencies,
   wrongKindDependencies,
 } from "../../../src/components/device/add-component-deps.js";
@@ -376,21 +375,5 @@ describe("wrongKindDependencies", () => {
 
   it("judges nothing before the catalog index has loaded", () => {
     expect(wrongKindDependencies(entries, ["modbus"], CLIENT_ONLY, null)).toEqual([]);
-  });
-});
-
-describe("hasClassReference", () => {
-  it("finds a class-restricted reference at any depth", () => {
-    const nested = makeConfigEntry({
-      key: "bus",
-      config_entries: [
-        makeConfigEntry({
-          key: "modbus_id",
-          references_class: "modbus::ModbusServerHub",
-        }),
-      ],
-    });
-    expect(hasClassReference([nested])).toBe(true);
-    expect(hasClassReference([makeConfigEntry({ key: "name" })])).toBe(false);
   });
 });

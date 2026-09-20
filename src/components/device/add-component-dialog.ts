@@ -33,10 +33,7 @@ import { formatApiError } from "../../util/format-api-error.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import {
-  getCachedCatalogIndex,
-  loadCatalog,
-} from "../../util/yaml-completion-catalog.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import {
@@ -230,7 +227,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
   ];
 
   public open() {
-    this._warmCatalogIndex();
     this._resetDetourState();
     this._selected = null;
     this._submitError = "";
@@ -247,18 +243,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * catalog.
    */
   public openWithSearch(domain: string) {
-    this._warmCatalogIndex();
     this._resetDetourState();
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
     void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
-  }
-
-  /** The skip-the-form path judges reference classes off the cached index. */
-  private _warmCatalogIndex(): void {
-    void loadCatalog(this._api);
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */

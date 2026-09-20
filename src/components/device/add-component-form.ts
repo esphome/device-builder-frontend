@@ -26,10 +26,7 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { withMergedSourcePresence } from "../../util/merged-source-presence.js";
 import { getIn, setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import {
-  getCachedCatalogIndex,
-  loadCatalog,
-} from "../../util/yaml-completion-catalog.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   parseTopLevelComponents,
   serializeYamlValues,
@@ -37,7 +34,6 @@ import {
 import {
   depsSatisfiedByProvides,
   findMissingDependencies,
-  hasClassReference,
   liveDependencies,
   wrongKindDependencies,
 } from "./add-component-deps.js";
@@ -257,11 +253,6 @@ export class ESPHomeAddComponentForm extends LitElement {
         // component's form.
         this._localBlockMessage = "";
         this._depResolver.kickoff(this.component.dependencies ?? []);
-        // The wrong-kind dependency check reads the cached catalog index;
-        // repaint for it only when this component has something to judge.
-        if (this._api && !getCachedCatalogIndex() && hasClassReference(this._entries)) {
-          void loadCatalog(this._api).then(() => this.requestUpdate());
-        }
       }
     }
     // Re-resolve when the present components shift (YAML) or the query scope

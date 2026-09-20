@@ -131,13 +131,6 @@ export async function depsSatisfiedByProvides(
   return satisfied;
 }
 
-/** Whether any of *entries*, at any depth, is a class-restricted reference. */
-export function hasClassReference(entries: ConfigEntry[]): boolean {
-  return entries.some(
-    (entry) => !!entry.references_class || hasClassReference(entry.config_entries ?? [])
-  );
-}
-
 /**
  * Live dependencies configured only as the wrong kind: *entries* reference
  * the dependency with a ``references_class`` that none of its configured

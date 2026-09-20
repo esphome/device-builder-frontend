@@ -529,18 +529,18 @@ export function classCandidates<T extends { id: string }>(
       section && byId.get(qualifiedSectionKey(section.key, section.platform));
     if (!section || !component) return true;
     let classes = component.id_classes;
-    const variants = Object.entries(component.id_classes_by_variant ?? {});
-    if (variants.length) {
+    // A typed schema has one discriminator, so the map has one key.
+    const [variant] = Object.entries(component.id_classes_by_variant ?? {});
+    if (variant) {
+      const [key, byValue] = variant;
       lines ??= splitYamlDocLines(yaml);
       if (hasHiddenKeys(lines, section)) return true;
-      const values = parseYamlSectionValues(yaml, section.key, section.fromLine);
-      for (const [key, byValue] of variants) {
-        // Unset keeps ``id_classes``, the default variant's.
-        if (values[key] == null) continue;
-        const variant = byValue[String(values[key])];
+      const value = parseYamlSectionValues(yaml, section.key, section.fromLine)[key];
+      // Unset keeps ``id_classes``, the default variant's.
+      if (value != null) {
         // A substitution or a value the catalog doesn't know: can't judge.
-        if (!variant) return true;
-        classes = variant;
+        if (!byValue[String(value)]) return true;
+        classes = byValue[String(value)];
       }
     }
     return !classes?.length || classes.includes(required);

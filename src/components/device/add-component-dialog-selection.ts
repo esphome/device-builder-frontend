@@ -3,6 +3,7 @@ import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { loadCatalog } from "../../util/yaml-completion-catalog.js";
 
 /**
  * Slice of ``ESPHomeAddComponentDialog`` state ``hydrateForSelection`` reads.
@@ -61,12 +62,12 @@ export async function hydrateForSelection(
   const seq = ++host._selectionSeq;
   const boardId = boardIdOverride ?? host.board?.id ?? undefined;
   try {
-    const entry = await fetchComponent(
-      host._api,
-      componentId,
-      host.platform || undefined,
-      boardId
-    );
+    const [entry] = await Promise.all([
+      fetchComponent(host._api, componentId, host.platform || undefined, boardId),
+      // Seeding and the skip-the-form path judge reference classes off the
+      // cached index; it never rejects, and an empty one fails open.
+      loadCatalog(host._api),
+    ]);
     if (seq !== host._selectionSeq) return { kind: "stale" };
     if (!entry) {
       // A null body isn't a thrown error — the fetch resolved but the backend
