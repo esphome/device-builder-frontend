@@ -6,6 +6,11 @@
  */
 
 import { joinActionFieldPath } from "./action-field-path.js";
+import {
+  enumerateListItems,
+  mappingFormItem,
+  readKeyOnLine,
+} from "./yaml-automation-items.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { walkIndexedPaths } from "./yaml-indexed-path.js";
 import { readInstanceScalar } from "./yaml-instance-scalars.js";
@@ -42,9 +47,6 @@ const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
 export const API_ACTIONS_BLOCK_KEYS = ["actions", "services"] as const;
 /** An inline ``on_*:`` trigger handler: group 1 the indent, group 2 the key. */
 const _ON_HANDLER_RE = /^(\s+)(on_[a-zA-Z_]+):/;
-/** A dash line with inline content — the match length is the item's
- *  content column. */
-const _DASH_CONTENT_RE = /^\s*-\s+(?=\S)/;
 
 /**
  * Synchronous fallback parser for automation sections. The navigator
@@ -274,9 +276,17 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
   for (const top of ["script", "interval"] as const) {
     const block = _findTopLevelBlock(lines, top);
     if (!block) continue;
-    const items = _enumerateListItems(lines, block.fromLine, block.toLine);
+    // A mapping-form block is one entry to esphome, and the backend lists it
+    // as index 0 (or the script's id) spanning the whole block.
+    const mapped = mappingFormItem(lines, block.fromLine, block.toLine);
+    const items = mapped
+      ? [mapped]
+      : enumerateListItems(lines, block.fromLine, block.toLine);
     items.forEach((item, idx) => {
-      const itemId = top === "script" ? _readKeyOnLine(lines, item.fromLine, "id") : null;
+      const itemId = top === "script" ? readKeyOnLine(lines, item.fromLine, "id") : null;
+      // A script has no row until its id is typed: the script location is
+      // keyed by id, so an index key would borrow the interval key space.
+      if (top === "script" && !itemId) return;
       const key =
         top === "script" && itemId
           ? `automation:script:${itemId}`
@@ -289,7 +299,7 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
         // it so the navigator can render "Every 60s" instead of
         // a generic "interval #N". Optional; we fall back to the
         // index when the field is missing or unparseable.
-        const every = _readKeyOnLine(lines, item.fromLine, "interval");
+        const every = readKeyOnLine(lines, item.fromLine, "interval");
         if (every) meta.every = every;
       }
       automations.push({
@@ -327,15 +337,11 @@ function _parseYamlAutomations(yaml: string): YamlSection[] {
         API_ACTIONS_BLOCK_KEYS[1]
       );
     if (actionsBlock) {
-      const items = _enumerateListItems(
-        lines,
-        actionsBlock.fromLine,
-        actionsBlock.toLine
-      );
+      const items = enumerateListItems(lines, actionsBlock.fromLine, actionsBlock.toLine);
       for (const item of items) {
         const actionName =
-          _readKeyOnLine(lines, item.fromLine, "action") ??
-          _readKeyOnLine(lines, item.fromLine, "service");
+          readKeyOnLine(lines, item.fromLine, "action") ??
+          readKeyOnLine(lines, item.fromLine, "service");
         if (!actionName) continue;
         automations.push({
           key: `automation:api_action:${actionName}`,
@@ -483,36 +489,6 @@ function _findChildBlock(
   return null;
 }
 
-/** List items (``- key: value`` ...) directly inside a top-level
- *  block. Nested list markers (the ``- logger.log`` inside a
- *  ``then:`` clause) are deeper and skipped by pinning to the
- *  block's first-row dash indent. */
-function _enumerateListItems(
-  lines: string[],
-  blockFromLine: number,
-  blockToLine: number
-): Array<{ fromLine: number; toLine: number }> {
-  const out: Array<{ fromLine: number; toLine: number }> = [];
-  let topIndent: number | null = null;
-  let inItem: { fromLine: number } | null = null;
-  for (let i = blockFromLine; i < blockToLine && i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "") continue;
-    const dash = line.match(/^(\s*)-\s/);
-    if (!dash) continue;
-    const indent = dash[1].length;
-    if (topIndent === null) topIndent = indent;
-    // Skip dashes deeper than the block's first row — those are
-    // nested action lists inside ``then:`` clauses, not block-level
-    // items.
-    if (indent > topIndent) continue;
-    if (inItem) out.push({ fromLine: inItem.fromLine, toLine: i });
-    inItem = { fromLine: i + 1 };
-  }
-  if (inItem) out.push({ fromLine: inItem.fromLine, toLine: blockToLine });
-  return out;
-}
-
 /** Keys that mark a ``time.on_time`` list entry — ``then:`` plus the
  *  cron fields. Used to tell a list-shaped trigger (split one row per
  *  entry) from a bare action list (one row for the whole handler). */
@@ -539,7 +515,7 @@ function _listTriggerEntries(
   keyFromLine: number,
   blockToLine: number
 ): Array<{ fromLine: number; toLine: number }> | null {
-  const items = _enumerateListItems(lines, keyFromLine, blockToLine);
+  const items = enumerateListItems(lines, keyFromLine, blockToLine);
   if (items.length === 0) return null;
   return items.every((item) => _isTriggerEntry(lines, item)) ? items : null;
 }
@@ -566,37 +542,5 @@ function _isTriggerEntry(
   return false;
 }
 
-/** Leading-whitespace width of a ``- `` list-item dash on *line*
- *  (0 when the line isn't a dash item). */
-function _dashIndent(line: string): number {
-  return line.match(/^(\s*)-/)?.[1].length ?? 0;
-}
-
 /** Read a leading ``key: value`` line inside a list item — used to
  *  pull the script's ``id:`` for the stable section key. */
-function _readKeyOnLine(lines: string[], fromLine: number, key: string): string | null {
-  const target = lines[fromLine - 1];
-  // ``<key>: value`` with the value's quotes peeled — shared between the
-  // dash-line form (``- id: my_alarm``) and the indented sibling form.
-  const value = `${key}:\\s*["']?([^"'\\s]+)["']?`;
-  const m = target.match(new RegExp(`^\\s*-\\s*${value}`));
-  if (m) return m[1];
-  const dashIndent = _dashIndent(target);
-  // Siblings of the item's own mapping all sit at one column: the
-  // dash line's content column, or the first body line's for a bare
-  // dash. Pinning to it keeps a same-named key nested deeper in the
-  // body (a homeassistant.action call, a then block) from winning.
-  let childIndent = target.match(_DASH_CONTENT_RE)?.[0].length ?? null;
-  const siblingRe = new RegExp(`^\\s+${value}`);
-  for (let i = fromLine; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "") continue;
-    const indent = lineIndent(line);
-    if (indent <= dashIndent) break;
-    childIndent ??= indent;
-    if (indent !== childIndent) continue;
-    const kv = line.match(siblingRe);
-    if (kv) return kv[1];
-  }
-  return null;
-}

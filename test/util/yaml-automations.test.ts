@@ -202,6 +202,81 @@ describe("parseYamlAutomations — top-level callable blocks", () => {
     expect(script?.id).toBe("my_script");
   });
 
+  it("lists a mapping-form interval block as index 0 spanning the block", () => {
+    const yaml = [
+      "esphome:",
+      "  name: x",
+      "interval:",
+      "  # every minute",
+      "  interval: 60s",
+      "  then:",
+      "    - delay: 1s",
+      "logger:",
+      "",
+    ].join("\n");
+    const rows = parseYamlAutomations(yaml);
+    const interval = rows.find((r) => r.key.startsWith("automation:interval"));
+    expect(interval?.key).toBe("automation:interval:0");
+    expect(interval?.meta?.every).toBe("60s");
+    expect(interval?.fromLine).toBe(3);
+    expect(interval?.toLine).toBe(7);
+  });
+
+  it("ignores an over-indented comment above a mapping-form script's id", () => {
+    const yaml = [
+      "script:",
+      "    # note",
+      "  id: my_script",
+      "  then:",
+      "    - delay: 1s",
+      "",
+    ].join("\n");
+    const script = parseYamlAutomations(yaml).find((r) =>
+      r.key.startsWith("automation:script")
+    );
+    expect(script?.key).toBe("automation:script:my_script");
+  });
+
+  it("keeps a dash at the mapping's own indent from flipping the form", () => {
+    const yaml = [
+      "interval:",
+      "  interval: 60s",
+      "  then:",
+      "  - delay: 1s",
+      "logger:",
+      "",
+    ].join("\n");
+    const interval = parseYamlAutomations(yaml).find((r) =>
+      r.key.startsWith("automation:interval")
+    );
+    expect(interval?.key).toBe("automation:interval:0");
+    expect(interval?.meta?.every).toBe("60s");
+    expect(interval?.fromLine).toBe(1);
+    expect(interval?.toLine).toBe(4);
+  });
+
+  it("emits no row for a script whose id is not typed yet", () => {
+    const yaml = [
+      "script:",
+      "  then:",
+      "    - delay: 1s",
+      "interval:",
+      "  - interval: 5s",
+      "",
+    ].join("\n");
+    expect(keys(yaml)).toEqual(["automation:interval:0"]);
+  });
+
+  it("keys a mapping-form script block by the id in its body", () => {
+    const yaml = ["script:", "  id: my_script", "  then:", "    - delay: 1s", ""].join(
+      "\n"
+    );
+    const rows = parseYamlAutomations(yaml);
+    const script = rows.find((r) => r.key.startsWith("automation:script"));
+    expect(script?.key).toBe("automation:script:my_script");
+    expect(script?.id).toBe("my_script");
+  });
+
   it("indexes interval items and surfaces the every-duration in meta", () => {
     const yaml = [
       "interval:",
