@@ -281,13 +281,14 @@ export function isEmptyBlock(
   // hide the field exactly when the user needs it.
   if (entry.type !== ConfigEntryType.NESTED || entry.multi_value) return false;
   // A scalar shorthand at the group key (e.g. ``pin: GPIO5``) still renders
-  // the user's value read-only; an object/null whose children all filtered
-  // out (seeded optional/advanced leaves in required-only mode) leaves an
-  // empty box.
+  // the user's value read-only, but only one that serializes: the renderer
+  // sends a cleared ``""`` to the group editor. An object/null whose children
+  // all filtered out (seeded optional/advanced leaves in required-only mode)
+  // leaves an empty box.
   const own = values[entry.key];
-  if (typeof own === "string" || typeof own === "number" || typeof own === "boolean") {
-    return false;
-  }
+  const isScalar =
+    typeof own === "string" || typeof own === "number" || typeof own === "boolean";
+  if (isScalar && hasSerializableValue(own)) return false;
   const children = filterRenderable(
     entry.config_entries ?? [],
     asRecord(own),

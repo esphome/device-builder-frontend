@@ -1058,6 +1058,16 @@ describe("filterRenderable demanded NESTED members", () => {
     ).toEqual([]);
   });
 
+  it("treats a cleared empty string at the block key as unset, as the renderer does", () => {
+    const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
+    expect(filterRenderable([block("fan")], { fan: "" }, opts)).toEqual([]);
+    expect(filterRenderable([block("fan")], { fan: "GPIO5" }, opts)).toHaveLength(1);
+    // A demanded one keeps its switch either way.
+    expect(
+      filterRenderable([block("pwm")], { pwm: "" }, { ...opts, requiredGroups: groups })
+    ).toHaveLength(1);
+  });
+
   it("still drops an undemanded block with no renderable child", () => {
     expect(filterRenderable([block("pwm")], {}, opts)).toEqual([]);
   });
