@@ -241,6 +241,7 @@ function seedFor(
 }
 
 const MASKED_VALUE = "••••••";
+const WHITESPACE_RUN_RE = /\s+/g;
 
 // What a block holds that the form does not paint, so a value the switch
 // wrote on the user's behalf is visible where it was written.
@@ -277,5 +278,5 @@ function shownValue(
 ): string {
   const secret =
     child?.type === ConfigEntryType.SECURE_STRING || isSensitiveKeyUnder(parentKey, key);
-  return secret ? MASKED_VALUE : String(value).replace(/\s+/g, " ");
+  return secret ? MASKED_VALUE : String(value).replace(WHITESPACE_RUN_RE, " ");
 }
