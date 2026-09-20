@@ -76,6 +76,13 @@ export function findReferencePath(
   return null;
 }
 
+/** The entry a `findReferencePath` result names, descending NESTED blocks. */
+function entryAtPath(entries: ConfigEntry[], path: string[]): ConfigEntry | undefined {
+  const [key, ...rest] = path;
+  const entry = entries.find((e) => e.key === key);
+  return rest.length && entry ? entryAtPath(entry.config_entries ?? [], rest) : entry;
+}
+
 /**
  * Seed initial form values. By default only required fields' defaults
  * are pre-filled — pre-filling optional fields the user can't see
@@ -257,7 +264,15 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
       [],
       seededDefaults
     );
-    if (targetPath) {
+    // A detour can add a block of the wrong class (a ``gpio`` output for a
+    // float reference); leave the field for the picker rather than prefill it.
+    const target = targetPath && entryAtPath(entries, targetPath);
+    const prefill = [{ id: prefillReference.id }];
+    if (
+      targetPath &&
+      target &&
+      classVerdict(yaml, prefill, target, ctx.catalogById).candidates.length > 0
+    ) {
       next = setIn(next, targetPath, prefillReference.id);
     }
   }

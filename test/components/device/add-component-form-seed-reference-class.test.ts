@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { identityLocalize } from "../../_dom.js";
-import { seedDefaults } from "../../../src/components/device/add-component-form-seed.js";
+import {
+  buildInitialValues,
+  seedDefaults,
+} from "../../../src/components/device/add-component-form-seed.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -28,6 +31,30 @@ describe("seedDefaults with a class-restricted reference", () => {
 
   it("does not auto-pick the only hub when it is the wrong variant", () => {
     expect(seedDefaults(entries, CLIENT_ONLY, identityLocalize, false, byId)).toEqual({});
+  });
+
+  it("does not prefill a detour's newly added block of the wrong class", () => {
+    const component = makeComponentEntry("hoermann_hcp", { config_entries: entries });
+    const seed = (id: string, yaml: string) =>
+      buildInitialValues({
+        entries,
+        component,
+        board: null,
+        yaml,
+        prefillReference: { domain: "modbus", id },
+        prefillFields: null,
+        restoredValues: null,
+        localize: identityLocalize,
+        catalogById: byId,
+      });
+    // Two server hubs leave the field unseeded, so the prefill decides.
+    const servers = "modbus:\n  - id: a\n    role: server\n  - id: b\n    role: server\n";
+    expect(seed("new_client", `${servers}  - id: new_client\n`)).toEqual({});
+    expect(
+      seed("new_server", `${servers}  - id: new_server\n    role: server\n`)
+    ).toEqual({
+      modbus_id: "new_server",
+    });
   });
 
   it("auto-picks the sole hub of the right variant", () => {
