@@ -272,9 +272,13 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
     // float reference); leave the field for the picker rather than prefill it.
     const target = targetPath && entryAtPath(entries, targetPath);
     const prefill = [{ id: prefillReference.id }];
+    // As in seedDefaults: with no index a class-restricted field can't tell a
+    // wrong-class block from a right one, so it is left for the picker.
+    const unjudged = Boolean(target?.references_class) && !ctx.catalogById;
     if (
       targetPath &&
       target &&
+      !unjudged &&
       classVerdict(yaml, prefill, target, ctx.catalogById).candidates.length > 0
     ) {
       next = setIn(next, targetPath, prefillReference.id);

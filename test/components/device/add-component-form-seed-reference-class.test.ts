@@ -35,7 +35,7 @@ describe("seedDefaults with a class-restricted reference", () => {
 
   it("does not prefill a detour's newly added block of the wrong class", () => {
     const component = makeComponentEntry("hoermann_hcp", { config_entries: entries });
-    const seed = (id: string, yaml: string) =>
+    const seed = (id: string, yaml: string, catalogById: typeof byId | null = byId) =>
       buildInitialValues({
         entries,
         component,
@@ -45,7 +45,7 @@ describe("seedDefaults with a class-restricted reference", () => {
         prefillFields: null,
         restoredValues: null,
         localize: identityLocalize,
-        catalogById: byId,
+        catalogById,
       });
     // Two server hubs leave the field unseeded, so the prefill decides.
     const servers = "modbus:\n  - id: a\n    role: server\n  - id: b\n    role: server\n";
@@ -55,6 +55,10 @@ describe("seedDefaults with a class-restricted reference", () => {
     ).toEqual({
       modbus_id: "new_server",
     });
+    // With no index the new block can't be judged, so the field stays unset.
+    expect(
+      seed("new_server", `${servers}  - id: new_server\n    role: server\n`, null)
+    ).toEqual({});
   });
 
   it("leaves a class-restricted field unseeded while the index is missing", () => {
