@@ -48,7 +48,11 @@ import {
 } from "../../util/yaml-escape.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
-import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
+import {
+  filterRenderable,
+  type RenderFilterOptions,
+  renderFilterOptions,
+} from "./config-entry-render-filter.js";
 import type { RenderCtx } from "./config-entry-renderers-types.js";
 import { constraintClusterStyles } from "./config-entry-renderers/constraint-cluster.styles.js";
 import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
@@ -536,22 +540,26 @@ export function renderSuggestionSelect(
   `;
 }
 
-// Shared child rendering for the nested renderer and the exclusive-group
-// dropdown. ``includeAdvanced`` forces advanced children visible — a picked
-// exclusive member's fields must all show, as it has no per-member toggle.
-export function renderChildEntries(
+/** The filter options for the scope *path* sits in. Required groups bind
+ *  only the form's top level, as ``filterRenderable`` strips them on recursion. */
+export function filterOptionsAt(ctx: RenderCtx, path: string[]): RenderFilterOptions {
+  return renderFilterOptions(ctx, {
+    rootValues: ctx.scopeValues([]),
+    requiredGroups: path.length === 1 ? ctx.requiredGroups : undefined,
+  });
+}
+
+// A picked exclusive member's children, advanced ones forced visible: the
+// member has no per-member toggle, so all of its fields must show.
+export function renderExclusiveMemberChildren(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
-  opts: { includeAdvanced?: boolean } = {}
+  ctx: RenderCtx
 ) {
-  const values = ctx.scopeValues(path);
-  const children = opts.includeAdvanced
-    ? filterRenderable(
-        entry.config_entries ?? [],
-        values,
-        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
-      )
-    : ctx.filterRenderable(entry.config_entries ?? [], values);
+  const children = filterRenderable(
+    entry.config_entries ?? [],
+    ctx.scopeValues(path),
+    renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
+  );
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }

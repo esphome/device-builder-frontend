@@ -5,8 +5,8 @@ import { isEntryVisible } from "../../../util/config-validation.js";
 import {
   fieldKeyAttr,
   labelFor,
-  renderChildEntries,
   type RenderCtx,
+  renderExclusiveMemberChildren,
 } from "../config-entry-renderers-shared.js";
 
 // Non-empty sentinel so the group always has a `?selected` option for
@@ -122,9 +122,7 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       ${
         selected
           ? html`<div class="nested-fields">
-              ${renderChildEntries(selected, [selected.key], ctx, {
-                includeAdvanced: true,
-              })}
+              ${renderExclusiveMemberChildren(selected, [selected.key], ctx)}
             </div>`
           : nothing
       }

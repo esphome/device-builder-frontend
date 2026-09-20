@@ -7,20 +7,13 @@
  * field its schema offers, if any.
  */
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import {
   addTakenIdsFromValues,
   collectTakenIds,
   generateNestedItemId,
 } from "../../../util/default-component-id.js";
+import { declaringIdChild } from "../config-entry-enable-seed.js";
 import type { RenderCtx } from "../config-entry-renderers-shared.js";
-
-/** Whether *entry*'s schema carries a `name` field to seed a label into. */
-export function hasNameChild(entry: ConfigEntry): boolean {
-  return (entry.config_entries ?? []).some(
-    (c) => c.key === "name" && c.type === ConfigEntryType.STRING
-  );
-}
 
 /**
  * A unique id for a subtree materializing under *entry*, or null when its
@@ -41,24 +34,12 @@ export function seedIdFor(
   { requiredOnly = false }: { requiredOnly?: boolean } = {}
 ): { key: string; id: string } | null {
   const idChild = declaringIdChild(entry, requiredOnly);
-  if (!idChild) return null;
-  const taken = collectTakenIds(ctx.yaml);
-  addTakenIdsFromValues(ctx.getAt([]), taken);
-  return { key: idChild.key, id: generateNestedItemId(entry.key, taken) };
+  return idChild ? { key: idChild.key, id: nextIdFor(entry, ctx) } : null;
 }
 
-// A declaring id, never a `references_component` pointer. A *required* one
-// counts under any key (tca9548a declares through ``bus_id``); an optional one
-// only when literally ``id``, so a catalog entry missing its
-// `references_component` flag can't take a generated id into a pointer field.
-function declaringIdChild(
-  entry: ConfigEntry,
-  requiredOnly: boolean
-): ConfigEntry | undefined {
-  return (entry.config_entries ?? []).find(
-    (c) =>
-      c.type === ConfigEntryType.ID &&
-      !c.references_component &&
-      (c.required || (!requiredOnly && c.key === "id"))
-  );
+/** A fresh id for *entry*, unique across the document and the form values. */
+export function nextIdFor(entry: ConfigEntry, ctx: RenderCtx): string {
+  const taken = collectTakenIds(ctx.yaml);
+  addTakenIdsFromValues(ctx.getAt([]), taken);
+  return generateNestedItemId(entry.key, taken);
 }

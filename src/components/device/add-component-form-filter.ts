@@ -1,5 +1,9 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+  type RequiredGroup,
+} from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import type { ConstraintKind } from "../../util/constraint-groups.js";
 import {
@@ -9,6 +13,7 @@ import {
 } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
+  isEmptyBlock,
   renderFilterOptions,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
@@ -108,14 +113,16 @@ function addFormVisibility(
       opts.targetPlatform ?? null,
       opts.rootValues,
       entries
-    );
+      // An exclusive-group member paints as a dropdown option whatever it holds.
+    ) &&
+    (Boolean(entry.exclusive_group) || !isEmptyBlock(entry, values, opts));
 }
 
 /**
  * Whether an unmet constraint should hold the Add button. Only one the user
- * can act on here counts: a member hidden by the required-only paint (an
- * advanced leaf, a NESTED block with no required children) must not leave
- * the component impossible to add.
+ * can act on here counts: a member the required-only paint drops (an
+ * advanced leaf, a NESTED block with no field and nothing for its enable
+ * switch to write) must not leave the component impossible to add.
  */
 export function addFormHasUnsatisfiedConstraint(
   entries: ConfigEntry[],
@@ -134,13 +141,15 @@ export function addFormHasUnsatisfiedConstraint(
   if (banner) return true;
   // A static cluster box carries its own warning header instead of a banner,
   // and paints every visible member, advanced or not. Radios force a choice.
-  const isVisible = addFormVisibility(
-    entries,
-    values,
-    addFormFilterOptions(values, board, presentComponents)
-  );
+  const isVisible = addFormVisibility(entries, values, {
+    ...addFormFilterOptions(values, board, presentComponents),
+    requiredGroups,
+  });
   return buildConstraintClusters(entries, requiredGroups).clusters.some((cluster) => {
-    if (isRadioCluster(cluster)) return false;
+    // Picking a radio side does not switch a block on, so a radio with a block
+    // side is judged like a box; an all-leaf radio is left to its forced choice.
+    const hasBlock = cluster.members.some((m) => m.type === ConfigEntryType.NESTED);
+    if (isRadioCluster(cluster) && !hasBlock) return false;
     const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
     if (cardinalityOk && inclusiveOk) return false;
     return hasActionableEntry(cluster.members, isVisible);
@@ -168,7 +177,7 @@ export function addFormNeedsUserInput(
   // Group/cluster members are unfiltered in the plan; gate them on the same
   // visibility the form uses so a hidden unlocked member can't keep the form
   // open when every rendered field is board-locked.
-  const isVisible = addFormVisibility(entries, values, opts);
+  const isVisible = addFormVisibility(entries, values, { ...opts, requiredGroups });
   if (planNeedsUserInput(plan, isVisible)) return true;
   // Any banner keeps the form open, actionable or not, so the user sees it.
   return (

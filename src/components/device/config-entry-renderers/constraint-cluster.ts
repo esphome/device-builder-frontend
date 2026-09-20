@@ -1,10 +1,12 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
-import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
-import { evaluateGroup } from "../../../util/constraint-groups.js";
+import { isEntryVisible } from "../../../util/config-validation.js";
+import { evaluateGroup, isMemberSet } from "../../../util/constraint-groups.js";
+import { isEmptyBlock } from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
+  filterOptionsAt,
   labelFor,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -172,24 +174,30 @@ export function selectClusterAlternative(
   ctx.setClusterChoice(clusterId, newAltId);
 }
 
+/** A member paints when it holds a value or is visible, unless it is a
+ *  block with nothing in it. */
+export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
+  const values = ctx.scopeValues([]);
+  const shown =
+    ctx.getAt([member.key]) !== undefined ||
+    isEntryVisible(
+      member,
+      values,
+      ctx.presentComponents,
+      ctx.board?.esphome.platform ?? null,
+      undefined,
+      ctx.entries
+    );
+  return shown && !isEmptyBlock(member, values, filterOptionsAt(ctx, [member.key]));
+}
+
 /** Render an `exactly_one` cluster as a radio chooser: a muted prompt, a radio
  *  per alternative, and only the selected alternative's fields. The radio
  *  enforces the choice and only the picked side is ever saved, so there is no
  *  unsatisfied/warning state. */
 export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
   const clusterId = cluster.members[0].key;
-  const values = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const isRenderable = (m: ConfigEntry): boolean =>
-    ctx.getAt([m.key]) !== undefined ||
-    isEntryVisible(
-      m,
-      values,
-      ctx.presentComponents,
-      targetPlatform,
-      undefined,
-      ctx.entries
-    );
+  const isRenderable = (m: ConfigEntry): boolean => isClusterMemberPainted(m, ctx);
 
   // Gate alternatives on renderability (a board / platform / depends_on can hide
   // a side at runtime) and fall back to the static box when fewer than two real
@@ -203,8 +211,7 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   // (round-trips existing YAML); else nothing selected yet.
   const selectedId =
     ctx.getClusterChoice(clusterId) ??
-    alternatives.find((a) => a.members.some((m) => isValuePresent(ctx.getAt([m.key]))))
-      ?.id;
+    alternatives.find((a) => a.members.some((m) => isMemberSet(ctx.getAt([m.key]))))?.id;
   const selected = alternatives.find((a) => a.id === selectedId);
 
   // The radios below name each alternative, so the header drops the key list
@@ -270,7 +277,6 @@ export function clusterRulesMet(
  *  constraint header (warning until satisfied) over its member fields. */
 export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: RenderCtx) {
   const values = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
   const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
 
   // Lead with whichever rule is currently unmet; once both hold, keep the
@@ -295,18 +301,7 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
     keys: formatConstraintKeys(prompt.keys, ctx.entries, ctx),
   });
 
-  const visibleMembers = cluster.members.filter(
-    (m) =>
-      ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(
-        m,
-        values,
-        ctx.presentComponents,
-        targetPlatform,
-        undefined,
-        ctx.entries
-      )
-  );
+  const visibleMembers = cluster.members.filter((m) => isClusterMemberPainted(m, ctx));
   // All members gated off (depends_on / platform / hidden): skip the box rather
   // than render an empty bordered card with just a header.
   if (!visibleMembers.length) return nothing;
