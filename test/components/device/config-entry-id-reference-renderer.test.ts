@@ -479,13 +479,19 @@ describe("renderIdReferenceField — candidates of the wrong id class", () => {
   });
 
   it("does not offer Auto when it would resolve to a wrong-class block", () => {
-    const html = JSON.stringify(
-      render(OUTPUTS, "relay_out", "output.gpio", "output.ledc")
+    expect(
+      optionValues(render(OUTPUTS, "relay_out", "output.gpio", "output.ledc"))
+    ).not.toContain(AUTO_SENTINEL);
+    expect(optionValues(render(OUTPUTS, "relay_out", "output.gpio"))).toContain(
+      AUTO_SENTINEL
     );
-    expect(html).not.toContain("device.id_reference_auto");
-    expect(JSON.stringify(render(OUTPUTS, "relay_out", "output.gpio"))).toContain(
-      "device.id_reference_auto"
-    );
+  });
+
+  it("marks a committed wrong-class id invalid with an inline message", () => {
+    const selectClass = (value: string) =>
+      findElementBindings(render(OUTPUTS, value, "output.gpio"), "wa-select")[0]?.class;
+    expect(selectClass("relay_out")).toContain("invalid");
+    expect(selectClass("pwm_out")).not.toContain("invalid");
   });
 
   it("does not claim none match while interface providers are unsettled", () => {

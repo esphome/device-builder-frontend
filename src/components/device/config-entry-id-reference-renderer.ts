@@ -87,7 +87,8 @@ export function renderIdReferenceField(
       ? [selected]
       : [];
   // Declared in this file but the wrong class: say so, not "not defined here".
-  const orphanCopy = allCandidates.some((c) => c.id === value)
+  const wrongKind = hasOrphanValue && allCandidates.some((c) => c.id === value);
+  const orphanCopy = wrongKind
     ? "device.id_reference_wrong_kind"
     : "device.id_reference_unresolved";
   const orphanOption = hasOrphanValue
@@ -102,10 +103,15 @@ export function renderIdReferenceField(
     !fieldError &&
     providers !== null &&
     isCertainlyDanglingId(value, allCandidates, ctx.yaml);
-  const invalid = fieldError || unknownId;
+  // A wrong-class id is as provable as a dangling one; the closed select shows
+  // only the bare id, so say it inline too.
+  const wrongKindError = !fieldError && wrongKind;
+  const invalid = fieldError || unknownId || wrongKindError;
   const unknownIdError = unknownId
     ? renderInlineError(ctx.localize("device.id_reference_unknown_error", { id: value }))
-    : nothing;
+    : wrongKindError
+      ? renderInlineError(ctx.localize("device.id_reference_wrong_kind", { domain }))
+      : nothing;
   // Solo "Add new" CTA only when there's genuinely nothing to show.
   const empty = candidates.length === 0 && !hasOrphanValue;
   // An id-less singleton (plain logger:, wifi:, ...) yields no candidates

@@ -9,6 +9,7 @@ import {
   depsSatisfiedByProvides,
   findMissingDependencies,
   liveDependencies,
+  resolveDepVerdict,
   wrongKindDependencies,
 } from "../../../src/components/device/add-component-deps.js";
 import { withMergedSourcePresence } from "../../../src/util/merged-source-presence.js";
@@ -414,7 +415,66 @@ describe("wrongKindDependencies", () => {
     );
   });
 
+  it("leaves an id-less provider block unjudged, since Auto may resolve to it", () => {
+    const bridge = makeComponentEntry("modbus_bridge", { provides: ["modbus"] });
+    const withBridge = {
+      components: [hub, bridge],
+      byId: new Map([
+        [hub.id, hub],
+        [bridge.id, bridge],
+      ]),
+    };
+    const yaml = `${CLIENT_ONLY}modbus_bridge:\n  uart_id: bus\n`;
+    expect(wrongKindDependencies(entries, ["modbus"], {}, yaml, withBridge)).toEqual([]);
+  });
+
   it("judges nothing before the catalog index has loaded", () => {
     expect(wrongKindDependencies(entries, ["modbus"], {}, CLIENT_ONLY, null)).toEqual([]);
+  });
+});
+
+describe("resolveDepVerdict copy family", () => {
+  const hub = makeComponentEntry("modbus", { id_classes: ["modbus::ModbusClientHub"] });
+  const index = { components: [hub], byId: new Map([[hub.id, hub]]) };
+  const cover = makeComponentEntry("hoermann_hcp", {
+    dependencies: ["modbus", "uart"],
+    config_entries: [
+      makeConfigEntry({
+        key: "modbus_id",
+        references_component: "modbus",
+        references_class: "modbus::ModbusServerHub",
+      }),
+    ],
+  });
+  const verdict = (yaml: string, busBlocked: string | null = null) =>
+    resolveDepVerdict({
+      component: cover,
+      entries: cover.config_entries,
+      values: {},
+      yaml,
+      present: parseTopLevelComponents(yaml),
+      resolvedPlatforms: [],
+      provided: new Set(),
+      busBlocked,
+      index,
+    });
+  const CLIENT = "uart:\n  - id: bus\nmodbus:\n  - id: client_hub\n";
+
+  it("uses the wrong-kind copy when every outstanding dep is the wrong kind", () => {
+    expect(verdict(CLIENT)).toEqual({
+      deps: ["modbus"],
+      copy: "device.wrong_kind_dependency",
+    });
+  });
+
+  it("falls back to the missing copy when an absent dep is outstanding too", () => {
+    expect(verdict("modbus:\n  - id: client_hub\n")).toEqual({
+      deps: ["uart", "modbus"],
+      copy: "device.missing_dependencies",
+    });
+  });
+
+  it("prefers the bus copy for a lone dep that is both bus-blocked and wrong kind", () => {
+    expect(verdict(CLIENT, "modbus").copy).toBe("device.bus_dependency_in_use");
   });
 });

@@ -167,3 +167,61 @@ export function wrongKindDependencies(
   }
   return [...wrong];
 }
+
+/** The banner copy family: present but unusable reads differently from absent. */
+export type DepsCopy =
+  | "device.bus_dependency_in_use"
+  | "device.missing_dependencies"
+  | "device.wrong_kind_dependency";
+
+/**
+ * The add form's dependency verdict: the net-missing deps driving the banner
+ * and submit gate, plus the copy that describes them. *provided* deps (absent
+ * ones a present component supplies) are dropped; a live bus dep with no
+ * attachable bus (*busBlocked*) and deps present only as the wrong kind are
+ * added. A lone bus-blocked dep takes the bus copy even when it is also the
+ * wrong kind. Reads *index*, never loads it: the dialog awaits it before the
+ * form mounts (``hydrateForSelection``).
+ */
+export function resolveDepVerdict(opts: {
+  component: Pick<ComponentCatalogEntry, "dependencies" | "config_entries">;
+  entries: ConfigEntry[];
+  values: Record<string, unknown>;
+  yaml: string;
+  present: ReadonlySet<string>;
+  resolvedPlatforms: readonly string[];
+  provided: ReadonlySet<string>;
+  busBlocked: string | null;
+  index: Pick<CatalogIndex, "components" | "byId"> | null;
+}): { deps: string[]; copy: DepsCopy } {
+  const live = liveDependencies(opts.component, opts.values);
+  const missing = findMissingDependencies(
+    live,
+    opts.yaml,
+    opts.present,
+    opts.resolvedPlatforms
+  ).filter((d) => !opts.provided.has(d));
+  const wrongKind = wrongKindDependencies(
+    opts.entries,
+    live,
+    opts.values,
+    opts.yaml,
+    opts.index
+  );
+  const unusable = new Set(wrongKind);
+  if (opts.busBlocked && live.includes(opts.busBlocked)) unusable.add(opts.busBlocked);
+  const deps = [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
+  const copy: DepsCopy =
+    deps.length === 1 && deps[0] === opts.busBlocked
+      ? "device.bus_dependency_in_use"
+      : deps.every((d) => wrongKind.includes(d))
+        ? "device.wrong_kind_dependency"
+        : "device.missing_dependencies";
+  return { deps, copy };
+}
+
+/** Whether a top-level entry needs a specific id class, so adding without the
+ *  catalog index would be adding blind. */
+export function hasClassReference(entries: ConfigEntry[]): boolean {
+  return entries.some((e) => e.references_component && e.references_class);
+}

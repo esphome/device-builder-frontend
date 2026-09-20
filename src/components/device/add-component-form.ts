@@ -32,10 +32,10 @@ import {
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import {
+  type DepsCopy,
   depsSatisfiedByProvides,
   findMissingDependencies,
-  liveDependencies,
-  wrongKindDependencies,
+  resolveDepVerdict,
 } from "./add-component-deps.js";
 import { NO_BUS_VERDICT, resolveBusVerdict } from "./add-component-form-bus.js";
 import { coerceFields } from "./add-component-form-coerce.js";
@@ -284,46 +284,18 @@ export class ESPHomeAddComponentForm extends LitElement {
     return this._widenPresence(this.yaml, this.resolvedComponents);
   }
 
-  /** Net-missing deps driving the banner and submit gate: the widened
-   *  scan minus those a present component provides (`_providedDeps`), plus
-   *  a live bus dep present but with no attachable bus (`_busBlockedDep`)
-   *  and any present only as the wrong kind (`_wrongKindDeps`). *copy* is
-   *  the banner's copy family: present but unusable reads differently from
-   *  absent. */
-  private _missingDeps(present: ReadonlySet<string>): { deps: string[]; copy: string } {
-    const live = liveDependencies(this.component, this._values);
-    const missing = findMissingDependencies(
-      live,
-      this.yaml,
+  private _missingDeps(present: ReadonlySet<string>): { deps: string[]; copy: DepsCopy } {
+    return resolveDepVerdict({
+      component: this.component,
+      entries: this._entries,
+      values: this._values,
+      yaml: this.yaml,
       present,
-      this.resolvedPlatforms
-    ).filter((d) => !this._providedDeps.has(d));
-    const wrongKind = this._wrongKindDeps(live);
-    const unusable = new Set(wrongKind);
-    const blocked = this._busBlockedDep;
-    if (blocked && live.includes(blocked)) unusable.add(blocked);
-    const deps = [...missing, ...[...unusable].filter((d) => !missing.includes(d))];
-    const copy =
-      deps.length === 1 && deps[0] === blocked
-        ? "device.bus_dependency_in_use"
-        : deps.every((d) => wrongKind.includes(d))
-          ? "device.wrong_kind_dependency"
-          : "device.missing_dependencies";
-    return { deps, copy };
-  }
-
-  /** Deps present only as the wrong kind. The index is read, never loaded:
-   *  the dialog awaits it before mounting this form (`hydrateForSelection`).
-   *  `_providedDeps` only covers absent deps; a provider's ids count here
-   *  through the candidate scan instead. */
-  private _wrongKindDeps(live: readonly string[]): string[] {
-    return wrongKindDependencies(
-      this._entries,
-      live,
-      this._values,
-      this.yaml,
-      getCachedCatalogIndex()
-    );
+      resolvedPlatforms: this.resolvedPlatforms,
+      provided: this._providedDeps,
+      busBlocked: this._busBlockedDep,
+      index: getCachedCatalogIndex(),
+    });
   }
 
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
@@ -514,11 +486,11 @@ export class ESPHomeAddComponentForm extends LitElement {
    * back to the raw id until the cache lookup lands (kicked off in
    * ``willUpdate``).
    */
-  private _depsBlockTitle(copy: string): string {
+  private _depsBlockTitle(copy: DepsCopy): string {
     return this._localize(`${copy}_title`, { name: this.component.name });
   }
 
-  private _renderMissingDeps(missing: string[], copy: string) {
+  private _renderMissingDeps(missing: string[], copy: DepsCopy) {
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>

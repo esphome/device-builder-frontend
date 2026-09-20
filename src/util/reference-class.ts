@@ -55,10 +55,16 @@ export function noneMatchClass(
   if (!required || !byId || yamlHasExternalIdSources(yaml)) return false;
   if (classCandidates(yaml, allCandidates, entry, byId).length) return false;
   const judge = sectionJudge(yaml, required, byId);
-  const idless = parseYamlTopLevelSections(yaml).filter(
-    (section) => !section.id && section.key === entry.references_component
-  );
-  return (allCandidates.length > 0 || idless.length > 0) && !idless.some(judge);
+  const domain = entry.references_component;
+  const idless = parseYamlTopLevelSections(yaml).filter((section) => !section.id);
+  // An id-less provider block (``modbus_bridge:``) may be what Auto resolves to.
+  const provides = (section: YamlSection): boolean =>
+    byId
+      .get(qualifiedSectionKey(section.key, section.platform))
+      ?.provides?.includes(domain ?? "") ?? false;
+  if (idless.some(provides)) return false;
+  const own = idless.filter((section) => section.key === domain);
+  return (allCandidates.length > 0 || own.length > 0) && !own.some(judge);
 }
 
 /** A verdict per section: false only when its classes are known to lack
