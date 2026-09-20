@@ -64,9 +64,41 @@ describe("renderNestedField enable switch", () => {
   });
 
   it("renders the switch for a plain block a required group demands", () => {
-    const entry = makeSensorEntry({ key: "pwm", platform_type: null });
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({
+          key: "divider",
+          type: ConfigEntryType.INTEGER,
+          default_value: "1",
+        }),
+      ],
+    });
     const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
     expect(switchesOf(renderNestedField(entry, ["pwm"], ctx))).toHaveLength(1);
+  });
+
+  it("omits it when the demanded block has nothing to write", () => {
+    const entry = makeSensorEntry({
+      key: "pwm",
+      platform_type: null,
+      config_entries: [
+        makeConfigEntry({ key: "divider", type: ConfigEntryType.INTEGER }),
+      ],
+    });
+    const ctx = makeRenderCtx({}, { overrides: { demandedKeys: new Set(["pwm"]) } });
+    expect(switchesOf(renderNestedField(entry, ["pwm"], ctx))).toHaveLength(0);
+  });
+
+  it("keeps a set block with no paintable field collapsed across renders", () => {
+    const entry = makeSensorEntry({ key: "pwm" });
+    const ctx = makeRenderCtx(
+      { pwm: { name: "PWM" } },
+      { overrides: { filterRenderable: () => [] } }
+    );
+    renderNestedField(entry, ["pwm"], ctx);
+    expect(ctx.seedNestedOpen).not.toHaveBeenCalled();
   });
 
   it("omits it for a same-named block below the top level", () => {
@@ -279,6 +311,22 @@ describe("onEnableToggle", () => {
       ctx,
     });
     expect(ctx.emitChange).toHaveBeenCalledWith(["pwm", "divider"], "1");
+  });
+
+  it("never seeds the label into a plain block's name", () => {
+    // Only an entity's ``name`` is a display label.
+    const entry = makeSensorEntry({ key: "pwm", platform_type: null });
+    const ctx = makeRenderCtx({});
+    onEnableToggle({
+      entry,
+      path: ["pwm"],
+      key: "pwm",
+      isOpen: false,
+      checked: true,
+      label: "PWM",
+      ctx,
+    });
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pwm"], undefined);
   });
 
   it("never seeds a reference child's default", () => {

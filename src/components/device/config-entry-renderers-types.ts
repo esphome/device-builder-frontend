@@ -10,6 +10,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import type { EnableSeed } from "./config-entry-renderers/seed-identity.js";
 
 export interface RenderCtx {
   localize: LocalizeFunc;
@@ -90,6 +91,8 @@ export interface RenderCtx {
     entries: ConfigEntry[],
     values: Record<string, unknown>
   ) => ConfigEntry[];
+  /** What switching the still-empty block *entry* on writes, or null. */
+  enableSeed: (entry: ConfigEntry) => EnableSeed | null;
   renderEntry: (entry: ConfigEntry, path: string[]) => unknown;
   /**
    * FLOAT_WITH_UNIT-only: stash a unit choice that the user picked

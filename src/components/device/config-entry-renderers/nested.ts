@@ -13,7 +13,7 @@ import {
   renderHelpLink,
   renderLabel,
 } from "../config-entry-renderers-shared.js";
-import { defaultedChild, hasNameChild, seedIdFor } from "./seed-identity.js";
+import { seedIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
 // turned off, keyed by the form's ``stashOwner`` (the host element,
@@ -62,8 +62,13 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // fields are visible without a manual expand (advanced groups like
   // remote_receiver's raw are otherwise collapsed). seedNestedOpen is
   // one-shot, so a later user collapse sticks.
-  if (entry.required || hasSerializableValue(raw)) ctx.seedNestedOpen(key);
-  const isOpen = ctx.nestedOpenSections.has(key);
+  // A block with nothing to show here (the add form drops emc2101's
+  // advanced-only children) never opens: an empty body reads broken.
+  const hasFields =
+    ctx.filterRenderable(entry.config_entries ?? [], isPlainObject(raw) ? raw : {})
+      .length > 0;
+  if (hasFields && (entry.required || hasSerializableValue(raw))) ctx.seedNestedOpen(key);
+  const isOpen = hasFields && ctx.nestedOpenSections.has(key);
   // Optional entity sub-readings (a debug component's per-metric sensors,
   // a DHT's temperature/humidity, …) are only written to YAML once their
   // group holds a value, so an untouched one is silently "off". Give those
@@ -71,9 +76,13 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // and required groups keep the bare collapsible header.
   const isOptionalEntity = entry.platform_type != null && !entry.required;
   // A plain block a required group demands (emc2101's pwm / dac) may have no
-  // field the form paints, so the switch is how the user picks it.
+  // field the form paints, so the switch is how the user picks it. Offered
+  // only when it has something to write.
   const isDemanded =
-    path.length === 1 && !entry.required && ctx.demandedKeys.has(entry.key);
+    path.length === 1 &&
+    !entry.required &&
+    ctx.demandedKeys.has(entry.key) &&
+    ctx.enableSeed(entry) != null;
   const hasSwitch = isOptionalEntity || isDemanded;
   const enabled = hasSwitch && hasSerializableValue(raw);
   const label = labelFor(entry, ctx);
@@ -160,39 +169,10 @@ export function onEnableToggle(opts: {
       stash.delete(key);
       next = restored;
       ctx.emitChange(path, restored);
-    } else if (hasNameChild(entry)) {
-      // Seed the *localized* label the user is looking at, so the
-      // name they get matches the switch they clicked (WYSIWYG) and
-      // reads natively in their dashboard locale. It's a plain
-      // editable value, not locale-pinned state — don't "fix" this
-      // to the entry key.
-      next = { name: label };
-      ctx.emitChange([...path, "name"], label);
     } else {
-      // A nameless group (pipsolar's output sub-entities, opentherm's)
-      // rejects ``name:`` outright, so seed its id instead — required or
-      // not, it's the only identity the group has to serialize on.
-      const seed = seedIdFor(entry, ctx);
-      // No identity at all (emc2101's pwm): write a child's own default, the
-      // smallest value that makes the block serialize without changing it.
-      const defaulted = seed ? undefined : defaultedChild(entry);
-      // With none of these (a light's ``initial_state``) there's nothing valid to
-      // write, so re-emit the still-absent group: the switch the user just
-      // clicked has no backing value, and only a re-render walks it back to
-      // off. The group persists once they set one of its own fields. This
-      // leans on the host handing itself a fresh values object for every
-      // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
-      // an identity-preserving fast path there would strand the switch on.
-      if (seed) {
-        next = { [seed.key]: seed.id };
-        ctx.emitChange([...path, seed.key], seed.id);
-      } else if (defaulted) {
-        next = { [defaulted.key]: defaulted.default_value };
-        ctx.emitChange([...path, defaulted.key], defaulted.default_value);
-      } else ctx.emitChange(path, undefined);
+      next = seedFor(entry, path, label, ctx);
     }
-    // Expand for editing, unless the block has nothing to show here (the add
-    // form drops emc2101's advanced-only children): an empty body reads broken.
+    // Expand for editing, unless the block has nothing to show here.
     const hasFields = ctx.filterRenderable(entry.config_entries ?? [], next).length > 0;
     if (!isOpen && hasFields) ctx.toggleNested(key);
   } else {
@@ -206,4 +186,46 @@ export function onEnableToggle(opts: {
     ctx.emitChange(path, undefined);
     if (isOpen) ctx.toggleNested(key);
   }
+}
+
+// Writes the seed switching *entry* on calls for and returns the block it
+// leaves behind.
+function seedFor(
+  entry: ConfigEntry,
+  path: string[],
+  label: string,
+  ctx: RenderCtx
+): Record<string, unknown> {
+  const seed = ctx.enableSeed(entry);
+  let value: unknown;
+  if (seed?.from === "name") {
+    // Seed the *localized* label the user is looking at, so the
+    // name they get matches the switch they clicked (WYSIWYG) and
+    // reads natively in their dashboard locale. It's a plain
+    // editable value, not locale-pinned state — don't "fix" this
+    // to the entry key.
+    value = label;
+  } else if (seed?.from === "id") {
+    // A nameless group (pipsolar's output sub-entities, opentherm's)
+    // rejects ``name:`` outright, so seed its id instead — required or
+    // not, it's the only identity the group has to serialize on.
+    value = seedIdFor(entry, ctx)?.id;
+  } else if (seed) {
+    // No identity at all (emc2101's pwm): write a child's own default, the
+    // smallest value that makes the block serialize without changing it.
+    value = seed.child.default_value;
+  }
+  if (!seed || value === undefined) {
+    // With none of these (a light's ``initial_state``) there's nothing valid to
+    // write, so re-emit the still-absent group: the switch the user just
+    // clicked has no backing value, and only a re-render walks it back to
+    // off. The group persists once they set one of its own fields. This
+    // leans on the host handing itself a fresh values object for every
+    // ``value-change``, no-op included (``setIn`` spreads unconditionally) —
+    // an identity-preserving fast path there would strand the switch on.
+    ctx.emitChange(path, undefined);
+    return {};
+  }
+  ctx.emitChange([...path, seed.key], value);
+  return { [seed.key]: value };
 }

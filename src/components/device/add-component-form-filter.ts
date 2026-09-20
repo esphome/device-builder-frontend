@@ -113,9 +113,9 @@ function addFormVisibility(
 
 /**
  * Whether an unmet constraint should hold the Add button. Only one the user
- * can act on here counts: a member hidden by the required-only paint (an
- * advanced leaf, a NESTED block with no required children) must not leave
- * the component impossible to add.
+ * can act on here counts: a member the required-only paint drops (an
+ * advanced leaf, a NESTED block with no field and nothing for its enable
+ * switch to write) must not leave the component impossible to add.
  */
 export function addFormHasUnsatisfiedConstraint(
   entries: ConfigEntry[],

@@ -198,8 +198,10 @@ describe("a required group whose members are blocks with no required child", () 
   // emc2101: exactly one of two optional NESTED blocks whose children are all
   // optional. Each paints as a block with an enable switch.
   const entries = [
-    makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution" })]),
-    makeNestedEntry("dac", [makeConfigEntry({ key: "conversion_rate" })]),
+    makeNestedEntry("pwm", [makeConfigEntry({ key: "resolution", default_value: "23" })]),
+    makeNestedEntry("dac", [
+      makeConfigEntry({ key: "conversion_rate", default_value: "16" }),
+    ]),
   ];
   const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
 

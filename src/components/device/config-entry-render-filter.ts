@@ -27,6 +27,7 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import { advancedGated } from "../../util/material-value.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
+import { type EnableSeed, enableSeedOf } from "./config-entry-renderers/seed-identity.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -93,8 +94,10 @@ export interface RenderFilterOptions {
    * The ``required_groups`` of the scope *entries* belong to. In
    * ``requiredOnly`` mode the leaf members of a group that demands a value
    * (``exactly_one`` / ``at_least_one``) stay visible so the user can
-   * satisfy it; a NESTED member still needs a renderable child. Scope-local: not forwarded into NESTED children, whose
-   * own groups only bind once that optional block is in use.
+   * satisfy it. A NESTED member with no renderable child stays only when its
+   * enable switch has something to write (``enableSeed``). Scope-local: not
+   * forwarded into NESTED children, whose own groups only bind once that
+   * optional block is in use.
    */
   requiredGroups?: RequiredGroup[];
 }
@@ -173,6 +176,23 @@ export function demandedKeys(requiredGroups: RequiredGroup[] | undefined): Set<s
   return keys;
 }
 
+/** What switching the still-empty block *entry* on writes, or null. */
+export function enableSeed(
+  entry: ConfigEntry,
+  opts: RenderFilterOptions
+): EnableSeed | null {
+  return enableSeedOf(entry, (child) =>
+    isEntryVisible(
+      child,
+      {},
+      opts.presentComponents,
+      opts.targetPlatform,
+      opts.rootValues,
+      entry.config_entries ?? []
+    )
+  );
+}
+
 export function filterRenderable(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
@@ -216,13 +236,10 @@ export function filterRenderable(
         const own = values[entry.key];
         const isScalarShorthand =
           typeof own === "string" || typeof own === "number" || typeof own === "boolean";
-        // A demanded block still paints: its enable switch is how the user
-        // satisfies the group when none of its children are required.
-        if (
-          renderableChildren.length === 0 &&
-          !isScalarShorthand &&
-          !demanded.has(entry.key)
-        ) {
+        // A demanded block still paints when its enable switch can write a
+        // value: that switch is how the user satisfies the group.
+        const switchable = demanded.has(entry.key) && enableSeed(entry, opts) != null;
+        if (renderableChildren.length === 0 && !isScalarShorthand && !switchable) {
           continue;
         }
       }

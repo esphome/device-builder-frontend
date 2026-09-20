@@ -23,6 +23,7 @@ import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { enableSeedOf } from "../../../src/components/device/config-entry-renderers/seed-identity.js";
 import { parseSubstitutions } from "../../../src/util/substitutions.js";
 
 /** Build a minimal ``BoardPin``. Defaults to a generic
@@ -114,6 +115,7 @@ export function makeRenderCtx(
     expandOptions: vi.fn(),
     scopeValues: () => ({}),
     filterRenderable: (entries) => entries,
+    enableSeed: (entry) => enableSeedOf(entry, () => true),
     renderEntry: vi.fn(),
     getPendingUnit: () => undefined,
     setPendingUnit: vi.fn(),

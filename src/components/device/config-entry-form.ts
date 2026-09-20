@@ -59,6 +59,7 @@ import { isSubstitutionString, parseSubstitutions } from "../../util/substitutio
 import {
   _isStructuralType,
   demandedKeys,
+  enableSeed,
   filterRenderable,
   renderFilterOptions,
 } from "./config-entry-render-filter.js";
@@ -1109,6 +1110,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       },
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
+      enableSeed: (entry) => enableSeed(entry, renderFilterOptions(this)),
       getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
       setPendingUnit: (path, unit) => {
         this._pendingUnits.set(path.join("."), unit);

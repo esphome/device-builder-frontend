@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   ALWAYS_SHOWN_KEYS,
@@ -998,7 +999,7 @@ describe("filterRenderable demanded NESTED members", () => {
     makeEntry({
       key,
       type: ConfigEntryType.NESTED,
-      config_entries: [makeEntry({ key: "resolution" })],
+      config_entries: [makeEntry({ key: "resolution", default_value: "23" })],
     });
   const opts = { requiredOnly: true, showAdvanced: false };
 
@@ -1021,7 +1022,7 @@ describe("filterRenderable demanded NESTED members", () => {
     const advancedOnly = makeEntry({
       key: "pwm",
       type: ConfigEntryType.NESTED,
-      config_entries: [makeEntry({ key: "divider", advanced: true })],
+      config_entries: [makeEntry({ key: "divider", advanced: true, default_value: "1" })],
     });
     const flat = { requiredOnly: false, showAdvanced: false };
     const groups = [{ kind: "exactly_one" as const, keys: ["pwm", "dac"] }];
@@ -1031,6 +1032,30 @@ describe("filterRenderable demanded NESTED members", () => {
         (e) => e.key
       )
     ).toEqual(["pwm"]);
+  });
+
+  it("drops a demanded block its switch could write nothing into", () => {
+    // Painting it would hold Add on a switch that snaps back off.
+    const bare = (key: string, child: Partial<ConfigEntry>) =>
+      makeEntry({
+        key,
+        type: ConfigEntryType.NESTED,
+        config_entries: [makeEntry({ key: "resolution", ...child })],
+      });
+    const unseedable = [
+      bare("pwm", {}),
+      bare("dac", { default_value: "" }),
+      bare("fan", { default_value: "1", locked: true }),
+      bare("out", { default_value: "1", depends_on_component: "wifi" }),
+    ];
+    const all = [{ kind: "at_least_one" as const, keys: ["pwm", "dac", "fan", "out"] }];
+    expect(
+      filterRenderable(
+        unseedable,
+        {},
+        { ...opts, requiredGroups: all, presentComponents: new Set<string>() }
+      )
+    ).toEqual([]);
   });
 
   it("still drops an undemanded block with no renderable child", () => {
