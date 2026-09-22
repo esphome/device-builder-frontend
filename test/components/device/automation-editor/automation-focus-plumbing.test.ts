@@ -58,6 +58,14 @@ const IF_DEF = makeAutomationAction({
   accepts_action_list: ["then", "else"],
 });
 
+const WHILE_DEF = makeAutomationAction({
+  id: "while",
+  name: "While",
+  is_control_flow: true,
+  has_condition_gate: true,
+  accepts_action_list: ["then"],
+});
+
 const LOG_DEF = makeAutomationAction({
   id: "logger.log",
   name: "Log",
@@ -118,7 +126,7 @@ describe("action-node focus routing", () => {
   ): Promise<ESPHomeAutomationActionNode> {
     const el = new ESPHomeAutomationActionNode();
     el.value = value;
-    el.catalog = [IF_DEF, LOG_DEF];
+    el.catalog = [IF_DEF, WHILE_DEF, LOG_DEF];
     el.conditionCatalog = [IN_RANGE_DEF, OR_DEF];
     el.focusTarget = focusTarget;
     await mount(el);
@@ -128,6 +136,17 @@ describe("action-node focus routing", () => {
   it("routes a conditions head into the gate tree, sliced", async () => {
     const el = await mountNode(
       { action_id: "if", params: {}, children: {}, conditions: [inRange()] },
+      { node: ["conditions", 0], field: ["above"] }
+    );
+    const tree = el.shadowRoot!.querySelector(
+      "esphome-automation-condition-tree"
+    ) as ESPHomeAutomationConditionTree;
+    expect(tree.focusTarget).toEqual({ node: [0], field: ["above"] });
+  });
+
+  it("routes a conditions head into a flagged while's gate tree, sliced", async () => {
+    const el = await mountNode(
+      { action_id: "while", params: {}, children: { then: [] }, conditions: [inRange()] },
       { node: ["conditions", 0], field: ["above"] }
     );
     const tree = el.shadowRoot!.querySelector(
