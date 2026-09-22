@@ -58,6 +58,9 @@ export interface AutomationAction {
    *  ``accepts_action_list``. */
   is_control_flow?: boolean;
   has_else_branch?: boolean;
+  /** True when the action takes a condition / all / any boolean gate
+   *  (if, while, wait_until). Absent on the wire when false. */
+  has_condition_gate?: boolean;
   /** Names of fields whose value is itself a list of actions
    *  (``["then"]`` for ``while``, ``["then", "else"]`` for ``if``).
    *  These are stripped from ``config_entries`` server-side so the
@@ -159,9 +162,10 @@ export type AutomationLocation =
  *  nested action lists for control-flow actions, keyed by the
  *  action's ``accepts_action_list`` entries (e.g.
  *  ``{ then: [...], else: [...] }`` for ``if``). ``conditions`` is
- *  populated only for ``if`` (the boolean gate) — other control-flow
- *  actions have their gate elsewhere. ``unknown`` marks an uncatalogued
- *  action (from an ``external_components`` source, or a typo): it's
+ *  populated for actions whose catalog entry has ``has_condition_gate``
+ *  (the boolean gate of ``if`` / ``while`` / ``wait_until``). ``unknown``
+ *  marks an uncatalogued action (from an ``external_components`` source,
+ *  or a typo): it's
  *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
  *  sibling actions stay editable. */
 export interface ActionNode {

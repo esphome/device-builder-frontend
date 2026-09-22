@@ -14,6 +14,7 @@ export function makeAutomationAction(
     config_entries: [],
     is_control_flow: false,
     has_else_branch: false,
+    has_condition_gate: false,
     accepts_action_list: [],
     ...overrides,
   };

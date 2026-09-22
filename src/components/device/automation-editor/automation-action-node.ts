@@ -86,12 +86,10 @@ registerMdiIcons({
 // defeat Lit's property change detection on the form mount.
 const NO_REQUIRED_GROUPS: RequiredGroup[] = [];
 
-/** Only ``if`` and ``wait_until`` carry a separate boolean-gate
- *  condition list distinct from a sub-action list. Detected by catalog
- *  id rather than a flag on AutomationAction — the wire shape keeps the
- *  gate implicit in the action's semantics. */
+/** Whether the action carries a boolean-gate condition list distinct
+ *  from its sub-action lists; the catalog flags it. */
 function hasConditionGate(def: AutomationAction | undefined): boolean {
-  return def?.id === "if" || def?.id === "wait_until";
+  return !!def?.has_condition_gate;
 }
 
 /** Whether the action's params render as a catalog-driven
@@ -359,8 +357,8 @@ export class ESPHomeAutomationActionNode extends LitElement {
   }
 
   /**
-   * Render the boolean-gate condition tree for actions that
-   * declare one (``if`` / ``wait_until``).
+   * Render the boolean-gate condition tree for actions whose catalog
+   * entry sets has_condition_gate (if / while / wait_until).
    */
   private _renderConditionGate(def: AutomationAction | undefined) {
     if (!hasConditionGate(def)) return nothing;

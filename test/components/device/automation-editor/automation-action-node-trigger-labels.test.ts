@@ -107,6 +107,7 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
       name: "If",
       description: "",
       config_entries: [],
+      has_condition_gate: true,
       accepts_action_list: ["then", "else"],
     } as unknown as AutomationAction;
     const ifNode = {
