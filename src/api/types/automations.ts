@@ -163,8 +163,9 @@ export type AutomationLocation =
  *  action's ``accepts_action_list`` entries (e.g.
  *  ``{ then: [...], else: [...] }`` for ``if``). ``conditions`` is
  *  populated for actions whose catalog entry has ``has_condition_gate``
- *  (the boolean gate of ``if`` / ``while`` / ``wait_until``). ``unknown`` marks an uncatalogued
- *  action (from an ``external_components`` source, or a typo): it's
+ *  (the boolean gate of ``if`` / ``while`` / ``wait_until``). ``unknown``
+ *  marks an uncatalogued action (from an ``external_components`` source,
+ *  or a typo): it's
  *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
  *  sibling actions stay editable. */
 export interface ActionNode {
