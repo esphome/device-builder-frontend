@@ -40,8 +40,8 @@ const countEntry = {
 } as unknown as ConfigEntry;
 
 // The two assertions are driven purely by config_entries (params form)
-// and accepts_action_list (nested list); the node reads neither
-// is_control_flow nor any other field.
+// and accepts_action_list (nested list); the node does not read
+// is_control_flow.
 const repeatAction: AutomationAction = {
   id: "repeat",
   name: "Repeat",

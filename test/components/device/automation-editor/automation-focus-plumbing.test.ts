@@ -54,6 +54,7 @@ const IF_DEF = makeAutomationAction({
   name: "If",
   is_control_flow: true,
   has_else_branch: true,
+  has_condition_gate: true,
   accepts_action_list: ["then", "else"],
 });
 
