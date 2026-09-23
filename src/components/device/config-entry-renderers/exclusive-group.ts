@@ -1,7 +1,10 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
-import { isEntryVisible } from "../../../util/config-validation.js";
+import {
+  type EntryVisibilityOptions,
+  isValuedOrVisible,
+} from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
   labelFor,
@@ -39,31 +42,35 @@ export function orderExclusiveGroups(
   return out;
 }
 
+/** One exclusive group as the plan paints it. */
+export interface ExclusiveGroupPaint {
+  members: ConfigEntry[];
+  /** The members the dropdown offers: valued, or visible under the board /
+   *  platform / depends_on gates. */
+  options: ConfigEntry[];
+}
+
+export function planExclusiveGroup(
+  members: ConfigEntry[],
+  values: Record<string, unknown>,
+  opts: EntryVisibilityOptions,
+  entries: ConfigEntry[]
+): ExclusiveGroupPaint {
+  return {
+    members,
+    options: members.filter((m) => isValuedOrVisible(m, values, opts, entries)),
+  };
+}
+
 // One exclusive_group as a pick-one dropdown plus the chosen member's
 // fields; ESPHome accepts exactly one, so only that key stays in values.
-export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
+export function renderExclusiveGroupField(paint: ExclusiveGroupPaint, ctx: RenderCtx) {
+  const { members, options } = paint;
   // emitChange clears with undefined, so only undefined is absent — a
   // scaffolded {} or an explicit null both count as the chosen member.
   const present = members.filter((m) => ctx.getAt([m.key]) !== undefined);
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
-
-  // Gate options through isEntryVisible so a board-incompatible / hidden /
-  // depends_on member can't be picked; keep an already-set one selectable.
-  const rootValues = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const options = members.filter(
-    (m) =>
-      ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(
-        m,
-        rootValues,
-        ctx.presentComponents,
-        targetPlatform,
-        undefined,
-        ctx.entries
-      )
-  );
 
   // Any *rendered* option board-locked → the choice is fixed: the board's
   // preset picked this member, and switching away would clear the locked

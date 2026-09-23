@@ -1,36 +1,59 @@
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { choicePinned } from "../../util/config-entry-tree.js";
+import type { ConstraintKind } from "../../util/constraint-groups.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import {
   filterRenderable,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
+import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
 import {
   buildConstraintClusters,
-  type ConstraintCluster,
-  isRadioCluster,
+  type ClusterPaint,
+  planCluster,
 } from "./config-entry-renderers/constraint-cluster.js";
-import { orderExclusiveGroups } from "./config-entry-renderers/exclusive-group.js";
+import {
+  type ExclusiveGroupPaint,
+  orderExclusiveGroups,
+  planExclusiveGroup,
+} from "./config-entry-renderers/exclusive-group.js";
+
+/** A constraint the paint reports unmet. */
+export interface UnmetConstraint {
+  kind: ConstraintKind;
+  /** The keys the prompt names. */
+  keys: string[];
+  /** The paint carrying the prompt. */
+  source: "banner" | "cluster";
+  /** The paint offers an unlocked member the user can set. */
+  actionable: boolean;
+}
 
 /**
  * The structural decision `ESPHomeConfigEntryForm.render()` makes before
  * emitting templates: which entries fold into exclusive-group dropdowns or
- * constraint-cluster boxes, and which plain entries survive the visibility
- * filter. Extracted so render() and the add-component dialog's empty-form
- * gate agree on what the form paints (constraint banners are separate — they
- * render only for *unsatisfied* groups; see ``collectUnsatisfiedConstraints``).
+ * constraint-cluster boxes, which plain entries survive the visibility
+ * filter, and which constraints are unmet. Extracted so render() and the
+ * add-component dialog's gates agree on what the form paints.
  */
 export interface FormRenderPlan {
   /** Entries in paint order; an array element is one exclusive group. */
   ordered: (ConfigEntry | ConfigEntry[])[];
-  /** Either/or constraint clusters, each rendered as one bordered box. */
-  clusters: ConstraintCluster[];
+  /** Either/or constraint clusters, each with its paint decision. */
+  clusters: ClusterPaint[];
   /** Keys folded into a cluster, dropped from the normal flow. */
   memberKeys: Set<string>;
   /** Each cluster keyed by its first member's key — the slot it paints at. */
-  clusterByFirstKey: Map<string, ConstraintCluster>;
+  clusterByFirstKey: Map<string, ClusterPaint>;
+  /** Each exclusive group's paint, keyed by its member array in `ordered`. */
+  groupPaints: Map<ConfigEntry[], ExclusiveGroupPaint>;
   /** Plain (non-exclusive, non-cluster) entries that pass the filter. */
   visible: Set<ConfigEntry>;
+  /** The painted entries the user can set (unlocked, not behind a pinned
+   *  selector), keyed by entry key. */
+  settable: Map<string, ConfigEntry>;
+  /** Unmet constraints, banners first, then cluster headers. */
+  unmet: UnmetConstraint[];
 }
 
 export function buildFormRenderPlan(
@@ -39,16 +62,60 @@ export function buildFormRenderPlan(
   requiredGroups: RequiredGroup[],
   opts: RenderFilterOptions
 ): FormRenderPlan {
+  const scoped = { ...opts, requiredGroups };
   const ordered = orderExclusiveGroups(entries);
-  const { clusters, memberKeys } = buildConstraintClusters(entries, requiredGroups);
-  const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
+  const { clusters: built, memberKeys } = buildConstraintClusters(
+    entries,
+    requiredGroups
+  );
+  const clusters = built.map((c) => planCluster(c, values, scoped, entries));
+  const clusterByFirstKey = new Map(clusters.map((c) => [c.cluster.members[0].key, c]));
+  const groups = ordered
+    .filter((item): item is ConfigEntry[] => Array.isArray(item))
+    .map((members) => planExclusiveGroup(members, values, scoped, entries));
+  const groupPaints = new Map(groups.map((g) => [g.members, g]));
   const nonExclusive = entries.filter(
     (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
   );
-  const visible = new Set(
-    filterRenderable(nonExclusive, values, { ...opts, requiredGroups })
-  );
-  return { ordered, clusters, memberKeys, clusterByFirstKey, visible };
+  const visible = new Set(filterRenderable(nonExclusive, values, scoped));
+
+  // A pinned selector (group dropdown, exactly_one radios) is disabled, so an
+  // unlocked member behind it is unreachable.
+  const settable = new Map<string, ConfigEntry>();
+  const offer = (members: ConfigEntry[]): void => {
+    for (const m of members) if (!m.locked) settable.set(m.key, m);
+  };
+  offer([...visible]);
+  for (const { painted, mode } of clusters) {
+    if (!(mode === "radio" && choicePinned(painted))) offer(painted);
+  }
+  for (const { options } of groups) if (!choicePinned(options)) offer(options);
+
+  // A prompt is actionable when the user can set one of the keys it names.
+  const actionable = (keys: string[]): boolean => keys.some((key) => settable.has(key));
+  const unmet: UnmetConstraint[] = collectUnsatisfiedConstraints(
+    { entries, requiredGroups, values, opts: scoped },
+    memberKeys
+  ).map(({ kind, keys }) => ({
+    kind,
+    keys,
+    source: "banner",
+    actionable: actionable(keys),
+  }));
+  for (const { unmet: rule } of clusters) {
+    if (rule)
+      unmet.push({ ...rule, source: "cluster", actionable: actionable(rule.keys) });
+  }
+  return {
+    ordered,
+    clusters,
+    memberKeys,
+    clusterByFirstKey,
+    groupPaints,
+    visible,
+    settable,
+    unmet,
+  };
 }
 
 /** Every member advanced — an atomic unit can't straddle the boundary. */
@@ -84,47 +151,13 @@ export function unitAdvancedGate(
   };
 }
 
-/** Whether any of *entries* is one the user can set: unlocked and visible. */
-export function hasActionableEntry(
-  entries: ConfigEntry[],
-  isVisible: (entry: ConfigEntry) => boolean
-): boolean {
-  return entries.some((entry) => !entry.locked && isVisible(entry));
-}
-
 /**
- * Whether the plan paints anything the user can act on: an unlocked plain
- * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
- *
- * A locked entry renders read-only ("Set by the board"), so a form whose only
- * fields — plain, grouped, or clustered — are locked is a dead-end screen. A
- * member is only counted when ``isVisible`` (the group/cluster member arrays are
- * unfiltered, so a hidden unlocked member — platform-incompatible, ``depends_on``
- * unmet — mustn't keep the form open). Lets a caller skip the form when every
- * input is fixed by the board.
+ * Whether the plan paints anything the user can act on. A locked entry
+ * renders read-only ("Set by the board"), so a form whose only fields are
+ * locked is a dead-end screen a caller can skip.
  */
-export function planNeedsUserInput(
-  plan: FormRenderPlan,
-  isVisible: (entry: ConfigEntry) => boolean
-): boolean {
-  const anyActionable = (entries: ConfigEntry[]): boolean =>
-    hasActionableEntry(entries, isVisible);
-  // A pinned selector (group dropdown, exactly_one radios) is disabled, so
-  // an unlocked member behind it is unreachable — don't let it hold the
-  // form open. Box clusters paint their members directly and stay gated on
-  // anyActionable alone.
-  return (
-    anyActionable([...plan.visible]) ||
-    plan.clusters.some(
-      (cluster) =>
-        anyActionable(cluster.members) &&
-        !(isRadioCluster(cluster) && choicePinned(cluster.members, isVisible))
-    ) ||
-    plan.ordered.some(
-      (item) =>
-        Array.isArray(item) && anyActionable(item) && !choicePinned(item, isVisible)
-    )
-  );
+export function planNeedsUserInput(plan: FormRenderPlan): boolean {
+  return plan.settable.size > 0;
 }
 
 function unitMembersByKey(

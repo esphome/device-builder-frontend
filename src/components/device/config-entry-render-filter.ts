@@ -174,6 +174,32 @@ export function ownRequiredGroups(
   return hasSerializableValue(blockValues) ? (entry.required_groups ?? []) : [];
 }
 
+/** The inputs `isEntryVisible` reads off a `RenderFilterOptions`. */
+export type EntryVisibilityOptions = Pick<
+  RenderFilterOptions,
+  "presentComponents" | "targetPlatform" | "rootValues"
+>;
+
+/** Whether *entry* stays on screen: it holds a value or passes `isEntryVisible`. */
+export function isValuedOrVisible(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+  opts: EntryVisibilityOptions,
+  entries: ConfigEntry[]
+): boolean {
+  return (
+    values[entry.key] !== undefined ||
+    isEntryVisible(
+      entry,
+      values,
+      opts.presentComponents,
+      opts.targetPlatform,
+      opts.rootValues,
+      entries
+    )
+  );
+}
+
 /** The options for the children of the NESTED block *entry*. Required groups
  *  are scope-local: the parent's never reach the children. */
 export function nestedOpts(

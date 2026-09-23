@@ -68,7 +68,6 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
-import { isClusterMemberPainted } from "./config-entry-renderers/constraint-cluster.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
@@ -85,18 +84,17 @@ import "../mdi-icon-picker.js";
 import "../options-combobox.js";
 import {
   buildFormRenderPlan,
+  type FormRenderPlan,
   unitAdvancedGate,
   unitAllAdvanced,
   unitHasMaterialValue,
 } from "./config-entry-form-plan.js";
 import {
   fieldRendererStyles,
-  isRadioCluster,
   labelFor,
   renderBooleanField,
   renderColorField,
-  renderConstraintClusterField,
-  renderConstraintRadioField,
+  renderConstraintCluster,
   type RenderCtx,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
@@ -413,7 +411,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       renderFilterOptions(this)
     );
     const renderItem = this._makeItemRenderer(plan, ctx);
-    return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${plan.ordered.map(
+    return html`${this._renderConstraintBanners(ctx, plan)}${plan.ordered.map(
       renderItem
     )}`;
   }
@@ -438,13 +436,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // a depends_on that isn't met) renders nothing, so it must not inflate the
     // "(N)" count or tip the all-advanced check. An exclusive group is one
     // dropdown. A constraint cluster is one box painted at its *first* member's
-    // slot, and only when a member is renderable — ``renderConstraintClusterField``
-    // returns nothing when every member is gated off, so read its own predicate
-    // here or a fully-gated cluster still counts.
-    const clusterRenders = (cluster: (typeof plan.clusters)[number]): boolean =>
-      cluster.members.some((m) => isClusterMemberPainted(m, ctx));
+    // slot, and only when the plan paints it.
     const renderedClusterKeys = new Set(
-      plan.clusters.filter(clusterRenders).map((c) => c.members[0].key)
+      plan.clusters.filter((c) => c.mode !== "none").map((c) => c.cluster.members[0].key)
     );
     const willRender = (item: ConfigEntry | ConfigEntry[]): boolean => {
       if (Array.isArray(item)) return true;
@@ -482,8 +476,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const unitPrefilled = (item: ConfigEntry | ConfigEntry[]): boolean => {
         if (Array.isArray(item)) return unitHasMaterialValue(item, this.values);
         if (plan.memberKeys.has(item.key)) {
-          const cluster = plan.clusterByFirstKey.get(item.key);
-          return !!cluster && unitHasMaterialValue(cluster.members, this.values);
+          const paint = plan.clusterByFirstKey.get(item.key);
+          return !!paint && unitHasMaterialValue(paint.cluster.members, this.values);
         }
         return hasMaterialValue(item, this.values);
       };
@@ -515,7 +509,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const showControl =
       this.forceAdvancedControl || (hasAdvanced && !autoOpenAllAdvanced);
     const count = gatedAdvanced.length + this.advancedExtraCount;
-    return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${basic.map(
+    return html`${this._renderConstraintBanners(ctx, plan)}${basic.map(
       renderItem
     )}${inlineAdvanced.map(renderItem)}${
       showControl ? this._renderAdvancedControl(open, count, locked) : nothing
@@ -525,18 +519,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Per-item renderer shared by both paint paths. An empty key means "this
    *  entry IS the whole values dict" (top-level user-keyed sections like
    *  ``substitutions:``); pass ``[]`` so the renderer sees the dict directly. */
-  private _makeItemRenderer(
-    plan: ReturnType<typeof buildFormRenderPlan>,
-    ctx: RenderCtx
-  ) {
+  private _makeItemRenderer(plan: FormRenderPlan, ctx: RenderCtx) {
     return (item: ConfigEntry | ConfigEntry[]) => {
-      if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
+      if (Array.isArray(item))
+        return renderExclusiveGroupField(plan.groupPaints.get(item)!, ctx);
       if (plan.memberKeys.has(item.key)) {
-        const cluster = plan.clusterByFirstKey.get(item.key);
-        if (!cluster) return nothing;
-        return isRadioCluster(cluster)
-          ? renderConstraintRadioField(cluster, ctx)
-          : renderConstraintClusterField(cluster, ctx);
+        const paint = plan.clusterByFirstKey.get(item.key);
+        return paint ? renderConstraintCluster(paint, ctx) : nothing;
       }
       return plan.visible.has(item)
         ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
@@ -560,9 +549,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Classify a render unit as advanced. A group (exclusive dropdown or
    *  constraint cluster) is advanced only when *every* member is — a group
    *  renders atomically, so it can't straddle the basic/advanced boundary. */
-  private _advancedUnitClassifier(plan: ReturnType<typeof buildFormRenderPlan>) {
+  private _advancedUnitClassifier(plan: FormRenderPlan) {
     const clusterAllAdvanced = new Map<string, boolean>();
-    for (const cluster of plan.clusters) {
+    for (const { cluster } of plan.clusters) {
       const all = unitAllAdvanced(cluster.members);
       for (const m of cluster.members) clusterAllAdvanced.set(m.key, all);
     }
@@ -622,19 +611,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
     fireEvent(this, "advanced-toggle", { show });
   }
 
-  /** Fallback banner for *unsatisfied* constraint groups that aren't visually
-   *  clustered (pure cardinality groups with no inclusive `group`). Groups
-   *  whose members render inside a `constraint-cluster` box are skipped — the
-   *  box header carries their prompt. */
-  private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
-    const scope = {
-      entries: this.entries,
-      requiredGroups: this.requiredGroups,
-      values: this.values,
-      // As the paint resolves them, board-implied values included.
-      rootValues: renderFilterOptions(this).rootValues,
-    };
-    return renderConstraintBanners(scope, clusteredKeys, ctx);
+  /** Fallback banner for the plan's unmet constraints no cluster box carries. */
+  private _renderConstraintBanners(ctx: RenderCtx, plan: FormRenderPlan) {
+    return renderConstraintBanners(
+      plan.unmet.filter((c) => c.source === "banner"),
+      this.entries,
+      ctx
+    );
   }
 
   connectedCallback() {

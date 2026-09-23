@@ -267,6 +267,40 @@ describe("an unmet constraint cluster box", () => {
     const radio = [{ kind: "exactly_one" as const, keys: ["identity", "certificate"] }];
     expect(addFormHasUnsatisfiedConstraint(members(), {}, radio, null, NONE)).toBe(false);
   });
+
+  it("holds Add on a radio that paints as a box because one side is hidden", () => {
+    const radio = [{ kind: "exactly_one" as const, keys: ["identity", "certificate"] }];
+    const oneSide = members().map((m) =>
+      m.key === "identity" ? { ...m, hidden: true } : m
+    );
+    expect(addFormHasUnsatisfiedConstraint(oneSide, {}, radio, null, NONE)).toBe(true);
+    expect(
+      addFormHasUnsatisfiedConstraint(
+        oneSide,
+        { certificate: "cert.pem", key: "key.pem" },
+        radio,
+        null,
+        NONE
+      )
+    ).toBe(false);
+  });
+
+  it("holds Add on a half-set pair whose set member is hidden by depends_on", () => {
+    const gated = members().map((m) =>
+      m.key === "certificate"
+        ? { ...m, depends_on: "identity", depends_on_value: "x" }
+        : m
+    );
+    expect(
+      addFormHasUnsatisfiedConstraint(
+        gated,
+        { certificate: "cert.pem" },
+        groups,
+        null,
+        NONE
+      )
+    ).toBe(true);
+  });
 });
 
 describe("a cluster box whose members are blocks", () => {

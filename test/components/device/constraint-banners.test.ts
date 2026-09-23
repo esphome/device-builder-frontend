@@ -8,10 +8,6 @@ import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { collectUnsatisfiedConstraints } from "../../../src/components/device/config-entry-renderers/constraint-banners.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
-// Echo the keys verbatim so assertions can see exactly which group surfaced,
-// standing in for the real formatConstraintKeys(keys, entries, ctx).
-const formatKeys = (keys: string[]): string => keys.join(",");
-
 const ENTRIES: ConfigEntry[] = [
   makeConfigEntry({ key: "ssid", type: ConfigEntryType.STRING, label: "SSID" }),
   makeConfigEntry({ key: "networks", type: ConfigEntryType.STRING, label: "Networks" }),
@@ -33,9 +29,7 @@ function collect(
       entries: overrides.entries ?? ENTRIES,
       requiredGroups: overrides.requiredGroups ?? REQUIRED_GROUPS,
       values: overrides.values ?? {},
-      presentComponents: new Set(),
-      targetPlatform: null,
-      formatKeys,
+      opts: {},
     },
     clustered
   );
@@ -43,7 +37,7 @@ function collect(
 
 describe("collectUnsatisfiedConstraints", () => {
   it("surfaces an unsatisfied, unclustered cardinality group", () => {
-    expect(collect()).toEqual([{ kind: "at_least_one", keys: "ssid,networks" }]);
+    expect(collect()).toEqual([{ kind: "at_least_one", keys: ["ssid", "networks"] }]);
   });
 
   it("returns nothing once the group is satisfied", () => {
@@ -72,7 +66,7 @@ describe("collectUnsatisfiedConstraints", () => {
       makeConfigEntry({ key: "key", type: ConfigEntryType.STRING, group: "tls" }),
     ];
     expect(collect({ entries, requiredGroups: [], values: { cert: "a.pem" } })).toEqual([
-      { kind: "all_or_none", keys: "cert,key" },
+      { kind: "all_or_none", keys: ["cert", "key"] },
     ]);
   });
 
@@ -96,8 +90,8 @@ describe("collectUnsatisfiedConstraints", () => {
       makeConfigEntry({ key: "key", type: ConfigEntryType.STRING, group: "tls" }),
     ];
     expect(collect({ entries, values: { cert: "a.pem" } })).toEqual([
-      { kind: "at_least_one", keys: "ssid,networks" },
-      { kind: "all_or_none", keys: "cert,key" },
+      { kind: "at_least_one", keys: ["ssid", "networks"] },
+      { kind: "all_or_none", keys: ["cert", "key"] },
     ]);
   });
 
@@ -110,7 +104,7 @@ describe("collectUnsatisfiedConstraints", () => {
       { kind: "exactly_one", keys: ["service", "action"] },
     ] as RequiredGroup[];
     const messages = collect({ entries, requiredGroups: groups });
-    expect(messages).toEqual([{ kind: "exactly_one", keys: "action" }]);
+    expect(messages).toEqual([{ kind: "exactly_one", keys: ["action"] }]);
   });
 
   it("keeps every key in an all-or-none prompt, hidden members included", () => {
@@ -122,6 +116,6 @@ describe("collectUnsatisfiedConstraints", () => {
       { kind: "all_or_none", keys: ["cert", "key"] },
     ] as unknown as RequiredGroup[];
     const messages = collect({ entries, requiredGroups: groups, values: { cert: "x" } });
-    expect(messages).toEqual([{ kind: "all_or_none", keys: "cert,key" }]);
+    expect(messages).toEqual([{ kind: "all_or_none", keys: ["cert", "key"] }]);
   });
 });
