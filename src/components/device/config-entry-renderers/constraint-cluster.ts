@@ -2,11 +2,14 @@ import { html, nothing } from "lit";
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
 import { isEntryVisible } from "../../../util/config-validation.js";
-import { evaluateGroup, isMemberSet } from "../../../util/constraint-groups.js";
-import { isEmptyBlock } from "../config-entry-render-filter.js";
+import {
+  type ConstraintKind,
+  evaluateGroup,
+  isMemberSet,
+} from "../../../util/constraint-groups.js";
+import { isEmptyBlock, type RenderFilterOptions } from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
-  filterOptionsAt,
   labelFor,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -109,7 +112,23 @@ export interface ClusterAlternative {
   /** Stable radio value — the alternative's first member key. */
   id: string;
   members: ConfigEntry[];
+}
+
+/** A `ClusterAlternative` with its radio label. */
+export interface LabelledClusterAlternative extends ClusterAlternative {
   label: string;
+}
+
+/** How one cluster paints under a value map: its members on screen, the
+ *  chooser shape, and the rule its header warns about. */
+export interface ClusterPaint {
+  cluster: ConstraintCluster;
+  /** Members the box (or a picked radio side) paints. */
+  painted: ConfigEntry[];
+  /** `radio` needs two paintable alternatives; `none` paints nothing. */
+  mode: "radio" | "box" | "none";
+  /** The rule the header leads with while unmet: cardinality, then all-or-none. */
+  unmet: { kind: ConstraintKind; keys: string[] } | null;
 }
 
 /** `exactly_one` clusters render as a radio chooser (only the picked side's
@@ -119,12 +138,9 @@ export function isRadioCluster(cluster: ConstraintCluster): boolean {
 }
 
 /** One alternative per cardinality key: a key heading an inclusive `group`
- *  expands to that group's members (label = member labels joined); a bare key
- *  is its own single-member alternative. */
-export function buildAlternatives(
-  cluster: ConstraintCluster,
-  ctx: RenderCtx
-): ClusterAlternative[] {
+ *  expands to that group's members; a bare key is its own single-member
+ *  alternative. */
+export function clusterAlternatives(cluster: ConstraintCluster): ClusterAlternative[] {
   const byKey = new Map(cluster.members.map((m) => [m.key, m]));
   return (cluster.cardinality?.keys ?? []).flatMap((key) => {
     const entry = byKey.get(key);
@@ -132,14 +148,78 @@ export function buildAlternatives(
     const members = entry.group
       ? cluster.members.filter((m) => m.group === entry.group)
       : [entry];
-    return [
-      {
-        id: members[0].key,
-        members,
-        label: members.map((m) => labelFor(m, ctx)).join(", "),
-      },
-    ];
+    return [{ id: members[0].key, members }];
   });
+}
+
+/** `clusterAlternatives` with each radio's label (member labels joined). */
+export function buildAlternatives(
+  cluster: ConstraintCluster,
+  ctx: RenderCtx
+): LabelledClusterAlternative[] {
+  return clusterAlternatives(cluster).map((alt) => ({
+    ...alt,
+    label: alt.members.map((m) => labelFor(m, ctx)).join(", "),
+  }));
+}
+
+/** A member paints when it holds a value or is visible, unless it is a
+ *  block with nothing in it. */
+function clusterMemberPainted(
+  member: ConfigEntry,
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions,
+  entries: ConfigEntry[]
+): boolean {
+  const shown =
+    values[member.key] !== undefined ||
+    isEntryVisible(
+      member,
+      values,
+      opts.presentComponents,
+      opts.targetPlatform ?? null,
+      opts.rootValues,
+      entries
+    );
+  return shown && !isEmptyBlock(member, values, opts);
+}
+
+/**
+ * Decide how *cluster* paints under *values*. A radio needs two alternatives
+ * with a painted member (a board / platform / depends_on can hide a side at
+ * runtime); with fewer it paints as the static box.
+ */
+export function planCluster(
+  cluster: ConstraintCluster,
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions,
+  entries: ConfigEntry[]
+): ClusterPaint {
+  const painted = cluster.members.filter((m) =>
+    clusterMemberPainted(m, values, opts, entries)
+  );
+  const paintedSet = new Set(painted);
+  const radio =
+    isRadioCluster(cluster) &&
+    clusterAlternatives(cluster).filter((a) => a.members.some((m) => paintedSet.has(m)))
+      .length >= 2;
+  const mode = painted.length === 0 ? "none" : radio ? "radio" : "box";
+  return { cluster, painted, mode, unmet: clusterUnmetRule(cluster, values) };
+}
+
+/** The rule a cluster's header leads with while unmet, or null once both hold. */
+function clusterUnmetRule(
+  cluster: ConstraintCluster,
+  values: Record<string, unknown>
+): ClusterPaint["unmet"] {
+  const { cardinality, inclusiveKeys } = cluster;
+  if (cardinality && !evaluateGroup(cardinality.kind, cardinality.keys, values)) {
+    return { kind: cardinality.kind, keys: cardinality.keys };
+  }
+  if (!evaluateGroup("all_or_none", inclusiveKeys, values)) {
+    return { kind: "all_or_none", keys: inclusiveKeys };
+  }
+  return null;
 }
 
 /** Switch the cluster's active alternative: stash + drop every other side's
@@ -174,38 +254,31 @@ export function selectClusterAlternative(
   ctx.setClusterChoice(clusterId, newAltId);
 }
 
-/** A member paints when it holds a value or is visible, unless it is a
- *  block with nothing in it. */
-export function isClusterMemberPainted(member: ConfigEntry, ctx: RenderCtx): boolean {
-  const values = ctx.scopeValues([]);
-  const shown =
-    ctx.getAt([member.key]) !== undefined ||
-    isEntryVisible(
-      member,
-      values,
-      ctx.presentComponents,
-      ctx.board?.esphome.platform ?? null,
-      undefined,
-      ctx.entries
-    );
-  return shown && !isEmptyBlock(member, values, filterOptionsAt(ctx, [member.key]));
+/** Paint one cluster as its plan decided: nothing, a radio chooser, or a box. */
+export function renderConstraintCluster(paint: ClusterPaint, ctx: RenderCtx) {
+  switch (paint.mode) {
+    case "none":
+      return nothing;
+    case "radio":
+      return renderConstraintRadioField(paint, ctx);
+    case "box":
+      return renderConstraintClusterField(paint, ctx);
+  }
 }
 
 /** Render an `exactly_one` cluster as a radio chooser: a muted prompt, a radio
  *  per alternative, and only the selected alternative's fields. The radio
  *  enforces the choice and only the picked side is ever saved, so there is no
  *  unsatisfied/warning state. */
-export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
+export function renderConstraintRadioField(paint: ClusterPaint, ctx: RenderCtx) {
+  const { cluster } = paint;
   const clusterId = cluster.members[0].key;
-  const isRenderable = (m: ConfigEntry): boolean => isClusterMemberPainted(m, ctx);
+  const painted = new Set(paint.painted);
+  const isRenderable = (m: ConfigEntry): boolean => painted.has(m);
 
-  // Gate alternatives on renderability (a board / platform / depends_on can hide
-  // a side at runtime) and fall back to the static box when fewer than two real
-  // choices remain, mirroring exclusive_group's option gating.
   const alternatives = buildAlternatives(cluster, ctx).filter((a) =>
     a.members.some(isRenderable)
   );
-  if (alternatives.length < 2) return renderConstraintClusterField(cluster, ctx);
 
   // Stored choice wins; else infer from whichever side already holds a value
   // (round-trips existing YAML); else nothing selected yet.
@@ -260,67 +333,35 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   `;
 }
 
-/** Whether *values* meet a cluster's cardinality rule and its all-or-none rule. */
-export function clusterRulesMet(
-  cluster: ConstraintCluster,
-  values: Record<string, unknown>
-): { cardinalityOk: boolean; inclusiveOk: boolean } {
-  return {
-    cardinalityOk: cluster.cardinality
-      ? evaluateGroup(cluster.cardinality.kind, cluster.cardinality.keys, values)
-      : true,
-    inclusiveOk: evaluateGroup("all_or_none", cluster.inclusiveKeys, values),
-  };
-}
-
 /** Render one cluster as a bordered `.nested-group` box: a reactive
  *  constraint header (warning until satisfied) over its member fields. */
-export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: RenderCtx) {
-  const values = ctx.scopeValues([]);
-  const { cardinalityOk, inclusiveOk } = clusterRulesMet(cluster, values);
-
-  // Lead with whichever rule is currently unmet; once both hold, keep the
-  // cardinality summary as a muted caption so the grouping stays legible.
-  const prompt =
-    !cardinalityOk && cluster.cardinality
-      ? {
-          kind: cluster.cardinality.kind,
-          keys: cluster.cardinality.keys,
-          satisfied: false,
-        }
-      : !inclusiveOk
-        ? { kind: "all_or_none" as const, keys: cluster.inclusiveKeys, satisfied: false }
-        : {
-            kind: cluster.cardinality?.kind ?? "all_or_none",
-            keys: cluster.cardinality?.keys ?? cluster.inclusiveKeys,
-            satisfied: true,
-          };
+export function renderConstraintClusterField(paint: ClusterPaint, ctx: RenderCtx) {
+  const { cluster, painted, unmet } = paint;
+  // Once both rules hold, keep the cardinality summary as a muted caption so
+  // the grouping stays legible.
+  const prompt = unmet ?? {
+    kind: cluster.cardinality?.kind ?? "all_or_none",
+    keys: cluster.cardinality?.keys ?? cluster.inclusiveKeys,
+  };
   const message = ctx.localize(`device.constraint_${prompt.kind}`, {
     // Resolve labels against the full entry set so a cardinality key dropped
     // from members (also an exclusive_group member) still localizes.
     keys: formatConstraintKeys(prompt.keys, ctx.entries, ctx),
   });
 
-  const visibleMembers = cluster.members.filter((m) => isClusterMemberPainted(m, ctx));
   // All members gated off (depends_on / platform / hidden): skip the box rather
   // than render an empty bordered card with just a header.
-  if (!visibleMembers.length) return nothing;
+  if (!painted.length) return nothing;
   return html`
     <div
       class="nested-group constraint-cluster"
       data-field-key=${fieldKeyAttr([cluster.members[0].key])}
     >
-      <div class="constraint-cluster-header ${prompt.satisfied ? "" : "unsatisfied"}">
-        ${
-          prompt.satisfied
-            ? nothing
-            : html`<wa-icon library="mdi" name="alert-circle-outline"></wa-icon>`
-        }
+      <div class="constraint-cluster-header ${unmet ? "unsatisfied" : ""}">
+        ${unmet ? html`<wa-icon library="mdi" name="alert-circle-outline"></wa-icon>` : nothing}
         <span>${message}</span>
       </div>
-      <div class="nested-fields">
-        ${visibleMembers.map((m) => ctx.renderEntry(m, [m.key]))}
-      </div>
+      <div class="nested-fields">${painted.map((m) => ctx.renderEntry(m, [m.key]))}</div>
     </div>
   `;
 }

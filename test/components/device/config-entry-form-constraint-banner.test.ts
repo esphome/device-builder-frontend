@@ -11,7 +11,12 @@ import type {
   RequiredGroup,
 } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import {
+  buildFormRenderPlan,
+  type FormRenderPlan,
+} from "../../../src/components/device/config-entry-form-plan.js";
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
+import { renderFilterOptions } from "../../../src/components/device/config-entry-render-filter.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -36,17 +41,24 @@ const REQUIRED_GROUPS: RequiredGroup[] = [
 
 function banners(
   values: Record<string, unknown>,
-  clustered: Set<string> = new Set()
+  entries: ConfigEntry[] = ENTRIES,
+  requiredGroups: RequiredGroup[] = REQUIRED_GROUPS
 ): string {
   const form = new ESPHomeConfigEntryForm();
-  form.entries = ENTRIES;
+  form.entries = entries;
   form.values = values;
-  form.requiredGroups = REQUIRED_GROUPS;
+  form.requiredGroups = requiredGroups;
+  const plan = buildFormRenderPlan(
+    entries,
+    values,
+    requiredGroups,
+    renderFilterOptions(form)
+  );
   const out = (
     form as unknown as {
-      _renderConstraintBanners(c: RenderCtx, clustered: Set<string>): unknown;
+      _renderConstraintBanners(c: RenderCtx, plan: FormRenderPlan): unknown;
     }
-  )._renderConstraintBanners(ctx, clustered);
+  )._renderConstraintBanners(ctx, plan);
   return serialize(out);
 }
 
@@ -62,25 +74,22 @@ describe("config-entry-form constraint banners", () => {
   });
 
   it("skips a group whose members are clustered (the box owns the prompt)", () => {
-    expect(banners({}, new Set(["ssid"]))).not.toContain("constraint-banner");
+    // ssid shares an inclusive group, so the cluster box absorbs the
+    // cardinality group and carries its prompt in the header.
+    const clustered = [
+      { ...ENTRIES[0], group: "g" },
+      makeConfigEntry({ key: "bssid", type: ConfigEntryType.STRING, group: "g" }),
+      ENTRIES[1],
+    ];
+    expect(banners({}, clustered)).not.toContain("constraint-banner");
   });
 
   it("skips a group whose members are not rendered entries", () => {
     // e.g. sensor.pid references climate.pid's cool_output/heat_output, which
     // aren't fields on the sensor form — no banner the user can act on.
-    const form = new ESPHomeConfigEntryForm();
-    form.entries = ENTRIES;
-    form.values = {};
-    form.requiredGroups = [
+    const groups: RequiredGroup[] = [
       { kind: "at_least_one", keys: ["cool_output", "heat_output"] },
     ];
-    const out = serialize(
-      (
-        form as unknown as {
-          _renderConstraintBanners(c: RenderCtx, clustered: Set<string>): unknown;
-        }
-      )._renderConstraintBanners(ctx, new Set())
-    );
-    expect(out).not.toContain("constraint-banner");
+    expect(banners({}, ENTRIES, groups)).not.toContain("constraint-banner");
   });
 });

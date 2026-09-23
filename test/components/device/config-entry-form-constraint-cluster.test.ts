@@ -17,13 +17,34 @@ import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   buildConstraintClusters,
+  type ConstraintCluster,
   formatConstraintKeys,
   isRadioCluster,
+  planCluster,
+  renderConstraintCluster,
   renderConstraintClusterField,
-  renderConstraintRadioField,
   selectClusterAlternative,
 } from "../../../src/components/device/config-entry-renderers/constraint-cluster.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
+
+/** The paint the form's plan would hand the renderer for *cluster* under *ctx*. */
+const paintFor = (cluster: ConstraintCluster, ctx: RenderCtx) =>
+  planCluster(
+    cluster,
+    ctx.scopeValues([]),
+    {
+      requiredOnly: false,
+      showAdvanced: false,
+      presentComponents: ctx.presentComponents,
+      targetPlatform: null,
+      requiredGroups: cluster.cardinality ? [cluster.cardinality] : [],
+    },
+    ctx.entries
+  );
+const box = (cluster: ConstraintCluster, ctx: RenderCtx) =>
+  renderConstraintClusterField(paintFor(cluster, ctx), ctx);
+const paint = (cluster: ConstraintCluster, ctx: RenderCtx) =>
+  renderConstraintCluster(paintFor(cluster, ctx), ctx);
 
 const radioGroupBindings = (tpl: unknown) =>
   extractAttributeBindings(findTemplatesByAnchor(tpl, "<wa-radio-group")[0]);
@@ -126,7 +147,7 @@ describe("renderConstraintClusterField", () => {
   const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
 
   it("renders one box with all members and an unsatisfied header when empty", () => {
-    const out = serialize(renderConstraintClusterField(cluster, ctxFor({})));
+    const out = serialize(box(cluster, ctxFor({})));
     expect(out).toContain("nested-group");
     expect(out).toContain("unsatisfied");
     expect(out).toContain("device.constraint_exactly_one|Chipset, (Bit0 High");
@@ -136,9 +157,7 @@ describe("renderConstraintClusterField", () => {
   });
 
   it("drops the warning tone once chipset satisfies the choice", () => {
-    const out = serialize(
-      renderConstraintClusterField(cluster, ctxFor({ chipset: "SK6812" }))
-    );
+    const out = serialize(box(cluster, ctxFor({ chipset: "SK6812" })));
     expect(out).not.toContain("unsatisfied");
   });
 
@@ -153,7 +172,7 @@ describe("renderConstraintClusterField", () => {
     };
     const ctx = ctxFor({});
     ctx.entries = ENTRIES;
-    const out = serialize(renderConstraintClusterField(absentChipset, ctx));
+    const out = serialize(box(absentChipset, ctx));
     expect(out).toContain("device.constraint_at_least_one|Chipset, (Bit0 High");
     expect(out).not.toContain("|chipset,");
   });
@@ -229,10 +248,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
 
   it("boxes both members and warns when only one is set", () => {
     const out = serialize(
-      renderConstraintClusterField(
-        cluster,
-        ctxFor({ client_certificate: "/d.crt" }, MQTT_ENTRIES)
-      )
+      box(cluster, ctxFor({ client_certificate: "/d.crt" }, MQTT_ENTRIES))
     );
     expect(out).toContain("nested-group");
     expect(out).toContain("unsatisfied");
@@ -249,7 +265,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
 
   it("drops the warning tone when both are set", () => {
     const out = serialize(
-      renderConstraintClusterField(
+      box(
         cluster,
         ctxFor(
           { client_certificate: "/d.crt", client_certificate_key: "/d.key" },
@@ -276,7 +292,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
       }),
     ];
     const [gated] = buildConstraintClusters(hidden, []).clusters;
-    expect(renderConstraintClusterField(gated, ctxFor({}))).toBe(nothing);
+    expect(box(gated, ctxFor({}))).toBe(nothing);
   });
 
   it("leaves out a block member with no field and nothing to switch on", () => {
@@ -289,15 +305,11 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
       });
     const members = [block("pwm", {}), block("dac", {})];
     const [cluster] = buildConstraintClusters(members, []).clusters;
-    expect(renderConstraintClusterField(cluster, ctxFor({}, members))).toBe(nothing);
+    expect(box(cluster, ctxFor({}, members))).toBe(nothing);
     // An emptied block is still nothing to paint; a set one shows its value.
-    expect(renderConstraintClusterField(cluster, ctxFor({ pwm: {} }, members))).toBe(
-      nothing
-    );
+    expect(box(cluster, ctxFor({ pwm: {} }, members))).toBe(nothing);
     const set = ctxFor({ pwm: { rate: "1" } }, members);
-    expect(JSON.stringify(renderConstraintClusterField(cluster, set))).toContain(
-      "<entry:pwm>"
-    );
+    expect(JSON.stringify(box(cluster, set))).toContain("<entry:pwm>");
   });
 });
 
@@ -305,7 +317,7 @@ describe("renderConstraintRadioField", () => {
   const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
 
   it("renders a radio per alternative with no fields and no warning when empty", () => {
-    const out = serialize(renderConstraintRadioField(cluster, statefulCtx({}).ctx));
+    const out = serialize(paint(cluster, statefulCtx({}).ctx));
     expect(out).toContain("wa-radio-group");
     expect(out).toContain("Bit0 High, Bit0 Low, Bit1 High, Bit1 Low");
     expect(out).not.toContain("<entry:bit0_high>");
@@ -313,9 +325,7 @@ describe("renderConstraintRadioField", () => {
   });
 
   it("infers the chipset side from its value and shows only that field", () => {
-    const out = serialize(
-      renderConstraintRadioField(cluster, statefulCtx({ chipset: "WS2812" }).ctx)
-    );
+    const out = serialize(paint(cluster, statefulCtx({ chipset: "WS2812" }).ctx));
     expect(out).toContain("<entry:chipset>");
     expect(out).not.toContain("<entry:bit0_high>");
   });
@@ -332,19 +342,14 @@ describe("renderConstraintRadioField", () => {
     const groups = [{ kind: "exactly_one" as const, keys: ["fan", "pwm"] }];
     const [blocks] = buildConstraintClusters(members, groups).clusters;
     const out = serialize(
-      renderConstraintRadioField(
-        blocks,
-        statefulCtx({ fan: {}, pwm: { rate: "16" } }, members).ctx
-      )
+      paint(blocks, statefulCtx({ fan: {}, pwm: { rate: "16" } }, members).ctx)
     );
     expect(out).toContain("<entry:pwm>");
     expect(out).not.toContain("<entry:fan>");
   });
 
   it("shows the timing fields and never a warning, even when partial", () => {
-    const out = serialize(
-      renderConstraintRadioField(cluster, statefulCtx({ bit0_high: "400ns" }).ctx)
-    );
+    const out = serialize(paint(cluster, statefulCtx({ bit0_high: "400ns" }).ctx));
     expect(out).toContain("<entry:bit0_high>");
     expect(out).not.toContain("<entry:chipset>");
     // The radio enforces the choice, so the cluster never reads as unsatisfied.
@@ -358,9 +363,22 @@ describe("renderConstraintRadioField", () => {
       e.key === "chipset" ? { ...e, hidden: true } : e
     );
     const [cluster] = buildConstraintClusters(hiddenChipset, REQUIRED_GROUPS).clusters;
-    const out = serialize(renderConstraintRadioField(cluster, ctxFor({})));
+    expect(paintFor(cluster, ctxFor({})).mode).toBe("box");
+    const out = serialize(paint(cluster, ctxFor({})));
     expect(out).not.toContain("wa-radio-group");
     expect(out).toContain("nested-group");
+    expect(out).toContain("unsatisfied");
+  });
+
+  it("paints a valued member its depends_on gate hides", () => {
+    const gated = ENTRIES.map((e) =>
+      e.key === "chipset" ? { ...e, depends_on: "rgb_order", depends_on_value: "GRB" } : e
+    );
+    const [cluster] = buildConstraintClusters(gated, REQUIRED_GROUPS).clusters;
+    const painted = (values: Record<string, unknown>) =>
+      paintFor(cluster, ctxFor(values, gated)).painted.map((m) => m.key);
+    expect(painted({})).not.toContain("chipset");
+    expect(painted({ chipset: "WS2812" })).toContain("chipset");
   });
 
   it("pins the radios when an alternative member is board-locked", () => {
@@ -370,15 +388,12 @@ describe("renderConstraintRadioField", () => {
       e.key === "chipset" ? { ...e, locked: true } : e
     );
     const [locked] = buildConstraintClusters(lockedChipset, REQUIRED_GROUPS).clusters;
-    const tpl = renderConstraintRadioField(
-      locked,
-      statefulCtx({ chipset: "WS2812" }).ctx
-    );
+    const tpl = paint(locked, statefulCtx({ chipset: "WS2812" }).ctx);
     expect(radioGroupBindings(tpl)["?disabled"]).toBe(true);
   });
 
   it("keeps the radios live when no member is locked", () => {
-    const tpl = renderConstraintRadioField(cluster, statefulCtx({}).ctx);
+    const tpl = paint(cluster, statefulCtx({}).ctx);
     expect(radioGroupBindings(tpl)["?disabled"]).toBe(false);
   });
 });

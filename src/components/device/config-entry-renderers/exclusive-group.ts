@@ -2,8 +2,10 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { choicePinned } from "../../../util/config-entry-tree.js";
 import { isEntryVisible } from "../../../util/config-validation.js";
+import type { RenderFilterOptions } from "../config-entry-render-filter.js";
 import {
   fieldKeyAttr,
+  filterOptionsAt,
   labelFor,
   type RenderCtx,
   renderExclusiveMemberChildren,
@@ -39,6 +41,29 @@ export function orderExclusiveGroups(
   return out;
 }
 
+/** The members the dropdown offers: gated through `isEntryVisible` so a
+ *  board-incompatible / hidden / depends_on member can't be picked, while an
+ *  already-set one stays selectable. */
+export function exclusiveOptions(
+  members: ConfigEntry[],
+  values: Record<string, unknown>,
+  opts: RenderFilterOptions,
+  entries: ConfigEntry[]
+): ConfigEntry[] {
+  return members.filter(
+    (m) =>
+      values[m.key] !== undefined ||
+      isEntryVisible(
+        m,
+        values,
+        opts.presentComponents,
+        opts.targetPlatform ?? null,
+        opts.rootValues,
+        entries
+      )
+  );
+}
+
 // One exclusive_group as a pick-one dropdown plus the chosen member's
 // fields; ESPHome accepts exactly one, so only that key stays in values.
 export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
@@ -48,21 +73,11 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
 
-  // Gate options through isEntryVisible so a board-incompatible / hidden /
-  // depends_on member can't be picked; keep an already-set one selectable.
-  const rootValues = ctx.scopeValues([]);
-  const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const options = members.filter(
-    (m) =>
-      ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(
-        m,
-        rootValues,
-        ctx.presentComponents,
-        targetPlatform,
-        undefined,
-        ctx.entries
-      )
+  const options = exclusiveOptions(
+    members,
+    ctx.scopeValues([]),
+    filterOptionsAt(ctx, []),
+    ctx.entries
   );
 
   // Any *rendered* option board-locked → the choice is fixed: the board's

@@ -1,10 +1,16 @@
-/** Unit tests for `unitAdvancedGate`. */
+/** Unit tests for the render plan's derived decisions. */
 import { describe, expect, it } from "vitest";
 
-import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
+import type {
+  ConfigEntry,
+  RequiredGroup,
+} from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import { unitAdvancedGate } from "../../../src/components/device/config-entry-form-plan.js";
-import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import {
+  buildFormRenderPlan,
+  unitAdvancedGate,
+} from "../../../src/components/device/config-entry-form-plan.js";
+import { makeConfigEntry, makeNestedEntry } from "../../util/_make-config-entry.js";
 
 const entry = (key: string, extra: Partial<ConfigEntry> = {}): ConfigEntry =>
   makeConfigEntry({ key, type: ConfigEntryType.STRING, label: key, ...extra });
@@ -38,5 +44,94 @@ describe("unitAdvancedGate", () => {
     expect(unitAdvancedGate(entries, [], { second: "set" })("first")).toBe(false);
     expect(unitAdvancedGate(entries, [], {})("first")).toBe(true);
     expect(unitAdvancedGate(entries, [], {})("second")).toBe(true);
+  });
+});
+
+describe("buildFormRenderPlan unmet constraints", () => {
+  const opts = { requiredOnly: false, showAdvanced: false };
+  const plan = (
+    entries: ConfigEntry[],
+    values: Record<string, unknown>,
+    groups: RequiredGroup[]
+  ) => buildFormRenderPlan(entries, values, groups, opts);
+
+  it("reports an unclustered group as a banner, actionable while a painted member is unlocked", () => {
+    const entries = [
+      makeConfigEntry({ key: "ssid", locked: true }),
+      makeConfigEntry({ key: "networks" }),
+    ];
+    const groups: RequiredGroup[] = [
+      { kind: "at_least_one", keys: ["ssid", "networks"] },
+    ];
+    expect(plan(entries, {}, groups).unmet).toEqual([
+      {
+        kind: "at_least_one",
+        keys: ["ssid", "networks"],
+        source: "banner",
+        actionable: true,
+      },
+    ]);
+    const locked = entries.map((e) => ({ ...e, locked: true }));
+    expect(plan(locked, {}, groups).unmet[0].actionable).toBe(false);
+    expect(plan(entries, { ssid: "home" }, groups).unmet).toEqual([]);
+  });
+
+  it("reports an unmet cluster box through its header", () => {
+    const entries = [
+      makeConfigEntry({ key: "cert", group: "tls" }),
+      makeConfigEntry({ key: "key", group: "tls" }),
+    ];
+    expect(plan(entries, { cert: "a.pem" }, []).unmet).toEqual([
+      { kind: "all_or_none", keys: ["cert", "key"], source: "cluster", actionable: true },
+    ]);
+    expect(plan(entries, {}, []).unmet).toEqual([]);
+  });
+
+  it("leaves a radio of leaves to its forced choice but reports its box fallback", () => {
+    const entries = [
+      makeConfigEntry({ key: "identity" }),
+      makeConfigEntry({ key: "cert", group: "tls" }),
+      makeConfigEntry({ key: "key", group: "tls" }),
+    ];
+    const groups: RequiredGroup[] = [{ kind: "exactly_one", keys: ["identity", "cert"] }];
+    const radio = plan(entries, {}, groups);
+    expect(radio.clusters[0].mode).toBe("radio");
+    expect(radio.unmet).toEqual([]);
+    const oneSide = plan(
+      entries.map((e) => (e.key === "identity" ? { ...e, hidden: true } : e)),
+      {},
+      groups
+    );
+    expect(oneSide.clusters[0].mode).toBe("box");
+    expect(oneSide.unmet).toEqual([
+      {
+        kind: "exactly_one",
+        keys: ["identity", "cert"],
+        source: "cluster",
+        actionable: true,
+      },
+    ]);
+  });
+
+  it("reports a radio with a block side, whose switch still has to be set", () => {
+    const block = (key: string, group?: string) =>
+      ({
+        ...makeNestedEntry(key, [makeConfigEntry({ key: "rate", default_value: "1" })]),
+        group,
+      }) as ConfigEntry;
+    const entries = [block("fan"), block("pwm", "out"), block("dac", "out")];
+    const groups: RequiredGroup[] = [{ kind: "exactly_one", keys: ["fan", "pwm"] }];
+    expect(plan(entries, {}, groups).unmet.map((c) => c.source)).toEqual(["cluster"]);
+  });
+
+  it("paints nothing for a cluster whose members are all gated off", () => {
+    const entries = [
+      makeConfigEntry({ key: "a", group: "g", hidden: true }),
+      makeConfigEntry({ key: "b", group: "g", hidden: true }),
+    ];
+    const out = plan(entries, { a: "x" }, []);
+    expect(out.clusters[0].mode).toBe("box");
+    expect(out.clusters[0].painted.map((m) => m.key)).toEqual(["a"]);
+    expect(plan(entries, {}, []).clusters[0].mode).toBe("none");
   });
 });

@@ -3,9 +3,7 @@ import { isEntryVisible } from "../../../util/config-validation.js";
 import { type ConstraintKind, evaluateGroup } from "../../../util/constraint-groups.js";
 import { getIn } from "../../../util/nested-values.js";
 
-/** Inputs for the fallback constraint-banner pass. ``formatKeys`` is injected
- *  (rather than passing a renderer ctx) so this module stays DOM/localize-free
- *  and unit-testable; the host wraps ``formatConstraintKeys(keys, entries, ctx)``. */
+/** Inputs for the fallback constraint-banner pass. */
 export interface ConstraintBannerInputs {
   entries: ConfigEntry[];
   requiredGroups: RequiredGroup[];
@@ -15,15 +13,14 @@ export interface ConstraintBannerInputs {
   /** The component-root values, so a nested member's ``depends_on`` on a
    *  top-level field resolves as it does in the paint. */
   rootValues?: Record<string, unknown>;
-  formatKeys: (keys: string[]) => string;
 }
 
 /** An unsatisfied constraint to surface as a banner: the prompt's ``kind``
- *  (mapped to ``device.constraint_${kind}`` by the host) plus the formatted
- *  key list for the ``{keys}`` placeholder. */
+ *  (mapped to ``device.constraint_${kind}`` by the host) plus the keys it
+ *  names for the ``{keys}`` placeholder. */
 export interface UnsatisfiedConstraint {
   kind: ConstraintKind;
-  keys: string;
+  keys: string[];
 }
 
 /**
@@ -44,7 +41,6 @@ export function collectUnsatisfiedConstraints(
     presentComponents,
     targetPlatform,
     rootValues,
-    formatKeys,
   } = inputs;
   // Most scopes carry neither kind of constraint.
   if (requiredGroups.length === 0 && !entries.some((e) => e.group)) return [];
@@ -79,10 +75,7 @@ export function collectUnsatisfiedConstraints(
     if (group.keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(group.keys)) continue;
     if (evaluateGroup(group.kind, group.keys, values)) continue;
-    messages.push({
-      kind: group.kind,
-      keys: formatKeys(namedKeys(group.kind, group.keys)),
-    });
+    messages.push({ kind: group.kind, keys: namedKeys(group.kind, group.keys) });
   }
   // At the form root buildConstraintClusters folds every *non-exclusive*
   // inclusive group into a cluster (its members land in clusteredKeys), so
@@ -100,12 +93,9 @@ export function collectUnsatisfiedConstraints(
     if (keys.some((k) => clusteredKeys.has(k))) continue;
     if (!anyVisible(keys)) continue;
     if (evaluateGroup("all_or_none", keys, values)) continue;
-    messages.push({
-      kind: "all_or_none",
-      // No-op for this loop's fixed kind; routed through so the naming
-      // rule lives in one place.
-      keys: formatKeys(namedKeys("all_or_none", keys)),
-    });
+    // No-op for this loop's fixed kind; routed through so the naming
+    // rule lives in one place.
+    messages.push({ kind: "all_or_none", keys: namedKeys("all_or_none", keys) });
   }
   return messages;
 }

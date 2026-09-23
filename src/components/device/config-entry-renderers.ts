@@ -47,7 +47,5 @@ export {
 export {
   buildConstraintClusters,
   formatConstraintKeys,
-  isRadioCluster,
-  renderConstraintClusterField,
-  renderConstraintRadioField,
+  renderConstraintCluster,
 } from "./config-entry-renderers/constraint-cluster.js";

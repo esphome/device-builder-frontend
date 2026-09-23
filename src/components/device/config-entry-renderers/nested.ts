@@ -19,6 +19,7 @@ import {
   renderLabel,
 } from "../config-entry-renderers-shared.js";
 import { renderConstraintBanners } from "./constraint-banner-view.js";
+import { collectUnsatisfiedConstraints } from "./constraint-banners.js";
 import { nextIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
@@ -167,14 +168,19 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
               ${
                 inUse
                   ? renderConstraintBanners(
-                      {
-                        entries: entry.config_entries ?? [],
-                        requiredGroups: ownGroups,
-                        values: scope,
-                        // As the paint resolves them, board-implied values included.
-                        rootValues: filterOptionsAt(ctx, path).rootValues,
-                      },
-                      NO_CLUSTERS,
+                      collectUnsatisfiedConstraints(
+                        {
+                          entries: entry.config_entries ?? [],
+                          requiredGroups: ownGroups,
+                          values: scope,
+                          presentComponents: ctx.presentComponents,
+                          targetPlatform: ctx.board?.esphome.platform ?? null,
+                          // As the paint resolves them, board-implied values included.
+                          rootValues: filterOptionsAt(ctx, path).rootValues,
+                        },
+                        NO_CLUSTERS
+                      ),
+                      entry.config_entries ?? [],
                       ctx
                     )
                   : nothing
