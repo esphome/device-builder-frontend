@@ -521,10 +521,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  ``substitutions:``); pass ``[]`` so the renderer sees the dict directly. */
   private _makeItemRenderer(plan: FormRenderPlan, ctx: RenderCtx) {
     return (item: ConfigEntry | ConfigEntry[]) => {
-      if (Array.isArray(item)) {
-        const group = plan.groupByFirstKey.get(item[0].key);
-        return group ? renderExclusiveGroupField(group, ctx) : nothing;
-      }
+      if (Array.isArray(item))
+        return renderExclusiveGroupField(plan.groupPaints.get(item)!, ctx);
       if (plan.memberKeys.has(item.key)) {
         const paint = plan.clusterByFirstKey.get(item.key);
         return paint ? renderConstraintCluster(paint, ctx) : nothing;

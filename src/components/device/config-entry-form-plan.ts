@@ -45,10 +45,13 @@ export interface FormRenderPlan {
   memberKeys: Set<string>;
   /** Each cluster keyed by its first member's key — the slot it paints at. */
   clusterByFirstKey: Map<string, ClusterPaint>;
-  /** Each exclusive group keyed by its first member's key. */
-  groupByFirstKey: Map<string, ExclusiveGroupPaint>;
+  /** Each exclusive group's paint, keyed by its member array in `ordered`. */
+  groupPaints: Map<ConfigEntry[], ExclusiveGroupPaint>;
   /** Plain (non-exclusive, non-cluster) entries that pass the filter. */
   visible: Set<ConfigEntry>;
+  /** The painted entries the user can set (unlocked, not behind a pinned
+   *  selector), keyed by entry key. */
+  settable: Map<string, ConfigEntry>;
   /** Unmet constraints, banners first, then cluster headers. */
   unmet: UnmetConstraint[];
 }
@@ -70,17 +73,24 @@ export function buildFormRenderPlan(
   const groups = ordered
     .filter((item): item is ConfigEntry[] => Array.isArray(item))
     .map((members) => planExclusiveGroup(members, values, scoped, entries));
-  const groupByFirstKey = new Map(groups.map((g) => [g.members[0].key, g]));
+  const groupPaints = new Map(groups.map((g) => [g.members, g]));
   const nonExclusive = entries.filter(
     (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
   );
   const visible = new Set(filterRenderable(nonExclusive, values, scoped));
 
-  // Every entry the root paint puts on screen, for banner actionability.
-  const painted = new Map<string, ConfigEntry>();
-  for (const entry of visible) painted.set(entry.key, entry);
-  for (const paint of clusters) paint.painted.forEach((m) => painted.set(m.key, m));
-  for (const group of groups) group.options.forEach((m) => painted.set(m.key, m));
+  // A pinned selector (group dropdown, exactly_one radios) is disabled, so an
+  // unlocked member behind it is unreachable.
+  const settable = new Map<string, ConfigEntry>();
+  const offer = (members: ConfigEntry[]): void => {
+    for (const m of members) if (!m.locked) settable.set(m.key, m);
+  };
+  offer([...visible]);
+  for (const { painted, mode } of clusters) {
+    if (!(mode === "radio" && choicePinned(painted))) offer(painted);
+  }
+  for (const { options } of groups) if (!choicePinned(options)) offer(options);
+
   const unmet: UnmetConstraint[] = collectUnsatisfiedConstraints(
     { entries, requiredGroups, values, opts: scoped },
     memberKeys
@@ -88,19 +98,24 @@ export function buildFormRenderPlan(
     kind,
     keys,
     source: "banner",
-    actionable: hasActionableEntry(keys.flatMap((key) => painted.get(key) ?? [])),
+    actionable: keys.some((key) => settable.has(key)),
   }));
-  for (const { painted: members, unmet: rule } of clusters) {
+  for (const { painted, unmet: rule } of clusters) {
     if (!rule) continue;
-    unmet.push({ ...rule, source: "cluster", actionable: hasActionableEntry(members) });
+    unmet.push({
+      ...rule,
+      source: "cluster",
+      actionable: painted.some((m) => settable.get(m.key) === m),
+    });
   }
   return {
     ordered,
     clusters,
     memberKeys,
     clusterByFirstKey,
-    groupByFirstKey,
+    groupPaints,
     visible,
+    settable,
     unmet,
   };
 }
@@ -138,33 +153,13 @@ export function unitAdvancedGate(
   };
 }
 
-/** Whether any of *entries* is one the user can set: unlocked. */
-function hasActionableEntry(entries: ConfigEntry[]): boolean {
-  return entries.some((entry) => !entry.locked);
-}
-
 /**
- * Whether the plan paints anything the user can act on: an unlocked plain
- * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
- *
- * A locked entry renders read-only ("Set by the board"), so a form whose only
- * fields (plain, grouped, or clustered) are locked is a dead-end screen.
- * Lets a caller skip the form when every input is fixed by the board.
+ * Whether the plan paints anything the user can act on. A locked entry
+ * renders read-only ("Set by the board"), so a form whose only fields are
+ * locked is a dead-end screen a caller can skip.
  */
 export function planNeedsUserInput(plan: FormRenderPlan): boolean {
-  // A pinned selector (group dropdown, exactly_one radios) is disabled, so
-  // an unlocked member behind it is unreachable and must not hold the form
-  // open. Box clusters paint their members directly.
-  return (
-    hasActionableEntry([...plan.visible]) ||
-    plan.clusters.some(
-      ({ painted, mode }) =>
-        hasActionableEntry(painted) && !(mode === "radio" && choicePinned(painted))
-    ) ||
-    [...plan.groupByFirstKey.values()].some(
-      ({ options }) => hasActionableEntry(options) && !choicePinned(options)
-    )
-  );
+  return plan.settable.size > 0;
 }
 
 function unitMembersByKey(

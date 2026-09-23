@@ -134,4 +134,17 @@ describe("buildFormRenderPlan unmet constraints", () => {
     expect(out.clusters[0].painted.map((m) => m.key)).toEqual(["a"]);
     expect(plan(entries, {}, []).clusters[0].mode).toBe("none");
   });
+
+  it("does not count an option behind a pinned exclusive group as actionable", () => {
+    const entries = [
+      makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),
+      makeConfigEntry({ key: "spi", exclusive_group: "bus" }),
+    ];
+    const groups: RequiredGroup[] = [{ kind: "exactly_one", keys: ["i2c", "spi"] }];
+    const out = plan(entries, {}, groups);
+    expect([...out.settable.keys()]).toEqual([]);
+    expect(out.unmet).toEqual([
+      { kind: "exactly_one", keys: ["i2c", "spi"], source: "banner", actionable: false },
+    ]);
+  });
 });
