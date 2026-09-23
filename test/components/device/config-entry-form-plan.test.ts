@@ -147,4 +147,24 @@ describe("buildFormRenderPlan unmet constraints", () => {
       { kind: "exactly_one", keys: ["i2c", "spi"], source: "banner", actionable: false },
     ]);
   });
+
+  it("judges a cluster by the keys of its unmet rule, not every painted member", () => {
+    // An editable identity cannot complete the locked, half-set pair.
+    const entries = [
+      makeConfigEntry({ key: "identity" }),
+      makeConfigEntry({ key: "cert", group: "tls", locked: true }),
+      makeConfigEntry({ key: "key", group: "tls", locked: true }),
+    ];
+    const groups: RequiredGroup[] = [
+      { kind: "at_least_one", keys: ["identity", "cert"] },
+    ];
+    expect(plan(entries, { cert: "a.pem" }, groups).unmet).toEqual([
+      {
+        kind: "all_or_none",
+        keys: ["cert", "key"],
+        source: "cluster",
+        actionable: false,
+      },
+    ]);
+  });
 });

@@ -91,6 +91,8 @@ export function buildFormRenderPlan(
   }
   for (const { options } of groups) if (!choicePinned(options)) offer(options);
 
+  // A prompt is actionable when the user can set one of the keys it names.
+  const actionable = (keys: string[]): boolean => keys.some((key) => settable.has(key));
   const unmet: UnmetConstraint[] = collectUnsatisfiedConstraints(
     { entries, requiredGroups, values, opts: scoped },
     memberKeys
@@ -98,15 +100,11 @@ export function buildFormRenderPlan(
     kind,
     keys,
     source: "banner",
-    actionable: keys.some((key) => settable.has(key)),
+    actionable: actionable(keys),
   }));
-  for (const { painted, unmet: rule } of clusters) {
-    if (!rule) continue;
-    unmet.push({
-      ...rule,
-      source: "cluster",
-      actionable: painted.some((m) => settable.get(m.key) === m),
-    });
+  for (const { unmet: rule } of clusters) {
+    if (rule)
+      unmet.push({ ...rule, source: "cluster", actionable: actionable(rule.keys) });
   }
   return {
     ordered,
