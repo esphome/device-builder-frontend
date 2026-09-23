@@ -8,11 +8,29 @@
 import { describe, expect, it, vi } from "vitest";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
+import {
+  filterOptionsAt,
+  type RenderCtx,
+} from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   orderExclusiveGroups,
   renderExclusiveGroupField,
 } from "../../../src/components/device/config-entry-renderers.js";
+import { planExclusiveGroup } from "../../../src/components/device/config-entry-renderers/exclusive-group.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
+
+/** Render *members* as the form's plan would paint them under *ctx*. */
+const render = (members: ConfigEntry[], ctx: RenderCtx) =>
+  renderExclusiveGroupField(
+    planExclusiveGroup(
+      members,
+      ctx.scopeValues([]),
+      filterOptionsAt(ctx, []),
+      ctx.entries
+    ),
+    ctx
+  );
 
 function members() {
   return [
@@ -38,7 +56,7 @@ describe("renderExclusiveGroupField", () => {
   it("selects the member present in the values and renders its children", () => {
     const renderEntry = vi.fn();
     const ctx = makeRenderCtx({ raw: { code: "x" } }, { overrides: { renderEntry } });
-    const tpl = renderExclusiveGroupField(members(), ctx);
+    const tpl = render(members(), ctx);
 
     expect(selectedValues(tpl)).toEqual(["raw"]);
     expect(renderEntry).toHaveBeenCalledWith(expect.objectContaining({ key: "code" }), [
@@ -50,7 +68,7 @@ describe("renderExclusiveGroupField", () => {
   it("switching clears the other members and scaffolds the chosen key", () => {
     const emitChange = vi.fn();
     const ctx = makeRenderCtx({ raw: { code: "x" } }, { overrides: { emitChange } });
-    const tpl = renderExclusiveGroupField(members(), ctx);
+    const tpl = render(members(), ctx);
 
     const onChange = findElementBindings(tpl, "wa-select")[0]["@change"] as (
       e: Event
@@ -70,10 +88,9 @@ describe("renderExclusiveGroupField", () => {
       makeEntry(ConfigEntryType.NESTED, { key: "jvc", exclusive_group: "g" }),
     ];
     const ctx = makeRenderCtx({ raw: { code: "x" } }, { overrides: { emitChange } });
-    const onChange = findElementBindings(
-      renderExclusiveGroupField(ms, ctx),
-      "wa-select"
-    )[0]["@change"] as (e: Event) => void;
+    const onChange = findElementBindings(render(ms, ctx), "wa-select")[0]["@change"] as (
+      e: Event
+    ) => void;
     onChange({ target: { value: "jvc" } } as never);
 
     expect(emitChange).toHaveBeenCalledWith(["raw"], undefined); // present → cleared
@@ -84,7 +101,7 @@ describe("renderExclusiveGroupField", () => {
   it("disables the dropdown when every member is board-locked", () => {
     const ctx = makeRenderCtx({ raw: { code: "x" } });
     const locked = members().map((m) => ({ ...m, locked: true }));
-    const tpl = renderExclusiveGroupField(locked, ctx);
+    const tpl = render(locked, ctx);
     expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
   });
 
@@ -93,7 +110,7 @@ describe("renderExclusiveGroupField", () => {
     // clear its locked value.
     const ctx = makeRenderCtx({ raw: { code: "x" } });
     const [a, b] = members();
-    const tpl = renderExclusiveGroupField([{ ...a, locked: true }, b], ctx);
+    const tpl = render([{ ...a, locked: true }, b], ctx);
     expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
   });
 
@@ -112,7 +129,7 @@ describe("renderExclusiveGroupField", () => {
         supported_platforms: ["esp8266"],
       }),
     ];
-    const tpl = renderExclusiveGroupField(ms, makeRenderCtx({}));
+    const tpl = render(ms, makeRenderCtx({}));
     expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
   });
 
@@ -124,7 +141,7 @@ describe("renderExclusiveGroupField", () => {
       { raw: { code: "x" }, nec: { address: 1 } },
       { overrides: { emitChange } }
     );
-    const tpl = renderExclusiveGroupField(members(), ctx);
+    const tpl = render(members(), ctx);
 
     const onChange = findElementBindings(tpl, "wa-select")[0]["@change"] as (
       e: Event
@@ -139,13 +156,13 @@ describe("renderExclusiveGroupField", () => {
     // Focus/scroll sync needs the group's wrapper to carry the chosen
     // protocol's path, not always the first member's.
     const ctx = makeRenderCtx({ nec: {} });
-    const div = findElementBindings(renderExclusiveGroupField(members(), ctx), "div")[0];
+    const div = findElementBindings(render(members(), ctx), "div")[0];
     expect(div["data-field-key"]).toBe(JSON.stringify(["nec"]));
   });
 
   it("uses an empty data-field-key when nothing is selected", () => {
     const ctx = makeRenderCtx({});
-    const div = findElementBindings(renderExclusiveGroupField(members(), ctx), "div")[0];
+    const div = findElementBindings(render(members(), ctx), "div")[0];
     expect(div["data-field-key"]).toBe(JSON.stringify([]));
   });
 
@@ -159,10 +176,9 @@ describe("renderExclusiveGroupField", () => {
         supported_platforms: ["esp8266"],
       }),
     ];
-    const opts = findElementBindings(
-      renderExclusiveGroupField(ms, makeRenderCtx({})),
-      "wa-option"
-    ).map((o) => o.value);
+    const opts = findElementBindings(render(ms, makeRenderCtx({})), "wa-option").map(
+      (o) => o.value
+    );
     expect(opts).toContain("raw");
     expect(opts).not.toContain("esp8266only");
   });
@@ -177,14 +193,14 @@ describe("renderExclusiveGroupField", () => {
       }),
     ];
     const opts = findElementBindings(
-      renderExclusiveGroupField(ms, makeRenderCtx({ esp8266only: {} })),
+      render(ms, makeRenderCtx({ esp8266only: {} })),
       "wa-option"
     ).map((o) => o.value);
     expect(opts).toContain("esp8266only");
   });
 
   it("associates the select with its label via aria-labelledby", () => {
-    const tpl = renderExclusiveGroupField(members(), makeRenderCtx({}));
+    const tpl = render(members(), makeRenderCtx({}));
     const select = findElementBindings(tpl, "wa-select")[0];
     const label = findElementBindings(tpl, "label")[0];
     expect(typeof label["id"]).toBe("string");
@@ -195,7 +211,7 @@ describe("renderExclusiveGroupField", () => {
     // A hand-written ``raw:`` parses to null; the key exists, so the
     // protocol is selected (only undefined means cleared/absent).
     const ctx = makeRenderCtx({ raw: null });
-    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["raw"]);
+    expect(selectedValues(render(members(), ctx))).toEqual(["raw"]);
   });
 
   it("keeps a freshly-scaffolded member selected", () => {
@@ -203,17 +219,17 @@ describe("renderExclusiveGroupField", () => {
     // though it has no serializable content yet (else the dropdown snaps
     // back to the placeholder and hides its fields).
     const ctx = makeRenderCtx({ nec: {} });
-    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["nec"]);
+    expect(selectedValues(render(members(), ctx))).toEqual(["nec"]);
   });
 
   it("ignores a cleared member left as undefined", () => {
     const ctx = makeRenderCtx({ nec: {}, raw: undefined });
-    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["nec"]);
+    expect(selectedValues(render(members(), ctx))).toEqual(["nec"]);
   });
 
   it("warns when more than one member is set", () => {
     const ctx = makeRenderCtx({ raw: { code: "x" }, nec: { address: 1 } });
-    const tpl = renderExclusiveGroupField(members(), ctx);
+    const tpl = render(members(), ctx);
     const note = findTemplatesByAnchor(tpl, "exclusive-group-conflict");
     expect(note.length).toBe(1);
   });
@@ -222,7 +238,7 @@ describe("renderExclusiveGroupField", () => {
     // The placeholder uses a sentinel value, not "", so the form's
     // _syncSelectedAttr (which no-ops on empty) still drives the select to it.
     const ctx = makeRenderCtx({});
-    const tpl = renderExclusiveGroupField(members(), ctx);
+    const tpl = render(members(), ctx);
 
     expect(selectedValues(tpl)).toEqual(["__none__"]);
   });

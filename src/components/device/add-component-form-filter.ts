@@ -1,10 +1,8 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
-import { isEntryVisible } from "../../util/config-validation.js";
 import { buildFormRenderPlan, planNeedsUserInput } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
-  isEmptyBlock,
   renderFilterOptions,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
@@ -48,24 +46,6 @@ export function addFormRenderablePaths(
   });
 }
 
-function addFormVisibility(
-  entries: ConfigEntry[],
-  values: Record<string, unknown>,
-  opts: RenderFilterOptions
-): (entry: ConfigEntry) => boolean {
-  return (entry) =>
-    isEntryVisible(
-      entry,
-      values,
-      opts.presentComponents,
-      opts.targetPlatform ?? null,
-      opts.rootValues,
-      entries
-      // An exclusive-group member paints as a dropdown option whatever it holds.
-    ) &&
-    (Boolean(entry.exclusive_group) || !isEmptyBlock(entry, values, opts));
-}
-
 /**
  * Whether an unmet constraint should hold the Add button. Only one the user
  * can act on here counts: a member the required-only paint drops (an
@@ -103,12 +83,12 @@ export function addFormNeedsUserInput(
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): boolean {
-  const opts = addFormFilterOptions(values, board, presentComponents);
-  const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
-  // Exclusive-group members are unfiltered in the plan; gate them on the same
-  // visibility the form uses so a hidden unlocked member can't keep the form
-  // open when every rendered field is board-locked.
-  const isVisible = addFormVisibility(entries, values, { ...opts, requiredGroups });
+  const plan = buildFormRenderPlan(
+    entries,
+    values,
+    requiredGroups,
+    addFormFilterOptions(values, board, presentComponents)
+  );
   // Any unmet prompt keeps the form open, actionable or not, so the user sees it.
-  return planNeedsUserInput(plan, isVisible) || plan.unmet.length > 0;
+  return planNeedsUserInput(plan) || plan.unmet.length > 0;
 }

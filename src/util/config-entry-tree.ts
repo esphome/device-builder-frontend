@@ -9,15 +9,12 @@ import { advancedGated } from "./material-value.js";
 import { asRecord, getIn, isIndexSegment } from "./nested-values.js";
 import { PIN_WIRING_KEYS } from "./pin/wiring-presets.js";
 
-/** A pick-one group/cluster with any visible board-locked member is the
+/** A pick-one group/cluster with any offered board-locked member is the
  *  board's choice: switching away would clear the locked value. Single
  *  source for the selector paint (dropdown/radios disable) and the
  *  add-form gate (the whole choice is non-actionable). */
-export function choicePinned(
-  members: ConfigEntry[],
-  isVisible: (entry: ConfigEntry) => boolean = () => true
-): boolean {
-  return members.some((m) => m.locked && isVisible(m));
+export function choicePinned(members: ConfigEntry[]): boolean {
+  return members.some((m) => m.locked);
 }
 
 /** True when `entries` contains any advanced entry, recursively. Drives whether

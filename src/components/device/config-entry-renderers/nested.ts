@@ -173,10 +173,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                           entries: entry.config_entries ?? [],
                           requiredGroups: ownGroups,
                           values: scope,
-                          presentComponents: ctx.presentComponents,
-                          targetPlatform: ctx.board?.esphome.platform ?? null,
-                          // As the paint resolves them, board-implied values included.
-                          rootValues: filterOptionsAt(ctx, path).rootValues,
+                          opts: filterOptionsAt(ctx, path),
                         },
                         NO_CLUSTERS
                       ),

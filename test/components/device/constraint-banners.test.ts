@@ -29,8 +29,7 @@ function collect(
       entries: overrides.entries ?? ENTRIES,
       requiredGroups: overrides.requiredGroups ?? REQUIRED_GROUPS,
       values: overrides.values ?? {},
-      presentComponents: new Set(),
-      targetPlatform: null,
+      opts: {},
     },
     clustered
   );

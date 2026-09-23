@@ -436,8 +436,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // a depends_on that isn't met) renders nothing, so it must not inflate the
     // "(N)" count or tip the all-advanced check. An exclusive group is one
     // dropdown. A constraint cluster is one box painted at its *first* member's
-    // slot, and only when the plan paints it, or a fully-gated cluster still
-    // counts.
+    // slot, and only when the plan paints it.
     const renderedClusterKeys = new Set(
       plan.clusters.filter((c) => c.mode !== "none").map((c) => c.cluster.members[0].key)
     );
@@ -522,7 +521,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  ``substitutions:``); pass ``[]`` so the renderer sees the dict directly. */
   private _makeItemRenderer(plan: FormRenderPlan, ctx: RenderCtx) {
     return (item: ConfigEntry | ConfigEntry[]) => {
-      if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
+      if (Array.isArray(item)) {
+        const group = plan.groupByFirstKey.get(item[0].key);
+        return group ? renderExclusiveGroupField(group, ctx) : nothing;
+      }
       if (plan.memberKeys.has(item.key)) {
         const paint = plan.clusterByFirstKey.get(item.key);
         return paint ? renderConstraintCluster(paint, ctx) : nothing;

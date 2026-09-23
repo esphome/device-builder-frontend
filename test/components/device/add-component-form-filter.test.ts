@@ -286,8 +286,6 @@ describe("an unmet constraint cluster box", () => {
   });
 
   it("holds Add on a half-set pair whose set member is hidden by depends_on", () => {
-    // The box paints a valued member whatever its gate says, so the user can
-    // still clear or complete the pair.
     const gated = members().map((m) =>
       m.key === "certificate"
         ? { ...m, depends_on: "identity", depends_on_value: "x" }

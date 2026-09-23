@@ -15,6 +15,7 @@ import type {
 } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { filterOptionsAt } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   buildConstraintClusters,
   type ConstraintCluster,
@@ -22,27 +23,24 @@ import {
   isRadioCluster,
   planCluster,
   renderConstraintCluster,
-  renderConstraintClusterField,
   selectClusterAlternative,
 } from "../../../src/components/device/config-entry-renderers/constraint-cluster.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 /** The paint the form's plan would hand the renderer for *cluster* under *ctx*. */
-const paintFor = (cluster: ConstraintCluster, ctx: RenderCtx) =>
-  planCluster(
+const paintFor = (cluster: ConstraintCluster, ctx: RenderCtx) => {
+  const scoped = {
+    ...ctx,
+    requiredGroups: cluster.cardinality ? [cluster.cardinality] : [],
+  };
+  const key = cluster.members[0].key;
+  return planCluster(
     cluster,
     ctx.scopeValues([]),
-    {
-      requiredOnly: false,
-      showAdvanced: false,
-      presentComponents: ctx.presentComponents,
-      targetPlatform: null,
-      requiredGroups: cluster.cardinality ? [cluster.cardinality] : [],
-    },
+    filterOptionsAt(scoped, [key]),
     ctx.entries
   );
-const box = (cluster: ConstraintCluster, ctx: RenderCtx) =>
-  renderConstraintClusterField(paintFor(cluster, ctx), ctx);
+};
 const paint = (cluster: ConstraintCluster, ctx: RenderCtx) =>
   renderConstraintCluster(paintFor(cluster, ctx), ctx);
 
@@ -97,6 +95,13 @@ function ctxFor(
   } satisfies Partial<RenderCtx> as unknown as RenderCtx;
 }
 
+const TIMINGS = {
+  bit0_high: "400ns",
+  bit0_low: "850ns",
+  bit1_high: "800ns",
+  bit1_low: "450ns",
+};
+
 const serialize = (tpl: unknown): string =>
   JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v)) ?? "";
 
@@ -143,21 +148,26 @@ describe("formatConstraintKeys", () => {
   });
 });
 
-describe("renderConstraintClusterField", () => {
-  const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
+describe("renderConstraintCluster (box)", () => {
+  // chipset gated off leaves one alternative, so the cluster paints as a box.
+  const BOX_ENTRIES = ENTRIES.map((e) =>
+    e.key === "chipset" ? { ...e, hidden: true } : e
+  );
+  const [cluster] = buildConstraintClusters(BOX_ENTRIES, REQUIRED_GROUPS).clusters;
 
-  it("renders one box with all members and an unsatisfied header when empty", () => {
-    const out = serialize(box(cluster, ctxFor({})));
+  it("renders one box with its painted members and an unsatisfied header when empty", () => {
+    const out = serialize(paint(cluster, ctxFor({}, BOX_ENTRIES)));
     expect(out).toContain("nested-group");
     expect(out).toContain("unsatisfied");
     expect(out).toContain("device.constraint_exactly_one|Chipset, (Bit0 High");
-    for (const key of ["chipset", "bit0_high", "bit1_low"]) {
+    for (const key of ["bit0_high", "bit1_low"]) {
       expect(out).toContain(`<entry:${key}>`);
     }
+    expect(out).not.toContain("<entry:chipset>");
   });
 
-  it("drops the warning tone once chipset satisfies the choice", () => {
-    const out = serialize(box(cluster, ctxFor({ chipset: "SK6812" })));
+  it("drops the warning tone once the timings satisfy the choice", () => {
+    const out = serialize(paint(cluster, ctxFor({ ...TIMINGS }, BOX_ENTRIES)));
     expect(out).not.toContain("unsatisfied");
   });
 
@@ -172,7 +182,7 @@ describe("renderConstraintClusterField", () => {
     };
     const ctx = ctxFor({});
     ctx.entries = ENTRIES;
-    const out = serialize(box(absentChipset, ctx));
+    const out = serialize(paint(absentChipset, ctx));
     expect(out).toContain("device.constraint_at_least_one|Chipset, (Bit0 High");
     expect(out).not.toContain("|chipset,");
   });
@@ -209,13 +219,6 @@ function statefulCtx(initial: Record<string, unknown>, entries: ConfigEntry[] = 
   return { ctx, values, stash, choice };
 }
 
-const TIMINGS = {
-  bit0_high: "400ns",
-  bit0_low: "850ns",
-  bit1_high: "800ns",
-  bit1_low: "450ns",
-};
-
 const MQTT_ENTRIES: ConfigEntry[] = [
   makeConfigEntry({ key: "broker", type: ConfigEntryType.STRING, label: "Broker" }),
   makeConfigEntry({
@@ -248,7 +251,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
 
   it("boxes both members and warns when only one is set", () => {
     const out = serialize(
-      box(cluster, ctxFor({ client_certificate: "/d.crt" }, MQTT_ENTRIES))
+      paint(cluster, ctxFor({ client_certificate: "/d.crt" }, MQTT_ENTRIES))
     );
     expect(out).toContain("nested-group");
     expect(out).toContain("unsatisfied");
@@ -265,7 +268,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
 
   it("drops the warning tone when both are set", () => {
     const out = serialize(
-      box(
+      paint(
         cluster,
         ctxFor(
           { client_certificate: "/d.crt", client_certificate_key: "/d.key" },
@@ -292,7 +295,7 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
       }),
     ];
     const [gated] = buildConstraintClusters(hidden, []).clusters;
-    expect(box(gated, ctxFor({}))).toBe(nothing);
+    expect(paint(gated, ctxFor({}))).toBe(nothing);
   });
 
   it("leaves out a block member with no field and nothing to switch on", () => {
@@ -305,11 +308,11 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
       });
     const members = [block("pwm", {}), block("dac", {})];
     const [cluster] = buildConstraintClusters(members, []).clusters;
-    expect(box(cluster, ctxFor({}, members))).toBe(nothing);
+    expect(paint(cluster, ctxFor({}, members))).toBe(nothing);
     // An emptied block is still nothing to paint; a set one shows its value.
-    expect(box(cluster, ctxFor({ pwm: {} }, members))).toBe(nothing);
+    expect(paint(cluster, ctxFor({ pwm: {} }, members))).toBe(nothing);
     const set = ctxFor({ pwm: { rate: "1" } }, members);
-    expect(JSON.stringify(box(cluster, set))).toContain("<entry:pwm>");
+    expect(JSON.stringify(paint(cluster, set))).toContain("<entry:pwm>");
   });
 });
 
