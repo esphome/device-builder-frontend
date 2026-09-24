@@ -34,6 +34,7 @@ vi.mock(
 
 import { identityLocalize } from "../../_dom.js";
 import { fakeLogBuffer } from "../../_fake-host.js";
+import { makeUf2Block } from "../../_make-uf2-block.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
@@ -48,27 +49,11 @@ import {
 import {
   UF2_FAMILY_RP2040,
   UF2_FAMILY_RP2350_ARM_S,
-  UF2_FLAG_FAMILY_ID_PRESENT,
-  UF2_MAGIC_END,
-  UF2_MAGIC_START0,
-  UF2_MAGIC_START1,
   type Uf2Image,
 } from "../../../src/util/uf2.js";
 
-function uf2(family: number): ArrayBuffer {
-  const b = new Uint8Array(512);
-  const v = new DataView(b.buffer);
-  v.setUint32(0, UF2_MAGIC_START0, true);
-  v.setUint32(4, UF2_MAGIC_START1, true);
-  v.setUint32(8, UF2_FLAG_FAMILY_ID_PRESENT, true);
-  v.setUint32(12, 0x10000000, true);
-  v.setUint32(16, 256, true);
-  v.setUint32(20, 0, true);
-  v.setUint32(24, 1, true);
-  v.setUint32(28, family, true);
-  v.setUint32(508, UF2_MAGIC_END, true);
-  return b.buffer;
-}
+const uf2 = (family: number): ArrayBuffer =>
+  makeUf2Block({ addr: 0x10000000, family }).buffer;
 
 const bin = (file: string, type?: string): FirmwareBinary => ({
   file,
@@ -119,7 +104,6 @@ function makeHost(opts: { binaries?: FirmwareBinary[]; uf2Family?: number } = {}
     _failureKind: null,
     _binaries: [] as FirmwareBinary[],
     _rp2Image: null as Uf2Image | null,
-    _rp2Uf2File: "",
     _flashBusy: false,
     _flashAbort: null as AbortController | null,
     _flashPercent: 0,
@@ -138,7 +122,7 @@ const asHost = (h: Host) => h as unknown as ESPHomeFirmwareInstallDialog;
 function readyHost(): Host {
   const host = makeHost();
   host._rp2Image = image;
-  host._rp2Uf2File = "firmware.uf2";
+  host._binaries = [bin("firmware.uf2", "uf2")];
   host._step = "rp2-bootsel";
   return host;
 }
@@ -156,7 +140,7 @@ describe("startRp2Uf2Install", () => {
       "firmware.uf2"
     );
     expect(host._rp2Image?.totalBytes).toBe(256);
-    expect(host._rp2Uf2File).toBe("firmware.uf2");
+    expect(host._binaries.map((b) => b.file)).toEqual(["firmware.uf2"]);
     expect(host._step).toBe("rp2-bootsel");
     expect(host._statusMessage).toBe("firmware.rp2_bootsel_title");
   });
@@ -217,7 +201,7 @@ describe("rp2DoReset", () => {
     mocks.resetToBootloader.mockRejectedValue(new Error("open failed"));
     await rp2DoReset(asHost(host));
     expect(host._step).toBe("error");
-    expect(host._statusMessage).toBe("firmware.rp2_connect_failed");
+    expect(host._statusMessage).toBe("firmware.browser_flash_connect_failed");
     expect(host._errorMessage).toBe("open failed");
   });
 

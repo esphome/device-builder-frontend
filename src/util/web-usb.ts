@@ -1,27 +1,12 @@
 /**
- * WebUSB availability and the RP2 BOOTSEL device picker. Kept outside the
+ * WebUSB support check and the RP2 BOOTSEL device picker. Kept outside the
  * lazy PICOBOOT engine because ``requestDevice()`` must run inside the
  * click's user activation, before any engine chunk is awaited.
  */
-export type WebUsbAvailability = "available" | "insecure-context" | "unsupported";
+import { isPortPickerCancel } from "./web-serial.js";
 
-/** Chromium only; Firefox has no WebUSB. Same secure-context caveat as Web Serial. */
-export function webUsbAvailability(): WebUsbAvailability {
-  if ("usb" in navigator) return "available";
-  if (typeof window !== "undefined" && !window.isSecureContext) {
-    return "insecure-context";
-  }
-  return "unsupported";
-}
-
-export function isWebUsbSupported(): boolean {
-  return webUsbAvailability() === "available";
-}
-
-/** The user dismissed the device chooser. */
-export function isUsbPickerCancel(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "NotFoundError";
-}
+/** Chromium only; Firefox has no WebUSB. */
+export const isWebUsbSupported = (): boolean => "usb" in navigator;
 
 /** The device dropped off the bus, or a transfer hit a device that already had. */
 export function isUsbDeviceLost(err: unknown): boolean {
@@ -40,12 +25,12 @@ export function isUsbAccessDenied(err: unknown): boolean {
 }
 
 export const RASPBERRY_PI_USB_VID = 0x2e8a;
-export const RP2040_BOOTSEL_PID = 0x0003;
-export const RP2350_BOOTSEL_PID = 0x000f;
+const RP2040_BOOTSEL_PID = 0x0003;
+const RP2350_BOOTSEL_PID = 0x000f;
 
-export type BootselKind = "rp2040" | "rp2350" | "not-bootsel";
-
-export function classifyUsbDevice(device: USBDevice): BootselKind {
+export function classifyUsbDevice(
+  device: USBDevice
+): "rp2040" | "rp2350" | "not-bootsel" {
   if (device.vendorId !== RASPBERRY_PI_USB_VID) return "not-bootsel";
   if (device.productId === RP2040_BOOTSEL_PID) return "rp2040";
   if (device.productId === RP2350_BOOTSEL_PID) return "rp2350";
@@ -55,7 +40,8 @@ export function classifyUsbDevice(device: USBDevice): BootselKind {
 /**
  * Chooser limited to RP2 bootloaders, so a Pico still running its app never
  * shows up; an RP2350 is listed so it can be refused with a specific message.
- * Returns null when the user dismisses the chooser.
+ * Returns null when the user dismisses the chooser (same DOMException as the
+ * serial picker).
  */
 export async function requestPicobootDevice(): Promise<USBDevice | null> {
   try {
@@ -66,7 +52,7 @@ export async function requestPicobootDevice(): Promise<USBDevice | null> {
       ],
     });
   } catch (err) {
-    if (isUsbPickerCancel(err)) return null;
+    if (isPortPickerCancel(err)) return null;
     throw err;
   }
 }

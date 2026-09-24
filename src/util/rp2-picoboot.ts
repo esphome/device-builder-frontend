@@ -3,6 +3,7 @@
  * BOOTSEL mode (pico-sdk ``boot/picoboot.h``). Loaded on demand by the
  * install flows; nothing here touches the DOM.
  */
+import { concat, int32LE } from "./bytes.js";
 import type { Uf2Image } from "./uf2.js";
 import { isUsbDeviceLost } from "./web-usb.js";
 
@@ -13,9 +14,6 @@ export const PicobootCmd = {
   FLASH_ERASE: 0x03,
   WRITE: 0x05,
   EXIT_XIP: 0x06,
-  ENTER_CMD_XIP: 0x07,
-  // RP2350 boots through REBOOT2 (0x0a: dFlags, dDelayMS, dParam0, dParam1);
-  // wire it here when an RP2350 is available to test against.
 } as const;
 const PICOBOOT_IF_RESET = 0x41;
 const PICOBOOT_IF_CMD_STATUS = 0x42;
@@ -40,16 +38,16 @@ const PICOBOOT_STATUS_NAMES: Record<number, string> = {
   17: "UNSUPPORTED_MODIFICATION",
 };
 
-export const FLASH_XIP_BASE = 0x10000000;
+const FLASH_XIP_BASE = 0x10000000;
 const FLASH_XIP_SIZE = 16 * 1024 * 1024;
 export const FLASH_SECTOR_SIZE = 4096;
-export const FLASH_PAGE_SIZE = 256;
-export const REBOOT_DELAY_MS = 500;
+const FLASH_PAGE_SIZE = 256;
+const REBOOT_DELAY_MS = 500;
 const EXCLUSIVE = 1;
 const NOT_EXCLUSIVE = 0;
 const ACK_READ_LENGTH = 64; // WebUSB rejects a zero length; the ACK is a zero-length packet.
 
-export interface PicobootCommand {
+interface PicobootCommand {
   id: number;
   args?: Uint8Array;
   transferLength?: number;
@@ -73,19 +71,7 @@ export function buildCommandPacket(
   return pkt;
 }
 
-// WebUSB wants an ArrayBuffer-backed view; a subarray of the image may not be.
-function usbBuffer(data: Uint8Array): Uint8Array<ArrayBuffer> {
-  const copy = new Uint8Array(data.length);
-  copy.set(data);
-  return copy;
-}
-
-function u32Args(...values: number[]): Uint8Array {
-  const out = new Uint8Array(values.length * 4);
-  const view = new DataView(out.buffer);
-  values.forEach((v, i) => view.setUint32(i * 4, v >>> 0, true));
-  return out;
-}
+const u32Args = (...values: number[]): Uint8Array => concat(...values.map(int32LE));
 
 /** The bootloader rejected a command; ``statusCode`` is its ``picoboot_status``. */
 export class PicobootError extends Error {
@@ -171,7 +157,10 @@ export class PicobootDevice {
     });
   }
 
-  private async command(cmd: PicobootCommand, payload?: Uint8Array): Promise<void> {
+  private async command(
+    cmd: PicobootCommand,
+    payload?: Uint8Array<ArrayBuffer>
+  ): Promise<void> {
     const token = ++this.token;
     const sent = await this.device.transferOut(
       this.ep.epOut,
@@ -179,7 +168,7 @@ export class PicobootDevice {
     );
     if (sent.status !== "ok") return this.fail(cmd.id);
     if (payload) {
-      const data = await this.device.transferOut(this.ep.epOut, usbBuffer(payload));
+      const data = await this.device.transferOut(this.ep.epOut, payload);
       if (data.status !== "ok") return this.fail(cmd.id);
     }
     const ack = await this.device.transferIn(this.ep.epIn, ACK_READ_LENGTH);
@@ -231,7 +220,7 @@ export class PicobootDevice {
     return this.command({ id: PicobootCmd.FLASH_ERASE, args: u32Args(addr, size) });
   }
 
-  write(addr: number, data: Uint8Array): Promise<void> {
+  write(addr: number, data: Uint8Array<ArrayBuffer>): Promise<void> {
     if (addr % FLASH_PAGE_SIZE !== 0 || data.length % FLASH_PAGE_SIZE !== 0) {
       throw new RangeError("Flash write must be 256-byte aligned");
     }
@@ -246,9 +235,12 @@ export class PicobootDevice {
   }
 
   /** RP2040 reboot into flash. The device may drop off the bus before the ACK arrives. */
-  async reboot(pc = 0, sp = 0, delayMs = REBOOT_DELAY_MS): Promise<void> {
+  async reboot(): Promise<void> {
     try {
-      await this.command({ id: PicobootCmd.REBOOT, args: u32Args(pc, sp, delayMs) });
+      await this.command({
+        id: PicobootCmd.REBOOT,
+        args: u32Args(0, 0, REBOOT_DELAY_MS),
+      });
     } catch (err) {
       if (!isUsbDeviceLost(err)) throw err;
     }
@@ -262,7 +254,7 @@ export class PicobootDevice {
 
 interface SectorWrite {
   address: number;
-  data: Uint8Array;
+  data: Uint8Array<ArrayBuffer>;
 }
 
 // Group every page of every range by the 4 KiB sector it lands in, so each
@@ -289,11 +281,8 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
       off += len;
     }
   }
-  return new Map([...sectors.entries()].sort((a, b) => a[0] - b[0]));
-}
-
-export interface FlashUf2Options {
-  signal?: AbortSignal;
+  // Ranges arrive sorted and disjoint, so insertion order is ascending.
+  return sectors;
 }
 
 /**
@@ -306,9 +295,8 @@ export async function flashUf2(
   dev: PicobootDevice,
   image: Uf2Image,
   onProgress: (percent: number) => void,
-  options: FlashUf2Options = {}
+  { signal }: { signal?: AbortSignal } = {}
 ): Promise<void> {
-  const { signal } = options;
   const sectors = planSectors(image);
   let written = 0;
   let rebooted = false;

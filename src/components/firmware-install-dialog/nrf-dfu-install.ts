@@ -4,6 +4,7 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
@@ -110,11 +111,13 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
         host._statusMessage = host._localize("firmware.nrf_step1_title");
       return;
     }
-    const { resetToBootloader } = await loadDfuEngine();
     await resetToBootloader(port);
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        getErrorMessage(err)
+      );
     }
     return;
   } finally {
@@ -141,7 +144,10 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     port = await requestSerialPort();
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        getErrorMessage(err)
+      );
     }
     return;
   } finally {

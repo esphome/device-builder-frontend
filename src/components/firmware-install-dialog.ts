@@ -218,7 +218,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   _nrfPkg: DfuPackage | null = null;
   _rp2Image: Uf2Image | null = null;
-  _rp2Uf2File = "";
   // Blocks a second picker while a browser-flash step's picker is open.
   @state() _flashBusy = false;
   // Aborts an in-flight browser flash on teardown so the device is released.
@@ -338,7 +337,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._detected = null;
     this._nrfPkg = null;
     this._rp2Image = null;
-    this._rp2Uf2File = "";
     this._flashBusy = false;
   }
 

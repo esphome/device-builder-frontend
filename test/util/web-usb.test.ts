@@ -4,10 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isUsbAccessDenied,
   isUsbDeviceLost,
-  isUsbPickerCancel,
+  isWebUsbSupported,
   RASPBERRY_PI_USB_VID,
   requestPicobootDevice,
-  webUsbAvailability,
 } from "../../src/util/web-usb.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -26,20 +25,12 @@ afterEach(() => {
   if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);
 });
 
-describe("webUsbAvailability", () => {
-  it("is available when navigator.usb exists", () => {
+describe("isWebUsbSupported", () => {
+  it("keys off navigator.usb", () => {
     setUsb({});
-    expect(webUsbAvailability()).toBe("available");
-  });
-
-  it("blames the origin when the API is missing on an insecure context", () => {
-    setUsb(null, false);
-    expect(webUsbAvailability()).toBe("insecure-context");
-  });
-
-  it("is unsupported when the API is missing on a secure context", () => {
-    setUsb(null, true);
-    expect(webUsbAvailability()).toBe("unsupported");
+    expect(isWebUsbSupported()).toBe(true);
+    setUsb(null);
+    expect(isWebUsbSupported()).toBe(false);
   });
 });
 
@@ -79,11 +70,6 @@ describe("requestPicobootDevice", () => {
 });
 
 describe("error classifiers", () => {
-  it("recognises the chooser cancel", () => {
-    expect(isUsbPickerCancel(new DOMException("x", "NotFoundError"))).toBe(true);
-    expect(isUsbPickerCancel(new Error("NotFoundError"))).toBe(false);
-  });
-
   it("recognises a lost device", () => {
     expect(isUsbDeviceLost(new DOMException("x", "NetworkError"))).toBe(true);
     expect(isUsbDeviceLost(new DOMException("x", "InvalidStateError"))).toBe(true);

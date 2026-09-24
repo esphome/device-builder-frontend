@@ -10,6 +10,7 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import type { DfuPackage } from "../../util/nrf-dfu.js";
+import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
@@ -91,12 +92,13 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   }
 
   private async _prepareAndReset(file: File): Promise<void> {
-    let resetToBootloader: Awaited<ReturnType<typeof loadDfuEngine>>["resetToBootloader"];
     try {
       // A revoked file handle or a stale chunk after a deploy rejects here.
-      const [zipBytes, engine] = await Promise.all([file.arrayBuffer(), loadDfuEngine()]);
-      resetToBootloader = engine.resetToBootloader;
-      this._pkg = engine.parseDfuPackage(new Uint8Array(zipBytes));
+      const [zipBytes, { parseDfuPackage }] = await Promise.all([
+        file.arrayBuffer(),
+        loadDfuEngine(),
+      ]);
+      this._pkg = parseDfuPackage(new Uint8Array(zipBytes));
     } catch (err) {
       this._fail(
         this._localize("web.nrf.install_error_bad_package", {

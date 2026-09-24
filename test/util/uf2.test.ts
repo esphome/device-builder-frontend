@@ -1,57 +1,18 @@
 import { describe, expect, it } from "vitest";
 
+import { makeUf2Block } from "../_make-uf2-block.js";
+import { concat } from "../../src/util/bytes.js";
 import {
   blocksToRanges,
   parseUf2Blocks,
   parseUf2Image,
   UF2_FAMILY_RP2040,
   UF2_FAMILY_RP2350_ARM_S,
-  UF2_FLAG_FAMILY_ID_PRESENT,
   UF2_FLAG_NOT_MAIN_FLASH,
-  UF2_MAGIC_END,
-  UF2_MAGIC_START0,
-  UF2_MAGIC_START1,
   Uf2FamilyError,
 } from "../../src/util/uf2.js";
 
-interface BlockSpec {
-  addr: number;
-  blockNo: number;
-  numBlocks: number;
-  family?: number | null;
-  fill?: number;
-  flags?: number;
-  payload?: number;
-  magicEnd?: number;
-}
-
-function block(spec: BlockSpec): Uint8Array {
-  const b = new Uint8Array(512);
-  const v = new DataView(b.buffer);
-  const family = spec.family === undefined ? UF2_FAMILY_RP2040 : spec.family;
-  const flags = (spec.flags ?? 0) | (family === null ? 0 : UF2_FLAG_FAMILY_ID_PRESENT);
-  v.setUint32(0, UF2_MAGIC_START0, true);
-  v.setUint32(4, UF2_MAGIC_START1, true);
-  v.setUint32(8, flags, true);
-  v.setUint32(12, spec.addr, true);
-  v.setUint32(16, spec.payload ?? 256, true);
-  v.setUint32(20, spec.blockNo, true);
-  v.setUint32(24, spec.numBlocks, true);
-  if (family !== null) v.setUint32(28, family, true);
-  b.fill(spec.fill ?? spec.blockNo + 1, 32, 32 + (spec.payload ?? 256));
-  v.setUint32(508, spec.magicEnd ?? UF2_MAGIC_END, true);
-  return b;
-}
-
-const concat = (...parts: Uint8Array[]): Uint8Array => {
-  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-  let off = 0;
-  for (const p of parts) {
-    out.set(p, off);
-    off += p.length;
-  }
-  return out;
-};
+const block = makeUf2Block;
 
 const BASE = 0x10000000;
 

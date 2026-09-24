@@ -50,6 +50,15 @@ const footerValues = (host: ReturnType<typeof footerHost>) =>
     'class="footer"'
   ).flatMap((t) => t.values);
 
+// The bootloader-step footer nests its optional button in a sub-template.
+const footerValuesDeep = (host: ReturnType<typeof footerHost>) => {
+  const values: unknown[] = [];
+  visitTemplates(renderFooter(host as unknown as ESPHomeFirmwareInstallDialog), (t) =>
+    values.push(...t.values)
+  );
+  return values;
+};
+
 describe("firmware-install-dialog footer", () => {
   it.each(["rp2-bootsel", "rp2-wait"])(
     "offers Close, Reset Device and Flash on the %s step with WebUSB",
@@ -57,7 +66,7 @@ describe("firmware-install-dialog footer", () => {
       isWebUsbSupported.mockReturnValue(true);
       const host = footerHost(step);
       host._installer = "rp2-uf2";
-      const values = footerValues(host);
+      const values = footerValuesDeep(host);
       expect(values).toContain(host._close);
       expect(values).toContain(host._rp2DoReset);
       expect(values).toContain(host._rp2DoFlash);
@@ -70,7 +79,7 @@ describe("firmware-install-dialog footer", () => {
     isWebUsbSupported.mockReturnValue(false);
     const host = footerHost("rp2-bootsel");
     host._installer = "rp2-uf2";
-    const values = footerValues(host);
+    const values = footerValuesDeep(host);
     expect(values).toContain(host._rp2DoReset);
     expect(values).toContain(host._rp2DoDownload);
     expect(values).not.toContain(host._rp2DoFlash);

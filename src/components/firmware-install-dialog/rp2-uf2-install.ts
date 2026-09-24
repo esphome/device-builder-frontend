@@ -47,9 +47,7 @@ export async function startRp2Uf2Install(
     return;
   }
 
-  const uf2 =
-    binaries.find((b) => b.type === "uf2") ??
-    binaries.find((b) => b.file.endsWith(".uf2"));
+  const uf2 = binaries.find((b) => b.type === "uf2");
   if (!uf2) {
     host._fail(host._localize("firmware.rp2_no_uf2"));
     return;
@@ -77,7 +75,12 @@ export async function startRp2Uf2Install(
     }
     return;
   }
-  host._rp2Uf2File = uf2.file;
+  // The only artifact this flow hands out; the download step reads it from here.
+  host._binaries = [uf2];
+  showBootselStep(host);
+}
+
+function showBootselStep(host: ESPHomeFirmwareInstallDialog): void {
   host._step = "rp2-bootsel";
   host._statusMessage = host._localize("firmware.rp2_bootsel_title");
 }
@@ -94,8 +97,7 @@ export function retryRp2Uf2(
   host._errorMessage = "";
   host._flashPercent = 0;
   host._flashBusy = false;
-  host._step = "rp2-bootsel";
-  host._statusMessage = host._localize("firmware.rp2_bootsel_title");
+  showBootselStep(host);
 }
 
 /** Step 1: 1200-baud touch into BOOTSEL. Runs from a button click (user gesture). */
@@ -116,7 +118,10 @@ export async function rp2DoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     await resetToBootloader(port);
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize("firmware.rp2_connect_failed"), getErrorMessage(err));
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        getErrorMessage(err)
+      );
     }
     return;
   } finally {
@@ -134,12 +139,8 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const device = host._device;
   const stillCurrent = () => host._device === device && host._rp2Image === image;
   host._flashBusy = true;
-  let dev: Awaited<ReturnType<typeof openPicoboot>>;
-  try {
-    dev = await openPicoboot(host, stillCurrent);
-  } finally {
-    if (stillCurrent()) host._flashBusy = false;
-  }
+  const dev = await openPicoboot(host, stillCurrent);
+  if (stillCurrent()) host._flashBusy = false;
   if (!dev || !stillCurrent()) return;
 
   host._step = "flashing";
@@ -186,7 +187,10 @@ async function openPicoboot(
     usb = await requestPicobootDevice();
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize("firmware.rp2_connect_failed"), getErrorMessage(err));
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        getErrorMessage(err)
+      );
     }
     return null;
   }
@@ -209,7 +213,7 @@ async function openPicoboot(
         host._localize(
           isUsbAccessDenied(err)
             ? "firmware.rp2_usb_access_denied"
-            : "firmware.rp2_connect_failed"
+            : "firmware.browser_flash_connect_failed"
         ),
         getErrorMessage(err)
       );
@@ -220,6 +224,7 @@ async function openPicoboot(
 
 /** Step 2 without WebUSB: save the UF2 for a manual copy onto the RPI-RP2 drive. */
 export function rp2DoDownload(host: ESPHomeFirmwareInstallDialog): void {
-  if (!host._rp2Uf2File || host._flashBusy) return;
-  void downloadSelectedBinary(host, host._rp2Uf2File);
+  const file = host._binaries[0]?.file;
+  if (!file || host._flashBusy) return;
+  void downloadSelectedBinary(host, file);
 }

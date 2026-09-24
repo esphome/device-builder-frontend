@@ -1,5 +1,6 @@
 import { unzipSync } from "fflate";
 
+import { concat, int32LE } from "./bytes.js";
 import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 
@@ -138,21 +139,6 @@ export function crc16Nordic(data: Uint8Array): number {
 }
 
 // ── Packet helpers ────────────────────────────────────────────────────────────
-
-function int32LE(v: number): Uint8Array {
-  return new Uint8Array([v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff]);
-}
-
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const len = arrays.reduce((s, a) => s + a.length, 0);
-  const out = new Uint8Array(len);
-  let off = 0;
-  for (const a of arrays) {
-    out.set(a, off);
-    off += a.length;
-  }
-  return out;
-}
 
 const HCI_PACKET_TYPE = 14;
 const DATA_INTEGRITY_PRESENT = 1;
@@ -365,8 +351,6 @@ class DfuSession {
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
-
-export { resetToBootloader } from "./serial-bootloader-touch.js";
 
 /**
  * Run the full DFU sequence on a closed port (opened at 115200, closed after).

@@ -4,7 +4,9 @@
  * container, group the pages into contiguous address ranges, and check the
  * family id against what the caller can flash.
  */
-export const UF2_BLOCK_SIZE = 512;
+import { concat } from "./bytes.js";
+
+const UF2_BLOCK_SIZE = 512;
 export const UF2_MAGIC_START0 = 0x0a324655;
 export const UF2_MAGIC_START1 = 0x9e5d5157;
 export const UF2_MAGIC_END = 0x0ab16f30;
@@ -14,21 +16,16 @@ const UF2_MAX_PAYLOAD = 476;
 
 export const UF2_FAMILY_RP2040 = 0xe48bff56;
 export const UF2_FAMILY_RP2350_ARM_S = 0xe48bff59;
-export const UF2_FAMILY_RP2350_RISCV = 0xe48bff5a;
 
 export interface Uf2Block {
-  flags: number;
   targetAddr: number;
-  payloadSize: number;
-  blockNo: number;
-  numBlocks: number;
   familyId: number | null;
   data: Uint8Array;
 }
 
 export interface Uf2Range {
   address: number;
-  data: Uint8Array;
+  data: Uint8Array<ArrayBuffer>;
 }
 
 export interface Uf2Image {
@@ -37,13 +34,14 @@ export interface Uf2Image {
   totalBytes: number;
 }
 
-export const formatFamilyId = (id: number | null): string =>
-  id === null ? "none" : `0x${id.toString(16).padStart(8, "0")}`;
-
 /** The image targets a chip family the caller can't flash. */
 export class Uf2FamilyError extends Error {
   constructor(readonly familyId: number | null) {
-    super(`UF2 family ${formatFamilyId(familyId)} is not supported`);
+    super(
+      `UF2 family ${
+        familyId === null ? "none" : `0x${familyId.toString(16).padStart(8, "0")}`
+      } is not supported`
+    );
     this.name = "Uf2FamilyError";
   }
 }
@@ -77,11 +75,7 @@ export function parseUf2Blocks(bytes: Uint8Array): Uf2Block[] {
     }
     if (flags & UF2_FLAG_NOT_MAIN_FLASH) continue;
     blocks.push({
-      flags,
       targetAddr: view.getUint32(off + 12, true),
-      payloadSize,
-      blockNo: view.getUint32(off + 20, true),
-      numBlocks,
       familyId:
         flags & UF2_FLAG_FAMILY_ID_PRESENT ? view.getUint32(off + 28, true) : null,
       data: bytes.subarray(off + 32, off + 32 + payloadSize),
@@ -107,15 +101,7 @@ export function blocksToRanges(blocks: Uf2Block[]): Uf2Range[] {
       runs.push({ address: b.targetAddr, parts: [b.data], length: b.data.length });
     }
   }
-  return runs.map((run) => {
-    const data = new Uint8Array(run.length);
-    let off = 0;
-    for (const part of run.parts) {
-      data.set(part, off);
-      off += part.length;
-    }
-    return { address: run.address, data };
-  });
+  return runs.map((run) => ({ address: run.address, data: concat(...run.parts) }));
 }
 
 /**

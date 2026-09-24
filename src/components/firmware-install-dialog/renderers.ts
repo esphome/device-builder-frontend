@@ -241,8 +241,7 @@ function renderDownloadReadyExtra(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
-  // rp2-uf2: the UF2 is the only format that flow hands out.
-  if (host._installer === "web-flash" || host._installer === "rp2-uf2") return nothing;
+  if (host._installer === "web-flash") return nothing;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return host._binaries.length > 1
@@ -320,6 +319,38 @@ export function renderLogs(
   `;
 }
 
+interface FooterAction {
+  onClick: () => void;
+  labelKey: string;
+}
+
+// The two-step bootloader hand-offs: nRF gets one primary per step; the Pico
+// keeps Reset beside the write on both steps (a touch on the wrong serial port
+// "succeeds" silently, and a blank Pico skips it), and the write is a UF2
+// download where WebUSB is missing.
+function bootloaderStepActions(
+  host: ESPHomeFirmwareInstallDialog
+): { primary: FooterAction; secondary?: FooterAction } | null {
+  const reset = "firmware.browser_flash_reset_action";
+  const flash = "firmware.browser_flash_action";
+  switch (host._step) {
+    case "nrf-reset":
+      return { primary: { onClick: host._nrfDoReset, labelKey: reset } };
+    case "nrf-wait":
+      return { primary: { onClick: host._nrfDoFlash, labelKey: flash } };
+    case "rp2-bootsel":
+    case "rp2-wait":
+      return {
+        secondary: { onClick: host._rp2DoReset, labelKey: reset },
+        primary: isWebUsbSupported()
+          ? { onClick: host._rp2DoFlash, labelKey: flash }
+          : { onClick: host._rp2DoDownload, labelKey: "firmware.rp2_download_action" },
+      };
+    default:
+      return null;
+  }
+}
+
 export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   if (host._step === "choose-binary" || host._step === "downloading") {
     // Compile is done and the byte fetch can't be cancelled, so offer Close
@@ -332,51 +363,31 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  if (host._step === "nrf-reset" || host._step === "nrf-wait") {
-    const isReset = host._step === "nrf-reset";
+  const bootloader = bootloaderStepActions(host);
+  if (bootloader) {
+    const { primary, secondary } = bootloader;
     return html`
       <div class="footer">
         <button class="btn btn--ghost" @click=${host._close}>
           ${host._localize("command.close")}
         </button>
+        ${
+          secondary
+            ? html`<button
+                class="btn btn--ghost"
+                ?disabled=${host._flashBusy}
+                @click=${secondary.onClick}
+              >
+                ${host._localize(secondary.labelKey)}
+              </button>`
+            : nothing
+        }
         <button
           class="btn btn--primary"
           ?disabled=${host._flashBusy}
-          @click=${isReset ? host._nrfDoReset : host._nrfDoFlash}
+          @click=${primary.onClick}
         >
-          ${host._localize(
-            isReset
-              ? "firmware.browser_flash_reset_action"
-              : "firmware.browser_flash_action"
-          )}
-        </button>
-      </div>
-    `;
-  }
-  if (host._step === "rp2-bootsel" || host._step === "rp2-wait") {
-    // Reset stays available on both steps: a touch on the wrong serial port
-    // "succeeds" silently. A blank Pico skips it (BOOTSEL held at plug-in).
-    const canFlash = isWebUsbSupported();
-    return html`
-      <div class="footer">
-        <button class="btn btn--ghost" @click=${host._close}>
-          ${host._localize("command.close")}
-        </button>
-        <button
-          class="btn btn--ghost"
-          ?disabled=${host._flashBusy}
-          @click=${host._rp2DoReset}
-        >
-          ${host._localize("firmware.browser_flash_reset_action")}
-        </button>
-        <button
-          class="btn btn--primary"
-          ?disabled=${host._flashBusy}
-          @click=${canFlash ? host._rp2DoFlash : host._rp2DoDownload}
-        >
-          ${host._localize(
-            canFlash ? "firmware.browser_flash_action" : "firmware.rp2_download_action"
-          )}
+          ${host._localize(primary.labelKey)}
         </button>
       </div>
     `;

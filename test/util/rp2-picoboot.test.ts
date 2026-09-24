@@ -96,7 +96,9 @@ class FakeUsbDevice {
   }
   async transferOut(ep: number, data: BufferSource) {
     const bytes =
-      data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer);
+      data instanceof ArrayBuffer
+        ? new Uint8Array(data)
+        : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     const t: Transfer = { kind: "out", ep, data: bytes };
     this.log.push(t);
     this.maybeFail(t);
