@@ -118,15 +118,26 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
+  // Stop / close doesn't abort the DFU session (there's no job to cancel and
+  // the serial write can't be interrupted safely), so the flash runs to
+  // completion in the background. The dialog instance is reused: only report
+  // back if it still shows this install and hasn't been closed or restarted.
+  // A retry re-parses the package, so the package identity distinguishes a
+  // restarted install on the same device too.
+  const device = host._device;
+  const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
   try {
     const { flashDfuPackage } = await loadDfuEngine();
     await flashDfuPackage(port, pkg, (percent) => {
-      host._flashPercent = percent;
+      if (stillCurrent()) host._flashPercent = percent;
     });
   } catch (err) {
-    host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));
+    if (stillCurrent()) {
+      host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));
+    }
     return;
   }
+  if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
   host._step = "done";
 }

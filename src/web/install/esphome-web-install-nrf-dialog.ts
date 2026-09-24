@@ -42,6 +42,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // Rounded so the per-packet progress callbacks only re-render on a visible change.
   @state() private _progress = 0;
   @state() private _errorMessage = "";
+  // True while the Continue step's port picker is open, so a second click
+  // can't fire another requestPort() that the browser would reject.
+  @state() private _picking = false;
 
   private _pkg: DfuPackage | null = null;
 
@@ -60,6 +63,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._file = null;
     this._progress = 0;
     this._errorMessage = "";
+    this._picking = false;
     this._pkg = null;
   }
 
@@ -79,12 +83,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       return;
     }
 
-    const [zipBytes, { parseDfuPackage, resetToBootloader }] = await Promise.all([
-      this._file.arrayBuffer(),
-      loadDfuEngine(),
-    ]);
+    let resetToBootloader: Awaited<ReturnType<typeof loadDfuEngine>>["resetToBootloader"];
     try {
-      this._pkg = parseDfuPackage(new Uint8Array(zipBytes));
+      // The file read and the engine chunk load can both fail (a revoked
+      // file handle, a stale chunk after a deploy); surface them like a bad package.
+      const [zipBytes, engine] = await Promise.all([
+        this._file.arrayBuffer(),
+        loadDfuEngine(),
+      ]);
+      resetToBootloader = engine.resetToBootloader;
+      this._pkg = engine.parseDfuPackage(new Uint8Array(zipBytes));
     } catch (err) {
       this._fail(
         this._localize("web.nrf.install_error_bad_package", {
@@ -111,14 +119,17 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
   private async _continueFlash(): Promise<void> {
     const pkg = this._pkg;
-    if (!pkg) return;
+    if (!pkg || this._picking) return;
 
     let port: SerialPort | null;
+    this._picking = true;
     try {
       port = await requestSerialPort();
     } catch (err) {
       this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
       return;
+    } finally {
+      this._picking = false;
     }
     if (!port) return;
 
@@ -218,7 +229,11 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
         `;
       case "waiting":
         return html`
-          <wa-button variant="brand" @click=${this._continueFlash}>
+          <wa-button
+            variant="brand"
+            ?disabled=${this._picking}
+            @click=${this._continueFlash}
+          >
             ${this._localize("onboarding.wizard.continue")}
           </wa-button>
         `;
