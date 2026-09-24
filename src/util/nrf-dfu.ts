@@ -163,6 +163,8 @@ const DFU_STOP_DATA_PACKET = 5;
 const DFU_PACKET_MAX_SIZE = 512;
 const ACK_TIMEOUT_MS = 1000;
 const MAX_SEND_ATTEMPTS = 3;
+// Upper bound on stream teardown so a dead device can't hold the port open.
+const STREAM_TEARDOWN_TIMEOUT_MS = 2000;
 // adafruit-nrfutil's FLASH_PAGE_WRITE_TIME / FLASH_PAGE_ERASE_TIME per 4 KiB page.
 const PAGE_WRITE_MS = (4096 / 4) * 0.0001 * 1000;
 const PAGE_ERASE_MS = 89.7;
@@ -328,10 +330,16 @@ class DfuSession {
 
   async close(): Promise<void> {
     this.active = false;
-    // Best effort: a dead port rejects these, and after an abort a stalled
-    // write would keep them pending, so don't wait on them then.
-    const settled = Promise.allSettled([this.reader.cancel(), this.writer.close()]);
-    await Promise.race([settled, this.aborted.catch(() => {})]);
+    // On abort, error the writable ourselves (which also rejects the in-flight
+    // write) rather than closing it: port.close() aborts a still-writable
+    // stream with its own "The port is closed." reason and drops that
+    // promise, which surfaces as an unhandled rejection.
+    const writer = this.signal?.aborted
+      ? this.writer.abort(this.signal.reason)
+      : this.writer.close();
+    // Best effort: a dead port rejects these or never settles them.
+    const settled = Promise.allSettled([this.reader.cancel(), writer]);
+    await Promise.race([settled, sleep(STREAM_TEARDOWN_TIMEOUT_MS)]);
     this.reader.releaseLock();
     this.writer.releaseLock();
   }

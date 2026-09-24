@@ -178,8 +178,16 @@ describe("flashDfuPackage", () => {
       open: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
       readable: new ReadableStream<Uint8Array>(),
-      // A write that never completes, as when the device is unplugged mid-flash.
-      writable: new WritableStream<Uint8Array>({ write: () => new Promise(() => {}) }),
+      // A write that only settles when the stream is aborted, as Chromium's
+      // serial sink does when the device is unplugged mid-flash.
+      writable: new WritableStream<Uint8Array>({
+        write: (_chunk, controller) =>
+          new Promise<void>((_, reject) => {
+            controller.signal.addEventListener("abort", () =>
+              reject(controller.signal.reason)
+            );
+          }),
+      }),
     } as unknown as SerialPort;
     const pkg = {
       parts: [
