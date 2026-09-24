@@ -7,6 +7,12 @@
  * Stop button mid-download.
  */
 import { describe, expect, it, vi } from "vitest";
+
+const { isWebUsbSupported } = vi.hoisted(() => ({
+  isWebUsbSupported: vi.fn(() => true),
+}));
+vi.mock("../../src/util/web-usb.js", () => ({ isWebUsbSupported }));
+
 import { identityLocalize } from "../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";
 import type {
@@ -29,6 +35,12 @@ function footerHost(step: string) {
     _tryChangeBoard: vi.fn(),
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),
+    _flashBusy: false,
+    _nrfDoReset: vi.fn(),
+    _nrfDoFlash: vi.fn(),
+    _rp2DoReset: vi.fn(),
+    _rp2DoFlash: vi.fn(),
+    _rp2DoDownload: vi.fn(),
   };
 }
 
@@ -39,6 +51,37 @@ const footerValues = (host: ReturnType<typeof footerHost>) =>
   ).flatMap((t) => t.values);
 
 describe("firmware-install-dialog footer", () => {
+  it.each(["rp2-bootsel", "rp2-wait"])(
+    "offers Close, Reset Device and Flash on the %s step with WebUSB",
+    (step) => {
+      isWebUsbSupported.mockReturnValue(true);
+      const host = footerHost(step);
+      host._installer = "rp2-uf2";
+      const values = footerValues(host);
+      expect(values).toContain(host._close);
+      expect(values).toContain(host._rp2DoReset);
+      expect(values).toContain(host._rp2DoFlash);
+      expect(values).not.toContain(host._rp2DoDownload);
+      expect(values).not.toContain(host._cancel);
+    }
+  );
+
+  it("swaps Flash for Download UF2 without WebUSB (Firefox)", () => {
+    isWebUsbSupported.mockReturnValue(false);
+    const host = footerHost("rp2-bootsel");
+    host._installer = "rp2-uf2";
+    const values = footerValues(host);
+    expect(values).toContain(host._rp2DoReset);
+    expect(values).toContain(host._rp2DoDownload);
+    expect(values).not.toContain(host._rp2DoFlash);
+  });
+
+  it("offers Retry on a Pico flash failure", () => {
+    const host = footerHost("error");
+    host._installer = "rp2-uf2";
+    expect(footerValues(host)).toContain(host._retry);
+  });
+
   it.each(["choose-binary", "downloading"])(
     "offers Close and not Stop on the %s step",
     (step) => {

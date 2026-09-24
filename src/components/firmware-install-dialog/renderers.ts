@@ -6,6 +6,7 @@ import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { isWebUsbSupported } from "../../util/web-usb.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   renderOffloadHint,
@@ -112,6 +113,8 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
     case "downloading":
     case "nrf-reset":
     case "nrf-wait":
+    case "rp2-bootsel":
+    case "rp2-wait":
       return "running";
     default:
       // Exhaustive: adding an InstallStep without mapping it here is a
@@ -123,6 +126,9 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
 function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
     return host._localize("firmware.usb_built_title");
+  }
+  if (host._installer === "rp2-uf2") {
+    return host._localize("firmware.rp2_uf2_download_done_title");
   }
   // binary-download
   const isElf = host._downloadedFilename.endsWith(".elf");
@@ -138,8 +144,11 @@ function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
     if (host._errorMessage) return host._errorMessage;
     return host._localize("firmware.usb_built_body", { host: FLASHER_HOST });
   }
-  // binary-download
   const filename = host._downloadedFilename;
+  if (host._installer === "rp2-uf2") {
+    return host._localize("firmware.rp2_uf2_download_done_body", { filename });
+  }
+  // binary-download
   const isElf = filename.endsWith(".elf");
   return host._localize(
     isElf ? "firmware.elf_download_done_body" : "firmware.binary_download_done_body",
@@ -162,6 +171,14 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (host._step === "download-ready") return downloadReadyDetail(host);
   if (host._step === "nrf-reset") return host._localize("firmware.nrf_step1_desc");
   if (host._step === "nrf-wait") return host._localize("firmware.nrf_step2_desc");
+  if (host._step === "rp2-bootsel" || host._step === "rp2-wait") {
+    // Without WebUSB the write is a UF2 download the user copies to the drive.
+    const base =
+      host._step === "rp2-bootsel"
+        ? "firmware.rp2_bootsel_desc"
+        : "firmware.rp2_wait_desc";
+    return host._localize(isWebUsbSupported() ? base : `${base}_download`);
+  }
   if (host._step === "error") return host._errorMessage;
   // Hidden tabs throttle timers, which can stall the Web Serial write and fail
   // the flash; there's no API to opt out, so warn the user to stay on the page.
@@ -224,7 +241,8 @@ function renderDownloadReadyExtra(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
-  if (host._installer === "web-flash") return nothing;
+  // rp2-uf2: the UF2 is the only format that flow hands out.
+  if (host._installer === "web-flash" || host._installer === "rp2-uf2") return nothing;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return host._binaries.length > 1
@@ -323,10 +341,42 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         </button>
         <button
           class="btn btn--primary"
-          ?disabled=${host._nrfBusy}
+          ?disabled=${host._flashBusy}
           @click=${isReset ? host._nrfDoReset : host._nrfDoFlash}
         >
-          ${host._localize(isReset ? "firmware.nrf_reset_action" : "firmware.nrf_flash_action")}
+          ${host._localize(
+            isReset
+              ? "firmware.browser_flash_reset_action"
+              : "firmware.browser_flash_action"
+          )}
+        </button>
+      </div>
+    `;
+  }
+  if (host._step === "rp2-bootsel" || host._step === "rp2-wait") {
+    // Reset stays available on both steps: a touch on the wrong serial port
+    // "succeeds" silently. A blank Pico skips it (BOOTSEL held at plug-in).
+    const canFlash = isWebUsbSupported();
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+        <button
+          class="btn btn--ghost"
+          ?disabled=${host._flashBusy}
+          @click=${host._rp2DoReset}
+        >
+          ${host._localize("firmware.browser_flash_reset_action")}
+        </button>
+        <button
+          class="btn btn--primary"
+          ?disabled=${host._flashBusy}
+          @click=${canFlash ? host._rp2DoFlash : host._rp2DoDownload}
+        >
+          ${host._localize(
+            canFlash ? "firmware.browser_flash_action" : "firmware.rp2_download_action"
+          )}
         </button>
       </div>
     `;

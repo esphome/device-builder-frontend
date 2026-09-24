@@ -37,6 +37,7 @@ import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import type { DfuPackage } from "../util/nrf-dfu.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
+import type { Uf2Image } from "../util/uf2.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
@@ -63,7 +64,19 @@ import {
   renderResetSuggestion,
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
+import {
+  retryRp2Uf2,
+  rp2DoDownload,
+  rp2DoFlash,
+  rp2DoReset,
+  startRp2Uf2Install,
+} from "./firmware-install-dialog/rp2-uf2-install.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import type {
+  Installer,
+  InstallFailureKind,
+  InstallStep,
+} from "./firmware-install-dialog/types.js";
 import {
   handOffToFlasher,
   startUsbFlash,
@@ -86,24 +99,11 @@ registerMdiIcons({
   "text-box-outline": mdiTextBoxOutline,
 });
 
-export type InstallStep =
-  | "connecting"
-  | "queued"
-  | "installing"
-  | "compiling"
-  | "flashing"
-  | "done"
-  | "choose-binary"
-  | "downloading"
-  | "download-ready"
-  | "nrf-reset"
-  | "nrf-wait"
-  | "error";
-
-export type Installer = "web-serial" | "binary-download" | "web-flash" | "nrf-dfu" | null;
-
-export type InstallFailureKind =
-  "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;
+export type {
+  InstallFailureKind,
+  Installer,
+  InstallStep,
+} from "./firmware-install-dialog/types.js";
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
@@ -217,10 +217,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _detected: DetectedChip | null = null;
 
   _nrfPkg: DfuPackage | null = null;
-  // Blocks a second requestPort() while a DFU step's picker is open.
-  @state() _nrfBusy = false;
-  // Aborts an in-flight DFU flash on teardown so the port is released.
-  _nrfAbort: AbortController | null = null;
+  _rp2Image: Uf2Image | null = null;
+  _rp2Uf2File = "";
+  // Blocks a second picker while a browser-flash step's picker is open.
+  @state() _flashBusy = false;
+  // Aborts an in-flight browser flash on teardown so the device is released.
+  _flashAbort: AbortController | null = null;
 
   static styles = [
     espHomeStyles,
@@ -239,14 +241,19 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startWebSerialInstall(this);
   }
 
+  // Shared prologue of the compile-first installers.
+  private _begin(device: ConfiguredDevice, installer: Installer) {
+    this._init(device);
+    this._installer = installer;
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+  }
+
   // "Flash via USB": compile + download the factory image here (logs/errors
   // visible), then land on the ready step. The flasher tab is opened only when
   // the user clicks Open USB flasher — never before a working image exists.
   installUsbFlash(device: ConfiguredDevice) {
-    this._init(device);
-    this._installer = "web-flash";
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
+    this._begin(device, "web-flash");
     void startUsbFlash(this);
   }
 
@@ -258,34 +265,33 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Compile + download with no opinion on how to flash. Always available so
   // users can plug into esptool.py / picotool / a UF2 mass-storage flow.
   installBinaryDownload(device: ConfiguredDevice) {
-    this._init(device);
-    this._installer = "binary-download";
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
+    this._begin(device, "binary-download");
     void startDownload(this);
   }
 
   installNrfDfu(device: ConfiguredDevice) {
-    this._init(device);
-    this._installer = "nrf-dfu";
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
+    this._begin(device, "nrf-dfu");
     void startNrfDfuInstall(this);
   }
 
-  // Footer button handlers: requestPort() needs a user gesture.
+  installRp2Uf2(device: ConfiguredDevice) {
+    this._begin(device, "rp2-uf2");
+    void startRp2Uf2Install(this);
+  }
+
+  // Footer button handlers: the port / device pickers need a user gesture.
   _nrfDoReset = () => void nrfDoReset(this);
   _nrfDoFlash = () => void nrfDoFlash(this);
+  _rp2DoReset = () => void rp2DoReset(this);
+  _rp2DoFlash = () => void rp2DoFlash(this);
+  _rp2DoDownload = () => rp2DoDownload(this);
 
   // Three-dot "Download" entry; compiles only when nothing is built.
   downloadArtifacts(device: ConfiguredDevice) {
-    this._init(device);
-    this._installer = "binary-download";
+    this._begin(device, "binary-download");
     this._title = this._localize("firmware.download_title", {
       name: device.friendly_name || device.name,
     });
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
     void startArtifactDownload(this);
   }
 
@@ -331,7 +337,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
     this._nrfPkg = null;
-    this._nrfBusy = false;
+    this._rp2Image = null;
+    this._rp2Uf2File = "";
+    this._flashBusy = false;
   }
 
   // Tear down active follow_job: client-side (drop local handler) and
@@ -348,8 +356,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       this._usbFlashTeardown();
       this._usbFlashTeardown = null;
     }
-    this._nrfAbort?.abort();
-    this._nrfAbort = null;
+    this._flashAbort?.abort();
+    this._flashAbort = null;
     if (this._streamId) {
       this._api.stopStream(this._streamId).catch(() => {});
       this._streamId = "";
@@ -485,6 +493,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     }
     if (this._installer === "web-flash") this.installUsbFlash(device);
     else if (this._installer === "nrf-dfu") retryNrfDfu(this, device);
+    else if (this._installer === "rp2-uf2") retryRp2Uf2(this, device);
     else this.installWebSerial(device);
   };
 

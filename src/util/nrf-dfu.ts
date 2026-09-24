@@ -366,11 +366,7 @@ class DfuSession {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** 1200-baud touch: the device re-enumerates as a DFU serial port. */
-export async function resetToBootloader(port: SerialPort): Promise<void> {
-  await port.open({ baudRate: 1200 });
-  await port.close();
-}
+export { resetToBootloader } from "./serial-bootloader-touch.js";
 
 /**
  * Run the full DFU sequence on a closed port (opened at 115200, closed after).

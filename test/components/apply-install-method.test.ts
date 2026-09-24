@@ -10,6 +10,7 @@ function deps() {
     installWebSerial: vi.fn(),
     installUsbFlash: vi.fn(),
     installBinaryDownload: vi.fn(),
+    installRp2Uf2: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;
   return { device, openInstall: vi.fn(), firmwareDialog };
 }
@@ -52,6 +53,13 @@ describe("applyInstallMethod", () => {
     expect(d.firmwareDialog.installUsbFlash).toHaveBeenCalledWith(device);
     expect(d.openInstall).not.toHaveBeenCalled();
     expect(d.firmwareDialog.installWebSerial).not.toHaveBeenCalled();
+  });
+
+  it("rp2-uf2 routes to the dialog's Pico flow", () => {
+    const d = deps();
+    applyInstallMethod("rp2-uf2", undefined, d);
+    expect(d.firmwareDialog.installRp2Uf2).toHaveBeenCalledWith(device);
+    expect(d.openInstall).not.toHaveBeenCalled();
   });
 
   it("binary-download routes to the firmware dialog", () => {

@@ -89,7 +89,7 @@ export function retryNrfDfu(
   }
   host._errorMessage = "";
   host._flashPercent = 0;
-  host._nrfBusy = false;
+  host._flashBusy = false;
   host._step = "nrf-reset";
   host._statusMessage = host._localize("firmware.nrf_step1_title");
 }
@@ -97,11 +97,11 @@ export function retryNrfDfu(
 /** Step 1: 1200-baud touch into DFU mode. Runs from a button click (user gesture). */
 export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const pkg = host._nrfPkg;
-  if (!pkg || host._nrfBusy) return;
+  if (!pkg || host._flashBusy) return;
   // The dialog is reused; only touch it if it still shows this install.
   const device = host._device;
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
-  host._nrfBusy = true;
+  host._flashBusy = true;
   host._statusMessage = host._localize("firmware.nrf_resetting");
   try {
     const port = await requestSerialPort();
@@ -118,7 +118,7 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     }
     return;
   } finally {
-    if (stillCurrent()) host._nrfBusy = false;
+    if (stillCurrent()) host._flashBusy = false;
   }
   if (!stillCurrent()) return;
   host._step = "nrf-wait";
@@ -128,14 +128,14 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
 /** Step 2: flash over the re-enumerated DFU port. Runs from a button click. */
 export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const pkg = host._nrfPkg;
-  if (!pkg || host._nrfBusy) return;
+  if (!pkg || host._flashBusy) return;
   // Teardown aborts the session, but the abort still lands here on a dialog
   // that may already show another install, so only report back to the same
   // one. A retry re-parses, so package identity covers a restart on the same
   // device.
   const device = host._device;
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
-  host._nrfBusy = true;
+  host._flashBusy = true;
   let port: SerialPort | null;
   try {
     port = await requestSerialPort();
@@ -145,14 +145,14 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     }
     return;
   } finally {
-    if (stillCurrent()) host._nrfBusy = false;
+    if (stillCurrent()) host._flashBusy = false;
   }
   if (!port || !stillCurrent()) return;
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
   const abort = new AbortController();
-  host._nrfAbort = abort;
+  host._flashAbort = abort;
   try {
     const { flashDfuPackageWithReconnect } = await loadDfuEngine();
     await flashDfuPackageWithReconnect(
@@ -176,7 +176,7 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     }
     return;
   } finally {
-    if (host._nrfAbort === abort) host._nrfAbort = null;
+    if (host._flashAbort === abort) host._flashAbort = null;
   }
   if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");

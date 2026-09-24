@@ -7,8 +7,8 @@
  * (`esphome run`) stays available, even on localhost where it's normally
  * collapsed into Web Serial.
  *
- * nRF52 is a special case: it doesn't get the esptool Web Serial row but
- * does get its own nRF DFU row when Web Serial is available.
+ * nRF52 and RP2 are special cases: they don't get the esptool Web Serial row
+ * but do get their own in-browser rows when Web Serial is available.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,12 +25,16 @@ import {
 } from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-async function mount(platform: string): Promise<ESPHomeInstallMethodDialog> {
+async function mount(
+  platform: string,
+  mode: "install" | "logs" = "install"
+): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {};
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = platform;
+  dialog.mode = mode;
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
@@ -44,6 +48,10 @@ const hasWebSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
 const hasNrfDfuRow = (d: ESPHomeInstallMethodDialog): boolean =>
   [...d.shadowRoot!.querySelectorAll(".option .title")].some(
     (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_nrf_dfu")
+  );
+const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
+  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
+    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_rp2_uf2")
   );
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
@@ -82,6 +90,25 @@ describe("install-method-dialog platform gating", () => {
     const d = await mount("nrf52");
     expect(hasWebSerialRow(d)).toBe(false);
     expect(hasNrfDfuRow(d)).toBe(true);
+    expect(hasRp2Row(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  // The Pico row needs only Web Serial (for the 1200-baud reset); WebUSB
+  // decides the write button inside the dialog, not the row.
+  it.each(["rp2", "rp2040", "rp2350"])("shows the Pico row for %s", async (platform) => {
+    const d = await mount(platform);
+    expect(hasRp2Row(d)).toBe(true);
+    expect(hasNrfDfuRow(d)).toBe(false);
+  });
+
+  it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
+    const d = await mount(platform);
+    expect(hasRp2Row(d)).toBe(false);
+  });
+
+  it("hides the Pico row in logs mode (flash-only)", async () => {
+    const d = await mount("rp2", "logs");
+    expect(hasRp2Row(d)).toBe(false);
   });
 });
