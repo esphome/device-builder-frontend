@@ -344,15 +344,17 @@ class DfuSession {
     onPercent(100);
   }
 
-  async close(): Promise<void> {
+  /**
+   * ``failure`` is the error that ended the flash, if any. Then the writable
+   * is errored with it (which also rejects the in-flight write) rather than
+   * closed: port.close() aborts a still-writable stream with its own "The
+   * port is closed." reason and drops that promise, which surfaces as an
+   * unhandled rejection. A clean finish has no write in flight, so close().
+   */
+  async close(failure?: unknown): Promise<void> {
     this.active = false;
-    // On abort, error the writable ourselves (which also rejects the in-flight
-    // write) rather than closing it: port.close() aborts a still-writable
-    // stream with its own "The port is closed." reason and drops that
-    // promise, which surfaces as an unhandled rejection.
-    const writer = this.signal?.aborted
-      ? this.writer.abort(this.signal.reason)
-      : this.writer.close();
+    const writer =
+      failure !== undefined ? this.writer.abort(failure) : this.writer.close();
     // Best effort: a dead port rejects these or never settles them.
     const settled = Promise.allSettled([this.reader.cancel(), writer]);
     await Promise.race([settled, sleep(STREAM_TEARDOWN_TIMEOUT_MS)]);
@@ -382,6 +384,7 @@ export async function flashDfuPackage(
 ): Promise<void> {
   await port.open({ baudRate: 115200 });
   let session: DfuSession | undefined;
+  let failure: unknown;
   try {
     session = new DfuSession(port, signal);
     for (let i = 0; i < pkg.parts.length; i++) {
@@ -415,11 +418,14 @@ export async function flashDfuPackage(
         onProgress(base + (pct * range) / 100);
       });
     }
+  } catch (err) {
+    failure = err;
+    throw err;
   } finally {
     // Both are best effort: the port must always be closed so a retry can
     // reopen it, and neither may replace the error that ended the flash.
     try {
-      await session?.close();
+      await session?.close(failure);
     } catch {
       // ignore
     }

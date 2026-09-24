@@ -50,6 +50,7 @@ import {
 import {
   nrfDoFlash,
   nrfDoReset,
+  retryNrfDfu,
   startNrfDfuInstall,
 } from "./firmware-install-dialog/nrf-dfu-install.js";
 import {
@@ -483,7 +484,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       if (!settled) return;
     }
     if (this._installer === "web-flash") this.installUsbFlash(device);
-    else if (this._installer === "nrf-dfu") this.installNrfDfu(device);
+    else if (this._installer === "nrf-dfu") retryNrfDfu(this, device);
     else this.installWebSerial(device);
   };
 

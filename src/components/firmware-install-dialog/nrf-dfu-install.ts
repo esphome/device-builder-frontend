@@ -2,6 +2,7 @@
  * nRF52 Nordic Legacy DFU install flow, split from install-flow.ts for the
  * line budget. The engine loads on demand so it stays out of the main chunk.
  */
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -61,6 +62,27 @@ export async function startNrfDfuInstall(
     return;
   }
 
+  host._step = "nrf-reset";
+  host._statusMessage = host._localize("firmware.nrf_step1_title");
+}
+
+/**
+ * Retry after a failed reset or flash (device dropped mid-transfer, wrong
+ * port picked). The package is still parsed, so skip the compile and go back
+ * to the DFU steps: the port was released on failure and the device is in
+ * the bootloader or back in the app, and step 1 handles either.
+ */
+export function retryNrfDfu(
+  host: ESPHomeFirmwareInstallDialog,
+  device: ConfiguredDevice
+): void {
+  if (!host._nrfPkg) {
+    host.installNrfDfu(device);
+    return;
+  }
+  host._errorMessage = "";
+  host._flashPercent = 0;
+  host._nrfBusy = false;
   host._step = "nrf-reset";
   host._statusMessage = host._localize("firmware.nrf_step1_title");
 }
