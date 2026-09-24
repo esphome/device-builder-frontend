@@ -100,26 +100,28 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
 export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const pkg = host._nrfPkg;
   if (!pkg || host._nrfBusy) return;
-  host._nrfBusy = true;
-  let port: SerialPort | null;
-  try {
-    port = await requestSerialPort();
-  } catch (err) {
-    host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
-    return;
-  } finally {
-    host._nrfBusy = false;
-  }
-  if (!port) return;
-  host._step = "flashing";
-  host._statusMessage = host._localize("firmware.status_flashing");
-  host._flashPercent = 0;
   // Teardown aborts the session, but the abort still lands here on a dialog
   // that may already show another install, so only report back to the same
   // one. A retry re-parses, so package identity covers a restart on the same
   // device.
   const device = host._device;
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
+  host._nrfBusy = true;
+  let port: SerialPort | null;
+  try {
+    port = await requestSerialPort();
+  } catch (err) {
+    if (stillCurrent()) {
+      host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
+    }
+    return;
+  } finally {
+    if (stillCurrent()) host._nrfBusy = false;
+  }
+  if (!port || !stillCurrent()) return;
+  host._step = "flashing";
+  host._statusMessage = host._localize("firmware.status_flashing");
+  host._flashPercent = 0;
   const abort = new AbortController();
   host._nrfAbort = abort;
   try {
