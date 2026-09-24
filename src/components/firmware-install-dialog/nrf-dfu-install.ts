@@ -42,12 +42,18 @@ export async function startNrfDfuInstall(
     bytes = new Uint8Array(
       await host._api.firmwareDownloadBytes(device.configuration, dfuBinary.file)
     );
-  } catch {
-    host._fail(host._localize("firmware.download_failed"));
+  } catch (err) {
+    host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
     return;
   }
 
-  const { parseDfuPackage } = await loadDfuEngine();
+  let parseDfuPackage: Awaited<ReturnType<typeof loadDfuEngine>>["parseDfuPackage"];
+  try {
+    ({ parseDfuPackage } = await loadDfuEngine());
+  } catch (err) {
+    host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
+    return;
+  }
   try {
     host._nrfPkg = parseDfuPackage(bytes);
   } catch (err) {
@@ -61,23 +67,31 @@ export async function startNrfDfuInstall(
 
 /** Step 1: 1200-baud touch into DFU mode. Runs from a button click (user gesture). */
 export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  if (!host._nrfPkg || host._nrfBusy) return;
+  const pkg = host._nrfPkg;
+  if (!pkg || host._nrfBusy) return;
+  // The dialog is reused; only touch it if it still shows this install.
+  const device = host._device;
+  const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
   host._nrfBusy = true;
   host._statusMessage = host._localize("firmware.nrf_resetting");
   try {
     const port = await requestSerialPort();
     if (!port) {
-      host._statusMessage = host._localize("firmware.nrf_step1_title");
+      if (stillCurrent())
+        host._statusMessage = host._localize("firmware.nrf_step1_title");
       return;
     }
     const { resetToBootloader } = await loadDfuEngine();
     await resetToBootloader(port);
   } catch (err) {
-    host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
+    if (stillCurrent()) {
+      host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
+    }
     return;
   } finally {
-    host._nrfBusy = false;
+    if (stillCurrent()) host._nrfBusy = false;
   }
+  if (!stillCurrent()) return;
   host._step = "nrf-wait";
   host._statusMessage = host._localize("firmware.nrf_step2_title");
 }

@@ -173,6 +173,26 @@ describe("flashDfuPackage", () => {
     expect(port.close).toHaveBeenCalled();
   });
 
+  it("fails fast with the read error when the port drops mid-flash", async () => {
+    const port = {
+      open: vi.fn(async () => {}),
+      close: vi.fn(async () => {}),
+      // The device vanishes: reads end immediately, writes still succeed.
+      readable: new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
+      writable: new WritableStream<Uint8Array>(),
+    } as unknown as SerialPort;
+    const pkg = {
+      parts: [
+        { type: "application" as const, mode: 4, bin: bytes(1, 2, 3), dat: bytes(0) },
+      ],
+    };
+
+    await expect(flashDfuPackage(port, pkg, () => {})).rejects.toThrow(
+      /Serial port closed/
+    );
+    expect(port.close).toHaveBeenCalled();
+  });
+
   it("interrupts a stalled write on abort", async () => {
     const port = {
       open: vi.fn(async () => {}),

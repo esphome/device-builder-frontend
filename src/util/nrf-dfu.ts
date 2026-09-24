@@ -202,15 +202,22 @@ class DfuSession {
   private rxBuf: number[] = [];
   private seqNum = 0;
   private resolveAck: ((ack: number) => void) | null = null;
+  private rejectAck: ((err: Error) => void) | null = null;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
   private active = true;
+  // Why the read loop stopped (device gone, port error). Fails the pending
+  // and later ACK waits right away instead of timing each one out.
+  private readEnded: Error | null = null;
 
   constructor(
     port: SerialPort,
     private readonly signal?: AbortSignal
   ) {
-    this.reader = port.readable!.getReader();
-    this.writer = port.writable!.getWriter();
+    if (!port.readable || !port.writable) {
+      throw new Error("Serial port has no readable / writable stream");
+    }
+    this.reader = port.readable.getReader();
+    this.writer = port.writable.getWriter();
     this.aborted = new Promise<never>((_, reject) => {
       if (!signal) return;
       if (signal.aborted) reject(signal.reason);
@@ -230,10 +237,14 @@ class DfuSession {
       let result: ReadableStreamReadResult<Uint8Array>;
       try {
         result = await this.reader.read();
-      } catch {
-        break;
+      } catch (err) {
+        this.endReads(err instanceof Error ? err : new Error(String(err)));
+        return;
       }
-      if (result.done || !result.value) break;
+      if (result.done || !result.value) {
+        this.endReads(new Error("Serial port closed"));
+        return;
+      }
       for (const b of result.value) {
         if (b !== SLIP_END) {
           this.rxBuf.push(b);
@@ -243,6 +254,11 @@ class DfuSession {
         this.rxBuf = [];
       }
     }
+  }
+
+  private endReads(err: Error): void {
+    this.readEnded = err;
+    this.rejectAck?.(err);
   }
 
   private onFrame(raw: number[]): void {
@@ -260,16 +276,16 @@ class DfuSession {
   }
 
   private waitAck(): Promise<number> {
+    if (this.readEnded) return Promise.reject(this.readEnded);
     const ack = new Promise<number>((resolve, reject) => {
       this.resolveAck = resolve;
-      this.ackTimer = setTimeout(() => {
-        this.resolveAck = null;
-        reject(new Error("ACK timeout"));
-      }, ACK_TIMEOUT_MS);
+      this.rejectAck = reject;
+      this.ackTimer = setTimeout(() => reject(new Error("ACK timeout")), ACK_TIMEOUT_MS);
     });
     return this.race(ack).finally(() => {
       if (this.ackTimer !== null) clearTimeout(this.ackTimer);
       this.resolveAck = null;
+      this.rejectAck = null;
     });
   }
 
@@ -283,7 +299,7 @@ class DfuSession {
         await this.waitAck();
         return;
       } catch (err) {
-        if (this.signal?.aborted) throw err;
+        if (this.signal?.aborted || this.readEnded) throw err;
         // Timed out; resend.
       }
     }
@@ -365,8 +381,9 @@ export async function flashDfuPackage(
   signal?: AbortSignal
 ): Promise<void> {
   await port.open({ baudRate: 115200 });
-  const session = new DfuSession(port, signal);
+  let session: DfuSession | undefined;
   try {
+    session = new DfuSession(port, signal);
     for (let i = 0; i < pkg.parts.length; i++) {
       const part = pkg.parts[i];
       const base = (i / pkg.parts.length) * 100;
@@ -399,7 +416,13 @@ export async function flashDfuPackage(
       });
     }
   } finally {
-    await session.close();
+    // Both are best effort: the port must always be closed so a retry can
+    // reopen it, and neither may replace the error that ended the flash.
+    try {
+      await session?.close();
+    } catch {
+      // ignore
+    }
     try {
       await port.close();
     } catch {
