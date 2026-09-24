@@ -172,4 +172,27 @@ describe("flashDfuPackage", () => {
     expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
     expect(port.close).toHaveBeenCalled();
   });
+
+  it("interrupts a stalled write on abort", async () => {
+    const port = {
+      open: vi.fn(async () => {}),
+      close: vi.fn(async () => {}),
+      readable: new ReadableStream<Uint8Array>(),
+      // A write that never completes, as when the device is unplugged mid-flash.
+      writable: new WritableStream<Uint8Array>({ write: () => new Promise(() => {}) }),
+    } as unknown as SerialPort;
+    const pkg = {
+      parts: [
+        { type: "application" as const, mode: 4, bin: bytes(1, 2, 3), dat: bytes(0) },
+      ],
+    };
+    const abort = new AbortController();
+
+    const flash = flashDfuPackage(port, pkg, () => {}, abort.signal);
+    await new Promise((r) => setTimeout(r, 10));
+    abort.abort();
+
+    await expect(flash).rejects.toMatchObject({ name: "AbortError" });
+    expect(port.close).toHaveBeenCalled();
+  });
 });

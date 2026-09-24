@@ -193,6 +193,10 @@ export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
 class DfuSession {
   private readonly reader: ReadableStreamDefaultReader<Uint8Array>;
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
+  // Rejects on abort, never settles otherwise. Raced against every wait: an
+  // in-flight stream write can't be interrupted (device unplugged mid-flash),
+  // so the abort must win the race instead of the stream.
+  private readonly aborted: Promise<never>;
   private rxBuf: number[] = [];
   private seqNum = 0;
   private resolveAck: ((ack: number) => void) | null = null;
@@ -205,7 +209,18 @@ class DfuSession {
   ) {
     this.reader = port.readable!.getReader();
     this.writer = port.writable!.getWriter();
+    this.aborted = new Promise<never>((_, reject) => {
+      if (!signal) return;
+      if (signal.aborted) reject(signal.reason);
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+    this.aborted.catch(() => {});
     void this.readLoop();
+  }
+
+  private race<T>(p: Promise<T>): Promise<T> {
+    p.catch(() => {}); // Losing the race must not surface as unhandled.
+    return Promise.race([p, this.aborted]);
   }
 
   private async readLoop(): Promise<void> {
@@ -243,12 +258,16 @@ class DfuSession {
   }
 
   private waitAck(): Promise<number> {
-    return new Promise<number>((resolve, reject) => {
+    const ack = new Promise<number>((resolve, reject) => {
       this.resolveAck = resolve;
       this.ackTimer = setTimeout(() => {
         this.resolveAck = null;
         reject(new Error("ACK timeout"));
       }, ACK_TIMEOUT_MS);
+    });
+    return this.race(ack).finally(() => {
+      if (this.ackTimer !== null) clearTimeout(this.ackTimer);
+      this.resolveAck = null;
     });
   }
 
@@ -257,12 +276,12 @@ class DfuSession {
     const pkt = buildHciPacket(data, this.seqNum);
 
     for (let attempt = 0; attempt < MAX_SEND_ATTEMPTS; attempt++) {
-      this.signal?.throwIfAborted();
-      await this.writer.write(pkt);
+      await this.race(this.writer.write(pkt));
       try {
         await this.waitAck();
         return;
-      } catch {
+      } catch (err) {
+        if (this.signal?.aborted) throw err;
         // Timed out; resend.
       }
     }
@@ -285,7 +304,7 @@ class DfuSession {
     await this.sendPacket(frame);
     const totalSize = sdSize + blSize + appSize;
     const eraseMs = Math.max(500, (Math.floor(totalSize / 4096) + 1) * PAGE_ERASE_MS);
-    await sleep(eraseMs);
+    await this.race(sleep(eraseMs));
   }
 
   async sendInitPacket(dat: Uint8Array): Promise<void> {
@@ -299,18 +318,20 @@ class DfuSession {
       const chunk = bin.subarray(i * DFU_PACKET_MAX_SIZE, (i + 1) * DFU_PACKET_MAX_SIZE);
       await this.sendPacket(concat(int32LE(DFU_DATA_PACKET), chunk));
       onPercent(Math.floor(((i + 1) / chunkCount) * 100));
-      if (i > 0 && i % 8 === 0) await sleep(PAGE_WRITE_MS);
+      if (i > 0 && i % 8 === 0) await this.race(sleep(PAGE_WRITE_MS));
     }
 
-    await sleep(PAGE_WRITE_MS);
+    await this.race(sleep(PAGE_WRITE_MS));
     await this.sendPacket(int32LE(DFU_STOP_DATA_PACKET));
     onPercent(100);
   }
 
   async close(): Promise<void> {
     this.active = false;
-    // Best effort: a dead port rejects these.
-    await Promise.allSettled([this.reader.cancel(), this.writer.close()]);
+    // Best effort: a dead port rejects these, and after an abort a stalled
+    // write would keep them pending, so don't wait on them then.
+    const settled = Promise.allSettled([this.reader.cancel(), this.writer.close()]);
+    await Promise.race([settled, this.aborted.catch(() => {})]);
     this.reader.releaseLock();
     this.writer.releaseLock();
   }
