@@ -18,9 +18,8 @@ const MODES: { mode: WebMode; logo: string; labelKey: string }[] = [
 ];
 
 /**
- * ESPHome Web top bar. On the right sits a segmented control for choosing
- * the active device family (ESP / Raspberry Pi / nRF52), hidden entirely on
- * browsers without Web Serial and in flash-receiver mode.
+ * ESPHome Web top bar. The device-family picker on the right is hidden
+ * without Web Serial and in flash-receiver mode.
  */
 @customElement("esphome-web-header")
 export class ESPHomeWebHeader extends LitElement {
@@ -60,8 +59,7 @@ export class ESPHomeWebHeader extends LitElement {
                 >
                   ${MODES.map(({ mode, logo, labelKey }) => {
                     const label = this._localize(labelKey);
-                    // Below 870px the text label is display:none and the logo
-                    // has no alt, so the button needs its own accessible name.
+                    // Below 870px the label is display:none, so the button needs its own name.
                     return html`
                       <button
                         class=${classMap({ "mode-btn": true, active: this.mode === mode })}
@@ -149,7 +147,6 @@ export class ESPHomeWebHeader extends LitElement {
         flex: 1;
       }
 
-      /* Segmented device-family picker */
       .mode-picker {
         display: inline-flex;
         flex-shrink: 0;

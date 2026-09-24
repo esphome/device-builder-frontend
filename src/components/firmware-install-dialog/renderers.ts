@@ -314,8 +314,6 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  // The two nRF DFU hand-off steps share one footer: Close plus the
-  // user-gesture button that opens the port picker for that step.
   if (host._step === "nrf-reset" || host._step === "nrf-wait") {
     const isReset = host._step === "nrf-reset";
     return html`

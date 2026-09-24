@@ -15,7 +15,7 @@ export interface DfuPackage {
   parts: DfuFirmwarePart[];
 }
 
-/** Overall flash progress across every part of the package, 0-100. */
+/** 0-100 across every part of the package. */
 export type DfuProgressCallback = (percent: number) => void;
 
 const DFU_MODE_SD = 1;
@@ -163,10 +163,8 @@ const DFU_STOP_DATA_PACKET = 5;
 const DFU_PACKET_MAX_SIZE = 512;
 const ACK_TIMEOUT_MS = 1000;
 const MAX_SEND_ATTEMPTS = 3;
-// adafruit-nrfutil's FLASH_PAGE_WRITE_TIME: a 4 KiB page of 4-byte words at
-// 0.1 µs per word, paced after every 8 data packets (one page).
+// adafruit-nrfutil's FLASH_PAGE_WRITE_TIME / FLASH_PAGE_ERASE_TIME per 4 KiB page.
 const PAGE_WRITE_MS = (4096 / 4) * 0.0001 * 1000;
-// adafruit-nrfutil's FLASH_PAGE_ERASE_TIME per 4 KiB page.
 const PAGE_ERASE_MS = 89.7;
 
 export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
@@ -227,14 +225,13 @@ class DfuSession {
     }
   }
 
-  /** Settle the pending ACK wait with the sequence number a SLIP frame carries. */
   private onFrame(raw: number[]): void {
     if (raw.length < 2 || !this.resolveAck) return;
     let decoded: Uint8Array;
     try {
       decoded = slipDecode(new Uint8Array(raw));
     } catch {
-      return; // Malformed frame: ignore and keep waiting.
+      return; // Malformed frame; keep waiting.
     }
     if (decoded.length === 0) return;
     if (this.ackTimer !== null) clearTimeout(this.ackTimer);
@@ -262,7 +259,7 @@ class DfuSession {
         await this.waitAck();
         return;
       } catch {
-        // ACK timeout: resend the same packet.
+        // Timed out; resend.
       }
     }
     throw new Error(`Failed to receive ACK after ${MAX_SEND_ATTEMPTS} attempts`);
@@ -308,8 +305,7 @@ class DfuSession {
 
   async close(): Promise<void> {
     this.active = false;
-    // Best effort: a port that already errored rejects these, and releaseLock
-    // is safe once the stream is cancelled / closed.
+    // Best effort: a dead port rejects these.
     await Promise.allSettled([this.reader.cancel(), this.writer.close()]);
     this.reader.releaseLock();
     this.writer.releaseLock();
@@ -318,19 +314,13 @@ class DfuSession {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Trigger the nRF52 DFU bootloader by opening at 1200 baud and immediately
- * closing. The device re-enumerates as a DFU serial port after a short delay.
- */
+/** 1200-baud touch: the device re-enumerates as a DFU serial port. */
 export async function resetToBootloader(port: SerialPort): Promise<void> {
   await port.open({ baudRate: 1200 });
   await port.close();
 }
 
-/**
- * Flash a parsed DFU package to a closed serial port.
- * Opens the port at 115200 baud, runs the full DFU sequence, then closes it.
- */
+/** Run the full DFU sequence on a closed port (opened at 115200, closed after). */
 export async function flashDfuPackage(
   port: SerialPort,
   pkg: DfuPackage,

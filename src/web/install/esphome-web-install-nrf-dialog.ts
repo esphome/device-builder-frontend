@@ -16,18 +16,13 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | "error";
 
-// The DFU engine (and its zip parser) only loads once a user starts an
-// install, so ESP / Pico visitors never download it.
+// Loaded on demand so ESP / Pico visitors never download the engine.
 const loadDfuEngine = () => import("../../util/nrf-dfu.js");
 
 /**
- * Two-step nRF52 DFU install dialog:
- * 1. User picks a DFU ZIP and clicks Install → port opened at 1200 baud to
- *    trigger bootloader, then user is asked to click Continue.
- * 2. Continue → port opened at 115200 for actual DFU flashing.
- *
- * Each ``requestPort()`` runs directly from its own button click, as Web
- * Serial requires a user gesture per picker.
+ * Two-step nRF52 DFU install: 1200-baud reset, then flash over the
+ * re-enumerated DFU port. Each requestPort() runs from its own button click
+ * (user-gesture requirement).
  */
 @customElement("esphome-web-install-nrf-dialog")
 export class ESPHomeWebInstallNrfDialog extends LitElement {
@@ -39,11 +34,10 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
   @state() private _state: InstallState = "idle";
   @state() private _file: File | null = null;
-  // Rounded so the per-packet progress callbacks only re-render on a visible change.
+  // Rounded so per-packet callbacks re-render only on a visible change.
   @state() private _progress = 0;
   @state() private _errorMessage = "";
-  // True while the Continue step's port picker is open, so a second click
-  // can't fire another requestPort() that the browser would reject.
+  // Blocks a second requestPort() while the Continue picker is open.
   @state() private _picking = false;
 
   private _pkg: DfuPackage | null = null;
@@ -85,8 +79,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
     let resetToBootloader: Awaited<ReturnType<typeof loadDfuEngine>>["resetToBootloader"];
     try {
-      // The file read and the engine chunk load can both fail (a revoked
-      // file handle, a stale chunk after a deploy); surface them like a bad package.
+      // A revoked file handle or a stale chunk after a deploy rejects here.
       const [zipBytes, engine] = await Promise.all([
         this._file.arrayBuffer(),
         loadDfuEngine(),
@@ -166,7 +159,6 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     `;
   }
 
-  /** Map the install state onto the shared progress card's banner. */
   private _terminalState(): ProcessTerminalState {
     switch (this._state) {
       case "success":

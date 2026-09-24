@@ -215,11 +215,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  // Parsed DFU package held between the compile step and the two-step DFU
-  // flash (nrf-reset → nrf-wait). Cleared on _init.
   _nrfPkg: DfuPackage | null = null;
-  // True while a DFU step's port picker / reset is in flight, so the footer
-  // button can't fire a second requestPort() that the browser would reject.
+  // Blocks a second requestPort() while a DFU step's picker is open.
   @state() _nrfBusy = false;
 
   static styles = [
@@ -265,8 +262,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startDownload(this);
   }
 
-  // Compile, download the DFU package, then walk the user through the
-  // two-step nRF52 DFU flash: 1200-baud reset → DFU serial flash.
   installNrfDfu(device: ConfiguredDevice) {
     this._init(device);
     this._installer = "nrf-dfu";
@@ -275,10 +270,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startNrfDfuInstall(this);
   }
 
-  // Step 1 of nRF DFU — called from footer button (user gesture for requestPort()).
+  // Footer button handlers: requestPort() needs a user gesture.
   _nrfDoReset = () => void nrfDoReset(this);
-
-  // Step 2 of nRF DFU — called from footer button (user gesture for requestPort()).
   _nrfDoFlash = () => void nrfDoFlash(this);
 
   // Three-dot "Download" entry; compiles only when nothing is built.

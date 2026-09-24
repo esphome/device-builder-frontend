@@ -16,11 +16,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({ upload: mdiUpload });
 
-/**
- * nRF52 card: lets users flash DFU firmware packages onto nRF52 devices
- * via the Nordic Legacy DFU protocol over Web Serial. No persistent connected
- * state — each install is a self-contained two-step flow (reset + flash).
- */
+/** nRF52 card: no connected state; each install is a self-contained reset + flash. */
 @customElement("esphome-web-nrf-card")
 export class ESPHomeWebNrfCard extends LitElement {
   @consume({ context: localizeContext, subscribe: true })

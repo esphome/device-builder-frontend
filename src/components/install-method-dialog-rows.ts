@@ -113,11 +113,7 @@ export function renderServerSerialOption(
   });
 }
 
-/**
- * Browser-based nRF DFU flash — compile here, then flash directly via the
- * Nordic Legacy DFU serial protocol (two-step: 1200-baud reset + DFU session).
- * Only shown for nRF52 target platforms when Web Serial is available.
- */
+/** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
 export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
   return renderMethodRow({
     icon: "chip",

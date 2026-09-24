@@ -51,9 +51,8 @@ describe("buildHciPacket", () => {
     const body = slipDecode(pkt.subarray(1, pkt.length - 1));
     expect(body.length).toBe(4 + data.length + 2);
 
-    // Header: seq | ack(seq+1)<<3 | integrity<<6 | reliable<<7, then type 14
-    // with the 12-bit length split across bytes 1-2, then a two's-complement
-    // checksum so the four header bytes sum to zero.
+    // Header: seq | ack<<3 | integrity<<6 | reliable<<7, type 14 + 12-bit length,
+    // then a checksum so the four bytes sum to zero.
     expect(body[0]).toBe(seq | (((seq + 1) % 8) << 3) | (1 << 6) | (1 << 7));
     expect(body[1]).toBe(14 | ((data.length & 0x0f) << 4));
     expect(body[2]).toBe((data.length & 0x0ff0) >> 4);

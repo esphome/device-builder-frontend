@@ -211,9 +211,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const hasWebSerial = availability === "available";
     const env = this._environment;
     // Browser flashers (in-app Web Serial esptool-js, the external flasher) are
-    // ESP-only; nRF52 gets its own in-app DFU row below. The remaining non-ESP
-    // targets (RP2040 / RP2350, libretiny) flash over serial only via the
-    // backend (`esphome run` / server-serial).
+    // ESP-only; nRF52 gets its own in-app DFU row. RP2040 / RP2350 and
+    // libretiny flash over serial only via the backend (server-serial).
     const isEsptool = this._isEsptoolPlatform;
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
