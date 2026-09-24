@@ -34,6 +34,7 @@ import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
+import type { DfuPackage } from "../util/nrf-dfu.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -46,6 +47,12 @@ import {
   startWebSerialInstall,
   waitForRunningJob,
 } from "./firmware-install-dialog/install-flow.js";
+import {
+  nrfDoFlash,
+  nrfDoReset,
+  retryNrfDfu,
+  startNrfDfuInstall,
+} from "./firmware-install-dialog/nrf-dfu-install.js";
 import {
   cardState,
   cardStatusDetail,
@@ -89,9 +96,11 @@ export type InstallStep =
   | "choose-binary"
   | "downloading"
   | "download-ready"
+  | "nrf-reset"
+  | "nrf-wait"
   | "error";
 
-export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
+export type Installer = "web-serial" | "binary-download" | "web-flash" | "nrf-dfu" | null;
 
 export type InstallFailureKind =
   "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;
@@ -207,6 +216,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
+  _nrfPkg: DfuPackage | null = null;
+  // Blocks a second requestPort() while a DFU step's picker is open.
+  @state() _nrfBusy = false;
+  // Aborts an in-flight DFU flash on teardown so the port is released.
+  _nrfAbort: AbortController | null = null;
+
   static styles = [
     espHomeStyles,
     firmwareInstallDialogStyles,
@@ -249,6 +264,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_queued");
     void startDownload(this);
   }
+
+  installNrfDfu(device: ConfiguredDevice) {
+    this._init(device);
+    this._installer = "nrf-dfu";
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+    void startNrfDfuInstall(this);
+  }
+
+  // Footer button handlers: requestPort() needs a user gesture.
+  _nrfDoReset = () => void nrfDoReset(this);
+  _nrfDoFlash = () => void nrfDoFlash(this);
 
   // Three-dot "Download" entry; compiles only when nothing is built.
   downloadArtifacts(device: ConfiguredDevice) {
@@ -303,6 +330,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
+    this._nrfPkg = null;
+    this._nrfBusy = false;
   }
 
   // Tear down active follow_job: client-side (drop local handler) and
@@ -319,6 +348,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       this._usbFlashTeardown();
       this._usbFlashTeardown = null;
     }
+    this._nrfAbort?.abort();
+    this._nrfAbort = null;
     if (this._streamId) {
       this._api.stopStream(this._streamId).catch(() => {});
       this._streamId = "";
@@ -453,6 +484,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       if (!settled) return;
     }
     if (this._installer === "web-flash") this.installUsbFlash(device);
+    else if (this._installer === "nrf-dfu") retryNrfDfu(this, device);
     else this.installWebSerial(device);
   };
 

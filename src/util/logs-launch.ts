@@ -9,9 +9,9 @@ import {
   attachSerialLogStream,
   openNetworkLogsFallback,
   reconnectWebSerialLogs,
-  requestSerialPort,
 } from "./post-install-logs.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
+import { requestSerialPort } from "./web-serial.js";
 
 /** The host bits both logs entry points need, decoupled from any page class. */
 export interface LogsLaunchHost {

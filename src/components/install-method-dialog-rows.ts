@@ -113,6 +113,16 @@ export function renderServerSerialOption(
   });
 }
 
+/** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
+export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize("dashboard.install_method_nrf_dfu"),
+    desc: ctx.localize("dashboard.install_method_nrf_dfu_desc"),
+    onClick: () => ctx.onSelect("nrf-dfu"),
+  });
+}
+
 /**
  * Manual binary download — always offered in install mode. Compiles
  * here, hands the user the resulting binary, and leaves flashing to

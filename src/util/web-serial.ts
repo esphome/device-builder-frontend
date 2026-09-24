@@ -81,6 +81,23 @@ export function isPortPickerCancel(err: unknown): boolean {
   return err instanceof DOMException && err.name === "NotFoundError";
 }
 
+/**
+ * Prompt for a Web Serial port without opening it. Returns ``null`` if the
+ * user dismissed the picker; throws on a real requestPort failure. Callers
+ * that only need the USB identity can decide before ever opening (no DTR/RTS
+ * pulse on a port that won't be used).
+ */
+export async function requestSerialPort(): Promise<SerialPort | null> {
+  try {
+    return await navigator.serial.requestPort();
+  } catch (err) {
+    if (isPortPickerCancel(err)) {
+      return null; // User dismissed the port picker.
+    }
+    throw err; // A real requestPort failure — let the caller surface it.
+  }
+}
+
 /** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
 const ESP_GET_SECURITY_INFO = 0x14;
 

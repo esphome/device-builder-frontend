@@ -197,6 +197,8 @@
     "install_method_network_address_label": "Device IP or hostname",
     "install_method_network_address_desc": "Target a specific address instead of the auto-detected one",
     "install_method_network_address_submit": "Install over network",
+    "install_method_nrf_dfu": "Flash via browser (nRF DFU)",
+    "install_method_nrf_dfu_desc": "Compile and flash your nRF52 device directly from this browser using the Nordic DFU protocol",
     "install_method_usb_local": "Plug into this computer",
     "install_method_usb_local_desc": "For devices connected via USB to this computer",
     "install_method_usb_remote_desc": "Opens the USB flasher in a new tab; the firmware stays in your browser and is flashed 100% locally",
@@ -496,6 +498,18 @@
     "status_flashing": "Flashing firmware to device…",
     "flashing_keep_visible": "Keep this window visible — switching to another tab or window can interrupt the flash.",
     "status_resetting": "Restarting device…",
+    "nrf_step1_title": "Ready to flash via DFU",
+    "nrf_step1_desc": "Click Reset Device to trigger the 1200-baud DFU bootloader entry, then click Flash once your device reconnects as a DFU port.",
+    "nrf_step2_title": "Device is entering DFU mode…",
+    "nrf_step2_desc": "Wait a few seconds for the device to re-enumerate, then click Flash to install the firmware.",
+    "nrf_reset_action": "Reset Device",
+    "nrf_flash_action": "Flash",
+    "nrf_resetting": "Resetting device to DFU mode…",
+    "nrf_connect_failed": "Could not connect to the device",
+    "nrf_flash_failed": "DFU flash failed",
+    "nrf_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
+    "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",
+    "nrf_bad_package": "Invalid DFU package",
     "status_done": "Installation complete!",
     "status_failed": "Installation failed",
     "install_failed": "Installation failed.",
@@ -1805,8 +1819,10 @@
     "header": {
       "title": "ESPHome Web",
       "subtitle": "Install and manage your devices from the browser",
-      "switch_to_pico": "Raspberry Pi",
-      "switch_to_esp": "ESP device",
+      "mode_esp": "ESP",
+      "mode_pico": "Raspberry Pi",
+      "mode_nrf": "nRF52",
+      "mode_picker_label": "Device family",
       "more_options": "More options",
       "report_issue": "Report an issue"
     },
@@ -1918,7 +1934,8 @@
       "body_pico": "ESPHome Web lets you prepare your Raspberry Pi Pico W for first use and check the device logs directly from your browser.",
       "privacy": "ESPHome Web runs 100% in your browser. No data will leave your computer.",
       "lite": "This page is a lite variant of the ESPHome Device Builder. To create and edit ESPHome projects, install it on your computer or inside Home Assistant (it's free!).",
-      "get_esphome": "Get ESPHome"
+      "get_esphome": "Get ESPHome",
+      "body_nrf": "ESPHome Web lets you update the firmware on your nRF52 device using the Nordic DFU protocol, directly from your browser."
     },
     "install": {
       "preparing": "Preparing firmware…",
@@ -1939,6 +1956,22 @@
       "adoptable_erase_helper": "Wipes everything on the device, including saved Wi-Fi credentials. Use this if the device ran other firmware before; it takes a little longer.",
       "connect_failed_hint": "Failed to initialize. Try resetting your device or holding the BOOT button while selecting your serial port until it starts preparing the installation.",
       "no_firmware": "No firmware to flash."
+    },
+    "nrf": {
+      "title": "nRF52 Device",
+      "connect_hint": "Update firmware on your nRF52 device using the Nordic DFU protocol. No drivers required.",
+      "install_title": "Update nRF52 firmware",
+      "install_file_label": "DFU package (.zip)",
+      "install_file_placeholder": "No file selected",
+      "install_done": "Firmware installed successfully.",
+      "install_done_hint": "Your device has been updated and is rebooting.",
+      "install_resetting": "Resetting device into DFU mode…",
+      "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready.",
+      "install_flashing": "Installing firmware…",
+      "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
+      "install_error_no_file": "Select a DFU package first.",
+      "install_error_bad_package": "Invalid DFU package: {error}",
+      "install_error_flash": "Firmware update failed: {error}"
     }
   },
   "remote_build_dashboard": {

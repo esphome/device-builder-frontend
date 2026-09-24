@@ -38,9 +38,12 @@ vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
   // Keep the real openNetworkLogsFallback so the baud-0 reroute test can
   // assert its toast + dialog-open behavior through the real helper.
   ...(await importOriginal<object>()),
-  requestSerialPort,
   attachSerialLogStream: vi.fn(),
   reconnectWebSerialLogs: vi.fn(),
+}));
+vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  requestSerialPort,
 }));
 
 // Append the interpolation params so the assertion sees the surfaced

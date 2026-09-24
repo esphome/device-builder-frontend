@@ -3,9 +3,9 @@
  *
  * ESP32 (all variants) and ESP8266 / ESP8285 speak the esptool ROM protocol,
  * which both Web Serial (esptool-js) and web.esphome.io / esp-web-tools use.
- * Non-ESP targets can't be browser-flashed: RP2040 / RP2350 and nrf52 use a
- * BOOTSEL / 1200-baud touch + UF2 copy, and libretiny (bk72xx / rtl87xx /
- * ln882x) uses ltchiptool's own serial protocol.
+ * Other targets don't speak it: RP2040 / RP2350 use a BOOTSEL + UF2 copy,
+ * libretiny (bk72xx / rtl87xx / ln882x) uses ltchiptool's own serial
+ * protocol, and nrf52 has its own in-app Nordic DFU path (``nrf-platform.ts``).
  *
  * Fail-closed: an empty / unknown platform returns false, so we never offer a
  * browser flasher that won't work.
