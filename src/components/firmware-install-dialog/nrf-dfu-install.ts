@@ -147,14 +147,21 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const abort = new AbortController();
   host._nrfAbort = abort;
   try {
-    const { flashDfuPackage } = await loadDfuEngine();
-    await flashDfuPackage(
+    const { flashDfuPackageWithReconnect } = await loadDfuEngine();
+    await flashDfuPackageWithReconnect(
       port,
       pkg,
       (percent) => {
         if (stillCurrent()) host._flashPercent = percent;
       },
-      abort.signal
+      {
+        signal: abort.signal,
+        onReconnecting: () => {
+          if (stillCurrent()) {
+            host._statusMessage = host._localize("firmware.nrf_reconnecting");
+          }
+        },
+      }
     );
   } catch (err) {
     if (stillCurrent()) {

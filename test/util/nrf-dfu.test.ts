@@ -5,6 +5,7 @@ import {
   buildHciPacket,
   crc16Nordic,
   flashDfuPackage,
+  flashDfuPackageWithReconnect,
   parseDfuPackage,
   slipDecode,
   slipEncode,
@@ -169,7 +170,6 @@ describe("flashDfuPackage", () => {
     ).rejects.toMatchObject({
       name: "AbortError",
     });
-    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
     expect(port.close).toHaveBeenCalled();
   });
 
@@ -222,5 +222,46 @@ describe("flashDfuPackage", () => {
 
     await expect(flash).rejects.toMatchObject({ name: "AbortError" });
     expect(port.close).toHaveBeenCalled();
+  });
+});
+
+describe("flashDfuPackageWithReconnect", () => {
+  const droppedPort = () =>
+    ({
+      getInfo: () => ({ usbVendorId: 0x239a, usbProductId: 0x0029 }),
+      open: vi.fn(async () => {}),
+      close: vi.fn(async () => {}),
+      readable: new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
+      writable: new WritableStream<Uint8Array>(),
+    }) as unknown as SerialPort;
+  const pkg = {
+    parts: [
+      { type: "application" as const, mode: 4, bin: bytes(1, 2, 3), dat: bytes(0) },
+    ],
+  };
+
+  it("retries once through the reacquired handle when the device drops", async () => {
+    const port = droppedPort();
+    const onReconnecting = vi.fn();
+    await expect(
+      flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
+    ).rejects.toThrow(/Serial port closed/);
+    expect(onReconnecting).toHaveBeenCalledTimes(1);
+    // Two attempts: the first open plus the reacquired handle, closed after each.
+    expect(port.close).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry after an abort", async () => {
+    const port = droppedPort();
+    const abort = new AbortController();
+    abort.abort();
+    const onReconnecting = vi.fn();
+    await expect(
+      flashDfuPackageWithReconnect(port, pkg, () => {}, {
+        signal: abort.signal,
+        onReconnecting,
+      })
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(onReconnecting).not.toHaveBeenCalled();
   });
 });

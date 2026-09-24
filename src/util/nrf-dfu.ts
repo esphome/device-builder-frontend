@@ -1,5 +1,6 @@
 import { unzipSync } from "fflate";
 
+import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 
 export interface DfuFirmwarePart {
@@ -382,7 +383,7 @@ export async function flashDfuPackage(
   onProgress: DfuProgressCallback,
   signal?: AbortSignal
 ): Promise<void> {
-  await port.open({ baudRate: 115200 });
+  if (!port.readable) await port.open({ baudRate: 115200 });
   let session: DfuSession | undefined;
   let failure: unknown;
   try {
@@ -434,5 +435,41 @@ export async function flashDfuPackage(
     } catch {
       // ignore
     }
+  }
+}
+
+/** The device dropped off the bus (unplug, bootloader reset) rather than a protocol failure. */
+export function isDeviceLost(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === "NetworkError") ||
+    (err instanceof Error && err.message === "Serial port closed")
+  );
+}
+
+/**
+ * ``flashDfuPackage``, retried once from the start if the device drops
+ * mid-transfer: waits out the re-enumeration window for the granted handle
+ * to come back (no picker needed) and flashes again. Any other failure, an
+ * abort, or the device staying gone rethrows the original error.
+ */
+export async function flashDfuPackageWithReconnect(
+  port: SerialPort,
+  pkg: DfuPackage,
+  onProgress: DfuProgressCallback,
+  options: { signal?: AbortSignal; onReconnecting?: () => void } = {}
+): Promise<void> {
+  const { signal, onReconnecting } = options;
+  try {
+    await flashDfuPackage(port, pkg, onProgress, signal);
+  } catch (err) {
+    if (signal?.aborted || !isDeviceLost(err)) throw err;
+    onReconnecting?.();
+    const live = await openLiveSerialPort(port, {
+      baudRate: 115200,
+      timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,
+      cancelled: () => signal?.aborted === true,
+    });
+    if (!live) throw err;
+    await flashDfuPackage(live, pkg, onProgress, signal);
   }
 }

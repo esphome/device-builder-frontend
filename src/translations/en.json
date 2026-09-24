@@ -507,6 +507,7 @@
     "nrf_resetting": "Resetting device to DFU mode…",
     "nrf_connect_failed": "Could not connect to the device",
     "nrf_flash_failed": "DFU flash failed",
+    "nrf_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
     "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",
     "nrf_bad_package": "Invalid DFU package",
     "status_done": "Installation complete!",
@@ -1967,6 +1968,7 @@
       "install_resetting": "Resetting device into DFU mode…",
       "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready.",
       "install_flashing": "Installing firmware…",
+      "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
       "install_error_no_file": "Select a DFU package first.",
       "install_error_bad_package": "Invalid DFU package: {error}",
       "install_error_flash": "Firmware update failed: {error}"

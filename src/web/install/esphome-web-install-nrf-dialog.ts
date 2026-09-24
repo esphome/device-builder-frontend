@@ -40,6 +40,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // Blocks a second click while a step's file read, engine load or port
   // picker is in flight.
   @state() private _pending = false;
+  @state() private _reconnecting = false;
 
   private _pkg: DfuPackage | null = null;
 
@@ -59,6 +60,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._progress = 0;
     this._errorMessage = "";
     this._pending = false;
+    this._reconnecting = false;
     this._pkg = null;
   }
 
@@ -135,11 +137,17 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
     this._state = "flashing";
     this._progress = 0;
+    this._reconnecting = false;
     try {
-      const { flashDfuPackage } = await loadDfuEngine();
-      await flashDfuPackage(port, pkg, (percent) => {
-        this._progress = Math.round(percent);
-      });
+      const { flashDfuPackageWithReconnect } = await loadDfuEngine();
+      await flashDfuPackageWithReconnect(
+        port,
+        pkg,
+        (percent) => {
+          this._progress = Math.round(percent);
+        },
+        { onReconnecting: () => (this._reconnecting = true) }
+      );
       this._state = "success";
     } catch (err) {
       this._fail(
@@ -186,7 +194,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       case "waiting":
         return this._localize("web.nrf.install_waiting_hint");
       case "flashing":
-        return this._localize("web.nrf.install_flashing");
+        return this._localize(
+          this._reconnecting ? "web.nrf.install_reconnecting" : "web.nrf.install_flashing"
+        );
       case "success":
         return this._localize("web.nrf.install_done");
       default:
