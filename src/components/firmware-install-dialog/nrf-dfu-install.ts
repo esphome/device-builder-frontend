@@ -21,12 +21,15 @@ export async function startNrfDfuInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
+  // The dialog is reused; a close-and-reopen for another device during an
+  // await must not receive this install's package.
+  const stale = () => host._device !== device;
 
-  if (!(await compileOrFail(host, device.configuration))) return;
+  if (!(await compileOrFail(host, device.configuration)) || stale()) return;
 
   host._statusMessage = host._localize("firmware.status_downloading");
   const binaries = await fetchBinaries(host, device.configuration);
-  if (!binaries) return;
+  if (!binaries || stale()) return;
   if (binaries.length === 0) {
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;
@@ -44,17 +47,21 @@ export async function startNrfDfuInstall(
       await host._api.firmwareDownloadBytes(device.configuration, dfuBinary.file)
     );
   } catch (err) {
-    host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
+    if (!stale())
+      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
     return;
   }
+  if (stale()) return;
 
   let parseDfuPackage: Awaited<ReturnType<typeof loadDfuEngine>>["parseDfuPackage"];
   try {
     ({ parseDfuPackage } = await loadDfuEngine());
   } catch (err) {
-    host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
+    if (!stale())
+      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
     return;
   }
+  if (stale()) return;
   try {
     host._nrfPkg = parseDfuPackage(bytes);
   } catch (err) {

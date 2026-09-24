@@ -50,8 +50,10 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
   }
 
+  // Also while a step's file read, engine load or picker is pending: a close
+  // then would reset the dialog under a step that keeps running.
   private get _busy(): boolean {
-    return this._state === "resetting" || this._state === "flashing";
+    return this._pending || this._state === "resetting" || this._state === "flashing";
   }
 
   private _reset(): void {
