@@ -7,8 +7,8 @@ import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import {
-  isPortPickerCancel,
   openLiveSerialPort,
+  requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
 
@@ -39,23 +39,6 @@ export function formatSerialPortLabel(port: SerialPort): string {
   }
   const hex = (n: number) => n.toString(16).padStart(4, "0");
   return `USB ${hex(usbVendorId)}:${hex(usbProductId)}`;
-}
-
-/**
- * Prompt for a Web Serial port without opening it. Returns ``null`` if the
- * user dismissed the picker; throws on a real requestPort failure. Callers
- * that only need the USB identity can decide before ever opening (no DTR/RTS
- * pulse on a port that won't be used).
- */
-export async function requestSerialPort(): Promise<SerialPort | null> {
-  try {
-    return await navigator.serial.requestPort();
-  } catch (err) {
-    if (isPortPickerCancel(err)) {
-      return null; // User dismissed the port picker.
-    }
-    throw err; // A real requestPort failure — let the caller surface it.
-  }
 }
 
 /**

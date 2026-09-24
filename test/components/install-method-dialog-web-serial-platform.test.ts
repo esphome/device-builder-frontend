@@ -8,7 +8,7 @@
  * collapsed into Web Serial.
  *
  * nRF52 is a special case: it doesn't get the esptool Web Serial row but
- * does get its own nRF DFU row (chip icon) when Web Serial is available.
+ * does get its own nRF DFU row when Web Serial is available.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,12 +36,15 @@ async function mount(platform: string): Promise<ESPHomeInstallMethodDialog> {
   return dialog;
 }
 
-// Rows are identified by their leading icon: Web Serial (esptool) uses "usb",
-// server-serial uses "serial-port", nRF DFU uses "chip".
+// Rows are identified by their leading icon: Web Serial uses "usb",
+// server-serial uses "serial-port". The nRF DFU row shares the "chip" icon
+// with the bootloader row, so it's matched by title instead.
 const hasWebSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="usb"]');
 const hasNrfDfuRow = (d: ESPHomeInstallMethodDialog): boolean =>
-  !!d.shadowRoot!.querySelector('wa-icon[name="chip"]');
+  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
+    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_nrf_dfu")
+  );
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
 /* eslint-enable @typescript-eslint/no-explicit-any */

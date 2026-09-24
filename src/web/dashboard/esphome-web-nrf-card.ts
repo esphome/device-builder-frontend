@@ -43,7 +43,7 @@ export class ESPHomeWebNrfCard extends LitElement {
             @click=${() => (this._installOpen = true)}
           >
             <wa-icon library="mdi" name="upload"></wa-icon>
-            ${this._localize("web.nrf.install_start")}
+            ${this._localize("dashboard.install")}
           </button>
         </div>
       </esphome-web-card>

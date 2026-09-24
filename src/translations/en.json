@@ -507,6 +507,8 @@
     "nrf_resetting": "Resetting device to DFU mode…",
     "nrf_connect_failed": "Could not connect to the device",
     "nrf_flash_failed": "DFU flash failed",
+    "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",
+    "nrf_bad_package": "Invalid DFU package",
     "status_done": "Installation complete!",
     "status_failed": "Installation failed",
     "install_failed": "Installation failed.",
@@ -1819,6 +1821,7 @@
       "mode_esp": "ESP",
       "mode_pico": "Raspberry Pi",
       "mode_nrf": "nRF52",
+      "mode_picker_label": "Device family",
       "more_options": "More options",
       "report_issue": "Report an issue"
     },
@@ -1959,16 +1962,14 @@
       "install_title": "Update nRF52 firmware",
       "install_file_label": "DFU package (.zip)",
       "install_file_placeholder": "No file selected",
-      "install_file_choose": "Choose file",
-      "install_start": "Install",
-      "install_continue": "Continue",
       "install_done": "Firmware installed successfully.",
       "install_done_hint": "Your device has been updated and is rebooting.",
+      "install_resetting": "Resetting device into DFU mode…",
       "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready.",
       "install_flashing": "Installing firmware…",
       "install_error_no_file": "Select a DFU package first.",
       "install_error_bad_package": "Invalid DFU package: {error}",
-      "install_error_connect": "Connection failed: {error}"
+      "install_error_flash": "Firmware update failed: {error}"
     }
   },
   "remote_build_dashboard": {
@@ -2037,7 +2038,7 @@
     "open": "Troubleshoot",
     "open_tooltip": "Click to troubleshoot connectivity",
     "check_again": "Check again",
-    "checking": "Checking connectivity…",
+    "checking": "Checking connectivity\u2026",
     "check_failed": "The connectivity check did not complete. Try again in a moment.",
     "learn_more": "Learn more",
     "result_dns_ok": "{address} resolves to {ips}",

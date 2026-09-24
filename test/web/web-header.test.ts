@@ -77,6 +77,19 @@ describe("esphome-web-header mode picker", () => {
     expect(logos[2].src).toContain("nordic");
   });
 
+  it("names every mode button for screen readers (labels hide below 870px)", async () => {
+    const el = await mount("esp");
+    const btns = [...el.shadowRoot!.querySelectorAll(".mode-btn")];
+    expect(btns.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "web.header.mode_esp",
+      "web.header.mode_pico",
+      "web.header.mode_nrf",
+    ]);
+    expect(el.shadowRoot!.querySelector(".mode-picker")!.getAttribute("aria-label")).toBe(
+      "web.header.mode_picker_label"
+    );
+  });
+
   it("dispatches set-mode with the clicked mode", async () => {
     const el = await mount("esp");
     const btns = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".mode-btn")];

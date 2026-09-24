@@ -158,10 +158,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return isEsptoolPlatform(this.deviceTargetPlatform);
   }
 
-  private get _isNrfPlatform(): boolean {
-    return isNrfPlatform(this.deviceTargetPlatform);
-  }
-
   protected willUpdate(changed: Map<string, unknown>) {
     // Reset to method view when dialog opens. Also collapse the
     // OTA address override and re-seed its input from the
@@ -215,10 +211,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const hasWebSerial = availability === "available";
     const env = this._environment;
     // Browser flashers (in-app Web Serial esptool-js, the external flasher) are
-    // ESP-only. Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over
-    // serial only via the backend (`esphome run` / server-serial).
+    // ESP-only; nRF52 gets its own in-app DFU row below. The remaining non-ESP
+    // targets (RP2040 / RP2350, libretiny) flash over serial only via the
+    // backend (`esphome run` / server-serial).
     const isEsptool = this._isEsptoolPlatform;
-    const isNrf = this._isNrfPlatform;
+    const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure

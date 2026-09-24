@@ -167,7 +167,7 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
   // the flash; there's no API to opt out, so warn the user to stay on the page.
   if (host._step === "flashing") {
     return host._localize(
-      host._installer === "web-flash" || host._installer === "nrf-dfu"
+      host._installer === "web-flash"
         ? "firmware.usb_flashing_detail"
         : "firmware.flashing_keep_visible"
     );
@@ -314,26 +314,21 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  if (host._step === "nrf-reset") {
+  // The two nRF DFU hand-off steps share one footer: Close plus the
+  // user-gesture button that opens the port picker for that step.
+  if (host._step === "nrf-reset" || host._step === "nrf-wait") {
+    const isReset = host._step === "nrf-reset";
     return html`
       <div class="footer">
         <button class="btn btn--ghost" @click=${host._close}>
           ${host._localize("command.close")}
         </button>
-        <button class="btn btn--primary" @click=${host._nrfDoReset}>
-          ${host._localize("firmware.nrf_reset_action")}
-        </button>
-      </div>
-    `;
-  }
-  if (host._step === "nrf-wait") {
-    return html`
-      <div class="footer">
-        <button class="btn btn--ghost" @click=${host._close}>
-          ${host._localize("command.close")}
-        </button>
-        <button class="btn btn--primary" @click=${host._nrfDoFlash}>
-          ${host._localize("firmware.nrf_flash_action")}
+        <button
+          class="btn btn--primary"
+          ?disabled=${host._nrfBusy}
+          @click=${isReset ? host._nrfDoReset : host._nrfDoFlash}
+        >
+          ${host._localize(isReset ? "firmware.nrf_reset_action" : "firmware.nrf_flash_action")}
         </button>
       </div>
     `;
@@ -408,9 +403,8 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   // re-flashing wouldn't address those.
   const canRetry =
     host._step === "error" &&
-    (host._installer === "web-serial" ||
-      host._installer === "web-flash" ||
-      host._installer === "nrf-dfu") &&
+    host._installer !== null &&
+    host._installer !== "binary-download" &&
     host._failureKind === null;
   if (canRetry) {
     return html`

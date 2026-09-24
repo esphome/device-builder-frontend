@@ -11,10 +11,10 @@ import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "./esphome-web-header-actions.js";
 
-const MODES: { mode: WebMode; logo: string; ext: string; labelKey: string }[] = [
-  { mode: "esp", logo: "espressif", ext: "png", labelKey: "web.header.mode_esp" },
-  { mode: "pico", logo: "raspberry", ext: "png", labelKey: "web.header.mode_pico" },
-  { mode: "nrf", logo: "nordic", ext: "svg", labelKey: "web.header.mode_nrf" },
+const MODES: { mode: WebMode; logo: string; labelKey: string }[] = [
+  { mode: "esp", logo: "espressif.png", labelKey: "web.header.mode_esp" },
+  { mode: "pico", logo: "raspberry.png", labelKey: "web.header.mode_pico" },
+  { mode: "nrf", logo: "nordic.svg", labelKey: "web.header.mode_nrf" },
 ];
 
 /**
@@ -53,19 +53,27 @@ export class ESPHomeWebHeader extends LitElement {
         ${
           !this.minimal && isWebSerialSupported()
             ? html`
-                <div class="mode-picker" role="group" aria-label="Device family">
-                  ${MODES.map(
-                    ({ mode, logo, ext, labelKey }) => html`
+                <div
+                  class="mode-picker"
+                  role="group"
+                  aria-label=${this._localize("web.header.mode_picker_label")}
+                >
+                  ${MODES.map(({ mode, logo, labelKey }) => {
+                    const label = this._localize(labelKey);
+                    // Below 870px the text label is display:none and the logo
+                    // has no alt, so the button needs its own accessible name.
+                    return html`
                       <button
                         class=${classMap({ "mode-btn": true, active: this.mode === mode })}
                         aria-pressed=${this.mode === mode}
+                        aria-label=${label}
                         @click=${() => this._setMode(mode)}
                       >
-                        <img class="mode-logo" src="/static/logo/${logo}.${ext}" alt="" />
-                        <span class="mode-label">${this._localize(labelKey)}</span>
+                        <img class="mode-logo" src="/static/logo/${logo}" alt="" />
+                        <span class="mode-label">${label}</span>
                       </button>
-                    `
-                  )}
+                    `;
+                  })}
                 </div>
               `
             : nothing

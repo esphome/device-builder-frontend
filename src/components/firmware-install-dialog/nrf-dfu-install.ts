@@ -6,26 +6,26 @@
  * the dialog to "nrf-reset" so the user can trigger the 1200-baud reset.
  * The two user-gesture callbacks (_nrfDoReset / _nrfDoFlash) live on the
  * dialog class itself; they're called by footer buttons in renderers.ts.
+ *
+ * The DFU engine (and its zip parser) is loaded on demand: only nRF52 targets
+ * ever reach this flow, so it stays out of the main dashboard chunk.
  */
-import {
-  type DfuPackage,
-  flashDfuPackage,
-  makeDfuPackageFromBin,
-  parseDfuPackage,
-  resetToBootloader,
-} from "../../util/nrf-dfu.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
+import { getErrorMessage } from "../../util/error-message.js";
+import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
 
+const loadDfuEngine = () => import("../../util/nrf-dfu.js");
+
 /**
- * Compile firmware, download the binary, parse it as a DFU package, then
- * advance the dialog to the two-step nRF DFU flash flow:
+ * Compile firmware, download the DFU package, parse it, then advance the
+ * dialog to the two-step nRF DFU flash flow:
  *   "nrf-reset" → user triggers 1200-baud reset via _nrfDoReset()
  *   "nrf-wait"  → user connects the DFU port and flashes via _nrfDoFlash()
  *
- * Prefers a .zip DFU package from the build artifacts; falls back to a
- * plain .bin and synthesises a minimal init packet.
+ * Only the ``firmware.zip`` DFU package ESPHome produces for the Adafruit
+ * bootloader can be flashed this way; a build without one (MCUboot / hex
+ * only) fails here rather than guessing at a raw image.
  */
 export async function startNrfDfuInstall(
   host: ESPHomeFirmwareInstallDialog
@@ -43,26 +43,30 @@ export async function startNrfDfuInstall(
     return;
   }
 
-  const dfuBinary =
-    binaries.find((b) => b.type === "dfu" || b.file.endsWith(".zip")) ??
-    binaries.find((b) => b.file.endsWith(".bin")) ??
-    binaries[0];
+  const dfuBinary = binaries.find((b) => b.file.endsWith(".zip"));
+  if (!dfuBinary) {
+    host._fail(host._localize("firmware.nrf_no_dfu_package"));
+    return;
+  }
 
-  let dfuPkg: DfuPackage;
+  let bytes: Uint8Array;
   try {
-    const bytes = new Uint8Array(
+    bytes = new Uint8Array(
       await host._api.firmwareDownloadBytes(device.configuration, dfuBinary.file)
     );
-    dfuPkg =
-      dfuBinary.file.endsWith(".zip") || dfuBinary.type === "dfu"
-        ? parseDfuPackage(bytes)
-        : makeDfuPackageFromBin(bytes);
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;
   }
 
-  host._nrfPkg = dfuPkg;
+  const { parseDfuPackage } = await loadDfuEngine();
+  try {
+    host._nrfPkg = parseDfuPackage(bytes);
+  } catch (err) {
+    host._fail(host._localize("firmware.nrf_bad_package"), getErrorMessage(err));
+    return;
+  }
+
   host._step = "nrf-reset";
   host._statusMessage = host._localize("firmware.nrf_step1_title");
 }
@@ -72,27 +76,22 @@ export async function startNrfDfuInstall(
  * Must be called directly from a user-gesture handler for requestPort().
  */
 export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  if (!host._nrfPkg) return;
+  if (!host._nrfPkg || host._nrfBusy) return;
+  host._nrfBusy = true;
   host._statusMessage = host._localize("firmware.nrf_resetting");
-  let port: SerialPort;
   try {
-    port = await navigator.serial.requestPort();
-  } catch (err) {
-    if (isPortPickerCancel(err)) {
+    const port = await requestSerialPort();
+    if (!port) {
       host._statusMessage = host._localize("firmware.nrf_step1_title");
       return;
     }
-    host._fail(host._localize("firmware.nrf_connect_failed"));
-    return;
-  }
-  try {
+    const { resetToBootloader } = await loadDfuEngine();
     await resetToBootloader(port);
   } catch (err) {
-    host._fail(
-      host._localize("firmware.nrf_connect_failed"),
-      err instanceof Error ? err.message : String(err)
-    );
+    host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
     return;
+  } finally {
+    host._nrfBusy = false;
   }
   host._step = "nrf-wait";
   host._statusMessage = host._localize("firmware.nrf_step2_title");
@@ -104,27 +103,28 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
  */
 export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const pkg = host._nrfPkg;
-  if (!pkg) return;
-  let port: SerialPort;
+  if (!pkg || host._nrfBusy) return;
+  host._nrfBusy = true;
+  let port: SerialPort | null;
   try {
-    port = await navigator.serial.requestPort();
+    port = await requestSerialPort();
   } catch (err) {
-    if (isPortPickerCancel(err)) return;
-    host._fail(host._localize("firmware.nrf_connect_failed"));
+    host._fail(host._localize("firmware.nrf_connect_failed"), getErrorMessage(err));
     return;
+  } finally {
+    host._nrfBusy = false;
   }
+  if (!port) return;
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
   try {
-    await flashDfuPackage(port, pkg, (p) => {
-      host._flashPercent = p.percent;
+    const { flashDfuPackage } = await loadDfuEngine();
+    await flashDfuPackage(port, pkg, (percent) => {
+      host._flashPercent = percent;
     });
   } catch (err) {
-    host._fail(
-      host._localize("firmware.nrf_flash_failed"),
-      err instanceof Error ? err.message : String(err)
-    );
+    host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));
     return;
   }
   host._statusMessage = host._localize("firmware.status_done");

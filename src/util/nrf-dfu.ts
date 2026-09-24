@@ -1,5 +1,7 @@
 import { unzipSync } from "fflate";
 
+import { sleep } from "./sleep.js";
+
 export interface DfuFirmwarePart {
   type: "application" | "bootloader" | "softdevice" | "softdevice+bootloader";
   mode: number;
@@ -13,14 +15,8 @@ export interface DfuPackage {
   parts: DfuFirmwarePart[];
 }
 
-export interface DfuProgress {
-  part: number;
-  parts: number;
-  percent: number;
-  label: string;
-}
-
-export type DfuProgressCallback = (p: DfuProgress) => void;
+/** Overall flash progress across every part of the package, 0-100. */
+export type DfuProgressCallback = (percent: number) => void;
 
 const DFU_MODE_SD = 1;
 const DFU_MODE_BL = 2;
@@ -91,26 +87,6 @@ export function parseDfuPackage(zipBytes: Uint8Array): DfuPackage {
   return { parts };
 }
 
-/**
- * Build a minimal DFU package from a raw application binary when no .zip DFU
- * package is available. Generates a wildcard init packet (any device type/revision,
- * no SoftDevice requirement) with the firmware CRC-16 so the Adafruit bootloader
- * accepts it.
- */
-export function makeDfuPackageFromBin(appBin: Uint8Array): DfuPackage {
-  const crc = crc16Nordic(appBin);
-  const dat = new Uint8Array(12);
-  const view = new DataView(dat.buffer);
-  view.setUint16(0, 0xffff, true); // device_type: wildcard
-  view.setUint16(2, 0xffff, true); // device_revision: wildcard
-  view.setUint32(4, 0xffffffff, true); // application_version: any
-  view.setUint16(8, 0, true); // softdevice_req_count: 0
-  view.setUint16(10, crc, true); // CRC-16 of firmware
-  return {
-    parts: [{ type: "application", mode: DFU_MODE_APP, bin: appBin, dat }],
-  };
-}
-
 // ── SLIP framing ─────────────────────────────────────────────────────────────
 
 const SLIP_END = 0xc0;
@@ -118,7 +94,7 @@ const SLIP_ESC = 0xdb;
 const SLIP_ESC_END = 0xdc;
 const SLIP_ESC_ESC = 0xdd;
 
-function slipEncode(data: Uint8Array): Uint8Array {
+export function slipEncode(data: Uint8Array): Uint8Array {
   const out: number[] = [];
   for (const b of data) {
     if (b === SLIP_END) {
@@ -132,7 +108,7 @@ function slipEncode(data: Uint8Array): Uint8Array {
   return new Uint8Array(out);
 }
 
-function slipDecode(data: Uint8Array): Uint8Array {
+export function slipDecode(data: Uint8Array): Uint8Array {
   const result: number[] = [];
   for (let i = 0; i < data.length; i++) {
     if (data[i] === SLIP_ESC) {
@@ -148,7 +124,7 @@ function slipDecode(data: Uint8Array): Uint8Array {
 
 // ── CRC-16 (Nordic variant) ───────────────────────────────────────────────────
 
-function crc16Nordic(data: Uint8Array): number {
+export function crc16Nordic(data: Uint8Array): number {
   let crc = 0xffff;
   for (const b of data) {
     crc = ((crc >> 8) & 0x00ff) | ((crc << 8) & 0xff00);
@@ -187,8 +163,13 @@ const DFU_STOP_DATA_PACKET = 5;
 const DFU_PACKET_MAX_SIZE = 512;
 const ACK_TIMEOUT_MS = 1000;
 const MAX_SEND_ATTEMPTS = 3;
+// adafruit-nrfutil's FLASH_PAGE_WRITE_TIME: a 4 KiB page of 4-byte words at
+// 0.1 µs per word, paced after every 8 data packets (one page).
+const PAGE_WRITE_MS = (4096 / 4) * 0.0001 * 1000;
+// adafruit-nrfutil's FLASH_PAGE_ERASE_TIME per 4 KiB page.
+const PAGE_ERASE_MS = 89.7;
 
-function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
+export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
   const h = new Uint8Array(4);
   h[0] =
     seq | (((seq + 1) % 8) << 3) | (DATA_INTEGRITY_PRESENT << 6) | (RELIABLE_PACKET << 7);
@@ -236,26 +217,29 @@ class DfuSession {
       }
       if (result.done || !result.value) break;
       for (const b of result.value) {
-        if (b === SLIP_END) {
-          if (this.rxBuf.length >= 2) {
-            try {
-              const decoded = slipDecode(new Uint8Array(this.rxBuf));
-              if (decoded.length >= 1 && this.resolveAck) {
-                const ackNr = (decoded[0] >> 3) & 0x07;
-                if (this.ackTimer !== null) clearTimeout(this.ackTimer);
-                this.resolveAck(ackNr);
-                this.resolveAck = null;
-              }
-            } catch {
-              // Malformed packet — ignore and continue
-            }
-          }
-          this.rxBuf = [];
-        } else {
+        if (b !== SLIP_END) {
           this.rxBuf.push(b);
+          continue;
         }
+        this.onFrame(this.rxBuf);
+        this.rxBuf = [];
       }
     }
+  }
+
+  /** Settle the pending ACK wait with the sequence number a SLIP frame carries. */
+  private onFrame(raw: number[]): void {
+    if (raw.length < 2 || !this.resolveAck) return;
+    let decoded: Uint8Array;
+    try {
+      decoded = slipDecode(new Uint8Array(raw));
+    } catch {
+      return; // Malformed frame: ignore and keep waiting.
+    }
+    if (decoded.length === 0) return;
+    if (this.ackTimer !== null) clearTimeout(this.ackTimer);
+    this.resolveAck((decoded[0] >> 3) & 0x07);
+    this.resolveAck = null;
   }
 
   private waitAck(): Promise<number> {
@@ -263,7 +247,6 @@ class DfuSession {
       this.resolveAck = resolve;
       this.ackTimer = setTimeout(() => {
         this.resolveAck = null;
-        this.seqNum = 0;
         reject(new Error("ACK timeout"));
       }, ACK_TIMEOUT_MS);
     });
@@ -279,11 +262,10 @@ class DfuSession {
         await this.waitAck();
         return;
       } catch {
-        if (attempt === MAX_SEND_ATTEMPTS - 1) {
-          throw new Error(`Failed to receive ACK after ${MAX_SEND_ATTEMPTS} attempts`);
-        }
+        // ACK timeout: resend the same packet.
       }
     }
+    throw new Error(`Failed to receive ACK after ${MAX_SEND_ATTEMPTS} attempts`);
   }
 
   async sendStartDfu(
@@ -301,7 +283,7 @@ class DfuSession {
     );
     await this.sendPacket(frame);
     const totalSize = sdSize + blSize + appSize;
-    const eraseMs = Math.max(500, (Math.floor(totalSize / 4096) + 1) * 89.7);
+    const eraseMs = Math.max(500, (Math.floor(totalSize / 4096) + 1) * PAGE_ERASE_MS);
     await sleep(eraseMs);
   }
 
@@ -311,49 +293,27 @@ class DfuSession {
   }
 
   async sendFirmware(bin: Uint8Array, onPercent: (p: number) => void): Promise<void> {
-    const pageWriteMs = (4096 / 4) * 0.0001 * 1000;
-
     const chunkCount = Math.ceil(bin.length / DFU_PACKET_MAX_SIZE);
     for (let i = 0; i < chunkCount; i++) {
-      const chunk = bin.slice(i * DFU_PACKET_MAX_SIZE, (i + 1) * DFU_PACKET_MAX_SIZE);
-      const frame = concat(int32LE(DFU_DATA_PACKET), chunk);
-      await this.sendPacket(frame);
+      const chunk = bin.subarray(i * DFU_PACKET_MAX_SIZE, (i + 1) * DFU_PACKET_MAX_SIZE);
+      await this.sendPacket(concat(int32LE(DFU_DATA_PACKET), chunk));
       onPercent(Math.floor(((i + 1) / chunkCount) * 100));
-      if (i > 0 && i % 8 === 0) await sleep(pageWriteMs);
+      if (i > 0 && i % 8 === 0) await sleep(PAGE_WRITE_MS);
     }
 
-    await sleep(pageWriteMs);
+    await sleep(PAGE_WRITE_MS);
     await this.sendPacket(int32LE(DFU_STOP_DATA_PACKET));
     onPercent(100);
   }
 
   async close(): Promise<void> {
     this.active = false;
-    try {
-      await this.reader.cancel();
-    } catch {
-      // ignore
-    }
-    try {
-      this.reader.releaseLock();
-    } catch {
-      // ignore
-    }
-    try {
-      await this.writer.close();
-    } catch {
-      // ignore
-    }
-    try {
-      this.writer.releaseLock();
-    } catch {
-      // ignore
-    }
+    // Best effort: a port that already errored rejects these, and releaseLock
+    // is safe once the stream is cancelled / closed.
+    await Promise.allSettled([this.reader.cancel(), this.writer.close()]);
+    this.reader.releaseLock();
+    this.writer.releaseLock();
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -384,7 +344,7 @@ export async function flashDfuPackage(
       const base = (i / pkg.parts.length) * 100;
       const range = 100 / pkg.parts.length;
 
-      onProgress({ part: i, parts: pkg.parts.length, percent: base, label: part.type });
+      onProgress(base);
 
       let sdSize = 0;
       let blSize = 0;
@@ -407,12 +367,7 @@ export async function flashDfuPackage(
       await session.sendStartDfu(part.mode, sdSize, blSize, appSize);
       await session.sendInitPacket(part.dat);
       await session.sendFirmware(part.bin, (pct) => {
-        onProgress({
-          part: i,
-          parts: pkg.parts.length,
-          percent: base + (pct * range) / 100,
-          label: part.type,
-        });
+        onProgress(base + (pct * range) / 100);
       });
     }
   } finally {

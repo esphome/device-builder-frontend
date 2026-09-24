@@ -218,6 +218,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Parsed DFU package held between the compile step and the two-step DFU
   // flash (nrf-reset → nrf-wait). Cleared on _init.
   _nrfPkg: DfuPackage | null = null;
+  // True while a DFU step's port picker / reset is in flight, so the footer
+  // button can't fire a second requestPort() that the browser would reject.
+  @state() _nrfBusy = false;
 
   static styles = [
     espHomeStyles,
@@ -332,6 +335,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
     this._nrfPkg = null;
+    this._nrfBusy = false;
   }
 
   // Tear down active follow_job: client-side (drop local handler) and
