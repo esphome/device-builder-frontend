@@ -523,6 +523,7 @@
     "rp2_flash_failed": "USB flash failed",
     "rp2_device_lost": "The device disconnected during the flash. Hold BOOTSEL while plugging it back in, then retry.",
     "rp2_not_bootsel": "The selected device is not in BOOTSEL mode. Click Reset Device, or hold BOOTSEL while plugging it in, then try again.",
+    "rp2_rp2350_device": "The selected device is an RP2350, but this firmware was built for the RP2040.",
     "rp2_rp2350_unsupported": "RP2350 boards can't be flashed from the browser yet. Download the UF2 and copy it to the RP2350 drive instead.",
     "rp2_usb_access_denied": "The browser was not allowed to open the device. On Linux, add a udev rule for Raspberry Pi USB devices (vendor 2e8a) and replug.",
     "rp2_no_uf2": "This build did not produce a UF2 image (firmware.uf2).",

@@ -6,7 +6,12 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
-import { parseUf2Image, UF2_FAMILY_RP2040, Uf2FamilyError } from "../../util/uf2.js";
+import {
+  parseUf2Image,
+  UF2_FAMILY_RP2040,
+  UF2_FAMILY_RP2350_ARM_S,
+  Uf2FamilyError,
+} from "../../util/uf2.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import {
   classifyUsbDevice,
@@ -68,11 +73,14 @@ export async function startRp2Uf2Install(
   try {
     host._rp2Image = parseUf2Image(bytes, [UF2_FAMILY_RP2040]);
   } catch (err) {
-    if (err instanceof Uf2FamilyError) {
-      host._fail(host._localize("firmware.rp2_rp2350_unsupported"), err.message);
-    } else {
-      host._fail(host._localize("firmware.rp2_bad_uf2"), getErrorMessage(err));
-    }
+    // Only a real RP2350 image gets the copy-to-drive advice; a missing or
+    // unknown family is just a bad file.
+    const rp2350 =
+      err instanceof Uf2FamilyError && err.familyId === UF2_FAMILY_RP2350_ARM_S;
+    host._fail(
+      host._localize(rp2350 ? "firmware.rp2_rp2350_unsupported" : "firmware.rp2_bad_uf2"),
+      getErrorMessage(err)
+    );
     return;
   }
   // The only artifact this flow hands out; the download step reads it from here.
@@ -195,18 +203,24 @@ async function openPicoboot(
     return null;
   }
   if (!usb || !stillCurrent()) return null;
+  // The image was validated as RP2040 already, so an RP2350 here is the
+  // wrong board for this build, not an unsupported image.
   const kind = classifyUsbDevice(usb);
   if (kind !== "rp2040") {
     host._fail(
       host._localize(
-        kind === "rp2350" ? "firmware.rp2_rp2350_unsupported" : "firmware.rp2_not_bootsel"
+        kind === "rp2350" ? "firmware.rp2_rp2350_device" : "firmware.rp2_not_bootsel"
       )
     );
     return null;
   }
   try {
     const { PicobootDevice } = await loadPicoboot();
-    return await PicobootDevice.open(usb);
+    const dev = await PicobootDevice.open(usb);
+    if (stillCurrent()) return dev;
+    // The dialog moved on mid-open; release the claim so the next attempt can open it.
+    await dev.close();
+    return null;
   } catch (err) {
     if (stillCurrent()) {
       host._fail(

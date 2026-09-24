@@ -161,6 +161,16 @@ describe("startRp2Uf2Install", () => {
     expect(host._rp2Image).toBeNull();
   });
 
+  it("treats a UF2 without a family id as a bad file, not an RP2350 image", async () => {
+    const host = makeHost();
+    vi.mocked(host._api.firmwareDownloadBytes).mockResolvedValue(
+      makeUf2Block({ addr: 0x10000000, family: null }).buffer
+    );
+    await startRp2Uf2Install(asHost(host));
+    expect(host._statusMessage).toBe("firmware.rp2_bad_uf2");
+    expect(host._errorMessage).toContain("family none");
+  });
+
   it("leaves a dialog that moved to another device untouched", async () => {
     const host = makeHost();
     vi.mocked(host._api.firmwareDownloadBytes).mockImplementation(async () => {
@@ -225,15 +235,29 @@ describe("rp2DoFlash", () => {
     expect(mocks.picobootOpen).not.toHaveBeenCalled();
   });
 
-  it("refuses an RP2350 bootloader", async () => {
+  it("refuses an RP2350 board for an RP2040 build", async () => {
     const host = readyHost();
     mocks.requestPicobootDevice.mockResolvedValue({
       vendorId: 0x2e8a,
       productId: 0x000f,
     });
     await rp2DoFlash(asHost(host));
-    expect(host._statusMessage).toBe("firmware.rp2_rp2350_unsupported");
+    expect(host._statusMessage).toBe("firmware.rp2_rp2350_device");
     expect(mocks.picobootOpen).not.toHaveBeenCalled();
+  });
+
+  it("releases a device opened after the dialog moved on", async () => {
+    const host = readyHost();
+    const dev = { close: vi.fn(async () => {}) };
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel);
+    mocks.picobootOpen.mockImplementation(async () => {
+      host._device = null;
+      return dev;
+    });
+    await rp2DoFlash(asHost(host));
+    expect(dev.close).toHaveBeenCalled();
+    expect(mocks.flashUf2).not.toHaveBeenCalled();
+    expect(host._step).toBe("rp2-bootsel");
   });
 
   it("names a refused open (udev) distinctly", async () => {

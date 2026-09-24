@@ -299,6 +299,21 @@ describe("flashUf2", () => {
     ]);
   });
 
+  it("pads a short last page with erased flash", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    await flashUf2(dev, image([{ address: BASE, length: 0x180 }]), () => {});
+    const writes = packetArgs(d, PicobootCmd.WRITE).map((a) => [u32(a, 0), u32(a, 4)]);
+    expect(writes).toEqual([[BASE, 0x200]]);
+    const payload = d.log.find(
+      (t): t is Extract<Transfer, { kind: "out" }> =>
+        t.kind === "out" && t.data.length === 0x200
+    );
+    expect(payload?.data[0x17f]).toBe(0xab);
+    expect(payload?.data[0x180]).toBe(0xff);
+    expect(payload?.data[0x1ff]).toBe(0xff);
+  });
+
   it("refuses an image that targets RAM", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));

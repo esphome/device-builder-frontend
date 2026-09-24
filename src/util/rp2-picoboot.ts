@@ -257,6 +257,16 @@ interface SectorWrite {
   data: Uint8Array<ArrayBuffer>;
 }
 
+// Writes go in whole 256-byte pages; a short tail is padded with erased
+// flash (0xff), as picotool does.
+function padToPage(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  const rem = data.length % FLASH_PAGE_SIZE;
+  if (rem === 0) return data;
+  const padded = new Uint8Array(data.length + FLASH_PAGE_SIZE - rem).fill(0xff);
+  padded.set(data);
+  return padded;
+}
+
 // Group every page of every range by the 4 KiB sector it lands in, so each
 // sector is erased exactly once before any of its pages are written. Two
 // ranges sharing a sector would otherwise erase each other's pages.
@@ -276,7 +286,7 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
       const sector = addr - (addr % FLASH_SECTOR_SIZE);
       const len = Math.min(sector + FLASH_SECTOR_SIZE - addr, range.data.length - off);
       const list = sectors.get(sector) ?? [];
-      list.push({ address: addr, data: range.data.subarray(off, off + len) });
+      list.push({ address: addr, data: padToPage(range.data.subarray(off, off + len)) });
       sectors.set(sector, list);
       off += len;
     }
