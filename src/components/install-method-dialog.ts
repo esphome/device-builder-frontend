@@ -31,6 +31,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
+import { isNrfPlatform } from "../util/nrf-platform.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
@@ -44,6 +45,7 @@ import {
   renderInstallNotice,
   renderManualDownloadOption,
   renderMethodRow,
+  renderNrfDfuOption,
   renderOtaOption,
   renderServerSerialOption,
 } from "./install-method-dialog-rows.js";
@@ -156,6 +158,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return isEsptoolPlatform(this.deviceTargetPlatform);
   }
 
+  private get _isNrfPlatform(): boolean {
+    return isNrfPlatform(this.deviceTargetPlatform);
+  }
+
   protected willUpdate(changed: Map<string, unknown>) {
     // Reset to method view when dialog opens. Also collapse the
     // OTA address override and re-seed its input from the
@@ -212,6 +218,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // ESP-only. Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over
     // serial only via the backend (`esphome run` / server-serial).
     const isEsptool = this._isEsptoolPlatform;
+    const isNrf = this._isNrfPlatform;
     const isLogs = this.mode === "logs";
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure
@@ -231,11 +238,14 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // ESPHome Web — a secure-context origin where the user can connect over USB
     // and read serial logs. ESP-only, like the USB row.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
+    // nRF52 browser DFU is install-only and requires in-app Web Serial.
+    const showNrfRow = !isLogs && isNrf && hasWebSerial;
 
     const ctx = this._rowContext();
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
+    const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
     const serverRow = showServerSerialRow
       ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
       : nothing;
@@ -246,8 +256,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // mode, so it's inert (``nothing``) in the usbFirst (install) ordering.
     const usbFirst = !isLogs && this.neverFlashed;
     const rows = usbFirst
-      ? [usbRow, logsWebRow, serverRow, otaRow]
-      : [otaRow, usbRow, logsWebRow, serverRow];
+      ? [usbRow, nrfRow, logsWebRow, serverRow, otaRow]
+      : [otaRow, usbRow, nrfRow, logsWebRow, serverRow];
 
     return html`
       ${renderInstallNotice(ctx)}

@@ -3,14 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import { expectTooltipsAnchored } from "../_tooltip-anchors.js";
 import { ESPHomeWebHeader } from "../../src/web/header/esphome-web-header.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// The switch button only renders when Web Serial is available; happy-dom has no
+// The mode picker only renders when Web Serial is available; happy-dom has no
 // navigator.serial, so define one for the duration of these tests.
 let hadSerial = false;
 beforeEach(() => {
@@ -27,7 +25,10 @@ afterEach(() => {
   }
 });
 
-async function mount(mode: "esp" | "pico", minimal = false): Promise<ESPHomeWebHeader> {
+async function mount(
+  mode: "esp" | "pico" | "nrf",
+  minimal = false
+): Promise<ESPHomeWebHeader> {
   const el = new ESPHomeWebHeader();
   (el as any)._localize = (k: string) => k;
   el.mode = mode;
@@ -37,42 +38,61 @@ async function mount(mode: "esp" | "pico", minimal = false): Promise<ESPHomeWebH
   return el;
 }
 
-describe("esphome-web-header switch target", () => {
-  it("targets Pico when the current mode is ESP", async () => {
+describe("esphome-web-header mode picker", () => {
+  it("renders three mode buttons", async () => {
     const el = await mount("esp");
-
-    const btn = el.shadowRoot!.querySelector(".switch-btn");
-    expect(btn).not.toBeNull();
-    expect(btn!.getAttribute("aria-label")).toBe("web.header.switch_to_pico");
-    const logo = el.shadowRoot!.querySelector<HTMLImageElement>(".target-logo");
-    expect(logo!.getAttribute("src")).toContain("raspberry");
+    const btns = el.shadowRoot!.querySelectorAll(".mode-btn");
+    expect(btns.length).toBe(3);
   });
 
-  it("targets ESP when the current mode is Pico", async () => {
+  it("marks ESP as active when mode is esp", async () => {
+    const el = await mount("esp");
+    const btns = [...el.shadowRoot!.querySelectorAll(".mode-btn")];
+    expect(btns[0].classList.contains("active")).toBe(true);
+    expect(btns[1].classList.contains("active")).toBe(false);
+    expect(btns[2].classList.contains("active")).toBe(false);
+  });
+
+  it("marks Pico as active when mode is pico", async () => {
     const el = await mount("pico");
-
-    const btn = el.shadowRoot!.querySelector(".switch-btn");
-    expect(btn!.getAttribute("aria-label")).toBe("web.header.switch_to_esp");
-    const logo = el.shadowRoot!.querySelector<HTMLImageElement>(".target-logo");
-    expect(logo!.getAttribute("src")).toContain("espressif");
+    const btns = [...el.shadowRoot!.querySelectorAll(".mode-btn")];
+    expect(btns[0].classList.contains("active")).toBe(false);
+    expect(btns[1].classList.contains("active")).toBe(true);
+    expect(btns[2].classList.contains("active")).toBe(false);
   });
 
-  it("hides the switch in minimal (flash-receiver) mode", async () => {
+  it("marks nRF as active when mode is nrf", async () => {
+    const el = await mount("nrf");
+    const btns = [...el.shadowRoot!.querySelectorAll(".mode-btn")];
+    expect(btns[0].classList.contains("active")).toBe(false);
+    expect(btns[1].classList.contains("active")).toBe(false);
+    expect(btns[2].classList.contains("active")).toBe(true);
+  });
+
+  it("shows espressif, raspberry and nordic logos in order", async () => {
+    const el = await mount("esp");
+    const logos = [...el.shadowRoot!.querySelectorAll<HTMLImageElement>(".mode-logo")];
+    expect(logos[0].src).toContain("espressif");
+    expect(logos[1].src).toContain("raspberry");
+    expect(logos[2].src).toContain("nordic");
+  });
+
+  it("dispatches set-mode with the clicked mode", async () => {
+    const el = await mount("esp");
+    const btns = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".mode-btn")];
+    const events: string[] = [];
+    el.addEventListener("set-mode", (e) => events.push((e as CustomEvent).detail));
+    btns[1].click(); // Pico
+    expect(events).toEqual(["pico"]);
+  });
+
+  it("hides the picker in minimal (flash-receiver) mode", async () => {
     const el = await mount("esp", true);
-
-    expect(el.shadowRoot!.querySelector(".switch-btn")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".mode-picker")).toBeNull();
   });
 
-  // The kebab stays in minimal mode on purpose: a flash failure in the
-  // receiver popup is exactly when a user needs the report-issue link.
   it("keeps the kebab in minimal (flash-receiver) mode", async () => {
     const el = await mount("esp", true);
-
     expect(el.shadowRoot!.querySelector("esphome-web-header-actions")).not.toBeNull();
-  });
-
-  it("anchors the switch tooltip to the button id", async () => {
-    const el = await mount("esp");
-    expectTooltipsAnchored(el, 1);
   });
 });

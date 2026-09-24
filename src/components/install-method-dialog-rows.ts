@@ -114,6 +114,20 @@ export function renderServerSerialOption(
 }
 
 /**
+ * Browser-based nRF DFU flash — compile here, then flash directly via the
+ * Nordic Legacy DFU serial protocol (two-step: 1200-baud reset + DFU session).
+ * Only shown for nRF52 target platforms when Web Serial is available.
+ */
+export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize("dashboard.install_method_nrf_dfu"),
+    desc: ctx.localize("dashboard.install_method_nrf_dfu_desc"),
+    onClick: () => ctx.onSelect("nrf-dfu"),
+  });
+}
+
+/**
  * Manual binary download — always offered in install mode. Compiles
  * here, hands the user the resulting binary, and leaves flashing to
  * whatever tool they prefer (esptool.py, picotool, copy-to-MSC for

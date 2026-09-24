@@ -86,10 +86,9 @@ export class ESPHomeWebApp extends LitElement {
     this._mode = readMode();
   };
 
-  private _onToggleMode = (): void => {
-    const next: WebMode = this._mode === "pico" ? "esp" : "pico";
-    this._mode = next;
-    writeMode(next);
+  private _onSetMode = (e: CustomEvent<WebMode>): void => {
+    this._mode = e.detail;
+    writeMode(e.detail);
   };
 
   protected render() {
@@ -97,7 +96,7 @@ export class ESPHomeWebApp extends LitElement {
       <esphome-web-header
         .mode=${this._mode}
         ?minimal=${this._flasherMode}
-        @toggle-mode=${this._onToggleMode}
+        @set-mode=${this._onSetMode}
       ></esphome-web-header>
       <main>
         ${

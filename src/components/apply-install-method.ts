@@ -45,5 +45,8 @@ export function applyInstallMethod(
     case "binary-download":
       h.firmwareDialog?.installBinaryDownload(h.device);
       break;
+    case "nrf-dfu":
+      h.firmwareDialog?.installNrfDfu(h.device);
+      break;
   }
 }

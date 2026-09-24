@@ -1,56 +1,47 @@
 import { consume } from "@lit/context";
-import { mdiSwapHorizontal } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "./esphome-web-header-actions.js";
 
-registerMdiIcons({ "swap-horizontal": mdiSwapHorizontal });
+const MODES: { mode: WebMode; logo: string; ext: string; labelKey: string }[] = [
+  { mode: "esp", logo: "espressif", ext: "png", labelKey: "web.header.mode_esp" },
+  { mode: "pico", logo: "raspberry", ext: "png", labelKey: "web.header.mode_pico" },
+  { mode: "nrf", logo: "nordic", ext: "svg", labelKey: "web.header.mode_nrf" },
+];
 
 /**
- * ESPHome Web top bar, replicating the main builder's ``.app-header`` chrome
- * (``esphome-layout.ts``): the brand-primary bar, the 44px logo box, and the
- * bold on-primary title + subtitle. On the right sits the ESP ⇄ Raspberry Pi
- * device-family switch (hidden entirely on browsers without Web Serial) and
- * the overflow kebab.
+ * ESPHome Web top bar. On the right sits a segmented control for choosing
+ * the active device family (ESP / Raspberry Pi / nRF52), hidden entirely on
+ * browsers without Web Serial and in flash-receiver mode.
  */
 @customElement("esphome-web-header")
 export class ESPHomeWebHeader extends LitElement {
   @property() mode: WebMode = "esp";
 
-  /** Hide the ESP ⇄ Pico switch (flash-receiver mode has no device family). */
+  /** Hide the mode picker (flash-receiver mode has no device family). */
   @property({ type: Boolean }) minimal = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  private _onToggle(): void {
-    this.dispatchEvent(new CustomEvent("toggle-mode", { bubbles: true, composed: true }));
+  private _setMode(mode: WebMode): void {
+    this.dispatchEvent(
+      new CustomEvent("set-mode", { detail: mode, bubbles: true, composed: true })
+    );
   }
 
   protected render() {
-    // True when clicking the switch moves the user to Pico mode (i.e. the
-    // current mode is ESP). Names the toggle's destination, not the current mode.
-    const switchToPico = this.mode === "esp";
-    const targetLogo = switchToPico ? "raspberry" : "espressif";
-    const targetLabel = switchToPico
-      ? this._localize("web.header.switch_to_pico")
-      : this._localize("web.header.switch_to_esp");
-
     return html`
       <div class="app-header">
-        <!-- Keep the current mode in the URL so clicking the logo doesn't drop
-             the user out of Pico mode. -->
         <a class="header-logo" href=${modeUrl(this.mode)}>
           <img src="/static/logo/esphome.svg" alt="ESPHome" />
         </a>
@@ -62,20 +53,20 @@ export class ESPHomeWebHeader extends LitElement {
         ${
           !this.minimal && isWebSerialSupported()
             ? html`
-                <button
-                  id="btn-switch"
-                  class="switch-btn"
-                  @click=${this._onToggle}
-                  aria-label=${targetLabel}
-                >
-                  <img class="target-logo" src="/static/logo/${targetLogo}.png" alt="" />
-                  <span class="target-label">${targetLabel}</span>
-                  <wa-icon library="mdi" name="swap-horizontal"></wa-icon>
-                </button>
-                <!-- Redundant beside the visible label on wide windows, but the
-                     870px query hides the label by width, not pointer — a
-                     narrow desktop window still hovers. -->
-                <wa-tooltip for="btn-switch">${targetLabel}</wa-tooltip>
+                <div class="mode-picker" role="group" aria-label="Device family">
+                  ${MODES.map(
+                    ({ mode, logo, ext, labelKey }) => html`
+                      <button
+                        class=${classMap({ "mode-btn": true, active: this.mode === mode })}
+                        aria-pressed=${this.mode === mode}
+                        @click=${() => this._setMode(mode)}
+                      >
+                        <img class="mode-logo" src="/static/logo/${logo}.${ext}" alt="" />
+                        <span class="mode-label">${this._localize(labelKey)}</span>
+                      </button>
+                    `
+                  )}
+                </div>
               `
             : nothing
         }
@@ -150,44 +141,57 @@ export class ESPHomeWebHeader extends LitElement {
         flex: 1;
       }
 
-      /* The device-family switch sits on the primary bar, so it uses the
-         on-primary ink like the layout's header actions. */
-      .switch-btn {
+      /* Segmented device-family picker */
+      .mode-picker {
+        display: inline-flex;
+        flex-shrink: 0;
+        border-radius: var(--wa-border-radius-m);
+        border: 1px solid color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
+        overflow: hidden;
+      }
+
+      .mode-btn {
         display: inline-flex;
         align-items: center;
-        gap: var(--wa-space-2xs);
+        gap: 5px;
         padding: 4px 10px;
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid
-          color-mix(in srgb, var(--esphome-on-primary), transparent 60%);
         background: none;
+        border: none;
+        border-right: 1px solid
+          color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
+        font-weight: var(--wa-font-weight-semibold);
         font-family: inherit;
         cursor: pointer;
-        flex-shrink: 0;
+        opacity: 0.6;
         transition:
-          background 0.12s,
-          border-color 0.12s;
+          background 0.1s,
+          opacity 0.1s;
+        white-space: nowrap;
       }
 
-      .switch-btn:hover {
+      .mode-btn:last-child {
+        border-right: none;
+      }
+
+      .mode-btn:hover {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        border-color: var(--esphome-on-primary);
+        opacity: 1;
       }
 
-      .switch-btn wa-icon {
-        font-size: 15px;
+      .mode-btn.active {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 75%);
+        opacity: 1;
+        cursor: default;
       }
 
-      .target-logo {
-        height: 20px;
+      .mode-logo {
+        height: 16px;
+        flex-shrink: 0;
       }
 
-      /* Compact header below the layout's 870px breakpoint: subtitle and
-         switch label drop, logo shrinks to fit the 40px bar (the height
-         itself comes from the --esphome-header-height token). */
+      /* Compact header below 870px: subtitle drops, logo shrinks, mode labels hide. */
       @media (max-width: 870px) {
         .app-header {
           gap: var(--wa-space-s);
@@ -204,8 +208,12 @@ export class ESPHomeWebHeader extends LitElement {
           box-sizing: border-box;
         }
 
-        .target-label {
+        .mode-label {
           display: none;
+        }
+
+        .mode-btn {
+          padding: 4px 8px;
         }
       }
     `,
