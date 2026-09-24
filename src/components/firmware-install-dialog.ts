@@ -218,6 +218,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _nrfPkg: DfuPackage | null = null;
   // Blocks a second requestPort() while a DFU step's picker is open.
   @state() _nrfBusy = false;
+  // Aborts an in-flight DFU flash on teardown so the port is released.
+  _nrfAbort: AbortController | null = null;
 
   static styles = [
     espHomeStyles,
@@ -345,6 +347,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       this._usbFlashTeardown();
       this._usbFlashTeardown = null;
     }
+    this._nrfAbort?.abort();
+    this._nrfAbort = null;
     if (this._streamId) {
       this._api.stopStream(this._streamId).catch(() => {});
       this._streamId = "";

@@ -37,8 +37,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // Rounded so per-packet callbacks re-render only on a visible change.
   @state() private _progress = 0;
   @state() private _errorMessage = "";
-  // Blocks a second requestPort() while the Continue picker is open.
-  @state() private _picking = false;
+  // Blocks a second click while a step's file read, engine load or port
+  // picker is in flight.
+  @state() private _pending = false;
 
   private _pkg: DfuPackage | null = null;
 
@@ -57,7 +58,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._file = null;
     this._progress = 0;
     this._errorMessage = "";
-    this._picking = false;
+    this._pending = false;
     this._pkg = null;
   }
 
@@ -76,14 +77,20 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       this._fail(this._localize("web.nrf.install_error_no_file"));
       return;
     }
+    if (this._pending) return;
+    this._pending = true;
+    try {
+      await this._prepareAndReset(this._file);
+    } finally {
+      this._pending = false;
+    }
+  }
 
+  private async _prepareAndReset(file: File): Promise<void> {
     let resetToBootloader: Awaited<ReturnType<typeof loadDfuEngine>>["resetToBootloader"];
     try {
       // A revoked file handle or a stale chunk after a deploy rejects here.
-      const [zipBytes, engine] = await Promise.all([
-        this._file.arrayBuffer(),
-        loadDfuEngine(),
-      ]);
+      const [zipBytes, engine] = await Promise.all([file.arrayBuffer(), loadDfuEngine()]);
       resetToBootloader = engine.resetToBootloader;
       this._pkg = engine.parseDfuPackage(new Uint8Array(zipBytes));
     } catch (err) {
@@ -112,17 +119,17 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
   private async _continueFlash(): Promise<void> {
     const pkg = this._pkg;
-    if (!pkg || this._picking) return;
+    if (!pkg || this._pending) return;
 
     let port: SerialPort | null;
-    this._picking = true;
+    this._pending = true;
     try {
       port = await requestSerialPort();
     } catch (err) {
       this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
       return;
     } finally {
-      this._picking = false;
+      this._pending = false;
     }
     if (!port) return;
 
@@ -213,7 +220,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${!this._file}
+            ?disabled=${!this._file || this._pending}
             @click=${this._startInstall}
           >
             ${this._localize("dashboard.install")}
@@ -223,7 +230,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${this._picking}
+            ?disabled=${this._pending}
             @click=${this._continueFlash}
           >
             ${this._localize("onboarding.wizard.continue")}

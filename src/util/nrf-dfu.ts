@@ -199,7 +199,10 @@ class DfuSession {
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
   private active = true;
 
-  constructor(port: SerialPort) {
+  constructor(
+    port: SerialPort,
+    private readonly signal?: AbortSignal
+  ) {
     this.reader = port.readable!.getReader();
     this.writer = port.writable!.getWriter();
     void this.readLoop();
@@ -254,6 +257,7 @@ class DfuSession {
     const pkt = buildHciPacket(data, this.seqNum);
 
     for (let attempt = 0; attempt < MAX_SEND_ATTEMPTS; attempt++) {
+      this.signal?.throwIfAborted();
       await this.writer.write(pkt);
       try {
         await this.waitAck();
@@ -320,14 +324,19 @@ export async function resetToBootloader(port: SerialPort): Promise<void> {
   await port.close();
 }
 
-/** Run the full DFU sequence on a closed port (opened at 115200, closed after). */
+/**
+ * Run the full DFU sequence on a closed port (opened at 115200, closed after).
+ * ``signal`` stops between packets and releases the port; the bootloader
+ * stays in DFU mode for a retry.
+ */
 export async function flashDfuPackage(
   port: SerialPort,
   pkg: DfuPackage,
-  onProgress: DfuProgressCallback
+  onProgress: DfuProgressCallback,
+  signal?: AbortSignal
 ): Promise<void> {
   await port.open({ baudRate: 115200 });
-  const session = new DfuSession(port);
+  const session = new DfuSession(port, signal);
   try {
     for (let i = 0; i < pkg.parts.length; i++) {
       const part = pkg.parts[i];

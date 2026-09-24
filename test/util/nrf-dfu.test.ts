@@ -1,9 +1,10 @@
 import { strToU8, zipSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildHciPacket,
   crc16Nordic,
+  flashDfuPackage,
   parseDfuPackage,
   slipDecode,
   slipEncode,
@@ -144,5 +145,31 @@ describe("parseDfuPackage", () => {
 
   it("rejects something that is not a zip", () => {
     expect(() => parseDfuPackage(bytes(1, 2, 3))).toThrow();
+  });
+});
+
+describe("flashDfuPackage", () => {
+  it("stops on abort and releases the port", async () => {
+    const port = {
+      open: vi.fn(async () => {}),
+      close: vi.fn(async () => {}),
+      readable: new ReadableStream<Uint8Array>(),
+      writable: new WritableStream<Uint8Array>(),
+    } as unknown as SerialPort;
+    const pkg = {
+      parts: [
+        { type: "application" as const, mode: 4, bin: bytes(1, 2, 3), dat: bytes(0) },
+      ],
+    };
+    const abort = new AbortController();
+    abort.abort();
+
+    await expect(
+      flashDfuPackage(port, pkg, () => {}, abort.signal)
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
+    expect(port.close).toHaveBeenCalled();
   });
 });

@@ -100,21 +100,31 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
-  // Stop / close can't abort the serial session, so the flash runs on; the
-  // dialog is reused, so only report back to the same install. A retry
-  // re-parses, so package identity covers a restart on the same device.
+  // Teardown aborts the session, but the abort still lands here on a dialog
+  // that may already show another install, so only report back to the same
+  // one. A retry re-parses, so package identity covers a restart on the same
+  // device.
   const device = host._device;
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
+  const abort = new AbortController();
+  host._nrfAbort = abort;
   try {
     const { flashDfuPackage } = await loadDfuEngine();
-    await flashDfuPackage(port, pkg, (percent) => {
-      if (stillCurrent()) host._flashPercent = percent;
-    });
+    await flashDfuPackage(
+      port,
+      pkg,
+      (percent) => {
+        if (stillCurrent()) host._flashPercent = percent;
+      },
+      abort.signal
+    );
   } catch (err) {
     if (stillCurrent()) {
       host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));
     }
     return;
+  } finally {
+    if (host._nrfAbort === abort) host._nrfAbort = null;
   }
   if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
