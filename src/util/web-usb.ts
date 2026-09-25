@@ -30,6 +30,24 @@ export function isUsbAccessDenied(err: unknown): boolean {
 export const RASPBERRY_PI_USB_VID = 0x2e8a;
 const RP2040_BOOTSEL_PID = 0x0003;
 const RP2350_BOOTSEL_PID = 0x000f;
+// Raspberry Pi products that are CDC UART bridges, not a board's own console.
+const RASPBERRY_PI_BRIDGE_PIDS = new Set([
+  0x0004 /* Picoprobe */, 0x000c /* Debug Probe */,
+]);
+
+/**
+ * A Web Serial port that is an RP2 board's own CDC console: arduino-pico
+ * enumerates every board under the Raspberry Pi vendor id with a per-board
+ * product id, so only the known bridge products are ruled out.
+ */
+export function isRp2CdcPort(port: SerialPort): boolean {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return (
+    usbVendorId === RASPBERRY_PI_USB_VID &&
+    usbProductId !== undefined &&
+    !RASPBERRY_PI_BRIDGE_PIDS.has(usbProductId)
+  );
+}
 
 export function classifyUsbDevice(
   device: USBDevice

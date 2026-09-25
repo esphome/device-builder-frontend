@@ -264,6 +264,10 @@ describe("picoResetHook", () => {
     expect(hook.supports(openPort({ usbVendorId: 0x1a86, usbProductId: 0x7523 }))).toBe(
       false
     );
+    // A Raspberry Pi Debug Probe is a bridge too, despite the vendor id.
+    expect(hook.supports(openPort({ usbVendorId: 0x2e8a, usbProductId: 0x000c }))).toBe(
+      false
+    );
     expect(hook.supports(openPort({}))).toBe(false);
   });
 

@@ -14,7 +14,7 @@ import {
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
-import { isWebUsbSupported, RASPBERRY_PI_USB_VID } from "./web-usb.js";
+import { isRp2CdcPort, isWebUsbSupported } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,
@@ -123,7 +123,7 @@ export function picoResetHook(
 ): SerialResetHook | undefined {
   if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
   return {
-    supports: (port) => port.getInfo().usbVendorId === RASPBERRY_PI_USB_VID,
+    supports: isRp2CdcPort,
     run: async (port, cancelled) => {
       let live: SerialPort | null = null;
       let failure: string | undefined;
