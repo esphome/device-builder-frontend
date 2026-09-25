@@ -38,27 +38,14 @@ describe("esphome-web-pico-device-card", () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 
-  // The Pico's Reset Device reboots through BOOTSEL over WebUSB, so the
-  // button shows only where WebUSB exists.
-  it("offers the Pico reboot reset only with WebUSB", async () => {
-    const mount = async () => {
-      const el = new ESPHomeWebPicoDeviceCard();
-      (el as any)._localize = (k: string) => k;
-      el.port = {} as SerialPort;
-      document.body.appendChild(el);
-      await el.updateComplete;
-      return el.shadowRoot!.querySelector("esphome-web-logs-dialog") as any;
-    };
-    const without = await mount();
-    expect(without.picoReset).toBe(true);
-    expect(without.noReset).toBe(true);
-    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
-    try {
-      const withUsb = await mount();
-      expect(withUsb.noReset).toBe(false);
-    } finally {
-      delete (navigator as any).usb;
-    }
+  it("asks the logs dialog for the Pico's reboot reset", async () => {
+    const el = new ESPHomeWebPicoDeviceCard();
+    (el as any)._localize = (k: string) => k;
+    el.port = {} as SerialPort;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const dialog = el.shadowRoot!.querySelector("esphome-web-logs-dialog") as any;
+    expect(dialog.resetMode).toBe("pico");
   });
 
   it("anchors every action tooltip to a real button id", async () => {

@@ -8,7 +8,6 @@ import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { isWebUsbSupported } from "../../util/web-usb.js";
 import { openImprovDialog } from "../improv/open-improv-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
@@ -91,8 +90,7 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.pico.title")}
-        .noReset=${!isWebUsbSupported()}
-        .picoReset=${true}
+        .resetMode=${"pico"}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

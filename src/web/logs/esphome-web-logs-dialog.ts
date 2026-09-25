@@ -22,10 +22,16 @@ import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { picoResetFailureKey } from "../../util/rp2-logs-reset.js";
 import type { SerialLineHooks } from "../../util/serial-log-stream.js";
+import { isWebUsbSupported } from "../../util/web-usb.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import { LOG_BAUD_RATE, LOG_BUFFER_SIZE, SerialLogSource } from "./serial-source.js";
+import {
+  LOG_BAUD_RATE,
+  LOG_BUFFER_SIZE,
+  SerialLogSource,
+  type SerialResetMode,
+} from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
 import "../../components/base-dialog.js";
@@ -107,18 +113,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @property() deviceLabel = "";
 
   /**
-   * Hide the "Reset device" button. A DTR/RTS pulse doesn't reset a
-   * native-USB CDC device (the Pico, an nRF52), so the button would be a
-   * no-op there — legacy hid it for the same reason.
+   * How Reset Device reaches the board (see ``SerialResetMode``). The Pico's
+   * reboot goes over WebUSB, so the button hides where that is missing.
    */
-  @property({ type: Boolean }) noReset = false;
-
-  /**
-   * Reset Device reboots a Pico through BOOTSEL and PICOBOOT over WebUSB,
-   * after which its CDC port re-enumerates and the stream resumes. The card
-   * sets ``noReset`` alongside where WebUSB is missing.
-   */
-  @property({ type: Boolean }) picoReset = false;
+  @property() resetMode: SerialResetMode = "rts";
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -176,7 +174,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   /** Reset Device is a serial RTS pulse; never over Bluetooth. */
   get canReset(): boolean {
-    return !this.noReset && !this.bleDevice;
+    if (this.bleDevice || this.resetMode === "none") return false;
+    return this.resetMode !== "pico" || isWebUsbSupported();
   }
 
   private _start(): void {
@@ -202,8 +201,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (this.bleDevice) return new BleLogSource(this.bleDevice);
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
-      canReset: this.canReset,
-      rebootOverUsb: this.canReset && this.picoReset,
+      reset: this.canReset ? this.resetMode : "none",
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>
@@ -364,15 +362,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
       this._failReconnect(source);
       return;
     }
-    this._adoptStream(cancel, wasPaused);
-  }
-
-  // A stream that came back after a drop or a reboot. Honour a Stop pressed
-  // before it: the reader drains either way, so the display stays paused
-  // instead of force-resuming.
-  private _adoptStream(cancel: () => Promise<void>, wasPaused: boolean): void {
     this._enqueueLine(this._localize("web.logs.reconnected"));
     this._enqueueLine("");
+    // Honour a Stop pressed before the drop: the reader drains either way,
+    // so the display stays paused instead of force-resuming.
     this._streaming = !wasPaused;
     this._paused = wasPaused;
     this._cancel = cancel;
@@ -461,27 +454,22 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
     const source = this._source;
-    if (source?.reboot) {
-      await this._reboot(source);
-      return;
-    }
     const reset = source?.reset;
     // No live session (the first attach failed): nothing to pulse.
-    if (!reset) {
+    if (!source || !reset) {
       toast.error(this._localize("web.logs.reset_failed"));
       return;
     }
-    try {
-      await reset();
-    } catch {
-      toast.error(this._localize("web.logs.reset_failed"));
+    if (!source.resetDropsStream) {
+      try {
+        await reset(() => false);
+      } catch {
+        toast.error(this._localize("web.logs.reset_failed"));
+      }
+      return;
     }
-  }
-
-  // A reset that re-enumerates the port: end the stream, reboot, and adopt
-  // the fresh stream on the disconnect-recovery rails (same generation
-  // guards, same failure ending).
-  private async _reboot(source: WebLogSource): Promise<void> {
+    // A reset that re-enumerates the port (a Pico rebooting through BOOTSEL):
+    // end the stream, reboot, then come back the way a dropped stream does.
     const generation = ++this._generation;
     const cancel = this._cancel;
     this._cancel = undefined;
@@ -493,25 +481,19 @@ export class ESPHomeWebLogsDialog extends LitElement {
     await cancel?.().catch((err) => {
       console.error("[Logs] Failed to release the stream before a reboot:", err);
     });
-    let live: (() => Promise<void>) | null;
     try {
-      live = await source.reboot!(this._hooks(), () => generation !== this._generation);
+      await reset(() => generation !== this._generation);
     } catch (err) {
       console.warn("[Logs] reset failed:", err);
       toast.error(this._localize(picoResetFailureKey(err, "web.logs.reset_failed")));
-      if (generation !== this._generation) return;
-      this._failReconnect(source);
+      if (generation === this._generation) this._failReconnect(source);
       return;
     }
-    if (generation !== this._generation) {
-      this._releaseSuperseded(source, live ?? undefined);
-      return;
-    }
-    if (!live) {
-      this._failReconnect(source);
-      return;
-    }
-    this._adoptStream(live, wasPaused);
+    if (generation !== this._generation) return;
+    await this._resume(source, generation, wasPaused).catch((err: unknown) => {
+      console.error("[Logs] reconnect failed:", err);
+      if (generation === this._generation) this._failReconnect(source, err);
+    });
   }
 
   _download(): void {
