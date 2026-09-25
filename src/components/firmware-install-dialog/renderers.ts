@@ -335,7 +335,10 @@ function bootloaderStepActions(
   const flash = "firmware.browser_flash_action";
   switch (host._step) {
     case "nrf-reset":
-      return { primary: { onClick: host._nrfDoReset, labelKey: reset } };
+      return {
+        secondary: { onClick: host._nrfDoFlash, labelKey: flash },
+        primary: { onClick: host._nrfDoReset, labelKey: reset },
+      };
     case "nrf-wait":
       return { primary: { onClick: host._nrfDoFlash, labelKey: flash } };
     case "rp2-bootsel":
