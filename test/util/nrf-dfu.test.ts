@@ -1,5 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
+import { driveFakeTimers } from "../_fake-timers.js";
+import { makeWebSerialPort } from "../web/_make-web-serial-port.js";
 
 import {
   buildHciPacket,
@@ -10,7 +12,17 @@ import {
   slipDecode,
   slipEncode,
 } from "../../src/util/nrf-dfu.js";
-import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
+import {
+  isRecentSerialActivity,
+  openLiveSerialPort,
+} from "../../src/util/serial-reacquire.js";
+
+// Real reacquire by default; one test makes the device stay gone.
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/util/serial-reacquire.js")>();
+  return { ...actual, openLiveSerialPort: vi.fn(actual.openLiveSerialPort) };
+});
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -167,7 +179,7 @@ describe("flashDfuPackage", () => {
     abort.abort();
 
     await expect(
-      flashDfuPackage(port, pkg, () => {}, abort.signal)
+      flashDfuPackage(port, pkg, { onProgress: () => {}, signal: abort.signal })
     ).rejects.toMatchObject({
       name: "AbortError",
     });
@@ -188,7 +200,7 @@ describe("flashDfuPackage", () => {
       ],
     };
 
-    await expect(flashDfuPackage(port, pkg, () => {})).rejects.toThrow(
+    await expect(flashDfuPackage(port, pkg, { onProgress: () => {} })).rejects.toThrow(
       /Serial port closed/
     );
     expect(port.close).toHaveBeenCalled();
@@ -217,12 +229,73 @@ describe("flashDfuPackage", () => {
     };
     const abort = new AbortController();
 
-    const flash = flashDfuPackage(port, pkg, () => {}, abort.signal);
+    const flash = flashDfuPackage(port, pkg, {
+      onProgress: () => {},
+      signal: abort.signal,
+    });
     await new Promise((r) => setTimeout(r, 10));
     abort.abort();
 
     await expect(flash).rejects.toMatchObject({ name: "AbortError" });
     expect(port.close).toHaveBeenCalled();
+  });
+});
+
+/**
+ * A DFU port whose bootloader ACKs every packet: each write is answered
+ * with a two-byte SLIP frame once the write settles, which is all the
+ * session's ACK wait needs.
+ */
+function ackingPort() {
+  let rx!: ReadableStreamDefaultController<Uint8Array>;
+  const written: Uint8Array[] = [];
+  const port = makeWebSerialPort({
+    close: vi.fn(async () => rx.close()),
+    readable: new ReadableStream<Uint8Array>({ start: (c) => (rx = c) }),
+    writable: new WritableStream<Uint8Array>({
+      write: (chunk) => {
+        written.push(chunk);
+        setTimeout(() => rx.enqueue(bytes(0x00, 0x00, 0xc0)), 1);
+      },
+    }),
+  });
+  return { port, written };
+}
+
+describe("flashDfuPackage log lines", () => {
+  it("names every step: start and erase, init, transfer by tens, stop, reboot", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { port, written } = ackingPort();
+    const app = new Uint8Array(512 * 10).fill(0xaa);
+    const pkg = {
+      parts: [{ type: "application" as const, mode: 4, bin: app, dat: bytes(1, 2) }],
+    };
+    const log: string[] = [];
+    const progress: number[] = [];
+    try {
+      await driveFakeTimers(
+        flashDfuPackage(port, pkg, {
+          onProgress: (p) => progress.push(p),
+          onLog: (l) => log.push(l),
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+    // The fake port is built open (its streams exist), so there is no open line.
+    expect(log).toEqual([
+      "Image 1 of 1: application (5120 bytes)",
+      "Sending the start packet; waiting 500 ms for the erase",
+      "Sending the init packet (2 bytes)",
+      "Transferring in 10 packets",
+      ...[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((p) => `Transferring: ${p}%`),
+      "Sending the stop packet",
+      "Transfer complete; closing the port reboots the device into the firmware",
+    ]);
+    // start, init, ten data packets, stop
+    expect(written.length).toBe(13);
+    expect(progress[progress.length - 1]).toBe(100);
+    expect(port.close).toHaveBeenCalledOnce();
   });
 });
 
@@ -248,10 +321,19 @@ describe("flashDfuPackageWithReconnect", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.now() + 1_000_000);
     try {
+      const log: string[] = [];
       await expect(
-        flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
+        flashDfuPackageWithReconnect(port, pkg, {
+          onProgress: () => {},
+          onReconnecting,
+          onLog: (l) => log.push(l),
+        })
       ).rejects.toThrow(/Serial port closed/);
       expect(onReconnecting).toHaveBeenCalledTimes(1);
+      expect(log).toContain(
+        "The device dropped off the bus mid-flash; waiting for it to re-enumerate"
+      );
+      expect(log).toContain("Reacquired the DFU port; flashing again from the start");
       // The close stamps serial activity so the bootloader's return is not
       // announced as a new device.
       expect(isRecentSerialActivity()).toBe(true);
@@ -262,13 +344,28 @@ describe("flashDfuPackageWithReconnect", () => {
     expect(port.close).toHaveBeenCalledTimes(2);
   });
 
+  it("says the device did not come back and rethrows the drop when the reacquire times out", async () => {
+    const port = droppedPort();
+    vi.mocked(openLiveSerialPort).mockResolvedValueOnce(null);
+    const log: string[] = [];
+    await expect(
+      flashDfuPackageWithReconnect(port, pkg, {
+        onProgress: () => {},
+        onLog: (l) => log.push(l),
+      })
+    ).rejects.toThrow(/Serial port closed/);
+    expect(log[log.length - 1]).toBe("The device did not come back");
+    expect(port.close).toHaveBeenCalledTimes(1);
+  });
+
   it("does not retry after an abort", async () => {
     const port = droppedPort();
     const abort = new AbortController();
     abort.abort();
     const onReconnecting = vi.fn();
     await expect(
-      flashDfuPackageWithReconnect(port, pkg, () => {}, {
+      flashDfuPackageWithReconnect(port, pkg, {
+        onProgress: () => {},
         signal: abort.signal,
         onReconnecting,
       })

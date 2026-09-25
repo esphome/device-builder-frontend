@@ -10,12 +10,17 @@ const isPortLost = (err: unknown): boolean =>
   err instanceof DOMException &&
   (err.name === "NetworkError" || err.name === "InvalidStateError");
 
-export async function resetToBootloader(port: SerialPort): Promise<void> {
+/** ``onLog`` gets one line per step, for an install dialog's details log. */
+export async function resetToBootloader(
+  port: SerialPort,
+  onLog: (line: string) => void = () => {}
+): Promise<void> {
   // The re-enumeration is ours; keep the "USB device connected" toast quiet.
   markSerialActivity();
   // A handle left open by an earlier touch whose close raced the reboot
   // would make open() throw "already open"; release it first.
   if (port.readable) await port.close().catch(() => {});
+  onLog("Touching the port at 1200 baud");
   await port.open({ baudRate: 1200 });
   try {
     // Drop DTR ourselves rather than through close(): the device reboots the
@@ -26,6 +31,7 @@ export async function resetToBootloader(port: SerialPort): Promise<void> {
     // Already gone: it rebooted on the line coding alone (nRF52). Anything
     // else means DTR never dropped, so an RP2 would not have reset.
     if (!isPortLost(err)) throw err;
+    onLog("The device rebooted on the line coding alone");
   }
   try {
     await port.close();
@@ -33,4 +39,5 @@ export async function resetToBootloader(port: SerialPort): Promise<void> {
     // The device vanished mid-close; that is the reboot we asked for.
     if (!isPortLost(err)) throw err;
   }
+  onLog("Port released; the device re-enumerates as its bootloader");
 }

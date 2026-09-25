@@ -88,3 +88,16 @@ export async function pickSerialPortOrFail(
     if (stillCurrent()) host._flashBusy = false;
   }
 }
+
+/**
+ * An engine's step lines land in the details log, as esptool's do; a line
+ * that arrives after the dialog moved on to another install is dropped.
+ */
+export function installLog(
+  host: ESPHomeFirmwareInstallDialog,
+  stillCurrent: () => boolean
+): (line: string) => void {
+  return (line) => {
+    if (stillCurrent()) host._log.enqueue(line);
+  };
+}

@@ -11,6 +11,7 @@ import { Uf2FamilyError } from "../../util/uf2.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
+  installLog,
   pickSerialPortOrFail,
   resetForRetry,
 } from "./browser-flash-steps.js";
@@ -91,10 +92,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     const { flashAmbz2 } = await loadEngine();
     rebooted = await flashAmbz2(port, image, {
       signal: abort.signal,
-      // The engine's steps land in the details log, as esptool's lines do.
-      onLog: (line) => {
-        if (stillCurrent()) host._log.enqueue(line);
-      },
+      onLog: installLog(host, stillCurrent),
       onWaitingForStrap: () => {
         if (!stillCurrent()) return;
         host._step = "rtl-wait";
