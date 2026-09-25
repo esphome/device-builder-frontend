@@ -266,6 +266,8 @@ export class PicobootDevice {
 interface SectorWrite {
   address: number;
   data: Uint8Array<ArrayBuffer>;
+  /** Image bytes in ``data``, excluding page padding; drives progress. */
+  bytes: number;
 }
 
 // Writes go in whole 256-byte pages; a short tail is padded with erased
@@ -297,7 +299,11 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
       const sector = addr - (addr % FLASH_SECTOR_SIZE);
       const len = Math.min(sector + FLASH_SECTOR_SIZE - addr, range.data.length - off);
       const list = sectors.get(sector) ?? [];
-      list.push({ address: addr, data: padToPage(range.data.subarray(off, off + len)) });
+      list.push({
+        address: addr,
+        data: padToPage(range.data.subarray(off, off + len)),
+        bytes: len,
+      });
       sectors.set(sector, list);
       off += len;
     }
@@ -333,7 +339,7 @@ export async function flashUf2(
       await dev.flashErase(sector, FLASH_SECTOR_SIZE);
       for (const w of writes) {
         await dev.write(w.address, w.data);
-        written += w.data.length;
+        written += w.bytes;
         onProgress(Math.floor((written / image.totalBytes) * 99));
       }
     }

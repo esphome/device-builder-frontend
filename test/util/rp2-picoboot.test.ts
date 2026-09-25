@@ -325,7 +325,13 @@ describe("flashUf2", () => {
   it("pads a short last page with erased flash", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
-    await flashUf2(dev, image([{ address: BASE, length: 0x180 }]), () => {});
+    const progress: number[] = [];
+    await flashUf2(dev, image([{ address: BASE, length: 0x180 }]), (p) =>
+      progress.push(p)
+    );
+    // Padding must not count toward progress.
+    expect(progress.slice(0, -1).every((p) => p <= 99)).toBe(true);
+    expect(progress[progress.length - 1]).toBe(100);
     const writes = packetArgs(d, PicobootCmd.WRITE).map((a) => [u32(a, 0), u32(a, 4)]);
     expect(writes).toEqual([[BASE, 0x200]]);
     const payload = d.log.find(
