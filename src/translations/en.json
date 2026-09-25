@@ -1955,6 +1955,7 @@
       "install_step_install": "Click Install and pick the RP2 Boot device.",
       "install_reset_action": "Reset into BOOTSEL",
       "install_not_bootsel": "The selected device is not in BOOTSEL mode. Click Reset into BOOTSEL, or hold BOOTSEL while plugging it in, then try again.",
+      "install_waiting": "Wait a few seconds for the Pico to reconnect as RP2 Boot, then click Install. If it does not, hold BOOTSEL while plugging it in, then click Install.",
       "install_image_failed": "Could not load the firmware: {error}"
     },
     "unsupported": {

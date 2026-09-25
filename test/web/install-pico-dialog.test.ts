@@ -244,6 +244,9 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     await settle(el);
     expect(mocks.touchIntoBootloader).toHaveBeenCalledWith({ filters: picoPortFilters });
     expect(card(el).statusMessage).toBe("firmware.rp2_wait_title");
+    expect(card(el).statusDetail).toBe("web.pico.install_waiting");
+    // The setup steps give way to the card's own instruction.
+    expect(text(el)).not.toContain("web.pico.install_step_bootsel");
     expect(button(el, "dashboard.install")).toBeDefined();
   });
 

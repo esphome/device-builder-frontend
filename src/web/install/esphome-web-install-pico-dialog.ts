@@ -188,15 +188,22 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     `;
   }
 
+  // The setup steps are for the start; once a step runs, the card says
+  // where things stand and what to do next.
   private _renderUsbInstall() {
     return html`
-      <p>${this._localize("web.pico.install_intro")}</p>
-      <ol>
-        <li>${this._localize("web.pico.install_step_bootsel")}</li>
-        <li>${this._localize("web.pico.install_step_running")}</li>
-        <li>${this._localize("web.pico.install_step_install")}</li>
-      </ol>
-      ${this._state === "idle" ? nothing : renderProgressCard(this._card())}
+      ${
+        this._state === "idle"
+          ? html`
+              <p>${this._localize("web.pico.install_intro")}</p>
+              <ol>
+                <li>${this._localize("web.pico.install_step_bootsel")}</li>
+                <li>${this._localize("web.pico.install_step_running")}</li>
+                <li>${this._localize("web.pico.install_step_install")}</li>
+              </ol>
+            `
+          : renderProgressCard(this._card())
+      }
       ${
         this._state === "success"
           ? html`<p>${this._localize("web.pico.setup_continue_hint")}</p>`
@@ -214,7 +221,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         return {
           state: null,
           message: this._localize("firmware.rp2_wait_title"),
-          detail: this._localize("firmware.rp2_wait_desc"),
+          detail: this._localize("web.pico.install_waiting"),
         };
       case "flashing":
         return {
