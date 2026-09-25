@@ -18,23 +18,23 @@ const BLE_NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
 export const isWebBluetoothSupported = (): boolean => "bluetooth" in navigator;
 
-/** Why Bluetooth cannot be used right now: the radio is off or access
- *  denied, or Brave has the feature switched off. */
+/** Not usable: the radio is off or access denied ("off"), and on Brave the
+ *  feature itself may also be switched off ("brave"). */
 export type BleUnavailableReason = "off" | "brave";
 
 /**
  * Whether Bluetooth can be used right now, or why not. The API object alone
- * says nothing: Brave exposes it with the feature switched off, and the radio
- * may be off or the browser denied access; the adapter query answers for
- * those.
+ * says nothing: the radio may be off or the browser denied access, and Brave
+ * exposes it with the feature switched off; the adapter query answers for
+ * all of those, and Brave is told apart so its extra step can be named.
  */
 export async function bleUnavailableReason(): Promise<BleUnavailableReason | null> {
   if (await bleAdapterAvailable()) return null;
   return (await isBraveBrowser()) ? "brave" : "off";
 }
 
+/** The one place the adapter is asked; a rejection counts as unusable. */
 async function bleAdapterAvailable(): Promise<boolean> {
-  if (!isWebBluetoothSupported()) return false;
   try {
     return await navigator.bluetooth.getAvailability();
   } catch {
@@ -42,7 +42,7 @@ async function bleAdapterAvailable(): Promise<boolean> {
   }
 }
 
-/** Brave ships with Web Bluetooth switched off; it announces itself. */
+/** Brave announces itself through `navigator.brave`. */
 async function isBraveBrowser(): Promise<boolean> {
   const brave = (navigator as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
   if (!brave?.isBrave) return false;
@@ -95,7 +95,7 @@ export async function requestBleNusDevice(
   } catch (err) {
     if (!isPortPickerCancel(err)) throw err;
     // Chrome rejects with the same NotFoundError when the adapter is off.
-    if (!(await navigator.bluetooth.getAvailability())) throw new BleUnavailableError();
+    if (!(await bleAdapterAvailable())) throw new BleUnavailableError();
     // Also Chrome's answer when no device matched or policy blocked the
     // chooser, so leave a trace for "nothing happened" reports.
     console.debug("BLE NUS chooser closed", err);

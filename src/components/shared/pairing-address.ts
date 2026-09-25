@@ -86,3 +86,25 @@ export async function copyAddressToClipboard(
     notify.warning(localize("settings.remote_build_address_copy_failed"));
   }
 }
+
+/**
+ * An address the user needs elsewhere (a browser-internal page, say, which
+ * no link can open): the whole line is one click to copy. Pair with
+ * `pairingAddressStyles`.
+ */
+export function renderCopyAddress(localize: LocalizeFunc, value: string): TemplateResult {
+  return html`
+    <button
+      type="button"
+      class="copy-address"
+      aria-label=${localize("settings.remote_build_address_copy_aria", {
+        address: value,
+      })}
+      title=${localize("settings.remote_build_address_copy")}
+      @click=${() => void copyAddressToClipboard(localize, value)}
+    >
+      <code>${value}</code>
+      <wa-icon library="mdi" name="content-copy"></wa-icon>
+    </button>
+  `;
+}

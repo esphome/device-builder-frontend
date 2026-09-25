@@ -33,6 +33,7 @@ import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
   setBluetooth,
+  setBrave,
   setLocalhostWithWebSerial,
 } from "./_install-method-dialog-env.js";
 
@@ -187,19 +188,32 @@ describe("install-method-dialog BLE NUS row gating", () => {
 
   const bleRow = (d: ESPHomeInstallMethodDialog): HTMLElement =>
     d.shadowRoot!.querySelector('wa-icon[name="bluetooth"]')!.closest(".option")!;
+  // Lets the adapter's answer land and the row re-render.
+  const settle = async (d: ESPHomeInstallMethodDialog): Promise<void> => {
+    await flush();
+    await d.updateComplete;
+  };
+
+  it("keeps the row non-actionable until the adapter answers", async () => {
+    setBluetooth(true, () => new Promise<boolean>(() => {}));
+    const d = await mount("nrf52", "logs");
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(true);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_desc")
+    );
+    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+  });
 
   it("enables the row once the adapter answers available", async () => {
     const d = await mount("nrf52", "logs");
-    await flush();
-    await d.updateComplete;
+    await settle(d);
     expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
   });
 
   it("disables the row with a hint when the adapter is off or blocked", async () => {
-    setBluetooth(true, false);
+    setBluetooth(true, async () => false);
     const d = await mount("nrf52", "logs");
-    await flush();
-    await d.updateComplete;
+    await settle(d);
     expect(bleRow(d).classList.contains("option--disabled")).toBe(true);
     expect(bleRow(d).textContent).toContain(
       defaultLocalize("dashboard.logs_method_ble_nus_off")
@@ -213,42 +227,32 @@ describe("install-method-dialog BLE NUS row gating", () => {
       new Promise<boolean>((r) => (resolveFirst = r)),
       Promise.resolve(true),
     ];
-    Object.defineProperty(navigator, "bluetooth", {
-      configurable: true,
-      value: { getAvailability: () => answers.shift()! },
-    });
+    setBluetooth(true, () => answers.shift()!);
     const d = await mount("nrf52", "logs");
     d.open = false;
     await d.updateComplete;
     d.open = true;
     await d.updateComplete;
     resolveFirst(false);
-    await flush();
-    await d.updateComplete;
+    await settle(d);
     expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
   });
 
   it("names the Brave flag when Brave has Web Bluetooth switched off", async () => {
-    setBluetooth(true, false);
-    Object.defineProperty(navigator, "brave", {
-      configurable: true,
-      value: { isBrave: async () => true },
-    });
-    try {
-      const d = await mount("nrf52", "logs");
-      await flush();
-      await d.updateComplete;
-      expect(bleRow(d).textContent).toContain(
-        defaultLocalize("dashboard.logs_method_ble_nus_brave")
-      );
-      // Pages cannot link to brave://, so the address is one click to copy.
-      const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-address")!;
-      expect(copy.textContent).toContain(BRAVE_WEB_BLUETOOTH_FLAG);
-      copy.click();
-      await flush();
-      expect(copyToClipboard).toHaveBeenCalledWith(BRAVE_WEB_BLUETOOTH_FLAG);
-    } finally {
-      delete (navigator as unknown as { brave?: unknown }).brave;
-    }
+    setBluetooth(true, async () => false);
+    setBrave();
+    const d = await mount("nrf52", "logs");
+    await settle(d);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_off")
+    );
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_brave")
+    );
+    const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-address")!;
+    expect(copy.textContent).toContain(BRAVE_WEB_BLUETOOTH_FLAG);
+    copy.click();
+    await flush();
+    expect(copyToClipboard).toHaveBeenCalledWith(BRAVE_WEB_BLUETOOTH_FLAG);
   });
 });

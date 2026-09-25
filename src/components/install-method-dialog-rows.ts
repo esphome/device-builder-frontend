@@ -6,9 +6,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { BleUnavailableReason } from "../util/ble-nus-stream.js";
+import type { BleProbeState } from "../util/ble-probe-controller.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
-import { copyAddressToClipboard } from "./shared/pairing-address.js";
+import { renderCopyAddress } from "./shared/pairing-address.js";
 
 export interface MethodRowContext {
   localize: LocalizeFunc;
@@ -135,32 +135,36 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
 // as a click-to-copy address for the user to paste.
 export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
 
-/** BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth. */
+/**
+ * BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth.
+ * Clickable only once the adapter answered; otherwise the row is disabled,
+ * with the reason once there is one. Brave gets the generic hint too (its
+ * radio can be off with the flag already on), plus its extra step.
+ */
 export function renderBleNusOption(
   ctx: MethodRowContext,
-  unavailable: BleUnavailableReason | null
+  state: BleProbeState
 ): TemplateResult {
   const title = ctx.localize("dashboard.logs_method_ble_nus");
-  if (unavailable) {
+  if (state === "available") {
     return renderMethodRow({
       icon: "bluetooth",
       title,
-      desc: ctx.localize(
-        unavailable === "brave"
-          ? "dashboard.logs_method_ble_nus_brave"
-          : "dashboard.logs_method_ble_nus_off"
-      ),
-      action:
-        unavailable === "brave"
-          ? renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG)
-          : undefined,
+      desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
+      onClick: () => ctx.onSelect("ble-nus"),
     });
+  }
+  const brave = state === "brave";
+  let desc = ctx.localize("dashboard.logs_method_ble_nus_desc");
+  if (state !== "pending") {
+    desc = ctx.localize("dashboard.logs_method_ble_nus_off");
+    if (brave) desc += " " + ctx.localize("dashboard.logs_method_ble_nus_brave");
   }
   return renderMethodRow({
     icon: "bluetooth",
     title,
-    desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
-    onClick: () => ctx.onSelect("ble-nus"),
+    desc,
+    action: brave ? renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG) : undefined,
   });
 }
 
@@ -227,22 +231,4 @@ function serverSerialCopyKeys(env: DeploymentEnvironment): {
         desc: "dashboard.install_method_usb_server_desc",
       };
   }
-}
-
-/** An address the user needs elsewhere: one click copies it. */
-function renderCopyAddress(localize: LocalizeFunc, value: string): TemplateResult {
-  return html`
-    <button
-      type="button"
-      class="copy-address"
-      aria-label=${localize("settings.remote_build_address_copy_aria", {
-        address: value,
-      })}
-      title=${localize("settings.remote_build_address_copy")}
-      @click=${() => void copyAddressToClipboard(localize, value)}
-    >
-      <code>${value}</code>
-      <wa-icon library="mdi" name="content-copy"></wa-icon>
-    </button>
-  `;
 }

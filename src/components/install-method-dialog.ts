@@ -27,6 +27,7 @@ import { disclosureStyles } from "../styles/disclosure.js";
 import { emptyStateStyles } from "../styles/empty-state.js";
 import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
+import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { bleNusLogsAvailable } from "../util/ble-nus-stream.js";
@@ -194,6 +195,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     emptyStateStyles,
     backButtonStyles,
     installMethodDialogStyles,
+    pairingAddressStyles,
   ];
 
   protected render() {
@@ -267,7 +269,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
     const rp2Row = showRp2Row ? renderRp2Uf2Option(ctx) : nothing;
     const bleNusRow = showBleNusRow
-      ? renderBleNusOption(ctx, this._bleProbe.reason)
+      ? renderBleNusOption(ctx, this._bleProbe.state)
       : nothing;
     const serverRow = showServerSerialRow
       ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
