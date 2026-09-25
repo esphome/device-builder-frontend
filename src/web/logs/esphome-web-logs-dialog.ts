@@ -136,7 +136,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  private _cancel?: () => Promise<void>;
+  // Reactive so the toolbar can offer Reset Device only over a live stream.
+  @state() private _cancel?: () => Promise<void>;
   // The transport of the current session; set for as long as the session
   // lives, streaming or mid-recovery.
   private _source?: WebLogSource;
@@ -176,6 +177,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
   get canReset(): boolean {
     if (this.bleDevice || this.resetMode === "none") return false;
     return this.resetMode !== "pico" || isWebUsbSupported();
+  }
+
+  /**
+   * A reset needs a live stream: during a reconnect or a reboot the port is
+   * being reacquired, and a second reset would run another BOOTSEL sequence
+   * against it.
+   */
+  get resetReady(): boolean {
+    return this._cancel !== undefined;
   }
 
   private _start(): void {
@@ -470,8 +480,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
     // A reset that re-enumerates the port (a Pico rebooting through BOOTSEL):
     // end the stream, reboot, then come back the way a dropped stream does.
-    const generation = ++this._generation;
+    // Not while a reconnect or an earlier reset is still reacquiring the port.
     const cancel = this._cancel;
+    if (!cancel) return;
+    const generation = ++this._generation;
     this._cancel = undefined;
     this._streaming = false;
     const wasPaused = this._paused;

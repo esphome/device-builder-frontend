@@ -170,6 +170,31 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._source).toBeUndefined();
   });
 
+  it("ignores a second Reset click while the reboot is still reacquiring the port", async () => {
+    const el = await mount("pico");
+    picoSession(el);
+    let finish!: (rebooted: boolean) => void;
+    vi.mocked(rebootPico).mockReturnValue(new Promise((r) => (finish = r)));
+    (openLiveSerialPort as any).mockResolvedValue(makeWebSerialPort());
+    const first = (el as any)._resetDevice();
+    await (el as any)._resetDevice();
+    // The first reset reaches the routine after releasing the stream.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rebootPico).toHaveBeenCalledOnce();
+    finish(true);
+    await first;
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("disables Reset Device until a stream is live", async () => {
+    const el = await mount();
+    await el.updateComplete;
+    expect((resetButtons(el)[0] as HTMLButtonElement).disabled).toBe(true);
+    (el as any)._cancel = async () => {};
+    await el.updateComplete;
+    expect((resetButtons(el)[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("offers the Pico reset only where WebUSB exists", async () => {
     expect(resetButtons(await mount("pico")).length).toBe(0);
     Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
