@@ -28,6 +28,8 @@ import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-res
 const port = { getInfo: () => ({}) } as unknown as SerialPort;
 const live = { readable: {} } as unknown as SerialPort;
 const usb = { vendorId: 0x2e8a, productId: 3 } as USBDevice;
+// A CDC handle the browser still sees as attached.
+const stillThere = { getInfo: () => ({}), connected: true } as unknown as SerialPort;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -85,9 +87,19 @@ describe("resetPicoForLogs", () => {
   });
 
   it("reports a plain failure when the CDC port never left (touch ignored)", async () => {
-    const stillThere = { getInfo: () => ({}), connected: true } as unknown as SerialPort;
     mocks.requestPicobootDevice.mockResolvedValue(null);
     await expect(run({ from: stillThere })).rejects.not.toBeInstanceOf(PicoStrandedError);
+  });
+
+  it("reads a chooser rejection with the CDC still connected as an ignored touch too", async () => {
+    mocks.requestPicobootDevice.mockRejectedValue(new Error("lapsed"));
+    await expect(run({ from: stillThere })).rejects.toThrow(/ignored.*lapsed/);
+  });
+
+  it("keeps the stranded hint on an early cancel, when the CDC may still be dropping", async () => {
+    await expect(run({ from: stillThere, cancelled: () => true })).rejects.toMatchObject({
+      step: "pick",
+    });
   });
 
   it("fails fast on a chooser-picked RP2350 instead of sending the RP2040 reboot", async () => {

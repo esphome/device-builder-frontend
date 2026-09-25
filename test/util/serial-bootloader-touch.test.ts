@@ -35,8 +35,11 @@ describe("resetToBootloader", () => {
 
   it("marks the re-enumeration as its own so the connect toast stays quiet", async () => {
     const { port } = fakePort();
+    const t0 = Date.now();
     await resetToBootloader(port);
-    expect(isRecentSerialActivity()).toBe(true);
+    // A window no wider than this call proves the stamp landed in it, not
+    // in an earlier test (the stamp is module state).
+    expect(isRecentSerialActivity(Date.now() - t0 + 1)).toBe(true);
   });
 
   it("releases a handle left open by an earlier touch before opening", async () => {

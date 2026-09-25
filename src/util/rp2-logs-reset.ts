@@ -51,17 +51,13 @@ export async function resetPicoForLogs(
   // granted board already sitting in BOOTSEL must not be rebooted instead.
   const before = await getPicobootDevices();
   await resetToBootloader(port);
-  const usb = await findBootselDevice(deadline, before, cancelled).catch(
-    (err: unknown) => {
-      throw new PicoStrandedError("pick", err);
-    }
-  );
-  if (!usb) {
-    // A CDC handle still connected means the firmware ignored the touch: the
-    // Pico never left, so this is a plain reset failure, not a stranding.
-    if (port.connected) throw new Error("The Pico ignored the 1200-baud touch");
-    throw new PicoStrandedError("pick");
+  let usb: USBDevice | null;
+  try {
+    usb = await findBootselDevice(deadline, before, cancelled);
+  } catch (err) {
+    throw noBootloader(port, cancelled, err);
   }
+  if (!usb) throw noBootloader(port, cancelled);
   // The chooser also lists RP2350 bootloaders; REBOOT is RP2040-only.
   if (classifyUsbDevice(usb) !== "rp2040") {
     throw new PicoStrandedError("reboot", "RP2350 is not supported");
@@ -78,6 +74,22 @@ export async function resetPicoForLogs(
     await dev.close();
   }
   return openLiveSerialPort(port, { baudRate, cancelled });
+}
+
+// No bootloader to reboot. A CDC handle still connected means the firmware
+// ignored the touch, a plain reset failure; unless the poll was cancelled
+// early, when the Pico may only be on its way into BOOTSEL.
+function noBootloader(
+  port: SerialPort,
+  cancelled: () => boolean,
+  cause?: unknown
+): Error {
+  if (port.connected && !cancelled()) {
+    return new Error(
+      `The Pico ignored the 1200-baud touch${cause === undefined ? "" : ` (${String(cause)})`}`
+    );
+  }
+  return new PicoStrandedError("pick", cause);
 }
 
 // A bootloader this origin was granted before shows up in getDevices() once
