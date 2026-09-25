@@ -196,11 +196,12 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         this._state === "idle"
           ? html`
               <p>${this._localize("web.pico.install_intro")}</p>
-              <ol>
+              <p>${this._localize("web.pico.install_bootsel_lead")}</p>
+              <ul>
                 <li>${this._localize("web.pico.install_step_bootsel")}</li>
                 <li>${this._localize("web.pico.install_step_running")}</li>
-                <li>${this._localize("web.pico.install_step_install")}</li>
-              </ol>
+              </ul>
+              <p>${this._localize("web.pico.install_step_install")}</p>
             `
           : renderProgressCard(this._card())
       }
@@ -299,7 +300,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   static styles = [
     espHomeStyles,
     css`
-      ol {
+      ol,
+      ul {
         padding-left: 1.5em;
       }
       li + li {
