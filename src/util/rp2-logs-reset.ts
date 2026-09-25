@@ -4,6 +4,7 @@
  * PICOBOOT reboot over WebUSB, after which the CDC port re-enumerates.
  */
 import { resetToBootloader } from "./serial-bootloader-touch.js";
+import { markSerialActivity } from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 import { openLiveSerialPort } from "./web-serial.js";
 import {
@@ -77,6 +78,8 @@ export async function resetPicoForLogs(
   } finally {
     await dev.close();
   }
+  // The CDC port is about to come back; that connect event is ours too.
+  markSerialActivity();
   return openLiveSerialPort(port, { baudRate, cancelled });
 }
 

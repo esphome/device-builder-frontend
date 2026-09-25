@@ -6,6 +6,7 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import { markSerialActivity } from "../../util/serial-reacquire.js";
 import {
   parseUf2Image,
   UF2_FAMILY_RP2040,
@@ -168,6 +169,8 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
       },
       { signal: abort.signal }
     );
+    // The flashed firmware re-enumerates as a CDC port: expected, not a new device.
+    markSerialActivity();
   } catch (err) {
     if (stillCurrent()) {
       host._fail(

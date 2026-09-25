@@ -10,6 +10,7 @@ import {
   slipDecode,
   slipEncode,
 } from "../../src/util/nrf-dfu.js";
+import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -247,6 +248,7 @@ describe("flashDfuPackageWithReconnect", () => {
       flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
     ).rejects.toThrow(/Serial port closed/);
     expect(onReconnecting).toHaveBeenCalledTimes(1);
+    expect(isRecentSerialActivity()).toBe(true);
     // Two attempts: the first open plus the reacquired handle, closed after each.
     expect(port.close).toHaveBeenCalledTimes(2);
   });

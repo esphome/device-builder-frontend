@@ -1,7 +1,11 @@
 import { unzipSync } from "fflate";
 
 import { concat, int32LE } from "./bytes.js";
-import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
+import {
+  markSerialActivity,
+  openLiveSerialPort,
+  SERIAL_REOPEN_TIMEOUT_MS,
+} from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 
 export interface DfuFirmwarePart {
@@ -444,6 +448,8 @@ export async function flashDfuPackageWithReconnect(
   } catch (err) {
     if (signal?.aborted || !isDeviceLost(err)) throw err;
     onReconnecting?.();
+    // The bootloader coming back is expected; keep the connect toast quiet.
+    markSerialActivity();
     const live = await openLiveSerialPort(port, {
       baudRate: 115200,
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,

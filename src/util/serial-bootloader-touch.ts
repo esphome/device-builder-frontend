@@ -4,11 +4,15 @@
  * nRF52 core on the line coding alone, arduino-pico once DTR also drops),
  * re-enumerating as a different USB device.
  */
+import { markSerialActivity } from "./serial-reacquire.js";
+
 const isPortLost = (err: unknown): boolean =>
   err instanceof DOMException &&
   (err.name === "NetworkError" || err.name === "InvalidStateError");
 
 export async function resetToBootloader(port: SerialPort): Promise<void> {
+  // The re-enumeration is ours; keep the "USB device connected" toast quiet.
+  markSerialActivity();
   // A handle left open by an earlier touch whose close raced the reboot
   // would make open() throw "already open"; release it first.
   if (port.readable) await port.close().catch(() => {});

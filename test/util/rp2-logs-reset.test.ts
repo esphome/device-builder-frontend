@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn<(usb: USBDevice) => Promise<unknown>>(),
   reboot: vi.fn<() => Promise<void>>(),
   close: vi.fn<() => Promise<void>>(),
+  markSerialActivity: vi.fn(),
 }));
 
 vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
@@ -23,6 +24,9 @@ vi.mock("../../src/util/web-usb.js", () => ({
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
+}));
+vi.mock("../../src/util/serial-reacquire.js", () => ({
+  markSerialActivity: mocks.markSerialActivity,
 }));
 
 import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
@@ -69,6 +73,8 @@ describe("resetPicoForLogs", () => {
       baudRate: 115200,
       cancelled: expect.any(Function),
     });
+    // The CDC coming back is expected; the connect toast must stay quiet.
+    expect(mocks.markSerialActivity).toHaveBeenCalledOnce();
   });
 
   it("ignores a bootloader that was already present before the touch", async () => {
