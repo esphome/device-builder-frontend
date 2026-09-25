@@ -407,6 +407,7 @@ export async function flashDfuPackage(
     failure = err;
     throw err;
   } finally {
+    markSerialActivity(); // the close reboots the board; its return is ours
     // Both are best effort: the port must always be closed so a retry can
     // reopen it, and neither may replace the error that ended the flash.
     try {
@@ -419,7 +420,6 @@ export async function flashDfuPackage(
     } catch {
       // ignore
     }
-    markSerialActivity(); // the re-enumeration next is ours
   }
 }
 
