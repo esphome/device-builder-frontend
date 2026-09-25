@@ -3,9 +3,16 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import {
+  bleNusLogsAvailable,
+  BleUnavailableError,
+  isWebBluetoothSupported,
+  requestBleNusDevice,
+} from "./ble-nus-stream.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {
+  attachBleNusLogs,
   attachSerialLogStream,
   openNetworkLogsFallback,
   picoResetHook,
@@ -29,7 +36,7 @@ const SERIAL_PORT_PROBE_TIMEOUT_MS = 2500;
  * Open live logs, offering the OTA-vs-serial picker when a serial path exists.
 
  * ``openMethodPicker`` is invoked (host wires the picker in its logs mode) when
- * WebSerial or a server serial port is available; otherwise OTA logs open
+ * WebSerial, a server serial port or Bluetooth logs are available; otherwise OTA logs open
  * directly. Online/offline state is intentionally not consulted (#525).
  */
 export async function launchLogs(
@@ -38,6 +45,7 @@ export async function launchLogs(
   openMethodPicker: () => void
 ): Promise<void> {
   const hasWebSerial = "serial" in navigator;
+  const hasBleNus = bleNusLogsAvailable(device.target_platform);
   let hasServerPorts = false;
   if (!hasWebSerial) {
     // Only pay the backend round-trip when WebSerial can't already provide a
@@ -57,7 +65,7 @@ export async function launchLogs(
       hasServerPorts = false;
     }
   }
-  if (hasWebSerial || hasServerPorts) {
+  if (hasWebSerial || hasServerPorts || hasBleNus) {
     openMethodPicker();
     return;
   }
@@ -165,5 +173,48 @@ export async function launchLogsWithMethod(
     } catch {
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }
+  } else if (method === "ble-nus") {
+    const bleDevice = await pickBleNusDevice(host, device);
+    if (!bleDevice) return;
+    host.logsDialog.configuration = device.configuration;
+    host.logsDialog.name = device.friendly_name || device.name;
+    const cancelled = host.logsDialog.openPassive({
+      source: "ble",
+      onReconnect: (cancelled) =>
+        attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled),
+    });
+    // attach reports its own failures; cover any other rejection so it can't
+    // escape this fire-and-forget call as an unhandled rejection.
+    try {
+      await attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled);
+    } catch (err) {
+      console.warn("BLE NUS attach failed", err);
+      notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
+    }
+  }
+}
+
+// The chooser, with its failures toasted; null when there is nothing to open.
+async function pickBleNusDevice(
+  host: LogsLaunchHost,
+  device: ConfiguredDevice
+): Promise<BluetoothDevice | null> {
+  if (!isWebBluetoothSupported()) {
+    notifyError(host.localize("dashboard.logs_ble_nus_unsupported"));
+    return null;
+  }
+  try {
+    // The firmware advertises the node name; the friendly name is a guess.
+    return await requestBleNusDevice([device.name, device.friendly_name]);
+  } catch (err) {
+    console.warn("BLE NUS chooser failed", err);
+    notifyError(
+      host.localize(
+        err instanceof BleUnavailableError
+          ? "dashboard.logs_ble_nus_unavailable"
+          : "dashboard.logs_ble_nus_open_failed"
+      )
+    );
+    return null;
   }
 }

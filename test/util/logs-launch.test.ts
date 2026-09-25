@@ -12,6 +12,16 @@ const launch = vi.hoisted(() => ({
 vi.mock("../../src/util/web-serial.js", () => ({
   requestSerialPort: launch.requestSerialPort,
 }));
+const ble = vi.hoisted(() => ({
+  requestBleNusDevice: vi.fn<() => Promise<BluetoothDevice | null>>(),
+  streamBleNus: vi.fn<() => Promise<() => Promise<void>>>(),
+}));
+vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/ble-nus-stream.js")>()),
+  isWebBluetoothSupported: () => true,
+  requestBleNusDevice: ble.requestBleNusDevice,
+  streamBleNus: ble.streamBleNus,
+}));
 vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/post-install-logs.js")>()),
   attachSerialLogStream: launch.attachSerialLogStream,
@@ -19,10 +29,11 @@ vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
-import { withWebSerial } from "../_web-serial.js";
+import { withWebBluetooth, withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
+import { BleUnavailableError } from "../../src/util/ble-nus-stream.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -40,13 +51,14 @@ type TestHost = LogsLaunchHost & {
     name?: string;
     open: ReturnType<typeof vi.fn>;
     openPassive: ReturnType<typeof vi.fn>;
+    setBleStream: ReturnType<typeof vi.fn>;
   };
 };
 
 function makeHost(getSerialPorts: () => Promise<unknown>): TestHost {
   return {
     api: { getSerialPorts: vi.fn(getSerialPorts) },
-    logsDialog: { open: vi.fn(), openPassive: vi.fn() },
+    logsDialog: { open: vi.fn(), openPassive: vi.fn(), setBleStream: vi.fn() },
     localize: (key: string) => key,
   } as unknown as TestHost;
 }
@@ -232,6 +244,102 @@ describe("launchLogsWithMethod web-serial", () => {
       );
     } finally {
       restore();
+    }
+  });
+});
+
+describe("launchLogsWithMethod ble-nus", () => {
+  it("opens a BLE passive session and registers the stream", async () => {
+    const device = {} as BluetoothDevice;
+    const cancel = vi.fn(async () => {});
+    ble.requestBleNusDevice.mockResolvedValue(device);
+    ble.streamBleNus.mockResolvedValue(cancel);
+    const host = makeHost(async () => []);
+    host.logsDialog.openPassive.mockReturnValue(() => false);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(ble.requestBleNusDevice).toHaveBeenCalledWith(["kitchen", "Kitchen"]);
+    expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "ble", onReconnect: expect.any(Function) })
+    );
+    expect(ble.streamBleNus).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({ onLine: expect.any(Function) }),
+      expect.objectContaining({ attempts: 3 })
+    );
+    expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(cancel);
+  });
+
+  it("toasts instead of leaving an unhandled rejection when the BLE attach throws", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    ble.requestBleNusDevice.mockResolvedValue({} as BluetoothDevice);
+    ble.streamBleNus.mockRejectedValue(new Error("boom"));
+    const host = makeHost(async () => []);
+    host.logsDialog.openPassive.mockReturnValue(() => false);
+    host.logsDialog.setBleStream.mockImplementation(() => {
+      throw new Error("late");
+    });
+    await expect(
+      launchLogsWithMethod(host, makeDevice(), "ble-nus")
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("says Bluetooth is off or blocked when the adapter is unavailable", async () => {
+    ble.requestBleNusDevice.mockRejectedValue(new BleUnavailableError());
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(toast.error).toHaveBeenCalledWith(
+      "dashboard.logs_ble_nus_unavailable",
+      expect.anything()
+    );
+    expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the chooser is dismissed", async () => {
+    ble.requestBleNusDevice.mockResolvedValue(null);
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
+  });
+});
+
+describe("launchLogs with Bluetooth", () => {
+  it("opens the method picker for an nRF52 on Bluetooth alone, with no serial path", async () => {
+    const restoreSerial = withWebSerial(false);
+    const restoreBluetooth = withWebBluetooth({});
+    const host = makeHost(async () => []); // no server serial ports either
+    const openMethodPicker = vi.fn();
+    try {
+      await launchLogs(
+        host,
+        { ...makeDevice(), target_platform: "nrf52" },
+        openMethodPicker
+      );
+      expect(openMethodPicker).toHaveBeenCalledOnce();
+      expect(host.logsDialog.open).not.toHaveBeenCalled();
+    } finally {
+      restoreBluetooth();
+      restoreSerial();
+    }
+  });
+
+  it("still opens OTA logs directly for a non-nRF device on Bluetooth alone", async () => {
+    const restoreSerial = withWebSerial(false);
+    const restoreBluetooth = withWebBluetooth({});
+    const host = makeHost(async () => []);
+    const openMethodPicker = vi.fn();
+    try {
+      await launchLogs(
+        host,
+        { ...makeDevice(), target_platform: "esp32" },
+        openMethodPicker
+      );
+      expect(openMethodPicker).not.toHaveBeenCalled();
+      expect(host.logsDialog.open).toHaveBeenCalledOnce();
+    } finally {
+      restoreBluetooth();
+      restoreSerial();
     }
   });
 });

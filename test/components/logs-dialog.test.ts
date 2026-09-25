@@ -1,6 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
+import type { LitElement } from "lit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -158,6 +159,31 @@ describe("logs-dialog header source chip", () => {
     expect(chipText(el)).toBe("/dev/cu.usbserial-110");
   });
 
+  it("shows the BLE label for a Bluetooth passive session, in every phase", async () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => Promise.resolve(), source: "ble" });
+    await el.updateComplete;
+    expect(chipText(el)).toBe("dashboard.logs_source_ble_nus"); // connecting
+    el.setBleStream(async () => {});
+    await el.updateComplete;
+    expect(chipText(el)).toBe("dashboard.logs_source_ble_nus"); // streaming
+  });
+
+  it.each([
+    ["ble", true],
+    ["serial", false],
+  ] as const)(
+    "shows the connecting banner while a %s session connects: %s",
+    async (source, shown) => {
+      const el = mount();
+      el.openPassive({ onReconnect: () => Promise.resolve(), source });
+      await el.updateComplete;
+      const term = el.shadowRoot!.querySelector("esphome-process-terminal") as LitElement;
+      await term.updateComplete;
+      expect(term.shadowRoot!.querySelector(".status-banner--info") !== null).toBe(shown);
+    }
+  );
+
   it("shows the Web Serial label for a passive (Web Serial) session", async () => {
     const el = mount();
     el.openPassive({ onReconnect: () => Promise.resolve() });
@@ -175,7 +201,7 @@ const alwaysHook: SerialResetHook = {
 describe("logs-dialog Reset Device gate", () => {
   async function mountPassive(
     targetPlatform: string,
-    options: { onResetDevice?: SerialResetHook } = {}
+    options: { onResetDevice?: SerialResetHook; source?: "serial" | "ble" } = {}
   ): Promise<ESPHomeLogsDialog> {
     const el = makeLogsDialog();
     el.configuration = "device.yaml";
@@ -213,6 +239,17 @@ describe("logs-dialog Reset Device gate", () => {
       onResetDevice: { ...alwaysHook, supports: () => false },
     });
     el.setSerialStream({ close: vi.fn(), setSignals: vi.fn() } as any, async () => {});
+    await el.updateComplete;
+    expect(hasResetButton(el)).toBe(false);
+  });
+
+  it("hides Reset Device for an nRF52 Web Serial session", async () => {
+    expect(hasResetButton(await mountPassive("nrf52"))).toBe(false);
+  });
+
+  it("hides Reset Device for a BLE session, whatever the platform", async () => {
+    const el = await mountPassive("esp32", { source: "ble" });
+    el.setBleStream(async () => {});
     await el.updateComplete;
     expect(hasResetButton(el)).toBe(false);
   });

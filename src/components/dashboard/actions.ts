@@ -13,7 +13,7 @@ import {
   type NotifyOptions,
   notifySuccess,
 } from "../../util/notify.js";
-import { streamSerialLines } from "../../util/serial-log-stream.js";
+import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import {
   connectToPort,
   detectChip,
@@ -428,13 +428,20 @@ export async function fetchEncryptionKey(
  */
 export function streamSerialToDialog(
   port: SerialPort,
-  dialog: {
-    _serialPaused?: boolean;
-    _noteSerialActivity(): void;
-    _enqueueLine(line: string): void;
-  }
+  dialog: LogLineSink
 ): () => Promise<void> {
-  return streamSerialLines(port, {
+  return streamSerialLines(port, dialogLineHooks(dialog));
+}
+
+interface LogLineSink {
+  _serialPaused?: boolean;
+  _noteSerialActivity(): void;
+  _enqueueLine(line: string): void;
+}
+
+/** Route finished lines into the dialog; any transport can feed these. */
+export function dialogLineHooks(dialog: LogLineSink): SerialLineHooks {
+  return {
     onLine: (line) => {
       // Keep draining while paused (Stop) but don't display (#526).
       if (!dialog._serialPaused) {
@@ -442,5 +449,5 @@ export function streamSerialToDialog(
         dialog._enqueueLine(line);
       }
     },
-  });
+  };
 }

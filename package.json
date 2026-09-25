@@ -64,6 +64,7 @@
     "@types/node": "26.6.2",
     "@types/w3c-web-serial": "^1.0.8",
     "@types/w3c-web-usb": "^1.0.14",
+    "@types/web-bluetooth": "0.0.21",
     "eslint": "^10.11.0",
     "eslint-plugin-perfectionist": "^5.11.1",
     "happy-dom": "^20.14.5",

@@ -12,6 +12,20 @@ export function makeDisconnectPort(): SerialPort & {
   } as unknown as SerialPort & { fire: () => void; listenerCount: () => number };
 }
 
+/** Install (or remove, with null) a `navigator.bluetooth` stub; returns a restore function. */
+export function withWebBluetooth(value: object | null): () => void {
+  const orig = Object.getOwnPropertyDescriptor(navigator, "bluetooth");
+  if (value) {
+    Object.defineProperty(navigator, "bluetooth", { configurable: true, value });
+  } else {
+    delete (navigator as unknown as { bluetooth?: unknown }).bluetooth;
+  }
+  return () => {
+    if (orig) Object.defineProperty(navigator, "bluetooth", orig);
+    else delete (navigator as unknown as { bluetooth?: unknown }).bluetooth;
+  };
+}
+
 /** Toggle `navigator.serial` presence for a test; returns a restore function. */
 export function withWebSerial(present: boolean): () => void {
   const had = "serial" in navigator;

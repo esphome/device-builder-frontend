@@ -35,6 +35,7 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { normalizeLogLine } from "../util/log-line.js";
+import { isNrfPlatform } from "../util/nrf-platform.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isRp2Platform } from "../util/rp2-platform.js";
@@ -50,21 +51,22 @@ import {
   onStop,
   openOta,
   openPassive,
-  resetOffered,
   resetSerialDevice,
   resumeAfterReconnect,
+  setBleStream,
   setSerialOpenFailed,
   setSerialStream,
   switchToOtaLogs,
   teardownSession,
   toggleShowStates,
 } from "./logs-dialog/session.js";
+import { renderLogsToolbar } from "./logs-dialog/toolbar.js";
 import {
-  hasSerialPort,
-  isOtaNetwork,
+  hasPause,
   isPassive,
   isStreaming,
   type LogsSession,
+  type PassiveSource,
 } from "./logs-session.js";
 import {
   crashCalloutStyles,
@@ -79,7 +81,7 @@ import {
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
 import { renderActionSuggestion } from "./process-terminal/reset-suggestion.js";
-import { renderTermButton, renderTermToggle } from "./process-terminal/toolbar-button.js";
+import { renderTermButton } from "./process-terminal/toolbar-button.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
@@ -217,20 +219,21 @@ export class ESPHomeLogsDialog extends LitElement {
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  // Read by `streamSerialToDialog` to gate appends while the log is paused (the
-  // reader keeps draining the open port; we just stop displaying).
+  // Read by the stream line hooks to gate appends while the log is paused.
   get _serialPaused(): boolean {
     const s = this._session;
-    return (s.kind === "serial" || s.kind === "reconnecting") && s.paused;
+    return hasPause(s) && s.paused;
   }
 
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // The RTS-pulse Reset Device works here. A Pico has no reset line on its
-  // CDC and arduino-pico gates output on DTR, so the pulse would only silence
-  // it; a Pico resets through the session's hook instead (WebUSB browsers).
+  // The RTS-pulse Reset Device works here. A Pico or an nRF52 has no reset
+  // line on its CDC and the pulse's DTR drop only detaches the host; a Pico
+  // resets through the session's hook instead (WebUSB browsers).
   _pulseResets = true;
+  // Set by openPassive; see PassiveSource.
+  _passiveSource: PassiveSource = "serial";
 
   static styles = [
     espHomeStyles,
@@ -252,7 +255,8 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      this._pulseResets = !isRp2Platform(this._targetPlatform);
+      this._pulseResets =
+        !isRp2Platform(this._targetPlatform) && !isNrfPlatform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -292,8 +296,14 @@ export class ESPHomeLogsDialog extends LitElement {
     onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
+    source?: PassiveSource;
   }): () => boolean {
     return openPassive(this, options);
+  }
+
+  /** Register a streaming BLE NUS link once notifications flow. */
+  public setBleStream(cancel: () => Promise<void>) {
+    setBleStream(this, cancel);
   }
 
   /** Register the Web Serial reader (its loop-cancel) + port. Called by
@@ -302,8 +312,7 @@ export class ESPHomeLogsDialog extends LitElement {
     setSerialStream(this, port, cancel);
   }
 
-  /** Surface a failure to reopen the Web Serial port for post-install logs.
-   *  The caller pairs this with a ``toast.error``. */
+  /** End the passive session for *message* (shown in the pane); Start reconnects. */
   public setSerialOpenFailed(message: string) {
     setSerialOpenFailed(this, message);
   }
@@ -335,27 +344,32 @@ export class ESPHomeLogsDialog extends LitElement {
     void this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
+  // A passive session shows its source; OTA / server-serial show the port.
+  private _sourceLabel(): string {
+    const s = this._session;
+    if (isPassive(s)) {
+      return this._localize(
+        this._passiveSource === "ble"
+          ? "dashboard.logs_source_ble_nus"
+          : "dashboard.logs_source_web_serial"
+      );
+    }
+    return s.kind === "ota" ? s.port : "";
+  }
+
   protected render() {
     const s = this._session;
     const streaming = isStreaming(s);
-    const passive = isPassive(s);
     // The dead state (serial reopen failed) gets the escape hatch
     // unconditionally — its only other recovery is Start-to-reconnect.
     const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
     const title = this._localize("dashboard.logs_title", { name: this.name });
-    // Web Serial's source label keys off the passive states; OTA / server-serial
-    // show the target port.
-    const source = passive
-      ? this._localize("dashboard.logs_source_web_serial")
-      : s.kind === "ota"
-        ? s.port
+    const source = this._sourceLabel();
+    // The BLE connect can take seconds with nothing to show yet.
+    const connectingMessage =
+      s.kind === "reconnecting" && this._passiveSource === "ble"
+        ? this._localize("dashboard.logs_ble_nus_connecting")
         : "";
-    const toggleLabel = this._localize(
-      this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states"
-    );
-    const expandLabel = this._localize(
-      this._expanded ? "dashboard.logs_collapse" : "dashboard.logs_expand"
-    );
     // Only the ota source rides the dashboard WS; a Web Serial stream
     // is healthy regardless, so no false error banner there.
     const wsDown = s.kind === "ota" && this._connectionLost;
@@ -375,6 +389,8 @@ export class ESPHomeLogsDialog extends LitElement {
           .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
+          .state=${connectingMessage ? "running" : null}
+          .statusMessage=${connectingMessage}
           .connectionLost=${wsDown}
           .connectionLostMessage=${this._localize("dashboard.logs_connection_lost")}
         >
@@ -416,67 +432,7 @@ export class ESPHomeLogsDialog extends LitElement {
                 )
               : ""
           }
-          <div class="toolbar-slot" slot="toolbar-right">
-            ${
-              resetOffered(this)
-                ? // Web Serial only; disabled until a port is attached.
-                  renderTermButton({
-                    icon: "restart",
-                    label: this._localize("dashboard.logs_reset_device"),
-                    disabled: !hasSerialPort(s),
-                    onClick: () => void this._onResetDevice(),
-                  })
-                : isOtaNetwork(s)
-                  ? // States arrive only over the network/API connection, so the
-                    // toggle is hidden for a server serial source (#539).
-                    renderTermToggle({
-                      active: this._showStates,
-                      onClick: () => void this._toggleShowStates(),
-                      icon: "pulse",
-                      label: this._localize("dashboard.logs_states"),
-                      title: toggleLabel,
-                    })
-                  : ""
-            }
-            <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
-            <button
-              type="button"
-              class="term-btn term-btn--ghost expand-btn"
-              @click=${this._toggleExpanded}
-              title=${expandLabel}
-              aria-label=${expandLabel}
-            >
-              <wa-icon
-                library="mdi"
-                name=${this._expanded ? "arrow-collapse" : "arrow-expand"}
-              ></wa-icon>
-            </button>
-            ${renderTermButton({
-              icon: "download",
-              title: this._localize("dashboard.logs_download"),
-              onClick: this._downloadLogs,
-            })}
-            ${renderTermButton({
-              icon: "delete-sweep",
-              label: this._localize("dashboard.logs_clear"),
-              onClick: this._clearLogs,
-            })}
-            ${
-              streaming
-                ? renderTermButton({
-                    icon: "stop",
-                    label: this._localize("dashboard.logs_stop"),
-                    variant: "stop",
-                    onClick: this._onStop,
-                  })
-                : renderTermButton({
-                    icon: "play",
-                    label: this._localize("dashboard.logs_start"),
-                    variant: "start",
-                    onClick: this._onStart,
-                  })
-            }
-          </div>
+          ${renderLogsToolbar(this)}
         </esphome-process-terminal>
       </esphome-base-dialog>
       <esphome-crash-report-dialog></esphome-crash-report-dialog>
@@ -496,26 +452,26 @@ export class ESPHomeLogsDialog extends LitElement {
     );
   };
 
-  private _onStart() {
+  _onStart() {
     onStart(this);
   }
 
-  private _onStop() {
+  _onStop() {
     onStop(this);
   }
 
-  private _downloadLogs() {
+  _downloadLogs() {
     this._log.flush();
     const stem = configurationStem(this.configuration, "logs");
     downloadAnsiText(this._log.lines, `${stem}-logs.txt`);
   }
 
-  private _toggleExpanded() {
+  _toggleExpanded() {
     this._expanded = !this._expanded;
   }
 
   // Returns the restart so a caller can await the respawn landing.
-  private _toggleShowStates() {
+  _toggleShowStates() {
     return toggleShowStates(this);
   }
 
@@ -562,7 +518,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   // Reset Device button (Web Serial only).
-  private _onResetDevice = () => resetSerialDevice(this);
+  _onResetDevice = () => resetSerialDevice(this);
 
   /**
    * Flip ``_open`` false the moment the user initiates a close (X / Esc /

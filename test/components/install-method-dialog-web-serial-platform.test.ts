@@ -22,6 +22,7 @@ import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import {
   restoreWebSerialEnv,
+  setBluetooth,
   setLocalhostWithWebSerial,
 } from "./_install-method-dialog-env.js";
 
@@ -126,9 +127,50 @@ describe("install-method-dialog logs-mode platform gating", () => {
     }
   );
 
-  it.each(["bk72xx", "nrf52"])("keeps logs on server-serial for %s", async (platform) => {
-    const d = await mount(platform, "logs");
+  it("keeps logs on server-serial for bk72xx", async () => {
+    const d = await mount("bk72xx", "logs");
     expect(hasWebSerialRow(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  // nRF52 gets the Web Serial row for logs (USB-CDC console); on localhost
+  // that collapses the server-serial row, same as ESP and RP2.
+  it("shows Web Serial logs and drops server-serial for nrf52", async () => {
+    const d = await mount("nrf52", "logs");
+    expect(hasWebSerialRow(d)).toBe(true);
+    expect(hasServerSerialRow(d)).toBe(false);
+  });
+});
+
+describe("install-method-dialog BLE NUS row gating", () => {
+  const hasBleNusRow = (d: ESPHomeInstallMethodDialog): boolean =>
+    !!d.shadowRoot!.querySelector('wa-icon[name="bluetooth"]');
+
+  beforeEach(() => {
+    setBluetooth(true);
+  });
+
+  it("shows BLE NUS row for nrf52 in logs mode when Bluetooth is available", async () => {
+    const d = await mount("nrf52", "logs");
+    expect(hasBleNusRow(d)).toBe(true);
+  });
+
+  it("hides BLE NUS row for nrf52 in install mode", async () => {
+    const d = await mount("nrf52");
+    expect(hasBleNusRow(d)).toBe(false);
+  });
+
+  it.each(["esp32", "rp2", "bk72xx"])(
+    "hides BLE NUS row for non-nRF platform %s in logs mode",
+    async (platform) => {
+      const d = await mount(platform, "logs");
+      expect(hasBleNusRow(d)).toBe(false);
+    }
+  );
+
+  it("hides BLE NUS row when Bluetooth is unavailable", async () => {
+    setBluetooth(false);
+    const d = await mount("nrf52", "logs");
+    expect(hasBleNusRow(d)).toBe(false);
   });
 });

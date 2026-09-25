@@ -123,6 +123,16 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
   });
 }
 
+/** BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth. */
+export function renderBleNusOption(ctx: MethodRowContext): TemplateResult {
+  return renderMethodRow({
+    icon: "bluetooth",
+    title: ctx.localize("dashboard.logs_method_ble_nus"),
+    desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
+    onClick: () => ctx.onSelect("ble-nus"),
+  });
+}
+
 /** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
 export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
   return renderMethodRow({

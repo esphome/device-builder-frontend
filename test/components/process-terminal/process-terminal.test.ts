@@ -49,6 +49,14 @@ describe("process-terminal status banner (stream)", () => {
   it("renders no banner while running / idle", async () => {
     const running = await mount((e) => (e.state = "running"));
     expect(sr(running).querySelector(".status-banner")).toBeNull();
+    // A running stream with a message is a connect phase: spinner banner.
+    const connecting = await mount((e) => {
+      e.state = "running";
+      e.statusMessage = "Connecting…";
+    });
+    const banner = sr(connecting).querySelector(".status-banner");
+    expect(banner?.classList.contains("status-banner--info")).toBe(true);
+    expect(banner?.querySelector("wa-spinner")).not.toBeNull();
     const idle = await mount((e) => (e.state = null));
     expect(sr(idle).querySelector(".status-banner")).toBeNull();
   });

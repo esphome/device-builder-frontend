@@ -7,7 +7,7 @@
 import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { isPassive, isStreaming } from "../logs-session.js";
+import { hasPause, isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
 
 /** Replaces the RTS-pulse Reset Device for a session. */
 export interface SerialResetHook {
@@ -46,11 +46,14 @@ export function openPassive(
     onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
+    /** What the attach will bring: drives the source chip in every phase. */
+    source?: PassiveSource;
   }
 ): () => boolean {
   beginSession(host, options.onBackToInstall);
   host._reconnect = options.onReconnect;
   host._resetDevice = options.onResetDevice ?? null;
+  host._passiveSource = options.source ?? "serial";
   // The attach (`attachSerialLogStream` -> `setSerialStream`) follows
   // immediately; show it as connecting/streaming until the reader lands.
   host._session = { kind: "reconnecting", paused: false };
@@ -88,27 +91,46 @@ export function setSerialStream(
   port: SerialPort,
   cancel: () => Promise<void>
 ): void {
-  // The attach is async (the reopen path retries for up to 5s). If the dialog
-  // closed or switched to a non-passive session while it was in flight, don't
-  // register — tear it down (cancel stops the reader and closes the port) so
-  // the handle isn't leaked, leaving the next open to fail "already open".
+  const pending = pendingPassiveAttach(host, cancel);
+  if (!pending) return;
+  // Replace any prior reader (defensive — `reconnecting` holds none).
+  if (host._session.kind === "serial") void host._session.cancel();
+  host._session = {
+    kind: "serial",
+    port,
+    cancel,
+    paused: pending.paused,
+    outputSeen: false,
+  };
+}
+
+/** Register a streaming BLE NUS link (its cancel). */
+export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void>): void {
+  const pending = pendingPassiveAttach(host, cancel);
+  if (pending) host._session = { kind: "ble", cancel, paused: pending.paused };
+}
+
+// An attach is async (a reopen retries for seconds). If the dialog closed or
+// switched to a non-passive session meanwhile, the stream is torn down
+// instead of registered (its cancel closes the port or link), or the next
+// open fails "already open". A Stop pressed during the attach is honoured.
+function pendingPassiveAttach(
+  host: ESPHomeLogsDialog,
+  cancel: () => Promise<void>
+): { paused: boolean } | null {
   if (!host._open || !isPassive(host._session)) {
     void cancel();
-    return;
+    return null;
   }
-  // Honor a Stop pressed during the in-flight attach; replace any prior
-  // reader (defensive — `reconnecting` holds none).
-  const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
-  if (host._session.kind === "serial") void host._session.cancel();
-  host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
+  return { paused: host._session.kind === "reconnecting" && host._session.paused };
 }
 
 /**
- * Surface a failure to reopen the Web Serial port for post-install logs.
- * Appends the message into the log pane (so a user who looked away during the
- * install still sees the cause) and drops to ``dead`` so the toolbar shows
- * "Start" — clicking it re-runs the reconnect hook. The caller pairs this
- * with a ``toast.error``.
+ * End the passive session for *message*: it lands in the log pane (so a user
+ * who looked away still sees the cause) and the session drops to ``dead``,
+ * where Start re-runs the reconnect hook. Used for a failed reopen or
+ * connect and for a remote disconnect; the caller toasts where the user did
+ * not already see the cause.
  */
 export function setSerialOpenFailed(host: ESPHomeLogsDialog, message: string): void {
   // Same guard as setSerialStream: the reopen retries across the re-enum
@@ -151,7 +173,7 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
   host._log.flush();
   const s = host._session;
   host._session = { kind: "idle" };
-  if (s.kind === "serial") return s.cancel();
+  if (s.kind === "serial" || s.kind === "ble") return s.cancel();
   if (s.kind === "ota" && s.streamId !== null) {
     return stopBackendStream(host, s.streamId);
   }
@@ -203,13 +225,11 @@ export function onStart(host: ESPHomeLogsDialog): void {
     case "ota":
       startOtaStream(host);
       break;
-    case "serial":
-    case "reconnecting":
-      host._session = { ...s, paused: false };
-      break;
     case "dead":
       reconnectSerial(host);
       break;
+    default:
+      if (hasPause(s)) host._session = { ...s, paused: false };
   }
 }
 
@@ -243,10 +263,8 @@ export function onStop(host: ESPHomeLogsDialog): void {
         void stopBackendStream(host, s.streamId);
       }
       break;
-    case "serial":
-    case "reconnecting":
-      host._session = { ...s, paused: true };
-      break;
+    default:
+      if (hasPause(s)) host._session = { ...s, paused: true };
   }
 }
 
@@ -337,7 +355,8 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
  *  (any port while none is attached), else the pulse where that works. */
 export function resetOffered(host: ESPHomeLogsDialog): boolean {
   const s = host._session;
-  if (!isPassive(s)) return false;
+  // A BLE link has no reset line at all.
+  if (!isPassive(s) || s.kind === "ble") return false;
   const hook = host._resetDevice;
   if (!hook) return host._pulseResets;
   return s.kind !== "serial" || hook.supports(s.port);
@@ -406,7 +425,13 @@ async function runReconnecting(
 function reconnectSerial(host: ESPHomeLogsDialog): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
-  void runReconnecting(host, reconnect, "dashboard.logs_web_serial_open_failed");
+  void runReconnecting(
+    host,
+    reconnect,
+    host._passiveSource === "ble"
+      ? "dashboard.logs_ble_nus_open_failed"
+      : "dashboard.logs_web_serial_open_failed"
+  );
 }
 
 /* The --no-states flag is baked into the esphome subprocess at spawn time,
