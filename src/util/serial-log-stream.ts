@@ -38,7 +38,10 @@ export interface SerialLineHooks {
  * (``streamSerialToDialog``) and ESPHome Web's logs dialog, so both web-serial
  * log surfaces stay byte-for-byte identical.
  */
-export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () => void {
+export function streamSerialLines(
+  port: SerialPort,
+  hooks: SerialLineHooks
+): () => Promise<void> {
   /* Read directly from ``port.readable.getReader()`` and decode in userland
      rather than going through ``port.readable.pipeTo()`` + a
      ``TextDecoderStream``. The pipeTo plumbing has been observed to silently
@@ -105,14 +108,16 @@ export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () 
 
   const loopDone = readLoop();
 
+  let closed: Promise<void> | null = null;
+  // Resolves once the port is closed, for callers that reopen it next.
   return () => {
-    if (cancelled) return;
+    if (closed) return closed;
     cancelled = true;
     // Cancel the reader, then wait for the read loop to finish (its finally
     // block calls releaseLock) BEFORE closing the port. Closing a still-locked
     // port throws and leaves it open, blocking the next open(); awaiting
     // loopDone guarantees the lock is released first.
-    void reader
+    closed = reader
       .cancel()
       .catch(() => {
         /* Already disposed — nothing to do. */
@@ -122,5 +127,6 @@ export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () 
       .catch(() => {
         /* Port already closed (user pulled the cable, etc). */
       });
+    return closed;
   };
 }

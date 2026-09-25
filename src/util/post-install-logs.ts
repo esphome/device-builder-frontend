@@ -2,15 +2,19 @@ import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import type { SerialResetHook } from "../components/logs-dialog/session.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import { PicoStrandedError, resetPicoForLogs } from "./rp2-logs-reset.js";
+import { isRp2Platform } from "./rp2-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import {
   openLiveSerialPort,
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
+import { isRp2CdcPort, isWebUsbSupported } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,
@@ -25,6 +29,32 @@ export function openNetworkLogsFallback(
   const { message, ...openOptions } = options;
   notifyInfo(message ?? localize("dashboard.logs_serial_disabled_fallback"));
   logsDialog.open(OTA_PORT, openOptions);
+}
+
+// A failed serial open drops the session to ``dead`` (Start reconnects) and
+// toasts the same message; not once the session moved on, since a newer
+// session is not this failure's.
+function failSerialOpen(
+  logsDialog: ESPHomeLogsDialog,
+  message: string,
+  cancelled: () => boolean = () => false
+): void {
+  if (cancelled()) return;
+  logsDialog.setSerialOpenFailed(message);
+  notifyError(message);
+}
+
+function failPortReopen(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  port: SerialPort,
+  cancelled?: () => boolean
+): void {
+  failSerialOpen(
+    logsDialog,
+    localize("dashboard.logs_port_reopen_failed", { port: formatSerialPortLabel(port) }),
+    cancelled
+  );
 }
 
 /**
@@ -56,17 +86,22 @@ export async function reconnectWebSerialLogs(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  loggerInterface: string | null
+  loggerInterface: string | null,
+  cancelled: () => boolean = () => false
 ): Promise<void> {
   let port: SerialPort | null;
   try {
     port = await requestSerialPort();
   } catch {
-    const message = localize("dashboard.logs_web_serial_open_failed");
-    logsDialog.setSerialOpenFailed(message);
-    notifyError(message);
+    failSerialOpen(
+      logsDialog,
+      localize("dashboard.logs_web_serial_open_failed"),
+      cancelled
+    );
     return;
   }
+  // A pick that lands after the session moved on must not touch the newer one.
+  if (cancelled()) return;
   if (!port) {
     logsDialog.abortSerialReconnect(); // Picker dismissed — back to "Start", quietly.
     return;
@@ -83,12 +118,61 @@ export async function reconnectWebSerialLogs(
   try {
     await port.open({ baudRate });
   } catch {
-    const message = localize("dashboard.logs_web_serial_open_failed");
-    logsDialog.setSerialOpenFailed(message);
-    notifyError(message);
+    failSerialOpen(
+      logsDialog,
+      localize("dashboard.logs_web_serial_open_failed"),
+      cancelled
+    );
     return;
   }
-  await attachSerialLogStream(port, logsDialog, localize, baudRate);
+  await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
+}
+
+/**
+ * Reset Device hook for a Pico logs session, or undefined where the dialog's
+ * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
+ * so the button stays hidden). The BOOTSEL touch only reaches the Pico over
+ * its own CDC, not a UART bridge on its console pins.
+ */
+export function picoResetHook(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  targetPlatform: string,
+  baudRate: number
+): SerialResetHook | undefined {
+  if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
+  return {
+    supports: isRp2CdcPort,
+    run: async (port, cancelled) => {
+      let live: SerialPort | null = null;
+      let failure: string | undefined;
+      try {
+        live = await resetPicoForLogs(port, baudRate, cancelled);
+      } catch (err) {
+        console.warn("Pico reset failed", err);
+        failure = localize(picoResetFailureKey(err));
+      }
+      if (failure) {
+        // A stranded Pico still gets its toast once the session moved on,
+        // but a newer session must not be flipped dead.
+        if (cancelled()) notifyError(failure);
+        else failSerialOpen(logsDialog, failure);
+      } else if (!live) {
+        failPortReopen(logsDialog, localize, port, cancelled);
+      } else {
+        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
+      }
+    },
+  };
+}
+
+// A stranded Pico wants a replug; a refused WebUSB open (Linux without the
+// udev rule) would strand it again every time, so name that cause instead.
+function picoResetFailureKey(err: unknown): string {
+  if (!(err instanceof PicoStrandedError)) return "dashboard.logs_reset_failed";
+  return err.step === "refused"
+    ? "firmware.rp2_usb_access_denied"
+    : "dashboard.logs_rp2_reset_stranded";
 }
 
 /**
@@ -116,6 +200,9 @@ export interface PostInstallShowLogsDetail {
   // meaningful on the webSerialPort path: a port that can't carry it
   // reroutes to network logs.
   loggerInterface?: string | null;
+  // Device.target_platform, so the logs get the same Reset Device wiring as
+  // a launch from the card (a Pico hook where that applies).
+  targetPlatform?: string;
   reopenInstall: () => void;
 }
 
@@ -183,19 +270,17 @@ export async function attachSerialLogStream(
   port: SerialPort,
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  baudRate: number
+  baudRate: number,
+  cancelled: () => boolean = () => false
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
       baudRate,
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,
+      cancelled,
     });
     if (!live) {
-      const message = localize("dashboard.logs_port_reopen_failed", {
-        port: formatSerialPortLabel(port),
-      });
-      logsDialog.setSerialOpenFailed(message);
-      notifyError(message);
+      failPortReopen(logsDialog, localize, port, cancelled);
       return;
     }
     port = live;
@@ -205,6 +290,11 @@ export async function attachSerialLogStream(
       /* setSignals failures are recoverable; the chip might be in a
          fine state already. Continue. */
     }
+  }
+  if (cancelled()) {
+    // The session moved on while the port was reopened; nothing will read it.
+    await port.close().catch(() => {});
+    return;
   }
   const cancel = streamSerialToDialog(port, logsDialog);
   logsDialog.setSerialStream(port, cancel);
@@ -223,6 +313,7 @@ export async function handlePostInstallShowLogs(
     webSerialPort,
     loggerBaudRate,
     loggerInterface,
+    targetPlatform,
     reopenInstall,
   } = e.detail;
   logsDialog.configuration = configuration;
@@ -241,13 +332,20 @@ export async function handlePostInstallShowLogs(
       });
       return;
     }
-    logsDialog.openPassive({
+    const cancelled = logsDialog.openPassive({
       onBackToInstall: reopenInstall,
       // "click Start to reconnect" after a reopen failure (#636). Re-acquire a
       // fresh port via the picker rather than reopening the cached esptool
       // handle, which a native-USB chip's post-flash re-enumeration leaves dead.
-      onReconnect: () =>
-        reconnectWebSerialLogs(logsDialog, localize, baudRate, loggerInterface ?? null),
+      onReconnect: (cancelled) =>
+        reconnectWebSerialLogs(
+          logsDialog,
+          localize,
+          baudRate,
+          loggerInterface ?? null,
+          cancelled
+        ),
+      onResetDevice: picoResetHook(logsDialog, localize, targetPlatform ?? "", baudRate),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly
@@ -259,7 +357,7 @@ export async function handlePostInstallShowLogs(
     /* The install just left the port closed via ``resetAndDisconnect``;
        the attach reopens the still-granted port (retrying the native-USB
        re-enumeration window) and starts reading. */
-    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate);
+    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate, cancelled);
   } else {
     logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }

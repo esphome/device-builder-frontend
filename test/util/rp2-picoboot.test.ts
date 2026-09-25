@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildCommandPacket,
@@ -9,6 +9,7 @@ import {
   PicobootDevice,
   PicobootError,
 } from "../../src/util/rp2-picoboot.js";
+import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 import type { Uf2Image } from "../../src/util/uf2.js";
 import { classifyUsbDevice } from "../../src/util/web-usb.js";
 
@@ -453,6 +454,34 @@ describe("flashUf2", () => {
     await expect(
       flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
     ).rejects.toMatchObject({ name: "NetworkError" });
+  });
+
+  it("stamps serial activity for the reboot's re-enumeration", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    // The stamp is module state: jump the clock so earlier tests' stamps are stale.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 1_000_000);
+    try {
+      expect(isRecentSerialActivity()).toBe(false);
+      await dev.reboot();
+      expect(isRecentSerialActivity()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reboots an RP2350 with REBOOT2, which replaced REBOOT on that chip", async () => {
+    const d = new FakeUsbDevice();
+    d.productId = 0x000f;
+    const dev = await PicobootDevice.open(asUsb(d));
+    await dev.reboot();
+    expect(packetArgs(d, PicobootCmd.REBOOT)).toHaveLength(0);
+    const [reboot2] = packetArgs(d, PicobootCmd.REBOOT2);
+    // flags (normal boot), delay, two unused params
+    expect([u32(reboot2, 0), u32(reboot2, 4), u32(reboot2, 8), u32(reboot2, 12)]).toEqual(
+      [0, 500, 0, 0]
+    );
   });
 
   it("treats the device vanishing on the reboot ACK as success", async () => {

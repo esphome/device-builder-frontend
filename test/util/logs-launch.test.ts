@@ -4,10 +4,25 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+const launch = vi.hoisted(() => ({
+  requestSerialPort: vi.fn<() => Promise<SerialPort | null>>(),
+  attachSerialLogStream: vi.fn(async () => {}),
+  picoResetHook: vi.fn<() => SerialResetHook | undefined>(),
+}));
+vi.mock("../../src/util/web-serial.js", () => ({
+  requestSerialPort: launch.requestSerialPort,
+}));
+vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/post-install-logs.js")>()),
+  attachSerialLogStream: launch.attachSerialLogStream,
+  picoResetHook: launch.picoResetHook,
+}));
+
 import toast from "sonner-js";
 import { withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -19,16 +34,21 @@ function makeDevice(): ConfiguredDevice {
   } as ConfiguredDevice;
 }
 
-function makeHost(getSerialPorts: () => Promise<unknown>): LogsLaunchHost & {
-  logsDialog: { configuration?: string; name?: string; open: ReturnType<typeof vi.fn> };
-} {
+type TestHost = LogsLaunchHost & {
+  logsDialog: {
+    configuration?: string;
+    name?: string;
+    open: ReturnType<typeof vi.fn>;
+    openPassive: ReturnType<typeof vi.fn>;
+  };
+};
+
+function makeHost(getSerialPorts: () => Promise<unknown>): TestHost {
   return {
     api: { getSerialPorts: vi.fn(getSerialPorts) },
-    logsDialog: { open: vi.fn() },
+    logsDialog: { open: vi.fn(), openPassive: vi.fn() },
     localize: (key: string) => key,
-  } as unknown as LogsLaunchHost & {
-    logsDialog: { configuration?: string; name?: string; open: ReturnType<typeof vi.fn> };
-  };
+  } as unknown as TestHost;
 }
 
 afterEach(() => {
@@ -184,5 +204,34 @@ describe("launchLogsWithMethod", () => {
     const host = makeHost(async () => []);
     await launchLogsWithMethod(host, makeDevice(), "server-serial");
     expect(host.logsDialog.open).not.toHaveBeenCalled();
+  });
+});
+
+describe("launchLogsWithMethod web-serial", () => {
+  it("hands the Pico reset hook to the passive session", async () => {
+    const restore = withWebSerial(true);
+    const port = {
+      getInfo: () => ({}),
+      open: vi.fn(async () => {}),
+    } as unknown as SerialPort;
+    launch.requestSerialPort.mockResolvedValue(port);
+    const hook = { supports: () => true, run: async () => {} };
+    launch.picoResetHook.mockReturnValue(hook);
+    const host = makeHost(async () => []);
+    try {
+      const device = { ...makeDevice(), target_platform: "rp2", logger_baud_rate: null };
+      await launchLogsWithMethod(host, device, "web-serial");
+      expect(launch.picoResetHook).toHaveBeenCalledWith(
+        host.logsDialog,
+        host.localize,
+        "rp2",
+        115200
+      );
+      expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
+        expect.objectContaining({ onResetDevice: hook })
+      );
+    } finally {
+      restore();
+    }
   });
 });

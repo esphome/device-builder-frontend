@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { resetToBootloader } from "../../src/util/serial-bootloader-touch.js";
+import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 
 function fakePort(
   opts: { open?: boolean; closeError?: Error; signalsError?: Error } = {}
@@ -30,6 +31,20 @@ describe("resetToBootloader", () => {
     const { port, calls } = fakePort();
     await resetToBootloader(port);
     expect(calls).toEqual(["open:1200", "signals:dtr=false", "close"]);
+  });
+
+  it("marks the re-enumeration as its own so the connect toast stays quiet", async () => {
+    const { port } = fakePort();
+    // The stamp is module state: jump the clock so earlier tests' stamps are stale.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 1_000_000);
+    try {
+      expect(isRecentSerialActivity()).toBe(false);
+      await resetToBootloader(port);
+      expect(isRecentSerialActivity()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("releases a handle left open by an earlier touch before opening", async () => {

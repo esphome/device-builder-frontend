@@ -1,7 +1,11 @@
 import { unzipSync } from "fflate";
 
 import { concat, int32LE } from "./bytes.js";
-import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
+import {
+  markSerialActivity,
+  openLiveSerialPort,
+  SERIAL_REOPEN_TIMEOUT_MS,
+} from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 
 export interface DfuFirmwarePart {
@@ -403,6 +407,7 @@ export async function flashDfuPackage(
     failure = err;
     throw err;
   } finally {
+    markSerialActivity(); // the close reboots the board; its return is ours
     // Both are best effort: the port must always be closed so a retry can
     // reopen it, and neither may replace the error that ended the flash.
     try {

@@ -8,6 +8,7 @@ import { notifyError, notifyInfo } from "./notify.js";
 import {
   attachSerialLogStream,
   openNetworkLogsFallback,
+  picoResetHook,
   reconnectWebSerialLogs,
 } from "./post-install-logs.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
@@ -135,19 +136,32 @@ export async function launchLogsWithMethod(
     }
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
-    host.logsDialog.openPassive({
-      onReconnect: () =>
+    const cancelled = host.logsDialog.openPassive({
+      onReconnect: (cancelled) =>
         reconnectWebSerialLogs(
           host.logsDialog,
           host.localize,
           baudRate,
-          device.logger_interface
+          device.logger_interface,
+          cancelled
         ),
+      onResetDevice: picoResetHook(
+        host.logsDialog,
+        host.localize,
+        device.target_platform,
+        baudRate
+      ),
     });
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.
     try {
-      await attachSerialLogStream(serialPort, host.logsDialog, host.localize, baudRate);
+      await attachSerialLogStream(
+        serialPort,
+        host.logsDialog,
+        host.localize,
+        baudRate,
+        cancelled
+      );
     } catch {
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }

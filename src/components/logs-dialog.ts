@@ -35,21 +35,23 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { normalizeLogLine } from "../util/log-line.js";
-import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isRp2Platform } from "../util/rp2-platform.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
+import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
-  expectSerialOutput,
+  beginClose,
   markSerialOutput,
   onStart,
   onStop,
   openOta,
   openPassive,
+  resetOffered,
+  resetSerialDevice,
   resumeAfterReconnect,
   setSerialOpenFailed,
   setSerialStream,
@@ -170,7 +172,12 @@ export class ESPHomeLogsDialog extends LitElement {
 
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
-  _reconnect: (() => Promise<void>) | null = null;
+  _reconnect: ((cancelled: () => boolean) => Promise<void>) | null = null;
+  // Session-supplied Reset Device (a Pico's BOOTSEL round trip); without it
+  // Reset Device is the RTS pulse, offered only where that works.
+  _resetDevice: SerialResetHook | null = null;
+  // Bumped per open; see runReconnecting.
+  _sessionGen = 0;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
@@ -220,9 +227,10 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // Reset Device is an RTS pulse. A Pico has no reset line on its CDC and
-  // arduino-pico gates output on DTR, so the pulse would only silence it.
-  private _canResetDevice = true;
+  // The RTS-pulse Reset Device works here. A Pico has no reset line on its
+  // CDC and arduino-pico gates output on DTR, so the pulse would only silence
+  // it; a Pico resets through the session's hook instead (WebUSB browsers).
+  _pulseResets = true;
 
   static styles = [
     espHomeStyles,
@@ -244,7 +252,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      this._canResetDevice = !isRp2Platform(this._targetPlatform);
+      this._pulseResets = !isRp2Platform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -279,16 +287,18 @@ export class ESPHomeLogsDialog extends LitElement {
     openOta(this, port, options);
   }
 
+  /** Returns the cancel predicate for this session's own attach. */
   public openPassive(options: {
-    onReconnect: () => Promise<void>;
+    onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
-  }) {
-    openPassive(this, options);
+    onResetDevice?: SerialResetHook;
+  }): () => boolean {
+    return openPassive(this, options);
   }
 
   /** Register the Web Serial reader (its loop-cancel) + port. Called by
    *  `attachSerialLogStream` once a port is open and streaming. */
-  public setSerialStream(port: SerialPort, cancel: () => void) {
+  public setSerialStream(port: SerialPort, cancel: () => Promise<void>) {
     setSerialStream(this, port, cancel);
   }
 
@@ -311,8 +321,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   public close() {
-    void teardownSession(this);
-    this._open = false;
+    beginClose(this);
   }
 
   _resetAnsiLogScroll() {
@@ -356,7 +365,6 @@ export class ESPHomeLogsDialog extends LitElement {
         ?open=${this._open}
         .label=${title}
         @request-close=${this._onDialogRequestClose}
-        @after-hide=${this._onDialogHide}
       >
         <span slot="header-suffix" class="source-chip truncate" title=${source}
           >${source}</span
@@ -410,7 +418,7 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
-              passive && this._canResetDevice
+              resetOffered(this)
                 ? // Web Serial only; disabled until a port is attached.
                   renderTermButton({
                     icon: "restart",
@@ -553,27 +561,8 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
-  // standard auto-reset circuit) to reboot the device, like the old dashboard's
-  // console; the reader stays attached so the boot log follows. Resumes display
-  // first so a Stopped log shows the boot output instead of dropping it.
-  private _onResetDevice = async () => {
-    const s = this._session;
-    if (s.kind !== "serial") return;
-    this._session = { ...s, paused: false };
-    try {
-      await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-      // Boot output can't precede the pulse; expecting it only once the pulse
-      // has landed keeps a stale pre-reset line from retiring the watchdog
-      // for a reset that never took.
-      expectSerialOutput(this);
-    } catch {
-      // setSignals fails if the cable was pulled; tell the user the reset didn't
-      // land rather than letting them assume the device rebooted.
-      notifyError(this._localize("dashboard.logs_reset_failed"));
-    }
-  };
+  // Reset Device button (Web Serial only).
+  private _onResetDevice = () => resetSerialDevice(this);
 
   /**
    * Flip ``_open`` false the moment the user initiates a close (X / Esc /
@@ -581,16 +570,9 @@ export class ESPHomeLogsDialog extends LitElement {
    * lines push into the buffer and each push re-renders with
    * ``?open=${this._open}``; were ``_open`` still true mid-animation the
    * re-asserted ``open=true`` could cancel wa-dialog's hide. No
-   * ``preventDefault`` — the close proceeds and ``after-hide`` tears down.
+   * ``preventDefault`` — the close proceeds; the session ends with it.
    */
-  private _onDialogRequestClose = (): void => {
-    this._open = false;
-  };
-
-  private _onDialogHide() {
-    this._open = false;
-    void teardownSession(this);
-  }
+  private _onDialogRequestClose = (): void => beginClose(this);
 
   /**
    * "Back to install" handler — only visible when an ``onBackToInstall``
@@ -604,7 +586,7 @@ export class ESPHomeLogsDialog extends LitElement {
     const handler = this._backToInstallHandler;
     this._backToInstall = false;
     this._backToInstallHandler = null;
-    this._open = false;
+    beginClose(this);
     handler?.();
   };
 }

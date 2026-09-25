@@ -139,7 +139,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  private _cancel?: () => void;
+  private _cancel?: () => Promise<void>;
   // Handle currently streamed. Starts as ``port`` and is replaced when a
   // native-USB re-enumeration hands back a fresh handle; the parent's own
   // ``PortDisconnectWatcher`` swap can't be relied on here — Firefox keeps
@@ -378,7 +378,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._cancel = undefined;
     if (cancel) {
       this._activePort = undefined;
-      cancel();
+      void cancel();
     } else {
       // A dead-stream path already dropped the cancel closure; release
       // whatever handle the reconnect flow last held (a no-op when the
