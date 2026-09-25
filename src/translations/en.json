@@ -1948,7 +1948,15 @@
       "setup_download_failed": "Could not load the download link. Close and reopen to try again.",
       "setup_step_4": "Drag the downloaded file onto the RPI-RP2 drive. The install is complete when the drive disappears.",
       "setup_step_5": "Your Pico now runs ESPHome 🎉",
-      "setup_continue_hint": "Click Continue to connect it to Wi-Fi. Once connected, it shows up automatically on your ESPHome Device Builder."
+      "setup_continue_hint": "Click Continue to connect it to Wi-Fi. Once connected, it shows up automatically on your ESPHome Device Builder.",
+      "install_intro": "ESPHome can be installed on your Pico straight from this page.",
+      "install_step_bootsel": "Hold the BOOTSEL button while connecting the Pico to your computer.",
+      "install_step_running": "If the Pico already runs ESPHome, click Reset into BOOTSEL instead and pick its serial port.",
+      "install_step_install": "Click Install and pick the RP2 Boot device.",
+      "install_reset_action": "Reset into BOOTSEL",
+      "install_resetting": "Resetting the Pico into BOOTSEL…",
+      "install_flashing": "Installing ESPHome…",
+      "install_image_failed": "Could not load the firmware: {error}"
     },
     "unsupported": {
       "status": "Unsupported",
