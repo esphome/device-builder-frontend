@@ -19,27 +19,37 @@ export function formatSerialTimestamp(now: Date): string {
  * re-application via :class:`ESPHomeLogParser`. Every log transport feeds
  * it so all surfaces render identically.
  */
-export function createLogLineAssembler(
-  onLine: (line: string) => void
-): (chunk: AllowSharedBufferSource) => void {
+export function createLogLineAssembler(onLine: (line: string) => void): {
+  push: (chunk: AllowSharedBufferSource) => void;
+  /** Emit a partial last line once the stream ends; a crash rarely ends on a newline. */
+  flush: () => void;
+} {
   const decoder = new TextDecoder();
   const parser = new ESPHomeLogParser();
   let buffer = "";
-  return (chunk) => {
-    buffer += decoder.decode(chunk, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      /* Strip trailing CR (CRLF endings from the ROM bootloader and many
-         serial sources). ``ansi-log`` treats any chunk ending in ``\r``
-         as a progress-style overwrite, so CRLF boot lines would collapse
-         to just the last one. */
-      const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
-      // Drop mis-sampled UART garbage (e.g. an ESP8266's 74880-baud boot
-      // banner read at the app's baud) before it reaches the parser.
-      if (isLikelyGarbageLine(cleaned)) continue;
-      onLine(`${formatSerialTimestamp(new Date())}${parser.parseLine(cleaned)}`);
-    }
+  const emit = (line: string): void => {
+    /* Strip trailing CR (CRLF endings from the ROM bootloader and many
+       serial sources). ``ansi-log`` treats any chunk ending in ``\r``
+       as a progress-style overwrite, so CRLF boot lines would collapse
+       to just the last one. */
+    const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
+    // Drop mis-sampled UART garbage (e.g. an ESP8266's 74880-baud boot
+    // banner read at the app's baud) before it reaches the parser.
+    if (isLikelyGarbageLine(cleaned)) return;
+    onLine(`${formatSerialTimestamp(new Date())}${parser.parseLine(cleaned)}`);
+  };
+  return {
+    push: (chunk) => {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) emit(line);
+    },
+    flush: () => {
+      buffer += decoder.decode();
+      if (buffer) emit(buffer);
+      buffer = "";
+    },
   };
 }
 
@@ -79,7 +89,7 @@ export function streamSerialLines(
      swallow bytes on some bridge chips (notably CH9102F) after a close/reopen
      within the same USB session — direct reads do not. */
   const reader = port.readable!.getReader();
-  const push = createLogLineAssembler(hooks.onLine);
+  const assembler = createLogLineAssembler(hooks.onLine);
   let cancelled = false;
 
   const readLoop = async (): Promise<void> => {
@@ -95,7 +105,7 @@ export function streamSerialLines(
           disconnected = true;
           break;
         }
-        if (value && value.length) push(value);
+        if (value && value.length) assembler.push(value);
       }
     } catch (err) {
       // A read error while we weren't cancelling means the device dropped
@@ -105,6 +115,7 @@ export function streamSerialLines(
         disconnectError = err;
       }
     } finally {
+      assembler.flush();
       try {
         reader.releaseLock();
       } catch {

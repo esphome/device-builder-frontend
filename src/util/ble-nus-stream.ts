@@ -96,12 +96,12 @@ async function subscribe(
   device: BluetoothDevice,
   hooks: SerialLineHooks
 ): Promise<() => Promise<void>> {
-  const push = createLogLineAssembler(hooks.onLine);
+  const assembler = createLogLineAssembler(hooks.onLine);
   let txChar: BluetoothRemoteGATTCharacteristic | null = null;
   let detached = false;
   const onValue = (): void => {
     const dv = txChar?.value;
-    if (dv) push(dv);
+    if (dv) assembler.push(dv);
   };
   // Chrome hands back the same characteristic object across sessions, so the
   // listeners must come off on every exit or they stack up.
@@ -114,7 +114,9 @@ async function subscribe(
     return true;
   };
   const onDisconnected = (): void => {
-    if (detach()) hooks.onDisconnect?.();
+    if (!detach()) return;
+    assembler.flush();
+    hooks.onDisconnect?.();
   };
   try {
     const server = await device.gatt!.connect();
@@ -138,7 +140,9 @@ async function subscribe(
     }
     device.addEventListener("gattserverdisconnected", onDisconnected);
     return async () => {
-      if (detach()) device.gatt?.disconnect();
+      if (!detach()) return;
+      assembler.flush();
+      device.gatt?.disconnect();
     };
   } catch (err) {
     // Leave nothing connected behind a failed attempt: a linked peripheral

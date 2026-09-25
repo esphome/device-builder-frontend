@@ -32,11 +32,10 @@ describe("formatSerialTimestamp", () => {
 });
 
 describe("streamSerialLines", () => {
-  it("stamps and emits complete lines, buffering the trailing fragment", async () => {
+  it("stamps and emits complete lines, holding the trailing fragment while the stream lives", async () => {
     const lines: string[] = [];
     const port = makeOpenPort((c) => {
       c.enqueue(enc("[I][app]: hello\nrest"));
-      c.close();
     });
     streamSerialLines(port as unknown as SerialPort, { onLine: (l) => lines.push(l) });
     await flush();
@@ -97,6 +96,17 @@ describe("streamSerialLines", () => {
 
     expect(onDisconnect).toHaveBeenCalledOnce();
     expect(String(onDisconnect.mock.calls[0][0])).toContain("cable yanked");
+  });
+
+  it("flushes a partial last line when the device drops the stream", async () => {
+    const lines: string[] = [];
+    const port = makeOpenPort((c) => {
+      c.enqueue(enc("[I][x:1]: done\n[E][x:2]: crashed mid-"));
+      c.close();
+    });
+    streamSerialLines(port as unknown as SerialPort, { onLine: (l) => lines.push(l) });
+    await vi.waitFor(() => expect(lines).toHaveLength(2));
+    expect(lines[1]).toContain("crashed mid-");
   });
 
   it("does NOT fire onDisconnect on a caller-initiated cancel", async () => {

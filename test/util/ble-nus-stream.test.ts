@@ -88,11 +88,19 @@ describe("streamBleNus", () => {
     expect(d.deviceListeners.size).toBe(0);
   });
 
-  it("reports a remote disconnect once and detaches", async () => {
+  it("reports a remote disconnect once, flushing a partial last line, and detaches", async () => {
     const d = fakeDevice();
     const onDisconnect = vi.fn();
-    const cancel = await streamBleNus(d.device, { onLine: () => {}, onDisconnect });
+    const lines: string[] = [];
+    const cancel = await streamBleNus(d.device, {
+      onLine: (l) => lines.push(l),
+      onDisconnect,
+    });
+    d.notify("[E][app:9]: crash mid-");
+    expect(lines).toHaveLength(0);
     d.dropLink();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("crash mid-");
     d.dropLink();
     expect(onDisconnect).toHaveBeenCalledOnce();
     expect(d.charListeners.size).toBe(0);
