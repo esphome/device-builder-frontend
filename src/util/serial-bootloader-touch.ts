@@ -4,6 +4,10 @@
  * nRF52 core on the line coding alone, arduino-pico once DTR also drops),
  * re-enumerating as a different USB device.
  */
+const isPortLost = (err: unknown): boolean =>
+  err instanceof DOMException &&
+  (err.name === "NetworkError" || err.name === "InvalidStateError");
+
 export async function resetToBootloader(port: SerialPort): Promise<void> {
   // A handle left open by an earlier touch whose close raced the reboot
   // would make open() throw "already open"; release it first.
@@ -14,8 +18,10 @@ export async function resetToBootloader(port: SerialPort): Promise<void> {
     // instant it drops, and a close() racing that can leave the OS handle
     // held until the page is reloaded.
     await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    // Already rebooting on the line coding alone (nRF52).
+  } catch (err) {
+    // Already gone: it rebooted on the line coding alone (nRF52). Anything
+    // else means DTR never dropped, so an RP2 would not have reset.
+    if (!isPortLost(err)) throw err;
   }
   try {
     await port.close();

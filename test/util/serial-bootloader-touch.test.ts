@@ -53,6 +53,15 @@ describe("resetToBootloader", () => {
     expect(calls[calls.length - 1]).toBe("close");
   });
 
+  it("surfaces a DTR drop the port refused, since the device then never reset", async () => {
+    const { port } = fakePort({
+      signalsError: new DOMException("Not supported.", "NotSupportedError"),
+    });
+    await expect(resetToBootloader(port)).rejects.toMatchObject({
+      name: "NotSupportedError",
+    });
+  });
+
   it("still surfaces a failed open", async () => {
     const { port } = fakePort();
     vi.mocked(port.open).mockRejectedValue(

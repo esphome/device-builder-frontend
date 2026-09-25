@@ -157,22 +157,31 @@ export class PicobootDevice {
     });
   }
 
+  // ``lostAckOk``: the command makes the device drop off the bus (reboot),
+  // so losing it while waiting for the ACK counts as delivered; losing it
+  // before the packet went out does not.
   private async command(
     cmd: PicobootCommand,
-    payload?: Uint8Array<ArrayBuffer>
+    payload?: Uint8Array<ArrayBuffer>,
+    { lostAckOk = false } = {}
   ): Promise<void> {
-    const token = ++this.token;
-    const sent = await this.device.transferOut(
-      this.ep.epOut,
-      buildCommandPacket(token, cmd)
-    );
-    if (sent.status !== "ok") return this.fail(cmd.id);
-    if (payload) {
-      const data = await this.device.transferOut(this.ep.epOut, payload);
-      if (data.status !== "ok") return this.fail(cmd.id);
+    const packet = buildCommandPacket(++this.token, cmd);
+    await this.send(cmd.id, packet);
+    if (payload) await this.send(cmd.id, payload);
+    try {
+      const ack = await this.device.transferIn(this.ep.epIn, ACK_READ_LENGTH);
+      if (ack.status !== "ok") return this.fail(cmd.id);
+    } catch (err) {
+      if (!(lostAckOk && isUsbDeviceLost(err))) throw err;
     }
-    const ack = await this.device.transferIn(this.ep.epIn, ACK_READ_LENGTH);
-    if (ack.status !== "ok") return this.fail(cmd.id);
+  }
+
+  private async send(cmdId: number, data: Uint8Array<ArrayBuffer>): Promise<void> {
+    const out = await this.device.transferOut(this.ep.epOut, data);
+    if (out.status !== "ok") return this.fail(cmdId);
+    if (out.bytesWritten !== data.length) {
+      throw new Error(`Short USB write: ${out.bytesWritten} of ${data.length} bytes`);
+    }
   }
 
   // A rejected command stalls the endpoint. Recover picotool's way: clear the
@@ -236,14 +245,11 @@ export class PicobootDevice {
 
   /** RP2040 reboot into flash. The device may drop off the bus before the ACK arrives. */
   async reboot(): Promise<void> {
-    try {
-      await this.command({
-        id: PicobootCmd.REBOOT,
-        args: u32Args(0, 0, REBOOT_DELAY_MS),
-      });
-    } catch (err) {
-      if (!isUsbDeviceLost(err)) throw err;
-    }
+    await this.command(
+      { id: PicobootCmd.REBOOT, args: u32Args(0, 0, REBOOT_DELAY_MS) },
+      undefined,
+      { lostAckOk: true }
+    );
   }
 
   async close(): Promise<void> {
@@ -307,10 +313,14 @@ export async function flashUf2(
   onProgress: (percent: number) => void,
   { signal }: { signal?: AbortSignal } = {}
 ): Promise<void> {
-  const sectors = planSectors(image);
   let written = 0;
   let rebooted = false;
+  // WebUSB transfers have no timeout; closing the device is what fails a
+  // pending one, so an abort mid-transfer closes it rather than waiting.
+  const onAbort = () => void dev.close();
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
+    const sectors = planSectors(image);
     await dev.exclusiveAccess(EXCLUSIVE);
     await dev.exitXip();
     for (const [sector, writes] of sectors) {
@@ -327,6 +337,7 @@ export async function flashUf2(
     rebooted = true;
     onProgress(100);
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     if (!rebooted) await dev.exclusiveAccess(NOT_EXCLUSIVE).catch(() => {});
     await dev.close();
   }

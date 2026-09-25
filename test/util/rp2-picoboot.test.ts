@@ -61,10 +61,18 @@ class FakeUsbDevice {
   log: Transfer[] = [];
   inQueue: USBInTransferResult[] = [];
   outStatus: USBTransferStatus = "ok";
+  /** When set, bulk IN reads hang until close() rejects them, as WebUSB does. */
+  hangIn = false;
+  shortWrite = false;
+  private pendingIn: ((err: Error) => void)[] = [];
   statusResponse = new Uint8Array(16);
   failOn: ((t: Transfer) => Error | null) | null = null;
 
+  // WebUSB rejects every transfer once the device is closed.
   private maybeFail(t: Transfer): void {
+    if (!this.opened) {
+      throw new DOMException("The device must be opened first.", "InvalidStateError");
+    }
     const err = this.failOn?.(t);
     if (err) throw err;
   }
@@ -75,6 +83,9 @@ class FakeUsbDevice {
   async close() {
     this.log.push({ kind: "close" });
     this.opened = false;
+    for (const reject of this.pendingIn.splice(0)) {
+      reject(new DOMException("The device was closed.", "InvalidStateError"));
+    }
   }
   async selectConfiguration() {}
   async claimInterface(iface: number) {
@@ -102,12 +113,18 @@ class FakeUsbDevice {
     const t: Transfer = { kind: "out", ep, data: bytes };
     this.log.push(t);
     this.maybeFail(t);
-    return { status: this.outStatus, bytesWritten: bytes.length };
+    return {
+      status: this.outStatus,
+      bytesWritten: this.shortWrite ? bytes.length - 1 : bytes.length,
+    };
   }
   async transferIn(ep: number, length: number) {
     const t: Transfer = { kind: "in", ep, length };
     this.log.push(t);
     this.maybeFail(t);
+    if (this.hangIn) {
+      return new Promise<USBInTransferResult>((_, reject) => this.pendingIn.push(reject));
+    }
     return (
       this.inQueue.shift() ?? {
         status: "ok" as const,
@@ -320,6 +337,43 @@ describe("flashUf2", () => {
     await expect(
       flashUf2(dev, image([{ address: 0x20000000, length: 0x100 }]), () => {})
     ).rejects.toThrow(/outside flash/);
+    expect(d.log[d.log.length - 1]).toEqual({ kind: "close" });
+  });
+
+  it("closes the device to fail a transfer that hangs when aborted mid-flash", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    d.hangIn = true;
+    const abort = new AbortController();
+    const flash = flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {}, {
+      signal: abort.signal,
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    abort.abort();
+    await expect(flash).rejects.toMatchObject({ name: "InvalidStateError" });
+    expect(d.log.filter((t) => t.kind === "close")).toHaveLength(2);
+    expect(commandIds(d)).not.toContain(PicobootCmd.REBOOT);
+  });
+
+  it("reports a device lost before the reboot packet went out", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    d.failOn = (t) =>
+      t.kind === "out" && t.data.length === 32 && t.data[8] === PicobootCmd.REBOOT
+        ? new DOMException("The device was disconnected.", "NetworkError")
+        : null;
+    await expect(
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+    ).rejects.toMatchObject({ name: "NetworkError" });
+  });
+
+  it("treats a short bulk write as a failure", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    d.shortWrite = true;
+    await expect(
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+    ).rejects.toThrow(/Short USB write/);
   });
 
   it("stops before erasing on an aborted signal and releases exclusive access", async () => {
