@@ -83,6 +83,41 @@ describe("parseLibreTinyImage", () => {
     ]);
   });
 
+  it("keeps a header page on its own partition when the previous run fills up to it", () => {
+    // boot is exactly four pages and ota1 starts right after it; the ota1
+    // header group must open its own run, not continue boot's.
+    const table = ltPartitionTable([
+      { name: "boot", offset: 0x4000, length: 0x400 },
+      { name: "ota1", offset: 0x4400, length: 0x1000 },
+    ]);
+    const uf2 = makeLibreTinyUf2({
+      headerTags: [
+        ltTag(LT_TAG.BOARD, "bw15"),
+        ltTag(LT_TAG.OTA_FORMAT_2, new Uint8Array([2])),
+        ltTag(LT_TAG.FAL_PTABLE, table),
+      ],
+      blocks: [
+        { addr: 0x0, fill: 0xb1, tags: info(BOOT_INFO) },
+        { addr: 0x100, fill: 0xb2 },
+        { addr: 0x200, fill: 0xb3 },
+        { addr: 0x300, fill: 0xb4 },
+        { addr: 0x0, fill: 0xa1, tags: info(ltPartInfo([0, 0, 0, 0, 1, 1], ["ota1"])) },
+      ],
+    });
+    expect(parse(uf2).runs.map((r) => [r.address, r.data.length])).toEqual([
+      [0x4000, 1024],
+      [0x4400, 256],
+    ]);
+  });
+
+  it("rejects a run whose XModem padding would reach past its partition", () => {
+    // boot ends at 0x8000; a page at 0x7F00 fits, but its 1 KiB block does not.
+    const uf2 = makeLibreTinyUf2({
+      blocks: [{ addr: 0x7f00, tags: info(BOOT_INFO) }],
+    });
+    expect(() => parse(uf2)).toThrow(/pads past 'boot'/);
+  });
+
   it("refuses another Realtek family, naming it", () => {
     const uf2 = makeLibreTinyUf2({
       family: UF2_FAMILY_AMBZ,
@@ -154,6 +189,17 @@ describe("parseLibreTinyBlocks", () => {
     expect(blocks[0].data.length).toBe(0);
     expect(new TextDecoder().decode(blocks[0].tags.get(LT_TAG.BOARD))).toBe("bw15");
     expect(blocks[1].tags.get(LT_TAG.OTA_PART_INFO)).toEqual(BOOT_INFO);
+  });
+
+  it("rejects a tag with an impossible size", () => {
+    const short = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(BOOT_INFO) }] });
+    short[32] = 2; // the header block's first tag claims less than its own header
+    expect(() => parseLibreTinyBlocks(short)).toThrow(/malformed tag/);
+
+    const past = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(BOOT_INFO) }] });
+    past[32] = 0xff; // a 255-byte tag, then one at 256 that runs past the region
+    past[32 + 256] = 0xff;
+    expect(() => parseLibreTinyBlocks(past)).toThrow(/malformed tag/);
   });
 
   it("rejects a block whose count disagrees with the file", () => {

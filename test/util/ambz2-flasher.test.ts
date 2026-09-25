@@ -256,6 +256,15 @@ describe("flashAmbz2", () => {
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
 
+  it("closes a port that opened without streams instead of leaving it held", async () => {
+    const rom = fakeRom();
+    rom.raw.open.mockImplementation(async () => {});
+    await expect(
+      drive(flashAmbz2(rom.port, image, { onProgress: () => {} }))
+    ).rejects.toThrow(/no readable/);
+    expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
   it("fails when the port goes away mid-transfer", async () => {
     const rom = fakeRom({ linkAfterPings: 1000 });
     const p = flashAmbz2(rom.port, image, { onProgress: () => {} });

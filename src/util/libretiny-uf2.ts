@@ -14,6 +14,7 @@ import {
   UF2_FLAG_NOT_MAIN_FLASH,
   type Uf2Range,
 } from "./uf2.js";
+import { XMODEM_BLOCK_SIZE } from "./xmodem.js";
 
 /** Realtek AmebaZ2 (RTL8720C), the family the UART engine can flash. */
 export const UF2_FAMILY_AMBZ2 = 0xe08f7564;
@@ -63,6 +64,8 @@ function parseTags(block: Uint8Array, payloadSize: number): Map<number, Uint8Arr
   while (i + 4 <= region.length) {
     const size = region[i];
     if (size === 0) break;
+    if (size < 4 || i + size > region.length)
+      throw new Error("Invalid UF2: malformed tag");
     const type = region[i + 1] | (region[i + 2] << 8) | (region[i + 3] << 16);
     tags.set(type, region.subarray(i + 4, i + size));
     i = Math.ceil((i + size) / 4) * 4;
@@ -151,7 +154,12 @@ export function parseLibreTinyImage(
   // A run grows at its cursor; LibreTiny writes an image's header as a
   // later group that lands back on the partition start, which rewinds the
   // cursor and overwrites the first pages in place (the body stays).
-  const runs: { address: number; bytes: number[]; cursor: number }[] = [];
+  const runs: {
+    part: LibreTinyPartition;
+    address: number;
+    bytes: number[];
+    cursor: number;
+  }[] = [];
   let part: LibreTinyPartition | null = null;
   let grouped = false;
   for (const b of blocks) {
@@ -172,19 +180,30 @@ export function parseLibreTinyImage(
       );
     }
     const address = part.offset + b.address;
-    let run = runs.find((r) => r.address + r.cursor === address);
+    // Runs never cross a partition, so the lookup stays inside this one: a
+    // page on a run's start rewinds it, a page at its cursor continues it.
+    const own = runs.filter((r) => r.part === part);
+    let run = own.find((r) => r.address === address);
+    if (run) run.cursor = 0;
+    else run = own.find((r) => r.address + r.cursor === address);
     if (!run) {
-      run = runs.find((r) => r.address === address);
-      if (run) run.cursor = 0;
-    }
-    if (!run) {
-      run = { address, bytes: [], cursor: 0 };
+      run = { part, address, bytes: [], cursor: 0 };
       runs.push(run);
     }
     for (let i = 0; i < b.data.length; i++) run.bytes[run.cursor + i] = b.data[i];
     run.cursor += b.data.length;
   }
   if (runs.length === 0) throw new Error("Invalid UF2: nothing to flash");
+  for (const r of runs) {
+    // The UART flasher sends whole XModem blocks, so a run's tail padding
+    // lands in flash too; it must not reach into the next partition.
+    const padded = Math.ceil(r.bytes.length / XMODEM_BLOCK_SIZE) * XMODEM_BLOCK_SIZE;
+    if (r.address + padded > r.part.offset + r.part.length) {
+      throw new Error(
+        `Invalid UF2: run at 0x${r.address.toString(16)} pads past '${r.part.name}'`
+      );
+    }
+  }
   const ranges = runs.map((r) => ({
     address: r.address,
     data: new Uint8Array(r.bytes) as Uint8Array<ArrayBuffer>,

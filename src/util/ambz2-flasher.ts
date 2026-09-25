@@ -211,13 +211,14 @@ async function writeRegister(
   const hexAddress = address.toString(16).toUpperCase();
   const hexValue = value.toString(16).toUpperCase();
   link.drain();
-  await link.write(`EW ${hexAddress} ${hexValue}
-`);
-  // The ROM echoes the write back as "0x<address> = 0x<value>".
-  const reply = (await link.readLine(LINE_MS)).toUpperCase();
-  if (!reply.includes(hexAddress) || !reply.includes(hexValue)) {
-    throw new Error(`Register write to 0x${hexAddress} was not acknowledged: ${reply}`);
+  await link.write(`EW ${hexAddress} ${hexValue}\n`);
+  // The ROM echoes the write back as "0x<address> = 0x<value>", possibly
+  // after a stray line.
+  for (let i = 0; i < 4; i++) {
+    const reply = (await link.readLine(LINE_MS)).toUpperCase();
+    if (reply.includes(hexAddress) && reply.includes(hexValue)) return;
   }
+  throw new Error(`Register write to 0x${hexAddress} was not acknowledged`);
 }
 
 /** Sets the flash controller up and returns the ``<speed> <mode>`` the ROM wants back. */
@@ -292,10 +293,11 @@ export async function flashAmbz2(
   hooks: Ambz2FlashHooks
 ): Promise<void> {
   if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
-  const rom = new RomLink(port, hooks.signal);
   const log = hooks.onLog ?? (() => {});
+  let rom: RomLink | undefined;
   let failure: unknown;
   try {
+    rom = new RomLink(port, hooks.signal);
     log("Resetting the board into download mode over DTR/RTS");
     await autoReset(port);
     if (!(await linkRom(rom, AUTO_LINK_MS))) {
@@ -333,7 +335,7 @@ export async function flashAmbz2(
     throw err;
   } finally {
     // A teardown failure must not replace the flash error nor skip the rest.
-    await rom.close(failure).catch(() => {});
+    await rom?.close(failure).catch(() => {});
     // DTR still holds the strap; drop it so the next reset boots the app.
     await port
       .setSignals({ dataTerminalReady: false, requestToSend: false })
