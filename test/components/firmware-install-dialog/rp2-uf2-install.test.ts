@@ -215,6 +215,17 @@ describe("rp2DoReset", () => {
     expect(host._errorMessage).toBe("open failed");
   });
 
+  it("does not touch a port picked after the dialog was dismissed", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockImplementation(async () => {
+      host._device = null;
+      return {};
+    });
+    await rp2DoReset(asHost(host));
+    expect(mocks.resetToBootloader).not.toHaveBeenCalled();
+    expect(host._step).toBe("rp2-bootsel");
+  });
+
   it("ignores a click while a step is already pending", async () => {
     const host = readyHost();
     host._flashBusy = true;

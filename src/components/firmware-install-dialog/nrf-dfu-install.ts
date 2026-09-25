@@ -111,6 +111,9 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
         host._statusMessage = host._localize("firmware.nrf_step1_title");
       return;
     }
+    // The picker outlives a dismissed dialog; don't reset a port picked for
+    // an install that no longer exists.
+    if (!stillCurrent()) return;
     await resetToBootloader(port);
   } catch (err) {
     if (stillCurrent()) {

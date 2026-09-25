@@ -123,6 +123,9 @@ export async function rp2DoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
         host._statusMessage = host._localize("firmware.rp2_bootsel_title");
       return;
     }
+    // The picker outlives a dismissed dialog; don't reset a port picked for
+    // an install that no longer exists.
+    if (!stillCurrent()) return;
     await resetToBootloader(port);
   } catch (err) {
     if (stillCurrent()) {
