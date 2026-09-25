@@ -361,9 +361,11 @@ export class ESPHomeLogsDialog extends LitElement {
   protected render() {
     const s = this._session;
     const streaming = isStreaming(s);
-    // The dead state (serial reopen failed) gets the escape hatch
-    // unconditionally — its only other recovery is Start-to-reconnect.
-    const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
+    // The dead state (serial reopen failed) gets the escape hatch — but not
+    // for BLE sessions: OTA logs don't apply to nRF52, and the message
+    // "Serial isn't available" is wrong for a Bluetooth disconnect.
+    const isBle = this._passiveSource === "ble";
+    const offerOtaFallback = !isBle && (this._quietSerial.quiet || s.kind === "dead");
     const title = this._localize("dashboard.logs_title", { name: this.name });
     const source = this._sourceLabel();
     // The BLE connect can take seconds with nothing to show yet.

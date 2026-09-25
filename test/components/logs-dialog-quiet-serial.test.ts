@@ -181,6 +181,18 @@ describe("logs-dialog quiet-serial banner", () => {
     expect(banner(el)!.textContent).toContain("dashboard.logs_serial_unavailable");
   });
 
+  it("offers no serial banner for a dead Bluetooth session", async () => {
+    // BLE NUS is nRF52-only, and those boards have no serial console to
+    // fall back to; the banner's OTA switch would strand the dialog.
+    el.openPassive({ onReconnect: () => Promise.resolve(), source: "ble" });
+    el.setSerialOpenFailed("link lost");
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+    vi.advanceTimersByTime(60_000);
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+  });
+
   it("never arms for an OTA session", async () => {
     el.open(OTA_PORT);
     await el.updateComplete;
