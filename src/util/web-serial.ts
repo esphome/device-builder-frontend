@@ -87,9 +87,11 @@ export function isPortPickerCancel(err: unknown): boolean {
  * that only need the USB identity can decide before ever opening (no DTR/RTS
  * pulse on a port that won't be used).
  */
-export async function requestSerialPort(): Promise<SerialPort | null> {
+export async function requestSerialPort(
+  options?: SerialPortRequestOptions
+): Promise<SerialPort | null> {
   try {
-    return await navigator.serial.requestPort();
+    return await navigator.serial.requestPort(options);
   } catch (err) {
     if (isPortPickerCancel(err)) {
       return null; // User dismissed the port picker.

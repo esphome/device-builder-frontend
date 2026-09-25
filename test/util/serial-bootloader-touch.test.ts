@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resetToBootloader } from "../../src/util/serial-bootloader-touch.js";
+import {
+  resetToBootloader,
+  touchIntoBootloader,
+} from "../../src/util/serial-bootloader-touch.js";
 import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 
 function fakePort(
@@ -101,5 +104,34 @@ describe("resetToBootloader", () => {
     const gone = new DOMException("gone", "NetworkError");
     await resetToBootloader(fakePort({ signalsError: gone }).port, (l) => lines.push(l));
     expect(lines).toContain("The device rebooted on the line coding alone");
+  });
+});
+
+describe("touchIntoBootloader", () => {
+  const withRequestPort = (impl: () => Promise<unknown>) =>
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { requestPort: vi.fn(impl) },
+    });
+  afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (navigator as any).serial;
+  });
+
+  it("touches the picked port and reports the pick", async () => {
+    const { port, calls } = fakePort();
+    withRequestPort(async () => port);
+    const filters = [{ usbVendorId: 0x2e8a }];
+    await expect(touchIntoBootloader({ filters })).resolves.toBe(true);
+    expect(calls).toEqual(["open:1200", "signals:dtr=false", "close"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((navigator as any).serial.requestPort).toHaveBeenCalledWith({ filters });
+  });
+
+  it("is quiet when the picker is dismissed", async () => {
+    withRequestPort(async () => {
+      throw new DOMException("cancelled", "NotFoundError");
+    });
+    await expect(touchIntoBootloader()).resolves.toBe(false);
   });
 });

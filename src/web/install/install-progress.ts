@@ -42,13 +42,30 @@ export function renderInstallProgress(
   flow: InstallFlowController,
   localize: LocalizeFunc
 ): TemplateResult {
+  return renderProgressCard({
+    state: terminalState(flow),
+    message: statusMessage(flow, localize),
+    detail: flow.errored ? flow.errorMessage : "",
+    progress: flow.step === "flashing" ? flow.progress : null,
+  });
+}
+
+export interface ProgressCard {
+  state: ProcessTerminalState;
+  message: string;
+  detail?: string;
+  progress?: number | null;
+}
+
+/** The progress card itself, for the dialogs that drive their own steps. */
+export function renderProgressCard(card: ProgressCard): TemplateResult {
   return html`
     <esphome-process-terminal
       variant="card"
-      .state=${terminalState(flow)}
-      .statusMessage=${statusMessage(flow, localize)}
-      .statusDetail=${flow.errored ? flow.errorMessage : ""}
-      .progress=${flow.step === "flashing" ? flow.progress : null}
+      .state=${card.state}
+      .statusMessage=${card.message}
+      .statusDetail=${card.detail ?? ""}
+      .progress=${card.progress ?? null}
     ></esphome-process-terminal>
   `;
 }
