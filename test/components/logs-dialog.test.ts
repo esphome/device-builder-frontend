@@ -14,7 +14,10 @@ import {
 } from "./_logs-dialog-env.js";
 
 import { makeConfiguredDevice } from "../_make-configured-device.js";
-import { startOtaStream } from "../../src/components/logs-dialog/session.js";
+import {
+  type SerialResetHook,
+  startOtaStream,
+} from "../../src/components/logs-dialog/session.js";
 import { hasSerialPort } from "../../src/components/logs-session.js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 
@@ -162,10 +165,15 @@ describe("logs-dialog header source chip", () => {
   });
 });
 
+const alwaysHook: SerialResetHook = {
+  supports: () => true,
+  run: () => Promise.resolve(),
+};
+
 describe("logs-dialog Reset Device gate", () => {
   async function mountPassive(
     targetPlatform: string,
-    options: { onResetDevice?: () => Promise<void> } = {}
+    options: { onResetDevice?: SerialResetHook } = {}
   ): Promise<ESPHomeLogsDialog> {
     const el = makeLogsDialog();
     el.configuration = "device.yaml";
@@ -194,8 +202,17 @@ describe("logs-dialog Reset Device gate", () => {
   });
 
   it("shows Reset Device for a Pico when the session supplies a reset hook", async () => {
-    const el = await mountPassive("rp2", { onResetDevice: () => Promise.resolve() });
+    const el = await mountPassive("rp2", { onResetDevice: alwaysHook });
     expect(hasResetButton(el)).toBe(true);
+  });
+
+  it("hides Reset Device when the hook does not support the attached port", async () => {
+    const el = await mountPassive("rp2", {
+      onResetDevice: { supports: () => false, run: () => Promise.resolve() },
+    });
+    el.setSerialStream({ close: vi.fn(), setSignals: vi.fn() } as any, async () => {});
+    await el.updateComplete;
+    expect(hasResetButton(el)).toBe(false);
   });
 });
 
@@ -309,19 +326,24 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
   it("Reset Device runs the session hook on the closed port instead of the pulse", async () => {
     cancel = vi.fn(async () => {});
     const fresh = { close: vi.fn(), setSignals: vi.fn() };
-    const onResetDevice = vi.fn(async (p: SerialPort) => {
+    const run = vi.fn(async (p: SerialPort, cancelled: () => boolean) => {
       expect(cancel).toHaveBeenCalledOnce(); // reader stopped and port closed first
       expect(p).toBe(port);
       expect(session(el).kind).toBe("reconnecting");
+      expect(cancelled()).toBe(false);
       el.setSerialStream(
         fresh as any,
         vi.fn(async () => {})
       );
+      expect(cancelled()).toBe(true); // the session moved on
     });
-    el.openPassive({ onReconnect: () => Promise.resolve(), onResetDevice });
+    el.openPassive({
+      onReconnect: () => Promise.resolve(),
+      onResetDevice: { supports: () => true, run },
+    });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     await (el as any)._onResetDevice();
-    expect(onResetDevice).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledOnce();
     expect(port.setSignals).not.toHaveBeenCalled();
     expect(session(el)).toMatchObject({ kind: "serial", port: fresh, paused: false });
   });
@@ -329,7 +351,10 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
   it("drops to dead with a toast when the reset hook rejects unhandled", async () => {
     el.openPassive({
       onReconnect: () => Promise.resolve(),
-      onResetDevice: () => Promise.reject(new Error("boom")),
+      onResetDevice: {
+        supports: () => true,
+        run: () => Promise.reject(new Error("boom")),
+      },
     });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     await (el as any)._onResetDevice();

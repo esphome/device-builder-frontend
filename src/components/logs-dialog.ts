@@ -41,6 +41,7 @@ import { isRp2Platform } from "../util/rp2-platform.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
+import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
   markSerialOutput,
@@ -48,6 +49,7 @@ import {
   onStop,
   openOta,
   openPassive,
+  resetOffered,
   resetSerialDevice,
   resumeAfterReconnect,
   setSerialOpenFailed,
@@ -172,7 +174,7 @@ export class ESPHomeLogsDialog extends LitElement {
   _reconnect: (() => Promise<void>) | null = null;
   // Session-supplied Reset Device (a Pico's BOOTSEL round trip); without it
   // Reset Device is the RTS pulse, offered only where that works.
-  _resetDevice: ((port: SerialPort) => Promise<void>) | null = null;
+  _resetDevice: SerialResetHook | null = null;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
@@ -225,7 +227,7 @@ export class ESPHomeLogsDialog extends LitElement {
   // The RTS-pulse Reset Device works here. A Pico has no reset line on its
   // CDC and arduino-pico gates output on DTR, so the pulse would only silence
   // it; a Pico resets through the session's hook instead (WebUSB browsers).
-  private _pulseResets = true;
+  _pulseResets = true;
 
   static styles = [
     espHomeStyles,
@@ -285,7 +287,7 @@ export class ESPHomeLogsDialog extends LitElement {
   public openPassive(options: {
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
-    onResetDevice?: (port: SerialPort) => Promise<void>;
+    onResetDevice?: SerialResetHook;
   }) {
     openPassive(this, options);
   }
@@ -414,7 +416,7 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
-              passive && (this._resetDevice !== null || this._pulseResets)
+              resetOffered(this)
                 ? // Web Serial only; disabled until a port is attached.
                   renderTermButton({
                     icon: "restart",

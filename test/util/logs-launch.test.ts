@@ -7,7 +7,7 @@ vi.mock("sonner-js", () => ({
 const launch = vi.hoisted(() => ({
   requestSerialPort: vi.fn<() => Promise<SerialPort | null>>(),
   attachSerialLogStream: vi.fn(async () => {}),
-  picoResetHook: vi.fn<() => ((port: SerialPort) => Promise<void>) | undefined>(),
+  picoResetHook: vi.fn<() => SerialResetHook | undefined>(),
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
   requestSerialPort: launch.requestSerialPort,
@@ -22,6 +22,7 @@ import toast from "sonner-js";
 import { withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -219,7 +220,7 @@ describe("launchLogsWithMethod web-serial", () => {
       open: vi.fn(async () => {}),
     } as unknown as SerialPort;
     launch.requestSerialPort.mockResolvedValue(port);
-    const hook = async () => {};
+    const hook = { supports: () => true, run: async () => {} };
     launch.picoResetHook.mockReturnValue(hook);
     const host = makeHost(async () => []);
     try {

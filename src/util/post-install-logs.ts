@@ -2,6 +2,7 @@ import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import type { SerialResetHook } from "../components/logs-dialog/session.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -13,7 +14,7 @@ import {
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
-import { isUsbAccessDenied, isWebUsbSupported } from "./web-usb.js";
+import { isWebUsbSupported, RASPBERRY_PI_USB_VID } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,
@@ -111,28 +112,34 @@ export async function reconnectWebSerialLogs(
 /**
  * Reset Device hook for a Pico logs session, or undefined where the dialog's
  * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
- * so the button stays hidden).
+ * so the button stays hidden). The BOOTSEL touch only reaches the Pico over
+ * its own CDC, not a UART bridge on its console pins.
  */
 export function picoResetHook(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   targetPlatform: string,
   baudRate: number
-): ((port: SerialPort) => Promise<void>) | undefined {
+): SerialResetHook | undefined {
   if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
-  return async (port) => {
-    let live: SerialPort | null;
-    try {
-      live = await resetPicoForLogs(port, baudRate);
-    } catch (err) {
-      failSerialOpen(logsDialog, localize(picoResetFailureKey(err)));
-      return;
-    }
-    if (!live) {
-      failPortReopen(logsDialog, localize, port);
-      return;
-    }
-    await attachSerialLogStream(live, logsDialog, localize, baudRate);
+  return {
+    supports: (port) => port.getInfo().usbVendorId === RASPBERRY_PI_USB_VID,
+    run: async (port, cancelled) => {
+      let live: SerialPort | null;
+      try {
+        live = await resetPicoForLogs(port, baudRate, cancelled);
+      } catch (err) {
+        console.warn("Pico reset failed", err);
+        failSerialOpen(logsDialog, localize(picoResetFailureKey(err)));
+        return;
+      }
+      if (cancelled()) return;
+      if (!live) {
+        failPortReopen(logsDialog, localize, port);
+        return;
+      }
+      await attachSerialLogStream(live, logsDialog, localize, baudRate);
+    },
   };
 }
 
@@ -140,7 +147,7 @@ export function picoResetHook(
 // udev rule) would strand it again every time, so name that cause instead.
 function picoResetFailureKey(err: unknown): string {
   if (!(err instanceof PicoStrandedError)) return "dashboard.logs_reset_failed";
-  return isUsbAccessDenied(err.cause)
+  return err.step === "refused"
     ? "firmware.rp2_usb_access_denied"
     : "dashboard.logs_rp2_reset_stranded";
 }

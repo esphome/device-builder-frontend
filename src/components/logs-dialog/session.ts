@@ -9,6 +9,16 @@ import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
 import { isPassive, isStreaming } from "../logs-session.js";
 
+/** Replaces the RTS-pulse Reset Device for a session. */
+export interface SerialResetHook {
+  /** Whether the device behind this port can be reset this way. */
+  supports(port: SerialPort): boolean;
+  /** Gets the port closed and, like onReconnect, ends by attaching a fresh
+   *  stream or ``setSerialOpenFailed``; ``cancelled`` flips once the dialog
+   *  closed or the session moved on. */
+  run(port: SerialPort, cancelled: () => boolean): Promise<void>;
+}
+
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(
   host: ESPHomeLogsDialog,
@@ -35,9 +45,7 @@ export function openPassive(
     // path — Start re-runs it; otherwise the Start button would be a dead end.
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
-    // Replaces the RTS-pulse Reset Device. Gets the port closed and, like
-    // onReconnect, ends by attaching a fresh stream or ``setSerialOpenFailed``.
-    onResetDevice?: (port: SerialPort) => Promise<void>;
+    onResetDevice?: SerialResetHook;
   }
 ): void {
   beginSession(host, options.onBackToInstall);
@@ -307,20 +315,31 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
   }
 }
 
+/** Whether the toolbar offers Reset Device: the hook for a port it supports
+ *  (any port while none is attached), else the pulse where that works. */
+export function resetOffered(host: ESPHomeLogsDialog): boolean {
+  const s = host._session;
+  if (!isPassive(s)) return false;
+  const hook = host._resetDevice;
+  if (!hook) return host._pulseResets;
+  return s.kind !== "serial" || hook.supports(s.port);
+}
+
 /** Reset Device. With a session hook: stop the reader and close the port,
  *  which the hook reopens. Otherwise pulse RTS (wired to EN on the standard
  *  auto-reset circuit) with the reader attached so the boot log follows;
  *  display resumes first so a Stopped log shows the boot output. */
 export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> {
   const s = host._session;
-  if (s.kind !== "serial") return;
-  const reset = host._resetDevice;
-  if (reset) {
+  if (s.kind !== "serial" || !resetOffered(host)) return;
+  const hook = host._resetDevice;
+  if (hook) {
     host._session = { kind: "reconnecting", paused: false };
     await s.cancel();
-    await reset(s.port).catch(() =>
-      failIfStillReconnecting(host, "dashboard.logs_reset_failed")
-    );
+    const cancelled = () => !host._open || host._session.kind !== "reconnecting";
+    await hook
+      .run(s.port, cancelled)
+      .catch(() => failIfStillReconnecting(host, "dashboard.logs_reset_failed"));
     return;
   }
   host._session = { ...s, paused: false };

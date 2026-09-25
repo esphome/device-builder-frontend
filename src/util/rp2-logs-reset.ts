@@ -6,61 +6,89 @@
 import { resetToBootloader } from "./serial-bootloader-touch.js";
 import { sleep } from "./sleep.js";
 import { openLiveSerialPort } from "./web-serial.js";
-import { getPicobootDevices, loadPicoboot, requestPicobootDevice } from "./web-usb.js";
+import {
+  classifyUsbDevice,
+  getPicobootDevices,
+  isUsbAccessDenied,
+  loadPicoboot,
+  requestPicobootDevice,
+} from "./web-usb.js";
 
 const BOOTSEL_POLL_MS = 200;
 // Counted from before the touch, well inside the click's transient activation,
 // so the chooser fallback is still allowed when the poll gives up.
 const BOOTSEL_WAIT_MS = 2000;
 
-/** The touch landed but the reboot did not: the Pico is sitting in BOOTSEL. */
+/**
+ * The touch landed but the reboot did not: the Pico is sitting in BOOTSEL.
+ * ``step`` says where it stopped: no bootloader picked (dismissed chooser or
+ * lapsed activation), the browser refused the device, or the reboot failed.
+ */
 export class PicoStrandedError extends Error {
-  // Error.cause needs lib ES2022; the field is declared here instead. Null
-  // when the chooser was dismissed.
-  constructor(readonly cause: unknown) {
-    super("Pico left in BOOTSEL");
+  constructor(
+    readonly step: "pick" | "refused" | "reboot",
+    // Error.cause needs lib ES2022; the field is declared here instead.
+    readonly cause: unknown = null
+  ) {
+    super(`Pico left in BOOTSEL (${step})`);
     this.name = "PicoStrandedError";
   }
 }
 
 /**
  * Reboot the Pico behind *port* (closed by the caller) and return its CDC port
- * reopened at *baudRate*, or null when it never came back. Throws
- * ``PicoStrandedError`` once the device is in BOOTSEL and cannot be rebooted;
- * a failed touch rethrows as is.
+ * reopened at *baudRate*, or null when it never came back or ``cancelled``
+ * flipped. Throws ``PicoStrandedError`` once the device is in BOOTSEL and
+ * cannot be rebooted; a failed touch rethrows as is.
  */
 export async function resetPicoForLogs(
   port: SerialPort,
-  baudRate: number
+  baudRate: number,
+  cancelled: () => boolean = () => false
 ): Promise<SerialPort | null> {
   const deadline = Date.now() + BOOTSEL_WAIT_MS;
+  // Only a bootloader that appears after the touch is this Pico; another
+  // granted board already sitting in BOOTSEL must not be rebooted instead.
+  const before = await getPicobootDevices();
   await resetToBootloader(port);
-  const usb = await findBootselDevice(deadline).catch((err: unknown) => {
-    throw new PicoStrandedError(err);
-  });
-  if (!usb) throw new PicoStrandedError(null);
-  try {
-    const { PicobootDevice } = await loadPicoboot();
-    const dev = await PicobootDevice.open(usb);
-    try {
-      await dev.reboot();
-    } finally {
-      await dev.close();
+  const usb = await findBootselDevice(deadline, before, cancelled).catch(
+    (err: unknown) => {
+      throw new PicoStrandedError("pick", err);
     }
+  );
+  if (!usb) throw new PicoStrandedError("pick");
+  const { PicobootDevice } = await loadPicoboot();
+  const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
+    throw new PicoStrandedError(isUsbAccessDenied(err) ? "refused" : "reboot", err);
+  });
+  try {
+    await dev.reboot();
   } catch (err) {
-    throw new PicoStrandedError(err);
+    throw new PicoStrandedError("reboot", err);
+  } finally {
+    await dev.close();
   }
-  return openLiveSerialPort(port, { baudRate });
+  return openLiveSerialPort(port, { baudRate, cancelled });
 }
 
 // A bootloader this origin was granted before shows up in getDevices() once
 // it enumerates, so a repeat reset skips the chooser; the chooser lists the
 // device live, so it can open before the Pico is back.
-async function findBootselDevice(deadline: number): Promise<USBDevice | null> {
+async function findBootselDevice(
+  deadline: number,
+  before: USBDevice[],
+  cancelled: () => boolean
+): Promise<USBDevice | null> {
   for (;;) {
-    const [granted] = await getPicobootDevices();
+    if (cancelled()) return null;
+    const granted = (await getPicobootDevices()).find(
+      (d) => classifyUsbDevice(d) === "rp2040" && !before.some((b) => sameDevice(b, d))
+    );
     if (granted) return granted;
     if (Date.now() >= deadline) return requestPicobootDevice();
     await sleep(BOOTSEL_POLL_MS);
   }
 }
+
+const sameDevice = (a: USBDevice, b: USBDevice): boolean =>
+  a === b || (a.serialNumber !== undefined && a.serialNumber === b.serialNumber);
