@@ -4,6 +4,7 @@
  * install flows; nothing here touches the DOM.
  */
 import { concat, int32LE } from "./bytes.js";
+import { formatAddress, tenthLogger } from "./flash-log.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 import type { Uf2Image } from "./uf2.js";
 import { classifyUsbDevice, isUsbDeviceLost } from "./web-usb.js";
@@ -316,6 +317,13 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
   return sectors;
 }
 
+export interface Uf2FlashHooks {
+  onProgress: (percent: number) => void;
+  /** One line per step, for the install dialog's details log. */
+  onLog?: (line: string) => void;
+  signal?: AbortSignal;
+}
+
 /**
  * picotool's ``load`` sequence: take exclusive access, leave XIP, then erase
  * and write sector by sector, and reboot into the new firmware. The abort
@@ -325,9 +333,9 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
 export async function flashUf2(
   dev: PicobootDevice,
   image: Uf2Image,
-  onProgress: (percent: number) => void,
-  { signal }: { signal?: AbortSignal } = {}
+  { onProgress, onLog, signal }: Uf2FlashHooks
 ): Promise<void> {
+  const log = onLog ?? (() => {});
   let written = 0;
   let rebooted = false;
   // WebUSB transfers have no timeout; closing the device is what fails a
@@ -336,18 +344,28 @@ export async function flashUf2(
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     const sectors = planSectors(image);
+    log(`Writing ${image.totalBytes} bytes in ${sectors.size} flash sectors`);
+    for (const range of image.ranges) {
+      log(`Range ${formatAddress(range.address)} (${range.data.length} bytes)`);
+    }
+    log("Taking exclusive access");
     await dev.exclusiveAccess(EXCLUSIVE);
+    log("Leaving XIP");
     await dev.exitXip();
+    const tenth = tenthLogger(log, "Writing");
     for (const [sector, writes] of sectors) {
       signal?.throwIfAborted();
       await dev.flashErase(sector, FLASH_SECTOR_SIZE);
       for (const w of writes) {
         await dev.write(w.address, w.data);
         written += w.bytes;
-        onProgress(Math.floor((written / image.totalBytes) * 99));
+        const percent = Math.floor((written / image.totalBytes) * 99);
+        onProgress(percent);
+        tenth(percent);
       }
     }
     signal?.throwIfAborted();
+    log("Rebooting into the firmware");
     await dev.reboot();
     rebooted = true;
     onProgress(100);
