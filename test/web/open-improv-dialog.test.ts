@@ -8,7 +8,10 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 // Post-reset reopen goes through openLiveSerialPort (re-enumeration retry
 // loop); stub it so the suite can hand back the cached or a fresh handle.
 const { openLiveSerialPort } = vi.hoisted(() => ({ openLiveSerialPort: vi.fn() }));
-vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort }));
+vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
+  openLiveSerialPort,
+}));
 
 import toast from "sonner-js";
 import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
@@ -16,15 +19,17 @@ import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
 const localize: (k: string, v?: Record<string, string | number>) => string = (k) => k;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-function makePort(): {
+function makePort(info: SerialPortInfo = {}): {
   close: ReturnType<typeof vi.fn>;
   setSignals: ReturnType<typeof vi.fn>;
+  getInfo: () => SerialPortInfo;
   readable: unknown;
   writable: unknown;
 } {
   return {
     close: vi.fn(async () => {}),
     setSignals: vi.fn(async () => {}),
+    getInfo: () => info,
     readable: null,
     writable: null,
   };
@@ -75,6 +80,48 @@ describe("openImprovDialog", () => {
       new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
     );
     await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
+  });
+
+  it("keeps DTR asserted on a Pico, whose CDC only transmits while DTR is up", async () => {
+    const port = makePort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    expect(port.setSignals).not.toHaveBeenCalled();
+    expect(dialogEl()).toBeTruthy();
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+  });
+
+  it("swallows the SDK's late state-request rejection while a dialog is up, and nothing else", async () => {
+    const port = makePort();
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    const rejection = (reason: unknown) => {
+      const ev = new Event("unhandledrejection", { cancelable: true }) as Event & {
+        reason: unknown;
+      };
+      ev.reason = reason;
+      window.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    expect(rejection(new Error("something else"))).toBe(false);
+    // A device error on the same request is real news, not the SDK's race.
+    expect(rejection(new Error("Error fetching current state: BAD_HOSTNAME"))).toBe(
+      false
+    );
+    // The SDK's late rejection can land up to its RPC timeout after the close;
+    // the guard stays for that long and no longer.
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+    expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + 30_000);
+      expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports improv-detected-but-not-provisioned and closes the port", async () => {

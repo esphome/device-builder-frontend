@@ -8,7 +8,8 @@ vi.mock("improv-wifi-serial-sdk/dist/serial-provision-dialog", () => {
 });
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 // The reopen retry loop is exercised elsewhere; here the cached handle just opens.
-vi.mock("../../src/util/web-serial.js", () => ({
+vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
   openLiveSerialPort: vi.fn(
     async (port: SerialPort, opts: { onOpened?: (p: SerialPort) => void }) => {
       opts.onOpened?.(port);
@@ -26,6 +27,7 @@ describe("openImprovDialog — SDK load failure", () => {
     const port = {
       close,
       setSignals: vi.fn(async () => {}),
+      getInfo: () => ({}),
       readable: null,
       writable: null,
     };

@@ -8,6 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { openLiveSerialPort } from "../../util/web-serial.js";
+import { isRp2CdcPort } from "../../util/web-usb.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
@@ -143,7 +144,10 @@ async function acquirePort(
     toast.error(localize("web.improv.port_busy"));
     return null;
   }
-  if (weOpened) {
+  // Clearing the lines keeps an auto-reset circuit on a UART-bridge board
+  // from holding EN low. Not on a Pico: its CDC only transmits while DTR is
+  // asserted, so clearing it silences the device and Improv never answers.
+  if (weOpened && !isRp2CdcPort(live)) {
     try {
       await live.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {
@@ -180,6 +184,7 @@ async function runImprov(
   const dialog = document.createElement("improv-wifi-serial-provision-dialog");
   dialog.port = port;
 
+  dialogMounted();
   return new Promise<ImprovResult>((resolve) => {
     dialog.addEventListener(
       "closed",
@@ -193,10 +198,48 @@ async function runImprov(
         // reader in its own close handler, so this just frees the device for the
         // next action. Best-effort: the device may have been unplugged.
         if (weOpened) void port.close().catch(() => {});
+        dialogClosed();
         resolve(result);
       },
       { once: true }
     );
     document.body.appendChild(dialog);
   });
+}
+
+/** The SDK's RPC timeout: how long after a close its late rejection can still land. */
+const LATE_STATE_ERROR_MS = 30_000;
+/** The one message the guard swallows: the state request losing to the detection timeout. */
+const LATE_STATE_ERROR = "Error fetching current state: TIMEOUT";
+
+/**
+ * The SDK's ``initialize`` races its first state request against a detection
+ * timeout inside an async promise executor. When the timeout wins (a device
+ * that never answers), the dialog shows its error state, but the request's
+ * own later rejection has nothing to catch it and surfaces as an unhandled
+ * "Error fetching current state: TIMEOUT" (improv-wifi/sdk-serial-js,
+ * serial.js). Swallow exactly that while a dialog is up and for an RPC
+ * timeout after one closed; anything else, including a device error on the
+ * same request, stays loud.
+ */
+let mountedDialogs = 0;
+let swallowUntil = 0;
+let listening = false;
+
+function dialogMounted(): void {
+  mountedDialogs++;
+  if (listening) return;
+  listening = true;
+  window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
+    if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
+    const reason = ev.reason as { message?: unknown } | undefined;
+    const message =
+      typeof reason?.message === "string" ? reason.message : String(ev.reason);
+    if (message === LATE_STATE_ERROR) ev.preventDefault();
+  });
+}
+
+function dialogClosed(): void {
+  mountedDialogs--;
+  swallowUntil = Date.now() + LATE_STATE_ERROR_MS;
 }
