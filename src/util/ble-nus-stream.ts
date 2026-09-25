@@ -146,11 +146,12 @@ async function subscribe(
       console.warn("BLE NUS stopNotifications failed", err);
     });
     await txChar.startNotifications();
-    // A drop during the subscribe fails it here rather than streaming nothing.
+    // Nothing awaits from here to the return, so a drop either already
+    // happened (the check below fails the subscribe) or reaches the listener.
+    device.addEventListener("gattserverdisconnected", onDisconnected);
     if (!device.gatt?.connected) {
       throw new DOMException("The device disconnected while subscribing", "NetworkError");
     }
-    device.addEventListener("gattserverdisconnected", onDisconnected);
     // A caller's cancel means the session moved on: no late fragment.
     return async () => {
       if (detach()) device.gatt?.disconnect();

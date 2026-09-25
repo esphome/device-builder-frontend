@@ -228,7 +228,16 @@ describe("streamBleNus", () => {
       name: "NetworkError",
     });
     expect(onDisconnect).not.toHaveBeenCalled();
-    expect(d.deviceListeners.size).toBe(0);
+    expect(d.deviceListeners.size).toBe(0); // the failed subscribe took its listener off
+  });
+
+  it("is listening for a disconnect from the moment it resolves", async () => {
+    const d = fakeDevice();
+    const onDisconnect = vi.fn();
+    await streamBleNus(d.device, { onLine: () => {}, onDisconnect });
+    expect(d.deviceListeners.size).toBe(1);
+    d.dropLink();
+    expect(onDisconnect).toHaveBeenCalledOnce();
   });
 
   it("removes the value listener when subscribing fails after it was added", async () => {
