@@ -29,7 +29,7 @@ vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
-import { withWebSerial } from "../_web-serial.js";
+import { withWebBluetooth, withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
@@ -301,5 +301,45 @@ describe("launchLogsWithMethod ble-nus", () => {
     const host = makeHost(async () => []);
     await launchLogsWithMethod(host, makeDevice(), "ble-nus");
     expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
+  });
+});
+
+describe("launchLogs with Bluetooth", () => {
+  it("opens the method picker for an nRF52 on Bluetooth alone, with no serial path", async () => {
+    const restoreSerial = withWebSerial(false);
+    const restoreBluetooth = withWebBluetooth({});
+    const host = makeHost(async () => []); // no server serial ports either
+    const openMethodPicker = vi.fn();
+    try {
+      await launchLogs(
+        host,
+        { ...makeDevice(), target_platform: "nrf52" },
+        openMethodPicker
+      );
+      expect(openMethodPicker).toHaveBeenCalledOnce();
+      expect(host.logsDialog.open).not.toHaveBeenCalled();
+    } finally {
+      restoreBluetooth();
+      restoreSerial();
+    }
+  });
+
+  it("still opens OTA logs directly for a non-nRF device on Bluetooth alone", async () => {
+    const restoreSerial = withWebSerial(false);
+    const restoreBluetooth = withWebBluetooth({});
+    const host = makeHost(async () => []);
+    const openMethodPicker = vi.fn();
+    try {
+      await launchLogs(
+        host,
+        { ...makeDevice(), target_platform: "esp32" },
+        openMethodPicker
+      );
+      expect(openMethodPicker).not.toHaveBeenCalled();
+      expect(host.logsDialog.open).toHaveBeenCalledOnce();
+    } finally {
+      restoreBluetooth();
+      restoreSerial();
+    }
   });
 });
