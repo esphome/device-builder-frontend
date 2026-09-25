@@ -1,4 +1,3 @@
-import { formatAddress, tenthLogger } from "./flash-log.js";
 /**
  * Flashing a Realtek AmebaZ2 (RTL8720C) over Web Serial through the ROM's
  * UART download console, the protocol ltchiptool speaks for this family:
@@ -6,6 +5,7 @@ import { formatAddress, tenthLogger } from "./flash-log.js";
  * ``fwd`` + XModem-1k per run, ``hashq`` to verify, ``disc`` to boot. Loaded
  * on demand by the install flow; nothing here touches the DOM.
  */
+import { formatAddress, tenthLogger } from "./flash-log.js";
 import type { LibreTinyImage } from "./libretiny-uf2.js";
 import { SerialStreamSession } from "./serial-stream-session.js";
 import { sleep } from "./sleep.js";
