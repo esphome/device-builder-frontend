@@ -96,6 +96,15 @@ export async function streamBleNus(
   }
 }
 
+// A service or characteristic the device does not have means the wrong
+// device was picked; anything else is a link problem worth a retry.
+function wrongDevice(err: unknown): never {
+  if (err instanceof DOMException && err.name === "NotFoundError") {
+    throw new BleNusServiceNotFoundError();
+  }
+  throw err;
+}
+
 async function subscribe(
   device: BluetoothDevice,
   hooks: SerialLineHooks
@@ -126,13 +135,8 @@ async function subscribe(
     const server = await device.gatt!.connect();
     const service = await server
       .getPrimaryService(BLE_NUS_SERVICE_UUID)
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "NotFoundError") {
-          throw new BleNusServiceNotFoundError();
-        }
-        throw err;
-      });
-    txChar = await service.getCharacteristic(BLE_NUS_TX_UUID);
+      .catch(wrongDevice);
+    txChar = await service.getCharacteristic(BLE_NUS_TX_UUID).catch(wrongDevice);
     txChar.addEventListener("characteristicvaluechanged", onValue);
     // Chrome caches its subscribed flag per characteristic; a device that
     // reset the CCCD on disconnect would otherwise never be re-subscribed.
@@ -143,10 +147,9 @@ async function subscribe(
       throw new DOMException("The device disconnected while subscribing", "NetworkError");
     }
     device.addEventListener("gattserverdisconnected", onDisconnected);
+    // A caller's cancel means the session moved on: no late fragment.
     return async () => {
-      if (!detach()) return;
-      safeFlush(assembler);
-      device.gatt?.disconnect();
+      if (detach()) device.gatt?.disconnect();
     };
   } catch (err) {
     // Leave nothing connected behind a failed attempt: a linked peripheral

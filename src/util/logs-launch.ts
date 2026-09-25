@@ -36,7 +36,7 @@ const SERIAL_PORT_PROBE_TIMEOUT_MS = 2500;
  * Open live logs, offering the OTA-vs-serial picker when a serial path exists.
 
  * ``openMethodPicker`` is invoked (host wires the picker in its logs mode) when
- * WebSerial or a server serial port is available; otherwise OTA logs open
+ * WebSerial, a server serial port or Bluetooth logs are available; otherwise OTA logs open
  * directly. Online/offline state is intentionally not consulted (#525).
  */
 export async function launchLogs(
@@ -204,7 +204,7 @@ async function pickBleNusDevice(
     notifyError(
       host.localize(
         err instanceof BleUnavailableError
-          ? "dashboard.logs_ble_nus_unsupported"
+          ? "dashboard.logs_ble_nus_unavailable"
           : "dashboard.logs_ble_nus_open_failed"
       )
     );

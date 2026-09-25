@@ -33,6 +33,7 @@ import { withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
+import { BleUnavailableError } from "../../src/util/ble-nus-stream.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -266,6 +267,17 @@ describe("launchLogsWithMethod ble-nus", () => {
       expect.objectContaining({ attempts: 3 })
     );
     expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(cancel);
+  });
+
+  it("says Bluetooth is off or blocked when the adapter is unavailable", async () => {
+    ble.requestBleNusDevice.mockRejectedValue(new BleUnavailableError());
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(toast.error).toHaveBeenCalledWith(
+      "dashboard.logs_ble_nus_unavailable",
+      expect.anything()
+    );
+    expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
   });
 
   it("does nothing when the chooser is dismissed", async () => {

@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/components/dashboard/actions.js", () => ({
+  dialogLineHooks: () => ({ onLine: vi.fn() }),
   streamSerialToDialog: () => () => {},
 }));
 
@@ -27,13 +28,29 @@ vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
   resetPicoForLogs: picoReset.resetPicoForLogs,
 }));
+const bleStream = vi.hoisted(() => ({
+  streamBleNus:
+    vi.fn<
+      (
+        device: BluetoothDevice,
+        hooks: { onLine: (l: string) => void; onDisconnect?: () => void },
+        opts: { attempts: number; cancelled: () => boolean }
+      ) => Promise<() => Promise<void>>
+    >(),
+}));
+vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/ble-nus-stream.js")>()),
+  streamBleNus: bleStream.streamBleNus,
+}));
 vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/web-usb.js")>()),
   isWebUsbSupported: () => picoReset.webUsb,
 }));
 
 import { defaultLocalize } from "../../src/common/localize.js";
+import { BleNusServiceNotFoundError } from "../../src/util/ble-nus-stream.js";
 import {
+  attachBleNusLogs,
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
@@ -378,6 +395,64 @@ describe("picoResetHook", () => {
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_port_reopen_failed", { port: "USB 303a:1001" })
     );
+  });
+});
+
+describe("attachBleNusLogs", () => {
+  const device = {} as BluetoothDevice;
+  const bleDialog = () => ({ ...stubDialog(), setBleStream: vi.fn() });
+
+  it("registers the stream once notifications flow", async () => {
+    const dialog = bleDialog();
+    const cancel = vi.fn(async () => {});
+    bleStream.streamBleNus.mockResolvedValue(cancel);
+    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    expect(dialog.setBleStream).toHaveBeenCalledWith(cancel);
+    expect(bleStream.streamBleNus).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({ onLine: expect.any(Function) }),
+      expect.objectContaining({ attempts: 3 })
+    );
+  });
+
+  it("cancels a stream that lands after the session moved on", async () => {
+    const dialog = bleDialog();
+    const cancel = vi.fn(async () => {});
+    bleStream.streamBleNus.mockResolvedValue(cancel);
+    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => true);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(dialog.setBleStream).not.toHaveBeenCalled();
+  });
+
+  it("names the wrong device when the NUS service is missing", async () => {
+    const dialog = bleDialog();
+    bleStream.streamBleNus.mockRejectedValue(new BleNusServiceNotFoundError());
+    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    const message = defaultLocalize("dashboard.logs_ble_nus_service_not_found");
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
+    expect(toastError).toHaveBeenCalledWith(message, expect.anything());
+  });
+
+  it("reports a failed connect", async () => {
+    const dialog = bleDialog();
+    bleStream.streamBleNus.mockRejectedValue(new DOMException("GATT", "NetworkError"));
+    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_ble_nus_open_failed")
+    );
+  });
+
+  it("ends the session quietly on a remote disconnect, leaving Start to reconnect", async () => {
+    const dialog = bleDialog();
+    bleStream.streamBleNus.mockImplementation(async (_d, hooks) => {
+      hooks.onDisconnect?.();
+      return async () => {};
+    });
+    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_ble_nus_disconnected")
+    );
+    expect(toastError).not.toHaveBeenCalled();
   });
 });
 

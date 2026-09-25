@@ -189,6 +189,7 @@
     "logs_method_ble_nus": "Via Bluetooth",
     "logs_method_ble_nus_desc": "Stream serial logs over Bluetooth using the Nordic UART Service.",
     "logs_ble_nus_unsupported": "Bluetooth is not available in this browser.",
+    "logs_ble_nus_unavailable": "Bluetooth is off or this browser is not allowed to use it.",
     "logs_ble_nus_connecting": "Connecting to Bluetooth device…",
     "logs_ble_nus_service_not_found": "This device does not have the NUS Bluetooth serial service. Make sure you selected the right device.",
     "logs_ble_nus_open_failed": "Could not connect to the Bluetooth device.",

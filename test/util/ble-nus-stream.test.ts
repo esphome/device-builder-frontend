@@ -54,6 +54,7 @@ function fakeDevice(opts: { connectFailures?: number; noService?: boolean } = {}
   return {
     device: device as unknown as BluetoothDevice,
     gatt,
+    service,
     char,
     notify(text: string) {
       char.value = enc(text);
@@ -141,6 +142,26 @@ describe("streamBleNus", () => {
       streamBleNus(d.device, { onLine: () => {} }, { attempts: 2, retryDelayMs: 0 })
     ).rejects.toMatchObject({ name: "NetworkError" });
     expect(d.gatt.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a missing TX characteristic as the wrong device too", async () => {
+    const d = fakeDevice();
+    d.service.getCharacteristic.mockRejectedValueOnce(
+      new DOMException("No Characteristics matching UUID", "NotFoundError")
+    );
+    await expect(
+      streamBleNus(d.device, { onLine: () => {} }, { attempts: 3, retryDelayMs: 0 })
+    ).rejects.toBeInstanceOf(BleNusServiceNotFoundError);
+    expect(d.gatt.connect).toHaveBeenCalledOnce();
+  });
+
+  it("drops a pending fragment on a caller's cancel (the session moved on)", async () => {
+    const d = fakeDevice();
+    const lines: string[] = [];
+    const cancel = await streamBleNus(d.device, { onLine: (l) => lines.push(l) });
+    d.notify("half a line");
+    await cancel();
+    expect(lines).toHaveLength(0);
   });
 
   it("never retries a device without the NUS service and drops the link", async () => {
