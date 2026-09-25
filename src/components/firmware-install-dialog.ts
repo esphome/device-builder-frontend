@@ -225,6 +225,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _nrfPkg: DfuPackage | null = null;
   _rp2Image: Uf2Image | null = null;
   _rtlImage: LibreTinyImage | null = null;
+  // The port the RTL8720C flash went through; backs "Show logs" on Done.
+  _rtlPort: SerialPort | null = null;
   // Blocks a second picker while a browser-flash step's picker is open.
   @state() _flashBusy = false;
   // Aborts an in-flight browser flash on teardown so the device is released.
@@ -351,6 +353,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._nrfPkg = null;
     this._rp2Image = null;
     this._rtlImage = null;
+    this._rtlPort = null;
     this._flashBusy = false;
   }
 
@@ -470,7 +473,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   };
 
   _showLogsAgain = () => {
-    if (this._detected) flipToLogs(this, this._detected.port);
+    const port = this._detected?.port ?? this._rtlPort;
+    if (port) flipToLogs(this, port);
   };
 
   // Web-flash success: the flash happened in the external tab, so view the

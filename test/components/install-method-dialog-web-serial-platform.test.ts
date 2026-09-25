@@ -7,9 +7,10 @@
  * (`esphome run`) stays available, even on localhost where it's normally
  * collapsed into Web Serial.
  *
- * nRF52 and RP2 are special cases: they don't get the esptool Web Serial row
- * but do get their own in-browser rows when Web Serial is available. In logs
- * mode the Web Serial row also covers RP2 (its CDC console reads like any port).
+ * nRF52, RP2 and the RTL8720C are special cases: they don't get the esptool
+ * Web Serial row but do get their own in-browser rows when Web Serial is
+ * available. In logs mode the Web Serial row also covers them (their consoles
+ * read like any port).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -156,7 +157,8 @@ describe("install-method-dialog platform gating", () => {
 describe("install-method-dialog logs-mode platform gating", () => {
   // The Pico's CDC console reads like any other port, so logs get the Web
   // Serial row; on localhost that collapses the server-serial row, as for ESP.
-  it.each(["rp2", "rp2040", "rp2350", "esp32"])(
+  // The RTL8720C logs on a plain UART, read like any other port.
+  it.each(["rp2", "rp2040", "rp2350", "esp32", "rtl87xx"])(
     "shows Web Serial logs and drops server-serial for %s",
     async (platform) => {
       const d = await mount(platform, "logs");

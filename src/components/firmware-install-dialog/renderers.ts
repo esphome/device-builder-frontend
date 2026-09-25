@@ -430,8 +430,10 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const isRunning =
     host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {
-    // Web Serial only — the download / web-flash installers don't connect.
-    const showToggle = host._installer === "web-serial";
+    // Only the installers that hold a port the logs can reopen: esptool and
+    // the RTL8720C flasher. The download / web-flash installers don't connect.
+    const showToggle =
+      host._installer === "web-serial" || host._installer === "rtl-ambz2";
     return html`
       <div class="footer">
         ${
@@ -528,11 +530,13 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     `;
   }
   // Web Serial install success — surface "Logs" so users can flip back after
-  // they've clicked logs-dialog's "Back to install". _detected survives
-  // _onClose but not _close, so the button only renders while the SerialPort
-  // reference is still around.
+  // they've clicked logs-dialog's "Back to install". _detected (esptool) and
+  // _rtlPort (RTL8720C) survive _onClose but not _close, so the button only
+  // renders while the SerialPort reference is still around.
   const canShowLogs =
-    host._installer === "web-serial" && host._step === "done" && host._detected !== null;
+    host._step === "done" &&
+    ((host._installer === "web-serial" && host._detected !== null) ||
+      (host._installer === "rtl-ambz2" && host._rtlPort !== null));
   return html`
     <div class="footer">
       ${

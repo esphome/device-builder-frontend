@@ -14,6 +14,7 @@ import {
   pickSerialPortOrFail,
   resetForRetry,
 } from "./browser-flash-steps.js";
+import { flipToLogs } from "./install-flow.js";
 
 const loadEngine = () => import("../../util/ambz2-flasher.js");
 
@@ -122,4 +123,9 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     rebooted ? "firmware.status_done" : "firmware.rtl_done_manual_reset"
   );
   host._step = "done";
+  host._rtlPort = port;
+  // The logs reopen the port with both lines released, so the boot log
+  // follows. Not while the manual-reset instruction is showing, and not for
+  // a dialog that was dismissed mid-flash (the logs would pop up unasked).
+  if (rebooted && host._open && host._showLogsAfterInstall) flipToLogs(host, port);
 }

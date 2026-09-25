@@ -220,6 +220,44 @@ describe("launchLogsWithMethod", () => {
 });
 
 describe("launchLogsWithMethod web-serial", () => {
+  it("releases DTR and RTS after opening an RTL8720C board's port", async () => {
+    const restore = withWebSerial(true);
+    const setSignals = vi.fn(async () => {});
+    const port = {
+      getInfo: () => ({}),
+      open: vi.fn(async () => {}),
+      setSignals,
+    } as unknown as SerialPort;
+    launch.requestSerialPort.mockResolvedValue(port);
+    const host = makeHost(async () => []);
+    try {
+      const device = { ...makeDevice(), target_platform: "rtl87xx" };
+      await launchLogsWithMethod(host, device, "web-serial");
+      expect(setSignals).toHaveBeenCalledWith({
+        dataTerminalReady: false,
+        requestToSend: false,
+      });
+      expect(launch.attachSerialLogStream).toHaveBeenCalledWith(
+        port,
+        host.logsDialog,
+        host.localize,
+        115200,
+        undefined
+      );
+      // An ESP board keeps the open's line state; its auto-reset circuit
+      // reads a change as a reset.
+      setSignals.mockClear();
+      await launchLogsWithMethod(
+        host,
+        { ...makeDevice(), target_platform: "esp32" },
+        "web-serial"
+      );
+      expect(setSignals).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("hands the Pico reset hook to the passive session", async () => {
     const restore = withWebSerial(true);
     const port = {
