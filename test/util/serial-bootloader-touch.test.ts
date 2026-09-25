@@ -35,11 +35,16 @@ describe("resetToBootloader", () => {
 
   it("marks the re-enumeration as its own so the connect toast stays quiet", async () => {
     const { port } = fakePort();
-    const t0 = Date.now();
-    await resetToBootloader(port);
-    // A window no wider than this call proves the stamp landed in it, not
-    // in an earlier test (the stamp is module state).
-    expect(isRecentSerialActivity(Date.now() - t0 + 1)).toBe(true);
+    // The stamp is module state: jump the clock so earlier tests' stamps are stale.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 1_000_000);
+    try {
+      expect(isRecentSerialActivity()).toBe(false);
+      await resetToBootloader(port);
+      expect(isRecentSerialActivity()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("releases a handle left open by an earlier touch before opening", async () => {

@@ -419,9 +419,7 @@ export async function flashDfuPackage(
     } catch {
       // ignore
     }
-    // The bootloader or the flashed app re-enumerates next; that connect
-    // event is ours.
-    markSerialActivity();
+    markSerialActivity(); // the re-enumeration next is ours
   }
 }
 

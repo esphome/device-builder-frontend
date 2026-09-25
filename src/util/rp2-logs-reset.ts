@@ -60,7 +60,9 @@ export async function resetPicoForLogs(
   if (!usb) throw noBootloader(port, cancelled);
   // Past this point a cancel is not honoured: the board is in BOOTSEL, and
   // the reboot is what brings it back.
-  const { PicobootDevice } = await loadPicoboot();
+  const { PicobootDevice } = await loadPicoboot().catch((err: unknown) => {
+    throw new PicoStrandedError("reboot", err);
+  });
   const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
     throw new PicoStrandedError(isUsbAccessDenied(err) ? "refused" : "reboot", err);
   });
@@ -82,23 +84,15 @@ function noBootloader(
   cancelled: () => boolean,
   cause?: unknown
 ): Error {
-  if (port.connected && !cancelled()) {
-    return new Error(
-      `The Pico ignored the 1200-baud touch${cause === undefined ? "" : ` (${String(cause)})`}`
-    );
-  }
+  if (port.connected && !cancelled())
+    return new Error("The Pico ignored the 1200-baud touch");
   return new PicoStrandedError("pick", cause);
 }
 
 // getDevices() need not hand back the same wrapper twice; a bootloader's
 // serial number (the flash unique id) is the stable identity.
 const sameDevice = (a: USBDevice, b: USBDevice): boolean =>
-  a === b ||
-  (a.serialNumber !== undefined &&
-    a.serialNumber !== "" &&
-    a.serialNumber === b.serialNumber &&
-    a.vendorId === b.vendorId &&
-    a.productId === b.productId);
+  a === b || (!!a.serialNumber && a.serialNumber === b.serialNumber);
 
 // A bootloader this origin was granted before shows up in getDevices() once
 // it enumerates, so a repeat reset skips the chooser; the chooser lists the

@@ -44,7 +44,6 @@ import { logsDialogStyles } from "./logs-dialog.styles.js";
 import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
-  afterHide,
   beginClose,
   markSerialOutput,
   onStart,
@@ -173,12 +172,11 @@ export class ESPHomeLogsDialog extends LitElement {
 
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
-  _reconnect: (() => Promise<void>) | null = null;
+  _reconnect: ((cancelled: () => boolean) => Promise<void>) | null = null;
   // Session-supplied Reset Device (a Pico's BOOTSEL round trip); without it
   // Reset Device is the RTS pulse, offered only where that works.
   _resetDevice: SerialResetHook | null = null;
-  // Bumped per open, so a hook still running for a closed dialog can tell
-  // the session it started in from one opened since.
+  // Bumped per open; see runReconnecting.
   _sessionGen = 0;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
@@ -290,7 +288,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   public openPassive(options: {
-    onReconnect: () => Promise<void>;
+    onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
   }) {
@@ -322,7 +320,6 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   public close() {
-    void teardownSession(this);
     beginClose(this);
   }
 
@@ -367,7 +364,6 @@ export class ESPHomeLogsDialog extends LitElement {
         ?open=${this._open}
         .label=${title}
         @request-close=${this._onDialogRequestClose}
-        @after-hide=${this._onDialogHide}
       >
         <span slot="header-suffix" class="source-chip truncate" title=${source}
           >${source}</span
@@ -573,11 +569,9 @@ export class ESPHomeLogsDialog extends LitElement {
    * lines push into the buffer and each push re-renders with
    * ``?open=${this._open}``; were ``_open`` still true mid-animation the
    * re-asserted ``open=true`` could cancel wa-dialog's hide. No
-   * ``preventDefault`` — the close proceeds and ``after-hide`` tears down.
+   * ``preventDefault`` — the close proceeds; the session ends with it.
    */
   private _onDialogRequestClose = (): void => beginClose(this);
-
-  private _onDialogHide = (): void => afterHide(this);
 
   /**
    * "Back to install" handler — only visible when an ``onBackToInstall``

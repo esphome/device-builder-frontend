@@ -78,7 +78,8 @@ export async function reconnectWebSerialLogs(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  loggerInterface: string | null
+  loggerInterface: string | null,
+  cancelled: () => boolean = () => false
 ): Promise<void> {
   let port: SerialPort | null;
   try {
@@ -106,7 +107,7 @@ export async function reconnectWebSerialLogs(
     failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
     return;
   }
-  await attachSerialLogStream(port, logsDialog, localize, baudRate);
+  await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
 }
 
 /**
@@ -133,16 +134,16 @@ export function picoResetHook(
         console.warn("Pico reset failed", err);
         failure = localize(picoResetFailureKey(err));
       }
-      if (cancelled()) {
-        // The session moved on: a newer one must not be flipped dead, a
-        // stranded Pico still gets its toast, a reopened port has no reader.
-        if (failure) notifyError(failure);
-        else await live?.close().catch(() => {});
-        return;
+      if (failure) {
+        // A stranded Pico still gets its toast once the session moved on,
+        // but a newer session must not be flipped dead.
+        if (cancelled()) notifyError(failure);
+        else failSerialOpen(logsDialog, failure);
+      } else if (!live) {
+        if (!cancelled()) failPortReopen(logsDialog, localize, port);
+      } else {
+        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
       }
-      if (failure) failSerialOpen(logsDialog, failure);
-      else if (!live) failPortReopen(logsDialog, localize, port);
-      else await attachSerialLogStream(live, logsDialog, localize, baudRate);
     },
   };
 }
@@ -248,15 +249,17 @@ export async function attachSerialLogStream(
   port: SerialPort,
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  baudRate: number
+  baudRate: number,
+  cancelled: () => boolean = () => false
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
       baudRate,
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,
+      cancelled,
     });
     if (!live) {
-      failPortReopen(logsDialog, localize, port);
+      if (!cancelled()) failPortReopen(logsDialog, localize, port);
       return;
     }
     port = live;
@@ -266,6 +269,11 @@ export async function attachSerialLogStream(
       /* setSignals failures are recoverable; the chip might be in a
          fine state already. Continue. */
     }
+  }
+  if (cancelled()) {
+    // The session moved on while the port was reopened; nothing will read it.
+    await port.close().catch(() => {});
+    return;
   }
   const cancel = streamSerialToDialog(port, logsDialog);
   logsDialog.setSerialStream(port, cancel);
@@ -307,8 +315,14 @@ export async function handlePostInstallShowLogs(
       // "click Start to reconnect" after a reopen failure (#636). Re-acquire a
       // fresh port via the picker rather than reopening the cached esptool
       // handle, which a native-USB chip's post-flash re-enumeration leaves dead.
-      onReconnect: () =>
-        reconnectWebSerialLogs(logsDialog, localize, baudRate, loggerInterface ?? null),
+      onReconnect: (cancelled) =>
+        reconnectWebSerialLogs(
+          logsDialog,
+          localize,
+          baudRate,
+          loggerInterface ?? null,
+          cancelled
+        ),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

@@ -252,8 +252,7 @@ export class PicobootDevice {
 
   /** RP2040 reboot into flash. The device may drop off the bus before the ACK arrives. */
   async reboot(): Promise<void> {
-    // The firmware's CDC port re-enumerates next; that connect event is ours.
-    markSerialActivity();
+    markSerialActivity(); // the CDC re-enumerating next is ours
     // RP2350 replaced REBOOT with REBOOT2 (flags 0: a normal boot from flash).
     const cmd =
       classifyUsbDevice(this.device) === "rp2350"

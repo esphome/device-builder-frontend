@@ -137,12 +137,13 @@ export async function launchLogsWithMethod(
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
     host.logsDialog.openPassive({
-      onReconnect: () =>
+      onReconnect: (cancelled) =>
         reconnectWebSerialLogs(
           host.logsDialog,
           host.localize,
           baudRate,
-          device.logger_interface
+          device.logger_interface,
+          cancelled
         ),
       onResetDevice: picoResetHook(
         host.logsDialog,

@@ -34,26 +34,21 @@ function makeDevice(): ConfiguredDevice {
   } as ConfiguredDevice;
 }
 
-function makeHost(getSerialPorts: () => Promise<unknown>): LogsLaunchHost & {
+type TestHost = LogsLaunchHost & {
   logsDialog: {
     configuration?: string;
     name?: string;
     open: ReturnType<typeof vi.fn>;
     openPassive: ReturnType<typeof vi.fn>;
   };
-} {
+};
+
+function makeHost(getSerialPorts: () => Promise<unknown>): TestHost {
   return {
     api: { getSerialPorts: vi.fn(getSerialPorts) },
     logsDialog: { open: vi.fn(), openPassive: vi.fn() },
     localize: (key: string) => key,
-  } as unknown as LogsLaunchHost & {
-    logsDialog: {
-      configuration?: string;
-      name?: string;
-      open: ReturnType<typeof vi.fn>;
-      openPassive: ReturnType<typeof vi.fn>;
-    };
-  };
+  } as unknown as TestHost;
 }
 
 afterEach(() => {

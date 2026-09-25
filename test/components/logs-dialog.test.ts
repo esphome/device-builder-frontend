@@ -14,6 +14,7 @@ import {
   toastError,
 } from "./_logs-dialog-env.js";
 
+import { flush } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 import {
   type SerialResetHook,
@@ -209,7 +210,7 @@ describe("logs-dialog Reset Device gate", () => {
 
   it("hides Reset Device when the hook does not support the attached port", async () => {
     const el = await mountPassive("rp2", {
-      onResetDevice: { supports: () => false, run: () => Promise.resolve() },
+      onResetDevice: { ...alwaysHook, supports: () => false },
     });
     el.setSerialStream({ close: vi.fn(), setSignals: vi.fn() } as any, async () => {});
     await el.updateComplete;
@@ -259,11 +260,13 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
       { logs, stopStream: vi.fn(() => Promise.resolve()) },
       { mount: false }
     );
-    port = {
-      close: vi.fn(() => Promise.resolve()),
-      setSignals: vi.fn(() => Promise.resolve()),
-    };
+    port = makePort();
     cancel = vi.fn();
+  });
+
+  const makePort = () => ({
+    close: vi.fn(() => Promise.resolve()),
+    setSignals: vi.fn(() => Promise.resolve()),
   });
 
   // Drive a live passive session the way attachSerialLogStream does.
@@ -326,7 +329,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("Reset Device runs the session hook on the closed port instead of the pulse", async () => {
     cancel = vi.fn(async () => {});
-    const fresh = { close: vi.fn(), setSignals: vi.fn() };
+    const fresh = makePort();
     const run = vi.fn(async (p: SerialPort, cancelled: () => boolean) => {
       expect(cancel).toHaveBeenCalledOnce(); // reader stopped and port closed first
       expect(p).toBe(port);
@@ -349,10 +352,13 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(session(el)).toMatchObject({ kind: "serial", port: fresh, paused: false });
   });
 
-  it("drops to dead with a toast when the reset hook rejects unhandled", async () => {
+  it.each([
+    ["rejects unhandled", () => Promise.reject(new Error("boom"))],
+    ["ends without a stream", () => Promise.resolve()],
+  ])("drops to dead with a toast when the reset hook %s", async (_case, run) => {
     el.openPassive({
       onReconnect: () => Promise.resolve(),
-      onResetDevice: { ...alwaysHook, run: () => Promise.reject(new Error("boom")) },
+      onResetDevice: { ...alwaysHook, run },
     });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     await (el as any)._onResetDevice();
@@ -360,22 +366,10 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(toastError).toHaveBeenCalledOnce();
   });
 
-  it("ignores a stale after-hide once the dialog was reopened", async () => {
-    startPassive();
-    call(el, "_onDialogRequestClose"); // X pressed; the hide animation starts
-    el.openPassive({ onReconnect: () => Promise.resolve() }); // reopened meanwhile
-    const fresh = { close: vi.fn(), setSignals: vi.fn() };
-    const freshCancel = vi.fn(async () => {});
-    el.setSerialStream(fresh as any, freshCancel);
-    call(el, "_onDialogHide"); // the old close's after-hide lands late
-    expect(session(el)).toMatchObject({ kind: "serial", port: fresh });
-    expect(freshCancel).not.toHaveBeenCalled();
-    expect((el as any)._open).toBe(true);
-  });
-
-  it("cancels an in-flight reset as soon as the close is requested", async () => {
+  // A reset whose hook is parked on a gate, exposing the hook's `cancelled`.
+  async function startGatedReset() {
     const gate = deferred();
-    let seen: (() => boolean) | undefined;
+    let seen!: () => boolean;
     const run = vi.fn(async (_p: SerialPort, cancelled: () => boolean) => {
       seen = cancelled;
       await gate.promise;
@@ -386,41 +380,26 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     const reset = (el as any)._onResetDevice() as Promise<void>;
-    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
-    call(el, "_onDialogRequestClose"); // X pressed; the hide has not landed yet
-    expect(seen!()).toBe(true);
+    await flush(); // past the awaited cancel; the hook is now parked
+    expect(run).toHaveBeenCalledOnce();
+    return { gate, reset, cancelled: () => seen() };
+  }
+
+  it("cancels an in-flight reset as soon as the close is requested", async () => {
+    const { gate, reset, cancelled } = await startGatedReset();
+    expect(cancelled()).toBe(false);
+    closeDialog(el); // X pressed; the hide animation has not even finished
+    expect(cancelled()).toBe(true);
     gate.resolve();
     await reset;
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("treats a reset hook that ends without a stream as a failure, not a stuck session", async () => {
-    el.openPassive({ onReconnect: () => Promise.resolve(), onResetDevice: alwaysHook });
-    el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
-    await (el as any)._onResetDevice();
-    expect(session(el).kind).toBe("dead");
-    expect(toastError).toHaveBeenCalledOnce();
-  });
-
   it("cancels a reset once the dialog was closed and reopened, sparing the new session", async () => {
-    const gate = deferred();
-    let seen: (() => boolean) | undefined;
-    const run = vi.fn(async (_p: SerialPort, cancelled: () => boolean) => {
-      seen = cancelled;
-      await gate.promise;
-    });
-    el.openPassive({
-      onReconnect: () => Promise.resolve(),
-      onResetDevice: { ...alwaysHook, run },
-    });
-    el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
-    const reset = (el as any)._onResetDevice() as Promise<void>;
-    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
-    expect(seen!()).toBe(false);
+    const { gate, reset, cancelled } = await startGatedReset();
     closeDialog(el);
-    expect(seen!()).toBe(true);
     el.openPassive({ onReconnect: () => Promise.resolve() }); // a new session
-    expect(seen!()).toBe(true); // still cancelled: not the session it started in
+    expect(cancelled()).toBe(true); // not the session it started in
     gate.resolve();
     await reset;
     expect(session(el).kind).toBe("reconnecting"); // the new session, untouched

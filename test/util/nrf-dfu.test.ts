@@ -244,14 +244,20 @@ describe("flashDfuPackageWithReconnect", () => {
   it("retries once through the reacquired handle when the device drops", async () => {
     const port = droppedPort();
     const onReconnecting = vi.fn();
-    const t0 = Date.now();
-    await expect(
-      flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
-    ).rejects.toThrow(/Serial port closed/);
-    expect(onReconnecting).toHaveBeenCalledTimes(1);
-    // The close stamps serial activity so the bootloader's return is not
-    // announced as a new device (window bounded to this call; module state).
-    expect(isRecentSerialActivity(Date.now() - t0 + 1)).toBe(true);
+    // The stamp is module state: jump the clock so earlier tests' stamps are stale.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 1_000_000);
+    try {
+      await expect(
+        flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
+      ).rejects.toThrow(/Serial port closed/);
+      expect(onReconnecting).toHaveBeenCalledTimes(1);
+      // The close stamps serial activity so the bootloader's return is not
+      // announced as a new device.
+      expect(isRecentSerialActivity()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
     // Two attempts: the first open plus the reacquired handle, closed after each.
     expect(port.close).toHaveBeenCalledTimes(2);
   });

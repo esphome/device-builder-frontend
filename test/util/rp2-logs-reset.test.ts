@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn<(usb: USBDevice) => Promise<unknown>>(),
   reboot: vi.fn<() => Promise<void>>(),
   close: vi.fn<() => Promise<void>>(),
+  loadPicoboot: vi.fn<() => Promise<unknown>>(),
 }));
 
 vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
@@ -16,7 +17,7 @@ vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
 vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/web-usb.js")>()),
   getPicobootDevices: mocks.getPicobootDevices,
-  loadPicoboot: async () => ({ PicobootDevice: { open: mocks.open } }),
+  loadPicoboot: mocks.loadPicoboot,
   requestPicobootDevice: mocks.requestPicobootDevice,
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
@@ -38,6 +39,7 @@ beforeEach(() => {
   mocks.requestPicobootDevice.mockResolvedValue(usb);
   mocks.openLiveSerialPort.mockResolvedValue(live);
   mocks.open.mockResolvedValue({ reboot: mocks.reboot, close: mocks.close });
+  mocks.loadPicoboot.mockResolvedValue({ PicobootDevice: { open: mocks.open } });
   mocks.reboot.mockResolvedValue(undefined);
   mocks.close.mockResolvedValue(undefined);
 });
@@ -93,7 +95,7 @@ describe("resetPicoForLogs", () => {
 
   it("reads a chooser rejection with the CDC still connected as an ignored touch too", async () => {
     mocks.requestPicobootDevice.mockRejectedValue(new Error("lapsed"));
-    await expect(run({ from: stillThere })).rejects.toThrow(/ignored.*lapsed/);
+    await expect(run({ from: stillThere })).rejects.toThrow(/ignored/);
   });
 
   it("keeps the stranded hint on an early cancel, when the CDC may still be dropping", async () => {
@@ -156,6 +158,15 @@ describe("resetPicoForLogs", () => {
       new DOMException("Must be handling a user gesture", "SecurityError")
     );
     await expect(run()).rejects.toMatchObject({ step: "pick" });
+  });
+
+  it("reports the Pico stranded when the engine chunk fails to load after the touch", async () => {
+    grantedAfterTouch();
+    mocks.loadPicoboot.mockRejectedValue(new TypeError("Failed to fetch"));
+    await expect(run()).rejects.toMatchObject({
+      name: "PicoStrandedError",
+      step: "reboot",
+    });
   });
 
   it("keeps the WebUSB refusal as the cause when the open is denied", async () => {

@@ -43,7 +43,7 @@ export function openPassive(
   options: {
     // Required so the `dead` state (a reopen failure) always has a recovery
     // path — Start re-runs it; otherwise the Start button would be a dead end.
-    onReconnect: () => Promise<void>;
+    onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
   }
@@ -123,17 +123,10 @@ export function abortSerialReconnect(host: ESPHomeLogsDialog): void {
   host._session = { kind: "dead" };
 }
 
-/** A close begins; ``_open`` drops now so wa-dialog's hide is not cancelled
- *  by a re-render and in-flight hooks see themselves cancelled at once. */
+/** A close: ``_open`` drops first so the re-render cannot cancel wa-dialog's
+ *  hide, and the session ends now, which also cancels any hook in flight. */
 export function beginClose(host: ESPHomeLogsDialog): void {
   host._open = false;
-}
-
-/** The dialog finished hiding. Every hide follows a close, so one landing
- *  while the dialog is open belongs to an older close and must leave the
- *  reopened session alone (however many closes are still hiding). */
-export function afterHide(host: ESPHomeLogsDialog): void {
-  if (host._open) return;
   void teardownSession(host);
 }
 
@@ -387,7 +380,7 @@ async function runReconnecting(
   // Also true once the dialog was closed and reopened: that is a new session
   // this task must not attach to or fail.
   const cancelled = () =>
-    !host._open || host._sessionGen !== gen || host._session.kind !== "reconnecting";
+    host._sessionGen !== gen || host._session.kind !== "reconnecting";
   host._session = { kind: "reconnecting", paused: false };
   let failure: unknown;
   try {
