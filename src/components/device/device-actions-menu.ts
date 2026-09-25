@@ -44,7 +44,8 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   /** A build is in flight — cleaning its files mid-build would corrupt it. */
   @property({ type: Boolean }) busy = false;
 
-  /** Unsaved edits block validation (Install validates too); disable the row. */
+  /** Unsaved edits block Validate and Analyze memory (both read the saved
+   *  YAML, so a draft would silently be left out); disable those rows. */
   @property({ type: Boolean, attribute: "validate-disabled" }) validateDisabled = false;
 
   /** Prebuilt ``buildWebUiUrl`` result; empty hides the Visit-web-UI item
@@ -126,17 +127,13 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                   this._expertMode
                     ? html`
                         <div
-                          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                          class="menu-item ${this._analyzeDisabled ? "menu-item--disabled" : ""}"
                           role="menuitem"
-                          tabindex=${this.busy ? "-1" : "0"}
-                          aria-disabled=${this.busy ? "true" : "false"}
-                          title=${
-                            this.busy
-                              ? this._localize("dashboard.action_analyze_memory_busy")
-                              : nothing
-                          }
-                          @click=${this.busy ? undefined : this._onAnalyzeMemory}
-                          @keydown=${this.busy ? undefined : this._onItemKeydown}
+                          tabindex=${this._analyzeDisabled ? "-1" : "0"}
+                          aria-disabled=${this._analyzeDisabled ? "true" : "false"}
+                          title=${this._analyzeDisabledTitle()}
+                          @click=${this._analyzeDisabled ? undefined : this._onAnalyzeMemory}
+                          @keydown=${this._analyzeDisabled ? undefined : this._onItemKeydown}
                         >
                           <wa-icon library="mdi" name="memory"></wa-icon>
                           <span class="menu-item-label"
@@ -229,8 +226,21 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
     this._emit("clean-build");
   };
 
+  /** Analyze memory compiles the saved YAML: blocked by a build in flight
+   *  and by unsaved edits, the busy reason first. */
+  private get _analyzeDisabled(): boolean {
+    return this.busy || this.validateDisabled;
+  }
+
+  private _analyzeDisabledTitle(): string | typeof nothing {
+    if (this.busy) return this._localize("dashboard.action_analyze_memory_busy");
+    if (this.validateDisabled)
+      return this._localize("device.analyze_memory_disabled_pending");
+    return nothing;
+  }
+
   private _onAnalyzeMemory = () => {
-    if (this.busy) return;
+    if (this._analyzeDisabled) return;
     this._close();
     this._emit("analyze-memory");
   };

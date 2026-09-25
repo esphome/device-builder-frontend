@@ -952,6 +952,7 @@
     "save_yaml": "Save YAML",
     "validate": "Validate",
     "validate_disabled_pending": "Save changes first to validate",
+    "analyze_memory_disabled_pending": "Save changes first to analyze memory",
     "loading_config_catalog": "Loading configuration catalog…",
     "loading_automation_catalog": "Loading automation catalog…",
     "loading_components": "Loading components…",

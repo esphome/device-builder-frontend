@@ -223,6 +223,23 @@ describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
     expect(items(el)).toHaveLength(0);
   });
 
+  it("is disabled with unsaved edits, since it analyzes the saved YAML", async () => {
+    const el = await mount({ expertMode: true, validateDisabled: true });
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    const row = analyzeRow(await openMenu(el))!;
+    expect(row.classList.contains("menu-item--disabled")).toBe(true);
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    expect(row.getAttribute("title")).toBe("device.analyze_memory_disabled_pending");
+    row.click();
+    expect(onAnalyze).not.toHaveBeenCalled();
+    // Clean build does not read the YAML, so it stays live.
+    const onClean = vi.fn();
+    el.addEventListener("clean-build", onClean);
+    items(el)[1].click();
+    expect(onClean).toHaveBeenCalledTimes(1);
+  });
+
   it("is disabled while a build is running", async () => {
     const el = await mount({ expertMode: true, busy: true });
     const onAnalyze = vi.fn();
