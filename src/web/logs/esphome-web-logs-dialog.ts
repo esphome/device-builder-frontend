@@ -255,6 +255,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
     try {
       cancel = await source.attach(this._hooks(), () => generation !== this._generation);
     } catch (err) {
+      console.error("[Logs] connect failed:", err);
+      // A dead session must not linger: release what the attach acquired
+      // (a serial handle, say) so the next open starts clean.
+      source.release();
+      if (this._source === source) this._source = undefined;
       if (generation !== this._generation) return;
       this._streaming = false;
       this._enqueueLine(
@@ -388,8 +393,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._source = undefined;
     // A dead-stream path already dropped the cancel closure; release
     // whatever the recovery last held (a no-op when nothing is).
-    if (cancel) void cancel();
-    else source?.release();
+    if (cancel) {
+      void cancel().catch((err) => {
+        console.error("[Logs] Failed to release the stream:", err);
+      });
+    } else {
+      source?.release();
+    }
   }
 
   // Buffer a streamed line; flush on the next animation frame so a log flood

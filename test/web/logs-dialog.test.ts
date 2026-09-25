@@ -252,7 +252,7 @@ describe("esphome-web-logs-dialog", () => {
     let hooks: any;
     (streamSerialLines as any).mockImplementation((_p: unknown, h: unknown) => {
       hooks = h;
-      return vi.fn();
+      return vi.fn(async () => {});
     });
     (openLiveSerialPort as any).mockResolvedValue({
       readable: {},
@@ -351,7 +351,7 @@ describe("esphome-web-logs-dialog", () => {
     // single update. _stop must release via the cancel closure or the source,
     // not this.port (already undefined by then).
     const el = await mount();
-    const cancel = vi.fn();
+    const cancel = vi.fn(async () => {});
     vi.mocked(streamSerialLines).mockReturnValue(cancel);
     el.port = makeWebSerialPort();
     el.open = true;
@@ -363,6 +363,22 @@ describe("esphome-web-logs-dialog", () => {
     await el.updateComplete;
     expect(cancel).toHaveBeenCalledOnce();
     expect((el as any)._source).toBeUndefined();
+  });
+
+  it("releases the port and forgets the session when the first attach fails", async () => {
+    const el = await mount();
+    const port = makeWebSerialPort();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(streamSerialLines).mockRejectedValueOnce(new Error("boom"));
+    el.port = port;
+    el.open = true;
+    await el.updateComplete;
+    await drainMacrotasks();
+    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._source).toBeUndefined();
+    expect(port.close).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith("[Logs] connect failed:", expect.any(Error));
+    error.mockRestore();
   });
 
   it("ignores a port swap while a disconnect recovery is in flight", async () => {
@@ -508,6 +524,8 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
     const { el } = await openBle();
     expect((el as any)._streaming).toBe(false);
     expect((el as any)._lines).toContain("web.logs.connect_failed");
+    // The dead session is gone, so the next open starts clean.
+    expect((el as any)._source).toBeUndefined();
   });
 
   it("declines and closes a port handed in over a Bluetooth session", async () => {
