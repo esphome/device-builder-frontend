@@ -65,7 +65,12 @@ export class ESPHomeWebNrfCard extends LitElement {
         );
         return;
       }
-      if (!port || !(await openPortForLogs(port, this._localize))) return;
+      if (!port) return;
+      // The shell may offer another board flow from the port's ids.
+      this.dispatchEvent(
+        new CustomEvent("port-picked", { detail: port, bubbles: true, composed: true })
+      );
+      if (!(await openPortForLogs(port, this._localize))) return;
       this._logs = { port };
     } finally {
       this._picking = false;

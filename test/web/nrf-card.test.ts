@@ -145,3 +145,18 @@ describe("esphome-web-nrf-card", () => {
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
   });
 });
+
+describe("esphome-web-nrf-card port announcement", () => {
+  it("announces the picked port before opening it for logs", async () => {
+    const port = { getInfo: () => ({}) };
+    mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.openPortForLogs.mockResolvedValue(true);
+    const el = await mount();
+    const picked = vi.fn();
+    document.body.addEventListener("port-picked", (e) =>
+      picked((e as CustomEvent).detail)
+    );
+    await (el as any)._showSerialLogs();
+    expect(picked).toHaveBeenCalledWith(port);
+  });
+});

@@ -6,10 +6,13 @@ import toast from "sonner-js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
+import { isRecentSerialActivity } from "../util/serial-reacquire.js";
 import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
+import { boardFamilyOfPort } from "./util/board-family.js";
 import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
 /**
@@ -45,6 +48,11 @@ export class ESPHomeWebApp extends LitElement {
     this._applySystemTheme();
     this._darkModeQuery.addEventListener("change", this._applySystemTheme);
     window.addEventListener("popstate", this._syncModeFromUrl);
+    this.addEventListener("port-picked", this._onPortPicked);
+    // Only ports this origin already has permission for announce themselves.
+    if ("serial" in navigator) {
+      navigator.serial.addEventListener("connect", this._onSerialConnect);
+    }
     void this._init();
   }
 
@@ -52,6 +60,10 @@ export class ESPHomeWebApp extends LitElement {
     super.disconnectedCallback();
     this._darkModeQuery.removeEventListener("change", this._applySystemTheme);
     window.removeEventListener("popstate", this._syncModeFromUrl);
+    this.removeEventListener("port-picked", this._onPortPicked);
+    if ("serial" in navigator) {
+      navigator.serial.removeEventListener("connect", this._onSerialConnect);
+    }
   }
 
   private async _init(): Promise<void> {
@@ -87,9 +99,41 @@ export class ESPHomeWebApp extends LitElement {
   };
 
   private _onSetMode = (e: CustomEvent<WebMode>): void => {
-    this._mode = e.detail;
-    writeMode(e.detail);
+    this._setMode(e.detail);
   };
+
+  private _setMode(mode: WebMode): void {
+    this._mode = mode;
+    writeMode(mode);
+  }
+
+  private _onPortPicked = (e: Event): void => {
+    this._suggestFlowFor((e as CustomEvent<SerialPort>).detail);
+  };
+
+  private _onSerialConnect = (e: Event): void => {
+    // A re-enumeration our own touch or flash caused is not a new device.
+    if (this._flasherMode || isRecentSerialActivity()) return;
+    this._suggestFlowFor((e as Event & { port: SerialPort }).port);
+  };
+
+  /**
+   * The ids alone never decide the flow: a port that clearly belongs to
+   * another board family gets a toast offering the switch, an unknown one
+   * nothing, and the flow the user is in carries on either way.
+   */
+  private _suggestFlowFor(port: SerialPort): void {
+    const family = boardFamilyOfPort(port);
+    if (family === null || family === this._mode) return;
+    notifyInfo(this._localize(`web.flow_switch.${family}`), {
+      id: "esphome-web-flow-switch",
+      duration: LONG_TOAST_DURATION_MS,
+      action: {
+        label: this._localize(`web.flow_switch.action_${family}`),
+        onClick: () => this._setMode(family),
+      },
+    });
+  }
 
   protected render() {
     return html`

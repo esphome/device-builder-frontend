@@ -94,6 +94,14 @@ export class ESPHomeWebEspConnectCard extends LitElement {
     }
     this._port = port;
     this._watcher.watch(port);
+    this._announcePick(port);
+  }
+
+  // The shell may offer another board flow from the port's ids.
+  private _announcePick(port: SerialPort): void {
+    this.dispatchEvent(
+      new CustomEvent("port-picked", { detail: port, bubbles: true, composed: true })
+    );
   }
 
   private _handleClose = (): void => {
