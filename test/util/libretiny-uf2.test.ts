@@ -41,8 +41,6 @@ describe("parseLibreTinyImage", () => {
     const image = parse(uf2);
     expect(image.familyId).toBe(UF2_FAMILY_AMBZ2);
     expect(image.board).toBe("bw15");
-    expect(image.firmware).toBe("esphome");
-    expect(image.version).toBe("2026.10.0-dev");
     expect(image.runs.map((r) => [r.address, r.data.length])).toEqual([
       [0xc000, 512],
       [0x4000, 256],
@@ -121,15 +119,22 @@ describe("parseLibreTinyImage", () => {
     expect(() => parse(uf2)).toThrow(/'kvs' not in table/);
   });
 
-  it("rejects a page past the end of its partition", () => {
+  it("rejects a page running past the end of its partition", () => {
+    // boot is 0x8000 long; a 256-byte page at 0x7F80 ends 128 bytes past it.
     const uf2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0x8000, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0x7f80, tags: info(BOOT_INFO) }],
     });
     expect(() => parse(uf2)).toThrow(/past 'boot'/);
   });
 
+  it("rejects a data block that arrives before any part info", () => {
+    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0 }] });
+    expect(() => parse(uf2)).toThrow(/before OTA_PART_INFO/);
+  });
+
   it("rejects a file with nothing to flash", () => {
-    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, payload: 0 } as never] });
+    const deviceOnly = ltPartInfo([1, 0, 0, 0, 0, 0], ["ota1"]);
+    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(deviceOnly) }] });
     expect(() => parse(uf2)).toThrow(/nothing to flash/);
   });
 });
@@ -147,7 +152,7 @@ describe("parseLibreTinyBlocks", () => {
 
   it("rejects a block whose count disagrees with the file", () => {
     const one = makeUf2Block({ addr: 0, numBlocks: 3, family: UF2_FAMILY_AMBZ2 });
-    expect(() => parseLibreTinyBlocks(one)).toThrow(/block count/);
+    expect(() => parseLibreTinyBlocks(one)).toThrow(/claims 3 blocks, file has 1/);
   });
 });
 

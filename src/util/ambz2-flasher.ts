@@ -6,10 +6,11 @@
  * on demand by the install flow; nothing here touches the DOM.
  */
 import type { LibreTinyImage } from "./libretiny-uf2.js";
+import { SerialStreamSession } from "./serial-stream-session.js";
 import { sleep } from "./sleep.js";
 import { type XmodemIo, xmodemSend } from "./xmodem.js";
 
-export const AMBZ2_BAUD_RATE = 115200;
+const AMBZ2_BAUD_RATE = 115200;
 /** How long the automatic DTR/RTS reset gets to produce a linked ROM. */
 const AUTO_LINK_MS = 2000;
 /** Relinking after a transfer; the ROM answers within a second normally. */
@@ -22,7 +23,6 @@ const RESET_HOLD_MS = 100;
 const ROM_SETTLE_MS = 400;
 const LINE_MS = 1000;
 const XMODEM_TIMEOUT_MS = 3000;
-const TEARDOWN_MS = 2000;
 const HASH_LENGTH = 32;
 // SYSCFG: bits 5..6 hold the flash pinout, which the ROM wants named back in
 // every flash command; the second write unlocks the flash controller.
@@ -66,59 +66,19 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /**
- * Byte-level access to the port: a background read loop feeds a buffer that
- * the command helpers consume with timeouts, and every wait races the abort
- * signal (an in-flight stream read or write cannot be interrupted otherwise).
+ * Byte-level access to the port: the read loop feeds a buffer that the
+ * command helpers consume with timeouts.
  */
-class RomLink implements XmodemIo {
-  private readonly reader: ReadableStreamDefaultReader<Uint8Array>;
-  private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
-  private readonly aborted: Promise<never>;
+class RomLink extends SerialStreamSession implements XmodemIo {
   private buf: number[] = [];
   private wake: (() => void) | null = null;
-  private readEnded: Error | null = null;
-  private active = true;
 
-  constructor(port: SerialPort, signal?: AbortSignal) {
-    if (!port.readable || !port.writable) {
-      throw new Error("Serial port has no readable / writable stream");
-    }
-    this.reader = port.readable.getReader();
-    this.writer = port.writable.getWriter();
-    this.aborted = new Promise<never>((_, reject) => {
-      if (!signal) return;
-      if (signal.aborted) reject(signal.reason);
-      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
-    });
-    this.aborted.catch(() => {});
-    void this.readLoop();
+  protected onBytes(bytes: Uint8Array): void {
+    for (const b of bytes) this.buf.push(b);
+    this.wake?.();
   }
 
-  private race<T>(p: Promise<T>): Promise<T> {
-    p.catch(() => {}); // Losing the race must not surface as unhandled.
-    return Promise.race([p, this.aborted]);
-  }
-
-  private async readLoop(): Promise<void> {
-    while (this.active) {
-      let result: ReadableStreamReadResult<Uint8Array>;
-      try {
-        result = await this.reader.read();
-      } catch (err) {
-        this.end(err instanceof Error ? err : new Error(String(err)));
-        return;
-      }
-      if (result.done || !result.value) {
-        this.end(new Error("Serial port closed"));
-        return;
-      }
-      for (const b of result.value) this.buf.push(b);
-      this.wake?.();
-    }
-  }
-
-  private end(err: Error): void {
-    this.readEnded = err;
+  protected onEnded(): void {
     this.wake?.();
   }
 
@@ -142,7 +102,7 @@ class RomLink implements XmodemIo {
 
   async write(data: Uint8Array | string): Promise<void> {
     const bytes = typeof data === "string" ? encoder.encode(data) : data;
-    await this.race(this.writer.write(bytes));
+    await this.writeBytes(bytes);
   }
 
   drain(): void {
@@ -187,17 +147,6 @@ class RomLink implements XmodemIo {
         throw new Error("Timed out waiting for a response line");
       }
     }
-  }
-
-  /** Errors the writable on failure rather than closing it (see nrf-dfu.ts). */
-  async close(failure?: unknown): Promise<void> {
-    this.active = false;
-    const writer =
-      failure !== undefined ? this.writer.abort(failure) : this.writer.close();
-    const settled = Promise.allSettled([this.reader.cancel(), writer]);
-    await Promise.race([settled, sleep(TEARDOWN_MS)]);
-    this.reader.releaseLock();
-    this.writer.releaseLock();
   }
 }
 
@@ -245,7 +194,9 @@ async function readRegister(link: RomLink, address: number): Promise<number> {
   const expect = `${address.toString(16).toUpperCase()}:`;
   for (let i = 0; i < 4; i++) {
     const words = (await link.readLine(LINE_MS)).split(/\s+/);
-    if (words[0].toUpperCase() === expect && words[1]) return parseInt(words[1], 16);
+    if (words[0].toUpperCase() === expect && /^[0-9a-f]{1,8}$/i.test(words[1] ?? "")) {
+      return parseInt(words[1], 16);
+    }
   }
   throw new Error(`Unexpected reply reading register 0x${address.toString(16)}`);
 }
@@ -255,11 +206,16 @@ async function writeRegister(
   address: number,
   value: number
 ): Promise<void> {
+  const hexAddress = address.toString(16).toUpperCase();
+  const hexValue = value.toString(16).toUpperCase();
   link.drain();
-  await link.write(
-    `EW ${address.toString(16).toUpperCase()} ${value.toString(16).toUpperCase()}\n`
-  );
-  await link.readLine(LINE_MS);
+  await link.write(`EW ${hexAddress} ${hexValue}
+`);
+  // The ROM echoes the write back as "0x<address> = 0x<value>".
+  const reply = (await link.readLine(LINE_MS)).toUpperCase();
+  if (!reply.includes(hexAddress) || !reply.includes(hexValue)) {
+    throw new Error(`Register write to 0x${hexAddress} was not acknowledged: ${reply}`);
+  }
 }
 
 /** Sets the flash controller up and returns the ``<speed> <mode>`` the ROM wants back. */
@@ -344,7 +300,8 @@ export async function flashAmbz2(
     failure = err;
     throw err;
   } finally {
-    await rom.close(failure);
+    // A teardown failure must not replace the flash error nor skip the rest.
+    await rom.close(failure).catch(() => {});
     // DTR still holds the strap; drop it so the next reset boots the app.
     await port
       .setSignals({ dataTerminalReady: false, requestToSend: false })

@@ -60,19 +60,16 @@ async function mount(
 // with the bootloader row, so it's matched by title instead.
 const hasWebSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="usb"]');
+const hasRowTitled = (d: ESPHomeInstallMethodDialog, key: string): boolean =>
+  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
+    (el) => el.textContent?.trim() === defaultLocalize(key)
+  );
 const hasNrfDfuRow = (d: ESPHomeInstallMethodDialog): boolean =>
-  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
-    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_nrf_dfu")
-  );
+  hasRowTitled(d, "dashboard.install_method_nrf_dfu");
 const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
-  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
-    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_rp2_uf2")
-  );
+  hasRowTitled(d, "dashboard.install_method_rp2_uf2");
 const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
-  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
-    (el) =>
-      el.textContent?.trim() === defaultLocalize("dashboard.install_method_rtl_ambz2")
-  );
+  hasRowTitled(d, "dashboard.install_method_rtl_ambz2");
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
 /* eslint-enable @typescript-eslint/no-explicit-any */

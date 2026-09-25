@@ -222,9 +222,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const availability = this._webSerialAvailability;
     const hasWebSerial = availability === "available";
     const env = this._environment;
-    // Browser flashers (in-app Web Serial esptool-js, the external flasher) are
-    // ESP-only; nRF52 and RP2 get their own in-app rows. libretiny flashes
-    // over serial only via the backend (server-serial).
+    // The esptool-js and external flashers are ESP-only; nRF52, RP2 and the
+    // RTL8720C get their own in-app rows (renderPlatformFlashOption).
     const isEsptool = this._isEsptoolPlatform;
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isRp2 = isRp2Platform(this.deviceTargetPlatform);

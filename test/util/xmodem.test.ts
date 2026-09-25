@@ -46,7 +46,7 @@ describe("xmodemSend", () => {
     expect(first.length).toBe(3 + XMODEM_BLOCK_SIZE + 1);
     expect([first[0], first[1], first[2]]).toEqual([STX, 1, 0xfe]);
     expect(first[first.length - 1]).toBe((1024 * 0x5a) & 0xff);
-    expect([second[1], second[2]]).toEqual([STX === 2 ? 2 : 0, 0xfd]);
+    expect([second[0], second[1], second[2]]).toEqual([STX, 2, 0xfd]);
     // The tail block carries 6 real bytes and 0x1a padding.
     expect(second[3 + 5]).toBe(0x5a);
     expect(second[3 + 6]).toBe(0x1a);

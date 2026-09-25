@@ -1,6 +1,11 @@
 /** Builders for LibreTiny-flavoured UF2 files (tags, partition table, part info). */
 import { concat } from "../src/util/bytes.js";
-import { LT_TAG, UF2_FAMILY_AMBZ2 } from "../src/util/libretiny-uf2.js";
+import {
+  LT_TAG,
+  PARTITION_ENTRY_SIZE,
+  PARTITION_MAGIC,
+  UF2_FAMILY_AMBZ2,
+} from "../src/util/libretiny-uf2.js";
 import { UF2_FLAG_NOT_MAIN_FLASH } from "../src/util/uf2.js";
 import { makeUf2Block, type Uf2Tag } from "./_make-uf2-block.js";
 
@@ -26,11 +31,11 @@ export const BW15_PARTITIONS: LtPartitionSpec[] = [
 ];
 
 export function ltPartitionTable(parts: LtPartitionSpec[]): Uint8Array {
-  const table = new Uint8Array(parts.length * 48);
+  const table = new Uint8Array(parts.length * PARTITION_ENTRY_SIZE);
   const v = new DataView(table.buffer);
   parts.forEach((p, i) => {
-    const off = i * 48;
-    v.setUint32(off, 0x45503130, true);
+    const off = i * PARTITION_ENTRY_SIZE;
+    v.setUint32(off, PARTITION_MAGIC, true);
     table.set(enc.encode(p.name), off + 4);
     table.set(enc.encode(p.name), off + 20);
     v.setUint32(off + 36, p.offset, true);
@@ -71,8 +76,6 @@ export function ltHeaderTags(
     tags.push(ltTag(LT_TAG[key], value ?? fallback));
   };
   add("BOARD", "bw15");
-  add("FIRMWARE", "esphome");
-  add("VERSION", "2026.10.0-dev");
   add("OTA_FORMAT_2", new Uint8Array([2]));
   add("FAL_PTABLE", ltPartitionTable(BW15_PARTITIONS));
   return tags;

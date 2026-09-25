@@ -6,6 +6,7 @@ import {
   openLiveSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./serial-reacquire.js";
+import { SerialStreamSession } from "./serial-stream-session.js";
 import { sleep } from "./sleep.js";
 
 export interface DfuFirmwarePart {
@@ -154,8 +155,6 @@ const DFU_STOP_DATA_PACKET = 5;
 const DFU_PACKET_MAX_SIZE = 512;
 const ACK_TIMEOUT_MS = 1000;
 const MAX_SEND_ATTEMPTS = 3;
-// Upper bound on stream teardown so a dead device can't hold the port open.
-const STREAM_TEARDOWN_TIMEOUT_MS = 2000;
 // adafruit-nrfutil's FLASH_PAGE_WRITE_TIME / FLASH_PAGE_ERASE_TIME per 4 KiB page.
 const PAGE_WRITE_MS = (4096 / 4) * 0.0001 * 1000;
 const PAGE_ERASE_MS = 89.7;
@@ -183,72 +182,27 @@ export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
 
 // ── DFU session ───────────────────────────────────────────────────────────────
 
-class DfuSession {
-  private readonly reader: ReadableStreamDefaultReader<Uint8Array>;
-  private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
-  // Rejects on abort, never settles otherwise. Raced against every wait: an
-  // in-flight stream write can't be interrupted (device unplugged mid-flash),
-  // so the abort must win the race instead of the stream.
-  private readonly aborted: Promise<never>;
+class DfuSession extends SerialStreamSession {
   private rxBuf: number[] = [];
   private seqNum = 0;
   private resolveAck: ((ack: number) => void) | null = null;
   private rejectAck: ((err: Error) => void) | null = null;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
-  private active = true;
-  // Why the read loop stopped (device gone, port error). Fails the pending
-  // and later ACK waits right away instead of timing each one out.
-  private readEnded: Error | null = null;
 
-  constructor(
-    port: SerialPort,
-    private readonly signal?: AbortSignal
-  ) {
-    if (!port.readable || !port.writable) {
-      throw new Error("Serial port has no readable / writable stream");
-    }
-    this.reader = port.readable.getReader();
-    this.writer = port.writable.getWriter();
-    this.aborted = new Promise<never>((_, reject) => {
-      if (!signal) return;
-      if (signal.aborted) reject(signal.reason);
-      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
-    });
-    this.aborted.catch(() => {});
-    void this.readLoop();
-  }
-
-  private race<T>(p: Promise<T>): Promise<T> {
-    p.catch(() => {}); // Losing the race must not surface as unhandled.
-    return Promise.race([p, this.aborted]);
-  }
-
-  private async readLoop(): Promise<void> {
-    while (this.active) {
-      let result: ReadableStreamReadResult<Uint8Array>;
-      try {
-        result = await this.reader.read();
-      } catch (err) {
-        this.endReads(err instanceof Error ? err : new Error(String(err)));
-        return;
+  protected onBytes(bytes: Uint8Array): void {
+    for (const b of bytes) {
+      if (b !== SLIP_END) {
+        this.rxBuf.push(b);
+        continue;
       }
-      if (result.done || !result.value) {
-        this.endReads(new Error("Serial port closed"));
-        return;
-      }
-      for (const b of result.value) {
-        if (b !== SLIP_END) {
-          this.rxBuf.push(b);
-          continue;
-        }
-        this.onFrame(this.rxBuf);
-        this.rxBuf = [];
-      }
+      this.onFrame(this.rxBuf);
+      this.rxBuf = [];
     }
   }
 
-  private endReads(err: Error): void {
-    this.readEnded = err;
+  // Fails the pending and later ACK waits right away instead of timing
+  // each one out.
+  protected onEnded(err: Error): void {
     this.rejectAck?.(err);
   }
 
@@ -285,7 +239,7 @@ class DfuSession {
     const pkt = buildHciPacket(data, this.seqNum);
 
     for (let attempt = 0; attempt < MAX_SEND_ATTEMPTS; attempt++) {
-      await this.race(this.writer.write(pkt));
+      await this.writeBytes(pkt);
       try {
         await this.waitAck();
         return;
@@ -333,24 +287,6 @@ class DfuSession {
     await this.race(sleep(PAGE_WRITE_MS));
     await this.sendPacket(int32LE(DFU_STOP_DATA_PACKET));
     onPercent(100);
-  }
-
-  /**
-   * ``failure`` is the error that ended the flash, if any. Then the writable
-   * is errored with it (which also rejects the in-flight write) rather than
-   * closed: port.close() aborts a still-writable stream with its own "The
-   * port is closed." reason and drops that promise, which surfaces as an
-   * unhandled rejection. A clean finish has no write in flight, so close().
-   */
-  async close(failure?: unknown): Promise<void> {
-    this.active = false;
-    const writer =
-      failure !== undefined ? this.writer.abort(failure) : this.writer.close();
-    // Best effort: a dead port rejects these or never settles them.
-    const settled = Promise.allSettled([this.reader.cancel(), writer]);
-    await Promise.race([settled, sleep(STREAM_TEARDOWN_TIMEOUT_MS)]);
-    this.reader.releaseLock();
-    this.writer.releaseLock();
   }
 }
 

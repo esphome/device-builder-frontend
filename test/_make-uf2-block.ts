@@ -1,6 +1,7 @@
 import {
   UF2_FAMILY_RP2040,
   UF2_FLAG_FAMILY_ID_PRESENT,
+  UF2_FLAG_HAS_TAGS,
   UF2_MAGIC_END,
   UF2_MAGIC_START0,
   UF2_MAGIC_START1,
@@ -26,8 +27,6 @@ export interface Uf2BlockSpec {
   tags?: Uf2Tag[];
   magicEnd?: number;
 }
-
-const UF2_FLAG_HAS_TAGS = 0x8000;
 
 /** One 512-byte UF2 block with a 256-byte payload of ``fill`` (default blockNo + 1). */
 export function makeUf2Block(spec: Uf2BlockSpec): Uint8Array<ArrayBuffer> {

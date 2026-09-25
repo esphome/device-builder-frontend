@@ -124,16 +124,6 @@ export function renderServerSerialOption(
   });
 }
 
-/** In-app RP2 flash: 1200-baud reset, then PICOBOOT over WebUSB (or a UF2 download). */
-export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
-  return renderMethodRow({
-    icon: "chip",
-    title: ctx.localize("dashboard.install_method_rp2_uf2"),
-    desc: ctx.localize("dashboard.install_method_rp2_uf2_desc"),
-    onClick: () => ctx.onSelect("rp2-uf2"),
-  });
-}
-
 // Pages cannot link to internal browser URLs, so the flag page is offered
 // as a click-to-copy address for the user to paste.
 export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
@@ -179,25 +169,13 @@ export function renderBleNusOption(
   });
 }
 
-/** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
-export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
-  return renderMethodRow({
-    icon: "chip",
-    title: ctx.localize("dashboard.install_method_nrf_dfu"),
-    desc: ctx.localize("dashboard.install_method_nrf_dfu_desc"),
-    onClick: () => ctx.onSelect("nrf-dfu"),
-  });
-}
-
-/** In-app RTL8720C flash: the ROM's UART downloader over Web Serial. */
-export function renderRtlAmbz2Option(ctx: MethodRowContext): TemplateResult {
-  return renderMethodRow({
-    icon: "chip",
-    title: ctx.localize("dashboard.install_method_rtl_ambz2"),
-    desc: ctx.localize("dashboard.install_method_rtl_ambz2_desc"),
-    onClick: () => ctx.onSelect("rtl-ambz2"),
-  });
-}
+// The in-app flashers of the non-ESP platforms; the copy keys are
+// `dashboard.install_method_<key>` and its `_desc`.
+const PLATFORM_FLASHERS = [
+  { matches: isNrfPlatform, method: "nrf-dfu", key: "nrf_dfu" },
+  { matches: isRp2Platform, method: "rp2-uf2", key: "rp2_uf2" },
+  { matches: isRtl87xxPlatform, method: "rtl-ambz2", key: "rtl_ambz2" },
+] as const;
 
 /**
  * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
@@ -209,10 +187,14 @@ export function renderPlatformFlashOption(
   hasWebSerial: boolean
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs" || !hasWebSerial) return nothing;
-  if (isNrfPlatform(platform)) return renderNrfDfuOption(ctx);
-  if (isRp2Platform(platform)) return renderRp2Uf2Option(ctx);
-  if (isRtl87xxPlatform(platform)) return renderRtlAmbz2Option(ctx);
-  return nothing;
+  const flasher = PLATFORM_FLASHERS.find((f) => f.matches(platform));
+  if (!flasher) return nothing;
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize(`dashboard.install_method_${flasher.key}`),
+    desc: ctx.localize(`dashboard.install_method_${flasher.key}_desc`),
+    onClick: () => ctx.onSelect(flasher.method),
+  });
 }
 
 /**

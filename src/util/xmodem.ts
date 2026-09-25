@@ -13,8 +13,8 @@ export interface XmodemIo {
 export interface XmodemOptions {
   retries?: number;
   timeoutMs?: number;
-  /** After each acknowledged block: payload bytes sent so far, of the total. */
-  onBlock?: (sent: number, total: number) => void;
+  /** After each acknowledged block: payload bytes sent so far. */
+  onBlock?: (sent: number) => void;
 }
 
 export const XMODEM_BLOCK_SIZE = 1024;
@@ -106,7 +106,7 @@ export async function xmodemSend(
       }
     }
     seq = (seq + 1) & 0xff;
-    onBlock?.(off + payload.length, data.length);
+    onBlock?.(off + payload.length);
   }
   for (let errors = 0; ; errors++) {
     await io.write(new Uint8Array([EOT]));

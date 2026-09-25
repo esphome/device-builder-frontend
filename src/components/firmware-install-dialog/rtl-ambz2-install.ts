@@ -8,9 +8,12 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { parseLibreTinyImage, UF2_FAMILY_AMBZ2 } from "../../util/libretiny-uf2.js";
 import { Uf2FamilyError } from "../../util/uf2.js";
-import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
+import {
+  downloadBuildArtifact,
+  pickSerialPortOrFail,
+  resetForRetry,
+} from "./browser-flash-steps.js";
 
 const loadEngine = () => import("../../util/ambz2-flasher.js");
 
@@ -20,40 +23,15 @@ export async function startRtlAmbz2Install(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // The dialog is reused; a close-and-reopen for another device during an
-  // await must not receive this install's image.
-  const stale = () => host._device !== device;
-
-  if (!(await compileOrFail(host, device.configuration)) || stale()) return;
-
-  host._statusMessage = host._localize("firmware.status_downloading");
-  const binaries = await fetchBinaries(host, device.configuration);
-  if (!binaries || stale()) return;
-  if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
-    return;
-  }
-
-  const uf2 = binaries.find((b) => b.type === "uf2");
-  if (!uf2) {
-    host._fail(host._localize("firmware.rtl_no_uf2"));
-    return;
-  }
-
-  let bytes: Uint8Array;
+  const artifact = await downloadBuildArtifact(
+    host,
+    device,
+    (b) => b.type === "uf2",
+    "firmware.no_uf2"
+  );
+  if (!artifact) return;
   try {
-    bytes = new Uint8Array(
-      await host._api.firmwareDownloadBytes(device.configuration, uf2.file)
-    );
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
-    return;
-  }
-  if (stale()) return;
-
-  try {
-    host._rtlImage = parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2]);
+    host._rtlImage = parseLibreTinyImage(artifact.bytes, [UF2_FAMILY_AMBZ2]);
   } catch (err) {
     // Another Realtek family (AmebaZ) is a real build for a chip this engine
     // cannot flash; anything else is a bad file.
@@ -67,7 +45,7 @@ export async function startRtlAmbz2Install(
     );
     return;
   }
-  host._binaries = [uf2];
+  host._binaries = [artifact.binary];
   showReadyStep(host);
 }
 
@@ -85,9 +63,7 @@ export function retryRtlAmbz2(
     host.installRtlAmbz2(device);
     return;
   }
-  host._errorMessage = "";
-  host._flashPercent = 0;
-  host._flashBusy = false;
+  resetForRetry(host);
   showReadyStep(host);
 }
 
@@ -101,22 +77,8 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   if (!image || host._flashBusy) return;
   const device = host._device;
   const stillCurrent = () => host._device === device && host._rtlImage === image;
-  host._flashBusy = true;
-  let port: SerialPort | null;
-  try {
-    port = await requestSerialPort();
-  } catch (err) {
-    if (stillCurrent()) {
-      host._fail(
-        host._localize("firmware.browser_flash_connect_failed"),
-        getErrorMessage(err)
-      );
-    }
-    return;
-  } finally {
-    if (stillCurrent()) host._flashBusy = false;
-  }
-  if (!port || !stillCurrent()) return;
+  const port = await pickSerialPortOrFail(host, stillCurrent);
+  if (!port) return;
 
   host._step = "rtl-connect";
   host._statusMessage = host._localize("firmware.rtl_connecting");

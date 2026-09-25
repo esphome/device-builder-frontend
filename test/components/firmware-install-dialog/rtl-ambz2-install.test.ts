@@ -18,13 +18,9 @@ vi.mock("../../../src/util/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
 }));
 
-import { identityLocalize } from "../../_dom.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
 import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
-import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
-import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import {
   retryRtlAmbz2,
   rtlDoFlash,
@@ -35,16 +31,12 @@ import {
   LT_TAG,
   UF2_FAMILY_AMBZ,
 } from "../../../src/util/libretiny-uf2.js";
+import { asHost, bin, makeFlashHost } from "./_flash-host.js";
 
 const bootInfo = [ltTag(LT_TAG.OTA_PART_INFO, ltPartInfo([0, 0, 0, 0, 1, 1], ["boot"]))];
 const uf2 = (family?: number | null): ArrayBuffer =>
   makeLibreTinyUf2({ family, blocks: [{ addr: 0, tags: bootInfo }] }).buffer;
 
-const bin = (file: string, type?: string): FirmwareBinary => ({
-  file,
-  title: file,
-  type,
-});
 const device = {
   configuration: "bw15.yaml",
   name: "bw15",
@@ -53,60 +45,24 @@ const device = {
 const image: LibreTinyImage = {
   familyId: 0xe08f7564,
   board: "bw15",
-  firmware: "esphome",
-  version: "1",
   runs: [{ address: 0x4000, data: new Uint8Array(256) }],
   totalBytes: 256,
 };
 
 function makeHost(opts: { binaries?: FirmwareBinary[]; uf2?: ArrayBuffer } = {}) {
-  const api = {
-    firmwareCompile: vi.fn().mockResolvedValue({ job_id: "j", source: "local" }),
-    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
-      cbs.onResult({ status: "completed" });
-      return "stream";
-    }),
-    firmwareGetBinaries: vi
-      .fn()
-      .mockResolvedValue(
-        opts.binaries ?? [
-          bin("firmware.uf2", "uf2"),
-          bin("image_firmware_is.0x00C000.bin"),
-        ]
-      ),
-    firmwareDownloadBytes: vi.fn().mockResolvedValue(opts.uf2 ?? uf2()),
-    stopStream: vi.fn().mockResolvedValue({ cancelled: true }),
-  } as unknown as ESPHomeAPI;
-  const host = {
-    _api: api,
-    _device: device as ConfiguredDevice | null,
-    _localize: identityLocalize,
-    _step: "queued",
-    _statusMessage: "",
-    _errorMessage: "",
-    _log: fakeLogBuffer(),
-    _jobId: "",
-    _streamId: "",
-    _compileReject: null,
-    _jobSource: 0,
-    _jobSourceLabel: "",
-    _failureKind: null,
-    _binaries: [] as FirmwareBinary[],
-    _rtlImage: null as LibreTinyImage | null,
-    _flashBusy: false,
-    _flashAbort: null as AbortController | null,
-    _flashPercent: 0,
-    installRtlAmbz2: vi.fn(),
-    _fail(title: string, detail = "") {
-      this._step = "error";
-      this._statusMessage = title;
-      this._errorMessage = detail;
+  return makeFlashHost(
+    device,
+    {
+      binaries: opts.binaries ?? [
+        bin("firmware.uf2", "uf2"),
+        bin("image_firmware_is.0x00C000.bin"),
+      ],
+      downloadBytes: opts.uf2 ?? uf2(),
     },
-  };
-  return host;
+    { _rtlImage: null as LibreTinyImage | null, installRtlAmbz2: vi.fn() }
+  );
 }
 type Host = ReturnType<typeof makeHost>;
-const asHost = (h: Host) => h as unknown as ESPHomeFirmwareInstallDialog;
 
 function readyHost(): Host {
   const host = makeHost();
@@ -137,7 +93,7 @@ describe("startRtlAmbz2Install", () => {
   it("fails when the build produced no UF2", async () => {
     const host = makeHost({ binaries: [bin("image_firmware_is.0x00C000.bin")] });
     await startRtlAmbz2Install(asHost(host));
-    expect(host._statusMessage).toBe("firmware.rtl_no_uf2");
+    expect(host._statusMessage).toBe("firmware.no_uf2");
     expect(host._api.firmwareDownloadBytes).not.toHaveBeenCalled();
   });
 

@@ -53,7 +53,7 @@ function fakeRom(opts: RomOptions = {}) {
     } else if (cmd === "DW") {
       reply(`${args[0]}: 00000020 00000000 00000000 00000000\r\n`);
     } else if (cmd === "EW") {
-      reply("OK\r\n");
+      reply(`0x${args[0]} = 0x${args[1]}\r\n`);
     } else if (cmd === "fwd") {
       xmodem = { offset: parseInt(args[2], 16), buf: [] };
       written.set(xmodem.offset, []);
@@ -126,8 +126,6 @@ const run = (address: number, length: number, fill: number) => ({
 const image: LibreTinyImage = {
   familyId: 0xe08f7564,
   board: "bw15",
-  firmware: "esphome",
-  version: "1",
   runs: [run(0xc000, 1500, 0xa5), run(0x4000, 100, 0x5a)],
   totalBytes: 1600,
 };
