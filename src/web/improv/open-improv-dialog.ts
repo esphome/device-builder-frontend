@@ -226,6 +226,11 @@ let mountedDialogs = 0;
 let swallowUntil = 0;
 let listening = false;
 
+/** Whether a Wi-Fi setup dialog is up (the SDK owns it, so it is not a wrapper dialog). */
+export function isImprovDialogMounted(): boolean {
+  return mountedDialogs > 0;
+}
+
 function dialogMounted(): void {
   mountedDialogs++;
   if (listening) return;

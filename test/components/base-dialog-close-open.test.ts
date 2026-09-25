@@ -11,7 +11,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
 import { mount } from "../_dom.js";
-import { closeOpenDialogs, ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
+import {
+  closeOpenDialogs,
+  ESPHomeBaseDialog,
+  hasOpenDialog,
+} from "../../src/components/base-dialog.js";
 
 /* The real element registration is stubbed out above; register a stand-in
    whose requestClose mimics the real one's entry point — fire the cancelable
@@ -120,5 +124,16 @@ describe("closeOpenDialogs", () => {
 
     closeOpenDialogs();
     expect(innerStub(el).requestCloseCalls).toBe(1);
+  });
+});
+
+describe("hasOpenDialog", () => {
+  it("reflects whether any wrapper is open", async () => {
+    expect(hasOpenDialog()).toBe(false);
+    const el = await mount(new ESPHomeBaseDialog(), { open: true });
+    expect(hasOpenDialog()).toBe(true);
+    el.open = false;
+    await el.updateComplete;
+    expect(hasOpenDialog()).toBe(false);
   });
 });

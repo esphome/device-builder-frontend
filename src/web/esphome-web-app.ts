@@ -4,6 +4,7 @@ import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
+import { hasOpenDialog } from "../components/base-dialog.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
@@ -16,6 +17,7 @@ import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
+import { isImprovDialogMounted } from "./improv/open-improv-dialog.js";
 import { boardFamilyOfPort } from "./util/board-family.js";
 import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
@@ -136,6 +138,9 @@ export class ESPHomeWebApp extends LitElement {
    * nothing, and the flow the user is in carries on either way.
    */
   private _suggestFlowFor(port: SerialPort): void {
+    // Switching flows unmounts the current one: never offer it while a
+    // dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
+    if (hasOpenDialog() || isImprovDialogMounted()) return;
     const family = boardFamilyOfPort(port);
     if (family === null || family === this._mode) return;
     notifyInfo(this._localize(`web.flow_switch.${family}`), {
