@@ -3,7 +3,8 @@
 The standalone, backend-free Web Serial tool published to
 [web.esphome.io](https://web.esphome.io). Everything runs in the
 browser: connect an ESP or Raspberry Pi Pico W over USB to install
-firmware, stream logs, and provision Wi-Fi via Improv. It shares the
+firmware, stream logs, and provision Wi-Fi via Improv; an nRF52 gets DFU
+installs and logs over USB or Bluetooth. It shares the
 repo's `src/` tree (design system, the esptool-js flash engine in
 `src/util/web-serial.ts`, localization) and adds only this app.
 
@@ -45,7 +46,7 @@ hardware classes behave differently:
 | `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                               |
 | `dashboard/`                           | Connect cards (ESP + Pico) and per-device action cards                  |
 | `install/`                             | Flash dialogs and the install flow controller                           |
-| `logs/`                                | Serial log viewer dialog                                                |
+| `logs/`                                | Log viewer dialog (Web Serial, or Bluetooth NUS for nRF52)              |
 | `improv/`                              | Wi-Fi provisioning dialog                                               |
 | `flash-receiver/`                      | Receives images from a Device Builder over the local network            |
 | `util/`                                | Web-only helpers (port disconnect watcher, firmware fetch, Pico filter) |

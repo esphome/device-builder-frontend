@@ -9,11 +9,13 @@ vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }));
+vi.mock("../../src/util/ble-nus-stream.js", () => ({ streamBleNus: vi.fn() }));
 
 const sleep = vi.fn((_ms?: number) => Promise.resolve());
 vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }));
 
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
+import { streamBleNus } from "../../src/util/ble-nus-stream.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
@@ -27,10 +29,10 @@ function toolbarLabels(el: ESPHomeWebLogsDialog): string[] {
   );
 }
 
-async function mount(isPico = false): Promise<ESPHomeWebLogsDialog> {
+async function mount(noReset = false): Promise<ESPHomeWebLogsDialog> {
   const el = new ESPHomeWebLogsDialog();
   (el as any)._localize = (k: string) => k;
-  el.isPico = isPico;
+  el.noReset = noReset;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -81,7 +83,7 @@ describe("esphome-web-logs-dialog", () => {
     expect(resetButtons(el).length).toBe(1);
   });
 
-  it("hides the reset button for a Pico (RTS pulse can't reset an RP2040)", async () => {
+  it("hides the reset button when the card says so (no reset line behind the CDC)", async () => {
     const el = await mount(true);
     expect(resetButtons(el).length).toBe(0);
   });
@@ -420,5 +422,85 @@ describe("esphome-web-logs-dialog", () => {
 
   it("composes the shared crash-callout styles", () => {
     expect(ESPHomeWebLogsDialog.styles).toContain(crashCalloutStyles);
+  });
+});
+
+describe("esphome-web-logs-dialog over Bluetooth", () => {
+  type Hooks = { onLine: (l: string) => void; onDisconnect?: () => void };
+  const device = {} as BluetoothDevice;
+
+  async function openBle(): Promise<{ el: ESPHomeWebLogsDialog; hooks: () => Hooks }> {
+    const el = await mount(true);
+    el.bleDevice = device;
+    el.open = true;
+    await el.updateComplete;
+    await drainMacrotasks();
+    return {
+      el,
+      hooks: () => vi.mocked(streamBleNus).mock.calls.slice(-1)[0][1] as Hooks,
+    };
+  }
+
+  it("connects on open, streams lines and hides the reset button", async () => {
+    const cancel = vi.fn(async () => {});
+    vi.mocked(streamBleNus).mockResolvedValue(cancel);
+    const { el, hooks } = await openBle();
+    expect(streamBleNus).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({ onLine: expect.any(Function) }),
+      expect.objectContaining({ attempts: 3 })
+    );
+    expect((el as any)._streaming).toBe(true);
+    expect(resetButtons(el).length).toBe(0);
+    hooks().onLine("[I][app:1]: hello");
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("[I][app:1]: hello");
+    // Closing cancels the subscription, which also drops the link.
+    el.open = false;
+    await el.updateComplete;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("prints why a connect failed and stops the spinner", async () => {
+    vi.mocked(streamBleNus).mockRejectedValue(new Error("gatt"));
+    const { el } = await openBle();
+    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._lines).toContain("web.logs.ble_connect_failed");
+  });
+
+  it("reconnects after the peripheral drops the link", async () => {
+    vi.mocked(streamBleNus).mockResolvedValue(async () => {});
+    const { el, hooks } = await openBle();
+    hooks().onDisconnect!();
+    await drainMacrotasks();
+    expect(streamBleNus).toHaveBeenCalledTimes(2);
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.terminal_disconnected");
+    expect((el as any)._lines).toContain("web.logs.reconnected");
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("gives up after repeated silent drops", async () => {
+    vi.mocked(streamBleNus).mockResolvedValue(async () => {});
+    const { el, hooks } = await openBle();
+    for (let i = 0; i < 4; i++) {
+      hooks().onDisconnect!();
+      await drainMacrotasks();
+    }
+    expect((el as any)._lines).toContain("web.logs.reconnect_gave_up");
+    expect((el as any)._streaming).toBe(false);
+  });
+
+  it("drops a connect that lands after the dialog closed", async () => {
+    const cancel = vi.fn(async () => {});
+    let resolveConnect!: (c: () => Promise<void>) => void;
+    vi.mocked(streamBleNus).mockReturnValue(new Promise((r) => (resolveConnect = r)));
+    const { el } = await openBle();
+    el.open = false;
+    await el.updateComplete;
+    resolveConnect(cancel);
+    await drainMacrotasks();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect((el as any)._cancel).toBeUndefined();
   });
 });

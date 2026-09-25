@@ -298,6 +298,16 @@ describe("requestBleNusDevice", () => {
     });
   });
 
+  it("lists every device when no name is known", async () => {
+    const requestDevice = vi.fn(async () => ({}));
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
+    await requestBleNusDevice([]);
+    expect(requestDevice).toHaveBeenCalledWith({
+      acceptAllDevices: true,
+      optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
   it("tells an absent adapter apart from a dismissed chooser, after the fact", async () => {
     const bluetooth = {
       requestDevice: vi.fn(async () => {

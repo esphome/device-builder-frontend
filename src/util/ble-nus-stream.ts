@@ -76,22 +76,25 @@ export class BleUnavailableError extends Error {
 /**
  * Chooser for a NUS peripheral. ESPHome advertises the node name, so the
  * chooser matches on the given names and, as a fallback, on the service
- * uuid (most firmware does not advertise it); the service must still be
- * listed as optional or GATT access to it is refused. Returns null when the
- * chooser is dismissed.
+ * uuid (most firmware does not advertise it); with no name known at all it
+ * lists every device. The service must still be listed as optional or GATT
+ * access to it is refused. Returns null when the chooser is dismissed.
  */
 export async function requestBleNusDevice(
   names: string[]
 ): Promise<BluetoothDevice | null> {
-  const filters: BluetoothLEScanFilter[] = [
-    ...[...new Set(names.filter(Boolean))].map((name) => ({ name })),
-    { services: [BLE_NUS_SERVICE_UUID] },
-  ];
+  const known = [...new Set(names.filter(Boolean))];
+  const options: RequestDeviceOptions = known.length
+    ? {
+        filters: [
+          ...known.map((name) => ({ name })),
+          { services: [BLE_NUS_SERVICE_UUID] },
+        ],
+        optionalServices: [BLE_NUS_SERVICE_UUID],
+      }
+    : { acceptAllDevices: true, optionalServices: [BLE_NUS_SERVICE_UUID] };
   try {
-    return await navigator.bluetooth.requestDevice({
-      filters,
-      optionalServices: [BLE_NUS_SERVICE_UUID],
-    });
+    return await navigator.bluetooth.requestDevice(options);
   } catch (err) {
     if (!isPortPickerCancel(err)) throw err;
     // Chrome rejects with the same NotFoundError when the adapter is off.

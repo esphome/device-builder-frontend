@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
@@ -16,7 +16,6 @@ import {
   termButtonStyles,
   termTokens,
 } from "../../components/process-terminal/process-terminal.styles.js";
-import { renderTermButton } from "../../components/process-terminal/toolbar-button.js";
 import { localizeContext } from "../../context/index.js";
 import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
 import {
@@ -30,6 +29,8 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
 import { openLiveSerialPort } from "../../util/web-serial.js";
+import { attachBleLogs } from "./ble-source.js";
+import { renderWebLogsToolbar } from "./toolbar.js";
 
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -94,19 +95,24 @@ export async function openPortForLogs(
 }
 
 /**
- * Serial log viewer for ESPHome Web.
+ * Log viewer for ESPHome Web.
  *
  * Reuses the dashboard's ``process-terminal`` display but drives it from a
- * plain Web Serial reader instead of the backend logs WS — no ``apiContext``,
- * no OTA source. The parent opens the port (via ``openPortForLogs``) before
- * showing the dialog; the dialog streams it and closes it on ``after-hide``.
- * After a mid-stream disconnect the dialog owns recovery: it closes the
- * dead handle and reopens a live one itself (``openLiveSerialPort``).
+ * plain Web Serial reader, or a Bluetooth NUS subscription, instead of the
+ * backend logs WS — no ``apiContext``, no OTA source. For serial the parent
+ * opens the port (via ``openPortForLogs``) before showing the dialog; the
+ * dialog streams it and closes it on ``after-hide``, and after a mid-stream
+ * disconnect it owns recovery: it closes the dead handle and reopens a live
+ * one itself (``openLiveSerialPort``). For Bluetooth the dialog connects
+ * itself and retries a dropped link a few times.
  */
 @customElement("esphome-web-logs-dialog")
 export class ESPHomeWebLogsDialog extends LitElement {
   /** Authorized (closed) serial port to stream from. */
   @property({ attribute: false }) port?: SerialPort;
+
+  /** A picked NUS peripheral to stream from instead of a port. */
+  @property({ attribute: false }) bleDevice?: BluetoothDevice;
 
   /** Reactive open flag, driven by the parent device card. */
   @property({ type: Boolean }) open = false;
@@ -115,31 +121,35 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @property() deviceLabel = "";
 
   /**
-   * Hide the "Reset device" button. A DTR/RTS pulse doesn't reset an RP2040
-   * native-USB CDC device, so the button is a no-op for the Pico — legacy hid
-   * it for the same reason.
+   * Hide the "Reset device" button. A DTR/RTS pulse doesn't reset a
+   * native-USB CDC device (the Pico, an nRF52), so the button would be a
+   * no-op there — legacy hid it for the same reason.
    */
-  @property({ type: Boolean }) isPico = false;
+  @property({ type: Boolean }) noReset = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
-  private _localize: LocalizeFunc = (key) => key;
+  _localize: LocalizeFunc = (key) => key;
 
   @state() private _lines: string[] = [];
   // ``_streaming`` = reader alive and displaying (drives the pulsing dot + the
   // Stop button). ``_paused`` = user pressed Stop; the reader keeps draining the
   // port (so Start resumes without a reopen/reset) but appends are dropped.
-  @state() private _streaming = false;
-  @state() private _paused = false;
+  @state() _streaming = false;
+  @state() _paused = false;
   // Latched once a crash marker flows through the stream; drives the callout
   // for the rest of the session. A live panic upgrades a previous-boot report;
   // nothing downgrades it (mirrors the builder's logs dialog).
-  @state() private _crashKind: CrashKind | null = null;
+  @state() _crashKind: CrashKind | null = null;
 
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  private _cancel?: () => Promise<void>;
+  _cancel?: () => Promise<void>;
+  // Supersedes a Bluetooth connect or reconnect still in flight; ``_bleActive``
+  // keeps a re-render from starting a second session.
+  _bleGen = 0;
+  private _bleActive = false;
   // Handle currently streamed. Starts as ``port`` and is replaced when a
   // native-USB re-enumeration hands back a fresh handle; the parent's own
   // ``PortDisconnectWatcher`` swap can't be relied on here — Firefox keeps
@@ -149,7 +159,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _reacquireGeneration = 0;
   // Consecutive reconnects that have produced no log lines yet; reset by
   // the first line after a resume, checked against MAX_SILENT_RECONNECTS.
-  private _silentReconnects = 0;
+  _silentReconnects = 0;
   // Batched line buffer flushed on the next animation frame, matching the
   // dashboard logs dialog (logs-dialog.ts): a flooding device would otherwise
   // trigger a Lit render per line. Flushed early on teardown / clear / download.
@@ -162,7 +172,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // calls no-ops, including a port swapped mid-stream or mid-reconnect —
   // the dialog owns its active handle and announces swaps via port-replaced.
   protected updated(changed: Map<string, unknown>): void {
-    if (!changed.has("open") && !changed.has("port")) return;
+    if (!changed.has("open") && !changed.has("port") && !changed.has("bleDevice")) return;
     if (this.open) {
       this._start();
     } else if (changed.has("open")) {
@@ -181,6 +191,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // the initial stream reads it as-is; reconnect reopens are this dialog's
   // own (_onDisconnect). Defensive guard: a closed port has no readable.
   private _start(): void {
+    if (this.bleDevice) {
+      if (!this._bleActive) {
+        this._bleActive = true;
+        void attachBleLogs(this, this.bleDevice, false);
+      }
+      return;
+    }
     if (!this.port?.readable) return; // no (open) port yet — legitimately quiet
     // Streaming or mid-recovery — _activePort covers both by the _streamFrom
     // invariant (streaming ⇒ _activePort set). A parent swapping .port in
@@ -231,7 +248,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Detection only — web.esphome.io has no backend to decode or report a
   // crash, so the callout stays a banner (the builder's dialog adds those).
-  private _observeCrash(line: string): void {
+  _observeCrash(line: string): void {
     if (this._crashKind === "live") return; // latched; skip the regex scan
     const next = latchCrashKind(this._crashKind, classifyLine(normalizeLogLine(line)));
     if (next === this._crashKind) return;
@@ -245,12 +262,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // Stop → pause the display (reader stays alive). Start → resume. Start only
   // shows while ``_paused`` is true, which is only reachable with a live reader,
   // so resuming never lands on a dead stream.
-  private _onStop(): void {
+  _onStop(): void {
     this._streaming = false;
     this._paused = true;
   }
 
-  private _onStart(): void {
+  _onStart(): void {
     this._streaming = true;
     this._paused = false;
   }
@@ -371,6 +388,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   private _stop(): void {
     this._reacquireGeneration++;
+    this._bleGen++;
+    this._bleActive = false;
     this._streaming = false;
     this._paused = false;
     this._resetPending();
@@ -389,7 +408,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Buffer a streamed line; flush on the next animation frame so a log flood
   // triggers one render per frame, not per line.
-  private _enqueueLine(line: string): void {
+  _enqueueLine(line: string): void {
     this._pendingLines.push(line);
     // rAF doesn't fire while the tab is hidden, so bound the pending buffer too.
     if (this._pendingLines.length > 2 * MAX_LOG_LINES) {
@@ -402,7 +421,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     });
   }
 
-  private _flushPending(): void {
+  _flushPending(): void {
     if (this._pendingLines.length === 0) return;
     const merged = [...this._lines, ...this._pendingLines];
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
@@ -417,7 +436,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
   }
 
-  private _resetLines(): void {
+  _resetLines(): void {
     this._resetPending();
     this._lines = [];
   }
@@ -426,7 +445,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // matching legacy ewt-console.reset(): RTS high then low back-to-back, then a
   // 1s settle for the device to come back up. Best-effort — some USB bridges
   // don't wire the reset lines.
-  private async _resetDevice(): Promise<void> {
+  async _resetDevice(): Promise<void> {
     // The reacquired handle after a re-enumeration, never the stale one.
     const port = this._activePort ?? this.port;
     if (!port) return;
@@ -439,13 +458,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
   }
 
-  private _download(): void {
+  _download(): void {
     this._flushPending();
     const stem = this.deviceLabel || "esphome-web";
     downloadAnsiText(this._lines, `${stem}-logs.txt`);
   }
 
-  private _clear(): void {
+  _clear(): void {
     this._resetLines();
     this._crashKind = null;
   }
@@ -474,49 +493,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
           variant="stream"
           .lines=${this._lines}
           .streaming=${this._streaming}
-          placeholder=${this._localize("web.logs.waiting")}
+          placeholder=${this._localize(
+            this.bleDevice ? "web.logs.waiting_ble" : "web.logs.waiting"
+          )}
         >
           ${renderCrashCallout(this._localize, this._crashKind)}
-          <div class="toolbar-slot" slot="toolbar-right">
-            ${
-              this.isPico
-                ? nothing
-                : renderTermButton({
-                    icon: "restart",
-                    // Reuse the builder's logs-terminal labels (same context) so
-                    // translators don't re-translate these generic strings.
-                    label: this._localize("dashboard.logs_reset_device"),
-                    onClick: () => void this._resetDevice(),
-                  })
-            }
-            ${renderTermButton({
-              icon: "download",
-              title: this._localize("web.logs.download"),
-              onClick: () => this._download(),
-            })}
-            ${renderTermButton({
-              icon: "delete-sweep",
-              label: this._localize("dashboard.logs_clear"),
-              onClick: () => this._clear(),
-            })}
-            ${
-              this._streaming
-                ? renderTermButton({
-                    icon: "stop",
-                    label: this._localize("dashboard.logs_stop"),
-                    variant: "stop",
-                    onClick: () => this._onStop(),
-                  })
-                : this._paused
-                  ? renderTermButton({
-                      icon: "play",
-                      label: this._localize("dashboard.logs_start"),
-                      variant: "start",
-                      onClick: () => this._onStart(),
-                    })
-                  : nothing
-            }
-          </div>
+          ${renderWebLogsToolbar(this)}
         </esphome-process-terminal>
       </esphome-base-dialog>
     `;
