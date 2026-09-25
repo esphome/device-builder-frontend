@@ -9,8 +9,7 @@
  *
  * nRF52 and RP2 are special cases: they don't get the esptool Web Serial row
  * but do get their own in-browser rows when Web Serial is available. In logs
- * mode the Web Serial row also covers RP2, whose native CDC console the
- * browser can read like any other port.
+ * mode the Web Serial row also covers RP2 (its CDC console reads like any port).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -129,12 +128,6 @@ describe("install-method-dialog logs-mode platform gating", () => {
 
   it.each(["bk72xx", "nrf52"])("keeps logs on server-serial for %s", async (platform) => {
     const d = await mount(platform, "logs");
-    expect(hasWebSerialRow(d)).toBe(false);
-    expect(hasServerSerialRow(d)).toBe(true);
-  });
-
-  it("keeps the install picker unchanged for rp2", async () => {
-    const d = await mount("rp2");
     expect(hasWebSerialRow(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
   });

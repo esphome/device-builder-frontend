@@ -13,6 +13,7 @@ import {
   toastError,
 } from "./_logs-dialog-env.js";
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { startOtaStream } from "../../src/components/logs-dialog/session.js";
 import { hasSerialPort } from "../../src/components/logs-session.js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
@@ -162,13 +163,14 @@ describe("logs-dialog header source chip", () => {
 });
 
 describe("logs-dialog Reset Device gate", () => {
-  // A Pico has no reset line over its CDC and drops output once DTR falls,
-  // so the button is hidden for it; ESP boards keep the RTS-pulse reset.
   async function mountPassive(targetPlatform: string): Promise<ESPHomeLogsDialog> {
     const el = makeLogsDialog();
     el.configuration = "device.yaml";
     (el as any)._devices = [
-      { configuration: "device.yaml", target_platform: targetPlatform },
+      makeConfiguredDevice({
+        configuration: "device.yaml",
+        target_platform: targetPlatform,
+      }),
     ];
     el.openPassive({ onReconnect: () => Promise.resolve() });
     await el.updateComplete;

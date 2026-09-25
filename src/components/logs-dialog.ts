@@ -11,7 +11,7 @@ import {
   mdiRestart,
   mdiStop,
 } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -220,6 +220,9 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
+  // Reset Device is an RTS pulse. A Pico has no reset line on its CDC and
+  // arduino-pico gates output on DTR, so the pulse would only silence it.
+  private _canResetDevice = true;
 
   static styles = [
     espHomeStyles,
@@ -241,6 +244,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
+      this._canResetDevice = !isRp2Platform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -406,19 +410,14 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
-              passive
-                ? // Web Serial only; disabled until a port is attached. A Pico
-                  // has no reset line over its CDC: the RTS pulse does nothing
-                  // and the DTR drop silences its output (arduino-pico gates
-                  // writes on DTR), so the button is hidden for it.
-                  isRp2Platform(this._targetPlatform)
-                  ? nothing
-                  : renderTermButton({
-                      icon: "restart",
-                      label: this._localize("dashboard.logs_reset_device"),
-                      disabled: !hasSerialPort(s),
-                      onClick: () => void this._onResetDevice(),
-                    })
+              passive && this._canResetDevice
+                ? // Web Serial only; disabled until a port is attached.
+                  renderTermButton({
+                    icon: "restart",
+                    label: this._localize("dashboard.logs_reset_device"),
+                    disabled: !hasSerialPort(s),
+                    onClick: () => void this._onResetDevice(),
+                  })
                 : isOtaNetwork(s)
                   ? // States arrive only over the network/API connection, so the
                     // toggle is hidden for a server serial source (#539).
