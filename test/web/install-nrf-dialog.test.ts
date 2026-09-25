@@ -73,6 +73,19 @@ describe("esphome-web-install-nrf-dialog details log", () => {
     ]);
   });
 
+  it("starts a retry with a fresh log without closing the dialog", async () => {
+    const el = await mountDialog();
+    mocks.flashDfuPackageWithReconnect.mockRejectedValue(new Error("no answer"));
+    await el._startInstall();
+    await el._continueFlash();
+    await el.updateComplete;
+    expect(el._state).toBe("error");
+    el._state = "idle";
+    await el._startInstall();
+    await el.updateComplete;
+    expect(logLines(el)).toEqual(["Touching the port at 1200 baud"]);
+  });
+
   it("starts the next run with a fresh log", async () => {
     const el = await mountDialog();
     await el._startInstall();

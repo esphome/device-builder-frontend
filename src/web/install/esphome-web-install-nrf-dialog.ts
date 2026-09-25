@@ -95,6 +95,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
     if (this._pending) return;
     this._pending = true;
+    this._logLines = [];
     try {
       await this._prepareAndReset(this._file);
     } finally {

@@ -57,7 +57,7 @@ export interface ProgressCard {
   message: string;
   detail?: string;
   progress?: number | null;
-  /** The flash engine's step lines, shown in a collapsible details log. */
+  /** The flash engine's step lines, in a details log that opens on failure. */
   log?: readonly string[];
 }
 
@@ -77,6 +77,7 @@ export function renderProgressCard(card: ProgressCard): TemplateResult {
               slot="status-extra"
               download-name="esphome-web-install.txt"
               .lines=${card.log}
+              .expanded=${card.state === "error"}
             ></esphome-install-details-log>`
           : nothing
       }

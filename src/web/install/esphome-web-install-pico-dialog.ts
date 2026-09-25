@@ -120,6 +120,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   // A Pico already running ESPHome: the 1200 baud touch reboots it into
   // BOOTSEL, where Install can pick it up.
   private async _resetIntoBootsel(): Promise<void> {
+    this._logLines = [];
     this._state = "resetting";
     try {
       const touched = await touchIntoBootloader({
@@ -136,6 +137,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _install(): Promise<void> {
+    // Installing after the reset step continues that run's log.
+    if (this._state !== "waiting") this._logLines = [];
     // The chooser opens first, inside the click, with the image possibly
     // still downloading behind it; the write starts once the device is claimed.
     this._state = "connecting";

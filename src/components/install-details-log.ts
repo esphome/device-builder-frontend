@@ -11,6 +11,8 @@ import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./ansi-log.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,

@@ -212,6 +212,34 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(log.lines).toEqual(["Claimed the RP2 Boot device (2e8a:0003)"]);
   });
 
+  it("keeps the reset step's lines when Install follows it, and drops them on a fresh run", async () => {
+    mocks.touchIntoBootloader.mockImplementation(async ({ onLog }) => {
+      onLog?.("Touching the port at 1200 baud");
+      return true;
+    });
+    mocks.flashPico.mockImplementation(async (uf2, hooks) => {
+      await uf2;
+      hooks.onLog?.("Claimed the RP2 Boot device (2e8a:0003)");
+      return true;
+    });
+    const el = await mount();
+    button(el, "web.pico.install_reset_action").click();
+    await settle(el);
+    button(el, "dashboard.install").click();
+    await settle(el);
+    const log = () => el.shadowRoot!.querySelector("esphome-install-details-log") as any;
+    expect(log().lines).toEqual([
+      "Touching the port at 1200 baud",
+      "Claimed the RP2 Boot device (2e8a:0003)",
+    ]);
+    // Retry from the start: a new run, a new log.
+    (el as any)._state = "idle";
+    await settle(el);
+    button(el, "dashboard.install").click();
+    await settle(el);
+    expect(log().lines).toEqual(["Claimed the RP2 Boot device (2e8a:0003)"]);
+  });
+
   it("goes back to the start when the chooser is dismissed", async () => {
     mocks.flashPico.mockResolvedValue(false);
     const el = await mount();
