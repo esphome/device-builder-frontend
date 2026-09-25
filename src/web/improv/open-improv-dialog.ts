@@ -184,7 +184,7 @@ async function runImprov(
   const dialog = document.createElement("improv-wifi-serial-provision-dialog");
   dialog.port = port;
 
-  const stopSwallowing = swallowLateStateError();
+  dialogMounted();
   return new Promise<ImprovResult>((resolve) => {
     dialog.addEventListener(
       "closed",
@@ -198,8 +198,7 @@ async function runImprov(
         // reader in its own close handler, so this just frees the device for the
         // next action. Best-effort: the device may have been unplugged.
         if (weOpened) void port.close().catch(() => {});
-        // The late rejection can land up to an RPC timeout after the close.
-        setTimeout(stopSwallowing, LATE_STATE_ERROR_MS);
+        dialogClosed();
         resolve(result);
       },
       { once: true }
@@ -217,15 +216,27 @@ const LATE_STATE_ERROR_MS = 30_000;
  * that never answers), the dialog shows its error state, but the request's
  * own later rejection has nothing to catch it and surfaces as an unhandled
  * "Error fetching current state" (improv-wifi/sdk-serial-js, serial.js).
- * Swallow that one while a dialog is up; anything else stays loud.
+ * Swallow that one while a dialog is up and for an RPC timeout after one
+ * closed; anything else stays loud.
  */
-function swallowLateStateError(): () => void {
-  const onRejection = (ev: PromiseRejectionEvent) => {
+let mountedDialogs = 0;
+let swallowUntil = 0;
+let listening = false;
+
+function dialogMounted(): void {
+  mountedDialogs++;
+  if (listening) return;
+  listening = true;
+  window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
+    if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
     const reason = ev.reason as { message?: unknown } | undefined;
     const message =
       typeof reason?.message === "string" ? reason.message : String(ev.reason);
     if (message.startsWith("Error fetching current state")) ev.preventDefault();
-  };
-  window.addEventListener("unhandledrejection", onRejection);
-  return () => window.removeEventListener("unhandledrejection", onRejection);
+  });
+}
+
+function dialogClosed(): void {
+  mountedDialogs--;
+  swallowUntil = Date.now() + LATE_STATE_ERROR_MS;
 }

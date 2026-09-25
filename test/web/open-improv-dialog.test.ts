@@ -79,7 +79,7 @@ describe("openImprovDialog", () => {
     await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
   });
 
-  it("keeps DTR asserted on a Pico, whose CDC only transmits while it is", async () => {
+  it("keeps DTR asserted on a Pico, whose CDC only transmits while DTR is up", async () => {
     const port = makePort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
@@ -103,8 +103,18 @@ describe("openImprovDialog", () => {
     };
     expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
     expect(rejection(new Error("something else"))).toBe(false);
+    // The SDK's late rejection can land up to its RPC timeout after the close;
+    // the guard stays for that long and no longer.
     dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
     await promise;
+    expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + 30_000);
+      expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports improv-detected-but-not-provisioned and closes the port", async () => {
