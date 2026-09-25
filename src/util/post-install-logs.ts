@@ -16,6 +16,7 @@ import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { PicoStrandedError, resetPicoForLogs } from "./rp2-logs-reset.js";
 import { isRp2Platform } from "./rp2-platform.js";
+import { isRtl87xxPlatform } from "./rtl87xx-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import {
   openLiveSerialPort,
@@ -95,7 +96,8 @@ export async function reconnectWebSerialLogs(
   localize: LocalizeFunc,
   baudRate: number,
   loggerInterface: string | null,
-  cancelled: () => boolean = () => false
+  cancelled: () => boolean = () => false,
+  targetPlatform = ""
 ): Promise<void> {
   let port: SerialPort | null;
   try {
@@ -124,7 +126,7 @@ export async function reconnectWebSerialLogs(
     return;
   }
   try {
-    await port.open({ baudRate });
+    await openPortForLogs(port, baudRate, targetPlatform);
   } catch {
     failSerialOpen(
       logsDialog,
@@ -134,6 +136,40 @@ export async function reconnectWebSerialLogs(
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
+}
+
+/**
+ * Whether a logs session releases DTR and RTS right after opening a port.
+ * Chromium asserts both on open. An ESP board's auto-reset circuit reads a
+ * change as a reset, so its lines stay as opened; a Pico or nRF52 native CDC
+ * ignores them; an RTL8720C kit wires RTS to CEN (held, the chip sits in
+ * reset) and DTR to PA00, the download strap (a reset with it held lands in
+ * the ROM downloader), so both are released and the board boots into the
+ * firmware.
+ */
+export function releasesLinesAfterOpen(
+  targetPlatform: string | null | undefined
+): boolean {
+  return isRtl87xxPlatform(targetPlatform);
+}
+
+/** Drop DTR and RTS, best effort: an adapter without the lines rejects. */
+export async function releaseControlLines(port: SerialPort): Promise<void> {
+  try {
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+  } catch {
+    // No control lines on this adapter.
+  }
+}
+
+/** Open ``port`` for a logs session and apply the platform's line policy; rejects as ``open`` does. */
+export async function openPortForLogs(
+  port: SerialPort,
+  baudRate: number,
+  targetPlatform: string | null | undefined
+): Promise<void> {
+  await port.open({ baudRate });
+  if (releasesLinesAfterOpen(targetPlatform)) await releaseControlLines(port);
 }
 
 /**
@@ -334,12 +370,7 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    try {
-      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    } catch {
-      /* setSignals failures are recoverable; the chip might be in a
-         fine state already. Continue. */
-    }
+    await releaseControlLines(port);
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.
@@ -393,7 +424,8 @@ export async function handlePostInstallShowLogs(
           localize,
           baudRate,
           loggerInterface ?? null,
-          cancelled
+          cancelled,
+          targetPlatform ?? ""
         ),
       onResetDevice: picoResetHook(logsDialog, localize, targetPlatform ?? "", baudRate),
     });

@@ -26,5 +26,11 @@ export type Installer =
   | "rtl-ambz2"
   | null;
 
+/** Installers whose flash leaves a port the logs can reopen (Show logs on Done, the after-install toggle). */
+export const PORT_HOLDING_INSTALLERS: ReadonlySet<Installer> = new Set<Installer>([
+  "web-serial",
+  "rtl-ambz2",
+]);
+
 export type InstallFailureKind =
   "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;

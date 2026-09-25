@@ -225,6 +225,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _nrfPkg: DfuPackage | null = null;
   _rp2Image: Uf2Image | null = null;
   _rtlImage: LibreTinyImage | null = null;
+  // The port a browser flash went through; backs "Show logs" on Done.
+  _logsPort: SerialPort | null = null;
   // Blocks a second picker while a browser-flash step's picker is open.
   @state() _flashBusy = false;
   // Aborts an in-flight browser flash on teardown so the device is released.
@@ -351,6 +353,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._nrfPkg = null;
     this._rp2Image = null;
     this._rtlImage = null;
+    this._logsPort = null;
     this._flashBusy = false;
   }
 
@@ -470,7 +473,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   };
 
   _showLogsAgain = () => {
-    if (this._detected) flipToLogs(this, this._detected.port);
+    if (this._logsPort) flipToLogs(this, this._logsPort);
   };
 
   // Web-flash success: the flash happened in the external tab, so view the

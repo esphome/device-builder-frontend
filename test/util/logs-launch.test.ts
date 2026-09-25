@@ -220,6 +220,48 @@ describe("launchLogsWithMethod", () => {
 });
 
 describe("launchLogsWithMethod web-serial", () => {
+  // Chromium asserts DTR and RTS on open; an RTL8720C kit needs them released
+  // (see releasesLinesAfterOpen), an ESP board must keep the open's state.
+  it.each([
+    ["rtl87xx", true],
+    ["esp32", false],
+  ])("releases the lines after opening a %s port: %s", async (platform, released) => {
+    const restore = withWebSerial(true);
+    const setSignals = vi.fn(async () => {});
+    const port = {
+      getInfo: () => ({}),
+      open: vi.fn(async () => {}),
+      setSignals,
+    } as unknown as SerialPort;
+    launch.requestSerialPort.mockResolvedValue(port);
+    const host = makeHost(async () => []);
+    try {
+      await launchLogsWithMethod(
+        host,
+        { ...makeDevice(), target_platform: platform },
+        "web-serial"
+      );
+      expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
+      if (released) {
+        expect(setSignals).toHaveBeenCalledWith({
+          dataTerminalReady: false,
+          requestToSend: false,
+        });
+      } else {
+        expect(setSignals).not.toHaveBeenCalled();
+      }
+      expect(launch.attachSerialLogStream).toHaveBeenCalledWith(
+        port,
+        host.logsDialog,
+        host.localize,
+        115200,
+        undefined
+      );
+    } finally {
+      restore();
+    }
+  });
+
   it("hands the Pico reset hook to the passive session", async () => {
     const restore = withWebSerial(true);
     const port = {

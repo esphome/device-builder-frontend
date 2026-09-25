@@ -228,9 +228,10 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // The RTS-pulse Reset Device works here. A Pico or an nRF52 has no reset
-  // line on its CDC and the pulse's DTR drop only detaches the host; a Pico
-  // resets through the session's hook instead (WebUSB browsers).
+  // The RTS-pulse Reset Device works here, RTL8720C kits included (see
+  // releasesLinesAfterOpen). A Pico or an nRF52 has no reset line on its CDC
+  // and the pulse's DTR drop only detaches the host; a Pico resets through
+  // the session's hook instead (WebUSB browsers).
   _pulseResets = true;
   // Set by openPassive; see PassiveSource.
   _passiveSource: PassiveSource = "serial";

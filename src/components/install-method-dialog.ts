@@ -38,6 +38,7 @@ import { fireEvent } from "../util/fire-event.js";
 import { isNrfPlatform } from "../util/nrf-platform.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isRp2Platform } from "../util/rp2-platform.js";
+import { isRtl87xxPlatform } from "../util/rtl87xx-platform.js";
 import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
   secureLoopbackUrl,
@@ -227,10 +228,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isEsptool = this._isEsptoolPlatform;
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isRp2 = isRp2Platform(this.deviceTargetPlatform);
+    const isRtl = isRtl87xxPlatform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
-    // Web Serial logs read the Pico's native CDC and nRF52's UART/USB-CDC;
-    // flashing stays esptool-only.
-    const webSerialPlatform = isLogs ? isEsptool || isRp2 || isNrf : isEsptool;
+    // Web Serial logs read the Pico's native CDC, nRF52's UART/USB-CDC and
+    // the RTL8720C's log UART; flashing stays esptool-only.
+    const webSerialPlatform = isLogs ? isEsptool || isRp2 || isNrf || isRtl : isEsptool;
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure
     // origins as a fallback: there a Web-Serial-incapable browser (Safari) still

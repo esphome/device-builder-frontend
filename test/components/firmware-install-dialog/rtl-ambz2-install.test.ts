@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
+  dispatchShowLogsAfterInstall: vi.fn(() => true),
   flashAmbz2: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<boolean>>(),
 }));
 type FlashHooks = {
@@ -14,6 +15,10 @@ type FlashHooks = {
 };
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
+}));
+vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  dispatchShowLogsAfterInstall: mocks.dispatchShowLogsAfterInstall,
 }));
 vi.mock("../../../src/util/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
@@ -60,7 +65,13 @@ function makeHost(opts: { binaries?: FirmwareBinary[]; uf2?: ArrayBuffer } = {})
       ],
       downloadBytes: opts.uf2 ?? uf2(),
     },
-    { _rtlImage: null as LibreTinyImage | null, installRtlAmbz2: vi.fn() }
+    {
+      _rtlImage: null as LibreTinyImage | null,
+      _logsPort: null as SerialPort | null,
+      _open: true,
+      _showLogsAfterInstall: false,
+      installRtlAmbz2: vi.fn(),
+    }
   );
 }
 type Host = ReturnType<typeof makeHost>;
@@ -177,6 +188,41 @@ describe("rtlDoFlash", () => {
     expect(host._step).toBe("done");
     expect(host._statusMessage).toBe("firmware.status_done");
     expect(host._flashAbort).toBeNull();
+  });
+
+  it("keeps the flashed port for Show logs and flips to logs when asked", async () => {
+    const host = readyHost();
+    const port = {};
+    mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.flashAmbz2.mockResolvedValue(true);
+    host._showLogsAfterInstall = true;
+    await rtlDoFlash(asHost(host));
+    expect(host._logsPort).toBe(port);
+    expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalledWith(
+      host,
+      expect.objectContaining({ webSerialPort: port, targetPlatform: "rtl87xx" })
+    );
+    expect(host._open).toBe(false);
+  });
+
+  it.each([
+    { show: false, open: true, rebooted: true, why: "not asked" },
+    { show: true, open: false, rebooted: true, why: "dismissed mid-flash" },
+    {
+      show: true,
+      open: true,
+      rebooted: false,
+      why: "the manual-reset notice is showing",
+    },
+  ])("does not flip to logs when $why", async ({ show, open, rebooted }) => {
+    const host = readyHost();
+    host._showLogsAfterInstall = show;
+    host._open = open;
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashAmbz2.mockResolvedValue(rebooted);
+    await rtlDoFlash(asHost(host));
+    expect(host._step).toBe("done");
+    expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
   });
 
   it("asks for a manual reset when the adapter could not reboot the board", async () => {

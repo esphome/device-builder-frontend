@@ -11,6 +11,7 @@ import {
   attachBleNusLogs,
   attachSerialLogStream,
   openNetworkLogsFallback,
+  openPortForLogs,
   picoResetHook,
   reconnectWebSerialLogs,
 } from "./post-install-logs.js";
@@ -132,7 +133,7 @@ export async function launchLogsWithMethod(
       return;
     }
     try {
-      await serialPort.open({ baudRate });
+      await openPortForLogs(serialPort, baudRate, device.target_platform);
     } catch {
       // The port couldn't open (claimed by another tab, driver error).
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
@@ -147,7 +148,8 @@ export async function launchLogsWithMethod(
           host.localize,
           baudRate,
           device.logger_interface,
-          cancelled
+          cancelled,
+          device.target_platform
         ),
       onResetDevice: picoResetHook(
         host.logsDialog,
