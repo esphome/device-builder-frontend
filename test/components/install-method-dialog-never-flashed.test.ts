@@ -71,10 +71,17 @@ describe("install-method-dialog never-flashed ordering", () => {
     );
   });
 
-  it("promotes server-serial when the platform has no Web Serial row", async () => {
-    const d = await mount({ neverFlashed: true, platform: "rp2" });
+  it("promotes server-serial when the platform has no browser row", async () => {
+    const d = await mount({ neverFlashed: true, platform: "bk72xx" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("serial-port");
+    expect(order[order.length - 1]).toBe("wifi");
+  });
+
+  it("promotes the Pico row for a never-flashed rp2", async () => {
+    const d = await mount({ neverFlashed: true, platform: "rp2" });
+    const order = rowIconOrder(d);
+    expect(order[0]).toBe("chip");
     expect(order[order.length - 1]).toBe("wifi");
   });
 

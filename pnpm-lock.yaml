@@ -110,6 +110,9 @@ importers:
       '@types/w3c-web-serial':
         specifier: ^1.0.8
         version: 1.0.8
+      '@types/w3c-web-usb':
+        specifier: ^1.0.14
+        version: 1.0.14
       eslint:
         specifier: ^10.11.0
         version: 10.11.0
@@ -613,6 +616,9 @@ packages:
 
   '@types/w3c-web-serial@1.0.8':
     resolution: {integrity: sha512-QQOT+bxQJhRGXoZDZGLs3ksLud1dMNnMiSQtBA0w8KXvLpXX4oM4TZb6J0GgJ8UbCaHo5s9/4VQT8uXy9JER2A==}
+
+  '@types/w3c-web-usb@1.0.14':
+    resolution: {integrity: sha512-Qu3Nn6JFuF4+sHKYl+IcX9vYiI40ogleXzFFSxoE1W94rG98o/kXs8uJ0QSfFzuwBCZWlGfUGpPkgwuuX4PchA==}
 
   '@types/whatwg-mimetype@3.0.2':
     resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
@@ -1903,6 +1909,8 @@ snapshots:
   '@types/trusted-types@2.0.7': {}
 
   '@types/w3c-web-serial@1.0.8': {}
+
+  '@types/w3c-web-usb@1.0.14': {}
 
   '@types/whatwg-mimetype@3.0.2': {}
 

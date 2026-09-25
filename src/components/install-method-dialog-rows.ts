@@ -113,6 +113,16 @@ export function renderServerSerialOption(
   });
 }
 
+/** In-app RP2 flash: 1200-baud reset, then PICOBOOT over WebUSB (or a UF2 download). */
+export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize("dashboard.install_method_rp2_uf2"),
+    desc: ctx.localize("dashboard.install_method_rp2_uf2_desc"),
+    onClick: () => ctx.onSelect("rp2-uf2"),
+  });
+}
+
 /** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
 export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
   return renderMethodRow({

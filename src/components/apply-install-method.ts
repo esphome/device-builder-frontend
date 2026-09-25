@@ -48,5 +48,8 @@ export function applyInstallMethod(
     case "nrf-dfu":
       h.firmwareDialog?.installNrfDfu(h.device);
       break;
+    case "rp2-uf2":
+      h.firmwareDialog?.installRp2Uf2(h.device);
+      break;
   }
 }
