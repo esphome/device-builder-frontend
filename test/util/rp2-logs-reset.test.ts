@@ -118,7 +118,7 @@ describe("resetPicoForLogs", () => {
     expect(mocks.resetToBootloader).not.toHaveBeenCalled();
   });
 
-  it("tells a granted board apart by serial number, not by wrapper identity", async () => {
+  it("tells a granted board apart by serial number and ids, not by wrapper identity", async () => {
     const first = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
     const again = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
     mocks.getPicobootDevices.mockResolvedValueOnce([first]).mockResolvedValue([again]);

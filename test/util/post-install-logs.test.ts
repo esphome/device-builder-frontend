@@ -141,6 +141,26 @@ describe("reconnectWebSerialLogs", () => {
     }
   });
 
+  it("leaves a newer session alone when the pick lands after the session moved on", async () => {
+    const restore = withRequestPort(async () => openPort());
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(
+        dialog as never,
+        defaultLocalize,
+        115200,
+        null,
+        () => true
+      );
+      expect(dialog.setSerialStream).not.toHaveBeenCalled();
+      expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
+      expect(dialog.switchToNetworkLogs).not.toHaveBeenCalled();
+      expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("opens the picked port at the resolved baud", async () => {
     const port = openPort();
     const restore = withRequestPort(async () => port);

@@ -92,7 +92,11 @@ function noBootloader(
 // getDevices() need not hand back the same wrapper twice; a bootloader's
 // serial number (the flash unique id) is the stable identity.
 const sameDevice = (a: USBDevice, b: USBDevice): boolean =>
-  a === b || (!!a.serialNumber && a.serialNumber === b.serialNumber);
+  a === b ||
+  (!!a.serialNumber &&
+    a.serialNumber === b.serialNumber &&
+    a.vendorId === b.vendorId &&
+    a.productId === b.productId);
 
 // A bootloader this origin was granted before shows up in getDevices() once
 // it enumerates, so a repeat reset skips the chooser; the chooser lists the

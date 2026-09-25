@@ -85,9 +85,12 @@ export async function reconnectWebSerialLogs(
   try {
     port = await requestSerialPort();
   } catch {
-    failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
+    if (!cancelled())
+      failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
     return;
   }
+  // A pick that lands after the session moved on must not touch the newer one.
+  if (cancelled()) return;
   if (!port) {
     logsDialog.abortSerialReconnect(); // Picker dismissed — back to "Start", quietly.
     return;
@@ -104,7 +107,8 @@ export async function reconnectWebSerialLogs(
   try {
     await port.open({ baudRate });
   } catch {
-    failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
+    if (!cancelled())
+      failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
