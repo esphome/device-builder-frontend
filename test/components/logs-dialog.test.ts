@@ -161,6 +161,34 @@ describe("logs-dialog header source chip", () => {
   });
 });
 
+describe("logs-dialog Reset Device gate", () => {
+  // A Pico has no reset line over its CDC and drops output once DTR falls,
+  // so the button is hidden for it; ESP boards keep the RTS-pulse reset.
+  async function mountPassive(targetPlatform: string): Promise<ESPHomeLogsDialog> {
+    const el = makeLogsDialog();
+    el.configuration = "device.yaml";
+    (el as any)._devices = [
+      { configuration: "device.yaml", target_platform: targetPlatform },
+    ];
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    await el.updateComplete;
+    return el;
+  }
+
+  const hasResetButton = (el: ESPHomeLogsDialog): boolean =>
+    [...el.shadowRoot!.querySelectorAll(".term-btn__label")].some(
+      (span) => span.textContent?.trim() === "dashboard.logs_reset_device"
+    );
+
+  it("shows Reset Device for an ESP passive session", async () => {
+    expect(hasResetButton(await mountPassive("esp32"))).toBe(true);
+  });
+
+  it("hides Reset Device for a Pico passive session", async () => {
+    expect(hasResetButton(await mountPassive("rp2"))).toBe(false);
+  });
+});
+
 describe("logs-dialog States toggle gate (#539)", () => {
   const mount = (): ESPHomeLogsDialog => makeLogsDialog();
 

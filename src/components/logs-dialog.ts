@@ -11,7 +11,7 @@ import {
   mdiRestart,
   mdiStop,
 } from "@mdi/js";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -38,6 +38,7 @@ import { normalizeLogLine } from "../util/log-line.js";
 import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { isRp2Platform } from "../util/rp2-platform.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
@@ -406,13 +407,18 @@ export class ESPHomeLogsDialog extends LitElement {
           <div class="toolbar-slot" slot="toolbar-right">
             ${
               passive
-                ? // Web Serial only; disabled until a port is attached.
-                  renderTermButton({
-                    icon: "restart",
-                    label: this._localize("dashboard.logs_reset_device"),
-                    disabled: !hasSerialPort(s),
-                    onClick: () => void this._onResetDevice(),
-                  })
+                ? // Web Serial only; disabled until a port is attached. A Pico
+                  // has no reset line over its CDC: the RTS pulse does nothing
+                  // and the DTR drop silences its output (arduino-pico gates
+                  // writes on DTR), so the button is hidden for it.
+                  isRp2Platform(this._targetPlatform)
+                  ? nothing
+                  : renderTermButton({
+                      icon: "restart",
+                      label: this._localize("dashboard.logs_reset_device"),
+                      disabled: !hasSerialPort(s),
+                      onClick: () => void this._onResetDevice(),
+                    })
                 : isOtaNetwork(s)
                   ? // States arrive only over the network/API connection, so the
                     // toggle is hidden for a server serial source (#539).
