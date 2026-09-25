@@ -12,6 +12,7 @@ import {
   streamBleNus,
 } from "./ble-nus-stream.js";
 import { fireRequestEvent } from "./fire-event.js";
+import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { PicoStrandedError, resetPicoForLogs } from "./rp2-logs-reset.js";
@@ -76,8 +77,7 @@ export function formatSerialPortLabel(port: SerialPort): string {
   if (usbVendorId === undefined || usbProductId === undefined) {
     return "unknown device";
   }
-  const hex = (n: number) => n.toString(16).padStart(4, "0");
-  return `USB ${hex(usbVendorId)}:${hex(usbProductId)}`;
+  return `USB ${formatUsbId(usbVendorId, usbProductId)}`;
 }
 
 /**
