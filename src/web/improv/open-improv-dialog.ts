@@ -8,6 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { openLiveSerialPort } from "../../util/web-serial.js";
+import { isRp2CdcPort } from "../../util/web-usb.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
@@ -143,7 +144,10 @@ async function acquirePort(
     toast.error(localize("web.improv.port_busy"));
     return null;
   }
-  if (weOpened) {
+  // Clearing the lines keeps an auto-reset circuit on a UART-bridge board
+  // from holding EN low. Not on a Pico: its CDC only transmits while DTR is
+  // asserted, so clearing it silences the device and Improv never answers.
+  if (weOpened && !isRp2CdcPort(live)) {
     try {
       await live.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {
@@ -180,6 +184,7 @@ async function runImprov(
   const dialog = document.createElement("improv-wifi-serial-provision-dialog");
   dialog.port = port;
 
+  const stopSwallowing = swallowLateStateError();
   return new Promise<ImprovResult>((resolve) => {
     dialog.addEventListener(
       "closed",
@@ -193,10 +198,34 @@ async function runImprov(
         // reader in its own close handler, so this just frees the device for the
         // next action. Best-effort: the device may have been unplugged.
         if (weOpened) void port.close().catch(() => {});
+        // The late rejection can land up to an RPC timeout after the close.
+        setTimeout(stopSwallowing, LATE_STATE_ERROR_MS);
         resolve(result);
       },
       { once: true }
     );
     document.body.appendChild(dialog);
   });
+}
+
+/** The SDK's RPC timeout: how long after a close its late rejection can still land. */
+const LATE_STATE_ERROR_MS = 30_000;
+
+/**
+ * The SDK's ``initialize`` races its first state request against a detection
+ * timeout inside an async promise executor. When the timeout wins (a device
+ * that never answers), the dialog shows its error state, but the request's
+ * own later rejection has nothing to catch it and surfaces as an unhandled
+ * "Error fetching current state" (improv-wifi/sdk-serial-js, serial.js).
+ * Swallow that one while a dialog is up; anything else stays loud.
+ */
+function swallowLateStateError(): () => void {
+  const onRejection = (ev: PromiseRejectionEvent) => {
+    const reason = ev.reason as { message?: unknown } | undefined;
+    const message =
+      typeof reason?.message === "string" ? reason.message : String(ev.reason);
+    if (message.startsWith("Error fetching current state")) ev.preventDefault();
+  };
+  window.addEventListener("unhandledrejection", onRejection);
+  return () => window.removeEventListener("unhandledrejection", onRejection);
 }

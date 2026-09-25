@@ -26,6 +26,7 @@ describe("openImprovDialog — SDK load failure", () => {
     const port = {
       close,
       setSignals: vi.fn(async () => {}),
+      getInfo: () => ({}),
       readable: null,
       writable: null,
     };

@@ -16,15 +16,17 @@ import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
 const localize: (k: string, v?: Record<string, string | number>) => string = (k) => k;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-function makePort(): {
+function makePort(info: SerialPortInfo = {}): {
   close: ReturnType<typeof vi.fn>;
   setSignals: ReturnType<typeof vi.fn>;
+  getInfo: () => SerialPortInfo;
   readable: unknown;
   writable: unknown;
 } {
   return {
     close: vi.fn(async () => {}),
     setSignals: vi.fn(async () => {}),
+    getInfo: () => info,
     readable: null,
     writable: null,
   };
@@ -75,6 +77,34 @@ describe("openImprovDialog", () => {
       new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
     );
     await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
+  });
+
+  it("keeps DTR asserted on a Pico, whose CDC only transmits while it is", async () => {
+    const port = makePort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    expect(port.setSignals).not.toHaveBeenCalled();
+    expect(dialogEl()).toBeTruthy();
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+  });
+
+  it("swallows the SDK's late state-request rejection while a dialog is up, and nothing else", async () => {
+    const port = makePort();
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    const rejection = (reason: unknown) => {
+      const ev = new Event("unhandledrejection", { cancelable: true }) as Event & {
+        reason: unknown;
+      };
+      ev.reason = reason;
+      window.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    expect(rejection(new Error("something else"))).toBe(false);
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
   });
 
   it("reports improv-detected-but-not-provisioned and closes the port", async () => {
