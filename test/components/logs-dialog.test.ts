@@ -284,6 +284,41 @@ describe("logs-dialog States toggle gate (#539)", () => {
   });
 });
 
+describe("logs-dialog BLE auto-reconnect", () => {
+  const mount = (): ESPHomeLogsDialog => makeLogsDialog();
+  const logLines = (el: ESPHomeLogsDialog): string[] => (el as any)._log.lines;
+
+  it("triggerBleReconnect appends status lines and starts a reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_reconnecting");
+    expect(session(el).kind).toBe("reconnecting");
+  });
+
+  it("triggerBleReconnect is a no-op when the session is not ble", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    // Still in the pending state (no setBleStream yet) — kind is "reconnecting".
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toHaveLength(0);
+    expect(session(el).kind).toBe("reconnecting");
+  });
+
+  it("setBleStream appends Reconnected when called during a reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(session(el).kind).toBe("reconnecting");
+    el.setBleStream(async () => {}); // reconnect lands
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_reconnected");
+    expect(session(el).kind).toBe("ble");
+  });
+});
+
 describe("logs-dialog passive Web Serial session (#526)", () => {
   let el: ESPHomeLogsDialog;
   let logs: ReturnType<typeof vi.fn>;
