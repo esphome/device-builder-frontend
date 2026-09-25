@@ -51,9 +51,8 @@ import {
   renderInstallNotice,
   renderManualDownloadOption,
   renderMethodRow,
-  renderNrfDfuOption,
   renderOtaOption,
-  renderRp2Uf2Option,
+  renderPlatformFlashOption,
   renderServerSerialOption,
 } from "./install-method-dialog-rows.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
@@ -223,9 +222,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const availability = this._webSerialAvailability;
     const hasWebSerial = availability === "available";
     const env = this._environment;
-    // Browser flashers (in-app Web Serial esptool-js, the external flasher) are
-    // ESP-only; nRF52 and RP2 get their own in-app rows. libretiny flashes
-    // over serial only via the backend (server-serial).
+    // The esptool-js and external flashers are ESP-only; nRF52, RP2 and the
+    // RTL8720C get their own in-app rows (renderPlatformFlashOption).
     const isEsptool = this._isEsptoolPlatform;
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isRp2 = isRp2Platform(this.deviceTargetPlatform);
@@ -257,17 +255,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // connect flow, which runs esptool chip detection.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
     const showBleNusRow = isLogs && bleNusLogsAvailable(this.deviceTargetPlatform);
-    // nRF52 browser DFU is install-only and requires in-app Web Serial.
-    const showNrfRow = !isLogs && isNrf && hasWebSerial;
-    // Web Serial covers the reset step; without WebUSB the write is a UF2 download.
-    const showRp2Row = !isLogs && isRp2 && hasWebSerial;
 
     const ctx = this._rowContext();
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
-    const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
-    const rp2Row = showRp2Row ? renderRp2Uf2Option(ctx) : nothing;
+    // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial).
+    const platformRow = renderPlatformFlashOption(
+      ctx,
+      this.deviceTargetPlatform,
+      hasWebSerial
+    );
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)
       : nothing;
@@ -281,8 +279,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // mode, so it's inert (``nothing``) in the usbFirst (install) ordering.
     const usbFirst = !isLogs && this.neverFlashed;
     const rows = usbFirst
-      ? [usbRow, nrfRow, rp2Row, logsWebRow, serverRow, otaRow]
-      : [otaRow, usbRow, nrfRow, rp2Row, logsWebRow, bleNusRow, serverRow];
+      ? [usbRow, platformRow, logsWebRow, serverRow, otaRow]
+      : [otaRow, usbRow, platformRow, logsWebRow, bleNusRow, serverRow];
 
     return html`
       ${renderInstallNotice(ctx)}

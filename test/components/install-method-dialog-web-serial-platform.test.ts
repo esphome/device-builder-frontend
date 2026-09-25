@@ -35,6 +35,7 @@ import {
   setBluetooth,
   setBrave,
   setLocalhostWithWebSerial,
+  setWebSerialEnv,
 } from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -59,14 +60,16 @@ async function mount(
 // with the bootloader row, so it's matched by title instead.
 const hasWebSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="usb"]');
+const hasRowTitled = (d: ESPHomeInstallMethodDialog, key: string): boolean =>
+  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
+    (el) => el.textContent?.trim() === defaultLocalize(key)
+  );
 const hasNrfDfuRow = (d: ESPHomeInstallMethodDialog): boolean =>
-  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
-    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_nrf_dfu")
-  );
+  hasRowTitled(d, "dashboard.install_method_nrf_dfu");
 const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
-  [...d.shadowRoot!.querySelectorAll(".option .title")].some(
-    (el) => el.textContent?.trim() === defaultLocalize("dashboard.install_method_rp2_uf2")
-  );
+  hasRowTitled(d, "dashboard.install_method_rp2_uf2");
+const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_rtl_ambz2");
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -124,6 +127,29 @@ describe("install-method-dialog platform gating", () => {
   it("hides the Pico row in logs mode (flash-only)", async () => {
     const d = await mount("rp2", "logs");
     expect(hasRp2Row(d)).toBe(false);
+  });
+
+  // The RTL8720C ROM downloader is spoken over Web Serial; the row keeps
+  // server-serial beside it as the backend path.
+  it("shows the RTL8720C row for rtl87xx with Web Serial", async () => {
+    const d = await mount("rtl87xx");
+    expect(hasRtlRow(d)).toBe(true);
+    expect(hasRp2Row(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  it.each(["esp32", "bk72xx", "ln882x"])(
+    "hides the RTL8720C row for %s",
+    async (platform) => {
+      const d = await mount(platform);
+      expect(hasRtlRow(d)).toBe(false);
+    }
+  );
+
+  it("hides the RTL8720C row in logs mode and without Web Serial", async () => {
+    expect(hasRtlRow(await mount("rtl87xx", "logs"))).toBe(false);
+    setWebSerialEnv({ serial: false, secure: true, href: "http://localhost:6052/" });
+    expect(hasRtlRow(await mount("rtl87xx"))).toBe(false);
   });
 });
 

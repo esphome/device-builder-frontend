@@ -6,13 +6,14 @@
  */
 import { concat } from "./bytes.js";
 
-const UF2_BLOCK_SIZE = 512;
+export const UF2_BLOCK_SIZE = 512;
 export const UF2_MAGIC_START0 = 0x0a324655;
 export const UF2_MAGIC_START1 = 0x9e5d5157;
 export const UF2_MAGIC_END = 0x0ab16f30;
 export const UF2_FLAG_NOT_MAIN_FLASH = 0x0001;
 export const UF2_FLAG_FAMILY_ID_PRESENT = 0x2000;
-const UF2_MAX_PAYLOAD = 476;
+export const UF2_FLAG_HAS_TAGS = 0x8000;
+export const UF2_MAX_PAYLOAD = 476;
 
 export const UF2_FAMILY_RP2040 = 0xe48bff56;
 export const UF2_FAMILY_RP2350_ARM_S = 0xe48bff59;
@@ -20,7 +21,17 @@ export const UF2_FAMILY_RP2350_ARM_S = 0xe48bff59;
 export interface Uf2Block {
   targetAddr: number;
   familyId: number | null;
+  flags: number;
   data: Uint8Array;
+  /** The whole 512-byte block, for flavours that append data after the payload. */
+  block: Uint8Array;
+}
+
+export interface ParseUf2Options {
+  /** Keep blocks flagged as not main flash (a header block) instead of skipping them. */
+  keepNotMainFlash?: boolean;
+  /** Accept a zero-length payload (a tags-only block). */
+  allowEmptyPayload?: boolean;
 }
 
 export interface Uf2Range {
@@ -46,7 +57,10 @@ export class Uf2FamilyError extends Error {
   }
 }
 
-export function parseUf2Blocks(bytes: Uint8Array): Uf2Block[] {
+export function parseUf2Blocks(
+  bytes: Uint8Array,
+  { keepNotMainFlash = false, allowEmptyPayload = false }: ParseUf2Options = {}
+): Uf2Block[] {
   if (bytes.length === 0 || bytes.length % UF2_BLOCK_SIZE !== 0) {
     throw new Error(`Invalid UF2: length ${bytes.length} is not a multiple of 512`);
   }
@@ -64,7 +78,7 @@ export function parseUf2Blocks(bytes: Uint8Array): Uf2Block[] {
     }
     const flags = view.getUint32(off + 8, true);
     const payloadSize = view.getUint32(off + 16, true);
-    if (payloadSize === 0 || payloadSize > UF2_MAX_PAYLOAD) {
+    if ((payloadSize === 0 && !allowEmptyPayload) || payloadSize > UF2_MAX_PAYLOAD) {
       throw new Error(`Invalid UF2: block ${i} payload size ${payloadSize}`);
     }
     const numBlocks = view.getUint32(off + 24, true);
@@ -73,15 +87,32 @@ export function parseUf2Blocks(bytes: Uint8Array): Uf2Block[] {
         `Invalid UF2: block ${i} claims ${numBlocks} blocks, file has ${count}`
       );
     }
-    if (flags & UF2_FLAG_NOT_MAIN_FLASH) continue;
+    if (flags & UF2_FLAG_NOT_MAIN_FLASH && !keepNotMainFlash) continue;
     blocks.push({
       targetAddr: view.getUint32(off + 12, true),
       familyId:
         flags & UF2_FLAG_FAMILY_ID_PRESENT ? view.getUint32(off + 28, true) : null,
+      flags,
       data: bytes.subarray(off + 32, off + 32 + payloadSize),
+      block: bytes.subarray(off, off + UF2_BLOCK_SIZE),
     });
   }
   return blocks;
+}
+
+/** The one family every block carries, which must be flashable by the caller. */
+export function requireUf2Family(
+  blocks: readonly { familyId: number | null }[],
+  allowedFamilies: readonly number[]
+): number {
+  const familyId = blocks[0]?.familyId ?? null;
+  if (blocks.some((b) => b.familyId !== familyId)) {
+    throw new Error("Invalid UF2: blocks target different chip families");
+  }
+  if (familyId === null || !allowedFamilies.includes(familyId)) {
+    throw new Uf2FamilyError(familyId);
+  }
+  return familyId;
 }
 
 /** Merge page blocks into contiguous, ascending address ranges. */
@@ -115,13 +146,7 @@ export function parseUf2Image(
 ): Uf2Image {
   const blocks = parseUf2Blocks(bytes);
   if (blocks.length === 0) throw new Error("Invalid UF2: no flash blocks");
-  const familyId = blocks[0].familyId;
-  if (blocks.some((b) => b.familyId !== familyId)) {
-    throw new Error("Invalid UF2: blocks target different chip families");
-  }
-  if (familyId === null || !allowedFamilies.includes(familyId)) {
-    throw new Uf2FamilyError(familyId);
-  }
+  const familyId = requireUf2Family(blocks, allowedFamilies);
   const ranges = blocksToRanges(blocks);
   return { familyId, ranges, totalBytes: ranges.reduce((n, r) => n + r.data.length, 0) };
 }

@@ -7,7 +7,11 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
+import {
+  downloadBuildArtifact,
+  pickSerialPortOrFail,
+  resetForRetry,
+} from "./browser-flash-steps.js";
 
 const loadDfuEngine = () => import("../../util/nrf-dfu.js");
 
@@ -22,37 +26,15 @@ export async function startNrfDfuInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // The dialog is reused; a close-and-reopen for another device during an
-  // await must not receive this install's package.
+  const artifact = await downloadBuildArtifact(
+    host,
+    device,
+    (b) => b.file.endsWith(".zip"),
+    "firmware.nrf_no_dfu_package"
+  );
+  if (!artifact) return;
+  const bytes = artifact.bytes;
   const stale = () => host._device !== device;
-
-  if (!(await compileOrFail(host, device.configuration)) || stale()) return;
-
-  host._statusMessage = host._localize("firmware.status_downloading");
-  const binaries = await fetchBinaries(host, device.configuration);
-  if (!binaries || stale()) return;
-  if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
-    return;
-  }
-
-  const dfuBinary = binaries.find((b) => b.file.endsWith(".zip"));
-  if (!dfuBinary) {
-    host._fail(host._localize("firmware.nrf_no_dfu_package"));
-    return;
-  }
-
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(
-      await host._api.firmwareDownloadBytes(device.configuration, dfuBinary.file)
-    );
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
-    return;
-  }
-  if (stale()) return;
 
   let parseDfuPackage: Awaited<ReturnType<typeof loadDfuEngine>>["parseDfuPackage"];
   try {
@@ -88,9 +70,7 @@ export function retryNrfDfu(
     host.installNrfDfu(device);
     return;
   }
-  host._errorMessage = "";
-  host._flashPercent = 0;
-  host._flashBusy = false;
+  resetForRetry(host);
   host._step = "nrf-reset";
   host._statusMessage = host._localize("firmware.nrf_step1_title");
 }
@@ -141,22 +121,8 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   // device.
   const device = host._device;
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
-  host._flashBusy = true;
-  let port: SerialPort | null;
-  try {
-    port = await requestSerialPort();
-  } catch (err) {
-    if (stillCurrent()) {
-      host._fail(
-        host._localize("firmware.browser_flash_connect_failed"),
-        getErrorMessage(err)
-      );
-    }
-    return;
-  } finally {
-    if (stillCurrent()) host._flashBusy = false;
-  }
-  if (!port || !stillCurrent()) return;
+  const port = await pickSerialPortOrFail(host, stillCurrent);
+  if (!port) return;
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;

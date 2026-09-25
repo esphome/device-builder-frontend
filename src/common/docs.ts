@@ -72,3 +72,7 @@ export const DECODER_URL =
 // Derived so the postMessage targetOrigin / inbound-frame check can't drift
 // from DECODER_URL.
 export const DECODER_ORIGIN = new URL(DECODER_URL).origin;
+
+/** LibreTiny's AmebaZ2 (RTL8720C) page: wiring and the download-mode strap. */
+export const LIBRETINY_AMBZ2_GUIDE_URL =
+  "https://docs.libretiny.eu/docs/platform/realtek-ambz2/";

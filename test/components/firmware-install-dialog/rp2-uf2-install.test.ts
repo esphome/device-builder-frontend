@@ -32,13 +32,9 @@ vi.mock(
   })
 );
 
-import { identityLocalize } from "../../_dom.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
 import { makeUf2Block } from "../../_make-uf2-block.js";
-import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
-import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import {
   retryRp2Uf2,
   rp2DoDownload,
@@ -51,15 +47,11 @@ import {
   UF2_FAMILY_RP2350_ARM_S,
   type Uf2Image,
 } from "../../../src/util/uf2.js";
+import { asHost, bin, makeFlashHost } from "./_flash-host.js";
 
 const uf2 = (family: number): ArrayBuffer =>
   makeUf2Block({ addr: 0x10000000, family }).buffer;
 
-const bin = (file: string, type?: string): FirmwareBinary => ({
-  file,
-  title: file,
-  type,
-});
 const device = {
   configuration: "pico.yaml",
   name: "pico",
@@ -72,52 +64,19 @@ const image: Uf2Image = {
 };
 
 function makeHost(opts: { binaries?: FirmwareBinary[]; uf2Family?: number } = {}) {
-  const api = {
-    firmwareCompile: vi.fn().mockResolvedValue({ job_id: "j", source: "local" }),
-    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
-      cbs.onResult({ status: "completed" });
-      return "stream";
-    }),
-    firmwareGetBinaries: vi
-      .fn()
-      .mockResolvedValue(
-        opts.binaries ?? [bin("firmware.uf2", "uf2"), bin("firmware.ota.bin", "ota")]
-      ),
-    firmwareDownloadBytes: vi
-      .fn()
-      .mockResolvedValue(uf2(opts.uf2Family ?? UF2_FAMILY_RP2040)),
-    stopStream: vi.fn().mockResolvedValue({ cancelled: true }),
-  } as unknown as ESPHomeAPI;
-  const host = {
-    _api: api,
-    _device: device as ConfiguredDevice | null,
-    _localize: identityLocalize,
-    _step: "queued",
-    _statusMessage: "",
-    _errorMessage: "",
-    _log: fakeLogBuffer(),
-    _jobId: "",
-    _streamId: "",
-    _compileReject: null,
-    _jobSource: 0,
-    _jobSourceLabel: "",
-    _failureKind: null,
-    _binaries: [] as FirmwareBinary[],
-    _rp2Image: null as Uf2Image | null,
-    _flashBusy: false,
-    _flashAbort: null as AbortController | null,
-    _flashPercent: 0,
-    installRp2Uf2: vi.fn(),
-    _fail(title: string, detail = "") {
-      this._step = "error";
-      this._statusMessage = title;
-      this._errorMessage = detail;
+  return makeFlashHost(
+    device,
+    {
+      binaries: opts.binaries ?? [
+        bin("firmware.uf2", "uf2"),
+        bin("firmware.ota.bin", "ota"),
+      ],
+      downloadBytes: uf2(opts.uf2Family ?? UF2_FAMILY_RP2040),
     },
-  };
-  return host;
+    { _rp2Image: null as Uf2Image | null, installRp2Uf2: vi.fn() }
+  );
 }
 type Host = ReturnType<typeof makeHost>;
-const asHost = (h: Host) => h as unknown as ESPHomeFirmwareInstallDialog;
 
 function readyHost(): Host {
   const host = makeHost();
@@ -149,7 +108,7 @@ describe("startRp2Uf2Install", () => {
     const host = makeHost({ binaries: [bin("firmware.ota.bin", "ota")] });
     await startRp2Uf2Install(asHost(host));
     expect(host._step).toBe("error");
-    expect(host._statusMessage).toBe("firmware.rp2_no_uf2");
+    expect(host._statusMessage).toBe("firmware.no_uf2");
     expect(host._api.firmwareDownloadBytes).not.toHaveBeenCalled();
   });
 

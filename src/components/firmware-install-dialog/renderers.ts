@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
-import { FLASHER_HOST } from "../../common/docs.js";
+import { FLASHER_HOST, LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
 import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
@@ -115,6 +115,9 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
     case "nrf-wait":
     case "rp2-bootsel":
     case "rp2-wait":
+    case "rtl-ready":
+    case "rtl-connect":
+    case "rtl-wait":
       return "running";
     default:
       // Exhaustive: adding an InstallStep without mapping it here is a
@@ -179,6 +182,9 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
         : "firmware.rp2_wait_desc";
     return host._localize(isWebUsbSupported() ? base : `${base}_download`);
   }
+  if (host._step === "rtl-ready") return host._localize("firmware.rtl_ready_desc");
+  if (host._step === "rtl-connect") return host._localize("firmware.rtl_connect_desc");
+  if (host._step === "rtl-wait") return host._localize("firmware.rtl_wait_desc");
   if (host._step === "error") return host._errorMessage;
   // Hidden tabs throttle timers, which can stall the Web Serial write and fail
   // the flash; there's no API to opt out, so warn the user to stay on the page.
@@ -255,19 +261,40 @@ function renderDownloadReadyExtra(
     : nothing;
 }
 
+// Where to read on when the strap step does not get the board into download mode.
+function renderRtlGuideLink(host: ESPHomeFirmwareInstallDialog): TemplateResult {
+  return html`<a
+    class="reset-suggestion-link"
+    href=${LIBRETINY_AMBZ2_GUIDE_URL}
+    target="_blank"
+    rel="noopener noreferrer"
+    >${host._localize("firmware.rtl_guide_link")}</a
+  >`;
+}
+
+// The body a step adds under its status text; the steps are exclusive.
+function stepExtra(host: ESPHomeFirmwareInstallDialog): TemplateResult | typeof nothing {
+  switch (host._step) {
+    case "choose-binary":
+      return renderBinaryList(host);
+    case "download-ready":
+      return renderDownloadReadyExtra(host);
+    case "rtl-wait":
+      return renderRtlGuideLink(host);
+    default:
+      return nothing;
+  }
+}
+
 export function renderStatusExtra(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  const binaryList = host._step === "choose-binary" ? renderBinaryList(host) : nothing;
-  const downloadExtra =
-    host._step === "download-ready" ? renderDownloadReadyExtra(host) : nothing;
+  const extra = stepExtra(host);
   const logs = renderLogs(host);
   // Skip the slotted wrapper entirely when there's nothing to show, so the
   // card doesn't carry an empty element.
-  if (binaryList === nothing && downloadExtra === nothing && logs === nothing) {
-    return nothing;
-  }
-  return html`<div slot="status-extra">${binaryList} ${downloadExtra} ${logs}</div>`;
+  if (extra === nothing && logs === nothing) return nothing;
+  return html`<div slot="status-extra">${extra} ${logs}</div>`;
 }
 
 function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
@@ -351,6 +378,9 @@ function bootloaderStepActions(
           ? { onClick: host._rp2DoFlash, labelKey: flash }
           : { onClick: host._rp2DoDownload, labelKey: "firmware.rp2_download_action" },
       };
+    // One click: the engine resets the board itself, or shows the strap guide.
+    case "rtl-ready":
+      return { primary: { onClick: host._rtlDoFlash, labelKey: flash } };
     default:
       return null;
   }
