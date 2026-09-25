@@ -21,6 +21,10 @@ describe("portOfSerialConnectEvent", () => {
       p
     );
     expect(portOfSerialConnectEvent({ target: {} } as unknown as Event)).toBeNull();
+    // A legacy property holding something else must not hide the target.
+    expect(portOfSerialConnectEvent({ port: "x", target: p } as unknown as Event)).toBe(
+      p
+    );
   });
 });
 

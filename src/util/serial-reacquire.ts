@@ -64,10 +64,11 @@ export function isOwnSerialReenumeration(): boolean {
  * ``event.port``. ``null`` for anything else.
  */
 export function portOfSerialConnectEvent(event: Event): SerialPort | null {
-  const candidate = (event as { port?: unknown }).port ?? event.target;
-  return typeof (candidate as SerialPort | null)?.getInfo === "function"
-    ? (candidate as SerialPort)
-    : null;
+  const isPort = (candidate: unknown): candidate is SerialPort =>
+    typeof (candidate as SerialPort | null)?.getInfo === "function";
+  const legacy = (event as { port?: unknown }).port;
+  if (isPort(legacy)) return legacy;
+  return isPort(event.target) ? event.target : null;
 }
 
 /**
