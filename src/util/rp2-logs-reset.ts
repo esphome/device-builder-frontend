@@ -35,21 +35,21 @@ export class PicoStrandedError extends Error {
 }
 
 /**
- * Reboot the Pico behind *port* (closed by the caller) and return its CDC port
- * reopened at *baudRate*, or null when it never came back or ``cancelled``
- * flipped. Throws ``PicoStrandedError`` once the device is in BOOTSEL and
- * cannot be rebooted; a failed touch rethrows as is.
+ * Touch the Pico behind *port* (closed by the caller) into BOOTSEL and reboot
+ * it over PICOBOOT; its CDC port re-enumerates afterwards. False when
+ * ``cancelled`` flipped before the touch. Throws ``PicoStrandedError`` once
+ * the device is in BOOTSEL and cannot be rebooted; a failed touch rethrows
+ * as is.
  */
-export async function resetPicoForLogs(
+export async function rebootPico(
   port: SerialPort,
-  baudRate: number,
   cancelled: () => boolean
-): Promise<SerialPort | null> {
+): Promise<boolean> {
   const deadline = Date.now() + BOOTSEL_WAIT_MS;
   // Only a bootloader that appears after the touch is this Pico; another
   // granted board already sitting in BOOTSEL must not be rebooted instead.
   const before = await getPicobootDevices();
-  if (cancelled()) return null;
+  if (cancelled()) return false;
   await resetToBootloader(port);
   let usb: USBDevice | null;
   try {
@@ -73,6 +73,19 @@ export async function resetPicoForLogs(
   } finally {
     await dev.close();
   }
+  return true;
+}
+
+/**
+ * ``rebootPico``, then the CDC port reopened at *baudRate*: null when the
+ * reboot was cancelled before the touch or the device never came back.
+ */
+export async function resetPicoForLogs(
+  port: SerialPort,
+  baudRate: number,
+  cancelled: () => boolean
+): Promise<SerialPort | null> {
+  if (!(await rebootPico(port, cancelled))) return null;
   return openLiveSerialPort(port, { baudRate, cancelled });
 }
 
@@ -115,4 +128,16 @@ async function findBootselDevice(
     if (Date.now() >= deadline) return requestPicobootDevice();
     await sleep(BOOTSEL_POLL_MS);
   }
+}
+
+/**
+ * The copy key for a failed Pico reset: a stranded Pico wants a replug; a
+ * refused WebUSB open (Linux without the udev rule) would strand it again
+ * every time, so that cause is named instead. Anything else is ``plainKey``.
+ */
+export function picoResetFailureKey(err: unknown, plainKey: string): string {
+  if (!(err instanceof PicoStrandedError)) return plainKey;
+  return err.step === "refused"
+    ? "firmware.rp2_usb_access_denied"
+    : "dashboard.logs_rp2_reset_stranded";
 }

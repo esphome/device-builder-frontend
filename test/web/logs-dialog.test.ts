@@ -9,6 +9,10 @@ vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }));
+vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
+  rebootPico: vi.fn(),
+}));
 vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   streamBleNus: vi.fn(),
@@ -20,11 +24,15 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 import toast from "sonner-js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { streamBleNus } from "../../src/util/ble-nus-stream.js";
+import { PicoStrandedError, rebootPico } from "../../src/util/rp2-logs-reset.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
-import { SerialLogSource } from "../../src/web/logs/serial-source.js";
+import {
+  SerialLogSource,
+  type SerialResetMode,
+} from "../../src/web/logs/serial-source.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -35,10 +43,10 @@ function toolbarLabels(el: ESPHomeWebLogsDialog): string[] {
   );
 }
 
-async function mount(noReset = false): Promise<ESPHomeWebLogsDialog> {
+async function mount(resetMode: SerialResetMode = "rts"): Promise<ESPHomeWebLogsDialog> {
   const el = new ESPHomeWebLogsDialog();
   (el as any)._localize = (k: string) => k;
-  el.noReset = noReset;
+  el.resetMode = resetMode;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -46,9 +54,13 @@ async function mount(noReset = false): Promise<ESPHomeWebLogsDialog> {
 
 // A serial session already streaming ``port`` (the reader is the mocked
 // streamSerialLines), the state a mid-stream drop starts from.
-function serialSession(el: ESPHomeWebLogsDialog, port: unknown): SerialLogSource {
+function serialSession(
+  el: ESPHomeWebLogsDialog,
+  port: unknown,
+  reset: SerialResetMode = "rts"
+): SerialLogSource {
   const source = new SerialLogSource(port as SerialPort, {
-    canReset: true,
+    reset,
     // What the dialog's own source wiring does with a recovered handle.
     onPortReplaced: (live) =>
       el.dispatchEvent(new CustomEvent("port-replaced", { detail: live, bubbles: true })),
@@ -101,13 +113,105 @@ describe("esphome-web-logs-dialog", () => {
     expect(sleep).toHaveBeenCalledWith(1000);
   });
 
+  // The Pico's Reset Device: the stream ends, the routine touches into
+  // BOOTSEL and reboots over WebUSB, and the re-enumerated CDC port comes
+  // back through the same resume as a dropped stream.
+  function picoSession(el: ESPHomeWebLogsDialog) {
+    el.open = true;
+    const port = makeWebSerialPort();
+    const cancel = vi.fn(async () => {});
+    serialSession(el, port, "pico");
+    (el as any)._cancel = cancel;
+    return { port, cancel };
+  }
+
+  it("reboots a Pico through the routine and resumes on the returned port", async () => {
+    const el = await mount("pico");
+    const { port, cancel } = picoSession(el);
+    const live = makeWebSerialPort();
+    vi.mocked(rebootPico).mockResolvedValue(true);
+    (openLiveSerialPort as any).mockResolvedValue(live);
+    const replaced = vi.fn();
+    el.addEventListener("port-replaced", (e) => replaced((e as CustomEvent).detail));
+
+    await (el as any)._resetDevice();
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(rebootPico).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(openLiveSerialPort).toHaveBeenCalledWith(
+      port,
+      expect.objectContaining({ bufferSize: 8192 })
+    );
+    expect(streamSerialLines).toHaveBeenLastCalledWith(live, expect.anything());
+    expect(replaced).toHaveBeenCalledWith(live);
+    expect((el as any)._streaming).toBe(true);
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.rebooting");
+    expect((el as any)._lines).toContain("web.logs.reconnected");
+  });
+
+  it.each([
+    { why: "the reboot leaves it stranded", stranded: true },
+    { why: "it never comes back", stranded: false },
+  ])("ends the session when $why", async ({ stranded }) => {
+    const el = await mount("pico");
+    picoSession(el);
+    if (stranded) vi.mocked(rebootPico).mockRejectedValue(new PicoStrandedError("pick"));
+    else {
+      vi.mocked(rebootPico).mockResolvedValue(true);
+      (openLiveSerialPort as any).mockResolvedValue(null);
+    }
+    await (el as any)._resetDevice();
+    if (stranded)
+      expect(toast.error).toHaveBeenCalledWith("dashboard.logs_rp2_reset_stranded");
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._source).toBeUndefined();
+  });
+
+  it("ignores a second Reset click while the reboot is still reacquiring the port", async () => {
+    const el = await mount("pico");
+    picoSession(el);
+    let finish!: (rebooted: boolean) => void;
+    vi.mocked(rebootPico).mockReturnValue(new Promise((r) => (finish = r)));
+    (openLiveSerialPort as any).mockResolvedValue(makeWebSerialPort());
+    const first = (el as any)._resetDevice();
+    await (el as any)._resetDevice();
+    // The first reset reaches the routine after releasing the stream.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rebootPico).toHaveBeenCalledOnce();
+    finish(true);
+    await first;
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("disables Reset Device until a stream is live", async () => {
+    const el = await mount();
+    await el.updateComplete;
+    expect((resetButtons(el)[0] as HTMLButtonElement).disabled).toBe(true);
+    (el as any)._cancel = async () => {};
+    await el.updateComplete;
+    expect((resetButtons(el)[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("offers the Pico reset only where WebUSB exists", async () => {
+    expect(resetButtons(await mount("pico")).length).toBe(0);
+    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+    try {
+      expect(resetButtons(await mount("pico")).length).toBe(1);
+    } finally {
+      delete (navigator as any).usb;
+    }
+  });
+
   it("shows the reset button for a non-Pico device", async () => {
-    const el = await mount(false);
+    const el = await mount();
     expect(resetButtons(el).length).toBe(1);
   });
 
   it("hides the reset button when the card says so (no reset line behind the CDC)", async () => {
-    const el = await mount(true);
+    const el = await mount("none");
     expect(resetButtons(el).length).toBe(0);
   });
 
@@ -544,7 +648,7 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
 
   async function openBle(): Promise<{ el: ESPHomeWebLogsDialog; hooks: () => Hooks }> {
     // noReset stays false: Bluetooth hides the button on its own.
-    const el = await mount(false);
+    const el = await mount();
     el.bleDevice = device;
     el.open = true;
     await el.updateComplete;

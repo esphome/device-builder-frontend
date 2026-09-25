@@ -15,6 +15,7 @@ export function renderWebLogsToolbar(host: ESPHomeWebLogsDialog): TemplateResult
               // Reuse the builder's logs-terminal labels (same context) so
               // translators don't re-translate these generic strings.
               label: host._localize("dashboard.logs_reset_device"),
+              disabled: !host.resetReady,
               onClick: () => void host._resetDevice(),
             })
       }

@@ -1,3 +1,4 @@
+import { rebootPico } from "../../util/rp2-logs-reset.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)
  * before the dialog showed; a drop mid-stream is ridden out the way the
@@ -17,12 +18,16 @@ export const LOG_BAUD_RATE = 115200;
 // throttled/backgrounded tab doesn't overrun: matches the legacy site.
 export const LOG_BUFFER_SIZE = 8192;
 
+/**
+ * How Reset Device reaches the board: an RTS pulse on a UART bridge, the
+ * BOOTSEL touch plus PICOBOOT reboot of a Pico (see rp2-logs-reset.ts; its
+ * CDC port re-enumerates, so the stream is dropped and resumed), or nothing
+ * for a native-USB CDC with no reset line (an nRF52).
+ */
+export type SerialResetMode = "rts" | "pico" | "none";
+
 export interface SerialLogSourceOptions {
-  /**
-   * Whether an RTS pulse reboots the device. Not for a native-USB CDC (the
-   * Pico, an nRF52): the pulse would be a no-op there.
-   */
-  canReset: boolean;
+  reset: SerialResetMode;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
 }
@@ -37,10 +42,16 @@ export class SerialLogSource implements WebLogSource {
     private readonly port: SerialPort,
     private readonly options: SerialLogSourceOptions
   ) {
-    if (options.canReset) this.reset = () => this.pulseReset();
+    if (options.reset === "rts") {
+      this.reset = () => this.pulseReset();
+    } else if (options.reset === "pico") {
+      this.reset = (cancelled) => this.rebootThroughBootsel(cancelled);
+      this.resetDropsStream = true;
+    }
   }
 
-  reset?: () => Promise<void>;
+  reset?: (cancelled: () => boolean) => Promise<void>;
+  readonly resetDropsStream: boolean = false;
 
   // Shared reader: same ESPHome log formatting / timestamps / garbage
   // filtering as the dashboard's post-install serial logs. The cancel it
@@ -61,6 +72,8 @@ export class SerialLogSource implements WebLogSource {
     // a UA that closed it on device loss rejects harmlessly. A real
     // failure is logged: it means the cached handle may come back dead.
     await dead.close().catch((err) => {
+      // Already closed (the stream's cancel closes the port before a reboot).
+      if (err instanceof DOMException && err.name === "InvalidStateError") return;
       console.error("[Web Serial] Failed to close the dead logs port:", err);
     });
     const live = await openLiveSerialPort(dead, {
@@ -97,6 +110,12 @@ export class SerialLogSource implements WebLogSource {
   private stream(port: SerialPort, hooks: SerialLineHooks): () => Promise<void> {
     this.activePort = port;
     return streamSerialLines(port, hooks);
+  }
+
+  // The stream's cancel closed the port already, which the routine expects;
+  // the dialog resumes afterwards, which reacquires the re-enumerated port.
+  private async rebootThroughBootsel(cancelled: () => boolean): Promise<void> {
+    await rebootPico(this.activePort ?? this.port, cancelled);
   }
 
   // Pulse RTS to reboot the running app so the user can capture boot logs,

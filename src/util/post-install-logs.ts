@@ -15,7 +15,7 @@ import { fireRequestEvent } from "./fire-event.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
-import { PicoStrandedError, resetPicoForLogs } from "./rp2-logs-reset.js";
+import { picoResetFailureKey, resetPicoForLogs } from "./rp2-logs-reset.js";
 import { isRp2Platform } from "./rp2-platform.js";
 import { isRtl87xxPlatform } from "./rtl87xx-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
@@ -194,7 +194,7 @@ export function picoResetHook(
         live = await resetPicoForLogs(port, baudRate, cancelled);
       } catch (err) {
         console.warn("Pico reset failed", err);
-        failure = localize(picoResetFailureKey(err));
+        failure = localize(picoResetFailureKey(err, "dashboard.logs_reset_failed"));
       }
       if (failure) {
         // A stranded Pico still gets its toast once the session moved on,
@@ -208,15 +208,6 @@ export function picoResetHook(
       }
     },
   };
-}
-
-// A stranded Pico wants a replug; a refused WebUSB open (Linux without the
-// udev rule) would strand it again every time, so name that cause instead.
-function picoResetFailureKey(err: unknown): string {
-  if (!(err instanceof PicoStrandedError)) return "dashboard.logs_reset_failed";
-  return err.step === "refused"
-    ? "firmware.rp2_usb_access_denied"
-    : "dashboard.logs_rp2_reset_stranded";
 }
 
 /**

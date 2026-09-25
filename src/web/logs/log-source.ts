@@ -20,6 +20,12 @@ export interface WebLogSource {
   ): Promise<(() => Promise<void>) | null>;
   /** Drop whatever a dead stream left behind; nothing else will. */
   release(): void;
-  /** Reboot the device behind the source, when its wiring allows it. */
-  reset?(): Promise<void>;
+  /**
+   * Reboot the device behind the source, when its wiring allows it. With
+   * ``resetDropsStream`` the caller cancels the stream first (the port is
+   * closed while the device reboots) and resumes afterwards; ``cancelled``
+   * flipping means the dialog moved on.
+   */
+  reset?(cancelled: () => boolean): Promise<void>;
+  readonly resetDropsStream?: boolean;
 }

@@ -90,7 +90,7 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.pico.title")}
-        .noReset=${true}
+        .resetMode=${"pico"}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;
