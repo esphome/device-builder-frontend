@@ -200,6 +200,9 @@ export interface PostInstallShowLogsDetail {
   // meaningful on the webSerialPort path: a port that can't carry it
   // reroutes to network logs.
   loggerInterface?: string | null;
+  // Device.target_platform, so the logs get the same Reset Device wiring as
+  // a launch from the card (a Pico hook where that applies).
+  targetPlatform?: string;
   reopenInstall: () => void;
 }
 
@@ -310,6 +313,7 @@ export async function handlePostInstallShowLogs(
     webSerialPort,
     loggerBaudRate,
     loggerInterface,
+    targetPlatform,
     reopenInstall,
   } = e.detail;
   logsDialog.configuration = configuration;
@@ -341,6 +345,7 @@ export async function handlePostInstallShowLogs(
           loggerInterface ?? null,
           cancelled
         ),
+      onResetDevice: picoResetHook(logsDialog, localize, targetPlatform ?? "", baudRate),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

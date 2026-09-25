@@ -538,4 +538,21 @@ describe("handlePostInstallShowLogs serial baud", () => {
     expect(dialog.open).not.toHaveBeenCalled();
     expect(dialog.openPassive).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["rp2", "object"],
+    ["esp32", "undefined"],
+  ])("wires Reset Device for %s the way a card launch does", async (platform, kind) => {
+    const dialog = logsDialog();
+    const event = new CustomEvent("request-show-logs-after-install", {
+      cancelable: true,
+      detail: { ...detail(115200), targetPlatform: platform },
+    });
+    await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
+    expect(dialog.openPassive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onResetDevice: expect.toSatisfy((h) => typeof h === kind),
+      })
+    );
+  });
 });
