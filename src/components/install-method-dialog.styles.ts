@@ -61,8 +61,11 @@ export const installMethodDialogStyles = css`
     cursor: not-allowed;
   }
 
+  /* The text dims, not the whole info block: a disabled row may keep a
+     live control under its description (the copy-address button). */
   .option--disabled > wa-icon,
-  .option--disabled .info {
+  .option--disabled .title,
+  .option--disabled .desc {
     opacity: 0.45;
   }
 
@@ -229,6 +232,43 @@ export const installMethodDialogStyles = css`
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
     line-height: 1.4;
+  }
+
+  /* Click-to-copy address under a disabled row's hint. */
+  .copy-address {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--wa-space-2xs);
+    margin-top: var(--wa-space-2xs);
+    padding: 2px 0;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--esphome-primary);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .copy-address code {
+    font-size: var(--wa-font-size-2xs);
+    user-select: text;
+  }
+
+  .option .copy-address wa-icon {
+    font-size: 14px;
+    color: inherit;
+  }
+
+  .copy-address:hover,
+  .copy-address:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .copy-address:focus-visible {
+    outline: var(--esphome-focus-outline);
+    outline-offset: 2px;
   }
 
   .back-btn {

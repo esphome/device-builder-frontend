@@ -72,6 +72,14 @@ async function _copyAddress(
   // Inside <summary>, a plain click would also toggle the disclosure.
   e.preventDefault();
   e.stopPropagation();
+  await copyAddressToClipboard(localize, value);
+}
+
+/** Copy *value* and toast the outcome; shared by every address copy control. */
+export async function copyAddressToClipboard(
+  localize: LocalizeFunc,
+  value: string
+): Promise<void> {
   if (await copyToClipboard(value)) {
     notify.success(localize("settings.remote_build_address_copied"));
   } else {

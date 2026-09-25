@@ -17,10 +17,19 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+vi.mock("../../src/util/copy-to-clipboard.js", () => ({
+  copyToClipboard: vi.fn(async () => true),
+}));
+vi.mock("../../src/util/notify.js", () => ({
+  notify: { success: vi.fn(), warning: vi.fn() },
+}));
+
 import { flush } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
+import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/components/install-method-dialog-rows.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
   setBluetooth,
@@ -194,6 +203,7 @@ describe("install-method-dialog BLE NUS row gating", () => {
     expect(bleRow(d).textContent).toContain(
       defaultLocalize("dashboard.logs_method_ble_nus_off")
     );
+    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
   });
 
   it("names the Brave flag when Brave has Web Bluetooth switched off", async () => {
@@ -209,6 +219,12 @@ describe("install-method-dialog BLE NUS row gating", () => {
       expect(bleRow(d).textContent).toContain(
         defaultLocalize("dashboard.logs_method_ble_nus_brave")
       );
+      // Pages cannot link to brave://, so the address is one click to copy.
+      const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-address")!;
+      expect(copy.textContent).toContain(BRAVE_WEB_BLUETOOTH_FLAG);
+      copy.click();
+      await flush();
+      expect(copyToClipboard).toHaveBeenCalledWith(BRAVE_WEB_BLUETOOTH_FLAG);
     } finally {
       delete (navigator as unknown as { brave?: unknown }).brave;
     }
