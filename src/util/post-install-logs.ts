@@ -32,8 +32,14 @@ export function openNetworkLogsFallback(
 }
 
 // A failed serial open drops the session to ``dead`` (Start reconnects) and
-// toasts the same message.
-function failSerialOpen(logsDialog: ESPHomeLogsDialog, message: string): void {
+// toasts the same message; not once the session moved on, since a newer
+// session is not this failure's.
+function failSerialOpen(
+  logsDialog: ESPHomeLogsDialog,
+  message: string,
+  cancelled: () => boolean = () => false
+): void {
+  if (cancelled()) return;
   logsDialog.setSerialOpenFailed(message);
   notifyError(message);
 }
@@ -41,11 +47,13 @@ function failSerialOpen(logsDialog: ESPHomeLogsDialog, message: string): void {
 function failPortReopen(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  port: SerialPort
+  port: SerialPort,
+  cancelled?: () => boolean
 ): void {
   failSerialOpen(
     logsDialog,
-    localize("dashboard.logs_port_reopen_failed", { port: formatSerialPortLabel(port) })
+    localize("dashboard.logs_port_reopen_failed", { port: formatSerialPortLabel(port) }),
+    cancelled
   );
 }
 
@@ -85,8 +93,11 @@ export async function reconnectWebSerialLogs(
   try {
     port = await requestSerialPort();
   } catch {
-    if (!cancelled())
-      failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
+    failSerialOpen(
+      logsDialog,
+      localize("dashboard.logs_web_serial_open_failed"),
+      cancelled
+    );
     return;
   }
   // A pick that lands after the session moved on must not touch the newer one.
@@ -107,8 +118,11 @@ export async function reconnectWebSerialLogs(
   try {
     await port.open({ baudRate });
   } catch {
-    if (!cancelled())
-      failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
+    failSerialOpen(
+      logsDialog,
+      localize("dashboard.logs_web_serial_open_failed"),
+      cancelled
+    );
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
@@ -144,7 +158,7 @@ export function picoResetHook(
         if (cancelled()) notifyError(failure);
         else failSerialOpen(logsDialog, failure);
       } else if (!live) {
-        if (!cancelled()) failPortReopen(logsDialog, localize, port);
+        failPortReopen(logsDialog, localize, port, cancelled);
       } else {
         await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
       }
@@ -263,7 +277,7 @@ export async function attachSerialLogStream(
       cancelled,
     });
     if (!live) {
-      if (!cancelled()) failPortReopen(logsDialog, localize, port);
+      failPortReopen(logsDialog, localize, port, cancelled);
       return;
     }
     port = live;
