@@ -11,6 +11,10 @@ describe("boardFamilyOfPort", () => {
     expect(boardFamilyOfPort(port(0x2e8a, 0x000c))).toBeNull();
   });
 
+  it("reads an nRF52 running ESPHome, which enumerates as a Zephyr USB device", () => {
+    expect(boardFamilyOfPort(port(0x2fe3, 0x0100))).toBe("nrf");
+  });
+
   it("reads the known nRF52 boards, and Nordic's own id outright", () => {
     expect(boardFamilyOfPort(port(0x239a, 0x8029))).toBe("nrf");
     expect(boardFamilyOfPort(port(0x239a, 0x0029))).toBe("nrf");

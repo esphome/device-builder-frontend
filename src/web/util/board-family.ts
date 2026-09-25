@@ -3,9 +3,12 @@ import { ESPRESSIF_USB_VID } from "../../util/web-serial.js";
 import { isRp2CdcPort } from "../../util/web-usb.js";
 import type { WebMode } from "../web-mode.js";
 
-// Adafruit and Seeed also ship RP2040 / ESP32-S3 / SAMD boards under their
-// vendor ids, so only their known nRF52840 products count (application id
-// with the bootloader id below it); Nordic's own id is nRF52 outright.
+// An nRF52 running ESPHome is a Zephyr USB device (ESPHome's only Zephyr
+// platform), and Nordic's own id is nRF52 outright. Adafruit and Seeed also
+// ship RP2040 / ESP32-S3 / SAMD boards under their vendor ids, so only their
+// known nRF52840 products count (the bootloader's ids, and the application
+// ids other firmwares use).
+const ZEPHYR_USB_VID = 0x2fe3;
 const NORDIC_USB_VID = 0x1915;
 const NRF52_USB_IDS = new Set([
   // Adafruit: Feather nRF52840 Express, Feather nRF52840 Sense, ItsyBitsy
@@ -18,7 +21,7 @@ const NRF52_USB_IDS = new Set([
 
 function isNrf52Port(port: SerialPort): boolean {
   const { usbVendorId, usbProductId } = port.getInfo();
-  if (usbVendorId === NORDIC_USB_VID) return true;
+  if (usbVendorId === ZEPHYR_USB_VID || usbVendorId === NORDIC_USB_VID) return true;
   if (usbVendorId === undefined || usbProductId === undefined) return false;
   return NRF52_USB_IDS.has(usbVendorId * 0x1_0000 + usbProductId);
 }
