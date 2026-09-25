@@ -4,7 +4,11 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
+import {
+  BootloaderTouchError,
+  resetToBootloader,
+} from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
@@ -85,9 +89,6 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
   host._flashBusy = true;
   host._statusMessage = host._localize("firmware.nrf_resetting");
-  // Only a touch that failed earns the manual-bootloader hint; a picker or
-  // permission failure has nothing to do with the board.
-  let touching = false;
   try {
     const port = await requestSerialPort();
     if (!port) {
@@ -98,13 +99,16 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     // The picker outlives a dismissed dialog; don't reset a port picked for
     // an install that no longer exists.
     if (!stillCurrent()) return;
-    touching = true;
     await resetToBootloader(port, installLog(host, stillCurrent));
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        touching ? withManualBootloaderHint(host, err) : getErrorMessage(err)
+        // A failed pick has nothing to do with the board; only the touch
+        // earns the manual-bootloader hint.
+        err instanceof BootloaderTouchError
+          ? withManualBootloaderHint(err, host._localize)
+          : getErrorMessage(err)
       );
     }
     return;
@@ -133,12 +137,9 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashPercent = 0;
   const abort = new AbortController();
   host._flashAbort = abort;
-  // Only the flash itself earns the manual-bootloader hint; a failed engine
-  // chunk load is the dashboard's problem, not the board's.
-  let flashing = false;
   try {
+    // A cache hit: the engine loaded when the package was parsed.
     const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-    flashing = true;
     await flashDfuPackageWithReconnect(port, pkg, {
       signal: abort.signal,
       onProgress: (percent) => {
@@ -155,7 +156,7 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.nrf_flash_failed"),
-        flashing ? withManualBootloaderHint(host, err) : getErrorMessage(err)
+        withManualBootloaderHint(err, host._localize)
       );
     }
     return;
@@ -165,19 +166,4 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
   host._step = "done";
-}
-
-// A failed touch or a bootloader that never answered both have the same way
-// out: enter the bootloader by hand. An abort is the dialog's own teardown.
-function withManualBootloaderHint(
-  host: ESPHomeFirmwareInstallDialog,
-  err: unknown
-): string {
-  const message = getErrorMessage(err);
-  if (err instanceof DOMException && err.name === "AbortError") return message;
-  // The joined sentence is one translatable string; a browser message that
-  // already ends with a period would otherwise double it.
-  return host._localize("firmware.nrf_manual_bootloader_hint", {
-    error: message.replace(/\.\s*$/, ""),
-  });
 }

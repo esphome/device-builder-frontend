@@ -76,7 +76,9 @@ describe("resetToBootloader", () => {
       signalsError: new DOMException("Not supported.", "NotSupportedError"),
     });
     await expect(resetToBootloader(port)).rejects.toMatchObject({
-      name: "NotSupportedError",
+      name: "BootloaderTouchError",
+      message: "Not supported.",
+      cause: { name: "NotSupportedError" },
     });
   });
 
@@ -90,7 +92,10 @@ describe("resetToBootloader", () => {
     vi.mocked(port.open).mockRejectedValue(
       new DOMException("Failed to open serial port.", "NetworkError")
     );
-    await expect(resetToBootloader(port)).rejects.toMatchObject({ name: "NetworkError" });
+    await expect(resetToBootloader(port)).rejects.toMatchObject({
+      name: "BootloaderTouchError",
+      cause: { name: "NetworkError" },
+    });
   });
 
   it("logs the touch and the release, and the early reboot when the port is already gone", async () => {
