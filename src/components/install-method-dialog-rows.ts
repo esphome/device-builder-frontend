@@ -154,17 +154,25 @@ export function renderBleNusOption(
       onClick: () => ctx.onSelect("ble-nus"),
     });
   }
-  const brave = state === "brave";
-  let desc = ctx.localize("dashboard.logs_method_ble_nus_desc");
-  if (state !== "pending") {
-    desc = ctx.localize("dashboard.logs_method_ble_nus_off");
-    if (brave) desc += " " + ctx.localize("dashboard.logs_method_ble_nus_brave");
-  }
   return renderMethodRow({
     icon: "bluetooth",
     title,
-    desc,
-    action: brave ? renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG) : undefined,
+    desc: ctx.localize(
+      state === "pending"
+        ? "dashboard.logs_method_ble_nus_desc"
+        : "dashboard.logs_method_ble_nus_off"
+    ),
+    // Brave's extra step is its own sentence under the generic hint, never
+    // spliced into it, so each key translates on its own.
+    action:
+      state === "brave"
+        ? html`
+            <span class="desc"
+              >${ctx.localize("dashboard.logs_method_ble_nus_brave")}</span
+            >
+            ${renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG)}
+          `
+        : undefined,
   });
 }
 
