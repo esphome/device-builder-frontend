@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
-  flashAmbz2: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<void>>(),
+  flashAmbz2: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<boolean>>(),
 }));
 type FlashHooks = {
   onProgress: (p: number) => void;
@@ -163,6 +163,7 @@ describe("rtlDoFlash", () => {
       steps.push(host._step);
       hooks.onProgress(40);
       hooks.onProgress(100);
+      return true;
     });
     await rtlDoFlash(asHost(host));
     expect(mocks.flashAmbz2).toHaveBeenCalledWith(
@@ -176,6 +177,27 @@ describe("rtlDoFlash", () => {
     expect(host._step).toBe("done");
     expect(host._statusMessage).toBe("firmware.status_done");
     expect(host._flashAbort).toBeNull();
+  });
+
+  it("asks for a manual reset when the adapter could not reboot the board", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashAmbz2.mockResolvedValue(false);
+    await rtlDoFlash(asHost(host));
+    expect(host._step).toBe("done");
+    expect(host._statusMessage).toBe("firmware.rtl_done_manual_reset");
+  });
+
+  it("drops a late log line once the dialog moved on", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashAmbz2.mockImplementation(async (_p, _i, hooks) => {
+      host._device = { name: "other" } as never;
+      hooks.onLog?.("Writing 0xC000 (1 bytes)");
+      return true;
+    });
+    await rtlDoFlash(asHost(host));
+    expect(host._log.lines).not.toContain("Writing 0xC000 (1 bytes)");
   });
 
   it("reports a failed flash with the engine's reason", async () => {

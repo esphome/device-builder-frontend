@@ -85,12 +85,15 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashPercent = 0;
   const abort = new AbortController();
   host._flashAbort = abort;
+  let rebooted: boolean;
   try {
     const { flashAmbz2 } = await loadEngine();
-    await flashAmbz2(port, image, {
+    rebooted = await flashAmbz2(port, image, {
       signal: abort.signal,
       // The engine's steps land in the details log, as esptool's lines do.
-      onLog: (line) => host._log.enqueue(line),
+      onLog: (line) => {
+        if (stillCurrent()) host._log.enqueue(line);
+      },
       onWaitingForStrap: () => {
         if (!stillCurrent()) return;
         host._step = "rtl-wait";
@@ -114,6 +117,9 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (host._flashAbort === abort) host._flashAbort = null;
   }
   if (!stillCurrent()) return;
-  host._statusMessage = host._localize("firmware.status_done");
+  // Without control lines the board is still sitting in the ROM downloader.
+  host._statusMessage = host._localize(
+    rebooted ? "firmware.status_done" : "firmware.rtl_done_manual_reset"
+  );
   host._step = "done";
 }

@@ -194,13 +194,26 @@ export function parseLibreTinyImage(
     run.cursor += b.data.length;
   }
   if (runs.length === 0) throw new Error("Invalid UF2: nothing to flash");
+  // The UART flasher sends whole XModem blocks, so a run's tail padding
+  // lands in flash too: it must not reach into the next partition, nor into
+  // another run of the same partition (that run was written and verified
+  // first, and would be overwritten).
+  const paddedEnd = (r: { address: number; bytes: number[] }) =>
+    r.address + Math.ceil(r.bytes.length / XMODEM_BLOCK_SIZE) * XMODEM_BLOCK_SIZE;
   for (const r of runs) {
-    // The UART flasher sends whole XModem blocks, so a run's tail padding
-    // lands in flash too; it must not reach into the next partition.
-    const padded = Math.ceil(r.bytes.length / XMODEM_BLOCK_SIZE) * XMODEM_BLOCK_SIZE;
-    if (r.address + padded > r.part.offset + r.part.length) {
+    if (paddedEnd(r) > r.part.offset + r.part.length) {
       throw new Error(
         `Invalid UF2: run at 0x${r.address.toString(16)} pads past '${r.part.name}'`
+      );
+    }
+  }
+  const ordered = [...runs].sort((a, b) => a.address - b.address);
+  for (let i = 1; i < ordered.length; i++) {
+    const prev = ordered[i - 1];
+    const next = ordered[i];
+    if (prev.part === next.part && paddedEnd(prev) > next.address) {
+      throw new Error(
+        `Invalid UF2: runs at 0x${prev.address.toString(16)} and 0x${next.address.toString(16)} overlap in '${prev.part.name}'`
       );
     }
   }

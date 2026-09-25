@@ -168,13 +168,20 @@ async function autoReset(port: SerialPort): Promise<void> {
   }
 }
 
-async function bootFirmware(port: SerialPort): Promise<void> {
+/**
+ * Release the strap and pulse reset so the board comes up in the firmware.
+ * False when the lines could not be driven (no control lines on this
+ * adapter, or the port is gone): the board is still in the ROM and the
+ * user has to reset it.
+ */
+async function bootFirmware(port: SerialPort): Promise<boolean> {
   try {
     await port.setSignals({ dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
     await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    return true;
   } catch {
-    // No control lines on this adapter; the user resets the board.
+    return false;
   }
 }
 
@@ -296,16 +303,19 @@ async function writeRun(
  * Flash ``image`` onto the chip behind ``port`` (opened here at 115200 if
  * needed, closed after). The automatic reset is tried first; failing that
  * the ROM is polled until the user straps the board or ``signal`` aborts.
+ * Resolves true once the board was rebooted into the firmware, false when
+ * the adapter has no control lines to do that and the user must reset it.
  */
 export async function flashAmbz2(
   port: SerialPort,
   image: LibreTinyImage,
   hooks: Ambz2FlashHooks
-): Promise<void> {
+): Promise<boolean> {
   if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
   const log = hooks.onLog ?? (() => {});
   let rom: RomLink | undefined;
   let failure: unknown;
+  let rebooted = false;
   try {
     rom = new RomLink(port, hooks.signal);
     log("Resetting the board into download mode over DTR/RTS");
@@ -339,7 +349,6 @@ export async function flashAmbz2(
     // Ends the ROM session; no reply comes back. The reboot itself happens
     // in the teardown below, with the strap released.
     await rom.write("disc\n");
-    log("Rebooting into the firmware");
     hooks.onProgress(100);
   } catch (err) {
     failure = err;
@@ -349,7 +358,15 @@ export async function flashAmbz2(
     await rom?.close(failure).catch(() => {});
     // DTR still holds the strap, so a reset now would land in the ROM again:
     // release it, then pulse RTS so the board comes up in the firmware.
-    await bootFirmware(port);
+    rebooted = await bootFirmware(port);
+    if (failure === undefined) {
+      log(
+        rebooted
+          ? "Rebooting into the firmware"
+          : "No control lines to reboot the board; release PA00 and reset it by hand"
+      );
+    }
     await port.close().catch(() => {});
   }
+  return rebooted;
 }

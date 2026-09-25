@@ -110,6 +110,18 @@ describe("parseLibreTinyImage", () => {
     ]);
   });
 
+  it("rejects a run that lands inside another run's written or padded range", () => {
+    // The first ota1 page pads to 1 KiB; a page at 0x200 is neither its
+    // start nor its cursor, so it opens a second run inside that block.
+    const uf2 = makeLibreTinyUf2({
+      blocks: [
+        { addr: 0x0, fill: 0xa1, tags: info(OTA_INFO) },
+        { addr: 0x200, fill: 0xa2 },
+      ],
+    });
+    expect(() => parse(uf2)).toThrow(/runs at 0xc000 and 0xc200 overlap in 'ota1'/);
+  });
+
   it("rejects a run whose XModem padding would reach past its partition", () => {
     // boot ends at 0x8000; a page at 0x7F00 fits, but its 1 KiB block does not.
     const uf2 = makeLibreTinyUf2({

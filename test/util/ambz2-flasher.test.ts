@@ -217,13 +217,25 @@ describe("flashAmbz2", () => {
     const rom = fakeRom({ linkAfterPings: 25, noSignals: true });
     const onWaitingForStrap = vi.fn();
     const onLinked = vi.fn();
-    await drive(
-      flashAmbz2(rom.port, image, { onProgress: () => {}, onWaitingForStrap, onLinked })
-    );
+    const log: string[] = [];
+    // No control lines: the flash lands but the board stays in the ROM, and
+    // the caller hears that instead of a reboot claim.
+    await expect(
+      drive(
+        flashAmbz2(rom.port, image, {
+          onProgress: () => {},
+          onLog: (l) => log.push(l),
+          onWaitingForStrap,
+          onLinked,
+        })
+      )
+    ).resolves.toBe(false);
     expect(onWaitingForStrap).toHaveBeenCalledOnce();
     expect(onLinked).toHaveBeenCalledOnce();
     expect(rom.commands.filter((c) => c === "ping").length).toBeGreaterThan(25);
     expect(last(rom.commands)).toBe("disc");
+    expect(last(log)).toMatch(/reset it by hand/);
+    expect(log).not.toContain("Rebooting into the firmware");
   });
 
   it("fails the run whose hash does not match and drops the strap", async () => {
