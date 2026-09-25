@@ -43,7 +43,6 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   @state() private _progress = 0;
   @state() private _errorTitle = "";
   @state() private _errorMessage = "";
-  // The touch's and the engine's step lines, for the details log.
   @state() private _logLines: string[] = [];
 
   private _log = (line: string) => {

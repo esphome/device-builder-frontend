@@ -13,7 +13,7 @@ vi.mock("../../src/web/util/esphome-web-firmware.js", () => ({
 }));
 
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
-vi.mock("../../src/web/install/esphome-web-install-log.js", () => ({}));
+vi.mock("../../src/components/install-details-log.js", () => ({}));
 const mocks = vi.hoisted(() => ({
   loadPicoImage: vi.fn(),
   flashPico: vi.fn(),
@@ -208,7 +208,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     const el = await mount();
     button(el, "dashboard.install").click();
     await settle(el);
-    const log = el.shadowRoot!.querySelector("esphome-web-install-log") as any;
+    const log = el.shadowRoot!.querySelector("esphome-install-details-log") as any;
     expect(log.lines).toEqual(["Claimed the RP2 Boot device (2e8a:0003)"]);
   });
 

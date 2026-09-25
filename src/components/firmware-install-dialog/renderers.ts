@@ -311,39 +311,18 @@ export function renderLogs(
 ): TemplateResult | typeof nothing {
   if (host._log.lines.length === 0) return nothing;
   return html`
-    <div class="logs-header">
-      <button
-        class="logs-toggle"
-        @click=${() => {
-          host._logsExpanded = !host._logsExpanded;
-        }}
-      >
-        <wa-icon
-          library="mdi"
-          name=${host._logsExpanded ? "chevron-up" : "chevron-down"}
-        ></wa-icon>
-        ${
-          host._logsExpanded
-            ? host._localize("firmware.hide_details")
-            : host._localize("firmware.show_details")
-        }
-      </button>
-      <button class="logs-toggle" @click=${() => downloadInstallLogs(host)}>
-        <wa-icon library="mdi" name="download"></wa-icon>
-        ${host._localize("dashboard.logs_download")}
-      </button>
-    </div>
-    ${
-      host._logsExpanded
-        ? html`<div class="logs-container">
-            <esphome-ansi-log
-              .lines=${host._log.lines}
-              .targetPlatform=${host._device ? devicePlatform(host._device) : ""}
-              ?light=${!host._darkMode}
-            ></esphome-ansi-log>
-          </div>`
-        : nothing
-    }
+    <esphome-install-details-log
+      .lines=${host._log.lines}
+      .targetPlatform=${host._device ? devicePlatform(host._device) : ""}
+      .expanded=${host._logsExpanded}
+      @expanded-changed=${(e: CustomEvent<boolean>) => {
+        host._logsExpanded = e.detail;
+      }}
+      @download-log=${(e: Event) => {
+        e.preventDefault();
+        downloadInstallLogs(host);
+      }}
+    ></esphome-install-details-log>
   `;
 }
 

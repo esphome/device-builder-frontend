@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/process-terminal/process-terminal.js";
-import "./esphome-web-install-log.js";
+import "../../components/install-details-log.js";
 import type { ProcessTerminalState } from "../../components/process-terminal/process-terminal.js";
 import type { InstallFlowController } from "./install-flow-controller.js";
 
@@ -73,10 +73,11 @@ export function renderProgressCard(card: ProgressCard): TemplateResult {
     >
       ${
         card.log?.length
-          ? html`<esphome-web-install-log
+          ? html`<esphome-install-details-log
               slot="status-extra"
+              download-name="esphome-web-install.txt"
               .lines=${card.log}
-            ></esphome-web-install-log>`
+            ></esphome-install-details-log>`
           : nothing
       }
     </esphome-process-terminal>

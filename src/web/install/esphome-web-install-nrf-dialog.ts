@@ -43,7 +43,6 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // picker is in flight.
   @state() private _pending = false;
   @state() private _reconnecting = false;
-  // The touch's and the engine's step lines, for the details log.
   @state() private _logLines: string[] = [];
 
   private _pkg: DfuPackage | null = null;

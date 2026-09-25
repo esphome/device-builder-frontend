@@ -3,13 +3,13 @@ import { mdiChevronDown, mdiChevronUp, mdiDownload } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import type { LocalizeFunc } from "../../common/localize.js";
-import "../../components/ansi-log.js";
-import { darkModeContext, localizeContext } from "../../context/index.js";
-import { espHomeStyles } from "../../styles/shared.js";
-import { initialDarkMode } from "../../util/dark-mode.js";
-import { downloadAnsiText } from "../../util/download-text.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import { darkModeContext, localizeContext } from "../context/index.js";
+import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode } from "../util/dark-mode.js";
+import { downloadAnsiText } from "../util/download-text.js";
+import { registerMdiIcons } from "../util/register-icons.js";
+import "./ansi-log.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
@@ -18,11 +18,15 @@ registerMdiIcons({
 });
 
 /**
- * The collapsible details log under an install card: the flash engine's
- * step lines, with a download. Renders nothing until a line arrives.
+ * The collapsible details log under an install card: a flash engine's step
+ * lines behind a Show details toggle, with a download. The host may drive
+ * ``expanded`` (it is mirrored back through ``expanded-changed``) and may
+ * take over the download by cancelling ``download-log``; otherwise the
+ * lines are saved as ``downloadName``. ``--install-log-height`` sizes the
+ * open log.
  */
-@customElement("esphome-web-install-log")
-export class ESPHomeWebInstallLog extends LitElement {
+@customElement("esphome-install-details-log")
+export class ESPHomeInstallDetailsLog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -33,26 +37,32 @@ export class ESPHomeWebInstallLog extends LitElement {
 
   @property({ attribute: false }) lines: readonly string[] = [];
 
-  @state() private _expanded = false;
+  /** The device's ``target_platform`` for the log's crash decoding; "" when unknown. */
+  @property({ attribute: false }) targetPlatform = "";
+
+  @property({ type: Boolean }) expanded = false;
+
+  @property({ attribute: "download-name" }) downloadName = "install.txt";
 
   private _toggle = () => {
-    this._expanded = !this._expanded;
+    this.expanded = !this.expanded;
+    this.dispatchEvent(new CustomEvent("expanded-changed", { detail: this.expanded }));
   };
 
   private _download = () => {
-    downloadAnsiText(this.lines, "esphome-web-install.txt");
+    const event = new Event("download-log", { cancelable: true });
+    if (this.dispatchEvent(event)) downloadAnsiText(this.lines, this.downloadName);
   };
 
   protected render() {
-    if (this.lines.length === 0) return nothing;
     return html`
       <div class="logs-header">
         <button class="logs-toggle" @click=${this._toggle}>
           <wa-icon
             library="mdi"
-            name=${this._expanded ? "chevron-up" : "chevron-down"}
+            name=${this.expanded ? "chevron-up" : "chevron-down"}
           ></wa-icon>
-          ${this._localize(this._expanded ? "firmware.hide_details" : "firmware.show_details")}
+          ${this._localize(this.expanded ? "firmware.hide_details" : "firmware.show_details")}
         </button>
         <button class="logs-toggle" @click=${this._download}>
           <wa-icon library="mdi" name="download"></wa-icon>
@@ -60,10 +70,11 @@ export class ESPHomeWebInstallLog extends LitElement {
         </button>
       </div>
       ${
-        this._expanded
+        this.expanded
           ? html`<div class="logs-container">
               <esphome-ansi-log
                 .lines=${this.lines}
+                .targetPlatform=${this.targetPlatform}
                 ?light=${!this._darkMode}
               ></esphome-ansi-log>
             </div>`
@@ -76,7 +87,9 @@ export class ESPHomeWebInstallLog extends LitElement {
     espHomeStyles,
     css`
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
       .logs-header {
         display: flex;
@@ -103,13 +116,18 @@ export class ESPHomeWebInstallLog extends LitElement {
         font-size: 16px;
       }
       .logs-container {
+        flex: 1 1 auto;
+        min-height: 0;
         margin-top: var(--wa-space-s);
         border: 1px solid var(--term-border);
         border-radius: var(--wa-border-radius-m);
         overflow: hidden;
       }
       esphome-ansi-log {
-        --log-height: 40vh;
+        --log-height: var(--install-log-height, 50vh);
+      }
+      esphome-ansi-log::part(container) {
+        border-radius: 0;
       }
     `,
   ];
@@ -117,6 +135,6 @@ export class ESPHomeWebInstallLog extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "esphome-web-install-log": ESPHomeWebInstallLog;
+    "esphome-install-details-log": ESPHomeInstallDetailsLog;
   }
 }

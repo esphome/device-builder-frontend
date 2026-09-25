@@ -147,47 +147,6 @@ export const firmwareInstallDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .logs-toggle {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
-    margin-top: var(--wa-space-m);
-    background: none;
-    border: none;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
-    cursor: pointer;
-  }
-  .logs-toggle:hover {
-    color: var(--wa-color-text-normal);
-  }
-  .logs-toggle wa-icon {
-    font-size: 16px;
-  }
-
-  .logs-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .logs-container {
-    margin-top: var(--wa-space-s);
-    border: 1px solid var(--term-border);
-    border-radius: var(--wa-border-radius-m);
-    overflow: hidden;
-  }
-
-  esphome-ansi-log {
-    --log-height: 50vh;
-  }
-
-  esphome-ansi-log::part(container) {
-    border-radius: 0;
-  }
-
   .footer {
     display: flex;
     justify-content: flex-end;
@@ -243,12 +202,9 @@ export const firmwareInstallDialogStyles = css`
       flex-direction: column;
       min-height: 0;
     }
-    :host([expanded]) .logs-container {
+    :host([expanded]) esphome-install-details-log {
       flex: 1 1 auto;
-      min-height: 0;
-    }
-    :host([expanded]) esphome-ansi-log {
-      --log-height: 100%;
+      --install-log-height: 100%;
     }
   }
 `;
