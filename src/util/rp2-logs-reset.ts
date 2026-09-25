@@ -6,21 +6,20 @@
 import { resetToBootloader } from "./serial-bootloader-touch.js";
 import { sleep } from "./sleep.js";
 import { openLiveSerialPort } from "./web-serial.js";
-import { getPicobootDevices, requestPicobootDevice } from "./web-usb.js";
+import { getPicobootDevices, loadPicoboot, requestPicobootDevice } from "./web-usb.js";
 
 const BOOTSEL_POLL_MS = 200;
-// Kept well inside the click's transient activation so the chooser fallback
-// is still allowed when the poll gives up.
+// Counted from before the touch, well inside the click's transient activation,
+// so the chooser fallback is still allowed when the poll gives up.
 const BOOTSEL_WAIT_MS = 2000;
 
 /** The touch landed but the reboot did not: the Pico is sitting in BOOTSEL. */
 export class PicoStrandedError extends Error {
-  cause: unknown;
-
-  constructor(cause: unknown) {
+  // Error.cause needs lib ES2022; the field is declared here instead. Null
+  // when the chooser was dismissed.
+  constructor(readonly cause: unknown) {
     super("Pico left in BOOTSEL");
     this.name = "PicoStrandedError";
-    this.cause = cause;
   }
 }
 
@@ -34,11 +33,14 @@ export async function resetPicoForLogs(
   port: SerialPort,
   baudRate: number
 ): Promise<SerialPort | null> {
+  const deadline = Date.now() + BOOTSEL_WAIT_MS;
   await resetToBootloader(port);
+  const usb = await findBootselDevice(deadline).catch((err: unknown) => {
+    throw new PicoStrandedError(err);
+  });
+  if (!usb) throw new PicoStrandedError(null);
   try {
-    const usb = await findBootselDevice();
-    if (!usb) throw new Error("chooser dismissed");
-    const { PicobootDevice } = await import("./rp2-picoboot.js");
+    const { PicobootDevice } = await loadPicoboot();
     const dev = await PicobootDevice.open(usb);
     try {
       await dev.reboot();
@@ -54,8 +56,7 @@ export async function resetPicoForLogs(
 // A bootloader this origin was granted before shows up in getDevices() once
 // it enumerates, so a repeat reset skips the chooser; the chooser lists the
 // device live, so it can open before the Pico is back.
-async function findBootselDevice(): Promise<USBDevice | null> {
-  const deadline = Date.now() + BOOTSEL_WAIT_MS;
+async function findBootselDevice(deadline: number): Promise<USBDevice | null> {
   for (;;) {
     const [granted] = await getPicobootDevices();
     if (granted) return granted;

@@ -17,6 +17,7 @@ import {
   classifyUsbDevice,
   isUsbAccessDenied,
   isUsbDeviceLost,
+  loadPicoboot,
   requestPicobootDevice,
 } from "../../util/web-usb.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -26,8 +27,6 @@ import {
   failNoBinaries,
   fetchBinaries,
 } from "./install-flow.js";
-
-const loadPicoboot = () => import("../../util/rp2-picoboot.js");
 
 /**
  * Compile, download and parse the UF2, then hand off to the BOOTSEL step.

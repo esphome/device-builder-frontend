@@ -35,7 +35,6 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { normalizeLogLine } from "../util/log-line.js";
-import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isRp2Platform } from "../util/rp2-platform.js";
@@ -44,7 +43,6 @@ import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   abortSerialReconnect,
-  expectSerialOutput,
   markSerialOutput,
   onStart,
   onStop,
@@ -172,7 +170,8 @@ export class ESPHomeLogsDialog extends LitElement {
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
-  /** Session-supplied Reset Device; null means the RTS pulse. */
+  // Session-supplied Reset Device (a Pico's BOOTSEL round trip); without it
+  // Reset Device is the RTS pulse, offered only where that works.
   _resetDevice: ((port: SerialPort) => Promise<void>) | null = null;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
@@ -558,28 +557,8 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
-  // standard auto-reset circuit) to reboot the device, like the old dashboard's
-  // console; the reader stays attached so the boot log follows. Resumes display
-  // first so a Stopped log shows the boot output instead of dropping it.
-  private _onResetDevice = async () => {
-    if (this._resetDevice) return resetSerialDevice(this);
-    const s = this._session;
-    if (s.kind !== "serial") return;
-    this._session = { ...s, paused: false };
-    try {
-      await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-      // Boot output can't precede the pulse; expecting it only once the pulse
-      // has landed keeps a stale pre-reset line from retiring the watchdog
-      // for a reset that never took.
-      expectSerialOutput(this);
-    } catch {
-      // setSignals fails if the cable was pulled; tell the user the reset didn't
-      // land rather than letting them assume the device rebooted.
-      notifyError(this._localize("dashboard.logs_reset_failed"));
-    }
-  };
+  // Reset Device button (Web Serial only).
+  private _onResetDevice = () => resetSerialDevice(this);
 
   /**
    * Flip ``_open`` false the moment the user initiates a close (X / Esc /

@@ -35,8 +35,8 @@ export function openPassive(
     // path — Start re-runs it; otherwise the Start button would be a dead end.
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
-    // Replaces the RTS-pulse Reset Device: gets the closed port and ends by
-    // attaching a fresh stream (or ``setSerialOpenFailed``), like onReconnect.
+    // Replaces the RTS-pulse Reset Device. Gets the port closed and, like
+    // onReconnect, ends by attaching a fresh stream or ``setSerialOpenFailed``.
     onResetDevice?: (port: SerialPort) => Promise<void>;
   }
 ): void {
@@ -125,10 +125,7 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
   host._log.flush();
   const s = host._session;
   host._session = { kind: "idle" };
-  if (s.kind === "serial") {
-    void s.cancel();
-    return Promise.resolve();
-  }
+  if (s.kind === "serial") return s.cancel();
   if (s.kind === "ota" && s.streamId !== null) {
     return stopBackendStream(host, s.streamId);
   }
@@ -148,6 +145,7 @@ export function switchToOtaLogs(host: ESPHomeLogsDialog, reason?: string): void 
   if (!isPassive(host._session)) return;
   void teardownSession(host);
   host._reconnect = null;
+  host._resetDevice = null;
   host._session = { kind: "ota", port: OTA_PORT, streamId: null };
   const switched = host._localize("dashboard.logs_switched_to_network");
   // The reason lands in the pane too, so a user who looked away still sees
@@ -309,37 +307,52 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
   }
 }
 
-/** Reset Device through the session's hook: stop the reader and close the
- *  port first, since the hook reopens it, then let the hook re-attach. */
+/** Reset Device. With a session hook: stop the reader and close the port,
+ *  which the hook reopens. Otherwise pulse RTS (wired to EN on the standard
+ *  auto-reset circuit) with the reader attached so the boot log follows;
+ *  display resumes first so a Stopped log shows the boot output. */
 export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> {
   const s = host._session;
+  if (s.kind !== "serial") return;
   const reset = host._resetDevice;
-  if (s.kind !== "serial" || !reset) return;
-  host._session = { kind: "reconnecting", paused: false };
-  await s.cancel();
+  if (reset) {
+    host._session = { kind: "reconnecting", paused: false };
+    await s.cancel();
+    await reset(s.port).catch(() =>
+      failIfStillReconnecting(host, "dashboard.logs_reset_failed")
+    );
+    return;
+  }
+  host._session = { ...s, paused: false };
   try {
-    await reset(s.port);
+    await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    // Boot output can't precede the pulse; expecting it only once the pulse
+    // has landed keeps a stale pre-reset line from retiring the watchdog
+    // for a reset that never took.
+    expectSerialOutput(host);
   } catch {
-    // The hook reports its own failures (setSerialOpenFailed -> dead); only
-    // an unhandled rejection leaves the session reconnecting.
-    if (host._session.kind !== "reconnecting") return;
-    host._session = { kind: "dead" };
+    // setSignals fails if the cable was pulled; tell the user the reset didn't
+    // land rather than letting them assume the device rebooted.
     notifyError(host._localize("dashboard.logs_reset_failed"));
   }
+}
+
+// The hook reports its own failures (setSerialOpenFailed -> `dead`, with its
+// own toast); still `reconnecting` means a genuinely unhandled rejection, so
+// only that gets surfaced (no double toast).
+function failIfStillReconnecting(host: ESPHomeLogsDialog, key: string): void {
+  if (host._session.kind !== "reconnecting") return;
+  host._session = { kind: "dead" };
+  notifyError(host._localize(key));
 }
 
 function reconnectSerial(host: ESPHomeLogsDialog): void {
   if (!host._reconnect) return;
   host._session = { kind: "reconnecting", paused: false };
-  host._reconnect().catch(() => {
-    // The reopen-retry failure path handles itself (setSerialOpenFailed ->
-    // `dead`, with its own toast). Only surface genuinely-unhandled
-    // rejections — still `reconnecting` means attach didn't handle it — so we
-    // don't double-toast.
-    if (host._session.kind !== "reconnecting") return;
-    host._session = { kind: "dead" };
-    notifyError(host._localize("dashboard.logs_web_serial_open_failed"));
-  });
+  host
+    ._reconnect()
+    .catch(() => failIfStillReconnecting(host, "dashboard.logs_web_serial_open_failed"));
 }
 
 /* The --no-states flag is baked into the esphome subprocess at spawn time,

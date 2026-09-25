@@ -15,13 +15,11 @@ vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
 }));
 vi.mock("../../src/util/web-usb.js", () => ({
   getPicobootDevices: mocks.getPicobootDevices,
+  loadPicoboot: async () => ({ PicobootDevice: { open: mocks.open } }),
   requestPicobootDevice: mocks.requestPicobootDevice,
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
-}));
-vi.mock("../../src/util/rp2-picoboot.js", () => ({
-  PicobootDevice: { open: mocks.open },
 }));
 
 import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
@@ -76,8 +74,18 @@ describe("resetPicoForLogs", () => {
 
   it("reports the Pico stranded when the chooser is dismissed", async () => {
     mocks.requestPicobootDevice.mockResolvedValue(null);
-    await expect(run()).rejects.toBeInstanceOf(PicoStrandedError);
+    await expect(run()).rejects.toMatchObject({ name: "PicoStrandedError", cause: null });
     expect(mocks.openLiveSerialPort).not.toHaveBeenCalled();
+  });
+
+  it("keeps the WebUSB refusal as the cause when the open is denied", async () => {
+    mocks.getPicobootDevices.mockResolvedValue([usb]);
+    const denied = new DOMException("Access denied.", "SecurityError");
+    mocks.open.mockRejectedValue(denied);
+    await expect(run()).rejects.toMatchObject({
+      name: "PicoStrandedError",
+      cause: denied,
+    });
   });
 
   it("reports the Pico stranded when the reboot fails, still releasing the device", async () => {

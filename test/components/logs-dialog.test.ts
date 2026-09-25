@@ -307,13 +307,10 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
   });
 
   it("Reset Device runs the session hook on the closed port instead of the pulse", async () => {
-    let closed = false;
-    cancel = vi.fn(async () => {
-      closed = true;
-    });
+    cancel = vi.fn(async () => {});
     const fresh = { close: vi.fn(), setSignals: vi.fn() };
     const onResetDevice = vi.fn(async (p: SerialPort) => {
-      expect(closed).toBe(true); // reader stopped and port closed first
+      expect(cancel).toHaveBeenCalledOnce(); // reader stopped and port closed first
       expect(p).toBe(port);
       expect(session(el).kind).toBe("reconnecting");
       el.setSerialStream(

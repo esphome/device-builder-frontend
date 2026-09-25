@@ -27,7 +27,8 @@ vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
   resetPicoForLogs: picoReset.resetPicoForLogs,
 }));
-vi.mock("../../src/util/web-usb.js", () => ({
+vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-usb.js")>()),
   isWebUsbSupported: () => picoReset.webUsb,
 }));
 
@@ -262,6 +263,17 @@ describe("picoResetHook", () => {
     const message = defaultLocalize("dashboard.logs_rp2_reset_stranded");
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
     expect(toastError).toHaveBeenCalledWith(message, expect.anything());
+  });
+
+  it("names the udev rule when WebUSB refused the bootloader", async () => {
+    const dialog = stubDialog();
+    picoReset.resetPicoForLogs.mockRejectedValue(
+      new PicoStrandedError(new DOMException("Access denied.", "SecurityError"))
+    );
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!(deadPort());
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("firmware.rp2_usb_access_denied")
+    );
   });
 
   it("reports a failed touch as a plain reset failure", async () => {

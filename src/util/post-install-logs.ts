@@ -13,7 +13,7 @@ import {
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
-import { isWebUsbSupported } from "./web-usb.js";
+import { isUsbAccessDenied, isWebUsbSupported } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,
@@ -28,6 +28,24 @@ export function openNetworkLogsFallback(
   const { message, ...openOptions } = options;
   notifyInfo(message ?? localize("dashboard.logs_serial_disabled_fallback"));
   logsDialog.open(OTA_PORT, openOptions);
+}
+
+// A failed serial open drops the session to ``dead`` (Start reconnects) and
+// toasts the same message.
+function failSerialOpen(logsDialog: ESPHomeLogsDialog, message: string): void {
+  logsDialog.setSerialOpenFailed(message);
+  notifyError(message);
+}
+
+function failPortReopen(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  port: SerialPort
+): void {
+  failSerialOpen(
+    logsDialog,
+    localize("dashboard.logs_port_reopen_failed", { port: formatSerialPortLabel(port) })
+  );
 }
 
 /**
@@ -65,9 +83,7 @@ export async function reconnectWebSerialLogs(
   try {
     port = await requestSerialPort();
   } catch {
-    const message = localize("dashboard.logs_web_serial_open_failed");
-    logsDialog.setSerialOpenFailed(message);
-    notifyError(message);
+    failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
     return;
   }
   if (!port) {
@@ -86,9 +102,7 @@ export async function reconnectWebSerialLogs(
   try {
     await port.open({ baudRate });
   } catch {
-    const message = localize("dashboard.logs_web_serial_open_failed");
-    logsDialog.setSerialOpenFailed(message);
-    notifyError(message);
+    failSerialOpen(logsDialog, localize("dashboard.logs_web_serial_open_failed"));
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate);
@@ -97,8 +111,7 @@ export async function reconnectWebSerialLogs(
 /**
  * Reset Device hook for a Pico logs session, or undefined where the dialog's
  * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
- * so the button stays hidden). Ends like a reconnect: a fresh stream attached,
- * or ``setSerialOpenFailed`` with the cause.
+ * so the button stays hidden).
  */
 export function picoResetHook(
   logsDialog: ESPHomeLogsDialog,
@@ -112,25 +125,24 @@ export function picoResetHook(
     try {
       live = await resetPicoForLogs(port, baudRate);
     } catch (err) {
-      const message = localize(
-        err instanceof PicoStrandedError
-          ? "dashboard.logs_rp2_reset_stranded"
-          : "dashboard.logs_reset_failed"
-      );
-      logsDialog.setSerialOpenFailed(message);
-      notifyError(message);
+      failSerialOpen(logsDialog, localize(picoResetFailureKey(err)));
       return;
     }
     if (!live) {
-      const message = localize("dashboard.logs_port_reopen_failed", {
-        port: formatSerialPortLabel(port),
-      });
-      logsDialog.setSerialOpenFailed(message);
-      notifyError(message);
+      failPortReopen(logsDialog, localize, port);
       return;
     }
     await attachSerialLogStream(live, logsDialog, localize, baudRate);
   };
+}
+
+// A stranded Pico wants a replug; a refused WebUSB open (Linux without the
+// udev rule) would strand it again every time, so name that cause instead.
+function picoResetFailureKey(err: unknown): string {
+  if (!(err instanceof PicoStrandedError)) return "dashboard.logs_reset_failed";
+  return isUsbAccessDenied(err.cause)
+    ? "firmware.rp2_usb_access_denied"
+    : "dashboard.logs_rp2_reset_stranded";
 }
 
 /**
@@ -233,11 +245,7 @@ export async function attachSerialLogStream(
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,
     });
     if (!live) {
-      const message = localize("dashboard.logs_port_reopen_failed", {
-        port: formatSerialPortLabel(port),
-      });
-      logsDialog.setSerialOpenFailed(message);
-      notifyError(message);
+      failPortReopen(logsDialog, localize, port);
       return;
     }
     port = live;

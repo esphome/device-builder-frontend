@@ -8,6 +8,9 @@ import { isPortPickerCancel } from "./web-serial.js";
 /** Chromium only; Firefox has no WebUSB. */
 export const isWebUsbSupported = (): boolean => "usb" in navigator;
 
+/** The PICOBOOT engine, kept in its own chunk. */
+export const loadPicoboot = () => import("./rp2-picoboot.js");
+
 /** The device dropped off the bus, or a transfer hit a device that already had. */
 export function isUsbDeviceLost(err: unknown): boolean {
   return (

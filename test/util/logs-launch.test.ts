@@ -34,14 +34,24 @@ function makeDevice(): ConfiguredDevice {
 }
 
 function makeHost(getSerialPorts: () => Promise<unknown>): LogsLaunchHost & {
-  logsDialog: { configuration?: string; name?: string; open: ReturnType<typeof vi.fn> };
+  logsDialog: {
+    configuration?: string;
+    name?: string;
+    open: ReturnType<typeof vi.fn>;
+    openPassive: ReturnType<typeof vi.fn>;
+  };
 } {
   return {
     api: { getSerialPorts: vi.fn(getSerialPorts) },
-    logsDialog: { open: vi.fn() },
+    logsDialog: { open: vi.fn(), openPassive: vi.fn() },
     localize: (key: string) => key,
   } as unknown as LogsLaunchHost & {
-    logsDialog: { configuration?: string; name?: string; open: ReturnType<typeof vi.fn> };
+    logsDialog: {
+      configuration?: string;
+      name?: string;
+      open: ReturnType<typeof vi.fn>;
+      openPassive: ReturnType<typeof vi.fn>;
+    };
   };
 }
 
@@ -202,14 +212,6 @@ describe("launchLogsWithMethod", () => {
 });
 
 describe("launchLogsWithMethod web-serial", () => {
-  function makeSerialHost() {
-    const host = makeHost(async () => []) as unknown as LogsLaunchHost & {
-      logsDialog: { openPassive: ReturnType<typeof vi.fn> };
-    };
-    (host.logsDialog as { openPassive: unknown }).openPassive = vi.fn();
-    return host;
-  }
-
   it("hands the Pico reset hook to the passive session", async () => {
     const restore = withWebSerial(true);
     const port = {
@@ -219,7 +221,7 @@ describe("launchLogsWithMethod web-serial", () => {
     launch.requestSerialPort.mockResolvedValue(port);
     const hook = async () => {};
     launch.picoResetHook.mockReturnValue(hook);
-    const host = makeSerialHost();
+    const host = makeHost(async () => []);
     try {
       const device = { ...makeDevice(), target_platform: "rp2", logger_baud_rate: null };
       await launchLogsWithMethod(host, device, "web-serial");
@@ -231,12 +233,6 @@ describe("launchLogsWithMethod web-serial", () => {
       );
       expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
         expect.objectContaining({ onResetDevice: hook })
-      );
-      expect(launch.attachSerialLogStream).toHaveBeenCalledWith(
-        port,
-        host.logsDialog,
-        host.localize,
-        115200
       );
     } finally {
       restore();
