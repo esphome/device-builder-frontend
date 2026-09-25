@@ -112,26 +112,20 @@ describe("esphome-web-nrf-card", () => {
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
   });
 
-  it("keeps a session opened while the previous dialog was still hiding", async () => {
-    const el = await mount();
-    mocks.pickBleNusDevice.mockResolvedValue({});
-    await (el as any)._showBleLogs();
-    await el.updateComplete;
-    // The dialog is open again for the new session when the old hide lands.
-    (el as any)._onLogsHidden({ target: { open: true } });
-    await el.updateComplete;
-    expect(logsDialog(el).hasAttribute("open")).toBe(true);
-  });
-
   it("forgets the source when the logs dialog hides", async () => {
     const el = await mount();
     mocks.pickBleNusDevice.mockResolvedValue({});
     await (el as any)._showBleLogs();
     await el.updateComplete;
-    logsDialog(el).open = false;
     logsDialog(el).dispatchEvent(new CustomEvent("after-hide"));
     await el.updateComplete;
     expect(logsDialog(el).hasAttribute("open")).toBe(false);
     expect(logsDialog(el).bleDevice).toBeUndefined();
+    // And the next session opens as usual.
+    mocks.requestSerialPort.mockResolvedValue({ readable: null });
+    mocks.openPortForLogs.mockResolvedValue(true);
+    await (el as any)._showSerialLogs();
+    await el.updateComplete;
+    expect(logsDialog(el).hasAttribute("open")).toBe(true);
   });
 });

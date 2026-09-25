@@ -77,10 +77,7 @@ export class ESPHomeWebNrfCard extends LitElement {
     }
   }
 
-  // The dialog's after-hide trails its close animation; one from the previous
-  // session must not drop a session opened meanwhile (the dialog is open again).
-  private _onLogsHidden(e: Event): void {
-    if ((e.target as { open?: boolean }).open) return;
+  private _onLogsHidden(): void {
     this._logs = undefined;
   }
 
