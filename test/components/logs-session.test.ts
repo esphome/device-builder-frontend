@@ -10,7 +10,7 @@ import {
 } from "../../src/components/logs-session.js";
 
 const fakePort = {} as SerialPort;
-const noop = () => {};
+const noop = () => Promise.resolve();
 const serial = (paused = false): LogsSession => ({
   kind: "serial",
   port: fakePort,

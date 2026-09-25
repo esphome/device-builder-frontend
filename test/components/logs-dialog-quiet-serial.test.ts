@@ -36,7 +36,7 @@ describe("logs-dialog quiet-serial banner", () => {
 
   async function startSerial(): Promise<void> {
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    el.setSerialStream(port, cancel as unknown as () => void);
+    el.setSerialStream(port, cancel as unknown as () => Promise<void>);
     await el.updateComplete;
   }
 
@@ -87,7 +87,7 @@ describe("logs-dialog quiet-serial banner", () => {
         await el.updateComplete;
         call(el, "_onStart");
         await el.updateComplete;
-        el.setSerialStream(port, cancel as unknown as () => void);
+        el.setSerialStream(port, cancel as unknown as () => Promise<void>);
       },
     ],
   ])("%s expects output afresh and watches again", async (_label, rearm) => {
@@ -162,7 +162,7 @@ describe("logs-dialog quiet-serial banner", () => {
     vi.advanceTimersByTime(60_000);
     await el.updateComplete;
     expect(banner(el)).toBeNull();
-    el.setSerialStream(port, cancel as unknown as () => void);
+    el.setSerialStream(port, cancel as unknown as () => Promise<void>);
     await el.updateComplete;
     vi.advanceTimersByTime(4999);
     await el.updateComplete;
@@ -228,7 +228,7 @@ describe("switchToOtaLogs", () => {
   it("tears down the serial reader and starts the OTA stream in place", () => {
     const cancel = vi.fn();
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    el.setSerialStream(port, cancel as unknown as () => void);
+    el.setSerialStream(port, cancel as unknown as () => Promise<void>);
     (el as any)._log.append(["boot garbage"]);
 
     switchToOtaLogs(el);
@@ -246,7 +246,7 @@ describe("switchToOtaLogs", () => {
   it("appends the reason ahead of the switch line when given", () => {
     const cancel = vi.fn();
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    el.setSerialStream(port, cancel as unknown as () => void);
+    el.setSerialStream(port, cancel as unknown as () => Promise<void>);
     switchToOtaLogs(el, "wrong port for this console");
     expect((el as any)._log.lines.slice(0, 2)).toEqual([
       "wrong port for this console",
@@ -259,7 +259,7 @@ describe("switchToOtaLogs", () => {
       onReconnect: () => Promise.resolve(),
       onBackToInstall: () => {},
     });
-    el.setSerialStream(port, vi.fn() as unknown as () => void);
+    el.setSerialStream(port, vi.fn() as unknown as () => Promise<void>);
     switchToOtaLogs(el);
     expect((el as any)._backToInstall).toBe(true);
   });
@@ -289,7 +289,7 @@ describe("switchToOtaLogs", () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
     switchToOtaLogs(el); // switched while the attach was still in flight
     const lateCancel = vi.fn();
-    el.setSerialStream(port, lateCancel as unknown as () => void);
+    el.setSerialStream(port, lateCancel as unknown as () => Promise<void>);
     expect(lateCancel).toHaveBeenCalledTimes(1);
     expect(session(el)).toMatchObject({ kind: "ota", port: OTA_PORT });
   });
