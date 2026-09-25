@@ -102,6 +102,14 @@ export class ESPHomeProcessTerminal extends LitElement {
 
   private _renderBanner() {
     const state = this._effectiveState;
+    if (state === "running" && this.variant === "stream") {
+      return html`
+        <div class="status-banner status-banner--info" role="status">
+          <wa-spinner></wa-spinner>
+          <span>${this._effectiveMessage}</span>
+        </div>
+      `;
+    }
     if (state !== "success" && state !== "error") return nothing;
     const isSuccess = state === "success";
     return html`

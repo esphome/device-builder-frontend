@@ -35,6 +35,7 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { normalizeLogLine } from "../util/log-line.js";
+import { isNrfPlatform } from "../util/nrf-platform.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isRp2Platform } from "../util/rp2-platform.js";
@@ -235,10 +236,16 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // The RTS-pulse Reset Device works here. A Pico has no reset line on its
-  // CDC and arduino-pico gates output on DTR, so the pulse would only silence
-  // it; a Pico resets through the session's hook instead (WebUSB browsers).
+  // The RTS-pulse Reset Device works here. A Pico or an nRF52 has no reset
+  // line on its CDC and the pulse's DTR drop only detaches the host; a Pico
+  // resets through the session's hook instead (WebUSB browsers).
   _pulseResets = true;
+  // Set by openBleNus for the whole session, so Reset Device stays hidden in
+  // the shared reconnecting and dead phases too.
+  _isBleSession = false;
+  // Disconnect / error message for a BLE session; shown via the connectionLost
+  // banner (dead state) instead of as a log line.
+  @state() _bleStatusMessage = "";
 
   static styles = [
     espHomeStyles,
@@ -260,7 +267,8 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      this._pulseResets = !isRp2Platform(this._targetPlatform);
+      this._pulseResets =
+        !isRp2Platform(this._targetPlatform) && !isNrfPlatform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -301,6 +309,7 @@ export class ESPHomeLogsDialog extends LitElement {
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
   }): () => boolean {
+    this._isBleSession = false;
     return openPassive(this, options);
   }
 
@@ -308,6 +317,8 @@ export class ESPHomeLogsDialog extends LitElement {
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
   }) {
+    this._isBleSession = true;
+    this._bleStatusMessage = "";
     openBleNus(this, options);
   }
 
@@ -316,9 +327,11 @@ export class ESPHomeLogsDialog extends LitElement {
     setBleStream(this, cancel);
   }
 
-  /** Record a BLE GATT disconnect; appends an optional pane message and goes dead. */
+  /** Record a BLE GATT disconnect; stores the message for the status banner
+   *  and goes dead. */
   public setBleDisconnected(message?: string) {
-    setBleDisconnected(this, message);
+    this._bleStatusMessage = message ?? "";
+    setBleDisconnected(this);
   }
 
   /** Register the Web Serial reader (its loop-cancel) + port. Called by
@@ -366,7 +379,10 @@ export class ESPHomeLogsDialog extends LitElement {
     const passive = isPassive(s);
     // The dead state (serial reopen failed) gets the escape hatch
     // unconditionally — its only other recovery is Start-to-reconnect.
-    const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
+    const offerOtaFallback =
+      !this._isBleSession &&
+      !isNrfPlatform(this._targetPlatform) &&
+      (this._quietSerial.quiet || s.kind === "dead");
     const title = this._localize("dashboard.logs_title", { name: this.name });
     // BLE NUS and Web Serial show their own source labels; OTA / server-serial
     // show the target port.
@@ -403,8 +419,18 @@ export class ESPHomeLogsDialog extends LitElement {
           .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
-          .connectionLost=${wsDown}
-          .connectionLostMessage=${this._localize("dashboard.logs_connection_lost")}
+          .state=${this._isBleSession && s.kind === "reconnecting" ? "running" : null}
+          .statusMessage=${
+            this._isBleSession && s.kind === "reconnecting"
+              ? this._localize("dashboard.logs_ble_nus_connecting")
+              : ""
+          }
+          .connectionLost=${wsDown || (this._isBleSession && s.kind === "dead")}
+          .connectionLostMessage=${
+            this._isBleSession && s.kind === "dead"
+              ? this._bleStatusMessage
+              : this._localize("dashboard.logs_connection_lost")
+          }
         >
           ${
             this._backToInstall

@@ -22,6 +22,7 @@ interface BluetoothRemoteGATTService {
 interface BluetoothRemoteGATTCharacteristic extends EventTarget {
   readonly value?: DataView;
   startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+  stopNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
   addEventListener(type: "characteristicvaluechanged", listener: EventListener): void;
   removeEventListener(type: "characteristicvaluechanged", listener: EventListener): void;
 }

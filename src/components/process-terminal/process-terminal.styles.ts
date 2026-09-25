@@ -226,6 +226,10 @@ export const processTerminalStyles = css`
     background: color-mix(in srgb, var(--term-error), transparent 85%);
     color: var(--term-error);
   }
+  .status-banner--info {
+    background: color-mix(in srgb, var(--term-accent), transparent 85%);
+    color: var(--term-accent);
+  }
 
   .terminal-toolbar {
     flex-shrink: 0;

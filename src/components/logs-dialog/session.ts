@@ -132,17 +132,13 @@ export function setBleStream(host: ESPHomeLogsDialog, cancel: () => void): void 
 }
 
 /**
- * Record a BLE GATT disconnect (or failed connect). Appends an optional
- * message to the pane and drops to ``dead`` so the Start button reconnects.
- * The caller handles the toast; this only updates dialog state.
+ * Record a BLE GATT disconnect (or failed connect). Drops to ``dead`` so the
+ * Start button reconnects. The message is stored on the host and shown via the
+ * connectionLost banner; the caller handles the toast.
  */
-export function setBleDisconnected(host: ESPHomeLogsDialog, message?: string): void {
+export function setBleDisconnected(host: ESPHomeLogsDialog): void {
   if (!host._open || !isPassive(host._session)) return;
   void teardownSession(host);
-  if (message) {
-    host._log.dropPending();
-    host._log.append([message]);
-  }
   host._session = { kind: "dead" };
 }
 
@@ -386,8 +382,8 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
  *  (any port while none is attached), else the pulse where that works. */
 export function resetOffered(host: ESPHomeLogsDialog): boolean {
   const s = host._session;
-  // BLE has no port and no reset line at all.
-  if (!isPassive(s) || s.kind === "ble") return false;
+  // A BLE session has no port and no reset line at all, in every phase.
+  if (!isPassive(s) || host._isBleSession) return false;
   const hook = host._resetDevice;
   if (!hook) return host._pulseResets;
   return s.kind !== "serial" || hook.supports(s.port);
@@ -456,6 +452,7 @@ async function runReconnecting(
 function reconnectSerial(host: ESPHomeLogsDialog): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
+  if (host._isBleSession) host._bleStatusMessage = "";
   void runReconnecting(host, reconnect, "dashboard.logs_web_serial_open_failed");
 }
 

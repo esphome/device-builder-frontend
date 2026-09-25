@@ -190,6 +190,20 @@ describe("logs-dialog Reset Device gate", () => {
     return el;
   }
 
+  async function mountBle(targetPlatform: string): Promise<ESPHomeLogsDialog> {
+    const el = makeLogsDialog();
+    el.configuration = "device.yaml";
+    (el as any)._devices = [
+      makeConfiguredDevice({
+        configuration: "device.yaml",
+        target_platform: targetPlatform,
+      }),
+    ];
+    el.openBleNus({ onReconnect: () => Promise.resolve() });
+    await el.updateComplete;
+    return el;
+  }
+
   const hasResetButton = (el: ESPHomeLogsDialog): boolean =>
     [...el.shadowRoot!.querySelectorAll(".term-btn__label")].some(
       (span) => span.textContent?.trim() === "dashboard.logs_reset_device"
@@ -215,6 +229,14 @@ describe("logs-dialog Reset Device gate", () => {
     el.setSerialStream({ close: vi.fn(), setSignals: vi.fn() } as any, async () => {});
     await el.updateComplete;
     expect(hasResetButton(el)).toBe(false);
+  });
+
+  it("hides Reset Device for an nRF52 Web Serial session", async () => {
+    expect(hasResetButton(await mountPassive("nrf52"))).toBe(false);
+  });
+
+  it("hides Reset Device for a BLE (nRF52) session", async () => {
+    expect(hasResetButton(await mountBle("nrf52"))).toBe(false);
   });
 });
 

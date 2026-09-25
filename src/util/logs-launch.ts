@@ -3,7 +3,11 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import { requestBleNusDevice, streamBleNus } from "./ble-nus-stream.js";
+import {
+  BleNusServiceNotFoundError,
+  requestBleNusDevice,
+  streamBleNus,
+} from "./ble-nus-stream.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { isNrfPlatform } from "./nrf-platform.js";
@@ -190,22 +194,46 @@ export async function launchLogsWithMethod(
   }
 }
 
+// Maximum number of GATT connect attempts before giving up. The connection
+// can fail transiently while the device is still advertising or the OS
+// Bluetooth stack is settling after a prior session.
+const BLE_CONNECT_ATTEMPTS = 3;
+const BLE_RETRY_DELAY_MS = 1000;
+
 async function _attachBleNusStream(
   dialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  device: BluetoothDevice
+  device: BluetoothDevice,
+  attemptsLeft = BLE_CONNECT_ATTEMPTS
 ): Promise<void> {
-  const cancel = streamBleNus(device, {
+  const cancel = await streamBleNus(device, {
     onLine: (line) => {
       if (!dialog._blePaused) dialog._enqueueLine(line);
     },
     onDisconnect: (err) => {
+      const serviceNotFound = err instanceof BleNusServiceNotFoundError;
+      if (err && !serviceNotFound && attemptsLeft > 1) {
+        // Transient connect failure — retry after a short delay while the
+        // session stays in ``reconnecting``. Abort if the dialog was closed
+        // or the user switched away from the BLE session in the meantime.
+        setTimeout(() => {
+          if (!dialog._open || !dialog._isBleSession) return;
+          void _attachBleNusStream(dialog, localize, device, attemptsLeft - 1);
+        }, BLE_RETRY_DELAY_MS);
+        return;
+      }
       const msg = localize(
-        err ? "dashboard.logs_ble_nus_open_failed" : "dashboard.logs_ble_nus_disconnected"
+        serviceNotFound
+          ? "dashboard.logs_ble_nus_service_not_found"
+          : err
+            ? "dashboard.logs_ble_nus_open_failed"
+            : "dashboard.logs_ble_nus_disconnected"
       );
       if (err) notifyError(msg);
       dialog.setBleDisconnected(msg);
     },
   });
-  dialog.setBleStream(cancel);
+  if (cancel !== null) {
+    dialog.setBleStream(cancel);
+  }
 }
