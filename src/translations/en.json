@@ -1954,8 +1954,6 @@
       "install_step_running": "If the Pico already runs ESPHome, click Reset into BOOTSEL instead and pick its serial port.",
       "install_step_install": "Click Install and pick the RP2 Boot device.",
       "install_reset_action": "Reset into BOOTSEL",
-      "install_resetting": "Resetting the Pico into BOOTSEL…",
-      "install_flashing": "Installing ESPHome…",
       "install_image_failed": "Could not load the firmware: {error}"
     },
     "unsupported": {

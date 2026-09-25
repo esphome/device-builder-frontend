@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../src/components/base-dialog.js", () => ({}));
@@ -13,23 +13,25 @@ vi.mock("../../src/web/util/esphome-web-firmware.js", () => ({
 }));
 
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
-const picoFlash = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   loadPicoImage: vi.fn(),
   flashPico: vi.fn(),
-  resetToBootloader: vi.fn(),
-  requestSerialPort: vi.fn(),
+  touchIntoBootloader: vi.fn(),
+  loadPicoboot: vi.fn(async () => ({})),
 }));
-vi.mock("../../src/web/install/pico-flash.js", async (importOriginal) => ({
+vi.mock("../../src/web/install/pico-image.js", () => ({
+  loadPicoImage: mocks.loadPicoImage,
+}));
+vi.mock("../../src/util/rp2-flash.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  loadPicoImage: picoFlash.loadPicoImage,
-  flashPico: picoFlash.flashPico,
+  flashPico: mocks.flashPico,
 }));
 vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
-  resetToBootloader: picoFlash.resetToBootloader,
+  touchIntoBootloader: mocks.touchIntoBootloader,
 }));
-vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  requestSerialPort: picoFlash.requestSerialPort,
+  loadPicoboot: mocks.loadPicoboot,
 }));
 
 import toast from "sonner-js";
@@ -59,10 +61,9 @@ afterEach(() => {
   document.body.innerHTML = "";
   vi.clearAllMocks();
   delete (navigator as any).usb;
+  delete (navigator as any).serial;
 });
 
-const withWebUsb = () =>
-  Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
 const text = (el: ESPHomeWebInstallPicoDialog) => el.shadowRoot!.textContent ?? "";
 const card = (el: ESPHomeWebInstallPicoDialog) =>
   el.shadowRoot!.querySelector("esphome-process-terminal") as any;
@@ -129,30 +130,40 @@ describe("esphome-web-install-pico-dialog", () => {
 describe("esphome-web-install-pico-dialog over WebUSB", () => {
   const image = { familyId: 0xe48bff56, ranges: [], totalBytes: 0 };
 
-  it("keeps the download steps where WebUSB is missing", async () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+    mocks.loadPicoImage.mockResolvedValue(image);
+  });
+
+  it("keeps the download steps where WebUSB is missing, without fetching the image", async () => {
+    delete (navigator as any).usb;
     fetchEsphomeWebManifest.mockResolvedValue({ version: "1" });
     picoUf2Url.mockReturnValue("https://example/x.uf2");
     const el = await mount();
     expect(text(el)).toContain("web.pico.setup_step_4");
     expect(button(el, "dashboard.install")).toBeUndefined();
-    expect(picoFlash.loadPicoImage).not.toHaveBeenCalled();
+    expect(mocks.loadPicoImage).not.toHaveBeenCalled();
   });
 
-  it("fetches the image on open and installs over PICOBOOT, then Continue hands over the port", async () => {
-    withWebUsb();
-    fetchEsphomeWebManifest.mockResolvedValue({ version: "1" });
-    picoFlash.loadPicoImage.mockResolvedValue(image);
-    picoFlash.flashPico.mockImplementation(async (_image, hooks) => {
+  it("fetches the image and warms the engine on open, without the download manifest", async () => {
+    const el = await mount();
+    expect(mocks.loadPicoImage).toHaveBeenCalledOnce();
+    expect(mocks.loadPicoboot).toHaveBeenCalledOnce();
+    expect(fetchEsphomeWebManifest).not.toHaveBeenCalled();
+    expect(text(el)).toContain("web.pico.install_step_bootsel");
+  });
+
+  it("installs over PICOBOOT with progress, then Continue hands over the port", async () => {
+    mocks.flashPico.mockImplementation(async (_image, hooks) => {
       hooks.onProgress(50);
       return true;
     });
     const el = await mount();
-    expect(picoFlash.loadPicoImage).toHaveBeenCalledOnce();
-    expect(text(el)).toContain("web.pico.install_step_bootsel");
     button(el, "dashboard.install").click();
     await settle(el);
-    expect(picoFlash.flashPico).toHaveBeenCalledWith(image, expect.anything());
+    expect(mocks.flashPico).toHaveBeenCalledWith(image, expect.anything());
     // The status lives on the progress card's properties (the element is stubbed).
+    expect(card(el).state).toBe("success");
     expect(card(el).statusMessage).toBe("web.pico.setup_step_5");
     const connected = vi.fn();
     el.addEventListener("pico-connected", connected);
@@ -164,50 +175,47 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     button(el, "onboarding.wizard.continue").click();
     await settle(el);
     expect(connected).toHaveBeenCalledOnce();
-    delete (navigator as any).serial;
   });
 
   it("goes back to the start when the chooser is dismissed", async () => {
-    withWebUsb();
-    picoFlash.loadPicoImage.mockResolvedValue(image);
-    picoFlash.flashPico.mockResolvedValue(false);
+    mocks.flashPico.mockResolvedValue(false);
     const el = await mount();
     button(el, "dashboard.install").click();
     await settle(el);
-    expect((el as any)._state).toBe("idle");
+    expect(card(el)).toBeNull();
     expect(button(el, "dashboard.install")).toBeDefined();
   });
 
-  it("names the failure and offers Retry, refetching an image that failed to load", async () => {
-    withWebUsb();
-    picoFlash.loadPicoImage
+  it("shows the failure copy with Retry, and refetches an image that failed to load", async () => {
+    // The prefetch on open fails, and so does the refetch behind Install.
+    mocks.loadPicoImage
+      .mockReset()
+      .mockRejectedValueOnce(new Error("offline"))
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValue(image);
     const el = await mount();
+    await settle(el);
     button(el, "dashboard.install").click();
     await settle(el);
+    expect(card(el).state).toBe("error");
     expect(card(el).statusDetail).toBe("web.pico.install_image_failed");
+    expect(mocks.loadPicoImage).toHaveBeenCalledTimes(2);
     button(el, "command.retry").click();
     await settle(el);
-    picoFlash.flashPico.mockRejectedValue(
-      new (await import("../../src/web/install/pico-flash.js")).PicoFlashError("rp2350")
-    );
+    const { PicoFlashError } = await import("../../src/util/rp2-flash.js");
+    mocks.flashPico.mockRejectedValue(new PicoFlashError("rp2350"));
     button(el, "dashboard.install").click();
     await settle(el);
-    expect(picoFlash.loadPicoImage).toHaveBeenCalledTimes(2);
     expect(card(el).statusDetail).toBe("firmware.rp2_rp2350_device");
   });
 
-  it("resets a running Pico into BOOTSEL from its serial port", async () => {
-    withWebUsb();
-    picoFlash.loadPicoImage.mockResolvedValue(image);
-    const port = {};
-    picoFlash.requestSerialPort.mockResolvedValue(port);
+  it("resets a running Pico into BOOTSEL and waits for it, keeping Install at hand", async () => {
+    mocks.touchIntoBootloader.mockResolvedValue(true);
     const el = await mount();
     button(el, "web.pico.install_reset_action").click();
     await settle(el);
-    expect(picoFlash.resetToBootloader).toHaveBeenCalledWith(port);
-    expect((el as any)._state).toBe("reset");
+    expect(mocks.touchIntoBootloader).toHaveBeenCalledOnce();
+    expect(card(el).statusMessage).toBe("firmware.rp2_wait_title");
     expect(button(el, "dashboard.install")).toBeDefined();
   });
 });
