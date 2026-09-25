@@ -8,12 +8,20 @@ import {
   PicobootCmd,
   PicobootDevice,
   PicobootError,
+  type Uf2FlashHooks,
 } from "../../src/util/rp2-picoboot.js";
 import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 import type { Uf2Image } from "../../src/util/uf2.js";
 import { classifyUsbDevice } from "../../src/util/web-usb.js";
 
 const BASE = 0x10000000;
+
+/** ``flashUf2`` with a silent progress hook, for the cases that check only the wire. */
+const flash = (
+  dev: PicobootDevice,
+  ranges: { address: number; length: number }[],
+  hooks: Partial<Uf2FlashHooks> = {}
+) => flashUf2(dev, image(ranges), { onProgress: () => {}, ...hooks });
 
 type Transfer =
   | { kind: "out"; ep: number; data: Uint8Array }
@@ -254,7 +262,7 @@ describe("flashUf2", () => {
       onLog: (l) => log.push(l),
     });
     expect(log).toEqual([
-      "Writing 1 range (10240 bytes) across 3 flash sectors",
+      "Writing 10240 bytes in 3 flash sectors",
       "Range 0x10000000 (10240 bytes)",
       "Taking exclusive access",
       "Leaving XIP",
@@ -322,14 +330,10 @@ describe("flashUf2", () => {
   it("keeps two ranges that share a sector from erasing each other", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
-    await flashUf2(
-      dev,
-      image([
-        { address: BASE, length: 0x100 },
-        { address: BASE + 0x800, length: 0x100 },
-      ]),
-      { onProgress: () => {} }
-    );
+    await flash(dev, [
+      { address: BASE, length: 0x100 },
+      { address: BASE + 0x800, length: 0x100 },
+    ]);
     expect(packetArgs(d, PicobootCmd.FLASH_ERASE)).toHaveLength(1);
     expect(packetArgs(d, PicobootCmd.WRITE).map((a) => u32(a, 0))).toEqual([
       BASE,
@@ -392,18 +396,18 @@ describe("flashUf2", () => {
       t.kind === "out" && t.data.length === 32 && t.data[8] === PicobootCmd.REBOOT
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
-    await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
-    ).rejects.toMatchObject({ name: "NetworkError" });
+    await expect(flash(dev, [{ address: BASE, length: 0x100 }])).rejects.toMatchObject({
+      name: "NetworkError",
+    });
   });
 
   it("treats a short bulk write as a failure", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
     d.shortWrite = true;
-    await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
-    ).rejects.toThrow(/Short USB write/);
+    await expect(flash(dev, [{ address: BASE, length: 0x100 }])).rejects.toThrow(
+      /Short USB write/
+    );
   });
 
   it("stops before erasing on an aborted signal and releases exclusive access", async () => {
@@ -467,9 +471,9 @@ describe("flashUf2", () => {
       t.kind === "control-in"
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
-    await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
-    ).rejects.toMatchObject({ name: "NetworkError" });
+    await expect(flash(dev, [{ address: BASE, length: 0x100 }])).rejects.toMatchObject({
+      name: "NetworkError",
+    });
   });
 
   it("stamps serial activity for the reboot's re-enumeration", async () => {
@@ -521,9 +525,9 @@ describe("flashUf2", () => {
       t.kind === "out" && t.data.length === 0x1000
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
-    await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x1000 }]), { onProgress: () => {} })
-    ).rejects.toMatchObject({ name: "NetworkError" });
+    await expect(flash(dev, [{ address: BASE, length: 0x1000 }])).rejects.toMatchObject({
+      name: "NetworkError",
+    });
     expect(d.log[d.log.length - 1]).toEqual({ kind: "close" });
   });
 });

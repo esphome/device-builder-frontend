@@ -4,6 +4,7 @@
  * install flows; nothing here touches the DOM.
  */
 import { concat, int32LE } from "./bytes.js";
+import { formatAddress, tenthLogger } from "./flash-log.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 import type { Uf2Image } from "./uf2.js";
 import { classifyUsbDevice, isUsbDeviceLost } from "./web-usb.js";
@@ -316,12 +317,6 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
   return sectors;
 }
 
-/**
- * picotool's ``load`` sequence: take exclusive access, leave XIP, then erase
- * and write sector by sector, and reboot into the new firmware. The abort
- * signal is checked between sectors; the device stays in BOOTSEL after an
- * abort or failure, so the caller can retry without a reset.
- */
 export interface Uf2FlashHooks {
   onProgress: (percent: number) => void;
   /** One line per step, for the install dialog's details log. */
@@ -329,8 +324,12 @@ export interface Uf2FlashHooks {
   signal?: AbortSignal;
 }
 
-const hex = (address: number): string => `0x${address.toString(16).toUpperCase()}`;
-
+/**
+ * picotool's ``load`` sequence: take exclusive access, leave XIP, then erase
+ * and write sector by sector, and reboot into the new firmware. The abort
+ * signal is checked between sectors; the device stays in BOOTSEL after an
+ * abort or failure, so the caller can retry without a reset.
+ */
 export async function flashUf2(
   dev: PicobootDevice,
   image: Uf2Image,
@@ -345,17 +344,15 @@ export async function flashUf2(
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     const sectors = planSectors(image);
-    log(
-      `Writing ${image.ranges.length} range${image.ranges.length === 1 ? "" : "s"} (${image.totalBytes} bytes) across ${sectors.size} flash sectors`
-    );
+    log(`Writing ${image.totalBytes} bytes in ${sectors.size} flash sectors`);
     for (const range of image.ranges) {
-      log(`Range ${hex(range.address)} (${range.data.length} bytes)`);
+      log(`Range ${formatAddress(range.address)} (${range.data.length} bytes)`);
     }
     log("Taking exclusive access");
     await dev.exclusiveAccess(EXCLUSIVE);
     log("Leaving XIP");
     await dev.exitXip();
-    let previous = 0;
+    const tenth = tenthLogger(log, "Writing");
     for (const [sector, writes] of sectors) {
       signal?.throwIfAborted();
       await dev.flashErase(sector, FLASH_SECTOR_SIZE);
@@ -364,10 +361,7 @@ export async function flashUf2(
         written += w.bytes;
         const percent = Math.floor((written / image.totalBytes) * 99);
         onProgress(percent);
-        // A line every ten percent, like the other engines.
-        if (Math.floor(percent / 10) > Math.floor(previous / 10))
-          log(`Writing: ${percent}%`);
-        previous = percent;
+        tenth(percent);
       }
     }
     signal?.throwIfAborted();

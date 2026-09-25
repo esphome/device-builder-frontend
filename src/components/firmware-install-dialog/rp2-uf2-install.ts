@@ -5,6 +5,7 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { formatUsbId } from "../../util/flash-log.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import {
   parseUf2Image,
@@ -122,10 +123,13 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const device = host._device;
   const stillCurrent = () => host._device === device && host._rp2Image === image;
   host._flashBusy = true;
-  const log = installLog(host, stillCurrent);
-  const dev = await openPicoboot(host, stillCurrent, log);
+  const dev = await openPicoboot(host, stillCurrent);
   if (stillCurrent()) host._flashBusy = false;
   if (!dev || !stillCurrent()) return;
+  const log = installLog(host, stillCurrent);
+  log(
+    `Claimed the RP2 Boot device (${formatUsbId(dev.device.vendorId, dev.device.productId)})`
+  );
 
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
@@ -163,8 +167,7 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
 // flash" (chooser dismissed, or the failure already reported on the host).
 async function openPicoboot(
   host: ESPHomeFirmwareInstallDialog,
-  stillCurrent: () => boolean,
-  log: (line: string) => void
+  stillCurrent: () => boolean
 ) {
   let usb: USBDevice | null;
   try {
@@ -193,11 +196,7 @@ async function openPicoboot(
   try {
     const { PicobootDevice } = await loadPicoboot();
     const dev = await PicobootDevice.open(usb);
-    if (stillCurrent()) {
-      const id = (n: number) => n.toString(16).padStart(4, "0");
-      log(`Claimed the RP2 Boot device (${id(usb.vendorId)}:${id(usb.productId)})`);
-      return dev;
-    }
+    if (stillCurrent()) return dev;
     // The dialog moved on mid-open; release the claim so the next attempt can open it.
     await dev.close();
     return null;

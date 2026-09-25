@@ -244,7 +244,7 @@ describe("rp2DoFlash", () => {
 
   it("flashes with progress and lands on done", async () => {
     const host = readyHost();
-    const dev = { close: vi.fn() };
+    const dev = { device: bootsel, close: vi.fn() };
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);
     mocks.picobootOpen.mockResolvedValue(dev);
     mocks.flashUf2.mockImplementation(async (_d, _i, hooks) => {
@@ -265,16 +265,14 @@ describe("rp2DoFlash", () => {
     expect(host._step).toBe("done");
     expect(host._flashAbort).toBeNull();
     // The claimed device and the engine's lines land in the details log.
-    expect(host._log.lines[0]).toMatch(
-      /^Claimed the RP2 Boot device \([0-9a-f]{4}:[0-9a-f]{4}\)$/
-    );
+    expect(host._log.lines[0]).toBe("Claimed the RP2 Boot device (2e8a:0003)");
     expect(host._log.lines).toContain("Rebooting into the firmware");
   });
 
   it("drops a late line once the dialog moved on", async () => {
     const host = readyHost();
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);
-    mocks.picobootOpen.mockResolvedValue({});
+    mocks.picobootOpen.mockResolvedValue({ device: bootsel });
     mocks.flashUf2.mockImplementation(async (_d, _i, hooks) => {
       host._device = null;
       hooks.onLog?.("Rebooting into the firmware");
@@ -286,7 +284,7 @@ describe("rp2DoFlash", () => {
   it("reports a device lost mid-flash with the BOOTSEL hint", async () => {
     const host = readyHost();
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);
-    mocks.picobootOpen.mockResolvedValue({});
+    mocks.picobootOpen.mockResolvedValue({ device: bootsel });
     mocks.flashUf2.mockRejectedValue(new DOMException("gone", "NetworkError"));
     await rp2DoFlash(asHost(host));
     expect(host._step).toBe("error");
@@ -297,7 +295,7 @@ describe("rp2DoFlash", () => {
   it("stays silent when the dialog was torn down during the flash", async () => {
     const host = readyHost();
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);
-    mocks.picobootOpen.mockResolvedValue({});
+    mocks.picobootOpen.mockResolvedValue({ device: bootsel });
     mocks.flashUf2.mockImplementation(async () => {
       host._device = null;
       host._flashAbort?.abort();

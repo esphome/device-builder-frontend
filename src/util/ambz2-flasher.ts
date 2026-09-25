@@ -1,3 +1,4 @@
+import { formatAddress, tenthLogger } from "./flash-log.js";
 /**
  * Flashing a Realtek AmebaZ2 (RTL8720C) over Web Serial through the ROM's
  * UART download console, the protocol ltchiptool speaks for this family:
@@ -265,8 +266,6 @@ async function readFlashHash(
   return reply.subarray(6);
 }
 
-const hex = (address: number): string => `0x${address.toString(16).toUpperCase()}`;
-
 async function writeRun(
   link: RomLink,
   cfg: string,
@@ -275,19 +274,15 @@ async function writeRun(
   onBytes: (sent: number) => void,
   log: (line: string) => void
 ): Promise<void> {
-  log(`Writing ${hex(address)} (${data.length} bytes)`);
-  let nextTenth = 10;
+  log(`Writing ${formatAddress(address)} (${data.length} bytes)`);
+  const tenth = tenthLogger(log, `Writing ${formatAddress(address)}`);
   link.drain();
   await link.write(`fwd ${cfg} ${address.toString(16)}\n`);
   await xmodemSend(link, data, {
     timeoutMs: XMODEM_TIMEOUT_MS,
     onBlock: (sent) => {
       onBytes(sent);
-      const percent = Math.floor((sent / data.length) * 100);
-      if (percent >= nextTenth) {
-        log(`Writing ${hex(address)}: ${percent}%`);
-        nextTenth = Math.floor(percent / 10) * 10 + 10;
-      }
+      tenth(Math.floor((sent / data.length) * 100));
     },
   });
   if (!(await linkRom(link, RELINK_MS))) {
@@ -296,7 +291,7 @@ async function writeRun(
   const expected = await sha256(data);
   const actual = await readFlashHash(link, cfg, data.length);
   if (expected.some((b, i) => b !== actual[i])) throw new Ambz2VerifyError(address);
-  log(`Verified ${hex(address)} (SHA-256 matches)`);
+  log(`Verified ${formatAddress(address)} (SHA-256 matches)`);
 }
 
 /**
