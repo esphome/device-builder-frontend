@@ -32,6 +32,8 @@ const FLASH_UNLOCK_VALUE = 0x7effffff;
 
 export interface Ambz2FlashHooks {
   onProgress: (percent: number) => void;
+  /** One line per step, for the install dialog's details log. */
+  onLog?: (line: string) => void;
   /** The chip is linked and the write is starting. */
   onLinked?: () => void;
   /** The automatic reset produced nothing; the user has to strap the board. */
@@ -245,22 +247,38 @@ async function readFlashHash(
   return reply.subarray(6);
 }
 
+const hex = (address: number): string => `0x${address.toString(16).toUpperCase()}`;
+
 async function writeRun(
   link: RomLink,
   cfg: string,
   address: number,
   data: Uint8Array<ArrayBuffer>,
-  onBytes: (sent: number) => void
+  onBytes: (sent: number) => void,
+  log: (line: string) => void
 ): Promise<void> {
+  log(`Writing ${hex(address)} (${data.length} bytes)`);
+  let nextTenth = 10;
   link.drain();
   await link.write(`fwd ${cfg} ${address.toString(16)}\n`);
-  await xmodemSend(link, data, { timeoutMs: XMODEM_TIMEOUT_MS, onBlock: onBytes });
+  await xmodemSend(link, data, {
+    timeoutMs: XMODEM_TIMEOUT_MS,
+    onBlock: (sent) => {
+      onBytes(sent);
+      const percent = Math.floor((sent / data.length) * 100);
+      if (percent >= nextTenth) {
+        log(`Writing ${hex(address)}: ${percent}%`);
+        nextTenth = Math.floor(percent / 10) * 10 + 10;
+      }
+    },
+  });
   if (!(await linkRom(link, RELINK_MS))) {
     throw new Ambz2LinkError("The chip stopped answering after the transfer");
   }
   const expected = await sha256(data);
   const actual = await readFlashHash(link, cfg, data.length);
   if (expected.some((b, i) => b !== actual[i])) throw new Ambz2VerifyError(address);
+  log(`Verified ${hex(address)} (SHA-256 matches)`);
 }
 
 /**
@@ -275,26 +293,40 @@ export async function flashAmbz2(
 ): Promise<void> {
   if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
   const rom = new RomLink(port, hooks.signal);
+  const log = hooks.onLog ?? (() => {});
   let failure: unknown;
   try {
+    log("Resetting the board into download mode over DTR/RTS");
     await autoReset(port);
     if (!(await linkRom(rom, AUTO_LINK_MS))) {
+      log("No answer from the ROM; waiting for download mode (PA00 to 3.3V, then reset)");
       hooks.onWaitingForStrap?.();
       if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();
     }
     hooks.onLinked?.();
     const cfg = await flashInit(rom);
+    log(
+      `Linked to the ROM downloader (flash config ${cfg}); ${image.runs.length} runs to write`
+    );
     let done = 0;
     for (const run of image.runs) {
-      await writeRun(rom, cfg, run.address, run.data, (sent) => {
-        hooks.onProgress(
-          Math.min(99, Math.floor(((done + sent) / image.totalBytes) * 100))
-        );
-      });
+      await writeRun(
+        rom,
+        cfg,
+        run.address,
+        run.data,
+        (sent) => {
+          hooks.onProgress(
+            Math.min(99, Math.floor(((done + sent) / image.totalBytes) * 100))
+          );
+        },
+        log
+      );
       done += run.data.length;
     }
     // The ROM boots the firmware on this; no reply comes back.
     await rom.write("disc\n");
+    log("Booting the firmware");
     hooks.onProgress(100);
   } catch (err) {
     failure = err;

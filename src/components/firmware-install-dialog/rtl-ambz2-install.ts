@@ -89,6 +89,8 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     const { flashAmbz2 } = await loadEngine();
     await flashAmbz2(port, image, {
       signal: abort.signal,
+      // The engine's steps land in the details log, as esptool's lines do.
+      onLog: (line) => host._log.enqueue(line),
       onWaitingForStrap: () => {
         if (!stillCurrent()) return;
         host._step = "rtl-wait";

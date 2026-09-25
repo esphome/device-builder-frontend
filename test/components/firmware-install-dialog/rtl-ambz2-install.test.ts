@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 type FlashHooks = {
   onProgress: (p: number) => void;
+  onLog?: (line: string) => void;
   onLinked?: () => void;
   onWaitingForStrap?: () => void;
   signal?: AbortSignal;
@@ -155,6 +156,7 @@ describe("rtlDoFlash", () => {
     mocks.requestSerialPort.mockResolvedValue(port);
     mocks.flashAmbz2.mockImplementation(async (_p, _i, hooks) => {
       steps.push(host._step);
+      hooks.onLog?.("Writing 0xC000 (1 bytes)");
       hooks.onWaitingForStrap?.();
       steps.push(host._step);
       hooks.onLinked?.();
@@ -169,6 +171,7 @@ describe("rtlDoFlash", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(steps).toEqual(["rtl-connect", "rtl-wait", "flashing"]);
+    expect(host._log.lines).toContain("Writing 0xC000 (1 bytes)");
     expect(host._flashPercent).toBe(100);
     expect(host._step).toBe("done");
     expect(host._statusMessage).toBe("firmware.status_done");

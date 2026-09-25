@@ -159,15 +159,29 @@ describe("flashAmbz2", () => {
   it("resets through DTR/RTS, links, writes and verifies every run, then boots", async () => {
     const rom = fakeRom();
     const progress: number[] = [];
+    const log: string[] = [];
     const onLinked = vi.fn();
     const onWaitingForStrap = vi.fn();
     await drive(
       flashAmbz2(rom.port, image, {
         onProgress: (p) => progress.push(p),
+        onLog: (line) => log.push(line),
         onLinked,
         onWaitingForStrap,
       })
     );
+    expect(log).toEqual([
+      "Resetting the board into download mode over DTR/RTS",
+      "Linked to the ROM downloader (flash config 0 1); 2 runs to write",
+      "Writing 0xC000 (1500 bytes)",
+      "Writing 0xC000: 68%",
+      "Writing 0xC000: 100%",
+      "Verified 0xC000 (SHA-256 matches)",
+      "Writing 0x4000 (100 bytes)",
+      "Writing 0x4000: 100%",
+      "Verified 0x4000 (SHA-256 matches)",
+      "Booting the firmware",
+    ]);
     expect(rom.raw.open).toHaveBeenCalledWith({ baudRate: 115200 });
     expect(rom.signals).toEqual([
       { dataTerminalReady: true, requestToSend: true },
