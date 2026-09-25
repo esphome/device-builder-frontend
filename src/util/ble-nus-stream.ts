@@ -1,35 +1,57 @@
-export const BLE_NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+/**
+ * Log streaming over the BLE Nordic UART Service (Web Bluetooth, Chromium
+ * only). Lines go through the same assembler as Web Serial so both surfaces
+ * render identically.
+ */
+import { isNrfPlatform } from "./nrf-platform.js";
+import { createLogLineAssembler, type SerialLineHooks } from "./serial-log-stream.js";
+import { sleep } from "./sleep.js";
 
-/** Thrown (and forwarded via onDisconnect) when the connected device does not
- *  advertise the NUS service — the user picked the wrong device. */
+export const BLE_NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+// TX characteristic: device -> host (notify).
+const BLE_NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+export const isWebBluetoothSupported = (): boolean => "bluetooth" in navigator;
+
+/** BLE NUS logs are an nRF52 feature and need Web Bluetooth. */
+export const bleNusLogsAvailable = (targetPlatform: string | null | undefined): boolean =>
+  isWebBluetoothSupported() && isNrfPlatform(targetPlatform);
+
+/** The picked device has no NUS service: the wrong device, not a bad link. */
 export class BleNusServiceNotFoundError extends Error {
   constructor() {
     super("BLE NUS service not found");
+    this.name = "BleNusServiceNotFoundError";
   }
 }
-// TX characteristic: device → host (notify)
-const BLE_NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+/** No usable Bluetooth adapter (off or absent). */
+export class BleUnavailableError extends Error {
+  constructor() {
+    super("Bluetooth adapter unavailable");
+    this.name = "BleUnavailableError";
+  }
+}
 
 /**
- * Open the browser's device picker for a BLE NUS peripheral.
- *
- * When ``deviceName`` is provided the picker is pre-filtered to that exact
- * name — most nRF52 devices only advertise their name, not the NUS service
- * UUID, so a service-UUID filter would show an empty list. ``optionalServices``
- * is always included so the browser grants GATT access regardless of the
- * filter type (Web Bluetooth requires every service you'll call
- * ``getPrimaryService`` on to appear in either ``filters[].services`` or
- * ``optionalServices``).
- *
- * Returns null when the user dismisses the picker (NotFoundError); re-throws
- * on other errors (Bluetooth unavailable, permission denied, etc.).
+ * Chooser for a NUS peripheral. ESPHome advertises the node name, so the
+ * chooser matches on the given names and, as a fallback, on the service
+ * uuid (most firmware does not advertise it); the service must still be
+ * listed as optional or GATT access to it is refused. Returns null when the
+ * chooser is dismissed.
  */
 export async function requestBleNusDevice(
-  deviceName?: string
+  names: string[]
 ): Promise<BluetoothDevice | null> {
-  const filters: BluetoothRequestDeviceFilter[] = deviceName
-    ? [{ name: deviceName }]
-    : [{ services: [BLE_NUS_SERVICE_UUID] }];
+  // Chrome rejects the chooser with the same NotFoundError as a dismissal
+  // when the adapter is off; ask first so that case gets its own message.
+  if (typeof navigator.bluetooth.getAvailability === "function") {
+    if (!(await navigator.bluetooth.getAvailability())) throw new BleUnavailableError();
+  }
+  const filters: BluetoothLEScanFilter[] = [
+    ...[...new Set(names.filter(Boolean))].map((name) => ({ name })),
+    { services: [BLE_NUS_SERVICE_UUID] },
+  ];
   try {
     return await navigator.bluetooth.requestDevice({
       filters,
@@ -41,88 +63,91 @@ export async function requestBleNusDevice(
   }
 }
 
+export interface BleNusOptions {
+  /** Connect attempts before giving up; a missing service is never retried. */
+  attempts?: number;
+  retryDelayMs?: number;
+  /** Stops the retries once the session that asked for them is gone. */
+  cancelled?: () => boolean;
+}
+
 /**
- * Connect to a BLE NUS peripheral and stream decoded log lines to the
- * callbacks.
- *
- * Resolves to a cancel function once the GATT connection is established and
- * notifications are enabled — the session stays in ``reconnecting`` until
- * this point. Resolves to null if the connection fails (``onDisconnect`` is
- * called with the error before null is returned). Call cancel() to stop
- * streaming and disconnect; it is idempotent and safe to call after a remote
- * disconnect.
+ * Connect to *device*, subscribe to NUS notifications and stream lines into
+ * *hooks*. Resolves to a cancel (idempotent, also disconnects) once
+ * notifications flow; throws the last connect error otherwise.
  */
 export async function streamBleNus(
   device: BluetoothDevice,
-  callbacks: {
-    onLine: (line: string) => void;
-    onDisconnect?: (error?: unknown) => void;
+  hooks: SerialLineHooks,
+  { attempts = 1, retryDelayMs = 1000, cancelled = () => false }: BleNusOptions = {}
+): Promise<() => void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await subscribe(device, hooks);
+    } catch (err) {
+      if (err instanceof BleNusServiceNotFoundError || attempt >= attempts) throw err;
+      await sleep(retryDelayMs);
+      if (cancelled()) throw err;
+    }
   }
-): Promise<(() => void) | null> {
-  let cancelled = false;
+}
+
+async function subscribe(
+  device: BluetoothDevice,
+  hooks: SerialLineHooks
+): Promise<() => void> {
+  const push = createLogLineAssembler(hooks.onLine);
   let txChar: BluetoothRemoteGATTCharacteristic | null = null;
-  let lineBuffer = "";
-  const decoder = new TextDecoder();
-
+  let detached = false;
+  let streaming = false;
   const onValue = (): void => {
-    if (cancelled) return;
     const dv = txChar?.value;
-    if (!dv) return;
-    const chunk = decoder.decode(dv, { stream: true });
-    lineBuffer += chunk;
-    let nl: number;
-    while ((nl = lineBuffer.indexOf("\n")) !== -1) {
-      callbacks.onLine(lineBuffer.slice(0, nl));
-      lineBuffer = lineBuffer.slice(nl + 1);
-    }
+    if (dv) push(dv);
   };
-
-  // Self-removing so stale listeners don't accumulate across reconnects.
-  // Chrome reuses the same characteristic object across sessions, so the
-  // characteristicvaluechanged listener must also be cleaned up here.
+  // Chrome hands back the same characteristic object across sessions, so the
+  // listeners must come off on every exit or they stack up.
+  const detach = (): boolean => {
+    if (detached) return false;
+    detached = true;
+    device.removeEventListener("gattserverdisconnected", onDisconnected);
+    txChar?.removeEventListener("characteristicvaluechanged", onValue);
+    txChar = null;
+    return true;
+  };
+  // A drop during the subscribe surfaces as the subscribe failing below;
+  // only a streaming link reports it as a disconnect.
   const onDisconnected = (): void => {
-    if (cancelled) return;
-    cancelled = true;
-    device.removeEventListener("gattserverdisconnected", onDisconnected);
-    if (txChar) {
-      txChar.removeEventListener("characteristicvaluechanged", onValue);
-      txChar = null;
-    }
-    callbacks.onDisconnect?.();
+    if (detach() && streaming) hooks.onDisconnect?.();
   };
-
-  const cancel = (): void => {
-    if (cancelled) return;
-    cancelled = true;
-    device.removeEventListener("gattserverdisconnected", onDisconnected);
-    if (txChar) {
-      txChar.removeEventListener("characteristicvaluechanged", onValue);
-      txChar = null;
-    }
-    device.gatt?.disconnect();
-  };
-
+  device.addEventListener("gattserverdisconnected", onDisconnected);
   try {
     const server = await device.gatt!.connect();
-    const service = await server.getPrimaryService(BLE_NUS_SERVICE_UUID).catch(() => {
-      throw new BleNusServiceNotFoundError();
-    });
-    const char = await service.getCharacteristic(BLE_NUS_TX_UUID);
-    if (cancelled) return null;
-    txChar = char;
-    char.addEventListener("characteristicvaluechanged", onValue);
-    // Chrome caches the "subscribed" flag per characteristic across sessions.
-    // If the device reset CCCD on disconnect (standard BLE behavior) Chrome
-    // won't rewrite it unless we clear its state first. stopNotifications()
-    // drops Chrome's flag so the subsequent startNotifications() re-enables
-    // CCCD unconditionally. No-op if notifications weren't active.
-    await char.stopNotifications().catch(() => {});
-    await char.startNotifications();
-    device.addEventListener("gattserverdisconnected", onDisconnected);
-    return cancel;
+    const service = await server
+      .getPrimaryService(BLE_NUS_SERVICE_UUID)
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "NotFoundError") {
+          throw new BleNusServiceNotFoundError();
+        }
+        throw err;
+      });
+    txChar = await service.getCharacteristic(BLE_NUS_TX_UUID);
+    txChar.addEventListener("characteristicvaluechanged", onValue);
+    // Chrome caches its subscribed flag per characteristic; a device that
+    // reset the CCCD on disconnect would otherwise never be re-subscribed.
+    await txChar.stopNotifications().catch(() => {});
+    await txChar.startNotifications();
+    if (detached || !device.gatt?.connected) {
+      throw new DOMException("The device disconnected while subscribing", "NetworkError");
+    }
+    streaming = true;
+    return () => {
+      if (detach()) device.gatt?.disconnect();
+    };
   } catch (err) {
-    cancelled = true;
-    callbacks.onDisconnect?.(err);
-    return null;
+    // Leave nothing connected behind a failed attempt: a linked peripheral
+    // stops advertising and burns radio budget.
+    detach();
+    device.gatt?.disconnect();
+    throw err;
   }
 }

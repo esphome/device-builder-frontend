@@ -175,7 +175,7 @@ const alwaysHook: SerialResetHook = {
 describe("logs-dialog Reset Device gate", () => {
   async function mountPassive(
     targetPlatform: string,
-    options: { onResetDevice?: SerialResetHook } = {}
+    options: { onResetDevice?: SerialResetHook; source?: "serial" | "ble" } = {}
   ): Promise<ESPHomeLogsDialog> {
     const el = makeLogsDialog();
     el.configuration = "device.yaml";
@@ -186,20 +186,6 @@ describe("logs-dialog Reset Device gate", () => {
       }),
     ];
     el.openPassive({ onReconnect: () => Promise.resolve(), ...options });
-    await el.updateComplete;
-    return el;
-  }
-
-  async function mountBle(targetPlatform: string): Promise<ESPHomeLogsDialog> {
-    const el = makeLogsDialog();
-    el.configuration = "device.yaml";
-    (el as any)._devices = [
-      makeConfiguredDevice({
-        configuration: "device.yaml",
-        target_platform: targetPlatform,
-      }),
-    ];
-    el.openBleNus({ onReconnect: () => Promise.resolve() });
     await el.updateComplete;
     return el;
   }
@@ -235,8 +221,11 @@ describe("logs-dialog Reset Device gate", () => {
     expect(hasResetButton(await mountPassive("nrf52"))).toBe(false);
   });
 
-  it("hides Reset Device for a BLE (nRF52) session", async () => {
-    expect(hasResetButton(await mountBle("nrf52"))).toBe(false);
+  it("hides Reset Device for a BLE session, whatever the platform", async () => {
+    const el = await mountPassive("esp32", { source: "ble" });
+    el.setBleStream(() => {});
+    await el.updateComplete;
+    expect(hasResetButton(el)).toBe(false);
   });
 });
 

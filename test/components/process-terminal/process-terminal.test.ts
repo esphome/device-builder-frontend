@@ -46,17 +46,17 @@ describe("process-terminal status banner (stream)", () => {
     expect(banner?.querySelector("wa-icon")?.getAttribute("name")).toBe("alert-circle");
   });
 
-  it("renders an info banner while running and no banner while idle", async () => {
-    const running = await mount((e) => {
+  it("renders no banner while running / idle", async () => {
+    const running = await mount((e) => (e.state = "running"));
+    expect(sr(running).querySelector(".status-banner")).toBeNull();
+    // A running stream with a message is a connect phase: spinner banner.
+    const connecting = await mount((e) => {
       e.state = "running";
       e.statusMessage = "Connecting…";
     });
-    expect(
-      sr(running)
-        .querySelector(".status-banner")
-        ?.classList.contains("status-banner--info")
-    ).toBe(true);
-    expect(sr(running).querySelector(".status-banner wa-spinner")).not.toBeNull();
+    const banner = sr(connecting).querySelector(".status-banner");
+    expect(banner?.classList.contains("status-banner--info")).toBe(true);
+    expect(banner?.querySelector("wa-spinner")).not.toBeNull();
     const idle = await mount((e) => (e.state = null));
     expect(sr(idle).querySelector(".status-banner")).toBeNull();
   });
@@ -123,12 +123,9 @@ describe("process-terminal connectionLost", () => {
     expect(banner?.textContent).toContain("Connection lost. Reconnecting…");
     expect(banner?.getAttribute("role")).toBe("status");
 
-    // connectionLost cleared — running state's info banner takes over.
     el.connectionLost = false;
     await el.updateComplete;
-    expect(
-      sr(el).querySelector(".status-banner")?.classList.contains("status-banner--info")
-    ).toBe(true);
+    expect(sr(el).querySelector(".status-banner")).toBeNull();
   });
 
   it("takes precedence over a success state without losing it", async () => {

@@ -35,6 +35,9 @@
  * - ``dead``         a Web Serial reopen or BLE GATT connect/reconnect failed;
  *                    the source is gone. Start runs the reconnect hook.
  */
+/** What a passive session streams: labels the source chip in every phase. */
+export type PassiveSource = "serial" | "ble";
+
 export type LogsSession =
   | { readonly kind: "idle" }
   | {

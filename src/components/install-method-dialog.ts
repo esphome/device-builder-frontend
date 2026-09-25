@@ -29,6 +29,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { bleNusLogsAvailable } from "../util/ble-nus-stream.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -248,8 +249,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // and read serial logs. ESP-only: that landing is ESPHome Web's ESP
     // connect flow, which runs esptool chip detection.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
-    // BLE NUS logs: nRF52 in logs mode, requires Web Bluetooth.
-    const showBleNusRow = isLogs && isNrf && "bluetooth" in navigator;
+    const showBleNusRow = isLogs && bleNusLogsAvailable(this.deviceTargetPlatform);
     // nRF52 browser DFU is install-only and requires in-app Web Serial.
     const showNrfRow = !isLogs && isNrf && hasWebSerial;
     // Web Serial covers the reset step; without WebUSB the write is a UF2 download.

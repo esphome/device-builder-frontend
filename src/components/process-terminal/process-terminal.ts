@@ -102,7 +102,8 @@ export class ESPHomeProcessTerminal extends LitElement {
 
   private _renderBanner() {
     const state = this._effectiveState;
-    if (state === "running" && this.variant === "stream") {
+    // A running stream with a message: a connect phase worth a spinner.
+    if (state === "running" && this.variant === "stream" && this.statusMessage) {
       return html`
         <div class="status-banner status-banner--info" role="status">
           <wa-spinner></wa-spinner>

@@ -7,7 +7,7 @@
 import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { isPassive, isStreaming } from "../logs-session.js";
+import { isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
 
 /** Replaces the RTS-pulse Reset Device for a session. */
 export interface SerialResetHook {
@@ -37,21 +37,6 @@ export function openOta(
   startOtaStream(host);
 }
 
-/** Open for a BLE NUS stream the caller attaches via ``setBleStream``. */
-export function openBleNus(
-  host: ESPHomeLogsDialog,
-  options: {
-    onReconnect: () => Promise<void>;
-    onBackToInstall?: () => void;
-  }
-): void {
-  beginSession(host, options.onBackToInstall);
-  host._reconnect = options.onReconnect;
-  host._session = { kind: "reconnecting", paused: false };
-  host._open = true;
-  host._resetAnsiLogScroll();
-}
-
 /** Open for a Web Serial reader the caller attaches via ``setSerialStream``. */
 export function openPassive(
   host: ESPHomeLogsDialog,
@@ -61,11 +46,14 @@ export function openPassive(
     onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
+    /** What the attach will bring: drives the source chip in every phase. */
+    source?: PassiveSource;
   }
 ): () => boolean {
   beginSession(host, options.onBackToInstall);
   host._reconnect = options.onReconnect;
   host._resetDevice = options.onResetDevice ?? null;
+  host._passiveSource = options.source ?? "serial";
   // The attach (`attachSerialLogStream` -> `setSerialStream`) follows
   // immediately; show it as connecting/streaming until the reader lands.
   host._session = { kind: "reconnecting", paused: false };
@@ -118,28 +106,15 @@ export function setSerialStream(
   host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
 }
 
-/** Register the BLE NUS stream cancel. Called by the launch path once
- *  ``streamBleNus`` returns a cancel. Transitions ``reconnecting`` → ``ble``,
- *  or updates the cancel on an existing ``ble`` session. */
+/** Register a streaming BLE NUS link (its cancel); the same late-attach guard
+ *  as ``setSerialStream``. */
 export function setBleStream(host: ESPHomeLogsDialog, cancel: () => void): void {
   if (!host._open || !isPassive(host._session)) {
     cancel();
     return;
   }
   const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
-  if (host._session.kind === "ble") host._session.cancel();
   host._session = { kind: "ble", cancel, paused };
-}
-
-/**
- * Record a BLE GATT disconnect (or failed connect). Drops to ``dead`` so the
- * Start button reconnects. The message is stored on the host and shown via the
- * connectionLost banner; the caller handles the toast.
- */
-export function setBleDisconnected(host: ESPHomeLogsDialog): void {
-  if (!host._open || !isPassive(host._session)) return;
-  void teardownSession(host);
-  host._session = { kind: "dead" };
 }
 
 /**
@@ -382,8 +357,8 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
  *  (any port while none is attached), else the pulse where that works. */
 export function resetOffered(host: ESPHomeLogsDialog): boolean {
   const s = host._session;
-  // A BLE session has no port and no reset line at all, in every phase.
-  if (!isPassive(s) || host._isBleSession) return false;
+  // A BLE link has no reset line at all.
+  if (!isPassive(s) || s.kind === "ble") return false;
   const hook = host._resetDevice;
   if (!hook) return host._pulseResets;
   return s.kind !== "serial" || hook.supports(s.port);
@@ -452,8 +427,13 @@ async function runReconnecting(
 function reconnectSerial(host: ESPHomeLogsDialog): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
-  if (host._isBleSession) host._bleStatusMessage = "";
-  void runReconnecting(host, reconnect, "dashboard.logs_web_serial_open_failed");
+  void runReconnecting(
+    host,
+    reconnect,
+    host._passiveSource === "ble"
+      ? "dashboard.logs_ble_nus_open_failed"
+      : "dashboard.logs_web_serial_open_failed"
+  );
 }
 
 /* The --no-states flag is baked into the esphome subprocess at spawn time,

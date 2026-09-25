@@ -34,7 +34,7 @@ export function openNetworkLogsFallback(
 // A failed serial open drops the session to ``dead`` (Start reconnects) and
 // toasts the same message; not once the session moved on, since a newer
 // session is not this failure's.
-function failSerialOpen(
+export function failSerialOpen(
   logsDialog: ESPHomeLogsDialog,
   message: string,
   cancelled: () => boolean = () => false

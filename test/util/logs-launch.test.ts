@@ -12,6 +12,16 @@ const launch = vi.hoisted(() => ({
 vi.mock("../../src/util/web-serial.js", () => ({
   requestSerialPort: launch.requestSerialPort,
 }));
+const ble = vi.hoisted(() => ({
+  requestBleNusDevice: vi.fn<() => Promise<BluetoothDevice | null>>(),
+  streamBleNus: vi.fn<() => Promise<() => void>>(),
+}));
+vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/ble-nus-stream.js")>()),
+  isWebBluetoothSupported: () => true,
+  requestBleNusDevice: ble.requestBleNusDevice,
+  streamBleNus: ble.streamBleNus,
+}));
 vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/post-install-logs.js")>()),
   attachSerialLogStream: launch.attachSerialLogStream,
@@ -233,5 +243,37 @@ describe("launchLogsWithMethod web-serial", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("launchLogsWithMethod ble-nus", () => {
+  it("opens a BLE passive session and registers the stream", async () => {
+    const device = {} as BluetoothDevice;
+    const cancel = vi.fn();
+    ble.requestBleNusDevice.mockResolvedValue(device);
+    ble.streamBleNus.mockResolvedValue(cancel);
+    const host = makeHost(async () => []);
+    host.logsDialog.openPassive.mockReturnValue(() => false);
+    (host.logsDialog as { setBleStream?: unknown }).setBleStream = vi.fn();
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(ble.requestBleNusDevice).toHaveBeenCalledWith(["kitchen", "Kitchen"]);
+    expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "ble", onReconnect: expect.any(Function) })
+    );
+    expect(ble.streamBleNus).toHaveBeenCalledWith(
+      device,
+      expect.objectContaining({ onLine: expect.any(Function) }),
+      expect.objectContaining({ attempts: 3 })
+    );
+    expect(
+      (host.logsDialog as { setBleStream?: unknown }).setBleStream
+    ).toHaveBeenCalledWith(cancel);
+  });
+
+  it("does nothing when the chooser is dismissed", async () => {
+    ble.requestBleNusDevice.mockResolvedValue(null);
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
   });
 });

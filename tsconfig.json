@@ -17,7 +17,7 @@
     "strict": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
-    "types": ["@types/w3c-web-serial", "@types/w3c-web-usb"],
+    "types": ["@types/w3c-web-serial", "@types/w3c-web-usb", "@types/web-bluetooth"],
     "esModuleInterop": true,
     "isolatedModules": true,
     "paths": {
