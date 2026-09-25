@@ -4,14 +4,15 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
-import "../../components/process-terminal/process-terminal.js";
 import type { ProcessTerminalState } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import type { DfuPackage } from "../../util/nrf-dfu.js";
-import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import { touchIntoBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
+
+import { renderProgressCard } from "./install-progress.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -110,12 +111,10 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
     this._state = "resetting";
     try {
-      const port = await requestSerialPort();
-      if (!port) {
+      if (!(await touchIntoBootloader())) {
         this._state = "idle";
         return;
       }
-      await resetToBootloader(port);
     } catch (err) {
       this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
       return;
@@ -209,21 +208,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   private _renderProgress() {
     const errored = this._state === "error";
     const done = this._state === "success";
-    return html`
-      <esphome-process-terminal
-        variant="card"
-        .state=${this._terminalState()}
-        .statusMessage=${this._statusMessage()}
-        .statusDetail=${
-          errored
-            ? this._errorMessage
-            : done
-              ? this._localize("web.nrf.install_done_hint")
-              : ""
-        }
-        .progress=${this._state === "flashing" ? this._progress : null}
-      ></esphome-process-terminal>
-    `;
+    return renderProgressCard({
+      state: this._terminalState(),
+      message: this._statusMessage(),
+      detail: errored
+        ? this._errorMessage
+        : done
+          ? this._localize("web.nrf.install_done_hint")
+          : "",
+      progress: this._state === "flashing" ? this._progress : null,
+    });
   }
 
   private _renderAction() {

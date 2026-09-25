@@ -5,6 +5,7 @@
  * re-enumerating as a different USB device.
  */
 import { markSerialActivity } from "./serial-reacquire.js";
+import { requestSerialPort } from "./web-serial.js";
 
 const isPortLost = (err: unknown): boolean =>
   err instanceof DOMException &&
@@ -40,4 +41,22 @@ export async function resetToBootloader(
     if (!isPortLost(err)) throw err;
   }
   onLog("Port released; the device re-enumerates as its bootloader");
+}
+
+/**
+ * The touch from a button click: pick the CDC port (narrowed by ``filters``
+ * where the board's ids are known), then reset. False when the picker was
+ * dismissed; a failed touch throws as ``resetToBootloader``.
+ */
+export async function touchIntoBootloader({
+  onLog,
+  filters,
+}: {
+  onLog?: (line: string) => void;
+  filters?: SerialPortRequestOptions["filters"];
+} = {}): Promise<boolean> {
+  const port = await requestSerialPort(filters ? { filters } : undefined);
+  if (!port) return false;
+  await resetToBootloader(port, onLog);
+  return true;
 }

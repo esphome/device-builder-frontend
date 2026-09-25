@@ -60,18 +60,26 @@ export async function downloadBuildParts(
   build: FirmwareManifestBuild
 ): Promise<FlashPart[]> {
   return Promise.all(
-    build.parts.map(async (part) => {
-      const resp = await fetch(`${ESPHOME_WEB_FIRMWARE_PREFIX}/${part.path}`);
-      if (!resp.ok) {
-        throw new Error(`Downloading firmware part ${part.path} failed (${resp.status})`);
-      }
-      const data = new Uint8Array(await resp.arrayBuffer());
-      return { data, address: part.offset };
-    })
+    build.parts.map(async (part) => ({
+      data: await fetchFirmwareFile(part.path),
+      address: part.offset,
+    }))
   );
+}
+
+/** One file under the firmware prefix, as bytes; throws with the status on failure. */
+export async function fetchFirmwareFile(path: string): Promise<Uint8Array> {
+  const resp = await fetch(`${ESPHOME_WEB_FIRMWARE_PREFIX}/${path}`);
+  if (!resp.ok) throw new Error(`Downloading ${path} failed (${resp.status})`);
+  return new Uint8Array(await resp.arrayBuffer());
+}
+
+/** The Raspberry Pi Pico W UF2's path under the prefix for the manifest's version. */
+export function picoUf2Path(manifest: FirmwareManifest): string {
+  return `${manifest.version}/esphome-web-rp2040.uf2`;
 }
 
 /** The Raspberry Pi Pico W UF2 download URL for the manifest's version. */
 export function picoUf2Url(manifest: FirmwareManifest): string {
-  return `${ESPHOME_WEB_FIRMWARE_PREFIX}/${manifest.version}/esphome-web-rp2040.uf2`;
+  return `${ESPHOME_WEB_FIRMWARE_PREFIX}/${picoUf2Path(manifest)}`;
 }
