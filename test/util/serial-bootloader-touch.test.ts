@@ -89,4 +89,17 @@ describe("resetToBootloader", () => {
     );
     await expect(resetToBootloader(port)).rejects.toMatchObject({ name: "NetworkError" });
   });
+
+  it("logs the touch and the release, and the early reboot when the port is already gone", async () => {
+    const lines: string[] = [];
+    await resetToBootloader(fakePort().port, (l) => lines.push(l));
+    expect(lines).toEqual([
+      "Touching the port at 1200 baud",
+      "Port released; the device re-enumerates as its bootloader",
+    ]);
+    lines.length = 0;
+    const gone = new DOMException("gone", "NetworkError");
+    await resetToBootloader(fakePort({ signalsError: gone }).port, (l) => lines.push(l));
+    expect(lines).toContain("The device rebooted on the line coding alone");
+  });
 });

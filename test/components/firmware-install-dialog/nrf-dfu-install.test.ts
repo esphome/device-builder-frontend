@@ -1,24 +1,14 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { flashDfuPackageWithReconnect as FlashWithReconnect } from "../../../src/util/nrf-dfu.js";
+import type { resetToBootloader as ResetToBootloader } from "../../../src/util/serial-bootloader-touch.js";
+
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
-  resetToBootloader: vi.fn(async () => {}),
-  flashDfuPackageWithReconnect:
-    vi.fn<
-      (
-        p: unknown,
-        pkg: unknown,
-        onProgress: (p: number) => void,
-        o: FlashOptions
-      ) => Promise<void>
-    >(),
+  resetToBootloader: vi.fn<typeof ResetToBootloader>(async () => {}),
+  flashDfuPackageWithReconnect: vi.fn<typeof FlashWithReconnect>(),
 }));
-type FlashOptions = {
-  signal?: AbortSignal;
-  onLog?: (line: string) => void;
-  onReconnecting?: () => void;
-};
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
 }));
@@ -60,19 +50,20 @@ function readyHost() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.requestSerialPort.mockResolvedValue({});
 });
 
 describe("nrfDoReset", () => {
-  it("logs the touch and the re-enumeration around the 1200 baud reset", async () => {
+  it("hands the touch a logger into the details log", async () => {
     const host = readyHost();
     const port = {};
     mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.resetToBootloader.mockImplementation(async (_port, onLog) => {
+      onLog?.("Touching the port at 1200 baud");
+    });
     await nrfDoReset(asHost(host));
-    expect(mocks.resetToBootloader).toHaveBeenCalledWith(port);
-    expect(host._log.lines).toEqual([
-      "Touching the port at 1200 baud to enter DFU mode",
-      "Reset sent; the device re-enumerates as its DFU port",
-    ]);
+    expect(mocks.resetToBootloader).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(host._log.lines).toEqual(["Touching the port at 1200 baud"]);
     expect(host._step).toBe("nrf-wait");
   });
 });
@@ -80,14 +71,11 @@ describe("nrfDoReset", () => {
 describe("nrfDoFlash", () => {
   it("streams the engine's step lines into the details log", async () => {
     const host = readyHost();
-    mocks.requestSerialPort.mockResolvedValue({});
-    mocks.flashDfuPackageWithReconnect.mockImplementation(
-      async (_p, _pkg, onProgress, o) => {
-        o.onLog?.("Opening the DFU port at 115200 baud");
-        onProgress(50);
-        o.onLog?.("Sending the stop packet");
-      }
-    );
+    mocks.flashDfuPackageWithReconnect.mockImplementation(async (_p, _pkg, hooks) => {
+      hooks.onLog?.("Opening the DFU port at 115200 baud");
+      hooks.onProgress(50);
+      hooks.onLog?.("Sending the stop packet");
+    });
     await nrfDoFlash(asHost(host));
     expect(host._log.lines).toEqual([
       "Opening the DFU port at 115200 baud",
@@ -99,13 +87,10 @@ describe("nrfDoFlash", () => {
 
   it("drops a late line once the dialog moved on", async () => {
     const host = readyHost();
-    mocks.requestSerialPort.mockResolvedValue({});
-    mocks.flashDfuPackageWithReconnect.mockImplementation(
-      async (_p, _pkg, _progress, o) => {
-        host._device = { ...device, name: "other" } as ConfiguredDevice;
-        o.onLog?.("Sending the stop packet");
-      }
-    );
+    mocks.flashDfuPackageWithReconnect.mockImplementation(async (_p, _pkg, hooks) => {
+      host._device = { ...device, name: "other" } as ConfiguredDevice;
+      hooks.onLog?.("Sending the stop packet");
+    });
     await nrfDoFlash(asHost(host));
     expect(host._log.lines).toEqual([]);
   });

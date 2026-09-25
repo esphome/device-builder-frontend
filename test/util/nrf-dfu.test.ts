@@ -1,5 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
+import { driveFakeTimers } from "../_fake-timers.js";
+import { makeWebSerialPort } from "../web/_make-web-serial-port.js";
 
 import {
   buildHciPacket,
@@ -167,7 +169,7 @@ describe("flashDfuPackage", () => {
     abort.abort();
 
     await expect(
-      flashDfuPackage(port, pkg, () => {}, { signal: abort.signal })
+      flashDfuPackage(port, pkg, { onProgress: () => {}, signal: abort.signal })
     ).rejects.toMatchObject({
       name: "AbortError",
     });
@@ -188,7 +190,7 @@ describe("flashDfuPackage", () => {
       ],
     };
 
-    await expect(flashDfuPackage(port, pkg, () => {})).rejects.toThrow(
+    await expect(flashDfuPackage(port, pkg, { onProgress: () => {} })).rejects.toThrow(
       /Serial port closed/
     );
     expect(port.close).toHaveBeenCalled();
@@ -217,7 +219,10 @@ describe("flashDfuPackage", () => {
     };
     const abort = new AbortController();
 
-    const flash = flashDfuPackage(port, pkg, () => {}, { signal: abort.signal });
+    const flash = flashDfuPackage(port, pkg, {
+      onProgress: () => {},
+      signal: abort.signal,
+    });
     await new Promise((r) => setTimeout(r, 10));
     abort.abort();
 
@@ -228,31 +233,27 @@ describe("flashDfuPackage", () => {
 
 /**
  * A DFU port whose bootloader ACKs every packet: each write is answered
- * with a two-byte SLIP frame, which is all the session's ACK wait needs.
+ * with a two-byte SLIP frame once the write settles, which is all the
+ * session's ACK wait needs.
  */
 function ackingPort() {
   let rx!: ReadableStreamDefaultController<Uint8Array>;
   const written: Uint8Array[] = [];
-  const port = {
-    open: vi.fn(async () => {}),
-    close: vi.fn(async () => {
-      rx.close();
-    }),
+  const port = makeWebSerialPort({
+    close: vi.fn(async () => rx.close()),
     readable: new ReadableStream<Uint8Array>({ start: (c) => (rx = c) }),
     writable: new WritableStream<Uint8Array>({
       write: (chunk) => {
         written.push(chunk);
-        // The reply lands after the write settles, as on the wire.
         setTimeout(() => rx.enqueue(bytes(0x00, 0x00, 0xc0)), 1);
       },
     }),
-  };
-  return { port: port as unknown as SerialPort, written };
+  });
+  return { port, written };
 }
 
 describe("flashDfuPackage log lines", () => {
-  it("names every step: open, start and erase, init, transfer by tens, stop, reboot", async () => {
-    const realSetTimeout = setTimeout;
+  it("names every step: start and erase, init, transfer by tens, stop, reboot", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { port, written } = ackingPort();
     const app = new Uint8Array(512 * 10).fill(0xaa);
@@ -262,29 +263,21 @@ describe("flashDfuPackage log lines", () => {
     const log: string[] = [];
     const progress: number[] = [];
     try {
-      const flash = flashDfuPackage(port, pkg, (p) => progress.push(p), {
-        onLog: (l) => log.push(l),
-      });
-      let settled = false;
-      flash.then(
-        () => (settled = true),
-        () => (settled = true)
+      await driveFakeTimers(
+        flashDfuPackage(port, pkg, {
+          onProgress: (p) => progress.push(p),
+          onLog: (l) => log.push(l),
+        })
       );
-      while (!settled) {
-        await vi.runAllTimersAsync();
-        await new Promise((r) => realSetTimeout(r, 0));
-      }
-      await flash;
     } finally {
       vi.useRealTimers();
     }
+    // The fake port is built open (its streams exist), so there is no open line.
     expect(log).toEqual([
-      // The fake port is built open (its streams exist), like a reacquired handle.
-      "Using the already open DFU port",
       "Image 1 of 1: application (5120 bytes)",
-      "Sending the start packet (softdevice 0, bootloader 0, application 5120 bytes); waiting 500 ms for the erase",
+      "Sending the start packet; waiting 500 ms for the erase",
       "Sending the init packet (2 bytes)",
-      "Transferring 5120 bytes in 10 packets",
+      "Transferring in 10 packets",
       ...[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((p) => `Transferring: ${p}%`),
       "Sending the stop packet",
       "Transfer complete; closing the port reboots the device into the firmware",
@@ -320,7 +313,8 @@ describe("flashDfuPackageWithReconnect", () => {
     try {
       const log: string[] = [];
       await expect(
-        flashDfuPackageWithReconnect(port, pkg, () => {}, {
+        flashDfuPackageWithReconnect(port, pkg, {
+          onProgress: () => {},
           onReconnecting,
           onLog: (l) => log.push(l),
         })
@@ -346,7 +340,8 @@ describe("flashDfuPackageWithReconnect", () => {
     abort.abort();
     const onReconnecting = vi.fn();
     await expect(
-      flashDfuPackageWithReconnect(port, pkg, () => {}, {
+      flashDfuPackageWithReconnect(port, pkg, {
+        onProgress: () => {},
         signal: abort.signal,
         onReconnecting,
       })

@@ -9,6 +9,7 @@ import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
+  installLog,
   pickSerialPortOrFail,
   resetForRetry,
 } from "./browser-flash-steps.js";
@@ -94,11 +95,7 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     // The picker outlives a dismissed dialog; don't reset a port picked for
     // an install that no longer exists.
     if (!stillCurrent()) return;
-    host._log.enqueue("Touching the port at 1200 baud to enter DFU mode");
-    await resetToBootloader(port);
-    if (stillCurrent()) {
-      host._log.enqueue("Reset sent; the device re-enumerates as its DFU port");
-    }
+    await resetToBootloader(port, installLog(host, stillCurrent));
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
@@ -134,25 +131,18 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashAbort = abort;
   try {
     const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-    await flashDfuPackageWithReconnect(
-      port,
-      pkg,
-      (percent) => {
+    await flashDfuPackageWithReconnect(port, pkg, {
+      signal: abort.signal,
+      onProgress: (percent) => {
         if (stillCurrent()) host._flashPercent = percent;
       },
-      {
-        signal: abort.signal,
-        // The engine's steps land in the details log, as esptool's lines do.
-        onLog: (line) => {
-          if (stillCurrent()) host._log.enqueue(line);
-        },
-        onReconnecting: () => {
-          if (stillCurrent()) {
-            host._statusMessage = host._localize("firmware.nrf_reconnecting");
-          }
-        },
-      }
-    );
+      onLog: installLog(host, stillCurrent),
+      onReconnecting: () => {
+        if (stillCurrent()) {
+          host._statusMessage = host._localize("firmware.nrf_reconnecting");
+        }
+      },
+    });
   } catch (err) {
     if (stillCurrent()) {
       host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));

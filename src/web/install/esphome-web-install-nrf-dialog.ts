@@ -144,14 +144,12 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._reconnecting = false;
     try {
       const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-      await flashDfuPackageWithReconnect(
-        port,
-        pkg,
-        (percent) => {
+      await flashDfuPackageWithReconnect(port, pkg, {
+        onProgress: (percent) => {
           this._progress = Math.round(percent);
         },
-        { onReconnecting: () => (this._reconnecting = true) }
-      );
+        onReconnecting: () => (this._reconnecting = true),
+      });
       this._state = "success";
     } catch (err) {
       this._fail(
