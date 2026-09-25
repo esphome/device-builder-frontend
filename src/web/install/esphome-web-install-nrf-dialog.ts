@@ -47,8 +47,13 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // picker is in flight.
   @state() private _pending = false;
   @state() private _reconnecting = false;
+  @state() private _logLines: string[] = [];
 
   private _pkg: DfuPackage | null = null;
+
+  private _log = (line: string) => {
+    this._logLines = [...this._logLines, line];
+  };
 
   protected updated(changed: Map<string, unknown>): void {
     if (changed.has("open") && !this.open) {
@@ -69,6 +74,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._errorMessage = "";
     this._pending = false;
     this._reconnecting = false;
+    this._logLines = [];
     this._pkg = null;
   }
 
@@ -89,6 +95,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
     if (this._pending) return;
     this._pending = true;
+    this._logLines = [];
     try {
       await this._prepareAndReset(this._file);
     } finally {
@@ -115,7 +122,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
     this._state = "resetting";
     try {
-      if (!(await touchIntoBootloader())) {
+      if (!(await touchIntoBootloader({ onLog: this._log }))) {
         this._state = "idle";
         return;
       }
@@ -162,6 +169,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
           this._progress = Math.round(percent);
         },
         onReconnecting: () => (this._reconnecting = true),
+        onLog: this._log,
       });
       this._state = "success";
     } catch (err) {
@@ -233,6 +241,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
           ? this._localize("web.nrf.install_done_hint")
           : "",
       progress: this._state === "flashing" ? this._progress : null,
+      log: this._logLines,
     });
   }
 

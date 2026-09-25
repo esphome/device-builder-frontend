@@ -56,9 +56,11 @@ describe("install-dialog log batching wiring", () => {
     dialog._log.append(["landed line"]);
     dialog._log.enqueue("buffered line");
     const container = renderInto(renderLogs(dialog));
-    // Second .logs-toggle is the download button (first is the expander).
-    const buttons = container.querySelectorAll<HTMLElement>(".logs-toggle");
-    buttons[1].click();
+    // The dialog takes the download over from the log element so it can flush first.
+    container
+      .querySelector("esphome-install-details-log")!
+      .dispatchEvent(new Event("download-log", { cancelable: true }));
+    expect(downloadAnsiText).toHaveBeenCalledTimes(1);
     expect(downloadAnsiText).toHaveBeenCalledWith(
       ["landed line", "buffered line"],
       "device-install.txt"

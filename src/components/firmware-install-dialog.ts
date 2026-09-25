@@ -2,10 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiArrowCollapse,
   mdiArrowExpand,
-  mdiChevronDown,
-  mdiChevronUp,
   mdiClose,
-  mdiDownload,
   mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
@@ -90,17 +87,14 @@ import {
 import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./ansi-log.js";
+import "./install-details-log.js";
 import "./base-dialog.js";
 import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
   "arrow-expand": mdiArrowExpand,
   "arrow-collapse": mdiArrowCollapse,
-  "chevron-down": mdiChevronDown,
-  "chevron-up": mdiChevronUp,
   close: mdiClose,
-  download: mdiDownload,
   "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });

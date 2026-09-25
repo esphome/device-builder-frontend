@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 vi.mock("../../src/components/process-terminal/process-terminal.js", () => ({}));
+vi.mock("../../src/components/install-details-log.js", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
