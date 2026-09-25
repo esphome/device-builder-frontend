@@ -12,7 +12,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { CommandType, ESPHomeCommandDialog } from "../components/command-dialog.js";
+import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import { applyRemoval } from "../components/device/apply-removal.js";
 import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
@@ -1196,10 +1196,7 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onValidateClick = () => {
-    if (!this._device) return;
-    this._commandDialog.configuration = this._device.configuration;
-    this._commandDialog.name = this._device.friendly_name || this._device.name;
-    this._commandDialog.open("validate");
+    if (this._device) this._commandDialog.openForDevice(this._device, "validate");
   };
 
   // Persist the editor buffer before building — install/compile build the
@@ -1265,7 +1262,7 @@ export class ESPHomePageDevice extends LitElement {
    *  build files for this device" link works the same way on
    *  the device page. */
   private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) => {
-    this._cleanBuild(e.detail);
+    this._commandDialog.openForDevice(e.detail, "clean");
   };
 
   /** "Logs" from the editor's device-actions menu. */
@@ -1273,23 +1270,13 @@ export class ESPHomePageDevice extends LitElement {
 
   /** "Clean build files" from the editor's device-actions menu. */
   private _onEditorCleanBuild = () => {
-    if (this._device) this._cleanBuild(this._device);
+    if (this._device) this._commandDialog.openForDevice(this._device, "clean");
   };
-
-  private _cleanBuild(device: ConfiguredDevice) {
-    this._openDeviceCommand(device, "clean");
-  }
 
   /** "Analyze memory" from the editor's device-actions menu (Expert Mode). */
   private _onEditorAnalyzeMemory = () => {
-    if (this._device) this._openDeviceCommand(this._device, "analyze_memory");
+    if (this._device) this._commandDialog.openForDevice(this._device, "analyze_memory");
   };
-
-  private _openDeviceCommand(device: ConfiguredDevice, type: CommandType) {
-    this._commandDialog.configuration = device.configuration;
-    this._commandDialog.name = device.friendly_name || device.name;
-    this._commandDialog.open(type);
-  }
 
   /** Catch ``request-open-editor`` from the post-validation-failure
    *  hint. ``stopPropagation`` to prevent any future higher-level

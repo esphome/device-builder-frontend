@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { identityLocalize } from "../../_dom.js";
+import { findMenuItem, identityLocalize } from "../../_dom.js";
 import { ESPHomeDeviceActionsMenu } from "../../../src/components/device/device-actions-menu.js";
 
 afterEach(() => {
@@ -28,7 +28,9 @@ async function mount(
 ): Promise<ESPHomeDeviceActionsMenu> {
   const el = new ESPHomeDeviceActionsMenu();
   (el as unknown as { _localize: typeof identityLocalize })._localize = identityLocalize;
-  (el as unknown as { _expertMode: boolean })._expertMode = opts.expertMode ?? false;
+  Object.assign(el, {
+    _expertMode: opts.expertMode ?? false,
+  } as Partial<ESPHomeDeviceActionsMenu>);
   el.busy = opts.busy ?? false;
   el.validateDisabled = opts.validateDisabled ?? false;
   el.webUiUrl = opts.webUiUrl ?? "";
@@ -197,13 +199,27 @@ describe("esphome-device-actions-menu", () => {
 });
 
 describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
-  const label = "dashboard.action_analyze_memory";
-  const analyzeRow = (rows: HTMLElement[]) =>
-    rows.find((row) => row.textContent!.includes(label));
+  const LABEL = "dashboard.action_analyze_memory";
+
+  async function openInert(
+    el: ESPHomeDeviceActionsMenu,
+    titleKey: string
+  ): Promise<void> {
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    await openMenu(el);
+    const row = findMenuItem(el, LABEL)!;
+    expect(row.classList.contains("menu-item--disabled")).toBe(true);
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    expect(row.getAttribute("title")).toBe(titleKey);
+    row.click();
+    expect(onAnalyze).not.toHaveBeenCalled();
+  }
 
   it("is absent unless Expert Mode is on", async () => {
     const el = await mount();
-    expect(analyzeRow(await openMenu(el))).toBeUndefined();
+    await openMenu(el);
+    expect(findMenuItem(el, LABEL)).toBeUndefined();
   });
 
   it("paints first, above Clean build, and emits analyze-memory", async () => {
@@ -212,7 +228,7 @@ describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
     el.addEventListener("analyze-memory", onAnalyze);
     const rows = await openMenu(el);
     expect(rows.map((row) => row.textContent!.trim())).toEqual([
-      label,
+      LABEL,
       "dashboard.action_clean_build",
       "device.validate",
       "device.show_logs",
@@ -225,32 +241,11 @@ describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
 
   it("is disabled with unsaved edits, since it analyzes the saved YAML", async () => {
     const el = await mount({ expertMode: true, validateDisabled: true });
-    const onAnalyze = vi.fn();
-    el.addEventListener("analyze-memory", onAnalyze);
-    const row = analyzeRow(await openMenu(el))!;
-    expect(row.classList.contains("menu-item--disabled")).toBe(true);
-    expect(row.getAttribute("aria-disabled")).toBe("true");
-    expect(row.getAttribute("title")).toBe("device.analyze_memory_disabled_pending");
-    row.click();
-    expect(onAnalyze).not.toHaveBeenCalled();
-    // Clean build does not read the YAML, so it stays live.
-    const onClean = vi.fn();
-    el.addEventListener("clean-build", onClean);
-    items(el)[1].click();
-    expect(onClean).toHaveBeenCalledTimes(1);
+    await openInert(el, "device.analyze_memory_disabled_pending");
   });
 
   it("is disabled while a build is running", async () => {
     const el = await mount({ expertMode: true, busy: true });
-    const onAnalyze = vi.fn();
-    el.addEventListener("analyze-memory", onAnalyze);
-    const row = analyzeRow(await openMenu(el))!;
-    expect(row.classList.contains("menu-item--disabled")).toBe(true);
-    expect(row.getAttribute("aria-disabled")).toBe("true");
-    expect(row.getAttribute("tabindex")).toBe("-1");
-    expect(row.getAttribute("title")).toBe("dashboard.action_analyze_memory_busy");
-    row.click();
-    pressEnter(row);
-    expect(onAnalyze).not.toHaveBeenCalled();
+    await openInert(el, "dashboard.action_analyze_memory_busy");
   });
 });

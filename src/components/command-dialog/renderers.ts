@@ -117,6 +117,15 @@ export function renderQueuedOverlay(
   `;
 }
 
+// Commands that run a compile: the ones a build-failure hint and a run
+// timer make sense for.
+const COMPILING_COMMANDS: ReadonlySet<CommandType> = new Set([
+  "install",
+  "compile",
+  "offline_compile",
+  "analyze_memory",
+]);
+
 // YAML validation failure → "open in editor". Build failure → clean → reset
 // staircase. _userStopped is shared — a user-cancel isn't a build problem.
 // The success / error status banner itself is rendered by
@@ -134,14 +143,7 @@ export function renderResetSuggestion(
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }
-  if (
-    host._commandType !== "install" &&
-    host._commandType !== "compile" &&
-    host._commandType !== "offline_compile" &&
-    host._commandType !== "analyze_memory"
-  ) {
-    return nothing;
-  }
+  if (!COMPILING_COMMANDS.has(host._commandType)) return nothing;
   // The flash failed, not the build — clean/reset can't help.
   if (host._failedDuringFlash) return nothing;
   return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
@@ -177,18 +179,11 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
 const MIN_RUN_TIMER_MS = 1000;
 
 // Whether to show the run timer at all. Only the build commands have a
-// meaningful build time (not clean / validate; analyze-memory compiles
-// first, so it counts), and only once the run has
+// meaningful build time (not clean / validate), and only once the run has
 // accrued at least a second — a sub-second or untimed job (e.g. one compiled
 // before this feature existed) degrades to the plain streaming dot.
 export function showRunTimer(host: ESPHomeCommandDialog): boolean {
-  if (
-    host._commandType !== "install" &&
-    host._commandType !== "compile" &&
-    host._commandType !== "offline_compile" &&
-    host._commandType !== "rename" &&
-    host._commandType !== "analyze_memory"
-  ) {
+  if (!COMPILING_COMMANDS.has(host._commandType) && host._commandType !== "rename") {
     return false;
   }
   const total = host._timer.totalRunElapsedMs;

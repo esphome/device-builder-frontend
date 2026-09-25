@@ -7,6 +7,14 @@ import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
+// Busy-badge copy per active job type; anything else (upload, install,
+// clean) reads as installing.
+const BUSY_STATUS_KEY: Partial<Record<JobType, string>> = {
+  [JobType.RENAME]: "dashboard.status_renaming",
+  [JobType.COMPILE]: "dashboard.status_compiling",
+  [JobType.ANALYZE_MEMORY]: "dashboard.status_analyzing_memory",
+};
+
 const RECENT_JOB_ICON: Record<JobStatus, string | null> = {
   [JobStatus.QUEUED]: null,
   [JobStatus.RUNNING]: null,
@@ -120,13 +128,8 @@ export function renderEncryptionIcon(
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   if (card.busy) {
     const labelKey =
-      card.activeJob?.job_type === JobType.RENAME
-        ? "dashboard.status_renaming"
-        : card.activeJob?.job_type === JobType.COMPILE
-          ? "dashboard.status_compiling"
-          : card.activeJob?.job_type === JobType.ANALYZE_MEMORY
-            ? "dashboard.status_analyzing_memory"
-            : "dashboard.status_installing";
+      (card.activeJob && BUSY_STATUS_KEY[card.activeJob.job_type]) ??
+      "dashboard.status_installing";
     return html`<div
       class="device-status busy"
       @click=${(e: Event) => {

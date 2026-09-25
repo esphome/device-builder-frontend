@@ -121,9 +121,8 @@ describe("stop during install releases the device's active slot", () => {
   });
 });
 
-// A memory analysis is shown once in its dialog and never kept (the backend
-// drops it from history at the same point), but the card still gets its
-// short outcome flash.
+// Ephemeral job types (a memory analysis) never enter history; the card
+// still gets its short outcome flash.
 describe("terminal analyze-memory jobs never enter history", () => {
   const CFG = "kitchen.yaml";
 
@@ -143,7 +142,6 @@ describe("terminal analyze-memory jobs never enter history", () => {
     expect(host._firmwareJobs.has("m1")).toBe(false);
     expect(host._activeJobs.has(CFG)).toBe(false);
     expect(host._recentJobs.get(CFG)?.job_id).toBe("m1");
-    for (const timer of host._recentJobTimers.values()) clearTimeout(timer);
   });
 
   it("leaves a terminal compile for the same device in place", () => {
@@ -164,6 +162,5 @@ describe("terminal analyze-memory jobs never enter history", () => {
       })
     );
     expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["c"]));
-    for (const timer of host._recentJobTimers.values()) clearTimeout(timer);
   });
 });

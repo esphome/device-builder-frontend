@@ -139,11 +139,7 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   if (active !== null) host._activeJobs = active;
 
   if (EPHEMERAL_JOB_TYPES.has(job.job_type)) {
-    if (host._firmwareJobs.has(job.job_id)) {
-      const next = new Map(host._firmwareJobs);
-      next.delete(job.job_id);
-      host._firmwareJobs = next;
-    }
+    dropJob(host, job.job_id);
     if (job.configuration) markJobRecent(host, job);
     return;
   }
@@ -156,9 +152,7 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
         !isTerminalJobStatus(j.status)
     );
     if (supersededByActive) {
-      const next = new Map(host._firmwareJobs);
-      next.delete(job.job_id);
-      host._firmwareJobs = next;
+      dropJob(host, job.job_id);
       return;
     }
   }
@@ -178,6 +172,13 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   }
   host._firmwareJobs = next;
   if (job.configuration) markJobRecent(host, job);
+}
+
+function dropJob(host: ESPHomeApp, jobId: string): void {
+  if (!host._firmwareJobs.has(jobId)) return;
+  const next = new Map(host._firmwareJobs);
+  next.delete(jobId);
+  host._firmwareJobs = next;
 }
 
 function markJobRecent(host: ESPHomeApp, job: FirmwareJob): void {
