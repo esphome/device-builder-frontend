@@ -523,6 +523,7 @@
     "nrf_resetting": "Resetting device to DFU mode…",
     "browser_flash_connect_failed": "Could not connect to the device",
     "nrf_flash_failed": "DFU flash failed",
+    "nrf_manual_bootloader_hint": "Double-press the board's reset button to enter the bootloader by hand, then retry and pick the new port.",
     "nrf_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
     "rp2_bootsel_title": "Ready to flash over USB",
     "rp2_bootsel_desc": "Click Reset Device if the Pico already runs ESPHome, or hold BOOTSEL while plugging it in. Then click Flash and pick the RP2 Boot device.",

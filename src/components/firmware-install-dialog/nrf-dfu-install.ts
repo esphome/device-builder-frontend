@@ -99,7 +99,7 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        getErrorMessage(err)
+        withManualBootloaderHint(host, err)
       );
     }
     return;
@@ -147,7 +147,10 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     );
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));
+      host._fail(
+        host._localize("firmware.nrf_flash_failed"),
+        withManualBootloaderHint(host, err)
+      );
     }
     return;
   } finally {
@@ -156,4 +159,15 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
   host._step = "done";
+}
+
+// A failed touch or a bootloader that never answered both have the same way
+// out: enter the bootloader by hand. An abort is the dialog's own teardown.
+function withManualBootloaderHint(
+  host: ESPHomeFirmwareInstallDialog,
+  err: unknown
+): string {
+  const message = getErrorMessage(err);
+  if (err instanceof DOMException && err.name === "AbortError") return message;
+  return `${message}. ${host._localize("firmware.nrf_manual_bootloader_hint")}`;
 }
