@@ -209,15 +209,18 @@ async function runImprov(
 
 /** The SDK's RPC timeout: how long after a close its late rejection can still land. */
 const LATE_STATE_ERROR_MS = 30_000;
+/** The one message the guard swallows: the state request losing to the detection timeout. */
+const LATE_STATE_ERROR = "Error fetching current state: TIMEOUT";
 
 /**
  * The SDK's ``initialize`` races its first state request against a detection
  * timeout inside an async promise executor. When the timeout wins (a device
  * that never answers), the dialog shows its error state, but the request's
  * own later rejection has nothing to catch it and surfaces as an unhandled
- * "Error fetching current state" (improv-wifi/sdk-serial-js, serial.js).
- * Swallow that one while a dialog is up and for an RPC timeout after one
- * closed; anything else stays loud.
+ * "Error fetching current state: TIMEOUT" (improv-wifi/sdk-serial-js,
+ * serial.js). Swallow exactly that while a dialog is up and for an RPC
+ * timeout after one closed; anything else, including a device error on the
+ * same request, stays loud.
  */
 let mountedDialogs = 0;
 let swallowUntil = 0;
@@ -232,7 +235,7 @@ function dialogMounted(): void {
     const reason = ev.reason as { message?: unknown } | undefined;
     const message =
       typeof reason?.message === "string" ? reason.message : String(ev.reason);
-    if (message.startsWith("Error fetching current state")) ev.preventDefault();
+    if (message === LATE_STATE_ERROR) ev.preventDefault();
   });
 }
 

@@ -8,7 +8,10 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 // Post-reset reopen goes through openLiveSerialPort (re-enumeration retry
 // loop); stub it so the suite can hand back the cached or a fresh handle.
 const { openLiveSerialPort } = vi.hoisted(() => ({ openLiveSerialPort: vi.fn() }));
-vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort }));
+vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
+  openLiveSerialPort,
+}));
 
 import toast from "sonner-js";
 import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
@@ -103,6 +106,10 @@ describe("openImprovDialog", () => {
     };
     expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
     expect(rejection(new Error("something else"))).toBe(false);
+    // A device error on the same request is real news, not the SDK's race.
+    expect(rejection(new Error("Error fetching current state: BAD_HOSTNAME"))).toBe(
+      false
+    );
     // The SDK's late rejection can land up to its RPC timeout after the close;
     // the guard stays for that long and no longer.
     dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
