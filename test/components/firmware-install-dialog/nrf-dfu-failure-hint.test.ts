@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  // Makes the next engine load fail, as a lost lazy chunk would.
+  engineLoadFails: false,
   requestSerialPort: vi.fn(),
   resetToBootloader: vi.fn(async () => {}),
   flashDfuPackageWithReconnect: vi.fn(async () => {}),
@@ -13,7 +15,12 @@ vi.mock("../../../src/util/serial-bootloader-touch.js", () => ({
   resetToBootloader: mocks.resetToBootloader,
 }));
 vi.mock("../../../src/util/nrf-dfu.js", () => ({
-  flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
+  // The flow reads this binding right after the lazy import; a throwing read
+  // fails the load the way a lost chunk would, before any flash starts.
+  get flashDfuPackageWithReconnect() {
+    if (mocks.engineLoadFails) throw new Error("chunk load failed");
+    return mocks.flashDfuPackageWithReconnect;
+  },
 }));
 
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
@@ -94,6 +101,19 @@ describe("nRF52 DFU failure hints", () => {
     await nrfDoReset(asHost(host));
     expect(host._step).toBe("error");
     expect(host._errorMessage).toBe("denied");
+  });
+
+  it("keeps a failed engine chunk load bare, since the board is not the problem", async () => {
+    const host = readyHost();
+    mocks.engineLoadFails = true;
+    try {
+      await nrfDoFlash(asHost(host));
+    } finally {
+      mocks.engineLoadFails = false;
+    }
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.nrf_flash_failed");
+    expect(host._errorMessage).toBe("chunk load failed");
   });
 
   it("keeps a teardown abort bare", async () => {
