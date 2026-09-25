@@ -20,6 +20,16 @@ export interface WebLogSource {
   ): Promise<(() => Promise<void>) | null>;
   /** Drop whatever a dead stream left behind; nothing else will. */
   release(): void;
-  /** Reboot the device behind the source, when its wiring allows it. */
+  /** Reboot the device behind the source in place, when its wiring allows it. */
   reset?(): Promise<void>;
+  /**
+   * Reboot a device whose port re-enumerates on reset (a Pico through
+   * BOOTSEL). The caller has cancelled the stream, which closed the port;
+   * resolves the fresh stream's cancel, null when the device never came
+   * back, and throws when it was left in a state the user has to fix.
+   */
+  reboot?(
+    hooks: SerialLineHooks,
+    cancelled: () => boolean
+  ): Promise<(() => Promise<void>) | null>;
 }

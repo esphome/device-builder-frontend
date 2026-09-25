@@ -9,6 +9,10 @@ vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }));
+vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
+  resetPicoForLogs: vi.fn(),
+}));
 vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   streamBleNus: vi.fn(),
@@ -20,6 +24,7 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 import toast from "sonner-js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { streamBleNus } from "../../src/util/ble-nus-stream.js";
+import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
@@ -46,9 +51,14 @@ async function mount(noReset = false): Promise<ESPHomeWebLogsDialog> {
 
 // A serial session already streaming ``port`` (the reader is the mocked
 // streamSerialLines), the state a mid-stream drop starts from.
-function serialSession(el: ESPHomeWebLogsDialog, port: unknown): SerialLogSource {
+function serialSession(
+  el: ESPHomeWebLogsDialog,
+  port: unknown,
+  rebootOverUsb = false
+): SerialLogSource {
   const source = new SerialLogSource(port as SerialPort, {
     canReset: true,
+    rebootOverUsb,
     // What the dialog's own source wiring does with a recovered handle.
     onPortReplaced: (live) =>
       el.dispatchEvent(new CustomEvent("port-replaced", { detail: live, bubbles: true })),
@@ -99,6 +109,59 @@ describe("esphome-web-logs-dialog", () => {
       requestToSend: false,
     });
     expect(sleep).toHaveBeenCalledWith(1000);
+  });
+
+  // The Pico's Reset Device: the stream ends, the routine touches into
+  // BOOTSEL and reboots over WebUSB, and the CDC port comes back re-enumerated.
+  it("reboots a Pico through the routine and streams the returned port", async () => {
+    const el = await mount();
+    el.open = true;
+    const port = makeWebSerialPort();
+    const live = makeWebSerialPort();
+    const cancel = vi.fn(async () => {});
+    vi.mocked(streamSerialLines)
+      .mockReturnValueOnce(cancel)
+      .mockReturnValueOnce(async () => {});
+    serialSession(el, port, true);
+    (el as any)._cancel = cancel;
+    vi.mocked(resetPicoForLogs).mockResolvedValue(live);
+    const replaced = vi.fn();
+    el.addEventListener("port-replaced", (e) => replaced((e as CustomEvent).detail));
+
+    await (el as any)._resetDevice();
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(resetPicoForLogs).toHaveBeenCalledWith(port, 115200, expect.any(Function));
+    expect(streamSerialLines).toHaveBeenLastCalledWith(live, expect.anything());
+    expect(replaced).toHaveBeenCalledWith(live);
+    expect((el as any)._streaming).toBe(true);
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.rebooting");
+    expect((el as any)._lines).toContain("web.logs.reconnected");
+  });
+
+  it("names a stranded Pico and ends the session when the reboot fails", async () => {
+    const el = await mount();
+    el.open = true;
+    serialSession(el, makeWebSerialPort(), true);
+    vi.mocked(resetPicoForLogs).mockRejectedValue(new PicoStrandedError("pick"));
+    await (el as any)._resetDevice();
+    expect(toast.error).toHaveBeenCalledWith("dashboard.logs_rp2_reset_stranded");
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+    expect((el as any)._streaming).toBe(false);
+    expect((el as any)._source).toBeUndefined();
+  });
+
+  it("ends the session when the Pico never comes back after the reboot", async () => {
+    const el = await mount();
+    el.open = true;
+    serialSession(el, makeWebSerialPort(), true);
+    vi.mocked(resetPicoForLogs).mockResolvedValue(null);
+    await (el as any)._resetDevice();
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.reconnect_failed");
+    expect((el as any)._source).toBeUndefined();
   });
 
   it("shows the reset button for a non-Pico device", async () => {

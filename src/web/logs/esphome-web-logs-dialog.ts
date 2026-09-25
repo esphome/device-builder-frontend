@@ -1,23 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
-import { css, html, LitElement } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  crashCalloutStyles,
   renderCrashCallout,
   repinTerminalForCallout,
 } from "../../components/process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
-import {
-  fillTerminalOnMobile,
-  termButtonStyles,
-  termTokens,
-} from "../../components/process-terminal/process-terminal.styles.js";
 import { localizeContext } from "../../context/index.js";
-import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
 import {
   classifyLine,
   type CrashKind,
@@ -27,8 +20,10 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { picoResetFailureKey } from "../../util/rp2-logs-reset.js";
 import type { SerialLineHooks } from "../../util/serial-log-stream.js";
 import { BleLogSource } from "./ble-source.js";
+import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
 import { LOG_BAUD_RATE, LOG_BUFFER_SIZE, SerialLogSource } from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
@@ -118,6 +113,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
    */
   @property({ type: Boolean }) noReset = false;
 
+  /**
+   * Reset Device reboots a Pico through BOOTSEL and PICOBOOT over WebUSB,
+   * after which its CDC port re-enumerates and the stream resumes. The card
+   * sets ``noReset`` alongside where WebUSB is missing.
+   */
+  @property({ type: Boolean }) picoReset = false;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -201,6 +203,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
       canReset: this.canReset,
+      rebootOverUsb: this.canReset && this.picoReset,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>
@@ -361,10 +364,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
       this._failReconnect(source);
       return;
     }
+    this._adoptStream(cancel, wasPaused);
+  }
+
+  // A stream that came back after a drop or a reboot. Honour a Stop pressed
+  // before it: the reader drains either way, so the display stays paused
+  // instead of force-resuming.
+  private _adoptStream(cancel: () => Promise<void>, wasPaused: boolean): void {
     this._enqueueLine(this._localize("web.logs.reconnected"));
     this._enqueueLine("");
-    // Honour a Stop pressed before the drop: the reader drains either way,
-    // so the display stays paused instead of force-resuming.
     this._streaming = !wasPaused;
     this._paused = wasPaused;
     this._cancel = cancel;
@@ -452,7 +460,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
-    const reset = this._source?.reset;
+    const source = this._source;
+    if (source?.reboot) {
+      await this._reboot(source);
+      return;
+    }
+    const reset = source?.reset;
     // No live session (the first attach failed): nothing to pulse.
     if (!reset) {
       toast.error(this._localize("web.logs.reset_failed"));
@@ -463,6 +476,42 @@ export class ESPHomeWebLogsDialog extends LitElement {
     } catch {
       toast.error(this._localize("web.logs.reset_failed"));
     }
+  }
+
+  // A reset that re-enumerates the port: end the stream, reboot, and adopt
+  // the fresh stream on the disconnect-recovery rails (same generation
+  // guards, same failure ending).
+  private async _reboot(source: WebLogSource): Promise<void> {
+    const generation = ++this._generation;
+    const cancel = this._cancel;
+    this._cancel = undefined;
+    this._streaming = false;
+    const wasPaused = this._paused;
+    this._enqueueLine("");
+    this._enqueueLine(this._localize("web.logs.rebooting"));
+    this._flushPending();
+    await cancel?.().catch((err) => {
+      console.error("[Logs] Failed to release the stream before a reboot:", err);
+    });
+    let live: (() => Promise<void>) | null;
+    try {
+      live = await source.reboot!(this._hooks(), () => generation !== this._generation);
+    } catch (err) {
+      console.warn("[Logs] reset failed:", err);
+      toast.error(this._localize(picoResetFailureKey(err, "web.logs.reset_failed")));
+      if (generation !== this._generation) return;
+      this._failReconnect(source);
+      return;
+    }
+    if (generation !== this._generation) {
+      this._releaseSuperseded(source, live ?? undefined);
+      return;
+    }
+    if (!live) {
+      this._failReconnect(source);
+      return;
+    }
+    this._adoptStream(live, wasPaused);
   }
 
   _download(): void {
@@ -511,42 +560,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     `;
   }
 
-  static styles = [
-    // Brand-primary header bar, matching the builder's own logs dialog.
-    primaryDialogHeaderStyles,
-    termTokens,
-    termButtonStyles,
-    fillTerminalOnMobile,
-    css`
-      esphome-base-dialog {
-        /* Wide enough for ESPHome's timestamp + [C][module:NNN] prefix plus a
-           long message before wrapping (mirrors the builder's logs dialog). */
-        --width: min(1300px, 94vw);
-      }
-      /* Dress the dialog body as the terminal surface: drop the default body
-         padding so the terminal fills it edge-to-edge, and paint the body the
-         terminal background so there's no seam behind the rounded corners. */
-      esphome-base-dialog::part(body) {
-        padding: 0;
-        background: var(--term-bg);
-        overflow: hidden;
-      }
-      esphome-process-terminal {
-        display: block;
-        /* Size the terminal's own flex column via its height variable, not the
-           host's height: the internal .content defaults to 60vh, so forcing a
-           taller host would leave a gap below the toolbar. */
-        --process-terminal-height: min(70vh, 40rem);
-        --process-terminal-max-height: min(70vh, 40rem);
-      }
-      .toolbar-slot {
-        display: flex;
-        gap: var(--wa-space-2xs);
-        align-items: center;
-      }
-    `,
-    crashCalloutStyles,
-  ];
+  static styles = webLogsDialogStyles;
 }
 
 declare global {

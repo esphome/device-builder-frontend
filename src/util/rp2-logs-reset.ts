@@ -116,3 +116,15 @@ async function findBootselDevice(
     await sleep(BOOTSEL_POLL_MS);
   }
 }
+
+/**
+ * The copy key for a failed Pico reset: a stranded Pico wants a replug; a
+ * refused WebUSB open (Linux without the udev rule) would strand it again
+ * every time, so that cause is named instead. Anything else is ``plainKey``.
+ */
+export function picoResetFailureKey(err: unknown, plainKey: string): string {
+  if (!(err instanceof PicoStrandedError)) return plainKey;
+  return err.step === "refused"
+    ? "firmware.rp2_usb_access_denied"
+    : "dashboard.logs_rp2_reset_stranded";
+}
