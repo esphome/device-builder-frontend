@@ -121,8 +121,11 @@ describe("touchIntoBootloader", () => {
   it("touches the picked port and reports the pick", async () => {
     const { port, calls } = fakePort();
     withRequestPort(async () => port);
-    await expect(touchIntoBootloader()).resolves.toBe(true);
+    const filters = [{ usbVendorId: 0x2e8a }];
+    await expect(touchIntoBootloader({ filters })).resolves.toBe(true);
     expect(calls).toEqual(["open:1200", "signals:dtr=false", "close"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((navigator as any).serial.requestPort).toHaveBeenCalledWith({ filters });
   });
 
   it("is quiet when the picker is dismissed", async () => {

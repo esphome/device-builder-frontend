@@ -44,13 +44,18 @@ export async function resetToBootloader(
 }
 
 /**
- * The touch from a button click: pick the CDC port, then reset. False when
- * the picker was dismissed; a failed touch throws as ``resetToBootloader``.
+ * The touch from a button click: pick the CDC port (narrowed by ``filters``
+ * where the board's ids are known), then reset. False when the picker was
+ * dismissed; a failed touch throws as ``resetToBootloader``.
  */
-export async function touchIntoBootloader(
-  onLog: (line: string) => void = () => {}
-): Promise<boolean> {
-  const port = await requestSerialPort();
+export async function touchIntoBootloader({
+  onLog,
+  filters,
+}: {
+  onLog?: (line: string) => void;
+  filters?: SerialPortRequestOptions["filters"];
+} = {}): Promise<boolean> {
+  const port = await requestSerialPort(filters ? { filters } : undefined);
   if (!port) return false;
   await resetToBootloader(port, onLog);
   return true;

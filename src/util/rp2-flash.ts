@@ -42,13 +42,14 @@ export interface PicoFlashHooks {
 }
 
 /**
- * Pick the RP2 Boot device (the chooser needs the click's activation, so it
- * runs first), open it and write ``image``; the Pico reboots into the
- * firmware afterwards. False when the chooser was dismissed or the caller
- * moved on. Throws ``PicoFlashError``.
+ * Pick the RP2 Boot device, open it and write ``image``; the Pico reboots
+ * into the firmware afterwards. The chooser runs first, inside the click's
+ * activation, so an image still downloading may be handed in as a promise;
+ * its rejection propagates as is. False when the chooser was dismissed or
+ * the caller moved on. Throws ``PicoFlashError`` for the write's own failures.
  */
 export async function flashPico(
-  image: Uf2Image,
+  image: Uf2Image | Promise<Uf2Image>,
   hooks: PicoFlashHooks
 ): Promise<boolean> {
   const cancelled = hooks.cancelled ?? (() => false);
@@ -64,6 +65,7 @@ export async function flashPico(
   const kind = classifyUsbDevice(usb);
   if (kind !== "rp2040")
     throw new PicoFlashError(kind === "rp2350" ? "rp2350" : "not-bootsel");
+  const uf2 = await image;
   const { PicobootDevice, flashUf2 } = await loadPicoboot().catch((err: unknown) => {
     throw new PicoFlashError("connect", err);
   });
@@ -80,7 +82,7 @@ export async function flashPico(
   );
   hooks.onDeviceOpened?.();
   try {
-    await flashUf2(dev, image, hooks);
+    await flashUf2(dev, uf2, hooks);
   } catch (err) {
     throw new PicoFlashError(isUsbDeviceLost(err) ? "device-lost" : "flash", err);
   }

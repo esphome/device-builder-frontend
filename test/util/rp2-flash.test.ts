@@ -41,6 +41,19 @@ describe("flashPico", () => {
     expect(dev.close).not.toHaveBeenCalled();
   });
 
+  it("opens the chooser before the image has arrived, then writes it", async () => {
+    let finish!: (uf2: typeof image) => void;
+    const pending = new Promise<typeof image>((r) => (finish = r));
+    const flashUf2 = vi.fn(async () => {});
+    mocks.requestPicobootDevice.mockImplementation(async () => {
+      finish(image);
+      return bootsel();
+    });
+    engine(async () => ({}), flashUf2);
+    await expect(flashPico(pending, { onProgress: () => {} })).resolves.toBe(true);
+    expect(flashUf2).toHaveBeenCalledWith(expect.anything(), image, expect.anything());
+  });
+
   it("is quiet when the chooser is dismissed", async () => {
     mocks.requestPicobootDevice.mockResolvedValue(null);
     await expect(flashPico(image, { onProgress: () => {} })).resolves.toBe(false);

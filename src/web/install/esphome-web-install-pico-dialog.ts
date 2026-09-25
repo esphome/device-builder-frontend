@@ -40,6 +40,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   @state() private _downloadFailed = false;
   @state() private _state: InstallState = "idle";
   @state() private _progress = 0;
+  @state() private _errorTitle = "";
   @state() private _errorMessage = "";
 
   // The parsed image, kept across opens; a failed fetch clears it so the
@@ -71,11 +72,13 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   private _resetFlow(): void {
     this._state = "idle";
     this._progress = 0;
+    this._errorTitle = "";
     this._errorMessage = "";
   }
 
-  private _fail(message: string): void {
-    this._errorMessage = message;
+  private _fail(title: string, detail = ""): void {
+    this._errorTitle = title;
+    this._errorMessage = detail;
     this._state = "error";
   }
 
@@ -108,9 +111,13 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   private async _resetIntoBootsel(): Promise<void> {
     this._state = "resetting";
     try {
-      this._state = (await touchIntoBootloader()) ? "waiting" : "idle";
+      const touched = await touchIntoBootloader({ filters: picoPortFilters });
+      this._state = touched ? "waiting" : "idle";
     } catch (err) {
-      this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+      this._fail(
+        this._localize("firmware.browser_flash_connect_failed"),
+        getErrorMessage(err)
+      );
     }
   }
 
@@ -118,7 +125,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._state = "flashing";
     this._progress = 0;
     try {
-      const flashed = await flashPico(await this._fetchImage(), {
+      // The chooser opens first, inside the click; the image may still be
+      // downloading behind it.
+      const flashed = await flashPico(this._fetchImage(), {
         onProgress: (percent) => (this._progress = percent),
       });
       this._state = flashed ? "success" : "idle";
@@ -126,7 +135,13 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       if (err instanceof PicoFlashError) {
         console.warn("Pico install failed", err.cause ?? err);
         const { title, detail } = picoFlashFailureCopy(err, this._localize);
-        this._fail(detail ? `${title}: ${detail}` : title);
+        // The dashboard's copy names its own button; this page's differs.
+        this._fail(
+          err.kind === "not-bootsel"
+            ? this._localize("web.pico.install_not_bootsel")
+            : title,
+          detail
+        );
       } else {
         this._fail(
           this._localize("web.pico.install_image_failed", { error: getErrorMessage(err) })
@@ -210,11 +225,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       case "success":
         return { state: "success", message: this._localize("web.pico.setup_step_5") };
       default:
-        return {
-          state: "error",
-          message: this._localize("firmware.status_failed"),
-          detail: this._errorMessage,
-        };
+        return { state: "error", message: this._errorTitle, detail: this._errorMessage };
     }
   }
 
