@@ -772,6 +772,22 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toBe("QUFB==");
   });
 
+  it("firmwareAnalyzeMemory sends firmware/analyze_memory and returns the job", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const pending = api.firmwareAnalyzeMemory("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("firmware/analyze_memory");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+    const job = {
+      job_id: "j1",
+      job_type: "analyze_memory",
+      configuration: "kitchen.yaml",
+    };
+    ws.receive({ message_id: sent.message_id, result: job });
+    await expect(pending).resolves.toEqual(job);
+  });
+
   it("getEncryptionKey returns an empty string for a non-string key", async () => {
     const api = makeApi();
     const ws = await connect(api);

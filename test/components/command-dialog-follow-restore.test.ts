@@ -307,6 +307,13 @@ describe("command-dialog run timer visibility", () => {
     expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(true);
   });
 
+  it("shows for analyze-memory, which compiles first", () => {
+    const el = mount([timedJob("t1m", 7)]);
+    el._timerJobId = "t1m";
+    el._commandType = "analyze_memory";
+    expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(true);
+  });
+
   it("hides for clean and validate (not builds)", () => {
     const el = mount([timedJob("t2", 7)]);
     el._timerJobId = "t2";

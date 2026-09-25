@@ -43,6 +43,7 @@ describe("command dialog translation keys", () => {
     clean: true,
     reset: true,
     rename: true,
+    analyze_memory: true,
   };
 
   it.each(Object.keys(COMMAND_TYPES))(

@@ -21,6 +21,9 @@ export enum JobType {
   CLEAN = "clean",
   RESET_BUILD_ENV = "reset_build_env",
   RENAME = "rename",
+  /** ``esphome analyze-memory``: compiles, then prints the flash / RAM
+   *  report into the output. Shown live, never kept in history. */
+  ANALYZE_MEMORY = "analyze_memory",
 }
 
 /** Where the bytes for a firmware build come from.

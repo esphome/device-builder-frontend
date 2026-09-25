@@ -451,6 +451,10 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("clean-build", e.detail);
         }}
+        @analyze-memory=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("analyze-memory", e.detail);
+        }}
         @download=${(e: CustomEvent) => {
           e.stopPropagation();
           this._forwardEvent("download", e.detail);

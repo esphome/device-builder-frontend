@@ -134,6 +134,19 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   }
   if (active !== null) host._activeJobs = active;
 
+  // A memory analysis is shown once in its dialog and never kept: the
+  // backend drops it from history at the same point, so mirror that here
+  // (the card still flashes the outcome through _recentJobs).
+  if (job.job_type === JobType.ANALYZE_MEMORY) {
+    if (host._firmwareJobs.has(job.job_id)) {
+      const next = new Map(host._firmwareJobs);
+      next.delete(job.job_id);
+      host._firmwareJobs = next;
+    }
+    if (job.configuration) markJobRecent(host, job);
+    return;
+  }
+
   if (job.status === JobStatus.CANCELLED && job.configuration) {
     const supersededByActive = [...host._firmwareJobs.values()].some(
       (j) =>

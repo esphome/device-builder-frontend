@@ -124,7 +124,9 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
         ? "dashboard.status_renaming"
         : card.activeJob?.job_type === JobType.COMPILE
           ? "dashboard.status_compiling"
-          : "dashboard.status_installing";
+          : card.activeJob?.job_type === JobType.ANALYZE_MEMORY
+            ? "dashboard.status_analyzing_memory"
+            : "dashboard.status_installing";
     return html`<div
       class="device-status busy"
       @click=${(e: Event) => {

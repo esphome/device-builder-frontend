@@ -63,6 +63,11 @@ const EXPERT_FEATURES: FeatureItem[] = [
     titleKey: "settings.expert_mode_feature_yaml",
     descKey: "settings.expert_mode_feature_yaml_desc",
   },
+  {
+    icon: "memory",
+    titleKey: "settings.expert_mode_feature_analyze_memory",
+    descKey: "settings.expert_mode_feature_analyze_memory_desc",
+  },
 ];
 
 @customElement("esphome-settings-appearance")

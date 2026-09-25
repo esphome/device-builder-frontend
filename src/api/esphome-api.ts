@@ -1442,6 +1442,12 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareJob>("firmware/clean", { configuration });
   }
 
+  /** Queue ``esphome analyze-memory`` for a device (compiles, then reports
+   *  flash / RAM use per component into the job output). */
+  async firmwareAnalyzeMemory(configuration: string): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/analyze_memory", { configuration });
+  }
+
   /** Queue a reset-build-environment job (wipes the toolchain cache). */
   async firmwareResetBuildEnv(): Promise<FirmwareJob> {
     return this.sendCommand<FirmwareJob>("firmware/reset_build_env");

@@ -137,7 +137,8 @@ export function renderResetSuggestion(
   if (
     host._commandType !== "install" &&
     host._commandType !== "compile" &&
-    host._commandType !== "offline_compile"
+    host._commandType !== "offline_compile" &&
+    host._commandType !== "analyze_memory"
   ) {
     return nothing;
   }
@@ -176,7 +177,8 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
 const MIN_RUN_TIMER_MS = 1000;
 
 // Whether to show the run timer at all. Only the build commands have a
-// meaningful build time (not clean / validate), and only once the run has
+// meaningful build time (not clean / validate; analyze-memory compiles
+// first, so it counts), and only once the run has
 // accrued at least a second — a sub-second or untimed job (e.g. one compiled
 // before this feature existed) degrades to the plain streaming dot.
 export function showRunTimer(host: ESPHomeCommandDialog): boolean {
@@ -184,7 +186,8 @@ export function showRunTimer(host: ESPHomeCommandDialog): boolean {
     host._commandType !== "install" &&
     host._commandType !== "compile" &&
     host._commandType !== "offline_compile" &&
-    host._commandType !== "rename"
+    host._commandType !== "rename" &&
+    host._commandType !== "analyze_memory"
   ) {
     return false;
   }

@@ -12,7 +12,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../components/command-dialog.js";
 import { applyRemoval } from "../components/device/apply-removal.js";
 import { applyYamlDiff } from "../components/device/automation-editor/serialise.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
@@ -1277,9 +1277,18 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _cleanBuild(device: ConfiguredDevice) {
+    this._openDeviceCommand(device, "clean");
+  }
+
+  /** "Analyze memory" from the editor's device-actions menu (Expert Mode). */
+  private _onEditorAnalyzeMemory = () => {
+    if (this._device) this._openDeviceCommand(this._device, "analyze_memory");
+  };
+
+  private _openDeviceCommand(device: ConfiguredDevice, type: CommandType) {
     this._commandDialog.configuration = device.configuration;
     this._commandDialog.name = device.friendly_name || device.name;
-    this._commandDialog.open("clean");
+    this._commandDialog.open(type);
   }
 
   /** Catch ``request-open-editor`` from the post-validation-failure
@@ -1599,6 +1608,7 @@ export class ESPHomePageDevice extends LitElement {
         @change-board=${this._onChangeBoard}
         @open-logs=${this._onEditorOpenLogs}
         @clean-build=${this._onEditorCleanBuild}
+        @analyze-memory=${this._onEditorAnalyzeMemory}
         ?hasUnsavedEdits=${this._isDirty}
         ?saving=${this._saving}
         ?showModified=${this._device ? showPendingChanges(this._device) : false}

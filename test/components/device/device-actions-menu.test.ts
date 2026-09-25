@@ -4,7 +4,8 @@
  * The editor bottom-bar device-actions menu: renders Clean build / Validate /
  * Logs, emits the matching events, gates Validate (unsaved edits) and
  * Clean build (busy) with disabled + out-of-tab-order semantics, and shows
- * Visit web UI only when the page passed a web-UI URL.
+ * Visit web UI only when the page passed a web-UI URL. Analyze memory is an
+ * Expert Mode row: absent by default, first (furthest from the trigger) once on.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,10 +19,16 @@ afterEach(() => {
 });
 
 async function mount(
-  opts: { busy?: boolean; validateDisabled?: boolean; webUiUrl?: string } = {}
+  opts: {
+    busy?: boolean;
+    validateDisabled?: boolean;
+    webUiUrl?: string;
+    expertMode?: boolean;
+  } = {}
 ): Promise<ESPHomeDeviceActionsMenu> {
   const el = new ESPHomeDeviceActionsMenu();
   (el as unknown as { _localize: typeof identityLocalize })._localize = identityLocalize;
+  (el as unknown as { _expertMode: boolean })._expertMode = opts.expertMode ?? false;
   el.busy = opts.busy ?? false;
   el.validateDisabled = opts.validateDisabled ?? false;
   el.webUiUrl = opts.webUiUrl ?? "";
@@ -186,5 +193,47 @@ describe("esphome-device-actions-menu", () => {
     link(el)!.click();
     await el.updateComplete;
     expect(items(el)).toHaveLength(0);
+  });
+});
+
+describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
+  const label = "dashboard.action_analyze_memory";
+  const analyzeRow = (rows: HTMLElement[]) =>
+    rows.find((row) => row.textContent!.includes(label));
+
+  it("is absent unless Expert Mode is on", async () => {
+    const el = await mount();
+    expect(analyzeRow(await openMenu(el))).toBeUndefined();
+  });
+
+  it("paints first, above Clean build, and emits analyze-memory", async () => {
+    const el = await mount({ expertMode: true });
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    const rows = await openMenu(el);
+    expect(rows.map((row) => row.textContent!.trim())).toEqual([
+      label,
+      "dashboard.action_clean_build",
+      "device.validate",
+      "device.show_logs",
+    ]);
+    rows[0].click();
+    expect(onAnalyze).toHaveBeenCalledTimes(1);
+    await el.updateComplete;
+    expect(items(el)).toHaveLength(0);
+  });
+
+  it("is disabled while a build is running", async () => {
+    const el = await mount({ expertMode: true, busy: true });
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    const row = analyzeRow(await openMenu(el))!;
+    expect(row.classList.contains("menu-item--disabled")).toBe(true);
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    expect(row.getAttribute("tabindex")).toBe("-1");
+    expect(row.getAttribute("title")).toBe("dashboard.action_analyze_memory_busy");
+    row.click();
+    pressEnter(row);
+    expect(onAnalyze).not.toHaveBeenCalled();
   });
 });

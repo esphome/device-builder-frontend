@@ -11,6 +11,7 @@ import {
   mdiFileDownloadOutline,
   mdiFormTextbox,
   mdiKeyVariant,
+  mdiMemory,
   mdiOpenInNew,
   mdiPencil,
   mdiRenameOutline,
@@ -21,7 +22,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { expertModeContext, localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
@@ -46,6 +47,7 @@ registerMdiIcons({
   "file-download-outline": mdiFileDownloadOutline,
   "form-textbox": mdiFormTextbox,
   "key-variant": mdiKeyVariant,
+  memory: mdiMemory,
   "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
   "rename-outline": mdiRenameOutline,
@@ -62,6 +64,11 @@ export class ESPHomeTableRowMenu extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** Expert Mode unlocks the power-user rows (Analyze memory). */
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  private _expertMode = false;
 
   @property({ attribute: false })
   device: ConfiguredDevice | null = null;
@@ -257,6 +264,19 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="broom"></wa-icon>
           ${this._localize("dashboard.action_clean_build")}
         </div>
+        ${
+          this._expertMode
+            ? html`
+                <div
+                  class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                  @click=${this.busy ? undefined : () => this._emit("analyze-memory")}
+                >
+                  <wa-icon library="mdi" name="memory"></wa-icon>
+                  ${this._localize("dashboard.action_analyze_memory")}
+                </div>
+              `
+            : nothing
+        }
         <div class="menu-item" @click=${() => this._emit("download")}>
           <wa-icon library="mdi" name="file-download-outline"></wa-icon>
           ${this._localize("dashboard.action_download")}

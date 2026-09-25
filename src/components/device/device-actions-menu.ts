@@ -3,13 +3,14 @@ import {
   mdiBroom,
   mdiCheckCircleOutline,
   mdiDotsVertical,
+  mdiMemory,
   mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { expertModeContext, localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -22,16 +23,23 @@ registerMdiIcons({
   broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
   "dots-vertical": mdiDotsVertical,
+  memory: mdiMemory,
   "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });
 
-/** Editor bottom-bar overflow menu: device-scoped actions (Clean build, Visit web UI, Validate, Logs). */
+/** Editor bottom-bar overflow menu: device-scoped actions (Analyze memory in
+ *  Expert Mode, Clean build, Visit web UI, Validate, Logs). */
 @customElement("esphome-device-actions-menu")
 export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** Expert Mode unlocks the power-user rows (Analyze memory). */
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  private _expertMode = false;
 
   /** A build is in flight — cleaning its files mid-build would corrupt it. */
   @property({ type: Boolean }) busy = false;
@@ -111,8 +119,33 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
               <div class="backdrop" @click=${this._close}></div>
               <!-- Opens upward, so DOM order inverts distance from the
                    trigger: frequent actions (Logs) last / nearest the
-                   click, rare ones (Clean build) first / furthest. -->
+                   click, rare ones (Analyze memory, Clean build) first /
+                   furthest. -->
               <div class="menu" role="menu">
+                ${
+                  this._expertMode
+                    ? html`
+                        <div
+                          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                          role="menuitem"
+                          tabindex=${this.busy ? "-1" : "0"}
+                          aria-disabled=${this.busy ? "true" : "false"}
+                          title=${
+                            this.busy
+                              ? this._localize("dashboard.action_analyze_memory_busy")
+                              : nothing
+                          }
+                          @click=${this.busy ? undefined : this._onAnalyzeMemory}
+                          @keydown=${this.busy ? undefined : this._onItemKeydown}
+                        >
+                          <wa-icon library="mdi" name="memory"></wa-icon>
+                          <span class="menu-item-label"
+                            >${this._localize("dashboard.action_analyze_memory")}</span
+                          >
+                        </div>
+                      `
+                    : nothing
+                }
                 <div
                   class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
                   role="menuitem"
@@ -194,6 +227,12 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
     if (this.busy) return;
     this._close();
     this._emit("clean-build");
+  };
+
+  private _onAnalyzeMemory = () => {
+    if (this.busy) return;
+    this._close();
+    this._emit("analyze-memory");
   };
 }
 
