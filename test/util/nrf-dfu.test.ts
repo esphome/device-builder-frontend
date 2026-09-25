@@ -167,7 +167,7 @@ describe("flashDfuPackage", () => {
     abort.abort();
 
     await expect(
-      flashDfuPackage(port, pkg, () => {}, abort.signal)
+      flashDfuPackage(port, pkg, () => {}, { signal: abort.signal })
     ).rejects.toMatchObject({
       name: "AbortError",
     });
@@ -217,12 +217,82 @@ describe("flashDfuPackage", () => {
     };
     const abort = new AbortController();
 
-    const flash = flashDfuPackage(port, pkg, () => {}, abort.signal);
+    const flash = flashDfuPackage(port, pkg, () => {}, { signal: abort.signal });
     await new Promise((r) => setTimeout(r, 10));
     abort.abort();
 
     await expect(flash).rejects.toMatchObject({ name: "AbortError" });
     expect(port.close).toHaveBeenCalled();
+  });
+});
+
+/**
+ * A DFU port whose bootloader ACKs every packet: each write is answered
+ * with a two-byte SLIP frame, which is all the session's ACK wait needs.
+ */
+function ackingPort() {
+  let rx!: ReadableStreamDefaultController<Uint8Array>;
+  const written: Uint8Array[] = [];
+  const port = {
+    open: vi.fn(async () => {}),
+    close: vi.fn(async () => {
+      rx.close();
+    }),
+    readable: new ReadableStream<Uint8Array>({ start: (c) => (rx = c) }),
+    writable: new WritableStream<Uint8Array>({
+      write: (chunk) => {
+        written.push(chunk);
+        // The reply lands after the write settles, as on the wire.
+        setTimeout(() => rx.enqueue(bytes(0x00, 0x00, 0xc0)), 1);
+      },
+    }),
+  };
+  return { port: port as unknown as SerialPort, written };
+}
+
+describe("flashDfuPackage log lines", () => {
+  it("names every step: open, start and erase, init, transfer by tens, stop, reboot", async () => {
+    const realSetTimeout = setTimeout;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { port, written } = ackingPort();
+    const app = new Uint8Array(512 * 10).fill(0xaa);
+    const pkg = {
+      parts: [{ type: "application" as const, mode: 4, bin: app, dat: bytes(1, 2) }],
+    };
+    const log: string[] = [];
+    const progress: number[] = [];
+    try {
+      const flash = flashDfuPackage(port, pkg, (p) => progress.push(p), {
+        onLog: (l) => log.push(l),
+      });
+      let settled = false;
+      flash.then(
+        () => (settled = true),
+        () => (settled = true)
+      );
+      while (!settled) {
+        await vi.runAllTimersAsync();
+        await new Promise((r) => realSetTimeout(r, 0));
+      }
+      await flash;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(log).toEqual([
+      // The fake port is built open (its streams exist), like a reacquired handle.
+      "Using the already open DFU port",
+      "Image 1 of 1: application (5120 bytes)",
+      "Sending the start packet (softdevice 0, bootloader 0, application 5120 bytes); waiting 500 ms for the erase",
+      "Sending the init packet (2 bytes)",
+      "Transferring 5120 bytes in 10 packets",
+      ...[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((p) => `Transferring: ${p}%`),
+      "Sending the stop packet",
+      "Transfer complete; closing the port reboots the device into the firmware",
+    ]);
+    // start, init, ten data packets, stop
+    expect(written.length).toBe(13);
+    expect(progress[progress.length - 1]).toBe(100);
+    expect(port.close).toHaveBeenCalledOnce();
   });
 });
 
@@ -248,10 +318,18 @@ describe("flashDfuPackageWithReconnect", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.now() + 1_000_000);
     try {
+      const log: string[] = [];
       await expect(
-        flashDfuPackageWithReconnect(port, pkg, () => {}, { onReconnecting })
+        flashDfuPackageWithReconnect(port, pkg, () => {}, {
+          onReconnecting,
+          onLog: (l) => log.push(l),
+        })
       ).rejects.toThrow(/Serial port closed/);
       expect(onReconnecting).toHaveBeenCalledTimes(1);
+      expect(log).toContain(
+        "The device dropped off the bus mid-flash; waiting for it to re-enumerate"
+      );
+      expect(log).toContain("Reacquired the DFU port; flashing again from the start");
       // The close stamps serial activity so the bootloader's return is not
       // announced as a new device.
       expect(isRecentSerialActivity()).toBe(true);

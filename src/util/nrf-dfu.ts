@@ -25,6 +25,13 @@ export interface DfuPackage {
 /** 0-100 across every part of the package. */
 export type DfuProgressCallback = (percent: number) => void;
 
+export interface DfuFlashOptions {
+  /** Stops between packets and releases the port; the bootloader stays in DFU mode for a retry. */
+  signal?: AbortSignal;
+  /** One line per step, for the install dialog's details log. */
+  onLog?: (line: string) => void;
+}
+
 const DFU_MODE_SD = 1;
 const DFU_MODE_BL = 2;
 const DFU_MODE_APP = 4;
@@ -183,6 +190,14 @@ export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
 // ── DFU session ───────────────────────────────────────────────────────────────
 
 class DfuSession extends SerialStreamSession {
+  constructor(
+    port: SerialPort,
+    signal: AbortSignal | undefined,
+    private readonly log: (line: string) => void
+  ) {
+    super(port, signal);
+  }
+
   private rxBuf: number[] = [];
   private seqNum = 0;
   private resolveAck: ((ack: number) => void) | null = null;
@@ -264,27 +279,40 @@ class DfuSession extends SerialStreamSession {
       int32LE(blSize),
       int32LE(appSize)
     );
-    await this.sendPacket(frame);
     const totalSize = sdSize + blSize + appSize;
     const eraseMs = Math.max(500, (Math.floor(totalSize / 4096) + 1) * PAGE_ERASE_MS);
+    this.log(
+      `Sending the start packet (softdevice ${sdSize}, bootloader ${blSize}, application ${appSize} bytes); waiting ${Math.round(eraseMs)} ms for the erase`
+    );
+    await this.sendPacket(frame);
     await this.race(sleep(eraseMs));
   }
 
   async sendInitPacket(dat: Uint8Array): Promise<void> {
+    this.log(`Sending the init packet (${dat.length} bytes)`);
     const frame = concat(int32LE(DFU_INIT_PACKET), dat, new Uint8Array([0x00, 0x00]));
     await this.sendPacket(frame);
   }
 
   async sendFirmware(bin: Uint8Array, onPercent: (p: number) => void): Promise<void> {
     const chunkCount = Math.ceil(bin.length / DFU_PACKET_MAX_SIZE);
+    this.log(`Transferring ${bin.length} bytes in ${chunkCount} packets`);
+    let loggedTens = 0;
     for (let i = 0; i < chunkCount; i++) {
       const chunk = bin.subarray(i * DFU_PACKET_MAX_SIZE, (i + 1) * DFU_PACKET_MAX_SIZE);
       await this.sendPacket(concat(int32LE(DFU_DATA_PACKET), chunk));
-      onPercent(Math.floor(((i + 1) / chunkCount) * 100));
+      const percent = Math.floor(((i + 1) / chunkCount) * 100);
+      onPercent(percent);
+      const tens = Math.floor(percent / 10);
+      if (tens > loggedTens) {
+        loggedTens = tens;
+        this.log(`Transferring: ${tens * 10}%`);
+      }
       if (i > 0 && i % 8 === 0) await this.race(sleep(PAGE_WRITE_MS));
     }
 
     await this.race(sleep(PAGE_WRITE_MS));
+    this.log("Sending the stop packet");
     await this.sendPacket(int32LE(DFU_STOP_DATA_PACKET));
     onPercent(100);
   }
@@ -294,26 +322,35 @@ class DfuSession extends SerialStreamSession {
 
 /**
  * Run the full DFU sequence on a closed port (opened at 115200, closed after).
- * ``signal`` stops between packets and releases the port; the bootloader
- * stays in DFU mode for a retry.
+ * The abort in ``options`` stops between packets and releases the port; the
+ * bootloader stays in DFU mode for a retry.
  */
 export async function flashDfuPackage(
   port: SerialPort,
   pkg: DfuPackage,
   onProgress: DfuProgressCallback,
-  signal?: AbortSignal
+  { signal, onLog }: DfuFlashOptions = {}
 ): Promise<void> {
-  if (!port.readable) await port.open({ baudRate: 115200 });
+  const log = onLog ?? (() => {});
+  if (port.readable) {
+    log("Using the already open DFU port");
+  } else {
+    log("Opening the DFU port at 115200 baud");
+    await port.open({ baudRate: 115200 });
+  }
   let session: DfuSession | undefined;
   let failure: unknown;
   try {
-    session = new DfuSession(port, signal);
+    session = new DfuSession(port, signal, log);
     for (let i = 0; i < pkg.parts.length; i++) {
       const part = pkg.parts[i];
       const base = (i / pkg.parts.length) * 100;
       const range = 100 / pkg.parts.length;
 
       onProgress(base);
+      log(
+        `Image ${i + 1} of ${pkg.parts.length}: ${part.type} (${part.bin.length} bytes)`
+      );
 
       let sdSize = 0;
       let blSize = 0;
@@ -339,6 +376,7 @@ export async function flashDfuPackage(
         onProgress(base + (pct * range) / 100);
       });
     }
+    log("Transfer complete; closing the port reboots the device into the firmware");
   } catch (err) {
     failure = err;
     throw err;
@@ -377,20 +415,25 @@ export async function flashDfuPackageWithReconnect(
   port: SerialPort,
   pkg: DfuPackage,
   onProgress: DfuProgressCallback,
-  options: { signal?: AbortSignal; onReconnecting?: () => void } = {}
+  options: DfuFlashOptions & { onReconnecting?: () => void } = {}
 ): Promise<void> {
-  const { signal, onReconnecting } = options;
+  const { signal, onLog, onReconnecting } = options;
   try {
-    await flashDfuPackage(port, pkg, onProgress, signal);
+    await flashDfuPackage(port, pkg, onProgress, { signal, onLog });
   } catch (err) {
     if (signal?.aborted || !isDeviceLost(err)) throw err;
+    onLog?.("The device dropped off the bus mid-flash; waiting for it to re-enumerate");
     onReconnecting?.();
     const live = await openLiveSerialPort(port, {
       baudRate: 115200,
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,
       cancelled: () => signal?.aborted === true,
     });
-    if (!live) throw err;
-    await flashDfuPackage(live, pkg, onProgress, signal);
+    if (!live) {
+      onLog?.("The device did not come back");
+      throw err;
+    }
+    onLog?.("Reacquired the DFU port; flashing again from the start");
+    await flashDfuPackage(live, pkg, onProgress, { signal, onLog });
   }
 }

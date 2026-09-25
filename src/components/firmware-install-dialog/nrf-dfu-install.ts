@@ -94,7 +94,11 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     // The picker outlives a dismissed dialog; don't reset a port picked for
     // an install that no longer exists.
     if (!stillCurrent()) return;
+    host._log.enqueue("Touching the port at 1200 baud to enter DFU mode");
     await resetToBootloader(port);
+    if (stillCurrent()) {
+      host._log.enqueue("Reset sent; the device re-enumerates as its DFU port");
+    }
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
@@ -138,6 +142,10 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
       },
       {
         signal: abort.signal,
+        // The engine's steps land in the details log, as esptool's lines do.
+        onLog: (line) => {
+          if (stillCurrent()) host._log.enqueue(line);
+        },
         onReconnecting: () => {
           if (stillCurrent()) {
             host._statusMessage = host._localize("firmware.nrf_reconnecting");
