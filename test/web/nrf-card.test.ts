@@ -158,3 +158,23 @@ describe("esphome-web-nrf-card port announcement", () => {
     expect(picked).toHaveBeenCalledWith(port);
   });
 });
+
+describe("esphome-web-nrf-card unmounted mid-open", () => {
+  it("releases a port that opened after a flow switch removed the card", async () => {
+    const port = { getInfo: () => ({}), close: vi.fn(async () => {}) };
+    mocks.requestSerialPort.mockResolvedValue(port);
+    let opened!: (ok: boolean) => void;
+    mocks.openPortForLogs.mockImplementation(
+      () => new Promise<boolean>((resolve) => (opened = resolve))
+    );
+    const el = await mount();
+    const pending = (el as any)._showSerialLogs();
+    // Let the pick resolve so the open is in flight, then unmount the card.
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    el.remove();
+    opened(true);
+    await pending;
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect((el as any)._logs).toBeUndefined();
+  });
+});

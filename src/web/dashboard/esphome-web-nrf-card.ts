@@ -70,6 +70,12 @@ export class ESPHomeWebNrfCard extends LitElement {
       // The shell may offer another board flow from the port's ids.
       fireEvent(this, "port-picked", port);
       if (!(await openPortForLogs(port, this._localize))) return;
+      // A flow switch accepted while the open was pending unmounted this
+      // card: nothing is left to own the port, so release it.
+      if (!this.isConnected) {
+        await port.close().catch(() => {});
+        return;
+      }
       this._logs = { port };
     } finally {
       this._picking = false;
