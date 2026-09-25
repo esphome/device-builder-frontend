@@ -6,6 +6,7 @@
 import { isNrfPlatform } from "./nrf-platform.js";
 import { createLogLineAssembler, type SerialLineHooks } from "./serial-log-stream.js";
 import { sleep } from "./sleep.js";
+import { isPortPickerCancel } from "./web-serial.js";
 
 export const BLE_NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 // TX characteristic: device -> host (notify).
@@ -43,11 +44,6 @@ export class BleUnavailableError extends Error {
 export async function requestBleNusDevice(
   names: string[]
 ): Promise<BluetoothDevice | null> {
-  // Chrome rejects the chooser with the same NotFoundError as a dismissal
-  // when the adapter is off; ask first so that case gets its own message.
-  if (typeof navigator.bluetooth.getAvailability === "function") {
-    if (!(await navigator.bluetooth.getAvailability())) throw new BleUnavailableError();
-  }
   const filters: BluetoothLEScanFilter[] = [
     ...[...new Set(names.filter(Boolean))].map((name) => ({ name })),
     { services: [BLE_NUS_SERVICE_UUID] },
@@ -58,8 +54,10 @@ export async function requestBleNusDevice(
       optionalServices: [BLE_NUS_SERVICE_UUID],
     });
   } catch (err) {
-    if (err instanceof DOMException && err.name === "NotFoundError") return null;
-    throw err;
+    if (!isPortPickerCancel(err)) throw err;
+    // Chrome rejects with the same NotFoundError when the adapter is off.
+    if (!(await navigator.bluetooth.getAvailability())) throw new BleUnavailableError();
+    return null;
   }
 }
 
@@ -74,13 +72,15 @@ export interface BleNusOptions {
 /**
  * Connect to *device*, subscribe to NUS notifications and stream lines into
  * *hooks*. Resolves to a cancel (idempotent, also disconnects) once
- * notifications flow; throws the last connect error otherwise.
+ * notifications flow; throws the last connect error otherwise. Chooser
+ * dismissal is told apart from an absent adapter only after the fact, so the
+ * chooser itself opens inside the click's activation.
  */
 export async function streamBleNus(
   device: BluetoothDevice,
   hooks: SerialLineHooks,
   { attempts = 1, retryDelayMs = 1000, cancelled = () => false }: BleNusOptions = {}
-): Promise<() => void> {
+): Promise<() => Promise<void>> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await subscribe(device, hooks);
@@ -95,11 +95,10 @@ export async function streamBleNus(
 async function subscribe(
   device: BluetoothDevice,
   hooks: SerialLineHooks
-): Promise<() => void> {
+): Promise<() => Promise<void>> {
   const push = createLogLineAssembler(hooks.onLine);
   let txChar: BluetoothRemoteGATTCharacteristic | null = null;
   let detached = false;
-  let streaming = false;
   const onValue = (): void => {
     const dv = txChar?.value;
     if (dv) push(dv);
@@ -114,12 +113,9 @@ async function subscribe(
     txChar = null;
     return true;
   };
-  // A drop during the subscribe surfaces as the subscribe failing below;
-  // only a streaming link reports it as a disconnect.
   const onDisconnected = (): void => {
-    if (detach() && streaming) hooks.onDisconnect?.();
+    if (detach()) hooks.onDisconnect?.();
   };
-  device.addEventListener("gattserverdisconnected", onDisconnected);
   try {
     const server = await device.gatt!.connect();
     const service = await server
@@ -136,11 +132,12 @@ async function subscribe(
     // reset the CCCD on disconnect would otherwise never be re-subscribed.
     await txChar.stopNotifications().catch(() => {});
     await txChar.startNotifications();
-    if (detached || !device.gatt?.connected) {
+    // A drop during the subscribe fails it here rather than streaming nothing.
+    if (!device.gatt?.connected) {
       throw new DOMException("The device disconnected while subscribing", "NetworkError");
     }
-    streaming = true;
-    return () => {
+    device.addEventListener("gattserverdisconnected", onDisconnected);
+    return async () => {
       if (detach()) device.gatt?.disconnect();
     };
   } catch (err) {

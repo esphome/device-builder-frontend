@@ -14,7 +14,7 @@ vi.mock("../../src/util/web-serial.js", () => ({
 }));
 const ble = vi.hoisted(() => ({
   requestBleNusDevice: vi.fn<() => Promise<BluetoothDevice | null>>(),
-  streamBleNus: vi.fn<() => Promise<() => void>>(),
+  streamBleNus: vi.fn<() => Promise<() => Promise<void>>>(),
 }));
 vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/ble-nus-stream.js")>()),
@@ -50,13 +50,14 @@ type TestHost = LogsLaunchHost & {
     name?: string;
     open: ReturnType<typeof vi.fn>;
     openPassive: ReturnType<typeof vi.fn>;
+    setBleStream: ReturnType<typeof vi.fn>;
   };
 };
 
 function makeHost(getSerialPorts: () => Promise<unknown>): TestHost {
   return {
     api: { getSerialPorts: vi.fn(getSerialPorts) },
-    logsDialog: { open: vi.fn(), openPassive: vi.fn() },
+    logsDialog: { open: vi.fn(), openPassive: vi.fn(), setBleStream: vi.fn() },
     localize: (key: string) => key,
   } as unknown as TestHost;
 }
@@ -249,12 +250,11 @@ describe("launchLogsWithMethod web-serial", () => {
 describe("launchLogsWithMethod ble-nus", () => {
   it("opens a BLE passive session and registers the stream", async () => {
     const device = {} as BluetoothDevice;
-    const cancel = vi.fn();
+    const cancel = vi.fn(async () => {});
     ble.requestBleNusDevice.mockResolvedValue(device);
     ble.streamBleNus.mockResolvedValue(cancel);
     const host = makeHost(async () => []);
     host.logsDialog.openPassive.mockReturnValue(() => false);
-    (host.logsDialog as { setBleStream?: unknown }).setBleStream = vi.fn();
     await launchLogsWithMethod(host, makeDevice(), "ble-nus");
     expect(ble.requestBleNusDevice).toHaveBeenCalledWith(["kitchen", "Kitchen"]);
     expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
@@ -265,9 +265,7 @@ describe("launchLogsWithMethod ble-nus", () => {
       expect.objectContaining({ onLine: expect.any(Function) }),
       expect.objectContaining({ attempts: 3 })
     );
-    expect(
-      (host.logsDialog as { setBleStream?: unknown }).setBleStream
-    ).toHaveBeenCalledWith(cancel);
+    expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(cancel);
   });
 
   it("does nothing when the chooser is dismissed", async () => {

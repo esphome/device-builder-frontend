@@ -1,8 +1,12 @@
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { streamSerialToDialog } from "../components/dashboard/actions.js";
+import {
+  dialogLineHooks,
+  streamSerialToDialog,
+} from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
+import { BleNusServiceNotFoundError, streamBleNus } from "./ble-nus-stream.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -31,10 +35,10 @@ export function openNetworkLogsFallback(
   logsDialog.open(OTA_PORT, openOptions);
 }
 
-// A failed serial open drops the session to ``dead`` (Start reconnects) and
-// toasts the same message; not once the session moved on, since a newer
-// session is not this failure's.
-export function failSerialOpen(
+// Ends the passive session with the cause in the pane (Start reconnects) and
+// toasts it; not once the session moved on, since a newer session is not
+// this failure's.
+function failSerialOpen(
   logsDialog: ESPHomeLogsDialog,
   message: string,
   cancelled: () => boolean = () => false
@@ -173,6 +177,52 @@ function picoResetFailureKey(err: unknown): string {
   return err.step === "refused"
     ? "firmware.rp2_usb_access_denied"
     : "dashboard.logs_rp2_reset_stranded";
+}
+
+// GATT connects fail transiently while the device is still advertising or
+// the OS stack settles after a prior session.
+const BLE_CONNECT_ATTEMPTS = 3;
+
+/**
+ * The BLE twin of ``attachSerialLogStream``: a stream registered, or the
+ * session dead with the reason in the pane. A remote disconnect goes dead
+ * quietly (Start reconnects); a failed connect also toasts.
+ */
+export async function attachBleNusLogs(
+  dialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  device: BluetoothDevice,
+  cancelled: () => boolean
+): Promise<void> {
+  let cancel: () => Promise<void>;
+  try {
+    cancel = await streamBleNus(
+      device,
+      {
+        ...dialogLineHooks(dialog),
+        onDisconnect: () =>
+          dialog.setSerialOpenFailed(localize("dashboard.logs_ble_nus_disconnected")),
+      },
+      { attempts: BLE_CONNECT_ATTEMPTS, cancelled }
+    );
+  } catch (err) {
+    console.warn("BLE NUS connect failed", err);
+    failSerialOpen(
+      dialog,
+      localize(
+        err instanceof BleNusServiceNotFoundError
+          ? "dashboard.logs_ble_nus_service_not_found"
+          : "dashboard.logs_ble_nus_open_failed"
+      ),
+      cancelled
+    );
+    return;
+  }
+  if (cancelled()) {
+    void cancel();
+    return;
+  }
+  dialog.setBleStream(cancel);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { html, type TemplateResult } from "lit";
 
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { hasSerialPort, isOtaNetwork } from "../logs-session.js";
+import { hasSerialPort, isOtaNetwork, isStreaming } from "../logs-session.js";
 import {
   renderTermButton,
   renderTermToggle,
@@ -10,11 +10,9 @@ import { resetOffered } from "./session.js";
 
 /** The terminal's right-hand toolbar: reset or states toggle, expand,
  *  download, clear, and stop / start. */
-export function renderLogsToolbar(
-  host: ESPHomeLogsDialog,
-  streaming: boolean
-): TemplateResult {
+export function renderLogsToolbar(host: ESPHomeLogsDialog): TemplateResult {
   const s = host._session;
+  const streaming = isStreaming(s);
   const toggleLabel = host._localize(
     host._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states"
   );

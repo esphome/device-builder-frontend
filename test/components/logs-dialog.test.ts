@@ -223,7 +223,7 @@ describe("logs-dialog Reset Device gate", () => {
 
   it("hides Reset Device for a BLE session, whatever the platform", async () => {
     const el = await mountPassive("esp32", { source: "ble" });
-    el.setBleStream(() => {});
+    el.setBleStream(async () => {});
     await el.updateComplete;
     expect(hasResetButton(el)).toBe(false);
   });

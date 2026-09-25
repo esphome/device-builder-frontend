@@ -62,6 +62,7 @@ import {
 } from "./logs-dialog/session.js";
 import { renderLogsToolbar } from "./logs-dialog/toolbar.js";
 import {
+  hasPause,
   isPassive,
   isStreaming,
   type LogsSession,
@@ -221,9 +222,7 @@ export class ESPHomeLogsDialog extends LitElement {
   // Read by the stream line hooks to gate appends while the log is paused.
   get _serialPaused(): boolean {
     const s = this._session;
-    return (
-      (s.kind === "serial" || s.kind === "reconnecting" || s.kind === "ble") && s.paused
-    );
+    return hasPause(s) && s.paused;
   }
 
   // Derived in willUpdate, not per render: the dialog re-renders per frame
@@ -233,8 +232,6 @@ export class ESPHomeLogsDialog extends LitElement {
   // line on its CDC and the pulse's DTR drop only detaches the host; a Pico
   // resets through the session's hook instead (WebUSB browsers).
   _pulseResets = true;
-  // An nRF52 has no network to fall back to for logs.
-  private _offersNetworkLogs = true;
   // Set by openPassive; see PassiveSource.
   _passiveSource: PassiveSource = "serial";
 
@@ -258,9 +255,8 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      const nrf = isNrfPlatform(this._targetPlatform);
-      this._pulseResets = !isRp2Platform(this._targetPlatform) && !nrf;
-      this._offersNetworkLogs = !nrf;
+      this._pulseResets =
+        !isRp2Platform(this._targetPlatform) && !isNrfPlatform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -306,7 +302,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   /** Register a streaming BLE NUS link once notifications flow. */
-  public setBleStream(cancel: () => void) {
+  public setBleStream(cancel: () => Promise<void>) {
     setBleStream(this, cancel);
   }
 
@@ -316,8 +312,7 @@ export class ESPHomeLogsDialog extends LitElement {
     setSerialStream(this, port, cancel);
   }
 
-  /** Surface a failure to reopen the Web Serial port for post-install logs.
-   *  The caller pairs this with a ``toast.error``. */
+  /** End the passive session for *message* (shown in the pane); Start reconnects. */
   public setSerialOpenFailed(message: string) {
     setSerialOpenFailed(this, message);
   }
@@ -349,27 +344,32 @@ export class ESPHomeLogsDialog extends LitElement {
     void this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
+  // A passive session shows its source; OTA / server-serial show the port.
+  private _sourceLabel(): string {
+    const s = this._session;
+    if (isPassive(s)) {
+      return this._localize(
+        this._passiveSource === "ble"
+          ? "dashboard.logs_source_ble_nus"
+          : "dashboard.logs_source_web_serial"
+      );
+    }
+    return s.kind === "ota" ? s.port : "";
+  }
+
   protected render() {
     const s = this._session;
     const streaming = isStreaming(s);
-    const passive = isPassive(s);
     // The dead state (serial reopen failed) gets the escape hatch
     // unconditionally — its only other recovery is Start-to-reconnect.
-    const offerOtaFallback =
-      this._offersNetworkLogs && (this._quietSerial.quiet || s.kind === "dead");
+    const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
     const title = this._localize("dashboard.logs_title", { name: this.name });
-    // A passive session shows its source; OTA / server-serial show the port.
-    const source = passive
-      ? this._localize(
-          this._passiveSource === "ble"
-            ? "dashboard.logs_source_ble_nus"
-            : "dashboard.logs_source_web_serial"
-        )
-      : s.kind === "ota"
-        ? s.port
-        : "";
+    const source = this._sourceLabel();
     // The BLE connect can take seconds with nothing to show yet.
-    const connecting = s.kind === "reconnecting" && this._passiveSource === "ble";
+    const connectingMessage =
+      s.kind === "reconnecting" && this._passiveSource === "ble"
+        ? this._localize("dashboard.logs_ble_nus_connecting")
+        : "";
     // Only the ota source rides the dashboard WS; a Web Serial stream
     // is healthy regardless, so no false error banner there.
     const wsDown = s.kind === "ota" && this._connectionLost;
@@ -389,8 +389,8 @@ export class ESPHomeLogsDialog extends LitElement {
           .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
-          .state=${connecting ? "running" : null}
-          .statusMessage=${connecting ? this._localize("dashboard.logs_ble_nus_connecting") : ""}
+          .state=${connectingMessage ? "running" : null}
+          .statusMessage=${connectingMessage}
           .connectionLost=${wsDown}
           .connectionLostMessage=${this._localize("dashboard.logs_connection_lost")}
         >
@@ -432,7 +432,7 @@ export class ESPHomeLogsDialog extends LitElement {
                 )
               : ""
           }
-          ${renderLogsToolbar(this, streaming)}
+          ${renderLogsToolbar(this)}
         </esphome-process-terminal>
       </esphome-base-dialog>
       <esphome-crash-report-dialog></esphome-crash-report-dialog>

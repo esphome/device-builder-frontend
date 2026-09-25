@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { withWebBluetooth } from "../_web-serial.js";
+
 import {
   BLE_NUS_SERVICE_UUID,
-  bleNusLogsAvailable,
   BleNusServiceNotFoundError,
   BleUnavailableError,
   requestBleNusDevice,
   streamBleNus,
 } from "../../src/util/ble-nus-stream.js";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const enc = (s: string) => new DataView(new TextEncoder().encode(s).buffer);
 
 /** A NUS peripheral: scripts the connect outcome and lets tests push notifications. */
@@ -67,10 +67,6 @@ function fakeDevice(opts: { connectFailures?: number; noService?: boolean } = {}
   };
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("streamBleNus", () => {
   it("streams assembled lines with the serial formatting (timestamp, CR stripped)", async () => {
     const d = fakeDevice();
@@ -85,8 +81,8 @@ describe("streamBleNus", () => {
     // Chrome's cached subscription is cleared before subscribing again.
     expect(d.char.stopNotifications).toHaveBeenCalledOnce();
     expect(d.char.startNotifications).toHaveBeenCalledOnce();
-    cancel();
-    cancel(); // idempotent
+    await cancel();
+    await cancel(); // idempotent
     expect(d.gatt.disconnect).toHaveBeenCalledOnce();
     expect(d.charListeners.size).toBe(0);
     expect(d.deviceListeners.size).toBe(0);
@@ -100,7 +96,7 @@ describe("streamBleNus", () => {
     d.dropLink();
     expect(onDisconnect).toHaveBeenCalledOnce();
     expect(d.charListeners.size).toBe(0);
-    cancel(); // nothing left to do after the remote end went
+    await cancel(); // nothing left to do after the remote end went
     expect(d.gatt.disconnect).not.toHaveBeenCalled();
   });
 
@@ -112,7 +108,7 @@ describe("streamBleNus", () => {
       { attempts: 3, retryDelayMs: 0 }
     );
     expect(d.gatt.connect).toHaveBeenCalledTimes(3);
-    cancel();
+    await cancel();
   });
 
   it("gives up after the last attempt, leaving nothing connected", async () => {
@@ -155,7 +151,7 @@ describe("streamBleNus", () => {
       { attempts: 2, retryDelayMs: 0 }
     );
     expect(d.gatt.connect).toHaveBeenCalledTimes(2);
-    cancel();
+    await cancel();
   });
 
   it("fails the subscribe, not the stream, when the link drops before notifications flow", async () => {
@@ -185,19 +181,13 @@ describe("streamBleNus", () => {
 });
 
 describe("requestBleNusDevice", () => {
-  const orig = Object.getOwnPropertyDescriptor(navigator, "bluetooth");
-  afterEach(() => {
-    if (orig) Object.defineProperty(navigator, "bluetooth", orig);
-    else delete (navigator as any).bluetooth;
-  });
+  let restore = (): void => {};
+  afterEach(() => restore());
 
   it("matches the given names and falls back to the service uuid", async () => {
     const picked = {};
     const requestDevice = vi.fn(async () => picked);
-    Object.defineProperty(navigator, "bluetooth", {
-      configurable: true,
-      value: { requestDevice, getAvailability: async () => true },
-    });
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
     await expect(
       requestBleNusDevice(["test3", "Living Room", "test3", ""])
     ).resolves.toBe(picked);
@@ -211,34 +201,20 @@ describe("requestBleNusDevice", () => {
     });
   });
 
-  it("tells an absent adapter apart from a dismissed chooser", async () => {
-    Object.defineProperty(navigator, "bluetooth", {
-      configurable: true,
-      value: {
-        requestDevice: vi.fn(async () => {
-          throw new DOMException("User cancelled", "NotFoundError");
-        }),
-        getAvailability: async () => false,
-      },
-    });
+  it("tells an absent adapter apart from a dismissed chooser, after the fact", async () => {
+    const bluetooth = {
+      requestDevice: vi.fn(async () => {
+        throw new DOMException("User cancelled", "NotFoundError");
+      }),
+      getAvailability: vi.fn(async () => false),
+    };
+    restore = withWebBluetooth(bluetooth);
     await expect(requestBleNusDevice(["x"])).rejects.toBeInstanceOf(BleUnavailableError);
-    (navigator as any).bluetooth.getAvailability = async () => true;
+    // The chooser opens first, inside the click's activation.
+    expect(bluetooth.requestDevice.mock.invocationCallOrder[0]).toBeLessThan(
+      bluetooth.getAvailability.mock.invocationCallOrder[0]
+    );
+    bluetooth.getAvailability.mockResolvedValue(true);
     await expect(requestBleNusDevice(["x"])).resolves.toBeNull();
-  });
-});
-
-describe("bleNusLogsAvailable", () => {
-  const orig = Object.getOwnPropertyDescriptor(navigator, "bluetooth");
-  afterEach(() => {
-    if (orig) Object.defineProperty(navigator, "bluetooth", orig);
-    else delete (navigator as any).bluetooth;
-  });
-
-  it("needs Web Bluetooth and an nRF52 target", () => {
-    Object.defineProperty(navigator, "bluetooth", { configurable: true, value: {} });
-    expect(bleNusLogsAvailable("nrf52")).toBe(true);
-    expect(bleNusLogsAvailable("esp32")).toBe(false);
-    delete (navigator as any).bluetooth;
-    expect(bleNusLogsAvailable("nrf52")).toBe(false);
   });
 });

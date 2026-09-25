@@ -433,7 +433,7 @@ export function streamSerialToDialog(
   return streamSerialLines(port, dialogLineHooks(dialog));
 }
 
-export interface LogLineSink {
+interface LogLineSink {
   _serialPaused?: boolean;
   _noteSerialActivity(): void;
   _enqueueLine(line: string): void;

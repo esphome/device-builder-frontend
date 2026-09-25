@@ -59,15 +59,19 @@ export type LogsSession =
     }
   | {
       readonly kind: "ble";
-      readonly cancel: () => void;
+      readonly cancel: () => Promise<void>;
       readonly paused: boolean;
     }
   | { readonly kind: "dead" };
 
+/** The phases Stop pauses on screen without ending the stream. */
+export const hasPause = (
+  s: LogsSession
+): s is Extract<LogsSession, { paused: boolean }> => "paused" in s;
+
 /** Whether the streaming dot / Stop button should show (vs. the Start button). */
 export const isStreaming = (s: LogsSession): boolean =>
-  (s.kind === "ota" && s.streamId !== null) ||
-  ((s.kind === "serial" || s.kind === "reconnecting" || s.kind === "ble") && !s.paused);
+  (s.kind === "ota" && s.streamId !== null) || (hasPause(s) && !s.paused);
 
 /** Web Serial or BLE session (any phase): drives the source chip + hides the
  *  states toggle, which only applies to the backend ``--no-states`` flag. */

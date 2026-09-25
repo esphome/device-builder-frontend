@@ -20,7 +20,7 @@ const serial = (paused = false): LogsSession => ({
 });
 const ble = (paused = false): LogsSession => ({
   kind: "ble",
-  cancel: () => {},
+  cancel: noop,
   paused,
 });
 

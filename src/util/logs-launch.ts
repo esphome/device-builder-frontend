@@ -2,21 +2,18 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { dialogLineHooks } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import {
   bleNusLogsAvailable,
-  BleNusServiceNotFoundError,
   BleUnavailableError,
   isWebBluetoothSupported,
   requestBleNusDevice,
-  streamBleNus,
 } from "./ble-nus-stream.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {
+  attachBleNusLogs,
   attachSerialLogStream,
-  failSerialOpen,
   openNetworkLogsFallback,
   picoResetHook,
   reconnectWebSerialLogs,
@@ -177,78 +174,40 @@ export async function launchLogsWithMethod(
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }
   } else if (method === "ble-nus") {
-    if (!isWebBluetoothSupported()) {
-      notifyError(host.localize("dashboard.logs_ble_nus_unsupported"));
-      return;
-    }
-    let bleDevice: BluetoothDevice | null;
-    try {
-      // The firmware advertises the node name; the friendly name is a guess.
-      bleDevice = await requestBleNusDevice([device.name, device.friendly_name]);
-    } catch (err) {
-      console.warn("BLE NUS chooser failed", err);
-      notifyError(
-        host.localize(
-          err instanceof BleUnavailableError
-            ? "dashboard.logs_ble_nus_unsupported"
-            : "dashboard.logs_ble_nus_open_failed"
-        )
-      );
-      return;
-    }
-    if (!bleDevice) return; // User dismissed the chooser.
-    const dev = bleDevice;
+    const bleDevice = await pickBleNusDevice(host, device);
+    if (!bleDevice) return;
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
     const cancelled = host.logsDialog.openPassive({
       source: "ble",
       onReconnect: (cancelled) =>
-        attachBleNusLogs(host.logsDialog, host.localize, dev, cancelled),
+        attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled),
     });
-    await attachBleNusLogs(host.logsDialog, host.localize, dev, cancelled);
+    await attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled);
   }
 }
 
-// GATT connects fail transiently while the device is still advertising or
-// the OS stack settles after a prior session.
-const BLE_CONNECT_ATTEMPTS = 3;
-
-// Ends like a serial attach: a stream registered, or the session dead with
-// the reason in the pane. A remote disconnect goes dead quietly (Start
-// reconnects); a failed connect also toasts.
-async function attachBleNusLogs(
-  dialog: ESPHomeLogsDialog,
-  localize: LocalizeFunc,
-  device: BluetoothDevice,
-  cancelled: () => boolean
-): Promise<void> {
-  let cancel: () => void;
+// The chooser, with its failures toasted; null when there is nothing to open.
+async function pickBleNusDevice(
+  host: LogsLaunchHost,
+  device: ConfiguredDevice
+): Promise<BluetoothDevice | null> {
+  if (!isWebBluetoothSupported()) {
+    notifyError(host.localize("dashboard.logs_ble_nus_unsupported"));
+    return null;
+  }
   try {
-    cancel = await streamBleNus(
-      device,
-      {
-        ...dialogLineHooks(dialog),
-        onDisconnect: () =>
-          dialog.setSerialOpenFailed(localize("dashboard.logs_ble_nus_disconnected")),
-      },
-      { attempts: BLE_CONNECT_ATTEMPTS, cancelled }
-    );
+    // The firmware advertises the node name; the friendly name is a guess.
+    return await requestBleNusDevice([device.name, device.friendly_name]);
   } catch (err) {
-    console.warn("BLE NUS connect failed", err);
-    failSerialOpen(
-      dialog,
-      localize(
-        err instanceof BleNusServiceNotFoundError
-          ? "dashboard.logs_ble_nus_service_not_found"
+    console.warn("BLE NUS chooser failed", err);
+    notifyError(
+      host.localize(
+        err instanceof BleUnavailableError
+          ? "dashboard.logs_ble_nus_unsupported"
           : "dashboard.logs_ble_nus_open_failed"
-      ),
-      cancelled
+      )
     );
-    return;
+    return null;
   }
-  if (cancelled()) {
-    cancel();
-    return;
-  }
-  dialog.setBleStream(cancel);
 }
