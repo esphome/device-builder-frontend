@@ -79,10 +79,10 @@ export class BleUnavailableError extends Error {
 
 /**
  * Chooser for a NUS peripheral. ESPHome advertises the node name, so the
- * chooser matches on the given names and, as a fallback, on the service
- * uuid (most firmware does not advertise it); with no name known at all it
- * lists every device. The service must still be listed as optional or GATT
- * access to it is refused. Returns null when the chooser is dismissed.
+ * chooser matches on the given names; with no name known at all it lists
+ * every device. The service is listed as optional so GATT access to it is
+ * granted after the user picks a device. Returns null when the chooser is
+ * dismissed.
  */
 export async function requestBleNusDevice(
   names: string[]
@@ -90,10 +90,7 @@ export async function requestBleNusDevice(
   const known = [...new Set(names.filter(Boolean))];
   const options: RequestDeviceOptions = known.length
     ? {
-        filters: [
-          ...known.map((name) => ({ name })),
-          { services: [BLE_NUS_SERVICE_UUID] },
-        ],
+        filters: known.map((name) => ({ name })),
         optionalServices: [BLE_NUS_SERVICE_UUID],
       }
     : { acceptAllDevices: true, optionalServices: [BLE_NUS_SERVICE_UUID] };
