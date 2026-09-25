@@ -54,6 +54,32 @@ describe("flashPico", () => {
     expect(flashUf2).toHaveBeenCalledWith(expect.anything(), image, expect.anything());
   });
 
+  it("reports a rejected image as its own kind, after the chooser", async () => {
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel());
+    await expect(
+      flashPico(Promise.reject(new Error("offline")), { onProgress: () => {} })
+    ).rejects.toMatchObject({ kind: "image" });
+    expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
+    expect(mocks.loadPicoboot).not.toHaveBeenCalled();
+  });
+
+  it("releases the claimed device when a hook throws before the write", async () => {
+    const dev = { close: vi.fn(async () => {}) };
+    const flashUf2 = vi.fn();
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel());
+    engine(async () => dev, flashUf2);
+    await expect(
+      flashPico(image, {
+        onProgress: () => {},
+        onDeviceOpened: () => {
+          throw new Error("hook");
+        },
+      })
+    ).rejects.toMatchObject({ kind: "flash" });
+    expect(dev.close).toHaveBeenCalledOnce();
+    expect(flashUf2).not.toHaveBeenCalled();
+  });
+
   it("is quiet when the chooser is dismissed", async () => {
     mocks.requestPicobootDevice.mockResolvedValue(null);
     await expect(flashPico(image, { onProgress: () => {} })).resolves.toBe(false);

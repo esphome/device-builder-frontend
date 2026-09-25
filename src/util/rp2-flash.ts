@@ -17,7 +17,13 @@ import {
 
 /** Why the write stopped; ``picoFlashFailureCopy`` has the words. */
 export type PicoFlashFailure =
-  "rp2350" | "not-bootsel" | "access-denied" | "device-lost" | "connect" | "flash";
+  | "rp2350"
+  | "not-bootsel"
+  | "access-denied"
+  | "image"
+  | "device-lost"
+  | "connect"
+  | "flash";
 
 export class PicoFlashError extends Error {
   constructor(
@@ -45,8 +51,8 @@ export interface PicoFlashHooks {
  * Pick the RP2 Boot device, open it and write ``image``; the Pico reboots
  * into the firmware afterwards. The chooser runs first, inside the click's
  * activation, so an image still downloading may be handed in as a promise;
- * its rejection propagates as is. False when the chooser was dismissed or
- * the caller moved on. Throws ``PicoFlashError`` for the write's own failures.
+ * a rejection is reported as the ``image`` kind. False when the chooser was
+ * dismissed or the caller moved on. Throws ``PicoFlashError``.
  */
 export async function flashPico(
   image: Uf2Image | Promise<Uf2Image>,
@@ -65,25 +71,31 @@ export async function flashPico(
   const kind = classifyUsbDevice(usb);
   if (kind !== "rp2040")
     throw new PicoFlashError(kind === "rp2350" ? "rp2350" : "not-bootsel");
-  const uf2 = await image;
+  const uf2 = await Promise.resolve(image).catch((err: unknown) => {
+    throw new PicoFlashError("image", err);
+  });
   const { PicobootDevice, flashUf2 } = await loadPicoboot().catch((err: unknown) => {
     throw new PicoFlashError("connect", err);
   });
   const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
     throw new PicoFlashError(isUsbAccessDenied(err) ? "access-denied" : "connect", err);
   });
-  if (cancelled()) {
-    // Release the claim so the next attempt can open it.
-    await dev.close();
-    return false;
-  }
-  hooks.onLog?.(
-    `Claimed the RP2 Boot device (${formatUsbId(usb.vendorId, usb.productId)})`
-  );
-  hooks.onDeviceOpened?.();
+  // From here the claim must be released on every exit: flashUf2 does it
+  // itself, everything before it does not.
+  let writing = false;
   try {
+    if (cancelled()) {
+      await dev.close();
+      return false;
+    }
+    hooks.onLog?.(
+      `Claimed the RP2 Boot device (${formatUsbId(usb.vendorId, usb.productId)})`
+    );
+    hooks.onDeviceOpened?.();
+    writing = true;
     await flashUf2(dev, uf2, hooks);
   } catch (err) {
+    if (!writing) await dev.close().catch(() => {});
     throw new PicoFlashError(isUsbDeviceLost(err) ? "device-lost" : "flash", err);
   }
   return true;
@@ -102,6 +114,11 @@ export function picoFlashFailureCopy(
     case "access-denied":
       return {
         title: localize("firmware.rp2_usb_access_denied"),
+        detail: getErrorMessage(err.cause),
+      };
+    case "image":
+      return {
+        title: localize("firmware.download_failed"),
         detail: getErrorMessage(err.cause),
       };
     case "connect":

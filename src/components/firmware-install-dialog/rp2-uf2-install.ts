@@ -136,9 +136,12 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
       },
     });
   } catch (err) {
-    if (stillCurrent() && err instanceof PicoFlashError) {
+    if (!stillCurrent()) return;
+    if (err instanceof PicoFlashError) {
       const { title, detail } = picoFlashFailureCopy(err, host._localize);
       host._fail(title, detail);
+    } else {
+      host._fail(host._localize("firmware.rp2_flash_failed"), getErrorMessage(err));
     }
     return;
   } finally {

@@ -281,6 +281,17 @@ describe("rp2DoFlash", () => {
     expect(host._log.lines).not.toContain("Rebooting into the firmware");
   });
 
+  it("reports an unexpected error from the write instead of dropping it", async () => {
+    const host = readyHost();
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel);
+    mocks.picobootOpen.mockResolvedValue({ device: bootsel });
+    mocks.flashUf2.mockRejectedValue(new Error("odd"));
+    await rp2DoFlash(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.rp2_flash_failed");
+    expect(host._errorMessage).toBe("odd");
+  });
+
   it("reports a device lost mid-flash with the BOOTSEL hint", async () => {
     const host = readyHost();
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);

@@ -36,6 +36,7 @@ vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
 
 import toast from "sonner-js";
 
+import { PicoFlashError } from "../../src/util/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../src/web/install/esphome-web-install-pico-dialog.js";
 import { picoPortFilters } from "../../src/web/util/pico-port-filter.js";
 
@@ -135,9 +136,12 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   beforeEach(() => {
     Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
     mocks.loadPicoImage.mockResolvedValue(image);
-    // Like the real helper, the write awaits the image it was handed.
+    // Like the real helper, the write awaits the image it was handed and
+    // reports a rejection as its own failure kind.
     mocks.flashPico.mockImplementation(async (uf2) => {
-      await uf2;
+      await Promise.resolve(uf2).catch((err: unknown) => {
+        throw new PicoFlashError("image", err);
+      });
       return true;
     });
   });
@@ -161,13 +165,21 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   });
 
   it("installs over PICOBOOT with progress, then Continue hands over the port", async () => {
+    let opened!: () => void;
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
       await uf2;
+      await new Promise<void>((r) => (opened = r));
+      hooks.onDeviceOpened?.();
       hooks.onProgress(50);
       return true;
     });
     const el = await mount();
     button(el, "dashboard.install").click();
+    await settle(el);
+    // Until the device is claimed the card connects; the bar comes with the write.
+    expect(card(el).statusMessage).toBe("firmware.status_connecting");
+    expect(card(el).progress).toBeNull();
+    opened();
     await settle(el);
     expect(mocks.flashPico).toHaveBeenCalledWith(expect.any(Promise), expect.anything());
     // The status lives on the progress card's properties (the element is stubbed).
@@ -210,7 +222,6 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(mocks.loadPicoImage).toHaveBeenCalledTimes(2);
     button(el, "command.retry").click();
     await settle(el);
-    const { PicoFlashError } = await import("../../src/util/rp2-flash.js");
     mocks.flashPico.mockRejectedValue(new PicoFlashError("rp2350"));
     button(el, "dashboard.install").click();
     await settle(el);
@@ -218,7 +229,6 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   });
 
   it("names this page's own reset action for a device that is not in BOOTSEL", async () => {
-    const { PicoFlashError } = await import("../../src/util/rp2-flash.js");
     mocks.flashPico.mockRejectedValue(new PicoFlashError("not-bootsel"));
     const el = await mount();
     button(el, "dashboard.install").click();

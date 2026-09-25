@@ -20,7 +20,8 @@ import { loadPicoImage } from "./pico-image.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
-type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | "error";
+type InstallState =
+  "idle" | "resetting" | "waiting" | "connecting" | "flashing" | "success" | "error";
 
 /**
  * First-time Raspberry Pi Pico W setup. With WebUSB, Install writes the
@@ -66,7 +67,11 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private get _busy(): boolean {
-    return this._state === "resetting" || this._state === "flashing";
+    return (
+      this._state === "resetting" ||
+      this._state === "connecting" ||
+      this._state === "flashing"
+    );
   }
 
   private _resetFlow(): void {
@@ -122,32 +127,40 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _install(): Promise<void> {
-    this._state = "flashing";
+    // The chooser opens first, inside the click, with the image possibly
+    // still downloading behind it; the write starts once the device is claimed.
+    this._state = "connecting";
     this._progress = 0;
     try {
-      // The chooser opens first, inside the click; the image may still be
-      // downloading behind it.
       const flashed = await flashPico(this._fetchImage(), {
+        onDeviceOpened: () => (this._state = "flashing"),
         onProgress: (percent) => (this._progress = percent),
       });
       this._state = flashed ? "success" : "idle";
     } catch (err) {
-      if (err instanceof PicoFlashError) {
-        console.warn("Pico install failed", err.cause ?? err);
-        const { title, detail } = picoFlashFailureCopy(err, this._localize);
-        // The dashboard's copy names its own button; this page's differs.
-        this._fail(
-          err.kind === "not-bootsel"
-            ? this._localize("web.pico.install_not_bootsel")
-            : title,
-          detail
-        );
-      } else {
-        this._fail(
-          this._localize("web.pico.install_image_failed", { error: getErrorMessage(err) })
-        );
-      }
+      console.warn(
+        "Pico install failed",
+        err instanceof PicoFlashError ? (err.cause ?? err) : err
+      );
+      this._fail(...this._failureCopy(err));
     }
+  }
+
+  // The shared copy, except where this page's own words fit better: its
+  // reset button has another name, and the image is this page's download.
+  private _failureCopy(err: unknown): [string, string] {
+    if (!(err instanceof PicoFlashError)) {
+      return [this._localize("firmware.rp2_flash_failed"), getErrorMessage(err)];
+    }
+    if (err.kind === "image") {
+      const error = getErrorMessage(err.cause);
+      return [this._localize("web.pico.install_image_failed", { error }), ""];
+    }
+    const { title, detail } = picoFlashFailureCopy(err, this._localize);
+    return [
+      err.kind === "not-bootsel" ? this._localize("web.pico.install_not_bootsel") : title,
+      detail,
+    ];
   }
 
   private async _continue(): Promise<void> {
@@ -218,6 +231,11 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     switch (this._state) {
       case "resetting":
         return { state: "running", message: this._localize("firmware.rp2_resetting") };
+      case "connecting":
+        return {
+          state: "running",
+          message: this._localize("firmware.status_connecting"),
+        };
       case "waiting":
         return {
           state: null,
