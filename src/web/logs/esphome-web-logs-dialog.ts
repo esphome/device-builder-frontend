@@ -215,14 +215,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   // Streaming or mid-recovery: a parent swapping .port in that window must
-  // not wipe the rendered lines or race a second reader against the resume.
-  // The port-replaced round trip echoes our own handle back — quiet. A
-  // genuinely foreign open handle (no known producer) is closed too: the
-  // dialog declines custody, so nothing else would ever release it.
+  // not wipe the rendered lines or race a second reader against the resume
+  // (nor displace a Bluetooth session). The port-replaced round trip echoes
+  // our own handle back — quiet. A genuinely foreign open handle (no known
+  // producer) is closed too: the dialog declines custody, so nothing else
+  // would ever release it.
   private _refusePortSwap(): void {
     const source = this._source;
-    if (!(source instanceof SerialLogSource) || !this.port) return;
-    if (this.port === source.activePort) return;
+    if (!this.port) return;
+    if (source instanceof SerialLogSource && this.port === source.activePort) return;
     console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
     // A failure here is a genuinely leaked open port — log it loudly.
     void this.port.close().catch((err) => {

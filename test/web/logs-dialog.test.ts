@@ -21,6 +21,7 @@ import { crashCalloutStyles } from "../../src/components/process-terminal/crash-
 import { streamBleNus } from "../../src/util/ble-nus-stream.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/web-serial.js";
+import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
@@ -494,6 +495,17 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
     const { el } = await openBle();
     expect((el as any)._streaming).toBe(false);
     expect((el as any)._lines).toContain("web.logs.connect_failed");
+  });
+
+  it("declines and closes a port handed in over a Bluetooth session", async () => {
+    vi.mocked(streamBleNus).mockResolvedValue(async () => {});
+    const { el } = await openBle();
+    const port = makeWebSerialPort();
+    el.port = port;
+    await el.updateComplete;
+    expect(streamSerialLines).not.toHaveBeenCalled();
+    expect(port.close).toHaveBeenCalledOnce();
+    expect((el as any)._source).toBeInstanceOf(BleLogSource);
   });
 
   it("reconnects after the peripheral drops the link", async () => {
