@@ -248,9 +248,21 @@ describe("flashUf2", () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
     const progress: number[] = [];
-    await flashUf2(dev, image([{ address: BASE, length: 10 * 1024 }]), (p) =>
-      progress.push(p)
-    );
+    const log: string[] = [];
+    await flashUf2(dev, image([{ address: BASE, length: 10 * 1024 }]), {
+      onProgress: (p) => progress.push(p),
+      onLog: (l) => log.push(l),
+    });
+    expect(log).toEqual([
+      "Writing 1 range (10240 bytes) across 3 flash sectors",
+      "Range 0x10000000 (10240 bytes)",
+      "Taking exclusive access",
+      "Leaving XIP",
+      "Writing: 39%",
+      "Writing: 79%",
+      "Writing: 99%",
+      "Rebooting into the firmware",
+    ]);
 
     expect(commandIds(d)).toEqual([
       PicobootCmd.EXCLUSIVE_ACCESS,
@@ -295,7 +307,9 @@ describe("flashUf2", () => {
   it("erases each sector once when a range starts mid-sector", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
-    await flashUf2(dev, image([{ address: BASE + 0x1100, length: 0x1000 }]), () => {});
+    await flashUf2(dev, image([{ address: BASE + 0x1100, length: 0x1000 }]), {
+      onProgress: () => {},
+    });
     const erases = packetArgs(d, PicobootCmd.FLASH_ERASE).map((a) => u32(a, 0));
     expect(erases).toEqual([BASE + 0x1000, BASE + 0x2000]);
     const writes = packetArgs(d, PicobootCmd.WRITE).map((a) => [u32(a, 0), u32(a, 4)]);
@@ -314,7 +328,7 @@ describe("flashUf2", () => {
         { address: BASE, length: 0x100 },
         { address: BASE + 0x800, length: 0x100 },
       ]),
-      () => {}
+      { onProgress: () => {} }
     );
     expect(packetArgs(d, PicobootCmd.FLASH_ERASE)).toHaveLength(1);
     expect(packetArgs(d, PicobootCmd.WRITE).map((a) => u32(a, 0))).toEqual([
@@ -327,9 +341,9 @@ describe("flashUf2", () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
     const progress: number[] = [];
-    await flashUf2(dev, image([{ address: BASE, length: 0x180 }]), (p) =>
-      progress.push(p)
-    );
+    await flashUf2(dev, image([{ address: BASE, length: 0x180 }]), {
+      onProgress: (p) => progress.push(p),
+    });
     // Padding must not count toward progress.
     expect(progress.slice(0, -1).every((p) => p <= 99)).toBe(true);
     expect(progress[progress.length - 1]).toBe(100);
@@ -348,7 +362,9 @@ describe("flashUf2", () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));
     await expect(
-      flashUf2(dev, image([{ address: 0x20000000, length: 0x100 }]), () => {})
+      flashUf2(dev, image([{ address: 0x20000000, length: 0x100 }]), {
+        onProgress: () => {},
+      })
     ).rejects.toThrow(/outside flash/);
     expect(d.log[d.log.length - 1]).toEqual({ kind: "close" });
   });
@@ -358,7 +374,8 @@ describe("flashUf2", () => {
     const dev = await PicobootDevice.open(asUsb(d));
     d.hangIn = true;
     const abort = new AbortController();
-    const flash = flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {}, {
+    const flash = flashUf2(dev, image([{ address: BASE, length: 0x100 }]), {
+      onProgress: () => {},
       signal: abort.signal,
     });
     await new Promise((r) => setTimeout(r, 5));
@@ -376,7 +393,7 @@ describe("flashUf2", () => {
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
     await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
     ).rejects.toMatchObject({ name: "NetworkError" });
   });
 
@@ -385,7 +402,7 @@ describe("flashUf2", () => {
     const dev = await PicobootDevice.open(asUsb(d));
     d.shortWrite = true;
     await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
     ).rejects.toThrow(/Short USB write/);
   });
 
@@ -395,7 +412,8 @@ describe("flashUf2", () => {
     const abort = new AbortController();
     abort.abort();
     await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x1000 }]), () => {}, {
+      flashUf2(dev, image([{ address: BASE, length: 0x1000 }]), {
+        onProgress: () => {},
         signal: abort.signal,
       })
     ).rejects.toMatchObject({ name: "AbortError" });
@@ -420,11 +438,9 @@ describe("flashUf2", () => {
     status.setUint32(4, 5, true);
     status.setUint8(8, PicobootCmd.FLASH_ERASE);
 
-    const err = await flashUf2(
-      dev,
-      image([{ address: BASE, length: 0x100 }]),
-      () => {}
-    ).catch((e: unknown) => e);
+    const err = await flashUf2(dev, image([{ address: BASE, length: 0x100 }]), {
+      onProgress: () => {},
+    }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(PicobootError);
     expect((err as PicobootError).statusCode).toBe(5);
     expect((err as PicobootError).cmdId).toBe(PicobootCmd.FLASH_ERASE);
@@ -452,7 +468,7 @@ describe("flashUf2", () => {
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
     await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), { onProgress: () => {} })
     ).rejects.toMatchObject({ name: "NetworkError" });
   });
 
@@ -492,9 +508,9 @@ describe("flashUf2", () => {
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
     const progress: number[] = [];
-    await flashUf2(dev, image([{ address: BASE, length: 0x100 }]), (p) =>
-      progress.push(p)
-    );
+    await flashUf2(dev, image([{ address: BASE, length: 0x100 }]), {
+      onProgress: (p) => progress.push(p),
+    });
     expect(progress[progress.length - 1]).toBe(100);
   });
 
@@ -506,7 +522,7 @@ describe("flashUf2", () => {
         ? new DOMException("The device was disconnected.", "NetworkError")
         : null;
     await expect(
-      flashUf2(dev, image([{ address: BASE, length: 0x1000 }]), () => {})
+      flashUf2(dev, image([{ address: BASE, length: 0x1000 }]), { onProgress: () => {} })
     ).rejects.toMatchObject({ name: "NetworkError" });
     expect(d.log[d.log.length - 1]).toEqual({ kind: "close" });
   });

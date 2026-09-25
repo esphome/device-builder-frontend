@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { flashUf2 as FlashUf2 } from "../../../src/util/rp2-picoboot.js";
+
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   resetToBootloader: vi.fn(),
   requestPicobootDevice: vi.fn(),
   picobootOpen: vi.fn(),
-  flashUf2:
-    vi.fn<(d: unknown, i: unknown, onProgress: (p: number) => void) => Promise<void>>(),
+  flashUf2: vi.fn<typeof FlashUf2>(),
   downloadSelectedBinary: vi.fn(),
 }));
 vi.mock("../../../src/util/web-serial.js", () => ({
@@ -159,7 +160,7 @@ describe("rp2DoReset", () => {
     mocks.requestSerialPort.mockResolvedValue(port);
     mocks.resetToBootloader.mockResolvedValue(undefined);
     await rp2DoReset(asHost(host));
-    expect(mocks.resetToBootloader).toHaveBeenCalledWith(port);
+    expect(mocks.resetToBootloader).toHaveBeenCalledWith(port, expect.any(Function));
     expect(host._step).toBe("rp2-wait");
     expect(host._statusMessage).toBe("firmware.rp2_wait_title");
   });
@@ -246,22 +247,40 @@ describe("rp2DoFlash", () => {
     const dev = { close: vi.fn() };
     mocks.requestPicobootDevice.mockResolvedValue(bootsel);
     mocks.picobootOpen.mockResolvedValue(dev);
-    mocks.flashUf2.mockImplementation(
-      async (_d: unknown, _i: unknown, onProgress: (p: number) => void) => {
-        onProgress(50);
-        onProgress(100);
-      }
-    );
+    mocks.flashUf2.mockImplementation(async (_d, _i, hooks) => {
+      hooks.onProgress(50);
+      hooks.onLog?.("Rebooting into the firmware");
+      hooks.onProgress(100);
+    });
     await rp2DoFlash(asHost(host));
     expect(mocks.flashUf2).toHaveBeenCalledWith(
       dev,
       image,
-      expect.any(Function),
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        onLog: expect.any(Function),
+      })
     );
     expect(host._flashPercent).toBe(100);
     expect(host._step).toBe("done");
     expect(host._flashAbort).toBeNull();
+    // The claimed device and the engine's lines land in the details log.
+    expect(host._log.lines[0]).toMatch(
+      /^Claimed the RP2 Boot device \([0-9a-f]{4}:[0-9a-f]{4}\)$/
+    );
+    expect(host._log.lines).toContain("Rebooting into the firmware");
+  });
+
+  it("drops a late line once the dialog moved on", async () => {
+    const host = readyHost();
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel);
+    mocks.picobootOpen.mockResolvedValue({});
+    mocks.flashUf2.mockImplementation(async (_d, _i, hooks) => {
+      host._device = null;
+      hooks.onLog?.("Rebooting into the firmware");
+    });
+    await rp2DoFlash(asHost(host));
+    expect(host._log.lines).not.toContain("Rebooting into the firmware");
   });
 
   it("reports a device lost mid-flash with the BOOTSEL hint", async () => {

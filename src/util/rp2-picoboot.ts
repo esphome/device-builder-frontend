@@ -322,12 +322,21 @@ function planSectors(image: Uf2Image): Map<number, SectorWrite[]> {
  * signal is checked between sectors; the device stays in BOOTSEL after an
  * abort or failure, so the caller can retry without a reset.
  */
+export interface Uf2FlashHooks {
+  onProgress: (percent: number) => void;
+  /** One line per step, for the install dialog's details log. */
+  onLog?: (line: string) => void;
+  signal?: AbortSignal;
+}
+
+const hex = (address: number): string => `0x${address.toString(16).toUpperCase()}`;
+
 export async function flashUf2(
   dev: PicobootDevice,
   image: Uf2Image,
-  onProgress: (percent: number) => void,
-  { signal }: { signal?: AbortSignal } = {}
+  { onProgress, onLog, signal }: Uf2FlashHooks
 ): Promise<void> {
+  const log = onLog ?? (() => {});
   let written = 0;
   let rebooted = false;
   // WebUSB transfers have no timeout; closing the device is what fails a
@@ -336,18 +345,33 @@ export async function flashUf2(
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     const sectors = planSectors(image);
+    log(
+      `Writing ${image.ranges.length} range${image.ranges.length === 1 ? "" : "s"} (${image.totalBytes} bytes) across ${sectors.size} flash sectors`
+    );
+    for (const range of image.ranges) {
+      log(`Range ${hex(range.address)} (${range.data.length} bytes)`);
+    }
+    log("Taking exclusive access");
     await dev.exclusiveAccess(EXCLUSIVE);
+    log("Leaving XIP");
     await dev.exitXip();
+    let previous = 0;
     for (const [sector, writes] of sectors) {
       signal?.throwIfAborted();
       await dev.flashErase(sector, FLASH_SECTOR_SIZE);
       for (const w of writes) {
         await dev.write(w.address, w.data);
         written += w.bytes;
-        onProgress(Math.floor((written / image.totalBytes) * 99));
+        const percent = Math.floor((written / image.totalBytes) * 99);
+        onProgress(percent);
+        // A line every ten percent, like the other engines.
+        if (Math.floor(percent / 10) > Math.floor(previous / 10))
+          log(`Writing: ${percent}%`);
+        previous = percent;
       }
     }
     signal?.throwIfAborted();
+    log("Rebooting into the firmware");
     await dev.reboot();
     rebooted = true;
     onProgress(100);
