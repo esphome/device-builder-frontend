@@ -144,6 +144,29 @@ describe("formatSerialPortLabel", () => {
 });
 
 describe("reconnectWebSerialLogs", () => {
+  it("releases both lines after reopening an RTL8720C board's port", async () => {
+    const port = openPort();
+    const restore = withRequestPort(async () => port);
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(
+        dialog as never,
+        defaultLocalize,
+        115200,
+        null,
+        () => false,
+        "rtl87xx"
+      );
+      expect(port.setSignals).toHaveBeenCalledWith({
+        dataTerminalReady: false,
+        requestToSend: false,
+      });
+      expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
   it("acquires a fresh port via requestPort and streams it", async () => {
     const restore = withRequestPort(async () => openPort());
     const dialog = stubDialog();

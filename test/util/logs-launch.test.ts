@@ -220,7 +220,12 @@ describe("launchLogsWithMethod", () => {
 });
 
 describe("launchLogsWithMethod web-serial", () => {
-  it("releases DTR and RTS after opening an RTL8720C board's port", async () => {
+  // Chromium asserts DTR and RTS on open; an RTL8720C kit needs them released
+  // (see releasesLinesAfterOpen), an ESP board must keep the open's state.
+  it.each([
+    ["rtl87xx", true],
+    ["esp32", false],
+  ])("releases the lines after opening a %s port: %s", async (platform, released) => {
     const restore = withWebSerial(true);
     const setSignals = vi.fn(async () => {});
     const port = {
@@ -231,12 +236,20 @@ describe("launchLogsWithMethod web-serial", () => {
     launch.requestSerialPort.mockResolvedValue(port);
     const host = makeHost(async () => []);
     try {
-      const device = { ...makeDevice(), target_platform: "rtl87xx" };
-      await launchLogsWithMethod(host, device, "web-serial");
-      expect(setSignals).toHaveBeenCalledWith({
-        dataTerminalReady: false,
-        requestToSend: false,
-      });
+      await launchLogsWithMethod(
+        host,
+        { ...makeDevice(), target_platform: platform },
+        "web-serial"
+      );
+      expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
+      if (released) {
+        expect(setSignals).toHaveBeenCalledWith({
+          dataTerminalReady: false,
+          requestToSend: false,
+        });
+      } else {
+        expect(setSignals).not.toHaveBeenCalled();
+      }
       expect(launch.attachSerialLogStream).toHaveBeenCalledWith(
         port,
         host.logsDialog,
@@ -244,15 +257,6 @@ describe("launchLogsWithMethod web-serial", () => {
         115200,
         undefined
       );
-      // An ESP board keeps the open's line state; its auto-reset circuit
-      // reads a change as a reset.
-      setSignals.mockClear();
-      await launchLogsWithMethod(
-        host,
-        { ...makeDevice(), target_platform: "esp32" },
-        "web-serial"
-      );
-      expect(setSignals).not.toHaveBeenCalled();
     } finally {
       restore();
     }

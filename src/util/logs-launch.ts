@@ -11,10 +11,10 @@ import {
   attachBleNusLogs,
   attachSerialLogStream,
   openNetworkLogsFallback,
+  openPortForLogs,
   picoResetHook,
   reconnectWebSerialLogs,
 } from "./post-install-logs.js";
-import { isRtl87xxPlatform, releaseRtl87xxLines } from "./rtl87xx-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { requestSerialPort } from "./web-serial.js";
 
@@ -133,14 +133,12 @@ export async function launchLogsWithMethod(
       return;
     }
     try {
-      await serialPort.open({ baudRate });
+      await openPortForLogs(serialPort, baudRate, device.target_platform);
     } catch {
       // The port couldn't open (claimed by another tab, driver error).
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
       return;
     }
-    // The open asserted both lines, which holds an RTL8720C kit in reset.
-    if (isRtl87xxPlatform(device.target_platform)) await releaseRtl87xxLines(serialPort);
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
     const cancelled = host.logsDialog.openPassive({
@@ -150,7 +148,8 @@ export async function launchLogsWithMethod(
           host.localize,
           baudRate,
           device.logger_interface,
-          cancelled
+          cancelled,
+          device.target_platform
         ),
       onResetDevice: picoResetHook(
         host.logsDialog,

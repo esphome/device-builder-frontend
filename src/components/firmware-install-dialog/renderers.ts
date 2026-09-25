@@ -18,6 +18,7 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
+import { PORT_HOLDING_INSTALLERS } from "./types.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -430,10 +431,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const isRunning =
     host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {
-    // Only the installers that hold a port the logs can reopen: esptool and
-    // the RTL8720C flasher. The download / web-flash installers don't connect.
-    const showToggle =
-      host._installer === "web-serial" || host._installer === "rtl-ambz2";
+    const showToggle = PORT_HOLDING_INSTALLERS.has(host._installer);
     return html`
       <div class="footer">
         ${
@@ -529,14 +527,11 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  // Web Serial install success — surface "Logs" so users can flip back after
-  // they've clicked logs-dialog's "Back to install". _detected (esptool) and
-  // _rtlPort (RTL8720C) survive _onClose but not _close, so the button only
-  // renders while the SerialPort reference is still around.
-  const canShowLogs =
-    host._step === "done" &&
-    ((host._installer === "web-serial" && host._detected !== null) ||
-      (host._installer === "rtl-ambz2" && host._rtlPort !== null));
+  // Browser-flash success — surface "Logs" so users can flip back after
+  // they've clicked logs-dialog's "Back to install". _logsPort survives
+  // _onClose but not _close, so the button only renders while the SerialPort
+  // reference is still around.
+  const canShowLogs = host._step === "done" && host._logsPort !== null;
   return html`
     <div class="footer">
       ${

@@ -204,13 +204,24 @@ export async function startWebSerialInstall(
   }
 
   host._statusMessage = host._localize("firmware.status_done");
+  finishWithLogsPort(host, detected.port);
+}
+
+/**
+ * A browser flash finished with ``port`` in hand: Done offers its logs, and
+ * flips to them at once when asked. Not for a dialog dismissed mid-flash
+ * (_cancel closes the UI without interrupting the flash loop, so the logs
+ * would pop up on a user who walked away), nor while ``boardUp`` is false
+ * (the caller has a notice to show first).
+ */
+export function finishWithLogsPort(
+  host: ESPHomeFirmwareInstallDialog,
+  port: SerialPort,
+  boardUp = true
+): void {
+  host._logsPort = port;
   host._step = "done";
-  // _cancel closes the UI but doesn't interrupt the flash loop — a dismissed
-  // install can still reach here, so gate the auto-flip on the dialog still
-  // being open. Otherwise the logs viewer pops up on a user who walked away.
-  if (host._open && host._showLogsAfterInstall) {
-    flipToLogs(host, detected.port);
-  }
+  if (boardUp && host._open && host._showLogsAfterInstall) flipToLogs(host, port);
 }
 
 // Best-effort release of the held serial port on an early return, so a failed
