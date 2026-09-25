@@ -2,8 +2,7 @@ import { mdiContentCopy } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import type { IdentityView } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { copyToClipboard } from "../../util/copy-to-clipboard.js";
-import { notify } from "../../util/notify.js";
+import { copyAddressToClipboard } from "../../util/copy-address.js";
 import { formatHostPort, pairingAddress } from "../../util/pairing-address.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -73,18 +72,6 @@ async function _copyAddress(
   e.preventDefault();
   e.stopPropagation();
   await copyAddressToClipboard(localize, value);
-}
-
-/** Copy *value* and toast the outcome; shared by every address copy control. */
-export async function copyAddressToClipboard(
-  localize: LocalizeFunc,
-  value: string
-): Promise<void> {
-  if (await copyToClipboard(value)) {
-    notify.success(localize("settings.remote_build_address_copied"));
-  } else {
-    notify.warning(localize("settings.remote_build_address_copy_failed"));
-  }
 }
 
 /**

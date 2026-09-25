@@ -6,7 +6,11 @@ import {
 } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
-import { BleNusServiceNotFoundError, streamBleNus } from "./ble-nus-stream.js";
+import {
+  BLE_CONNECT_ATTEMPTS,
+  BleNusServiceNotFoundError,
+  streamBleNus,
+} from "./ble-nus-stream.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -178,10 +182,6 @@ function picoResetFailureKey(err: unknown): string {
     ? "firmware.rp2_usb_access_denied"
     : "dashboard.logs_rp2_reset_stranded";
 }
-
-// GATT connects fail transiently while the device is still advertising or
-// the OS stack settles after a prior session.
-const BLE_CONNECT_ATTEMPTS = 3;
 
 /**
  * The BLE twin of ``attachSerialLogStream``: a stream registered, or the

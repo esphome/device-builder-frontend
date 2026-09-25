@@ -5,7 +5,6 @@ import { withWebBluetooth } from "../_web-serial.js";
 import {
   BLE_NUS_SERVICE_UUID,
   BleNusServiceNotFoundError,
-  BleUnavailableError,
   requestBleNusDevice,
   streamBleNus,
 } from "../../src/util/ble-nus-stream.js";
@@ -298,6 +297,16 @@ describe("requestBleNusDevice", () => {
     });
   });
 
+  it("lists every device when no name is known", async () => {
+    const requestDevice = vi.fn(async () => ({}));
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
+    await requestBleNusDevice([]);
+    expect(requestDevice).toHaveBeenCalledWith({
+      acceptAllDevices: true,
+      optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
   it("tells an absent adapter apart from a dismissed chooser, after the fact", async () => {
     const bluetooth = {
       requestDevice: vi.fn(async () => {
@@ -306,7 +315,10 @@ describe("requestBleNusDevice", () => {
       getAvailability: vi.fn(async () => false),
     };
     restore = withWebBluetooth(bluetooth);
-    await expect(requestBleNusDevice(["x"])).rejects.toBeInstanceOf(BleUnavailableError);
+    await expect(requestBleNusDevice(["x"])).rejects.toMatchObject({
+      name: "BleUnavailableError",
+      reason: "off",
+    });
     // The chooser opens first, inside the click's activation.
     expect(bluetooth.requestDevice.mock.invocationCallOrder[0]).toBeLessThan(
       bluetooth.getAvailability.mock.invocationCallOrder[0]
