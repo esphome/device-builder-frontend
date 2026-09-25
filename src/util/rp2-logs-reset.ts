@@ -7,7 +7,6 @@ import { resetToBootloader } from "./serial-bootloader-touch.js";
 import { sleep } from "./sleep.js";
 import { openLiveSerialPort } from "./web-serial.js";
 import {
-  classifyUsbDevice,
   getPicobootDevices,
   isUsbAccessDenied,
   loadPicoboot,
@@ -50,6 +49,7 @@ export async function resetPicoForLogs(
   // Only a bootloader that appears after the touch is this Pico; another
   // granted board already sitting in BOOTSEL must not be rebooted instead.
   const before = await getPicobootDevices();
+  if (cancelled()) return null;
   await resetToBootloader(port);
   let usb: USBDevice | null;
   try {
@@ -58,10 +58,8 @@ export async function resetPicoForLogs(
     throw noBootloader(port, cancelled, err);
   }
   if (!usb) throw noBootloader(port, cancelled);
-  // The chooser also lists RP2350 bootloaders; REBOOT is RP2040-only.
-  if (classifyUsbDevice(usb) !== "rp2040") {
-    throw new PicoStrandedError("reboot", "RP2350 is not supported");
-  }
+  // Past this point a cancel is not honoured: the board is in BOOTSEL, and
+  // the reboot is what brings it back.
   const { PicobootDevice } = await loadPicoboot();
   const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
     throw new PicoStrandedError(isUsbAccessDenied(err) ? "refused" : "reboot", err);
@@ -92,6 +90,16 @@ function noBootloader(
   return new PicoStrandedError("pick", cause);
 }
 
+// getDevices() need not hand back the same wrapper twice; a bootloader's
+// serial number (the flash unique id) is the stable identity.
+const sameDevice = (a: USBDevice, b: USBDevice): boolean =>
+  a === b ||
+  (a.serialNumber !== undefined &&
+    a.serialNumber !== "" &&
+    a.serialNumber === b.serialNumber &&
+    a.vendorId === b.vendorId &&
+    a.productId === b.productId);
+
 // A bootloader this origin was granted before shows up in getDevices() once
 // it enumerates, so a repeat reset skips the chooser; the chooser lists the
 // device live, so it can open before the Pico is back.
@@ -102,7 +110,9 @@ async function findBootselDevice(
 ): Promise<USBDevice | null> {
   for (;;) {
     if (cancelled()) return null;
-    const granted = (await getPicobootDevices()).find((d) => !before.includes(d));
+    const granted = (await getPicobootDevices()).find(
+      (d) => !before.some((b) => sameDevice(b, d))
+    );
     if (granted) return granted;
     if (Date.now() >= deadline) return requestPicobootDevice();
     await sleep(BOOTSEL_POLL_MS);

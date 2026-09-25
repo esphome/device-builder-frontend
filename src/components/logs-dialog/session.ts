@@ -123,6 +123,22 @@ export function abortSerialReconnect(host: ESPHomeLogsDialog): void {
   host._session = { kind: "dead" };
 }
 
+/** A close begins: remember which session it belongs to. */
+export function beginClose(host: ESPHomeLogsDialog): void {
+  host._closingGen = host._sessionGen;
+  host._open = false;
+}
+
+/** The dialog finished hiding. A hide that lands after a reopen belongs to
+ *  the older session and must leave the new one alone. */
+export function afterHide(host: ESPHomeLogsDialog): void {
+  const stale = host._closingGen !== null && host._closingGen !== host._sessionGen;
+  host._closingGen = null;
+  if (stale) return;
+  host._open = false;
+  void teardownSession(host);
+}
+
 /** Stop whatever the session is running (Web Serial reader -> closes the
  *  port; backend WS -> kills the subprocess) and return to ``idle``. The
  *  cancel from `streamSerialToDialog` releases the reader lock before closing

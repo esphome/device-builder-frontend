@@ -460,6 +460,19 @@ describe("flashUf2", () => {
     ).rejects.toMatchObject({ name: "NetworkError" });
   });
 
+  it("reboots an RP2350 with REBOOT2, which replaced REBOOT on that chip", async () => {
+    const d = new FakeUsbDevice();
+    d.productId = 0x000f;
+    const dev = await PicobootDevice.open(asUsb(d));
+    await dev.reboot();
+    expect(packetArgs(d, PicobootCmd.REBOOT)).toHaveLength(0);
+    const [reboot2] = packetArgs(d, PicobootCmd.REBOOT2);
+    // flags (normal boot), delay, two unused params
+    expect([u32(reboot2, 0), u32(reboot2, 4), u32(reboot2, 8), u32(reboot2, 12)]).toEqual(
+      [0, 500, 0, 0]
+    );
+  });
+
   it("treats the device vanishing on the reboot ACK as success", async () => {
     const d = new FakeUsbDevice();
     const dev = await PicobootDevice.open(asUsb(d));

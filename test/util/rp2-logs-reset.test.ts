@@ -97,22 +97,40 @@ describe("resetPicoForLogs", () => {
   });
 
   it("keeps the stranded hint on an early cancel, when the CDC may still be dropping", async () => {
-    await expect(run({ from: stillThere, cancelled: () => true })).rejects.toMatchObject({
+    let calls = 0;
+    const cancelled = () => calls++ > 0;
+    await expect(run({ from: stillThere, cancelled })).rejects.toMatchObject({
       step: "pick",
     });
   });
 
-  it("fails fast on a chooser-picked RP2350 instead of sending the RP2040 reboot", async () => {
-    mocks.requestPicobootDevice.mockResolvedValue({
-      vendorId: 0x2e8a,
-      productId: 0xf,
-    } as USBDevice);
-    await expect(run()).rejects.toMatchObject({ step: "reboot" });
-    expect(mocks.open).not.toHaveBeenCalled();
+  it("reboots a chooser-picked RP2350 too (the engine picks REBOOT2 for it)", async () => {
+    const rp2350 = { vendorId: 0x2e8a, productId: 0xf } as USBDevice;
+    mocks.requestPicobootDevice.mockResolvedValue(rp2350);
+    await expect(run()).resolves.toBe(live);
+    expect(mocks.open).toHaveBeenCalledWith(rp2350);
   });
 
-  it("stops before the chooser once cancelled", async () => {
-    await expect(run({ cancelled: () => true })).rejects.toMatchObject({ step: "pick" });
+  it("returns without touching when cancelled before the touch", async () => {
+    await expect(run({ cancelled: () => true })).resolves.toBeNull();
+    expect(mocks.resetToBootloader).not.toHaveBeenCalled();
+  });
+
+  it("tells a granted board apart by serial number, not by wrapper identity", async () => {
+    const first = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
+    const again = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
+    mocks.getPicobootDevices.mockResolvedValueOnce([first]).mockResolvedValue([again]);
+    await expect(run()).resolves.toBe(live);
+    expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce(); // `again` is not new
+    expect(mocks.open).toHaveBeenCalledWith(usb);
+  });
+
+  it("stops before the chooser once cancelled during the poll", async () => {
+    let calls = 0;
+    // Cancelled from the first poll round on, after the touch went out.
+    const cancelled = () => calls++ > 0;
+    await expect(run({ cancelled })).rejects.toMatchObject({ step: "pick" });
+    expect(mocks.resetToBootloader).toHaveBeenCalledOnce();
     expect(mocks.requestPicobootDevice).not.toHaveBeenCalled();
     expect(mocks.reboot).not.toHaveBeenCalled();
   });

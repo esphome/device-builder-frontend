@@ -44,6 +44,8 @@ import { logsDialogStyles } from "./logs-dialog.styles.js";
 import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
+  afterHide,
+  beginClose,
   markSerialOutput,
   onStart,
   onStop,
@@ -178,6 +180,8 @@ export class ESPHomeLogsDialog extends LitElement {
   // Bumped per open, so a hook still running for a closed dialog can tell
   // the session it started in from one opened since.
   _sessionGen = 0;
+  // Generation a close began in; see ``afterHide``.
+  _closingGen: number | null = null;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
@@ -321,7 +325,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   public close() {
     void teardownSession(this);
-    this._open = false;
+    beginClose(this);
   }
 
   _resetAnsiLogScroll() {
@@ -573,14 +577,9 @@ export class ESPHomeLogsDialog extends LitElement {
    * re-asserted ``open=true`` could cancel wa-dialog's hide. No
    * ``preventDefault`` — the close proceeds and ``after-hide`` tears down.
    */
-  private _onDialogRequestClose = (): void => {
-    this._open = false;
-  };
+  private _onDialogRequestClose = (): void => beginClose(this);
 
-  private _onDialogHide() {
-    this._open = false;
-    void teardownSession(this);
-  }
+  private _onDialogHide = (): void => afterHide(this);
 
   /**
    * "Back to install" handler — only visible when an ``onBackToInstall``
@@ -594,7 +593,7 @@ export class ESPHomeLogsDialog extends LitElement {
     const handler = this._backToInstallHandler;
     this._backToInstall = false;
     this._backToInstallHandler = null;
-    this._open = false;
+    beginClose(this);
     handler?.();
   };
 }

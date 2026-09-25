@@ -359,6 +359,19 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(toastError).toHaveBeenCalledOnce();
   });
 
+  it("ignores a stale after-hide once the dialog was reopened", async () => {
+    startPassive();
+    call(el, "_onDialogRequestClose"); // X pressed; the hide animation starts
+    el.openPassive({ onReconnect: () => Promise.resolve() }); // reopened meanwhile
+    const fresh = { close: vi.fn(), setSignals: vi.fn() };
+    const freshCancel = vi.fn(async () => {});
+    el.setSerialStream(fresh as any, freshCancel);
+    call(el, "_onDialogHide"); // the old close's after-hide lands late
+    expect(session(el)).toMatchObject({ kind: "serial", port: fresh });
+    expect(freshCancel).not.toHaveBeenCalled();
+    expect((el as any)._open).toBe(true);
+  });
+
   it("treats a reset hook that ends without a stream as a failure, not a stuck session", async () => {
     el.openPassive({ onReconnect: () => Promise.resolve(), onResetDevice: alwaysHook });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);

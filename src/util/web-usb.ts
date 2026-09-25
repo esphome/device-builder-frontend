@@ -58,10 +58,10 @@ export function classifyUsbDevice(
   return "not-bootsel";
 }
 
-/** RP2040 bootloaders this origin was already granted, so a repeat pick can skip the chooser. */
+/** RP2 bootloaders this origin was already granted, so a repeat pick can skip the chooser. */
 export async function getPicobootDevices(): Promise<USBDevice[]> {
   const devices = await navigator.usb.getDevices();
-  return devices.filter((d) => classifyUsbDevice(d) === "rp2040");
+  return devices.filter((d) => classifyUsbDevice(d) !== "not-bootsel");
 }
 
 /**

@@ -6,7 +6,7 @@
 import { concat, int32LE } from "./bytes.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 import type { Uf2Image } from "./uf2.js";
-import { isUsbDeviceLost } from "./web-usb.js";
+import { classifyUsbDevice, isUsbDeviceLost } from "./web-usb.js";
 
 export const PICOBOOT_MAGIC = 0x431fd10b;
 export const PicobootCmd = {
@@ -15,6 +15,7 @@ export const PicobootCmd = {
   FLASH_ERASE: 0x03,
   WRITE: 0x05,
   EXIT_XIP: 0x06,
+  REBOOT2: 0x0a,
 } as const;
 const PICOBOOT_IF_RESET = 0x41;
 const PICOBOOT_IF_CMD_STATUS = 0x42;
@@ -253,11 +254,12 @@ export class PicobootDevice {
   async reboot(): Promise<void> {
     // The firmware's CDC port re-enumerates next; that connect event is ours.
     markSerialActivity();
-    await this.command(
-      { id: PicobootCmd.REBOOT, args: u32Args(0, 0, REBOOT_DELAY_MS) },
-      undefined,
-      { lostAckOk: true }
-    );
+    // RP2350 replaced REBOOT with REBOOT2 (flags 0: a normal boot from flash).
+    const cmd =
+      classifyUsbDevice(this.device) === "rp2350"
+        ? { id: PicobootCmd.REBOOT2, args: u32Args(0, REBOOT_DELAY_MS, 0, 0) }
+        : { id: PicobootCmd.REBOOT, args: u32Args(0, 0, REBOOT_DELAY_MS) };
+    await this.command(cmd, undefined, { lostAckOk: true });
   }
 
   async close(): Promise<void> {
