@@ -18,12 +18,22 @@ const BLE_NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
 export const isWebBluetoothSupported = (): boolean => "bluetooth" in navigator;
 
+/** Why Bluetooth cannot be used right now: the radio is off or access
+ *  denied, or Brave has the feature switched off. */
+export type BleUnavailableReason = "off" | "brave";
+
 /**
- * Whether Bluetooth can be used right now. The API object alone says
- * nothing: Brave exposes it with the feature switched off, and the radio may
- * be off or the browser denied access; the adapter query answers for those.
+ * Whether Bluetooth can be used right now, or why not. The API object alone
+ * says nothing: Brave exposes it with the feature switched off, and the radio
+ * may be off or the browser denied access; the adapter query answers for
+ * those.
  */
-export async function bleAdapterAvailable(): Promise<boolean> {
+export async function bleUnavailableReason(): Promise<BleUnavailableReason | null> {
+  if (await bleAdapterAvailable()) return null;
+  return (await isBraveBrowser()) ? "brave" : "off";
+}
+
+async function bleAdapterAvailable(): Promise<boolean> {
   if (!isWebBluetoothSupported()) return false;
   try {
     return await navigator.bluetooth.getAvailability();
@@ -33,7 +43,7 @@ export async function bleAdapterAvailable(): Promise<boolean> {
 }
 
 /** Brave ships with Web Bluetooth switched off; it announces itself. */
-export async function isBraveBrowser(): Promise<boolean> {
+async function isBraveBrowser(): Promise<boolean> {
   const brave = (navigator as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
   if (!brave?.isBrave) return false;
   try {

@@ -6,6 +6,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { BleUnavailableReason } from "../util/ble-nus-stream.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { copyAddressToClipboard } from "./shared/pairing-address.js";
 
@@ -130,9 +131,6 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
   });
 }
 
-/** Why Bluetooth cannot be used now, for a disabled row with a hint. */
-export type BleUnavailableReason = "off" | "brave";
-
 // Pages cannot link to internal browser URLs, so the flag page is offered
 // as a click-to-copy address for the user to paste.
 export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
@@ -147,7 +145,11 @@ export function renderBleNusOption(
     return renderMethodRow({
       icon: "bluetooth",
       title,
-      desc: ctx.localize(`dashboard.logs_method_ble_nus_${unavailable}`),
+      desc: ctx.localize(
+        unavailable === "brave"
+          ? "dashboard.logs_method_ble_nus_brave"
+          : "dashboard.logs_method_ble_nus_off"
+      ),
       action:
         unavailable === "brave"
           ? renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG)

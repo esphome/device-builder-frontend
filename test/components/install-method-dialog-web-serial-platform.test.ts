@@ -47,6 +47,7 @@ async function mount(
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = platform;
   dialog.mode = mode;
+  dialog.open = true;
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
@@ -204,6 +205,27 @@ describe("install-method-dialog BLE NUS row gating", () => {
       defaultLocalize("dashboard.logs_method_ble_nus_off")
     );
     expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+  });
+
+  it("takes only the newest open's answer, so a slow earlier probe cannot disable the row", async () => {
+    let resolveFirst!: (available: boolean) => void;
+    const answers = [
+      new Promise<boolean>((r) => (resolveFirst = r)),
+      Promise.resolve(true),
+    ];
+    Object.defineProperty(navigator, "bluetooth", {
+      configurable: true,
+      value: { getAvailability: () => answers.shift()! },
+    });
+    const d = await mount("nrf52", "logs");
+    d.open = false;
+    await d.updateComplete;
+    d.open = true;
+    await d.updateComplete;
+    resolveFirst(false);
+    await flush();
+    await d.updateComplete;
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
   });
 
   it("names the Brave flag when Brave has Web Bluetooth switched off", async () => {

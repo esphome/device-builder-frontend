@@ -29,11 +29,8 @@ import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
-import {
-  bleAdapterAvailable,
-  bleNusLogsAvailable,
-  isBraveBrowser,
-} from "../util/ble-nus-stream.js";
+import { bleNusLogsAvailable } from "../util/ble-nus-stream.js";
+import { BleProbeController } from "../util/ble-probe-controller.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -47,7 +44,6 @@ import {
   type WebSerialAvailability,
 } from "../util/web-serial.js";
 import {
-  type BleUnavailableReason,
   type MethodRowContext,
   renderBleNusOption,
   renderBootloaderOption,
@@ -137,6 +133,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @state() private _view: DialogView = "method";
 
   private _portsPoll = new SerialPortsPollController(this, () => this._api);
+  private _bleProbe = new BleProbeController(this);
   /**
    * `true` when the user has opened the "Advanced options"
    * disclosure at the bottom of the method list. Holds the
@@ -154,10 +151,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    */
   @state() private _otaAddressCardExpanded = false;
   @state() private _otaAddressValue = "";
-  // Bluetooth's usability is only knowable asynchronously (see
-  // bleAdapterAvailable); null while unprobed, so the row starts enabled.
-  @state() private _bleUnavailable: BleUnavailableReason | null = null;
-  private _bleProbed = false;
 
   private get _webSerialAvailability(): WebSerialAvailability {
     return webSerialAvailability();
@@ -184,24 +177,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       this._advancedExpanded = false;
       this._otaAddressCardExpanded = false;
       this._otaAddressValue = this.deviceCurrentAddress;
-      // Re-probe per open: the radio may have been switched on meanwhile.
-      this._bleProbed = false;
-      this._bleUnavailable = null;
     }
     this._portsPoll.set(this.open && this._view === "port-select");
-    if (
-      !this._bleProbed &&
-      this.mode === "logs" &&
-      bleNusLogsAvailable(this.deviceTargetPlatform)
-    ) {
-      this._bleProbed = true;
-      void this._probeBle();
-    }
-  }
-
-  private async _probeBle(): Promise<void> {
-    if (await bleAdapterAvailable()) return;
-    this._bleUnavailable = (await isBraveBrowser()) ? "brave" : "off";
+    this._bleProbe.set(
+      this.open && this.mode === "logs" && bleNusLogsAvailable(this.deviceTargetPlatform)
+    );
   }
 
   static styles = [
@@ -287,7 +267,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
     const rp2Row = showRp2Row ? renderRp2Uf2Option(ctx) : nothing;
     const bleNusRow = showBleNusRow
-      ? renderBleNusOption(ctx, this._bleUnavailable)
+      ? renderBleNusOption(ctx, this._bleProbe.reason)
       : nothing;
     const serverRow = showServerSerialRow
       ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
