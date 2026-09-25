@@ -337,9 +337,10 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
     host._session = { kind: "reconnecting", paused: false };
     await s.cancel();
     const cancelled = () => !host._open || host._session.kind !== "reconnecting";
-    await hook
-      .run(s.port, cancelled)
-      .catch(() => failIfStillReconnecting(host, "dashboard.logs_reset_failed"));
+    await hook.run(s.port, cancelled).catch((err: unknown) => {
+      console.warn("Reset hook failed", err);
+      failIfStillReconnecting(host, "dashboard.logs_reset_failed");
+    });
     return;
   }
   host._session = { ...s, paused: false };

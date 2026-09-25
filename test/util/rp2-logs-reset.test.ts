@@ -25,7 +25,7 @@ vi.mock("../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
 }));
 
-import { resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
+import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
 
 const port = { getInfo: () => ({}) } as unknown as SerialPort;
 const live = { readable: {} } as unknown as SerialPort;
@@ -84,6 +84,24 @@ describe("resetPicoForLogs", () => {
     mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([rp2350]);
     await expect(run()).resolves.toBe(live);
     expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
+  });
+
+  it("reports a plain failure when the CDC port never left (touch ignored)", async () => {
+    const stillThere = { getInfo: () => ({}), connected: true } as unknown as SerialPort;
+    mocks.requestPicobootDevice.mockResolvedValue(null);
+    const result = resetPicoForLogs(stillThere, 115200);
+    result.catch(() => {});
+    await vi.runAllTimersAsync();
+    await expect(result).rejects.not.toBeInstanceOf(PicoStrandedError);
+  });
+
+  it("fails fast on a chooser-picked RP2350 instead of sending the RP2040 reboot", async () => {
+    mocks.requestPicobootDevice.mockResolvedValue({
+      vendorId: 0x2e8a,
+      productId: 0xf,
+    } as USBDevice);
+    await expect(run()).rejects.toMatchObject({ step: "reboot" });
+    expect(mocks.open).not.toHaveBeenCalled();
   });
 
   it("stops before the chooser once cancelled", async () => {

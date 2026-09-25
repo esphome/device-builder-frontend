@@ -56,7 +56,16 @@ export async function resetPicoForLogs(
       throw new PicoStrandedError("pick", err);
     }
   );
-  if (!usb) throw new PicoStrandedError("pick");
+  if (!usb) {
+    // A CDC handle still connected means the firmware ignored the touch: the
+    // Pico never left, so this is a plain reset failure, not a stranding.
+    if (port.connected) throw new Error("The Pico ignored the 1200-baud touch");
+    throw new PicoStrandedError("pick");
+  }
+  // The chooser also lists RP2350 bootloaders; REBOOT is RP2040-only.
+  if (classifyUsbDevice(usb) !== "rp2040") {
+    throw new PicoStrandedError("reboot", new Error("RP2350 is not supported"));
+  }
   const { PicobootDevice } = await loadPicoboot();
   const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
     throw new PicoStrandedError(isUsbAccessDenied(err) ? "refused" : "reboot", err);

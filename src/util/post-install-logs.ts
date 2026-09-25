@@ -130,12 +130,20 @@ export function picoResetHook(
         live = await resetPicoForLogs(port, baudRate, cancelled);
       } catch (err) {
         console.warn("Pico reset failed", err);
-        failSerialOpen(logsDialog, localize(picoResetFailureKey(err)));
+        const message = localize(picoResetFailureKey(err));
+        // Once the session moved on, only the toast: the Pico may still be
+        // sitting in BOOTSEL, but a newer session must not be flipped dead.
+        if (cancelled()) notifyError(message);
+        else failSerialOpen(logsDialog, message);
         return;
       }
-      if (cancelled()) return;
       if (!live) {
-        failPortReopen(logsDialog, localize, port);
+        if (!cancelled()) failPortReopen(logsDialog, localize, port);
+        return;
+      }
+      if (cancelled()) {
+        // Reopened for a session that is gone; nothing will stream it.
+        await live.close().catch(() => {});
         return;
       }
       await attachSerialLogStream(live, logsDialog, localize, baudRate);

@@ -266,6 +266,32 @@ describe("picoResetHook", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
+  it("only toasts a stranding once the dialog closed, leaving newer sessions alone", async () => {
+    const dialog = stubDialog();
+    picoReset.resetPicoForLogs.mockRejectedValue(new PicoStrandedError("pick"));
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
+      deadPort(),
+      () => true
+    );
+    expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_rp2_reset_stranded"),
+      expect.anything()
+    );
+  });
+
+  it("closes a port reopened for a session that is gone", async () => {
+    const dialog = stubDialog();
+    const live = openPort();
+    picoReset.resetPicoForLogs.mockResolvedValue(live);
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
+      deadPort(),
+      () => true
+    );
+    expect(live.close).toHaveBeenCalledOnce();
+    expect(dialog.setSerialStream).not.toHaveBeenCalled();
+  });
+
   it("streams the reopened port after the reboot", async () => {
     const dialog = stubDialog();
     const closed = deadPort();
