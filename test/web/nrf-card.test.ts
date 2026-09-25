@@ -60,7 +60,7 @@ describe("esphome-web-nrf-card", () => {
     expect(logsDialog(el).port).toBe(port);
     expect(logsDialog(el).bleDevice).toBeUndefined();
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
-    expect(logsDialog(el).noReset).toBe(true);
+    expect(logsDialog(el).resetMode).toBe("none");
   });
 
   it("stays closed when the picker is dismissed, fails, or the port will not open", async () => {

@@ -1,23 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
-import { css, html, LitElement } from "lit";
+import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  crashCalloutStyles,
   renderCrashCallout,
   repinTerminalForCallout,
 } from "../../components/process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
-import {
-  fillTerminalOnMobile,
-  termButtonStyles,
-  termTokens,
-} from "../../components/process-terminal/process-terminal.styles.js";
 import { localizeContext } from "../../context/index.js";
-import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
 import {
   classifyLine,
   type CrashKind,
@@ -27,10 +20,18 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { picoResetFailureKey } from "../../util/rp2-logs-reset.js";
 import type { SerialLineHooks } from "../../util/serial-log-stream.js";
+import { isWebUsbSupported } from "../../util/web-usb.js";
 import { BleLogSource } from "./ble-source.js";
+import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import { LOG_BAUD_RATE, LOG_BUFFER_SIZE, SerialLogSource } from "./serial-source.js";
+import {
+  LOG_BAUD_RATE,
+  LOG_BUFFER_SIZE,
+  SerialLogSource,
+  type SerialResetMode,
+} from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
 import "../../components/base-dialog.js";
@@ -112,11 +113,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @property() deviceLabel = "";
 
   /**
-   * Hide the "Reset device" button. A DTR/RTS pulse doesn't reset a
-   * native-USB CDC device (the Pico, an nRF52), so the button would be a
-   * no-op there — legacy hid it for the same reason.
+   * How Reset Device reaches the board (see ``SerialResetMode``). The Pico's
+   * reboot goes over WebUSB, so the button hides where that is missing.
    */
-  @property({ type: Boolean }) noReset = false;
+  @property() resetMode: SerialResetMode = "rts";
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -136,7 +136,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  private _cancel?: () => Promise<void>;
+  // Reactive so the toolbar can offer Reset Device only over a live stream.
+  @state() private _cancel?: () => Promise<void>;
   // The transport of the current session; set for as long as the session
   // lives, streaming or mid-recovery.
   private _source?: WebLogSource;
@@ -174,7 +175,17 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   /** Reset Device is a serial RTS pulse; never over Bluetooth. */
   get canReset(): boolean {
-    return !this.noReset && !this.bleDevice;
+    if (this.bleDevice || this.resetMode === "none") return false;
+    return this.resetMode !== "pico" || isWebUsbSupported();
+  }
+
+  /**
+   * A reset needs a live stream: during a reconnect or a reboot the port is
+   * being reacquired, and a second reset would run another BOOTSEL sequence
+   * against it.
+   */
+  get resetReady(): boolean {
+    return this._cancel !== undefined;
   }
 
   private _start(): void {
@@ -200,7 +211,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (this.bleDevice) return new BleLogSource(this.bleDevice);
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
-      canReset: this.canReset,
+      reset: this.canReset ? this.resetMode : "none",
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>
@@ -452,17 +463,49 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
-    const reset = this._source?.reset;
+    const source = this._source;
+    const reset = source?.reset;
     // No live session (the first attach failed): nothing to pulse.
-    if (!reset) {
+    if (!source || !reset) {
       toast.error(this._localize("web.logs.reset_failed"));
       return;
     }
-    try {
-      await reset();
-    } catch {
-      toast.error(this._localize("web.logs.reset_failed"));
+    if (!source.resetDropsStream) {
+      try {
+        await reset(() => false);
+      } catch {
+        toast.error(this._localize("web.logs.reset_failed"));
+      }
+      return;
     }
+    // A reset that re-enumerates the port (a Pico rebooting through BOOTSEL):
+    // end the stream, reboot, then come back the way a dropped stream does.
+    // Not while a reconnect or an earlier reset is still reacquiring the port.
+    const cancel = this._cancel;
+    if (!cancel) return;
+    const generation = ++this._generation;
+    this._cancel = undefined;
+    this._streaming = false;
+    const wasPaused = this._paused;
+    this._enqueueLine("");
+    this._enqueueLine(this._localize("web.logs.rebooting"));
+    this._flushPending();
+    await cancel?.().catch((err) => {
+      console.error("[Logs] Failed to release the stream before a reboot:", err);
+    });
+    try {
+      await reset(() => generation !== this._generation);
+    } catch (err) {
+      console.warn("[Logs] reset failed:", err);
+      toast.error(this._localize(picoResetFailureKey(err, "web.logs.reset_failed")));
+      if (generation === this._generation) this._failReconnect(source);
+      return;
+    }
+    if (generation !== this._generation) return;
+    await this._resume(source, generation, wasPaused).catch((err: unknown) => {
+      console.error("[Logs] reconnect failed:", err);
+      if (generation === this._generation) this._failReconnect(source, err);
+    });
   }
 
   _download(): void {
@@ -511,42 +554,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     `;
   }
 
-  static styles = [
-    // Brand-primary header bar, matching the builder's own logs dialog.
-    primaryDialogHeaderStyles,
-    termTokens,
-    termButtonStyles,
-    fillTerminalOnMobile,
-    css`
-      esphome-base-dialog {
-        /* Wide enough for ESPHome's timestamp + [C][module:NNN] prefix plus a
-           long message before wrapping (mirrors the builder's logs dialog). */
-        --width: min(1300px, 94vw);
-      }
-      /* Dress the dialog body as the terminal surface: drop the default body
-         padding so the terminal fills it edge-to-edge, and paint the body the
-         terminal background so there's no seam behind the rounded corners. */
-      esphome-base-dialog::part(body) {
-        padding: 0;
-        background: var(--term-bg);
-        overflow: hidden;
-      }
-      esphome-process-terminal {
-        display: block;
-        /* Size the terminal's own flex column via its height variable, not the
-           host's height: the internal .content defaults to 60vh, so forcing a
-           taller host would leave a gap below the toolbar. */
-        --process-terminal-height: min(70vh, 40rem);
-        --process-terminal-max-height: min(70vh, 40rem);
-      }
-      .toolbar-slot {
-        display: flex;
-        gap: var(--wa-space-2xs);
-        align-items: center;
-      }
-    `,
-    crashCalloutStyles,
-  ];
+  static styles = webLogsDialogStyles;
 }
 
 declare global {

@@ -137,7 +137,7 @@ export class ESPHomeWebNrfCard extends LitElement {
         .bleDevice=${logs && "ble" in logs ? logs.ble : undefined}
         ?open=${logs !== undefined}
         .deviceLabel=${this._localize("web.nrf.title")}
-        .noReset=${true}
+        .resetMode=${"none"}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;

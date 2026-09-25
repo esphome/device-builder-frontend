@@ -36,8 +36,12 @@ hardware classes behave differently:
   same one — test both.
 - **UART bridges** (CP210x, CH34x): no re-enumeration; DTR/RTS reset
   pulses work.
-- **Pico W**: native-USB CDC; no DTR/RTS reset, and flashing goes
-  through UF2 (its own connect card and install dialog).
+- **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
+  dialog's Reset Device instead touches the port at 1200 baud into
+  BOOTSEL and reboots it over WebUSB (`src/util/rp2-logs-reset.ts`),
+  after which the CDC port re-enumerates; without WebUSB the button is
+  hidden. Flashing goes through UF2 (its own connect card and install
+  dialog).
 
 ## Where things live
 
