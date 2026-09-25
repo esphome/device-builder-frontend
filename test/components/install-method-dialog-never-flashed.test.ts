@@ -78,6 +78,13 @@ describe("install-method-dialog never-flashed ordering", () => {
     expect(order[order.length - 1]).toBe("wifi");
   });
 
+  it("promotes the RTL8720C row for a never-flashed rtl87xx", async () => {
+    const d = await mount({ neverFlashed: true, platform: "rtl87xx" });
+    const order = rowIconOrder(d);
+    expect(order[0]).toBe("chip");
+    expect(order[order.length - 1]).toBe("wifi");
+  });
+
   it("promotes the Pico row for a never-flashed rp2", async () => {
     const d = await mount({ neverFlashed: true, platform: "rp2" });
     const order = rowIconOrder(d);

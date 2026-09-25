@@ -8,6 +8,9 @@ import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { BleProbeState } from "../util/ble-probe-controller.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
+import { isNrfPlatform } from "../util/nrf-platform.js";
+import { isRp2Platform } from "../util/rp2-platform.js";
+import { isRtl87xxPlatform } from "../util/rtl87xx-platform.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
 export interface MethodRowContext {
@@ -184,6 +187,32 @@ export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
     desc: ctx.localize("dashboard.install_method_nrf_dfu_desc"),
     onClick: () => ctx.onSelect("nrf-dfu"),
   });
+}
+
+/** In-app RTL8720C flash: the ROM's UART downloader over Web Serial. */
+export function renderRtlAmbz2Option(ctx: MethodRowContext): TemplateResult {
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize("dashboard.install_method_rtl_ambz2"),
+    desc: ctx.localize("dashboard.install_method_rtl_ambz2_desc"),
+    onClick: () => ctx.onSelect("rtl-ambz2"),
+  });
+}
+
+/**
+ * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
+ * ROM), install mode only and only with Web Serial; nothing for the rest.
+ */
+export function renderPlatformFlashOption(
+  ctx: MethodRowContext,
+  platform: string | null | undefined,
+  hasWebSerial: boolean
+): TemplateResult | typeof nothing {
+  if (ctx.mode === "logs" || !hasWebSerial) return nothing;
+  if (isNrfPlatform(platform)) return renderNrfDfuOption(ctx);
+  if (isRp2Platform(platform)) return renderRp2Uf2Option(ctx);
+  if (isRtl87xxPlatform(platform)) return renderRtlAmbz2Option(ctx);
+  return nothing;
 }
 
 /**

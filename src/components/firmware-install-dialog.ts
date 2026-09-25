@@ -32,6 +32,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
+import type { LibreTinyImage } from "../util/libretiny-uf2.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import type { DfuPackage } from "../util/nrf-dfu.js";
@@ -71,6 +72,11 @@ import {
   rp2DoReset,
   startRp2Uf2Install,
 } from "./firmware-install-dialog/rp2-uf2-install.js";
+import {
+  retryRtlAmbz2,
+  rtlDoFlash,
+  startRtlAmbz2Install,
+} from "./firmware-install-dialog/rtl-ambz2-install.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
 import type {
   Installer,
@@ -218,6 +224,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   _nrfPkg: DfuPackage | null = null;
   _rp2Image: Uf2Image | null = null;
+  _rtlImage: LibreTinyImage | null = null;
   // Blocks a second picker while a browser-flash step's picker is open.
   @state() _flashBusy = false;
   // Aborts an in-flight browser flash on teardown so the device is released.
@@ -278,12 +285,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startRp2Uf2Install(this);
   }
 
+  installRtlAmbz2(device: ConfiguredDevice) {
+    this._begin(device, "rtl-ambz2");
+    void startRtlAmbz2Install(this);
+  }
+
   // Footer button handlers: the port / device pickers need a user gesture.
   _nrfDoReset = () => void nrfDoReset(this);
   _nrfDoFlash = () => void nrfDoFlash(this);
   _rp2DoReset = () => void rp2DoReset(this);
   _rp2DoFlash = () => void rp2DoFlash(this);
   _rp2DoDownload = () => rp2DoDownload(this);
+  _rtlDoFlash = () => void rtlDoFlash(this);
 
   // Three-dot "Download" entry; compiles only when nothing is built.
   downloadArtifacts(device: ConfiguredDevice) {
@@ -337,6 +350,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._detected = null;
     this._nrfPkg = null;
     this._rp2Image = null;
+    this._rtlImage = null;
     this._flashBusy = false;
   }
 
@@ -492,6 +506,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (this._installer === "web-flash") this.installUsbFlash(device);
     else if (this._installer === "nrf-dfu") retryNrfDfu(this, device);
     else if (this._installer === "rp2-uf2") retryRp2Uf2(this, device);
+    else if (this._installer === "rtl-ambz2") retryRtlAmbz2(this, device);
     else this.installWebSerial(device);
   };
 

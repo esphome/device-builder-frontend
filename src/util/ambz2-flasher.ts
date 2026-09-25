@@ -1,0 +1,354 @@
+/**
+ * Flashing a Realtek AmebaZ2 (RTL8720C) over Web Serial through the ROM's
+ * UART download console, the protocol ltchiptool speaks for this family:
+ * ``ping`` to link, ``DW`` / ``EW`` register access to set the flash up,
+ * ``fwd`` + XModem-1k per run, ``hashq`` to verify, ``disc`` to boot. Loaded
+ * on demand by the install flow; nothing here touches the DOM.
+ */
+import type { LibreTinyImage } from "./libretiny-uf2.js";
+import { sleep } from "./sleep.js";
+import { type XmodemIo, xmodemSend } from "./xmodem.js";
+
+export const AMBZ2_BAUD_RATE = 115200;
+/** How long the automatic DTR/RTS reset gets to produce a linked ROM. */
+const AUTO_LINK_MS = 2000;
+/** Relinking after a transfer; the ROM answers within a second normally. */
+const RELINK_MS = 10000;
+/** The strap guide keeps polling this long before giving up. */
+const STRAP_WAIT_MS = 5 * 60 * 1000;
+const PING_QUIET_MS = 150;
+const PING_WINDOW_MS = 400;
+const RESET_HOLD_MS = 100;
+const ROM_SETTLE_MS = 400;
+const LINE_MS = 1000;
+const XMODEM_TIMEOUT_MS = 3000;
+const TEARDOWN_MS = 2000;
+const HASH_LENGTH = 32;
+// SYSCFG: bits 5..6 hold the flash pinout, which the ROM wants named back in
+// every flash command; the second write unlocks the flash controller.
+const REG_FLASH_MODE = 0x40000038;
+const REG_FLASH_UNLOCK = 0x40002800;
+const FLASH_UNLOCK_VALUE = 0x7effffff;
+
+export interface Ambz2FlashHooks {
+  onProgress: (percent: number) => void;
+  /** The chip is linked and the write is starting. */
+  onLinked?: () => void;
+  /** The automatic reset produced nothing; the user has to strap the board. */
+  onWaitingForStrap?: () => void;
+  signal?: AbortSignal;
+}
+
+/** No ROM answered while the user had the chance to enter download mode. */
+export class Ambz2LinkError extends Error {
+  constructor(message = "The chip did not enter download mode") {
+    super(message);
+    this.name = "Ambz2LinkError";
+  }
+}
+
+/** The chip answered from the SDK console rather than the ROM downloader. */
+export class Ambz2ConsoleError extends Error {
+  constructor() {
+    super("The chip answered from its SDK console, not the ROM download mode");
+    this.name = "Ambz2ConsoleError";
+  }
+}
+
+export class Ambz2VerifyError extends Error {
+  constructor(address: number) {
+    super(`Flash contents at 0x${address.toString(16)} do not match the image`);
+    this.name = "Ambz2VerifyError";
+  }
+}
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+/**
+ * Byte-level access to the port: a background read loop feeds a buffer that
+ * the command helpers consume with timeouts, and every wait races the abort
+ * signal (an in-flight stream read or write cannot be interrupted otherwise).
+ */
+class RomLink implements XmodemIo {
+  private readonly reader: ReadableStreamDefaultReader<Uint8Array>;
+  private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
+  private readonly aborted: Promise<never>;
+  private buf: number[] = [];
+  private wake: (() => void) | null = null;
+  private readEnded: Error | null = null;
+  private active = true;
+
+  constructor(port: SerialPort, signal?: AbortSignal) {
+    if (!port.readable || !port.writable) {
+      throw new Error("Serial port has no readable / writable stream");
+    }
+    this.reader = port.readable.getReader();
+    this.writer = port.writable.getWriter();
+    this.aborted = new Promise<never>((_, reject) => {
+      if (!signal) return;
+      if (signal.aborted) reject(signal.reason);
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+    this.aborted.catch(() => {});
+    void this.readLoop();
+  }
+
+  private race<T>(p: Promise<T>): Promise<T> {
+    p.catch(() => {}); // Losing the race must not surface as unhandled.
+    return Promise.race([p, this.aborted]);
+  }
+
+  private async readLoop(): Promise<void> {
+    while (this.active) {
+      let result: ReadableStreamReadResult<Uint8Array>;
+      try {
+        result = await this.reader.read();
+      } catch (err) {
+        this.end(err instanceof Error ? err : new Error(String(err)));
+        return;
+      }
+      if (result.done || !result.value) {
+        this.end(new Error("Serial port closed"));
+        return;
+      }
+      for (const b of result.value) this.buf.push(b);
+      this.wake?.();
+    }
+  }
+
+  private end(err: Error): void {
+    this.readEnded = err;
+    this.wake?.();
+  }
+
+  /** Resolves true when bytes arrived, false on timeout; throws once the port is gone. */
+  private waitForData(timeoutMs: number): Promise<boolean> {
+    if (this.readEnded) return Promise.reject(this.readEnded);
+    let timer: ReturnType<typeof setTimeout>;
+    const arrived = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+      this.wake = () => {
+        clearTimeout(timer);
+        this.wake = null;
+        resolve(true);
+      };
+    });
+    return this.race(arrived).then((got) => {
+      if (got && this.readEnded && this.buf.length === 0) throw this.readEnded;
+      return got;
+    });
+  }
+
+  async write(data: Uint8Array | string): Promise<void> {
+    const bytes = typeof data === "string" ? encoder.encode(data) : data;
+    await this.race(this.writer.write(bytes));
+  }
+
+  drain(): void {
+    this.buf = [];
+  }
+
+  async readByte(timeoutMs: number): Promise<number | null> {
+    if (this.buf.length === 0 && !(await this.waitForData(timeoutMs))) return null;
+    return this.buf.shift() ?? null;
+  }
+
+  /** Exactly ``count`` bytes; the timeout restarts with every arrival. */
+  async readBytes(count: number, timeoutMs: number): Promise<Uint8Array> {
+    while (this.buf.length < count) {
+      if (!(await this.waitForData(timeoutMs))) {
+        throw new Error(`Timed out waiting for ${count} bytes (got ${this.buf.length})`);
+      }
+    }
+    return new Uint8Array(this.buf.splice(0, count));
+  }
+
+  /** Everything received until ``quietMs`` of silence, at most ``windowMs``. */
+  async readQuiet(quietMs: number, windowMs: number): Promise<Uint8Array> {
+    const deadline = Date.now() + windowMs;
+    while (Date.now() < deadline) {
+      const wait = Math.min(quietMs, deadline - Date.now());
+      if (!(await this.waitForData(wait)) && this.buf.length > 0) break;
+    }
+    return new Uint8Array(this.buf.splice(0));
+  }
+
+  /** The next non-empty line, CR/LF stripped. */
+  async readLine(timeoutMs: number): Promise<string> {
+    for (;;) {
+      const nl = this.buf.indexOf(0x0a);
+      if (nl >= 0) {
+        const line = decoder.decode(new Uint8Array(this.buf.splice(0, nl + 1))).trim();
+        if (line) return line;
+        continue;
+      }
+      if (!(await this.waitForData(timeoutMs))) {
+        throw new Error("Timed out waiting for a response line");
+      }
+    }
+  }
+
+  /** Errors the writable on failure rather than closing it (see nrf-dfu.ts). */
+  async close(failure?: unknown): Promise<void> {
+    this.active = false;
+    const writer =
+      failure !== undefined ? this.writer.abort(failure) : this.writer.close();
+    const settled = Promise.allSettled([this.reader.cancel(), writer]);
+    await Promise.race([settled, sleep(TEARDOWN_MS)]);
+    this.reader.releaseLock();
+    this.writer.releaseLock();
+  }
+}
+
+/**
+ * Boards wired like the BW15 kit tie RTS to CEN and DTR to PA00, so holding
+ * DTR through an RTS pulse boots the ROM downloader. Adapters without those
+ * lines ignore this, and the strap guide covers them.
+ */
+async function autoReset(port: SerialPort): Promise<void> {
+  try {
+    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    await sleep(RESET_HOLD_MS);
+    await port.setSignals({ requestToSend: false });
+    await sleep(ROM_SETTLE_MS);
+  } catch {
+    // No control lines on this adapter.
+  }
+}
+
+/** One ping; true when the ROM downloader answered. */
+async function ping(rom: RomLink): Promise<boolean> {
+  rom.drain();
+  await rom.write("ping\n");
+  const reply = decoder.decode(await rom.readQuiet(PING_QUIET_MS, PING_WINDOW_MS));
+  if (reply.includes("$8710c")) throw new Ambz2ConsoleError();
+  return reply === "ping";
+}
+
+/**
+ * Ping until the ROM answers or ``timeoutMs`` passes. A running LibreTiny
+ * firmware reboots into download mode on the same ``ping`` line, so this
+ * doubles as that trigger.
+ */
+async function linkRom(rom: RomLink, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (await ping(rom)) return true;
+  } while (Date.now() < deadline);
+  return false;
+}
+
+async function readRegister(link: RomLink, address: number): Promise<number> {
+  link.drain();
+  await link.write(`DW ${address.toString(16).toUpperCase()} 1\n`);
+  const expect = `${address.toString(16).toUpperCase()}:`;
+  for (let i = 0; i < 4; i++) {
+    const words = (await link.readLine(LINE_MS)).split(/\s+/);
+    if (words[0].toUpperCase() === expect && words[1]) return parseInt(words[1], 16);
+  }
+  throw new Error(`Unexpected reply reading register 0x${address.toString(16)}`);
+}
+
+async function writeRegister(
+  link: RomLink,
+  address: number,
+  value: number
+): Promise<void> {
+  link.drain();
+  await link.write(
+    `EW ${address.toString(16).toUpperCase()} ${value.toString(16).toUpperCase()}\n`
+  );
+  await link.readLine(LINE_MS);
+}
+
+/** Sets the flash controller up and returns the ``<speed> <mode>`` the ROM wants back. */
+async function flashInit(link: RomLink): Promise<string> {
+  const mode = ((await readRegister(link, REG_FLASH_MODE)) >> 5) & 0b11;
+  await writeRegister(link, REG_FLASH_UNLOCK, FLASH_UNLOCK_VALUE);
+  return `0 ${mode}`;
+}
+
+async function sha256(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+}
+
+async function readFlashHash(
+  link: RomLink,
+  cfg: string,
+  length: number
+): Promise<Uint8Array> {
+  // The ROM hashes at roughly 1.5 Mbit/s and answers only when done.
+  const timeout = Math.max(LINE_MS, Math.ceil(length / 150_000) * 1000 + 500);
+  link.drain();
+  await link.write(`hashq ${length} ${cfg}\n`);
+  const reply = await link.readBytes(6 + HASH_LENGTH, timeout);
+  if (decoder.decode(reply.subarray(0, 6)) !== "hashs ") {
+    throw new Error("Unexpected reply to the hash query");
+  }
+  return reply.subarray(6);
+}
+
+async function writeRun(
+  link: RomLink,
+  cfg: string,
+  address: number,
+  data: Uint8Array<ArrayBuffer>,
+  onBytes: (sent: number) => void
+): Promise<void> {
+  link.drain();
+  await link.write(`fwd ${cfg} ${address.toString(16)}\n`);
+  await xmodemSend(link, data, { timeoutMs: XMODEM_TIMEOUT_MS, onBlock: onBytes });
+  if (!(await linkRom(link, RELINK_MS))) {
+    throw new Ambz2LinkError("The chip stopped answering after the transfer");
+  }
+  const expected = await sha256(data);
+  const actual = await readFlashHash(link, cfg, data.length);
+  if (expected.some((b, i) => b !== actual[i])) throw new Ambz2VerifyError(address);
+}
+
+/**
+ * Flash ``image`` onto the chip behind ``port`` (opened here at 115200 if
+ * needed, closed after). The automatic reset is tried first; failing that
+ * the ROM is polled until the user straps the board or ``signal`` aborts.
+ */
+export async function flashAmbz2(
+  port: SerialPort,
+  image: LibreTinyImage,
+  hooks: Ambz2FlashHooks
+): Promise<void> {
+  if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
+  const rom = new RomLink(port, hooks.signal);
+  let failure: unknown;
+  try {
+    await autoReset(port);
+    if (!(await linkRom(rom, AUTO_LINK_MS))) {
+      hooks.onWaitingForStrap?.();
+      if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();
+    }
+    hooks.onLinked?.();
+    const cfg = await flashInit(rom);
+    let done = 0;
+    for (const run of image.runs) {
+      await writeRun(rom, cfg, run.address, run.data, (sent) => {
+        hooks.onProgress(
+          Math.min(99, Math.floor(((done + sent) / image.totalBytes) * 100))
+        );
+      });
+      done += run.data.length;
+    }
+    // The ROM boots the firmware on this; no reply comes back.
+    await rom.write("disc\n");
+    hooks.onProgress(100);
+  } catch (err) {
+    failure = err;
+    throw err;
+  } finally {
+    await rom.close(failure);
+    // DTR still holds the strap; drop it so the next reset boots the app.
+    await port
+      .setSignals({ dataTerminalReady: false, requestToSend: false })
+      .catch(() => {});
+    await port.close().catch(() => {});
+  }
+}

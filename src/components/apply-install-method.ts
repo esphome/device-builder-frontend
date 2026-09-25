@@ -51,5 +51,8 @@ export function applyInstallMethod(
     case "rp2-uf2":
       h.firmwareDialog?.installRp2Uf2(h.device);
       break;
+    case "rtl-ambz2":
+      h.firmwareDialog?.installRtlAmbz2(h.device);
+      break;
   }
 }
