@@ -1,6 +1,7 @@
 import { consume } from "@lit/context";
 import {
   mdiArrowLeft,
+  mdiBluetooth,
   mdiChevronDown,
   mdiChevronRight,
   mdiChevronUp,
@@ -42,6 +43,7 @@ import {
 } from "../util/web-serial.js";
 import {
   type MethodRowContext,
+  renderBleNusOption,
   renderBootloaderOption,
   renderInstallNotice,
   renderManualDownloadOption,
@@ -65,6 +67,7 @@ import "./base-dialog.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
+  bluetooth: mdiBluetooth,
   "chevron-down": mdiChevronDown,
   "chevron-right": mdiChevronRight,
   "chevron-up": mdiChevronUp,
@@ -219,8 +222,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isRp2 = isRp2Platform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
-    // Web Serial logs also read the Pico's native CDC; flashing stays esptool-only.
-    const webSerialPlatform = isLogs ? isEsptool || isRp2 : isEsptool;
+    // Web Serial logs read the Pico's native CDC and nRF52's UART/USB-CDC;
+    // flashing stays esptool-only.
+    const webSerialPlatform = isLogs ? isEsptool || isRp2 || isNrf : isEsptool;
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure
     // origins as a fallback: there a Web-Serial-incapable browser (Safari) still
@@ -244,6 +248,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // and read serial logs. ESP-only: that landing is ESPHome Web's ESP
     // connect flow, which runs esptool chip detection.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
+    // BLE NUS logs: nRF52 in logs mode, requires Web Bluetooth.
+    const showBleNusRow = isLogs && isNrf && "bluetooth" in navigator;
     // nRF52 browser DFU is install-only and requires in-app Web Serial.
     const showNrfRow = !isLogs && isNrf && hasWebSerial;
     // Web Serial covers the reset step; without WebUSB the write is a UF2 download.
@@ -255,6 +261,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
     const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
     const rp2Row = showRp2Row ? renderRp2Uf2Option(ctx) : nothing;
+    const bleNusRow = showBleNusRow ? renderBleNusOption(ctx) : nothing;
     const serverRow = showServerSerialRow
       ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
       : nothing;
@@ -266,7 +273,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const usbFirst = !isLogs && this.neverFlashed;
     const rows = usbFirst
       ? [usbRow, nrfRow, rp2Row, logsWebRow, serverRow, otaRow]
-      : [otaRow, usbRow, nrfRow, rp2Row, logsWebRow, serverRow];
+      : [otaRow, usbRow, nrfRow, rp2Row, logsWebRow, bleNusRow, serverRow];
 
     return html`
       ${renderInstallNotice(ctx)}

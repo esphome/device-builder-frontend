@@ -3,8 +3,10 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import { requestBleNusDevice, streamBleNus } from "./ble-nus-stream.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import { isNrfPlatform } from "./nrf-platform.js";
 import {
   attachSerialLogStream,
   openNetworkLogsFallback,
@@ -38,6 +40,7 @@ export async function launchLogs(
   openMethodPicker: () => void
 ): Promise<void> {
   const hasWebSerial = "serial" in navigator;
+  const hasBleNus = "bluetooth" in navigator && isNrfPlatform(device.target_platform);
   let hasServerPorts = false;
   if (!hasWebSerial) {
     // Only pay the backend round-trip when WebSerial can't already provide a
@@ -57,7 +60,7 @@ export async function launchLogs(
       hasServerPorts = false;
     }
   }
-  if (hasWebSerial || hasServerPorts) {
+  if (hasWebSerial || hasServerPorts || hasBleNus) {
     openMethodPicker();
     return;
   }
@@ -165,5 +168,44 @@ export async function launchLogsWithMethod(
     } catch {
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }
+  } else if (method === "ble-nus") {
+    if (!("bluetooth" in navigator)) {
+      notifyError(host.localize("dashboard.logs_ble_nus_unsupported"));
+      return;
+    }
+    let bleDevice: BluetoothDevice | null;
+    try {
+      bleDevice = await requestBleNusDevice(device.friendly_name);
+    } catch {
+      notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
+      return;
+    }
+    if (!bleDevice) return; // User dismissed the picker.
+    host.logsDialog.configuration = device.configuration;
+    host.logsDialog.name = device.friendly_name || device.name;
+    host.logsDialog.openBleNus({
+      onReconnect: () => _attachBleNusStream(host.logsDialog, host.localize, bleDevice!),
+    });
+    await _attachBleNusStream(host.logsDialog, host.localize, bleDevice);
   }
+}
+
+async function _attachBleNusStream(
+  dialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  device: BluetoothDevice
+): Promise<void> {
+  const cancel = streamBleNus(device, {
+    onLine: (line) => {
+      if (!dialog._blePaused) dialog._enqueueLine(line);
+    },
+    onDisconnect: (err) => {
+      const msg = localize(
+        err ? "dashboard.logs_ble_nus_open_failed" : "dashboard.logs_ble_nus_disconnected"
+      );
+      if (err) notifyError(msg);
+      dialog.setBleDisconnected(msg);
+    },
+  });
+  dialog.setBleStream(cancel);
 }

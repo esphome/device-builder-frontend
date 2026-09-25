@@ -48,11 +48,14 @@ import {
   markSerialOutput,
   onStart,
   onStop,
+  openBleNus,
   openOta,
   openPassive,
   resetOffered,
   resetSerialDevice,
   resumeAfterReconnect,
+  setBleDisconnected,
+  setBleStream,
   setSerialOpenFailed,
   setSerialStream,
   switchToOtaLogs,
@@ -217,11 +220,16 @@ export class ESPHomeLogsDialog extends LitElement {
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  // Read by `streamSerialToDialog` to gate appends while the log is paused (the
-  // reader keeps draining the open port; we just stop displaying).
+  // Read by `streamSerialToDialog` to gate appends while the log is paused.
   get _serialPaused(): boolean {
     const s = this._session;
     return (s.kind === "serial" || s.kind === "reconnecting") && s.paused;
+  }
+
+  // Read by the BLE stream callback to gate appends while paused.
+  get _blePaused(): boolean {
+    const s = this._session;
+    return s.kind === "ble" && s.paused;
   }
 
   // Derived in willUpdate, not per render: the dialog re-renders per frame
@@ -296,6 +304,23 @@ export class ESPHomeLogsDialog extends LitElement {
     return openPassive(this, options);
   }
 
+  public openBleNus(options: {
+    onReconnect: () => Promise<void>;
+    onBackToInstall?: () => void;
+  }) {
+    openBleNus(this, options);
+  }
+
+  /** Register the BLE NUS stream cancel. Called once the cancel is available. */
+  public setBleStream(cancel: () => void) {
+    setBleStream(this, cancel);
+  }
+
+  /** Record a BLE GATT disconnect; appends an optional pane message and goes dead. */
+  public setBleDisconnected(message?: string) {
+    setBleDisconnected(this, message);
+  }
+
   /** Register the Web Serial reader (its loop-cancel) + port. Called by
    *  `attachSerialLogStream` once a port is open and streaming. */
   public setSerialStream(port: SerialPort, cancel: () => Promise<void>) {
@@ -343,13 +368,16 @@ export class ESPHomeLogsDialog extends LitElement {
     // unconditionally — its only other recovery is Start-to-reconnect.
     const offerOtaFallback = this._quietSerial.quiet || s.kind === "dead";
     const title = this._localize("dashboard.logs_title", { name: this.name });
-    // Web Serial's source label keys off the passive states; OTA / server-serial
+    // BLE NUS and Web Serial show their own source labels; OTA / server-serial
     // show the target port.
-    const source = passive
-      ? this._localize("dashboard.logs_source_web_serial")
-      : s.kind === "ota"
-        ? s.port
-        : "";
+    const source =
+      s.kind === "ble"
+        ? this._localize("dashboard.logs_source_ble_nus")
+        : passive
+          ? this._localize("dashboard.logs_source_web_serial")
+          : s.kind === "ota"
+            ? s.port
+            : "";
     const toggleLabel = this._localize(
       this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states"
     );

@@ -15,9 +15,11 @@
  * - ``ota``          backend WS source; ``streamId`` null means stopped (the
  *                    Start button restarts it), non-null means streaming.
  * - ``reconnecting`` a Web Serial attach/reopen is in flight (no reader yet).
- *                    ``paused`` records a Stop pressed during the wait so the
- *                    landing attach honors it; Start/Stop here only toggle
- *                    ``paused`` — they never start a *second* reconnect.
+ *                    Also used as the transient state while BLE GATT is
+ *                    connecting. ``paused`` records a Stop pressed during the
+ *                    wait so the landing attach honors it; Start/Stop here
+ *                    only toggle ``paused`` — they never start a second
+ *                    reconnect.
  * - ``serial``       a Web Serial reader is attached and draining the open
  *                    port. ``paused`` gates the on-screen log (the reader keeps
  *                    draining either way, so resuming needn't reopen the port
@@ -27,8 +29,11 @@
  *                    output afresh and clear it, so a quiet device (bursty
  *                    logging at INFO) never re-trips the banner, a Stop/Start
  *                    included.
- * - ``dead``         a Web Serial reopen failed; the port is gone. Start runs
- *                    the reconnect hook (the #636 "click Start to reconnect").
+ * - ``ble``          a BLE NUS GATT notify session is streaming. ``paused``
+ *                    gates the on-screen log; Stop pauses display without
+ *                    disconnecting, Start resumes. No reset line or port handle.
+ * - ``dead``         a Web Serial reopen or BLE GATT connect/reconnect failed;
+ *                    the source is gone. Start runs the reconnect hook.
  */
 export type LogsSession =
   | { readonly kind: "idle" }
@@ -49,17 +54,25 @@ export type LogsSession =
       readonly paused: boolean;
       readonly outputSeen: boolean;
     }
+  | {
+      readonly kind: "ble";
+      readonly cancel: () => void;
+      readonly paused: boolean;
+    }
   | { readonly kind: "dead" };
 
 /** Whether the streaming dot / Stop button should show (vs. the Start button). */
 export const isStreaming = (s: LogsSession): boolean =>
   (s.kind === "ota" && s.streamId !== null) ||
-  ((s.kind === "serial" || s.kind === "reconnecting") && !s.paused);
+  ((s.kind === "serial" || s.kind === "reconnecting" || s.kind === "ble") && !s.paused);
 
-/** Web Serial session (any phase): drives the source chip + hides the states
- *  toggle, which only applies to the backend ``--no-states`` flag. */
+/** Web Serial or BLE session (any phase): drives the source chip + hides the
+ *  states toggle, which only applies to the backend ``--no-states`` flag. */
 export const isPassive = (s: LogsSession): boolean =>
-  s.kind === "serial" || s.kind === "reconnecting" || s.kind === "dead";
+  s.kind === "serial" ||
+  s.kind === "reconnecting" ||
+  s.kind === "ble" ||
+  s.kind === "dead";
 
 /** A live Web Serial port is held — the only state where Reset Device can fire
  *  and the port can be torn down. */

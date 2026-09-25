@@ -126,9 +126,17 @@ describe("install-method-dialog logs-mode platform gating", () => {
     }
   );
 
-  it.each(["bk72xx", "nrf52"])("keeps logs on server-serial for %s", async (platform) => {
-    const d = await mount(platform, "logs");
+  it("keeps logs on server-serial for bk72xx", async () => {
+    const d = await mount("bk72xx", "logs");
     expect(hasWebSerialRow(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  // nRF52 gets the Web Serial row for logs (USB-CDC console); on localhost
+  // that collapses the server-serial row, same as ESP and RP2.
+  it("shows Web Serial logs and drops server-serial for nrf52", async () => {
+    const d = await mount("nrf52", "logs");
+    expect(hasWebSerialRow(d)).toBe(true);
+    expect(hasServerSerialRow(d)).toBe(false);
   });
 });

@@ -37,6 +37,21 @@ export function openOta(
   startOtaStream(host);
 }
 
+/** Open for a BLE NUS stream the caller attaches via ``setBleStream``. */
+export function openBleNus(
+  host: ESPHomeLogsDialog,
+  options: {
+    onReconnect: () => Promise<void>;
+    onBackToInstall?: () => void;
+  }
+): void {
+  beginSession(host, options.onBackToInstall);
+  host._reconnect = options.onReconnect;
+  host._session = { kind: "reconnecting", paused: false };
+  host._open = true;
+  host._resetAnsiLogScroll();
+}
+
 /** Open for a Web Serial reader the caller attaches via ``setSerialStream``. */
 export function openPassive(
   host: ESPHomeLogsDialog,
@@ -103,6 +118,34 @@ export function setSerialStream(
   host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
 }
 
+/** Register the BLE NUS stream cancel. Called by the launch path once
+ *  ``streamBleNus`` returns a cancel. Transitions ``reconnecting`` → ``ble``,
+ *  or updates the cancel on an existing ``ble`` session. */
+export function setBleStream(host: ESPHomeLogsDialog, cancel: () => void): void {
+  if (!host._open || !isPassive(host._session)) {
+    cancel();
+    return;
+  }
+  const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
+  if (host._session.kind === "ble") host._session.cancel();
+  host._session = { kind: "ble", cancel, paused };
+}
+
+/**
+ * Record a BLE GATT disconnect (or failed connect). Appends an optional
+ * message to the pane and drops to ``dead`` so the Start button reconnects.
+ * The caller handles the toast; this only updates dialog state.
+ */
+export function setBleDisconnected(host: ESPHomeLogsDialog, message?: string): void {
+  if (!host._open || !isPassive(host._session)) return;
+  void teardownSession(host);
+  if (message) {
+    host._log.dropPending();
+    host._log.append([message]);
+  }
+  host._session = { kind: "dead" };
+}
+
 /**
  * Surface a failure to reopen the Web Serial port for post-install logs.
  * Appends the message into the log pane (so a user who looked away during the
@@ -152,6 +195,10 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
   const s = host._session;
   host._session = { kind: "idle" };
   if (s.kind === "serial") return s.cancel();
+  if (s.kind === "ble") {
+    s.cancel();
+    return Promise.resolve();
+  }
   if (s.kind === "ota" && s.streamId !== null) {
     return stopBackendStream(host, s.streamId);
   }
@@ -205,6 +252,7 @@ export function onStart(host: ESPHomeLogsDialog): void {
       break;
     case "serial":
     case "reconnecting":
+    case "ble":
       host._session = { ...s, paused: false };
       break;
     case "dead":
@@ -245,6 +293,7 @@ export function onStop(host: ESPHomeLogsDialog): void {
       break;
     case "serial":
     case "reconnecting":
+    case "ble":
       host._session = { ...s, paused: true };
       break;
   }
@@ -337,7 +386,8 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
  *  (any port while none is attached), else the pulse where that works. */
 export function resetOffered(host: ESPHomeLogsDialog): boolean {
   const s = host._session;
-  if (!isPassive(s)) return false;
+  // BLE has no port and no reset line at all.
+  if (!isPassive(s) || s.kind === "ble") return false;
   const hook = host._resetDevice;
   if (!hook) return host._pulseResets;
   return s.kind !== "serial" || hook.supports(s.port);
