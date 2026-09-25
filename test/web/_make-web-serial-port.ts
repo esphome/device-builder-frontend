@@ -16,3 +16,8 @@ export function makeWebSerialPort(overrides: Record<string, unknown> = {}): Seri
     ...overrides,
   } as unknown as SerialPort;
 }
+
+/** A port whose only trait is its USB identity. */
+export function makeUsbPort(usbVendorId?: number, usbProductId?: number): SerialPort {
+  return makeWebSerialPort({ getInfo: () => ({ usbVendorId, usbProductId }) });
+}

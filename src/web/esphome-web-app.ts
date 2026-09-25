@@ -7,7 +7,11 @@ import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/loca
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
-import { isRecentSerialActivity } from "../util/serial-reacquire.js";
+import {
+  isOwnSerialReenumeration,
+  portOfSerialConnectEvent,
+  SerialConnectAnnouncements,
+} from "../util/serial-reacquire.js";
 import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
@@ -50,7 +54,7 @@ export class ESPHomeWebApp extends LitElement {
     window.addEventListener("popstate", this._syncModeFromUrl);
     this.addEventListener("port-picked", this._onPortPicked);
     // Only ports this origin already has permission for announce themselves.
-    if ("serial" in navigator) {
+    if (this._listensForPlugIns) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
     }
     void this._init();
@@ -61,7 +65,7 @@ export class ESPHomeWebApp extends LitElement {
     this._darkModeQuery.removeEventListener("change", this._applySystemTheme);
     window.removeEventListener("popstate", this._syncModeFromUrl);
     this.removeEventListener("port-picked", this._onPortPicked);
-    if ("serial" in navigator) {
+    if (this._listensForPlugIns) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
     }
   }
@@ -111,10 +115,17 @@ export class ESPHomeWebApp extends LitElement {
     this._suggestFlowFor((e as CustomEvent<SerialPort>).detail);
   };
 
+  private get _listensForPlugIns(): boolean {
+    return !this._flasherMode && "serial" in navigator;
+  }
+
+  private _connectAnnouncements = new SerialConnectAnnouncements();
+
   private _onSerialConnect = (e: Event): void => {
-    // A re-enumeration our own touch or flash caused is not a new device.
-    if (this._flasherMode || isRecentSerialActivity()) return;
-    this._suggestFlowFor((e as Event & { port: SerialPort }).port);
+    if (isOwnSerialReenumeration()) return;
+    const port = portOfSerialConnectEvent(e);
+    if (port && this._connectAnnouncements.shouldAnnounce(port))
+      this._suggestFlowFor(port);
   };
 
   /**

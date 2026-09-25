@@ -8,6 +8,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 import { PortDisconnectWatcher } from "../util/port-disconnect-watcher.js";
@@ -94,14 +95,8 @@ export class ESPHomeWebEspConnectCard extends LitElement {
     }
     this._port = port;
     this._watcher.watch(port);
-    this._announcePick(port);
-  }
-
-  // The shell may offer another board flow from the port's ids.
-  private _announcePick(port: SerialPort): void {
-    this.dispatchEvent(
-      new CustomEvent("port-picked", { detail: port, bubbles: true, composed: true })
-    );
+    // The shell may offer another board flow from the port's ids.
+    fireEvent(this, "port-picked", port);
   }
 
   private _handleClose = (): void => {

@@ -183,13 +183,16 @@ export function secureLoopbackUrl(): string | null {
 // here so long-standing import paths (and their tests) keep working.
 export {
   grantedHandlesFor,
+  isOwnSerialReenumeration,
   isRecentSerialActivity,
   markSerialActivity,
   matchesDevice,
   openLiveSerialPort,
+  portOfSerialConnectEvent,
   reacquirePort,
   SERIAL_ACTIVITY_WINDOW_MS,
   SERIAL_REOPEN_TIMEOUT_MS,
+  SerialConnectAnnouncements,
 } from "./serial-reacquire.js";
 
 /**

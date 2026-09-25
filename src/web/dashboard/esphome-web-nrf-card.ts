@@ -10,6 +10,7 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { pickBleNusDevice } from "../../util/ble-nus-picker.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import "../install/esphome-web-install-nrf-dialog.js";
@@ -67,9 +68,7 @@ export class ESPHomeWebNrfCard extends LitElement {
       }
       if (!port) return;
       // The shell may offer another board flow from the port's ids.
-      this.dispatchEvent(
-        new CustomEvent("port-picked", { detail: port, bubbles: true, composed: true })
-      );
+      fireEvent(this, "port-picked", port);
       if (!(await openPortForLogs(port, this._localize))) return;
       this._logs = { port };
     } finally {

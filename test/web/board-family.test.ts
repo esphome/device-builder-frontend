@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { boardFamilyOfPort } from "../../src/web/util/board-family.js";
-
-const port = (usbVendorId?: number, usbProductId?: number) =>
-  ({ getInfo: () => ({ usbVendorId, usbProductId }) }) as unknown as SerialPort;
+import { makeUsbPort as port } from "./_make-web-serial-port.js";
 
 describe("boardFamilyOfPort", () => {
   it("reads a Pico's own console from the Raspberry Pi vendor id", () => {

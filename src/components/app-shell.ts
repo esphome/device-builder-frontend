@@ -68,7 +68,12 @@ import {
 } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
-import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
+import {
+  isOwnSerialReenumeration,
+  markSerialActivity,
+  portOfSerialConnectEvent,
+  SerialConnectAnnouncements,
+} from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
   connectionOverlayStyles,
@@ -336,67 +341,14 @@ export class ESPHomeApp extends LitElement {
     connectionOverlayStyles,
   ];
 
-  private _portToastMs = new Map<SerialPort, number>();
-  private static readonly PORT_TOAST_DEDUP_MS = 60_000;
+  private _connectAnnouncements = new SerialConnectAnnouncements();
 
   private _onSerialConnect = (event: Event) => {
-    // Suppress connect events that fire as a side-effect of our own
-    // serial ops. esptool-js's chip reset toggles DTR/RTS, which on
-    // native-USB chips (ESP32-C6 / S3 / C3) drops the USB device and
-    // re-enumerates it — firing a fresh connect event for the same
-    // port. Without this guard the toast loops every time the user
-    // clicks "Set it up" (each click triggers another reset).
-    const recent = isRecentSerialActivity();
-    if (recent) {
-      // Self-extend the window: a burst of re-enum events from the
-      // same chip reset keeps the suppression alive even if the
-      // events trickle in slower than the static window. Without
-      // this a slow re-enum could land outside the original window
-      // and leak a toast through despite the op being ongoing.
-      markSerialActivity();
-      return;
-    }
-
-    // Per-port dedup. A bare-flash board with no app to feed the
-    // RTC watchdog can reboot-loop, which on native-USB chips
-    // re-enumerates the device on every restart — firing a fresh
-    // connect event each cycle. Don't re-toast for the same port
-    // within a generous window; the user already saw it the first
-    // time. SerialPort identity is stable across re-enums per the
-    // Web Serial spec, so reference equality is the right key.
-    //
-    // Modern Chromium follows the current WICG spec: the event is
-    // fired at ``navigator.serial`` with the SerialPort as
-    // ``event.target``. An older draft of the spec exposed the port
-    // on a ``SerialConnectionEvent.port`` property instead, so check
-    // both — covers legacy / non-Chromium implementations without
-    // changing the modern path.
-    const eventPort = (event as { port?: unknown }).port;
-    const port =
-      eventPort instanceof SerialPort
-        ? eventPort
-        : event.target instanceof SerialPort
-          ? event.target
-          : null;
-    if (port) {
-      const now = Date.now();
-      // Lazy eviction of stale entries so the map can't grow
-      // unbounded over a long session that sees many distinct
-      // ports. ``navigator.serial`` holds permitted SerialPort
-      // references for the lifetime of the page, so a WeakMap
-      // wouldn't free them either — explicit time-based eviction
-      // is the right tool.
-      for (const [p, ts] of this._portToastMs) {
-        if (now - ts >= ESPHomeApp.PORT_TOAST_DEDUP_MS) {
-          this._portToastMs.delete(p);
-        }
-      }
-      const last = this._portToastMs.get(port);
-      if (last !== undefined && now - last < ESPHomeApp.PORT_TOAST_DEDUP_MS) {
-        return;
-      }
-      this._portToastMs.set(port, now);
-    }
+    // esptool-js's chip reset re-enumerates native-USB chips, firing a fresh
+    // connect event for the port we are working on: not a new device.
+    if (isOwnSerialReenumeration()) return;
+    const port = portOfSerialConnectEvent(event);
+    if (port && !this._connectAnnouncements.shouldAnnounce(port)) return;
     notifyInfo(this._localize("layout.usb_device_connected"), {
       // Stable id so multiple connect events collapse onto the same
       // toast instead of stacking — defence in depth on top of the
