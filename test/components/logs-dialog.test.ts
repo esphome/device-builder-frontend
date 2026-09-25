@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   call,
+  closeDialog,
   ESPHomeLogsDialog,
   makeLogsDialog,
   paused,
@@ -58,7 +59,7 @@ describe("logs-dialog states-toggle restart", () => {
     const restart = call(el, "_toggleShowStates");
 
     // The user closes the dialog while the cancel round-trip is outstanding.
-    call(el, "_onDialogHide");
+    closeDialog(el);
     expect((el as any)._open).toBe(false);
 
     stop.resolve(); // the cancel lands; the toggle continuation runs
@@ -302,7 +303,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("dialog close tears down the serial session (closes port, returns to idle)", () => {
     startPassive();
-    call(el, "_onDialogHide");
+    closeDialog(el);
     // The cancel (from streamSerialToDialog) stops the reader and closes the
     // port; the session drops back to idle so a reopen starts clean.
     expect(cancel).toHaveBeenCalledTimes(1);
@@ -372,6 +373,27 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect((el as any)._open).toBe(true);
   });
 
+  it("cancels an in-flight reset as soon as the close is requested", async () => {
+    const gate = deferred();
+    let seen: (() => boolean) | undefined;
+    const run = vi.fn(async (_p: SerialPort, cancelled: () => boolean) => {
+      seen = cancelled;
+      await gate.promise;
+    });
+    el.openPassive({
+      onReconnect: () => Promise.resolve(),
+      onResetDevice: { ...alwaysHook, run },
+    });
+    el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
+    const reset = (el as any)._onResetDevice() as Promise<void>;
+    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
+    call(el, "_onDialogRequestClose"); // X pressed; the hide has not landed yet
+    expect(seen!()).toBe(true);
+    gate.resolve();
+    await reset;
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
   it("treats a reset hook that ends without a stream as a failure, not a stuck session", async () => {
     el.openPassive({ onReconnect: () => Promise.resolve(), onResetDevice: alwaysHook });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
@@ -395,7 +417,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     const reset = (el as any)._onResetDevice() as Promise<void>;
     await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
     expect(seen!()).toBe(false);
-    call(el, "_onDialogHide");
+    closeDialog(el);
     expect(seen!()).toBe(true);
     el.openPassive({ onReconnect: () => Promise.resolve() }); // a new session
     expect(seen!()).toBe(true); // still cancelled: not the session it started in
@@ -470,7 +492,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("tears down a late attach after the dialog closed (no port leak)", () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    call(el, "_onDialogHide"); // closed while an attach was in flight
+    closeDialog(el); // closed while an attach was in flight
     const lateCancel = vi.fn();
     el.setSerialStream(port as any, lateCancel as unknown as () => Promise<void>);
     expect(lateCancel).toHaveBeenCalledTimes(1); // torn down, not registered
@@ -497,7 +519,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("ignores a late reopen failure after the dialog closed", () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
-    call(el, "_onDialogHide");
+    closeDialog(el);
     el.setSerialOpenFailed("reopen failed");
     expect(session(el).kind).toBe("idle");
   });

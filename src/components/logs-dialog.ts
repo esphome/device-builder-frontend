@@ -180,8 +180,6 @@ export class ESPHomeLogsDialog extends LitElement {
   // Bumped per open, so a hook still running for a closed dialog can tell
   // the session it started in from one opened since.
   _sessionGen = 0;
-  // Generation a close began in; see ``afterHide``.
-  _closingGen: number | null = null;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in

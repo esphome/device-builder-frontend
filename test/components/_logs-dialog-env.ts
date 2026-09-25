@@ -17,6 +17,11 @@ export const session = (el: ESPHomeLogsDialog): LogsSession => (el as any)._sess
 export const streaming = (el: ESPHomeLogsDialog): boolean => isStreaming(session(el));
 export const paused = (el: ESPHomeLogsDialog): boolean => (el as any)._serialPaused;
 export const call = (el: ESPHomeLogsDialog, method: string) => (el as any)[method]();
+/** Close as the browser does: the request-close, then the after-hide. */
+export const closeDialog = (el: ESPHomeLogsDialog) => {
+  call(el, "_onDialogRequestClose");
+  call(el, "_onDialogHide");
+};
 export const append = (el: ESPHomeLogsDialog, lines: string[]) =>
   (el as any)._log.append(lines);
 

@@ -123,19 +123,17 @@ export function abortSerialReconnect(host: ESPHomeLogsDialog): void {
   host._session = { kind: "dead" };
 }
 
-/** A close begins: remember which session it belongs to. */
+/** A close begins; ``_open`` drops now so wa-dialog's hide is not cancelled
+ *  by a re-render and in-flight hooks see themselves cancelled at once. */
 export function beginClose(host: ESPHomeLogsDialog): void {
-  host._closingGen = host._sessionGen;
   host._open = false;
 }
 
-/** The dialog finished hiding. A hide that lands after a reopen belongs to
- *  the older session and must leave the new one alone. */
+/** The dialog finished hiding. Every hide follows a close, so one landing
+ *  while the dialog is open belongs to an older close and must leave the
+ *  reopened session alone (however many closes are still hiding). */
 export function afterHide(host: ESPHomeLogsDialog): void {
-  const stale = host._closingGen !== null && host._closingGen !== host._sessionGen;
-  host._closingGen = null;
-  if (stale) return;
-  host._open = false;
+  if (host._open) return;
   void teardownSession(host);
 }
 
@@ -389,7 +387,7 @@ async function runReconnecting(
   // Also true once the dialog was closed and reopened: that is a new session
   // this task must not attach to or fail.
   const cancelled = () =>
-    host._sessionGen !== gen || host._session.kind !== "reconnecting";
+    !host._open || host._sessionGen !== gen || host._session.kind !== "reconnecting";
   host._session = { kind: "reconnecting", paused: false };
   let failure: unknown;
   try {

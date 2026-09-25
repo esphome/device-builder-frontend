@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { call, makeLogsDialog, session } from "./_logs-dialog-env.js";
+import { call, closeDialog, makeLogsDialog, session } from "./_logs-dialog-env.js";
 
 import { OTA_PORT } from "../../src/api/types/streaming.js";
 import { switchToOtaLogs } from "../../src/components/logs-dialog/session.js";
@@ -203,7 +203,7 @@ describe("logs-dialog quiet-serial banner", () => {
 
   it("closing the dialog cancels the pending window", async () => {
     await startSerial();
-    call(el, "_onDialogHide");
+    closeDialog(el);
     await el.updateComplete;
     vi.advanceTimersByTime(60_000);
     await el.updateComplete;
@@ -278,7 +278,7 @@ describe("switchToOtaLogs", () => {
     switchToOtaLogs(el);
     expect(logs).toHaveBeenCalledTimes(1); // no second stream
 
-    call(el, "_onDialogHide"); // -> idle
+    closeDialog(el); // -> idle
     logs.mockClear();
     switchToOtaLogs(el);
     expect(logs).not.toHaveBeenCalled();
