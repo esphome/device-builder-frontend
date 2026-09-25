@@ -13,6 +13,7 @@ import {
   toastError,
 } from "./_logs-dialog-env.js";
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { startOtaStream } from "../../src/components/logs-dialog/session.js";
 import { hasSerialPort } from "../../src/components/logs-session.js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
@@ -158,6 +159,35 @@ describe("logs-dialog header source chip", () => {
     await el.updateComplete;
     // Identity _localize in tests returns the key verbatim.
     expect(chipText(el)).toBe("dashboard.logs_source_web_serial");
+  });
+});
+
+describe("logs-dialog Reset Device gate", () => {
+  async function mountPassive(targetPlatform: string): Promise<ESPHomeLogsDialog> {
+    const el = makeLogsDialog();
+    el.configuration = "device.yaml";
+    (el as any)._devices = [
+      makeConfiguredDevice({
+        configuration: "device.yaml",
+        target_platform: targetPlatform,
+      }),
+    ];
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    await el.updateComplete;
+    return el;
+  }
+
+  const hasResetButton = (el: ESPHomeLogsDialog): boolean =>
+    [...el.shadowRoot!.querySelectorAll(".term-btn__label")].some(
+      (span) => span.textContent?.trim() === "dashboard.logs_reset_device"
+    );
+
+  it("shows Reset Device for an ESP passive session", async () => {
+    expect(hasResetButton(await mountPassive("esp32"))).toBe(true);
+  });
+
+  it("hides Reset Device for a Pico passive session", async () => {
+    expect(hasResetButton(await mountPassive("rp2"))).toBe(false);
   });
 });
 

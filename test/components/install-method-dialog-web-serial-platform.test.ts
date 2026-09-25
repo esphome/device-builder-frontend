@@ -1,14 +1,15 @@
 /**
  * @vitest-environment happy-dom
  *
- * Browser Web Serial (esptool-js) is ESP-only. Non-ESP targets — RP2040 /
+ * Browser Web Serial flashing (esptool-js) is ESP-only. Non-ESP targets — RP2040 /
  * RP2350, libretiny (bk72xx / rtl87xx / ln882x) — can't be flashed from
  * the browser, so the Web Serial install row is hidden for them; server-serial
  * (`esphome run`) stays available, even on localhost where it's normally
  * collapsed into Web Serial.
  *
  * nRF52 and RP2 are special cases: they don't get the esptool Web Serial row
- * but do get their own in-browser rows when Web Serial is available.
+ * but do get their own in-browser rows when Web Serial is available. In logs
+ * mode the Web Serial row also covers RP2 (its CDC console reads like any port).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -110,5 +111,24 @@ describe("install-method-dialog platform gating", () => {
   it("hides the Pico row in logs mode (flash-only)", async () => {
     const d = await mount("rp2", "logs");
     expect(hasRp2Row(d)).toBe(false);
+  });
+});
+
+describe("install-method-dialog logs-mode platform gating", () => {
+  // The Pico's CDC console reads like any other port, so logs get the Web
+  // Serial row; on localhost that collapses the server-serial row, as for ESP.
+  it.each(["rp2", "rp2040", "rp2350", "esp32"])(
+    "shows Web Serial logs and drops server-serial for %s",
+    async (platform) => {
+      const d = await mount(platform, "logs");
+      expect(hasWebSerialRow(d)).toBe(true);
+      expect(hasServerSerialRow(d)).toBe(false);
+    }
+  );
+
+  it.each(["bk72xx", "nrf52"])("keeps logs on server-serial for %s", async (platform) => {
+    const d = await mount(platform, "logs");
+    expect(hasWebSerialRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
   });
 });

@@ -38,6 +38,7 @@ import { normalizeLogLine } from "../util/log-line.js";
 import { notifyError } from "../util/notify.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { isRp2Platform } from "../util/rp2-platform.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
@@ -219,6 +220,9 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
+  // Reset Device is an RTS pulse. A Pico has no reset line on its CDC and
+  // arduino-pico gates output on DTR, so the pulse would only silence it.
+  private _canResetDevice = true;
 
   static styles = [
     espHomeStyles,
@@ -240,6 +244,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
+      this._canResetDevice = !isRp2Platform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -405,7 +410,7 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
-              passive
+              passive && this._canResetDevice
                 ? // Web Serial only; disabled until a port is attached.
                   renderTermButton({
                     icon: "restart",

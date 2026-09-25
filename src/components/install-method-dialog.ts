@@ -219,11 +219,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isNrf = isNrfPlatform(this.deviceTargetPlatform);
     const isRp2 = isRp2Platform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
+    // Web Serial logs also read the Pico's native CDC; flashing stays esptool-only.
+    const webSerialPlatform = isLogs ? isEsptool || isRp2 : isEsptool;
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure
     // origins as a fallback: there a Web-Serial-incapable browser (Safari) still
     // needs a working serial path, and we can't detect that case client-side.
-    const showServerSerialRow = !(env === "localhost" && hasWebSerial && isEsptool);
+    const showServerSerialRow = !(
+      env === "localhost" &&
+      hasWebSerial &&
+      webSerialPlatform
+    );
     // On localhost a Web-Serial-incapable browser gets the same "Plug into this
     // computer" path from the server-serial row, so drop the disabled USB hint
     // there to avoid a duplicate, non-actionable title.
@@ -231,11 +237,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // The external flasher only flashes (install). In logs mode the USB row is
     // actionable solely via in-app Web Serial, so show it only when that's
     // available; otherwise logs go through server-serial / OTA.
-    const showUsbRow = isEsptool && (isLogs ? hasWebSerial : !dropDisabledUsb);
+    const showUsbRow = webSerialPlatform && (isLogs ? hasWebSerial : !dropDisabledUsb);
     // Logs on an insecure origin: the in-app USB row is hidden (Web Serial is
     // blocked here and the external flasher only flashes), so offer a link to
     // ESPHome Web — a secure-context origin where the user can connect over USB
-    // and read serial logs. ESP-only, like the USB row.
+    // and read serial logs. ESP-only: that landing is ESPHome Web's ESP
+    // connect flow, which runs esptool chip detection.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
     // nRF52 browser DFU is install-only and requires in-app Web Serial.
     const showNrfRow = !isLogs && isNrf && hasWebSerial;
