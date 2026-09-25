@@ -18,6 +18,31 @@ const BLE_NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
 export const isWebBluetoothSupported = (): boolean => "bluetooth" in navigator;
 
+/**
+ * Whether Bluetooth can be used right now. The API object alone says
+ * nothing: Brave exposes it with the feature switched off, and the radio may
+ * be off or the browser denied access; the adapter query answers for those.
+ */
+export async function bleAdapterAvailable(): Promise<boolean> {
+  if (!isWebBluetoothSupported()) return false;
+  try {
+    return await navigator.bluetooth.getAvailability();
+  } catch {
+    return false;
+  }
+}
+
+/** Brave ships with Web Bluetooth switched off; it announces itself. */
+export async function isBraveBrowser(): Promise<boolean> {
+  const brave = (navigator as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
+  if (!brave?.isBrave) return false;
+  try {
+    return await brave.isBrave();
+  } catch {
+    return false;
+  }
+}
+
 /** BLE NUS logs are an nRF52 feature and need Web Bluetooth. */
 export const bleNusLogsAvailable = (targetPlatform: string | null | undefined): boolean =>
   isWebBluetoothSupported() && isNrfPlatform(targetPlatform);

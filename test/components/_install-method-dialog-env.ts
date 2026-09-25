@@ -32,9 +32,13 @@ export function setLocalhostWithWebSerial(): void {
   setWebSerialEnv({ serial: true, secure: true, href: "http://localhost:6052/" });
 }
 
-export function setBluetooth(available: boolean): void {
+/** Install the Web Bluetooth API object; ``adapter`` is what its availability query answers. */
+export function setBluetooth(available: boolean, adapter = true): void {
   if (available) {
-    Object.defineProperty(navigator, "bluetooth", { configurable: true, value: {} });
+    Object.defineProperty(navigator, "bluetooth", {
+      configurable: true,
+      value: { getAvailability: async () => adapter },
+    });
   } else if ("bluetooth" in navigator) {
     delete (navigator as any).bluetooth;
   }

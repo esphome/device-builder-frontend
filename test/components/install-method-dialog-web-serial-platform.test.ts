@@ -17,6 +17,7 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+import { flush } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
@@ -172,5 +173,44 @@ describe("install-method-dialog BLE NUS row gating", () => {
     setBluetooth(false);
     const d = await mount("nrf52", "logs");
     expect(hasBleNusRow(d)).toBe(false);
+  });
+
+  const bleRow = (d: ESPHomeInstallMethodDialog): HTMLElement =>
+    d.shadowRoot!.querySelector('wa-icon[name="bluetooth"]')!.closest(".option")!;
+
+  it("enables the row once the adapter answers available", async () => {
+    const d = await mount("nrf52", "logs");
+    await flush();
+    await d.updateComplete;
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
+  });
+
+  it("disables the row with a hint when the adapter is off or blocked", async () => {
+    setBluetooth(true, false);
+    const d = await mount("nrf52", "logs");
+    await flush();
+    await d.updateComplete;
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(true);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_off")
+    );
+  });
+
+  it("names the Brave flag when Brave has Web Bluetooth switched off", async () => {
+    setBluetooth(true, false);
+    Object.defineProperty(navigator, "brave", {
+      configurable: true,
+      value: { isBrave: async () => true },
+    });
+    try {
+      const d = await mount("nrf52", "logs");
+      await flush();
+      await d.updateComplete;
+      expect(bleRow(d).textContent).toContain(
+        defaultLocalize("dashboard.logs_method_ble_nus_brave")
+      );
+    } finally {
+      delete (navigator as unknown as { brave?: unknown }).brave;
+    }
   });
 });

@@ -124,10 +124,24 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
 }
 
 /** BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth. */
-export function renderBleNusOption(ctx: MethodRowContext): TemplateResult {
+/** Why Bluetooth cannot be used now, for a disabled row with a hint. */
+export type BleUnavailableReason = "off" | "brave";
+
+export function renderBleNusOption(
+  ctx: MethodRowContext,
+  unavailable: BleUnavailableReason | null
+): TemplateResult {
+  const title = ctx.localize("dashboard.logs_method_ble_nus");
+  if (unavailable) {
+    return renderMethodRow({
+      icon: "bluetooth",
+      title,
+      desc: ctx.localize(`dashboard.logs_method_ble_nus_${unavailable}`),
+    });
+  }
   return renderMethodRow({
     icon: "bluetooth",
-    title: ctx.localize("dashboard.logs_method_ble_nus"),
+    title,
     desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
     onClick: () => ctx.onSelect("ble-nus"),
   });
