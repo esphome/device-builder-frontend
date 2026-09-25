@@ -133,8 +133,12 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashPercent = 0;
   const abort = new AbortController();
   host._flashAbort = abort;
+  // Only the flash itself earns the manual-bootloader hint; a failed engine
+  // chunk load is the dashboard's problem, not the board's.
+  let flashing = false;
   try {
     const { flashDfuPackageWithReconnect } = await loadDfuEngine();
+    flashing = true;
     await flashDfuPackageWithReconnect(port, pkg, {
       signal: abort.signal,
       onProgress: (percent) => {
@@ -151,7 +155,7 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.nrf_flash_failed"),
-        withManualBootloaderHint(host, err)
+        flashing ? withManualBootloaderHint(host, err) : getErrorMessage(err)
       );
     }
     return;
