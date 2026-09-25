@@ -280,7 +280,7 @@ describe("requestBleNusDevice", () => {
   let restore = (): void => {};
   afterEach(() => restore());
 
-  it("matches the given names and falls back to the service uuid", async () => {
+  it("matches the given names with the service uuid as optional", async () => {
     const picked = {};
     const requestDevice = vi.fn(async () => picked);
     restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
@@ -288,11 +288,7 @@ describe("requestBleNusDevice", () => {
       requestBleNusDevice(["test3", "Living Room", "test3", ""])
     ).resolves.toBe(picked);
     expect(requestDevice).toHaveBeenCalledWith({
-      filters: [
-        { name: "test3" },
-        { name: "Living Room" },
-        { services: [BLE_NUS_SERVICE_UUID] },
-      ],
+      filters: [{ name: "test3" }, { name: "Living Room" }],
       optionalServices: [BLE_NUS_SERVICE_UUID],
     });
   });
