@@ -12,7 +12,17 @@ import {
   slipDecode,
   slipEncode,
 } from "../../src/util/nrf-dfu.js";
-import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
+import {
+  isRecentSerialActivity,
+  openLiveSerialPort,
+} from "../../src/util/serial-reacquire.js";
+
+// Real reacquire by default; one test makes the device stay gone.
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/util/serial-reacquire.js")>();
+  return { ...actual, openLiveSerialPort: vi.fn(actual.openLiveSerialPort) };
+});
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -332,6 +342,20 @@ describe("flashDfuPackageWithReconnect", () => {
     }
     // Two attempts: the first open plus the reacquired handle, closed after each.
     expect(port.close).toHaveBeenCalledTimes(2);
+  });
+
+  it("says the device did not come back and rethrows the drop when the reacquire times out", async () => {
+    const port = droppedPort();
+    vi.mocked(openLiveSerialPort).mockResolvedValueOnce(null);
+    const log: string[] = [];
+    await expect(
+      flashDfuPackageWithReconnect(port, pkg, {
+        onProgress: () => {},
+        onLog: (l) => log.push(l),
+      })
+    ).rejects.toThrow(/Serial port closed/);
+    expect(log[log.length - 1]).toBe("The device did not come back");
+    expect(port.close).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry after an abort", async () => {
