@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { driveFakeTimers } from "../_fake-timers.js";
 
 import {
   Ambz2ConsoleError,
@@ -13,8 +14,6 @@ const ACK = 0x06;
 const NAK = 0x15;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-// Captured before the fake timers replace it: the driver needs a real turn.
-const realSetTimeout = globalThis.setTimeout;
 const last = <T>(items: T[]): T | undefined => items[items.length - 1];
 
 interface RomOptions {
@@ -130,24 +129,6 @@ const image: LibreTinyImage = {
   totalBytes: 1600,
 };
 
-/**
- * Drive the engine under fake timers to completion. The fake ROM hashes
- * with WebCrypto, which settles on a real event-loop turn, so timers are
- * re-run after each turn until the promise settles.
- */
-async function drive<T>(p: Promise<T>): Promise<T> {
-  let settled = false;
-  p.then(
-    () => (settled = true),
-    () => (settled = true)
-  );
-  while (!settled) {
-    await vi.runAllTimersAsync();
-    await new Promise((r) => realSetTimeout(r, 0));
-  }
-  return p;
-}
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 });
@@ -162,7 +143,7 @@ describe("flashAmbz2", () => {
     const log: string[] = [];
     const onLinked = vi.fn();
     const onWaitingForStrap = vi.fn();
-    await drive(
+    await driveFakeTimers(
       flashAmbz2(rom.port, image, {
         onProgress: (p) => progress.push(p),
         onLog: (line) => log.push(line),
@@ -221,7 +202,7 @@ describe("flashAmbz2", () => {
     // No control lines: the flash lands but the board stays in the ROM, and
     // the caller hears that instead of a reboot claim.
     await expect(
-      drive(
+      driveFakeTimers(
         flashAmbz2(rom.port, image, {
           onProgress: () => {},
           onLog: (l) => log.push(l),
@@ -241,7 +222,7 @@ describe("flashAmbz2", () => {
   it("fails the run whose hash does not match and drops the strap", async () => {
     const rom = fakeRom({ badHash: true });
     await expect(
-      drive(flashAmbz2(rom.port, image, { onProgress: () => {} }))
+      driveFakeTimers(flashAmbz2(rom.port, image, { onProgress: () => {} }))
     ).rejects.toBeInstanceOf(Ambz2VerifyError);
     expect(rom.commands).not.toContain("disc");
     // Even a failed flash ends with a reset and the strap released.
@@ -255,7 +236,7 @@ describe("flashAmbz2", () => {
   it("tells the SDK console apart from the ROM", async () => {
     const rom = fakeRom({ console: true });
     await expect(
-      drive(flashAmbz2(rom.port, image, { onProgress: () => {} }))
+      driveFakeTimers(flashAmbz2(rom.port, image, { onProgress: () => {} }))
     ).rejects.toBeInstanceOf(Ambz2ConsoleError);
   });
 
@@ -266,7 +247,7 @@ describe("flashAmbz2", () => {
     p.catch(() => {});
     await vi.advanceTimersByTimeAsync(3000);
     abort.abort();
-    await expect(drive(p)).rejects.toMatchObject({ name: "AbortError" });
+    await expect(driveFakeTimers(p)).rejects.toMatchObject({ name: "AbortError" });
     expect(rom.commands).not.toContain("fwd 0 1 c000");
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
@@ -275,7 +256,7 @@ describe("flashAmbz2", () => {
     const rom = fakeRom();
     rom.raw.open.mockImplementation(async () => {});
     await expect(
-      drive(flashAmbz2(rom.port, image, { onProgress: () => {} }))
+      driveFakeTimers(flashAmbz2(rom.port, image, { onProgress: () => {} }))
     ).rejects.toThrow(/no readable/);
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
@@ -286,7 +267,7 @@ describe("flashAmbz2", () => {
     p.catch(() => {});
     await vi.advanceTimersByTimeAsync(1000);
     rom.dropLink();
-    await expect(drive(p)).rejects.toThrow(/Serial port closed/);
+    await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
 });
