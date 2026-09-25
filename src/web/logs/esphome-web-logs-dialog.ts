@@ -131,12 +131,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // Latched once a crash marker flows through the stream; drives the callout
   // for the rest of the session. A live panic upgrades a previous-boot report;
   // nothing downgrades it (mirrors the builder's logs dialog).
-  @state() _crashKind: CrashKind | null = null;
+  @state() private _crashKind: CrashKind | null = null;
 
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
-  _cancel?: () => Promise<void>;
+  private _cancel?: () => Promise<void>;
   // The transport of the current session; set for as long as the session
   // lives, streaming or mid-recovery.
   private _source?: WebLogSource;
@@ -144,7 +144,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _generation = 0;
   // Consecutive reconnects that have produced no log lines yet; reset by
   // the first line after a resume, checked against MAX_SILENT_RECONNECTS.
-  _silentReconnects = 0;
+  private _silentReconnects = 0;
   // Batched line buffer flushed on the next animation frame, matching the
   // dashboard logs dialog (logs-dialog.ts): a flooding device would otherwise
   // trigger a Lit render per line. Flushed early on teardown / clear / download.
@@ -263,7 +263,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
       return;
     }
     if (generation !== this._generation) {
-      void cancel();
+      void cancel().catch((err) => {
+        console.error("[Logs] Failed to release a superseded stream:", err);
+      });
       return;
     }
     this._cancel = cancel;
@@ -271,7 +273,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Detection only — web.esphome.io has no backend to decode or report a
   // crash, so the callout stays a banner (the builder's dialog adds those).
-  _observeCrash(line: string): void {
+  private _observeCrash(line: string): void {
     if (this._crashKind === "live") return; // latched; skip the regex scan
     const next = latchCrashKind(this._crashKind, classifyLine(normalizeLogLine(line)));
     if (next === this._crashKind) return;
@@ -326,12 +328,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._enqueueLine(this._localize("web.logs.reconnecting"));
     this._flushPending();
     const generation = ++this._generation;
-    void this._resume(source, generation, wasPaused).catch((err) => {
-      // A throw in the resume tail (a locked readable slipping through)
-      // must not strand the spinner on a dead stream.
+    void this._resume(source, generation, wasPaused).catch((err: unknown) => {
+      // A failed comeback (a locked readable slipping through, a Bluetooth
+      // reconnect that threw) must not strand the spinner on a dead stream.
       console.error("[Logs] reconnect failed:", err);
       if (generation !== this._generation) return;
-      this._failReconnect(source);
+      this._failReconnect(source, err);
     });
   }
 
@@ -345,7 +347,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
       () => generation !== this._generation
     );
     if (generation !== this._generation) {
-      void cancel?.();
+      void cancel?.().catch((err) => {
+        console.error("[Logs] Failed to release a superseded stream:", err);
+      });
       return;
     }
     if (!cancel) {
@@ -363,11 +367,12 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Recovery failed ⇒ the handle is released and the spinner is down. A
   // Start button over a released handle would strand the spinner.
-  private _failReconnect(source: WebLogSource): void {
+  private _failReconnect(source: WebLogSource, error?: unknown): void {
     this._streaming = false;
     this._paused = false;
     source.release();
-    this._enqueueLine(this._localize("web.logs.reconnect_failed"));
+    const base = this._localize("web.logs.reconnect_failed");
+    this._enqueueLine(error === undefined ? base : `${base} (${getErrorMessage(error)})`);
     this._flushPending();
   }
 
@@ -388,7 +393,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   // Buffer a streamed line; flush on the next animation frame so a log flood
   // triggers one render per frame, not per line.
-  _enqueueLine(line: string): void {
+  private _enqueueLine(line: string): void {
     this._pendingLines.push(line);
     // rAF doesn't fire while the tab is hidden, so bound the pending buffer too.
     if (this._pendingLines.length > 2 * MAX_LOG_LINES) {
@@ -401,7 +406,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     });
   }
 
-  _flushPending(): void {
+  private _flushPending(): void {
     if (this._pendingLines.length === 0) return;
     const merged = [...this._lines, ...this._pendingLines];
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
@@ -416,7 +421,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     }
   }
 
-  _resetLines(): void {
+  private _resetLines(): void {
     this._resetPending();
     this._lines = [];
   }

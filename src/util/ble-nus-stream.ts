@@ -107,7 +107,11 @@ export async function requestBleNusDevice(
   }
 }
 
-/** Connect attempts a logs session gives a NUS link; a cable rarely needs more than one. */
+/**
+ * Connect attempts a logs session gives a NUS link: GATT connects fail
+ * transiently while the device is still advertising or the OS stack settles
+ * after a prior session.
+ */
 export const BLE_CONNECT_ATTEMPTS = 3;
 
 export interface BleNusOptions {

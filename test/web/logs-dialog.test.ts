@@ -225,7 +225,12 @@ describe("esphome-web-logs-dialog", () => {
 
     (el as any)._onDisconnect();
     await vi.waitFor(() =>
-      expect((el as any)._lines).toContain("web.logs.reconnect_failed")
+      expect((el as any)._lines).toContainEqual(
+        expect.stringContaining("web.logs.reconnect_failed")
+      )
+    );
+    expect((el as any)._lines).toContainEqual(
+      expect.stringContaining("stream already locked")
     );
     expect((el as any)._streaming).toBe(false);
   });
@@ -501,6 +506,18 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
     expect((el as any)._lines).toContain("web.logs.terminal_disconnected");
     expect((el as any)._lines).toContain("web.logs.reconnected");
     expect((el as any)._streaming).toBe(true);
+  });
+
+  it("prints why a reconnect failed, not just that it did", async () => {
+    vi.mocked(streamBleNus)
+      .mockResolvedValueOnce(async () => {})
+      .mockRejectedValueOnce(new Error("no NUS service"));
+    const { el, hooks } = await openBle();
+    hooks().onDisconnect!();
+    await drainMacrotasks();
+    (el as any)._flushPending();
+    expect((el as any)._lines).toContain("web.logs.reconnect_failed (no NUS service)");
+    expect((el as any)._streaming).toBe(false);
   });
 
   it("gives up after repeated silent drops", async () => {

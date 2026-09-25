@@ -24,15 +24,12 @@ export class BleLogSource implements WebLogSource {
   ): Promise<(() => Promise<void>) | null> {
     await sleep(REATTACH_DELAY_MS);
     if (cancelled()) return null;
-    try {
-      return await streamBleNus(this.device, hooks, {
-        attempts: BLE_CONNECT_ATTEMPTS,
-        cancelled,
-      });
-    } catch (err) {
-      console.warn("BLE NUS reconnect failed", err);
-      return null;
-    }
+    // A failed reconnect throws (a missing NUS service is a real reason to
+    // show); the dialog prints it with the reconnect-failed line.
+    return streamBleNus(this.device, hooks, {
+      attempts: BLE_CONNECT_ATTEMPTS,
+      cancelled,
+    });
   }
 
   // The subscription's cancel disconnects; a dead link left nothing behind.

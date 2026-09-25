@@ -183,9 +183,6 @@ function picoResetFailureKey(err: unknown): string {
     : "dashboard.logs_rp2_reset_stranded";
 }
 
-// GATT connects fail transiently while the device is still advertising or
-// the OS stack settles after a prior session.
-
 /**
  * The BLE twin of ``attachSerialLogStream``: a stream registered, or the
  * session dead with the reason in the pane. A remote disconnect goes dead
