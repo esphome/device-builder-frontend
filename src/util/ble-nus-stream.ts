@@ -65,9 +65,9 @@ export class BleNusServiceNotFoundError extends Error {
   }
 }
 
-/** No usable Bluetooth adapter (off or absent). */
+/** No usable Bluetooth adapter (off or absent), with why for the hint. */
 export class BleUnavailableError extends Error {
-  constructor() {
+  constructor(readonly reason: BleUnavailableReason = "off") {
     super("Bluetooth adapter unavailable");
     this.name = "BleUnavailableError";
   }
@@ -98,13 +98,17 @@ export async function requestBleNusDevice(
   } catch (err) {
     if (!isPortPickerCancel(err)) throw err;
     // Chrome rejects with the same NotFoundError when the adapter is off.
-    if (!(await bleAdapterAvailable())) throw new BleUnavailableError();
+    const reason = await bleUnavailableReason();
+    if (reason) throw new BleUnavailableError(reason);
     // Also Chrome's answer when no device matched or policy blocked the
     // chooser, so leave a trace for "nothing happened" reports.
     console.debug("BLE NUS chooser closed", err);
     return null;
   }
 }
+
+/** Connect attempts a logs session gives a NUS link; a cable rarely needs more than one. */
+export const BLE_CONNECT_ATTEMPTS = 3;
 
 export interface BleNusOptions {
   /** Connect attempts before giving up; a missing service is never retried. */

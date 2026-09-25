@@ -3,12 +3,8 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import {
-  bleNusLogsAvailable,
-  BleUnavailableError,
-  isWebBluetoothSupported,
-  requestBleNusDevice,
-} from "./ble-nus-stream.js";
+import { pickBleNusDevice } from "./ble-nus-picker.js";
+import { bleNusLogsAvailable } from "./ble-nus-stream.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {
@@ -174,7 +170,11 @@ export async function launchLogsWithMethod(
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }
   } else if (method === "ble-nus") {
-    const bleDevice = await pickBleNusDevice(host, device);
+    // The firmware advertises the node name; the friendly name is a guess.
+    const bleDevice = await pickBleNusDevice(host.localize, [
+      device.name,
+      device.friendly_name,
+    ]);
     if (!bleDevice) return;
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
@@ -191,30 +191,5 @@ export async function launchLogsWithMethod(
       console.warn("BLE NUS attach failed", err);
       notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
     }
-  }
-}
-
-// The chooser, with its failures toasted; null when there is nothing to open.
-async function pickBleNusDevice(
-  host: LogsLaunchHost,
-  device: ConfiguredDevice
-): Promise<BluetoothDevice | null> {
-  if (!isWebBluetoothSupported()) {
-    notifyError(host.localize("dashboard.logs_ble_nus_unsupported"));
-    return null;
-  }
-  try {
-    // The firmware advertises the node name; the friendly name is a guess.
-    return await requestBleNusDevice([device.name, device.friendly_name]);
-  } catch (err) {
-    console.warn("BLE NUS chooser failed", err);
-    notifyError(
-      host.localize(
-        err instanceof BleUnavailableError
-          ? "dashboard.logs_ble_nus_unavailable"
-          : "dashboard.logs_ble_nus_open_failed"
-      )
-    );
-    return null;
   }
 }

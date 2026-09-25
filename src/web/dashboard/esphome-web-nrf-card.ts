@@ -8,12 +8,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  BleUnavailableError,
-  bleUnavailableReason,
-  isWebBluetoothSupported,
-  requestBleNusDevice,
-} from "../../util/ble-nus-stream.js";
+import { pickBleNusDevice } from "../../util/ble-nus-picker.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import "../install/esphome-web-install-nrf-dialog.js";
@@ -30,6 +26,9 @@ registerMdiIcons({
   bluetooth: mdiBluetooth,
 });
 
+/** What the open logs dialog streams from; one or the other, never both. */
+type LogsSource = { port: SerialPort } | { ble: BluetoothDevice };
+
 /**
  * nRF52 card: no connected state; each install is a self-contained reset +
  * flash, and each logs session picks its own port or Bluetooth device.
@@ -41,9 +40,7 @@ export class ESPHomeWebNrfCard extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _installOpen = false;
-  @state() private _logsOpen = false;
-  @state() private _logsPort?: SerialPort;
-  @state() private _logsBle?: BluetoothDevice;
+  @state() private _logs?: LogsSource;
 
   // Pick and open the CDC port in the click gesture, so a failure lands as a
   // toast instead of an empty terminal (the dialog streams an open port).
@@ -52,55 +49,20 @@ export class ESPHomeWebNrfCard extends LitElement {
     try {
       port = await requestSerialPort();
     } catch (err) {
-      toast.error(
-        this._localize("web.logs.open_failed", {
-          error: err instanceof Error ? err.message : String(err),
-        })
-      );
+      toast.error(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
       return;
     }
     if (!port || !(await openPortForLogs(port, this._localize))) return;
-    this._logsBle = undefined;
-    this._logsPort = port;
-    this._logsOpen = true;
+    this._logs = { port };
   }
 
-  // The chooser must open inside the click; whether the adapter is usable is
-  // only told apart afterwards, as the dashboard does.
   private async _showBleLogs(): Promise<void> {
-    if (!isWebBluetoothSupported()) {
-      toast.error(this._localize("dashboard.logs_ble_nus_unsupported"));
-      return;
-    }
-    let device: BluetoothDevice | null;
-    try {
-      device = await requestBleNusDevice([]);
-    } catch (err) {
-      if (err instanceof BleUnavailableError) {
-        const brave = (await bleUnavailableReason()) === "brave";
-        toast.error(this._localize("dashboard.logs_ble_nus_unavailable"), {
-          description: brave
-            ? this._localize("dashboard.logs_method_ble_nus_brave")
-            : undefined,
-        });
-      } else {
-        toast.error(this._localize("dashboard.logs_ble_nus_open_failed"));
-      }
-      return;
-    }
-    if (!device) return;
-    this._logsPort = undefined;
-    this._logsBle = device;
-    this._logsOpen = true;
-  }
-
-  private _onLogsHidden(): void {
-    this._logsOpen = false;
-    this._logsPort = undefined;
-    this._logsBle = undefined;
+    const ble = await pickBleNusDevice(this._localize, []);
+    if (ble) this._logs = { ble };
   }
 
   protected render() {
+    const logs = this._logs;
     return html`
       <esphome-web-card
         status=${this._localize("web.status.not_connected")}
@@ -145,12 +107,12 @@ export class ESPHomeWebNrfCard extends LitElement {
         @after-hide=${() => (this._installOpen = false)}
       ></esphome-web-install-nrf-dialog>
       <esphome-web-logs-dialog
-        .port=${this._logsPort}
-        .bleDevice=${this._logsBle}
-        ?open=${this._logsOpen}
+        .port=${logs && "port" in logs ? logs.port : undefined}
+        .bleDevice=${logs && "ble" in logs ? logs.ble : undefined}
+        ?open=${logs !== undefined}
         .deviceLabel=${this._localize("web.nrf.title")}
         .noReset=${true}
-        @after-hide=${this._onLogsHidden}
+        @after-hide=${() => (this._logs = undefined)}
       ></esphome-web-logs-dialog>
     `;
   }

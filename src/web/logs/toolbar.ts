@@ -8,7 +8,7 @@ export function renderWebLogsToolbar(host: ESPHomeWebLogsDialog): TemplateResult
   return html`
     <div class="toolbar-slot" slot="toolbar-right">
       ${
-        host.noReset || host.bleDevice
+        !host.canReset
           ? nothing
           : renderTermButton({
               icon: "restart",
