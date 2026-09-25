@@ -14,7 +14,7 @@ import type { WebLogSource } from "./log-source.js";
 export const LOG_BAUD_RATE = 115200;
 
 // 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
-// throttled/backgrounded tab doesn't overrun — matches the legacy site.
+// throttled/backgrounded tab doesn't overrun: matches the legacy site.
 export const LOG_BUFFER_SIZE = 8192;
 
 export interface SerialLogSourceOptions {
@@ -59,7 +59,7 @@ export class SerialLogSource implements WebLogSource {
     // reopening a still-open port would re-read the dead stream and loop.
     // The dead reader already released its lock, so close() can proceed;
     // a UA that closed it on device loss rejects harmlessly. A real
-    // failure is logged — it means the cached handle may come back dead.
+    // failure is logged: it means the cached handle may come back dead.
     await dead.close().catch((err) => {
       console.error("[Web Serial] Failed to close the dead logs port:", err);
     });
@@ -69,7 +69,7 @@ export class SerialLogSource implements WebLogSource {
       cancelled,
     });
     if (cancelled()) {
-      // Superseded after the open — reclaim the handle we just opened.
+      // Superseded after the open: reclaim the handle we just opened.
       // Logged loudly: a failure here is a genuinely leaked open port.
       void live?.close().catch((err) => {
         console.error("[Web Serial] Failed to release superseded port:", err);
@@ -97,7 +97,7 @@ export class SerialLogSource implements WebLogSource {
 
   // Pulse RTS to reboot the running app so the user can capture boot logs,
   // matching legacy ewt-console.reset(): RTS high then low back-to-back, then a
-  // 1s settle for the device to come back up. Best-effort — some USB bridges
+  // 1s settle for the device to come back up. Best-effort: some USB bridges
   // don't wire the reset lines.
   private async pulseReset(): Promise<void> {
     const port = this.activePort ?? this.port;

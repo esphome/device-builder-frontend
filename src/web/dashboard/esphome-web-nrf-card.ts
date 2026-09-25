@@ -41,24 +41,47 @@ export class ESPHomeWebNrfCard extends LitElement {
 
   @state() private _installOpen = false;
   @state() private _logs?: LogsSource;
+  // A chooser is up; a second click must not open another beside it.
+  private _picking = false;
 
   // Pick and open the CDC port in the click gesture, so a failure lands as a
   // toast instead of an empty terminal (the dialog streams an open port).
   private async _showSerialLogs(): Promise<void> {
-    let port: SerialPort | null;
+    if (this._picking) return;
+    this._picking = true;
     try {
-      port = await requestSerialPort();
-    } catch (err) {
-      toast.error(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
-      return;
+      let port: SerialPort | null;
+      try {
+        port = await requestSerialPort();
+      } catch (err) {
+        toast.error(
+          this._localize("web.connect.failed", { error: getErrorMessage(err) })
+        );
+        return;
+      }
+      if (!port || !(await openPortForLogs(port, this._localize))) return;
+      this._logs = { port };
+    } finally {
+      this._picking = false;
     }
-    if (!port || !(await openPortForLogs(port, this._localize))) return;
-    this._logs = { port };
   }
 
   private async _showBleLogs(): Promise<void> {
-    const ble = await pickBleNusDevice(this._localize, []);
-    if (ble) this._logs = { ble };
+    if (this._picking) return;
+    this._picking = true;
+    try {
+      const ble = await pickBleNusDevice(this._localize, []);
+      if (ble) this._logs = { ble };
+    } finally {
+      this._picking = false;
+    }
+  }
+
+  // The dialog's after-hide trails its close animation; one from the previous
+  // session must not drop a session opened meanwhile (the dialog is open again).
+  private _onLogsHidden(e: Event): void {
+    if ((e.target as { open?: boolean }).open) return;
+    this._logs = undefined;
   }
 
   protected render() {
@@ -112,7 +135,7 @@ export class ESPHomeWebNrfCard extends LitElement {
         ?open=${logs !== undefined}
         .deviceLabel=${this._localize("web.nrf.title")}
         .noReset=${true}
-        @after-hide=${() => (this._logs = undefined)}
+        @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;
   }

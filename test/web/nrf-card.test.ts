@@ -99,11 +99,36 @@ describe("esphome-web-nrf-card", () => {
     expect((el as any)._logs).toBeUndefined();
   });
 
+  it("ignores a second click while a chooser is up", async () => {
+    const el = await mount();
+    let resolvePick!: (d: unknown) => void;
+    mocks.pickBleNusDevice.mockReturnValue(new Promise((r) => (resolvePick = r)));
+    const first = (el as any)._showBleLogs();
+    await (el as any)._showSerialLogs();
+    expect(mocks.requestSerialPort).not.toHaveBeenCalled();
+    resolvePick({});
+    await first;
+    await el.updateComplete;
+    expect(logsDialog(el).hasAttribute("open")).toBe(true);
+  });
+
+  it("keeps a session opened while the previous dialog was still hiding", async () => {
+    const el = await mount();
+    mocks.pickBleNusDevice.mockResolvedValue({});
+    await (el as any)._showBleLogs();
+    await el.updateComplete;
+    // The dialog is open again for the new session when the old hide lands.
+    (el as any)._onLogsHidden({ target: { open: true } });
+    await el.updateComplete;
+    expect(logsDialog(el).hasAttribute("open")).toBe(true);
+  });
+
   it("forgets the source when the logs dialog hides", async () => {
     const el = await mount();
     mocks.pickBleNusDevice.mockResolvedValue({});
     await (el as any)._showBleLogs();
     await el.updateComplete;
+    logsDialog(el).open = false;
     logsDialog(el).dispatchEvent(new CustomEvent("after-hide"));
     await el.updateComplete;
     expect(logsDialog(el).hasAttribute("open")).toBe(false);
