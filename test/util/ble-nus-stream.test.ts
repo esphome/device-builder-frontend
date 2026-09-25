@@ -140,7 +140,8 @@ describe("streamBleNus", () => {
     warn.mockRestore();
   });
 
-  it("retries a failed connect up to the attempt budget", async () => {
+  it("retries a failed connect up to the attempt budget, logging each miss", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const d = fakeDevice({ connectFailures: 2 });
     const cancel = await streamBleNus(
       d.device,
@@ -148,7 +149,34 @@ describe("streamBleNus", () => {
       { attempts: 3, retryDelayMs: 0 }
     );
     expect(d.gatt.connect).toHaveBeenCalledTimes(3);
+    expect(warn.mock.calls.map((c) => c[0])).toEqual([
+      "BLE NUS connect attempt 1 of 3 failed",
+      "BLE NUS connect attempt 2 of 3 failed",
+    ]);
     await cancel();
+    warn.mockRestore();
+  });
+
+  it("keeps streaming after a line the sink rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const d = fakeDevice();
+    const lines: string[] = [];
+    const cancel = await streamBleNus(d.device, {
+      onLine: (l) => {
+        if (l.includes("bad")) throw new Error("sink");
+        lines.push(l);
+      },
+    });
+    d.notify("bad line\n");
+    d.notify("good line\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("good line");
+    expect(warn).toHaveBeenCalledWith(
+      "Appending a BLE NUS log line failed",
+      expect.any(Error)
+    );
+    await cancel();
+    warn.mockRestore();
   });
 
   it("gives up after the last attempt, leaving nothing connected", async () => {
@@ -284,6 +312,9 @@ describe("requestBleNusDevice", () => {
       bluetooth.getAvailability.mock.invocationCallOrder[0]
     );
     bluetooth.getAvailability.mockResolvedValue(true);
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
     await expect(requestBleNusDevice(["x"])).resolves.toBeNull();
+    expect(debug).toHaveBeenCalledWith("BLE NUS chooser closed", expect.anything());
+    debug.mockRestore();
   });
 });

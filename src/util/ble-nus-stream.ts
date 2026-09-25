@@ -61,6 +61,9 @@ export async function requestBleNusDevice(
     if (!isPortPickerCancel(err)) throw err;
     // Chrome rejects with the same NotFoundError when the adapter is off.
     if (!(await navigator.bluetooth.getAvailability())) throw new BleUnavailableError();
+    // Also Chrome's answer when no device matched or policy blocked the
+    // chooser, so leave a trace for "nothing happened" reports.
+    console.debug("BLE NUS chooser closed", err);
     return null;
   }
 }
@@ -90,6 +93,7 @@ export async function streamBleNus(
       return await subscribe(device, hooks);
     } catch (err) {
       if (err instanceof BleNusServiceNotFoundError || attempt >= attempts) throw err;
+      console.warn(`BLE NUS connect attempt ${attempt} of ${attempts} failed`, err);
       await sleep(retryDelayMs);
       if (cancelled()) throw err;
     }
@@ -114,7 +118,14 @@ async function subscribe(
   let detached = false;
   const onValue = (): void => {
     const dv = txChar?.value;
-    if (dv) assembler.push(dv);
+    if (!dv) return;
+    // A throw from the line sink would otherwise surface only as an uncaught
+    // event-listener error while the session looked healthy.
+    try {
+      assembler.push(dv);
+    } catch (err) {
+      console.warn("Appending a BLE NUS log line failed", err);
+    }
   };
   // Chrome hands back the same characteristic object across sessions, so the
   // listeners must come off on every exit or they stack up.
