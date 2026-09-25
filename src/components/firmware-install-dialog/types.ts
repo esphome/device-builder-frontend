@@ -12,10 +12,19 @@ export type InstallStep =
   | "nrf-wait"
   | "rp2-bootsel"
   | "rp2-wait"
+  | "rtl-ready"
+  | "rtl-connect"
+  | "rtl-wait"
   | "error";
 
 export type Installer =
-  "web-serial" | "binary-download" | "web-flash" | "nrf-dfu" | "rp2-uf2" | null;
+  | "web-serial"
+  | "binary-download"
+  | "web-flash"
+  | "nrf-dfu"
+  | "rp2-uf2"
+  | "rtl-ambz2"
+  | null;
 
 export type InstallFailureKind =
   "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;

@@ -8,6 +8,9 @@ import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { BleProbeState } from "../util/ble-probe-controller.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
+import { isNrfPlatform } from "../util/nrf-platform.js";
+import { isRp2Platform } from "../util/rp2-platform.js";
+import { isRtl87xxPlatform } from "../util/rtl87xx-platform.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
 export interface MethodRowContext {
@@ -121,16 +124,6 @@ export function renderServerSerialOption(
   });
 }
 
-/** In-app RP2 flash: 1200-baud reset, then PICOBOOT over WebUSB (or a UF2 download). */
-export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
-  return renderMethodRow({
-    icon: "chip",
-    title: ctx.localize("dashboard.install_method_rp2_uf2"),
-    desc: ctx.localize("dashboard.install_method_rp2_uf2_desc"),
-    onClick: () => ctx.onSelect("rp2-uf2"),
-  });
-}
-
 // Pages cannot link to internal browser URLs, so the flag page is offered
 // as a click-to-copy address for the user to paste.
 export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
@@ -176,13 +169,31 @@ export function renderBleNusOption(
   });
 }
 
-/** In-app nRF52 flash: 1200-baud reset, then Nordic Legacy DFU over Web Serial. */
-export function renderNrfDfuOption(ctx: MethodRowContext): TemplateResult {
+// The in-app flashers of the non-ESP platforms; the copy keys are
+// `dashboard.install_method_<key>` and its `_desc`.
+const PLATFORM_FLASHERS = [
+  { matches: isNrfPlatform, method: "nrf-dfu", key: "nrf_dfu" },
+  { matches: isRp2Platform, method: "rp2-uf2", key: "rp2_uf2" },
+  { matches: isRtl87xxPlatform, method: "rtl-ambz2", key: "rtl_ambz2" },
+] as const;
+
+/**
+ * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
+ * ROM), install mode only and only with Web Serial; nothing for the rest.
+ */
+export function renderPlatformFlashOption(
+  ctx: MethodRowContext,
+  platform: string | null | undefined,
+  hasWebSerial: boolean
+): TemplateResult | typeof nothing {
+  if (ctx.mode === "logs" || !hasWebSerial) return nothing;
+  const flasher = PLATFORM_FLASHERS.find((f) => f.matches(platform));
+  if (!flasher) return nothing;
   return renderMethodRow({
     icon: "chip",
-    title: ctx.localize("dashboard.install_method_nrf_dfu"),
-    desc: ctx.localize("dashboard.install_method_nrf_dfu_desc"),
-    onClick: () => ctx.onSelect("nrf-dfu"),
+    title: ctx.localize(`dashboard.install_method_${flasher.key}`),
+    desc: ctx.localize(`dashboard.install_method_${flasher.key}_desc`),
+    onClick: () => ctx.onSelect(flasher.method),
   });
 }
 

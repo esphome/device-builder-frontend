@@ -21,12 +21,8 @@ import {
   requestPicobootDevice,
 } from "../../util/web-usb.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import {
-  compileOrFail,
-  downloadSelectedBinary,
-  failNoBinaries,
-  fetchBinaries,
-} from "./install-flow.js";
+import { downloadBuildArtifact, resetForRetry } from "./browser-flash-steps.js";
+import { downloadSelectedBinary } from "./install-flow.js";
 
 /**
  * Compile, download and parse the UF2, then hand off to the BOOTSEL step.
@@ -37,40 +33,15 @@ export async function startRp2Uf2Install(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // The dialog is reused; a close-and-reopen for another device during an
-  // await must not receive this install's image.
-  const stale = () => host._device !== device;
-
-  if (!(await compileOrFail(host, device.configuration)) || stale()) return;
-
-  host._statusMessage = host._localize("firmware.status_downloading");
-  const binaries = await fetchBinaries(host, device.configuration);
-  if (!binaries || stale()) return;
-  if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
-    return;
-  }
-
-  const uf2 = binaries.find((b) => b.type === "uf2");
-  if (!uf2) {
-    host._fail(host._localize("firmware.rp2_no_uf2"));
-    return;
-  }
-
-  let bytes: Uint8Array;
+  const artifact = await downloadBuildArtifact(
+    host,
+    device,
+    (b) => b.type === "uf2",
+    "firmware.no_uf2"
+  );
+  if (!artifact) return;
   try {
-    bytes = new Uint8Array(
-      await host._api.firmwareDownloadBytes(device.configuration, uf2.file)
-    );
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
-    return;
-  }
-  if (stale()) return;
-
-  try {
-    host._rp2Image = parseUf2Image(bytes, [UF2_FAMILY_RP2040]);
+    host._rp2Image = parseUf2Image(artifact.bytes, [UF2_FAMILY_RP2040]);
   } catch (err) {
     // Only a real RP2350 image gets the copy-to-drive advice; a missing or
     // unknown family is just a bad file.
@@ -83,7 +54,7 @@ export async function startRp2Uf2Install(
     return;
   }
   // The only artifact this flow hands out; the download step reads it from here.
-  host._binaries = [uf2];
+  host._binaries = [artifact.binary];
   showBootselStep(host);
 }
 
@@ -101,9 +72,7 @@ export function retryRp2Uf2(
     host.installRp2Uf2(device);
     return;
   }
-  host._errorMessage = "";
-  host._flashPercent = 0;
-  host._flashBusy = false;
+  resetForRetry(host);
   showBootselStep(host);
 }
 
