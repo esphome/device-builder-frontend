@@ -118,6 +118,15 @@ describe("web app flow-switch suggestion", () => {
     expect(notifyInfo).not.toHaveBeenCalled();
   });
 
+  it("does not apply a stale toast once a dialog has opened", async () => {
+    const el = await mountApp();
+    pick(el, PICO);
+    const { onClick } = notifyInfo.mock.lastCall![1].action;
+    hasOpenDialog.mockReturnValue(true);
+    onClick();
+    expect(window.location.search).toBe("");
+  });
+
   it("ignores a plug-in that is our own touch or flash re-enumerating", async () => {
     await mountApp();
     isRecentSerialActivity.mockReturnValue(true);

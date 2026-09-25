@@ -137,10 +137,14 @@ export class ESPHomeWebApp extends LitElement {
    * another board family gets a toast offering the switch, an unknown one
    * nothing, and the flow the user is in carries on either way.
    */
+  // Switching flows unmounts the current one: never offer or apply it while
+  // a dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
+  private _operationInProgress(): boolean {
+    return hasOpenDialog() || isImprovDialogMounted();
+  }
+
   private _suggestFlowFor(port: SerialPort): void {
-    // Switching flows unmounts the current one: never offer it while a
-    // dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
-    if (hasOpenDialog() || isImprovDialogMounted()) return;
+    if (this._operationInProgress()) return;
     const family = boardFamilyOfPort(port);
     if (family === null || family === this._mode) return;
     notifyInfo(this._localize(`web.flow_switch.${family}`), {
@@ -148,7 +152,10 @@ export class ESPHomeWebApp extends LitElement {
       duration: LONG_TOAST_DURATION_MS,
       action: {
         label: this._localize(`web.flow_switch.action_${family}`),
-        onClick: () => this._setMode(family),
+        // The toast outlives the moment; a dialog may have opened since.
+        onClick: () => {
+          if (!this._operationInProgress()) this._setMode(family);
+        },
       },
     });
   }
