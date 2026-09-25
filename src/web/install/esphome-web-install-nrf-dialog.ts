@@ -8,7 +8,6 @@ import type { ProcessTerminalState } from "../../components/process-terminal/pro
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { fireEvent } from "../../util/fire-event.js";
 import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
 import type { DfuPackage } from "../../util/nrf-dfu.js";
 import {
@@ -158,8 +157,6 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       this._pending = false;
     }
     if (!port) return;
-    // The shell may offer another board flow from the port's ids.
-    fireEvent(this, "port-picked", port);
 
     this._state = "flashing";
     this._progress = 0;
