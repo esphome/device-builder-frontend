@@ -42,6 +42,9 @@ function readyHost() {
     { _nrfPkg: pkg as DfuPackage | null, installNrfDfu: vi.fn() }
   );
   host._step = "nrf-reset";
+  // Keep the substitution visible: the key plus its arguments.
+  host._localize = ((key: string, args?: Record<string, unknown>) =>
+    args ? `${key} ${JSON.stringify(args)}` : key) as typeof host._localize;
   return host;
 }
 
@@ -60,7 +63,7 @@ describe("nRF52 DFU failure hints", () => {
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.nrf_flash_failed");
     expect(host._errorMessage).toBe(
-      "Failed to receive ACK after 3 attempts. firmware.nrf_manual_bootloader_hint"
+      'firmware.nrf_manual_bootloader_hint {"error":"Failed to receive ACK after 3 attempts"}'
     );
   });
 
@@ -72,6 +75,15 @@ describe("nRF52 DFU failure hints", () => {
     await nrfDoReset(asHost(host));
     expect(host._step).toBe("error");
     expect(host._errorMessage).toContain("firmware.nrf_manual_bootloader_hint");
+  });
+
+  it("drops a trailing period from the browser's message before joining", async () => {
+    const host = readyHost();
+    mocks.flashDfuPackageWithReconnect.mockRejectedValue(
+      new Error("Failed to open serial port.")
+    );
+    await nrfDoFlash(asHost(host));
+    expect(host._errorMessage).toContain('{"error":"Failed to open serial port"}');
   });
 
   it("keeps a teardown abort bare", async () => {

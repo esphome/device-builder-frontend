@@ -167,5 +167,9 @@ function withManualBootloaderHint(
 ): string {
   const message = getErrorMessage(err);
   if (err instanceof DOMException && err.name === "AbortError") return message;
-  return `${message}. ${host._localize("firmware.nrf_manual_bootloader_hint")}`;
+  // The joined sentence is one translatable string; a browser message that
+  // already ends with a period would otherwise double it.
+  return host._localize("firmware.nrf_manual_bootloader_hint", {
+    error: message.replace(/\.\s*$/, ""),
+  });
 }
