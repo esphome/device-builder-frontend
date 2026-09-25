@@ -112,6 +112,22 @@ describe("esphome-web-nrf-card", () => {
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
   });
 
+  it("ignores a logs click until the previous session's hide has cleared it", async () => {
+    const el = await mount();
+    mocks.pickBleNusDevice.mockResolvedValue({});
+    await (el as any)._showBleLogs();
+    await el.updateComplete;
+    // Dismissed, but after-hide (which clears the session) not fired yet.
+    await (el as any)._showSerialLogs();
+    expect(mocks.requestSerialPort).not.toHaveBeenCalled();
+    logsDialog(el).dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    mocks.requestSerialPort.mockResolvedValue({ readable: null });
+    mocks.openPortForLogs.mockResolvedValue(true);
+    await (el as any)._showSerialLogs();
+    expect(mocks.requestSerialPort).toHaveBeenCalledOnce();
+  });
+
   it("forgets the source when the logs dialog hides", async () => {
     const el = await mount();
     mocks.pickBleNusDevice.mockResolvedValue({});

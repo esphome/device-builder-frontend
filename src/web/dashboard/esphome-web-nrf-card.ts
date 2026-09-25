@@ -41,13 +41,19 @@ export class ESPHomeWebNrfCard extends LitElement {
 
   @state() private _installOpen = false;
   @state() private _logs?: LogsSource;
-  // A chooser is up; a second click must not open another beside it.
+  // A chooser is up; a second click must not open another beside it. A
+  // session still set (the dialog open, or hiding with its after-hide yet to
+  // clear it) blocks the same way, so a stale hide can never clear a newer
+  // session.
   private _picking = false;
+  private get _busy(): boolean {
+    return this._picking || this._logs !== undefined;
+  }
 
   // Pick and open the CDC port in the click gesture, so a failure lands as a
   // toast instead of an empty terminal (the dialog streams an open port).
   private async _showSerialLogs(): Promise<void> {
-    if (this._picking) return;
+    if (this._busy) return;
     this._picking = true;
     try {
       let port: SerialPort | null;
@@ -67,7 +73,7 @@ export class ESPHomeWebNrfCard extends LitElement {
   }
 
   private async _showBleLogs(): Promise<void> {
-    if (this._picking) return;
+    if (this._busy) return;
     this._picking = true;
     try {
       const ble = await pickBleNusDevice(this._localize, []);
