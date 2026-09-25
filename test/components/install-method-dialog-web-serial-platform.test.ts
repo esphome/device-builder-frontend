@@ -27,8 +27,8 @@ vi.mock("../../src/util/notify.js", () => ({
 import { flush } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
-import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/components/install-method-dialog-rows.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/util/ble-nus-stream.js";
 import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,

@@ -8,8 +8,6 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 
 registerMdiIcons({ "content-copy": mdiContentCopy });
 
-export { copyAddressToClipboard };
-
 /**
  * The pairing address as a disclosure: the advertised hostname:port
  * always visible, the raw advertised IP:port lines behind the native

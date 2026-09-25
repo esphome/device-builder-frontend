@@ -87,7 +87,11 @@ export class SerialLogSource implements WebLogSource {
   release(): void {
     const active = this.activePort;
     this.activePort = undefined;
-    void active?.close().catch(() => {});
+    // A UA that closed the handle on device loss rejects harmlessly; a
+    // live handle (a failed first attach) that will not close is a leak.
+    void active?.close().catch((err) => {
+      console.warn("[Web Serial] Failed to release the logs port:", err);
+    });
   }
 
   private stream(port: SerialPort, hooks: SerialLineHooks): () => Promise<void> {

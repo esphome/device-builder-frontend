@@ -17,6 +17,7 @@ vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
 const sleep = vi.fn((_ms?: number) => Promise.resolve());
 vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }));
 
+import toast from "sonner-js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
 import { streamBleNus } from "../../src/util/ble-nus-stream.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
@@ -379,6 +380,74 @@ describe("esphome-web-logs-dialog", () => {
     expect(port.close).toHaveBeenCalledOnce();
     expect(error).toHaveBeenCalledWith("[Logs] connect failed:", expect.any(Error));
     error.mockRestore();
+  });
+
+  it("leaves the recovery's port alone when the first read dies at once", async () => {
+    // The reader ends before _attach stores its cancel: the recovery owns
+    // the handle from here, and the stale cancel (whose last step closes the
+    // port) must not run against the reopened one.
+    const el = await mount();
+    const port = makeWebSerialPort();
+    const staleCancel = vi.fn(async () => {});
+    const liveCancel = vi.fn(async () => {});
+    vi.mocked(streamSerialLines)
+      .mockImplementationOnce((_port, hooks) => {
+        hooks.onDisconnect?.();
+        return staleCancel;
+      })
+      .mockReturnValueOnce(liveCancel);
+    (openLiveSerialPort as any).mockResolvedValue(port);
+    el.port = port;
+    el.open = true;
+    await el.updateComplete;
+    await vi.waitFor(() => expect((el as any)._cancel).toBe(liveCancel));
+    await drainMacrotasks();
+    expect(staleCancel).not.toHaveBeenCalled();
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("starts a fresh session from a new port after a failed recovery", async () => {
+    const el = await mount();
+    (openLiveSerialPort as any).mockResolvedValue(null);
+    el.open = true;
+    serialSession(el, { close: vi.fn(async () => {}) });
+    (el as any)._onDisconnect();
+    await vi.waitFor(() =>
+      expect((el as any)._lines).toContain("web.logs.reconnect_failed")
+    );
+    expect((el as any)._source).toBeUndefined();
+    const next = makeWebSerialPort();
+    el.port = next;
+    await el.updateComplete;
+    expect(streamSerialLines).toHaveBeenLastCalledWith(next, expect.anything());
+    expect(next.close).not.toHaveBeenCalled();
+    expect((el as any)._streaming).toBe(true);
+  });
+
+  it("ignores a closed handle handed in mid-session without closing it", async () => {
+    const el = await mount();
+    el.open = true;
+    serialSession(el, { close: vi.fn(async () => {}) });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const closed = makeWebSerialPort({ readable: null });
+    el.port = closed;
+    await el.updateComplete;
+    expect(closed.close).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("toasts a Reset click once the session is gone", async () => {
+    const el = await mount();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(streamSerialLines).mockRejectedValueOnce(new Error("boom"));
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    await drainMacrotasks();
+    await (el as any)._resetDevice();
+    expect(toast.error).toHaveBeenCalledWith("web.logs.reset_failed");
+    vi.mocked(console.error).mockRestore();
   });
 
   it("ignores a port swap while a disconnect recovery is in flight", async () => {

@@ -222,7 +222,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // would ever release it.
   private _refusePortSwap(): void {
     const source = this._source;
-    if (!this.port) return;
+    // A closed handle (a parent watcher's) holds nothing to release.
+    if (!this.port?.readable) return;
     if (source instanceof SerialLogSource && this.port === source.activePort) return;
     console.warn("[Web Serial] Logs dialog refused a port swap mid-session");
     // A failure here is a genuinely leaked open port — log it loudly.
@@ -269,9 +270,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
       return;
     }
     if (generation !== this._generation) {
-      void cancel().catch((err) => {
-        console.error("[Logs] Failed to release a superseded stream:", err);
-      });
+      this._releaseSuperseded(source, cancel);
       return;
     }
     this._cancel = cancel;
@@ -326,8 +325,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
       }
       // Nothing else will release what the dead stream left behind — an open
       // Web Serial port locks the device away from every other tool for the
-      // tab's lifetime.
+      // tab's lifetime. The session is over: forget it, so a port handed in
+      // next starts a fresh one instead of being refused as a swap.
       source?.release();
+      if (source && this._source === source) this._source = undefined;
       this._flushPending();
       return;
     }
@@ -353,9 +354,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
       () => generation !== this._generation
     );
     if (generation !== this._generation) {
-      void cancel?.().catch((err) => {
-        console.error("[Logs] Failed to release a superseded stream:", err);
-      });
+      this._releaseSuperseded(source, cancel ?? undefined);
       return;
     }
     if (!cancel) {
@@ -371,12 +370,26 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._cancel = cancel;
   }
 
+  // A stream that lost the generation race. Only a source no longer ours
+  // (closed, replaced) still needs its stream released: with the source
+  // unchanged, the bump came from its reader dying, and the recovery now
+  // owns the handle (it closes and reopens it); cancelling the dead stream
+  // then would close the reopened port under the recovery.
+  private _releaseSuperseded(source: WebLogSource, cancel?: () => Promise<void>): void {
+    if (this._source === source || !cancel) return;
+    void cancel().catch((err) => {
+      console.error("[Logs] Failed to release a superseded stream:", err);
+    });
+  }
+
   // Recovery failed ⇒ the handle is released and the spinner is down. A
-  // Start button over a released handle would strand the spinner.
+  // Start button over a released handle would strand the spinner, and the
+  // dead session is forgotten so a port handed in next starts a fresh one.
   private _failReconnect(source: WebLogSource, error?: unknown): void {
     this._streaming = false;
     this._paused = false;
     source.release();
+    if (this._source === source) this._source = undefined;
     const base = this._localize("web.logs.reconnect_failed");
     this._enqueueLine(error === undefined ? base : `${base} (${getErrorMessage(error)})`);
     this._flushPending();
@@ -440,7 +453,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
     const reset = this._source?.reset;
-    if (!reset) return;
+    // No live session (the first attach failed): nothing to pulse.
+    if (!reset) {
+      toast.error(this._localize("web.logs.reset_failed"));
+      return;
+    }
     try {
       await reset();
     } catch {

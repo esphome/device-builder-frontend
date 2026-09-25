@@ -248,5 +248,3 @@ function serverSerialCopyKeys(env: DeploymentEnvironment): {
       };
   }
 }
-
-export { BRAVE_WEB_BLUETOOTH_FLAG };
