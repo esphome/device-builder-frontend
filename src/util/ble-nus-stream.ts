@@ -22,6 +22,10 @@ export const isWebBluetoothSupported = (): boolean => "bluetooth" in navigator;
  *  feature itself may also be switched off ("brave"). */
 export type BleUnavailableReason = "off" | "brave";
 
+// Pages cannot link to internal browser URLs, so the flag page is offered
+// as an address for the user to copy and paste.
+export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
+
 /**
  * Whether Bluetooth can be used right now, or why not. The API object alone
  * says nothing: the radio may be off or the browser denied access, and Brave

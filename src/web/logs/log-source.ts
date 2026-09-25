@@ -7,13 +7,13 @@ import type { SerialLineHooks } from "../../util/serial-log-stream.js";
  * what to release when the stream is dead.
  */
 export interface WebLogSource {
-  /** Start streaming; resolves the cancel, which also releases the transport. */
-  attach(hooks: SerialLineHooks): Promise<() => Promise<void>>;
   /**
-   * After a drop: a live stream again, or null when the device stayed gone.
-   * ``cancelled`` turning true means the dialog moved on; a handle acquired
-   * after that is the source's to release.
+   * Start streaming; resolves the cancel, which also releases the transport.
+   * ``cancelled`` turning true means the dialog moved on: stop retrying, and
+   * a handle acquired after that is the source's to release.
    */
+  attach(hooks: SerialLineHooks, cancelled: () => boolean): Promise<() => Promise<void>>;
+  /** After a drop: a live stream again, or null when the device stayed gone. */
   resume(
     hooks: SerialLineHooks,
     cancelled: () => boolean

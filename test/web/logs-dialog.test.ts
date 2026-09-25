@@ -477,7 +477,7 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
     expect(streamBleNus).toHaveBeenCalledWith(
       device,
       expect.objectContaining({ onLine: expect.any(Function) }),
-      expect.objectContaining({ attempts: 3 })
+      expect.objectContaining({ attempts: 3, cancelled: expect.any(Function) })
     );
     expect((el as any)._streaming).toBe(true);
     expect(resetButtons(el).length).toBe(0);
@@ -488,6 +488,19 @@ describe("esphome-web-logs-dialog over Bluetooth", () => {
     el.open = false;
     await el.updateComplete;
     expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("tells a retrying first connect to stop once the dialog closes", async () => {
+    let cancelled!: () => boolean;
+    vi.mocked(streamBleNus).mockImplementation(async (_device, _hooks, options) => {
+      cancelled = options!.cancelled!;
+      return async () => {};
+    });
+    const { el } = await openBle();
+    expect(cancelled()).toBe(false);
+    el.open = false;
+    await el.updateComplete;
+    expect(cancelled()).toBe(true);
   });
 
   it("prints why a connect failed and stops the spinner", async () => {

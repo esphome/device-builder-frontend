@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  copyAddressToClipboard: vi.fn(async () => {}),
   notifyError: vi.fn(),
   requestBleNusDevice: vi.fn(),
   isWebBluetoothSupported: vi.fn(() => true),
+}));
+vi.mock("../../src/util/copy-address.js", () => ({
+  copyAddressToClipboard: mocks.copyAddressToClipboard,
 }));
 vi.mock("../../src/util/notify.js", () => ({
   LONG_TOAST_DURATION_MS: 8000,
@@ -16,7 +20,10 @@ vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
 }));
 
 import { pickBleNusDevice } from "../../src/util/ble-nus-picker.js";
-import { BleUnavailableError } from "../../src/util/ble-nus-stream.js";
+import {
+  BleUnavailableError,
+  BRAVE_WEB_BLUETOOTH_FLAG,
+} from "../../src/util/ble-nus-stream.js";
 
 const localize = (key: string) => key;
 
@@ -59,9 +66,19 @@ describe("pickBleNusDevice", () => {
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_unavailable",
       {
-        description: "dashboard.logs_method_ble_nus_brave",
+        description: `dashboard.logs_method_ble_nus_brave ${BRAVE_WEB_BLUETOOTH_FLAG}`,
         duration: 8000,
+        action: {
+          label: "settings.remote_build_address_copy",
+          onClick: expect.any(Function),
+        },
       }
+    );
+    // The action copies the flag address, since no page can link to it.
+    mocks.notifyError.mock.lastCall![1].action.onClick();
+    expect(mocks.copyAddressToClipboard).toHaveBeenCalledWith(
+      localize,
+      BRAVE_WEB_BLUETOOTH_FLAG
     );
   });
 

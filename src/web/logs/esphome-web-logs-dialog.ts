@@ -253,7 +253,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     const generation = this._generation;
     let cancel: () => Promise<void>;
     try {
-      cancel = await source.attach(this._hooks());
+      cancel = await source.attach(this._hooks(), () => generation !== this._generation);
     } catch (err) {
       if (generation !== this._generation) return;
       this._streaming = false;

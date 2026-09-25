@@ -14,8 +14,11 @@ const REATTACH_DELAY_MS = 1000;
 export class BleLogSource implements WebLogSource {
   constructor(private readonly device: BluetoothDevice) {}
 
-  attach(hooks: SerialLineHooks): Promise<() => Promise<void>> {
-    return streamBleNus(this.device, hooks, { attempts: BLE_CONNECT_ATTEMPTS });
+  attach(hooks: SerialLineHooks, cancelled: () => boolean): Promise<() => Promise<void>> {
+    return streamBleNus(this.device, hooks, {
+      attempts: BLE_CONNECT_ATTEMPTS,
+      cancelled,
+    });
   }
 
   async resume(

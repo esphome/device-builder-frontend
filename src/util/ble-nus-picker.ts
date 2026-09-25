@@ -6,9 +6,11 @@
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   BleUnavailableError,
+  BRAVE_WEB_BLUETOOTH_FLAG,
   isWebBluetoothSupported,
   requestBleNusDevice,
 } from "./ble-nus-stream.js";
+import { copyAddressToClipboard } from "./copy-address.js";
 import { LONG_TOAST_DURATION_MS, notifyError } from "./notify.js";
 
 export async function pickBleNusDevice(
@@ -26,10 +28,15 @@ export async function pickBleNusDevice(
     if (!(err instanceof BleUnavailableError)) {
       notifyError(localize("dashboard.logs_ble_nus_open_failed"));
     } else if (err.reason === "brave") {
-      // Brave ships with the API switched off; name the flag page too.
+      // Brave ships with the API switched off; name the flag page too, with
+      // a copy action since no page can link to it.
       notifyError(localize("dashboard.logs_ble_nus_unavailable"), {
-        description: localize("dashboard.logs_method_ble_nus_brave"),
+        description: `${localize("dashboard.logs_method_ble_nus_brave")} ${BRAVE_WEB_BLUETOOTH_FLAG}`,
         duration: LONG_TOAST_DURATION_MS,
+        action: {
+          label: localize("settings.remote_build_address_copy"),
+          onClick: () => void copyAddressToClipboard(localize, BRAVE_WEB_BLUETOOTH_FLAG),
+        },
       });
     } else {
       notifyError(localize("dashboard.logs_ble_nus_unavailable"));

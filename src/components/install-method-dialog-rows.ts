@@ -6,6 +6,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { BRAVE_WEB_BLUETOOTH_FLAG } from "../util/ble-nus-stream.js";
 import type { BleProbeState } from "../util/ble-probe-controller.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
@@ -131,10 +132,6 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
   });
 }
 
-// Pages cannot link to internal browser URLs, so the flag page is offered
-// as a click-to-copy address for the user to paste.
-export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
-
 /**
  * BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth.
  * Clickable only once the adapter answered; otherwise the row is disabled,
@@ -240,3 +237,5 @@ function serverSerialCopyKeys(env: DeploymentEnvironment): {
       };
   }
 }
+
+export { BRAVE_WEB_BLUETOOTH_FLAG };
