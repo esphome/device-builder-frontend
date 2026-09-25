@@ -43,6 +43,12 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   @state() private _progress = 0;
   @state() private _errorTitle = "";
   @state() private _errorMessage = "";
+  // The touch's and the engine's step lines, for the details log.
+  @state() private _logLines: string[] = [];
+
+  private _log = (line: string) => {
+    this._logLines = [...this._logLines, line];
+  };
 
   // The parsed image, kept across opens; a failed fetch clears it so the
   // next open or Install fetches again.
@@ -79,6 +85,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._progress = 0;
     this._errorTitle = "";
     this._errorMessage = "";
+    this._logLines = [];
   }
 
   private _fail(title: string, detail = ""): void {
@@ -116,7 +123,10 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   private async _resetIntoBootsel(): Promise<void> {
     this._state = "resetting";
     try {
-      const touched = await touchIntoBootloader({ filters: picoPortFilters });
+      const touched = await touchIntoBootloader({
+        filters: picoPortFilters,
+        onLog: this._log,
+      });
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
       this._fail(
@@ -135,6 +145,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       const flashed = await flashPico(this._fetchImage(), {
         onDeviceOpened: () => (this._state = "flashing"),
         onProgress: (percent) => (this._progress = percent),
+        onLog: this._log,
       });
       this._state = flashed ? "success" : "idle";
     } catch (err) {
@@ -216,7 +227,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
               </ul>
               <p>${this._localize("web.pico.install_step_install")}</p>
             `
-          : renderProgressCard(this._card())
+          : renderProgressCard({ ...this._card(), log: this._logLines })
       }
       ${
         this._state === "success"

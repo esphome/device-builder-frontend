@@ -1,7 +1,8 @@
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/process-terminal/process-terminal.js";
+import "./esphome-web-install-log.js";
 import type { ProcessTerminalState } from "../../components/process-terminal/process-terminal.js";
 import type { InstallFlowController } from "./install-flow-controller.js";
 
@@ -47,6 +48,7 @@ export function renderInstallProgress(
     message: statusMessage(flow, localize),
     detail: flow.errored ? flow.errorMessage : "",
     progress: flow.step === "flashing" ? flow.progress : null,
+    log: flow.logLines,
   });
 }
 
@@ -55,6 +57,8 @@ export interface ProgressCard {
   message: string;
   detail?: string;
   progress?: number | null;
+  /** The flash engine's step lines, shown in a collapsible details log. */
+  log?: readonly string[];
 }
 
 /** The progress card itself, for the dialogs that drive their own steps. */
@@ -66,6 +70,15 @@ export function renderProgressCard(card: ProgressCard): TemplateResult {
       .statusMessage=${card.message}
       .statusDetail=${card.detail ?? ""}
       .progress=${card.progress ?? null}
-    ></esphome-process-terminal>
+    >
+      ${
+        card.log?.length
+          ? html`<esphome-web-install-log
+              slot="status-extra"
+              .lines=${card.log}
+            ></esphome-web-install-log>`
+          : nothing
+      }
+    </esphome-process-terminal>
   `;
 }
