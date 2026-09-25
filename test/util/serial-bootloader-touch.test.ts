@@ -62,6 +62,11 @@ describe("resetToBootloader", () => {
     });
   });
 
+  it("surfaces a close that failed for a reason other than the device leaving", async () => {
+    const { port } = fakePort({ closeError: new TypeError("stream locked") });
+    await expect(resetToBootloader(port)).rejects.toThrow(/stream locked/);
+  });
+
   it("still surfaces a failed open", async () => {
     const { port } = fakePort();
     vi.mocked(port.open).mockRejectedValue(

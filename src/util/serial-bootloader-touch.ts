@@ -25,7 +25,8 @@ export async function resetToBootloader(port: SerialPort): Promise<void> {
   }
   try {
     await port.close();
-  } catch {
+  } catch (err) {
     // The device vanished mid-close; that is the reboot we asked for.
+    if (!isPortLost(err)) throw err;
   }
 }

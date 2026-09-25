@@ -102,7 +102,13 @@ class FakeUsbDevice {
     return { status: "ok" as const, bytesWritten: 0 };
   }
   async controlTransferIn(setup: USBControlTransferParameters) {
-    this.log.push({ kind: "control-in", request: setup.request, index: setup.index });
+    const t: Transfer = {
+      kind: "control-in",
+      request: setup.request,
+      index: setup.index,
+    };
+    this.log.push(t);
+    this.maybeFail(t);
     return { status: "ok" as const, data: new DataView(this.statusResponse.buffer) };
   }
   async transferOut(ep: number, data: BufferSource) {
@@ -428,6 +434,19 @@ describe("flashUf2", () => {
       "control-in",
     ]);
     expect(d.log[d.log.length - 1]).toEqual({ kind: "close" });
+  });
+
+  it("surfaces a device lost during stall recovery instead of a status of -1", async () => {
+    const d = new FakeUsbDevice();
+    const dev = await PicobootDevice.open(asUsb(d));
+    d.inQueue = [{ status: "stall", data: new DataView(new ArrayBuffer(0)) }];
+    d.failOn = (t) =>
+      t.kind === "control-in"
+        ? new DOMException("The device was disconnected.", "NetworkError")
+        : null;
+    await expect(
+      flashUf2(dev, image([{ address: BASE, length: 0x100 }]), () => {})
+    ).rejects.toMatchObject({ name: "NetworkError" });
   });
 
   it("treats the device vanishing on the reboot ACK as success", async () => {

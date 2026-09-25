@@ -43,6 +43,7 @@ const FLASH_XIP_SIZE = 16 * 1024 * 1024;
 export const FLASH_SECTOR_SIZE = 4096;
 const FLASH_PAGE_SIZE = 256;
 const REBOOT_DELAY_MS = 500;
+const RELEASE_TIMEOUT_MS = 2000;
 const EXCLUSIVE = 1;
 const NOT_EXCLUSIVE = 0;
 const ACK_READ_LENGTH = 64; // WebUSB rejects a zero length; the ACK is a zero-length packet.
@@ -77,7 +78,9 @@ const u32Args = (...values: number[]): Uint8Array => concat(...values.map(int32L
 export class PicobootError extends Error {
   constructor(
     readonly cmdId: number,
-    readonly statusCode: number
+    readonly statusCode: number,
+    // Error.cause needs lib ES2022; the field is declared here instead.
+    readonly cause?: unknown
   ) {
     super(
       `PICOBOOT command 0x${cmdId.toString(16)} failed: ${
@@ -205,8 +208,10 @@ export class PicobootDevice {
         statusCode = res.data.getUint32(4, true);
         statusCmd = res.data.getUint8(8);
       }
-    } catch {
-      // Recovery itself failed (device gone); report the original command.
+    } catch (err) {
+      // The device vanishing is the real story; anything else rides along.
+      if (isUsbDeviceLost(err)) throw err;
+      throw new PicobootError(statusCmd, statusCode, err);
     }
     throw new PicobootError(statusCmd, statusCode);
   }
@@ -337,8 +342,16 @@ export async function flashUf2(
     rebooted = true;
     onProgress(100);
   } finally {
+    // Best-effort release, bounded: after a failed write the bootloader may
+    // still be waiting for payload bytes and never ACK. The abort listener
+    // stays on until the device is closed so a Stop can still cut it short.
+    if (!rebooted) {
+      await Promise.race([
+        dev.exclusiveAccess(NOT_EXCLUSIVE).catch(() => {}),
+        new Promise((r) => setTimeout(r, RELEASE_TIMEOUT_MS)),
+      ]);
+    }
     signal?.removeEventListener("abort", onAbort);
-    if (!rebooted) await dev.exclusiveAccess(NOT_EXCLUSIVE).catch(() => {});
     await dev.close();
   }
 }
