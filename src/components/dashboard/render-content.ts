@@ -231,8 +231,6 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @analyze-memory=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openCommand(e.detail, "analyze_memory")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmClearQueuedUpdate(e.detail)}
@@ -352,8 +350,6 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @analyze-memory=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openCommand(e.detail, "analyze_memory")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmClearQueuedUpdate(e.detail)}

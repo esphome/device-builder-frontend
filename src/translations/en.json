@@ -1553,7 +1553,7 @@
     "expert_mode_feature_yaml": "YAML content search",
     "expert_mode_feature_yaml_desc": "Search across all your configs from the command palette and the dashboard.",
     "expert_mode_feature_analyze_memory": "Memory analysis",
-    "expert_mode_feature_analyze_memory_desc": "Run esphome analyze-memory from a device's advanced menu to see flash and RAM use per component.",
+    "expert_mode_feature_analyze_memory_desc": "Run esphome analyze-memory from the device page's menu to see flash and RAM use per component.",
     "build_server": "Build server",
     "pairing_requests": "Pairing requests",
     "build_offload": "Send builds",

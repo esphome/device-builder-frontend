@@ -36,7 +36,7 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  /** Expert Mode unlocks the power-user rows (Analyze memory). */
+  /** Expert Mode unlocks Analyze memory, which lives only in this menu. */
   @consume({ context: expertModeContext, subscribe: true })
   @state()
   private _expertMode = false;
