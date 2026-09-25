@@ -109,6 +109,37 @@ describe("streamSerialLines", () => {
     expect(lines[1]).toContain("crashed mid-");
   });
 
+  it("drops the trailing fragment on a caller-initiated cancel (the session moved on)", async () => {
+    const lines: string[] = [];
+    const port = makeOpenPort((c) => {
+      c.enqueue(enc("[I][x:1]: done\n[D][x:2]: half"));
+    });
+    const cancel = streamSerialLines(port as unknown as SerialPort, {
+      onLine: (l) => lines.push(l),
+    });
+    await flush();
+    await cancel();
+    expect(lines).toHaveLength(1);
+  });
+
+  it("still releases the port when the flushed line's sink throws", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const port = makeOpenPort((c) => {
+      c.enqueue(enc("tail"));
+      c.close();
+    });
+    const onDisconnect = vi.fn();
+    streamSerialLines(port as unknown as SerialPort, {
+      onLine: () => {
+        throw new Error("sink");
+      },
+      onDisconnect,
+    });
+    await vi.waitFor(() => expect(onDisconnect).toHaveBeenCalledOnce());
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("does NOT fire onDisconnect on a caller-initiated cancel", async () => {
     let ctrl!: ReadableStreamDefaultController<Uint8Array>;
     const port = makeOpenPort((c) => {

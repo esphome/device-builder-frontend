@@ -108,6 +108,22 @@ describe("streamBleNus", () => {
     expect(d.gatt.disconnect).not.toHaveBeenCalled();
   });
 
+  it("still reports the disconnect when the flushed line's sink throws", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const d = fakeDevice();
+    const onDisconnect = vi.fn();
+    await streamBleNus(d.device, {
+      onLine: () => {
+        throw new Error("sink");
+      },
+      onDisconnect,
+    });
+    d.notify("partial");
+    d.dropLink();
+    expect(onDisconnect).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
   it("retries a failed connect up to the attempt budget", async () => {
     const d = fakeDevice({ connectFailures: 2 });
     const cancel = await streamBleNus(

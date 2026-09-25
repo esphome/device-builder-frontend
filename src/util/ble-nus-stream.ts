@@ -4,7 +4,11 @@
  * render identically.
  */
 import { isNrfPlatform } from "./nrf-platform.js";
-import { createLogLineAssembler, type SerialLineHooks } from "./serial-log-stream.js";
+import {
+  createLogLineAssembler,
+  safeFlush,
+  type SerialLineHooks,
+} from "./serial-log-stream.js";
 import { sleep } from "./sleep.js";
 import { isPortPickerCancel } from "./web-serial.js";
 
@@ -115,7 +119,7 @@ async function subscribe(
   };
   const onDisconnected = (): void => {
     if (!detach()) return;
-    assembler.flush();
+    safeFlush(assembler);
     hooks.onDisconnect?.();
   };
   try {
@@ -141,7 +145,7 @@ async function subscribe(
     device.addEventListener("gattserverdisconnected", onDisconnected);
     return async () => {
       if (!detach()) return;
-      assembler.flush();
+      safeFlush(assembler);
       device.gatt?.disconnect();
     };
   } catch (err) {

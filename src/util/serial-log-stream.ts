@@ -53,6 +53,15 @@ export function createLogLineAssembler(onLine: (line: string) => void): {
   };
 }
 
+/** A flush runs the line sink; a throw there must not skip what follows. */
+export function safeFlush(assembler: { flush: () => void }): void {
+  try {
+    assembler.flush();
+  } catch (err) {
+    console.warn("Flushing the last log line failed", err);
+  }
+}
+
 export interface SerialLineHooks {
   /** One formatted log line (timestamp + parser color/prefix already applied). */
   onLine: (line: string) => void;
@@ -115,12 +124,14 @@ export function streamSerialLines(
         disconnectError = err;
       }
     } finally {
-      assembler.flush();
       try {
         reader.releaseLock();
       } catch {
         /* Lock already released — ignore. */
       }
+      // Only when the device ended the stream: after a caller's cancel the
+      // session has moved on and a late fragment would land in the wrong one.
+      if (!cancelled) safeFlush(assembler);
     }
     if (disconnected) hooks.onDisconnect?.(disconnectError);
   };
