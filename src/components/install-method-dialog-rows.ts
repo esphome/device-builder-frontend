@@ -6,7 +6,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { BleProbeState } from "../util/ble-probe-controller.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
+import { renderCopyAddress } from "./shared/pairing-address.js";
 
 export interface MethodRowContext {
   localize: LocalizeFunc;
@@ -16,11 +18,16 @@ export interface MethodRowContext {
   onSelect: (method: string) => void;
 }
 
-/** Shared option-row template; a row without ``onClick`` renders disabled. */
+/**
+ * Shared option-row template; a row without ``onClick`` renders disabled.
+ * ``action`` is a control kept live under the description, for a disabled
+ * row that can still tell the user what to do.
+ */
 export function renderMethodRow(opts: {
   icon: string;
   title: unknown;
   desc: unknown;
+  action?: TemplateResult;
   onClick?: () => void;
 }): TemplateResult {
   return html`
@@ -29,6 +36,7 @@ export function renderMethodRow(opts: {
       <div class="info">
         <span class="title">${opts.title}</span>
         <span class="desc">${opts.desc}</span>
+        ${opts.action ?? nothing}
       </div>
     </div>
   `;
@@ -123,13 +131,48 @@ export function renderRp2Uf2Option(ctx: MethodRowContext): TemplateResult {
   });
 }
 
-/** BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth. */
-export function renderBleNusOption(ctx: MethodRowContext): TemplateResult {
+// Pages cannot link to internal browser URLs, so the flag page is offered
+// as a click-to-copy address for the user to paste.
+export const BRAVE_WEB_BLUETOOTH_FLAG = "brave://flags/#brave-web-bluetooth-api";
+
+/**
+ * BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth.
+ * Clickable only once the adapter answered; otherwise the row is disabled,
+ * with the reason once there is one. Brave gets the generic hint too (its
+ * radio can be off with the flag already on), plus its extra step.
+ */
+export function renderBleNusOption(
+  ctx: MethodRowContext,
+  state: BleProbeState
+): TemplateResult {
+  const title = ctx.localize("dashboard.logs_method_ble_nus");
+  if (state === "available") {
+    return renderMethodRow({
+      icon: "bluetooth",
+      title,
+      desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
+      onClick: () => ctx.onSelect("ble-nus"),
+    });
+  }
   return renderMethodRow({
     icon: "bluetooth",
-    title: ctx.localize("dashboard.logs_method_ble_nus"),
-    desc: ctx.localize("dashboard.logs_method_ble_nus_desc"),
-    onClick: () => ctx.onSelect("ble-nus"),
+    title,
+    desc: ctx.localize(
+      state === "pending"
+        ? "dashboard.logs_method_ble_nus_desc"
+        : "dashboard.logs_method_ble_nus_off"
+    ),
+    // Brave's extra step is its own sentence under the generic hint, never
+    // spliced into it, so each key translates on its own.
+    action:
+      state === "brave"
+        ? html`
+            <span class="desc"
+              >${ctx.localize("dashboard.logs_method_ble_nus_brave")}</span
+            >
+            ${renderCopyAddress(ctx.localize, BRAVE_WEB_BLUETOOTH_FLAG)}
+          `
+        : undefined,
   });
 }
 

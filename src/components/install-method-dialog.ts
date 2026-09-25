@@ -27,9 +27,11 @@ import { disclosureStyles } from "../styles/disclosure.js";
 import { emptyStateStyles } from "../styles/empty-state.js";
 import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
+import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { bleNusLogsAvailable } from "../util/ble-nus-stream.js";
+import { BleProbeController } from "../util/ble-probe-controller.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -132,6 +134,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @state() private _view: DialogView = "method";
 
   private _portsPoll = new SerialPortsPollController(this, () => this._api);
+  private _bleProbe = new BleProbeController(this);
   /**
    * `true` when the user has opened the "Advanced options"
    * disclosure at the bottom of the method list. Holds the
@@ -177,6 +180,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       this._otaAddressValue = this.deviceCurrentAddress;
     }
     this._portsPoll.set(this.open && this._view === "port-select");
+    this._bleProbe.set(
+      this.open && this.mode === "logs" && bleNusLogsAvailable(this.deviceTargetPlatform)
+    );
   }
 
   static styles = [
@@ -189,6 +195,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     emptyStateStyles,
     backButtonStyles,
     installMethodDialogStyles,
+    pairingAddressStyles,
   ];
 
   protected render() {
@@ -261,7 +268,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
     const nrfRow = showNrfRow ? renderNrfDfuOption(ctx) : nothing;
     const rp2Row = showRp2Row ? renderRp2Uf2Option(ctx) : nothing;
-    const bleNusRow = showBleNusRow ? renderBleNusOption(ctx) : nothing;
+    const bleNusRow = showBleNusRow
+      ? renderBleNusOption(ctx, this._bleProbe.state)
+      : nothing;
     const serverRow = showServerSerialRow
       ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
       : nothing;

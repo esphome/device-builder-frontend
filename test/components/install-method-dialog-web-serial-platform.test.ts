@@ -17,12 +17,23 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+vi.mock("../../src/util/copy-to-clipboard.js", () => ({
+  copyToClipboard: vi.fn(async () => true),
+}));
+vi.mock("../../src/util/notify.js", () => ({
+  notify: { success: vi.fn(), warning: vi.fn() },
+}));
+
+import { flush } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
+import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/components/install-method-dialog-rows.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
   setBluetooth,
+  setBrave,
   setLocalhostWithWebSerial,
 } from "./_install-method-dialog-env.js";
 
@@ -37,6 +48,7 @@ async function mount(
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = platform;
   dialog.mode = mode;
+  dialog.open = true;
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
@@ -172,5 +184,75 @@ describe("install-method-dialog BLE NUS row gating", () => {
     setBluetooth(false);
     const d = await mount("nrf52", "logs");
     expect(hasBleNusRow(d)).toBe(false);
+  });
+
+  const bleRow = (d: ESPHomeInstallMethodDialog): HTMLElement =>
+    d.shadowRoot!.querySelector('wa-icon[name="bluetooth"]')!.closest(".option")!;
+  // Lets the adapter's answer land and the row re-render.
+  const settle = async (d: ESPHomeInstallMethodDialog): Promise<void> => {
+    await flush();
+    await d.updateComplete;
+  };
+
+  it("keeps the row non-actionable until the adapter answers", async () => {
+    setBluetooth(true, () => new Promise<boolean>(() => {}));
+    const d = await mount("nrf52", "logs");
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(true);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_desc")
+    );
+    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+  });
+
+  it("enables the row once the adapter answers available", async () => {
+    const d = await mount("nrf52", "logs");
+    await settle(d);
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
+  });
+
+  it("disables the row with a hint when the adapter is off or blocked", async () => {
+    setBluetooth(true, async () => false);
+    const d = await mount("nrf52", "logs");
+    await settle(d);
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(true);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_off")
+    );
+    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+  });
+
+  it("takes only the newest open's answer, so a slow earlier probe cannot disable the row", async () => {
+    let resolveFirst!: (available: boolean) => void;
+    const answers = [
+      new Promise<boolean>((r) => (resolveFirst = r)),
+      Promise.resolve(true),
+    ];
+    setBluetooth(true, () => answers.shift()!);
+    const d = await mount("nrf52", "logs");
+    d.open = false;
+    await d.updateComplete;
+    d.open = true;
+    await d.updateComplete;
+    resolveFirst(false);
+    await settle(d);
+    expect(bleRow(d).classList.contains("option--disabled")).toBe(false);
+  });
+
+  it("names the Brave flag when Brave has Web Bluetooth switched off", async () => {
+    setBluetooth(true, async () => false);
+    setBrave();
+    const d = await mount("nrf52", "logs");
+    await settle(d);
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_off")
+    );
+    expect(bleRow(d).textContent).toContain(
+      defaultLocalize("dashboard.logs_method_ble_nus_brave")
+    );
+    const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-address")!;
+    expect(copy.textContent).toContain(BRAVE_WEB_BLUETOOTH_FLAG);
+    copy.click();
+    await flush();
+    expect(copyToClipboard).toHaveBeenCalledWith(BRAVE_WEB_BLUETOOTH_FLAG);
   });
 });
