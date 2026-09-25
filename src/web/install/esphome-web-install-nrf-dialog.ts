@@ -8,8 +8,12 @@ import type { ProcessTerminalState } from "../../components/process-terminal/pro
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
 import type { DfuPackage } from "../../util/nrf-dfu.js";
-import { touchIntoBootloader } from "../../util/serial-bootloader-touch.js";
+import {
+  BootloaderTouchError,
+  touchIntoBootloader,
+} from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
 import { renderProgressCard } from "./install-progress.js";
@@ -116,7 +120,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
         return;
       }
     } catch (err) {
-      this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+      // A failed pick has nothing to do with the board; only the touch earns
+      // the manual-bootloader hint.
+      this._fail(
+        this._localize("web.connect.failed", {
+          error:
+            err instanceof BootloaderTouchError
+              ? withManualBootloaderHint(err, this._localize)
+              : getErrorMessage(err),
+        })
+      );
       return;
     }
     this._state = "waiting";
@@ -142,6 +155,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._progress = 0;
     this._reconnecting = false;
     try {
+      // A cache hit: the engine loaded when the package was parsed.
       const { flashDfuPackageWithReconnect } = await loadDfuEngine();
       await flashDfuPackageWithReconnect(port, pkg, {
         onProgress: (percent) => {
@@ -152,7 +166,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       this._state = "success";
     } catch (err) {
       this._fail(
-        this._localize("web.nrf.install_error_flash", { error: getErrorMessage(err) })
+        this._localize("web.nrf.install_error_flash", {
+          error: withManualBootloaderHint(err, this._localize),
+        })
       );
     }
   }
