@@ -168,6 +168,16 @@ async function autoReset(port: SerialPort): Promise<void> {
   }
 }
 
+async function bootFirmware(port: SerialPort): Promise<void> {
+  try {
+    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await sleep(RESET_HOLD_MS);
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+  } catch {
+    // No control lines on this adapter; the user resets the board.
+  }
+}
+
 /** One ping; true when the ROM downloader answered. */
 async function ping(rom: RomLink): Promise<boolean> {
   rom.drain();
@@ -326,9 +336,10 @@ export async function flashAmbz2(
       );
       done += run.data.length;
     }
-    // The ROM boots the firmware on this; no reply comes back.
+    // Ends the ROM session; no reply comes back. The reboot itself happens
+    // in the teardown below, with the strap released.
     await rom.write("disc\n");
-    log("Booting the firmware");
+    log("Rebooting into the firmware");
     hooks.onProgress(100);
   } catch (err) {
     failure = err;
@@ -336,10 +347,9 @@ export async function flashAmbz2(
   } finally {
     // A teardown failure must not replace the flash error nor skip the rest.
     await rom?.close(failure).catch(() => {});
-    // DTR still holds the strap; drop it so the next reset boots the app.
-    await port
-      .setSignals({ dataTerminalReady: false, requestToSend: false })
-      .catch(() => {});
+    // DTR still holds the strap, so a reset now would land in the ROM again:
+    // release it, then pulse RTS so the board comes up in the firmware.
+    await bootFirmware(port);
     await port.close().catch(() => {});
   }
 }

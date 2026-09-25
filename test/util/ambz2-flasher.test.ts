@@ -180,12 +180,14 @@ describe("flashAmbz2", () => {
       "Writing 0x4000 (100 bytes)",
       "Writing 0x4000: 100%",
       "Verified 0x4000 (SHA-256 matches)",
-      "Booting the firmware",
+      "Rebooting into the firmware",
     ]);
     expect(rom.raw.open).toHaveBeenCalledWith({ baudRate: 115200 });
+    // Into the ROM with the strap held, then a reset with it released.
     expect(rom.signals).toEqual([
       { dataTerminalReady: true, requestToSend: true },
       { requestToSend: false },
+      { dataTerminalReady: false, requestToSend: true },
       { dataTerminalReady: false, requestToSend: false },
     ]);
     expect(rom.commands).toEqual([
@@ -230,10 +232,11 @@ describe("flashAmbz2", () => {
       drive(flashAmbz2(rom.port, image, { onProgress: () => {} }))
     ).rejects.toBeInstanceOf(Ambz2VerifyError);
     expect(rom.commands).not.toContain("disc");
-    expect(last(rom.signals)).toEqual({
-      dataTerminalReady: false,
-      requestToSend: false,
-    });
+    // Even a failed flash ends with a reset and the strap released.
+    expect(rom.signals.slice(-2)).toEqual([
+      { dataTerminalReady: false, requestToSend: true },
+      { dataTerminalReady: false, requestToSend: false },
+    ]);
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
 
