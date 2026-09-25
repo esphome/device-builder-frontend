@@ -213,7 +213,7 @@ export async function attachBleLogs(
       device,
       {
         ...dialogLineHooks(dialog),
-        onDisconnect: () => dialog.setSerialOpenFailed(localize(ble.disconnectedKey)),
+        onDisconnect: () => dialog.triggerBleReconnect(localize(ble.disconnectedKey)),
       },
       cancelled
     );

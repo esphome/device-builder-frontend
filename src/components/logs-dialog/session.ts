@@ -107,8 +107,34 @@ export function setSerialStream(
 
 /** Register a streaming Bluetooth logs link (its cancel). */
 export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void>): void {
+  const wasReconnecting = host._session.kind === "reconnecting";
   const pending = pendingPassiveAttach(host, cancel);
-  if (pending) host._session = { kind: "ble", cancel, paused: pending.paused };
+  if (pending) {
+    host._session = { kind: "ble", cancel, paused: pending.paused };
+    if (wasReconnecting) {
+      host._log.append([host._localize("dashboard.logs_ble_nus_reconnected"), ""]);
+    }
+  }
+}
+
+/**
+ * Called when the BLE device disconnects mid-session. Appends the disconnect
+ * and reconnecting messages to the log pane, then auto-triggers the reconnect
+ * hook — matching ESPHome Web's behaviour of printing status in the log window
+ * rather than only showing it in the toolbar bar.
+ */
+export function triggerBleReconnect(
+  host: ESPHomeLogsDialog,
+  disconnectMessage: string
+): void {
+  if (!host._open || host._session.kind !== "ble") return;
+  host._log.append([
+    "",
+    "",
+    disconnectMessage,
+    host._localize("dashboard.logs_ble_nus_reconnecting"),
+  ]);
+  reconnectSerial(host);
 }
 
 // An attach is async (a reopen retries for seconds). If the dialog closed or

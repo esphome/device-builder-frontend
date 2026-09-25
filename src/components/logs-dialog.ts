@@ -58,6 +58,7 @@ import {
   switchToOtaLogs,
   teardownSession,
   toggleShowStates,
+  triggerBleReconnect,
 } from "./logs-dialog/session.js";
 import { renderLogsToolbar } from "./logs-dialog/toolbar.js";
 import {
@@ -313,6 +314,10 @@ export class ESPHomeLogsDialog extends LitElement {
   /** End the passive session for *message* (shown in the pane); Start reconnects. */
   public setSerialOpenFailed(message: string) {
     setSerialOpenFailed(this, message);
+  }
+
+  public triggerBleReconnect(message: string) {
+    triggerBleReconnect(this, message);
   }
 
   /** Return an in-flight reconnect to ``dead`` without surfacing an error. */
