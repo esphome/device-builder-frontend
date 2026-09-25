@@ -170,3 +170,13 @@ export async function flushMicrotasks(times: number): Promise<void> {
 export async function flushTimers(): Promise<void> {
   await vi.advanceTimersByTimeAsync(0);
 }
+
+/** The rendered ``.menu-item`` whose label is the translation key. */
+export function findMenuItem(
+  el: { shadowRoot: ShadowRoot | null },
+  key: string
+): HTMLElement | undefined {
+  return [...el.shadowRoot!.querySelectorAll<HTMLElement>(".menu-item")].find((item) =>
+    item.textContent!.includes(key)
+  );
+}

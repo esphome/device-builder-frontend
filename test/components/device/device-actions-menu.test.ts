@@ -4,13 +4,14 @@
  * The editor bottom-bar device-actions menu: renders Clean build / Validate /
  * Logs, emits the matching events, gates Validate (unsaved edits) and
  * Clean build (busy) with disabled + out-of-tab-order semantics, and shows
- * Visit web UI only when the page passed a web-UI URL.
+ * Visit web UI only when the page passed a web-UI URL. Analyze memory is an
+ * Expert Mode row: absent by default, first (furthest from the trigger) once on.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { identityLocalize } from "../../_dom.js";
+import { findMenuItem, identityLocalize } from "../../_dom.js";
 import { ESPHomeDeviceActionsMenu } from "../../../src/components/device/device-actions-menu.js";
 
 afterEach(() => {
@@ -18,10 +19,18 @@ afterEach(() => {
 });
 
 async function mount(
-  opts: { busy?: boolean; validateDisabled?: boolean; webUiUrl?: string } = {}
+  opts: {
+    busy?: boolean;
+    validateDisabled?: boolean;
+    webUiUrl?: string;
+    expertMode?: boolean;
+  } = {}
 ): Promise<ESPHomeDeviceActionsMenu> {
   const el = new ESPHomeDeviceActionsMenu();
   (el as unknown as { _localize: typeof identityLocalize })._localize = identityLocalize;
+  Object.assign(el, {
+    _expertMode: opts.expertMode ?? false,
+  } as Partial<ESPHomeDeviceActionsMenu>);
   el.busy = opts.busy ?? false;
   el.validateDisabled = opts.validateDisabled ?? false;
   el.webUiUrl = opts.webUiUrl ?? "";
@@ -186,5 +195,57 @@ describe("esphome-device-actions-menu", () => {
     link(el)!.click();
     await el.updateComplete;
     expect(items(el)).toHaveLength(0);
+  });
+});
+
+describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
+  const LABEL = "dashboard.action_analyze_memory";
+
+  async function openInert(
+    el: ESPHomeDeviceActionsMenu,
+    titleKey: string
+  ): Promise<void> {
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    await openMenu(el);
+    const row = findMenuItem(el, LABEL)!;
+    expect(row.classList.contains("menu-item--disabled")).toBe(true);
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    expect(row.getAttribute("title")).toBe(titleKey);
+    row.click();
+    expect(onAnalyze).not.toHaveBeenCalled();
+  }
+
+  it("is absent unless Expert Mode is on", async () => {
+    const el = await mount();
+    await openMenu(el);
+    expect(findMenuItem(el, LABEL)).toBeUndefined();
+  });
+
+  it("paints first, above Clean build, and emits analyze-memory", async () => {
+    const el = await mount({ expertMode: true });
+    const onAnalyze = vi.fn();
+    el.addEventListener("analyze-memory", onAnalyze);
+    const rows = await openMenu(el);
+    expect(rows.map((row) => row.textContent!.trim())).toEqual([
+      LABEL,
+      "dashboard.action_clean_build",
+      "device.validate",
+      "device.show_logs",
+    ]);
+    rows[0].click();
+    expect(onAnalyze).toHaveBeenCalledTimes(1);
+    await el.updateComplete;
+    expect(items(el)).toHaveLength(0);
+  });
+
+  it("is disabled with unsaved edits, since it analyzes the saved YAML", async () => {
+    const el = await mount({ expertMode: true, validateDisabled: true });
+    await openInert(el, "device.analyze_memory_disabled_pending");
+  });
+
+  it("is disabled while a build is running", async () => {
+    const el = await mount({ expertMode: true, busy: true });
+    await openInert(el, "dashboard.action_analyze_memory_busy");
   });
 });

@@ -120,3 +120,47 @@ describe("stop during install releases the device's active slot", () => {
     expect(host._activeJobs.get(CFG)?.job_id).toBe("new");
   });
 });
+
+// Ephemeral job types (a memory analysis) never enter history; the card
+// still gets its short outcome flash.
+describe("terminal analyze-memory jobs never enter history", () => {
+  const CFG = "kitchen.yaml";
+
+  it("drops the job and releases the active slot, keeping the recent flash", () => {
+    const host = makeHost();
+    const running = makeJob({
+      job_id: "m1",
+      job_type: JobType.ANALYZE_MEMORY,
+      configuration: CFG,
+      status: JobStatus.RUNNING,
+    });
+    handleJobEvent(host, "job_started", running);
+    expect(host._firmwareJobs.has("m1")).toBe(true);
+    expect(host._activeJobs.get(CFG)?.job_id).toBe("m1");
+
+    handleJobEvent(host, "job_completed", { ...running, status: JobStatus.COMPLETED });
+    expect(host._firmwareJobs.has("m1")).toBe(false);
+    expect(host._activeJobs.has(CFG)).toBe(false);
+    expect(host._recentJobs.get(CFG)?.job_id).toBe("m1");
+  });
+
+  it("leaves a terminal compile for the same device in place", () => {
+    const host = makeHost();
+    handleJobEvent(
+      host,
+      "job_completed",
+      done({ job_id: "c", job_type: JobType.COMPILE, configuration: CFG })
+    );
+    handleJobEvent(
+      host,
+      "job_failed",
+      makeJob({
+        job_id: "m2",
+        job_type: JobType.ANALYZE_MEMORY,
+        configuration: CFG,
+        status: JobStatus.FAILED,
+      })
+    );
+    expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["c"]));
+  });
+});

@@ -10,6 +10,10 @@ const PRIMARY_JOB_TYPES: ReadonlySet<JobType> = new Set([
   JobType.INSTALL,
 ]);
 
+// Shown once in their dialog and never kept: the backend drops these from
+// history at the same point (the card still flashes the outcome).
+const EPHEMERAL_JOB_TYPES: ReadonlySet<JobType> = new Set([JobType.ANALYZE_MEMORY]);
+
 // How long a terminated job stays in _recentJobs so the dashboard can flash a
 // status indicator. Successful completions revert quickly so the device's real
 // online/offline state isn't masked; failed/cancelled linger so the user notices.
@@ -134,6 +138,12 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   }
   if (active !== null) host._activeJobs = active;
 
+  if (EPHEMERAL_JOB_TYPES.has(job.job_type)) {
+    dropJob(host, job.job_id);
+    if (job.configuration) markJobRecent(host, job);
+    return;
+  }
+
   if (job.status === JobStatus.CANCELLED && job.configuration) {
     const supersededByActive = [...host._firmwareJobs.values()].some(
       (j) =>
@@ -142,9 +152,7 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
         !isTerminalJobStatus(j.status)
     );
     if (supersededByActive) {
-      const next = new Map(host._firmwareJobs);
-      next.delete(job.job_id);
-      host._firmwareJobs = next;
+      dropJob(host, job.job_id);
       return;
     }
   }
@@ -164,6 +172,13 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   }
   host._firmwareJobs = next;
   if (job.configuration) markJobRecent(host, job);
+}
+
+function dropJob(host: ESPHomeApp, jobId: string): void {
+  if (!host._firmwareJobs.has(jobId)) return;
+  const next = new Map(host._firmwareJobs);
+  next.delete(jobId);
+  host._firmwareJobs = next;
 }
 
 function markJobRecent(host: ESPHomeApp, job: FirmwareJob): void {

@@ -94,6 +94,23 @@ describe("renderResetSuggestion — local build", () => {
     expectFallbackToLocal(render(host), host);
   });
 
+  it("offers clean and reset for a failed memory analysis (it compiles first)", () => {
+    const host = baseHost({
+      _commandType: "analyze_memory",
+      _jobs: new Map([
+        [
+          "job-1",
+          fakeJob({
+            job_type: JobType.ANALYZE_MEMORY,
+            source: JobSource.LOCAL,
+            source_label: "",
+          }),
+        ],
+      ]),
+    });
+    expectLocalSuggestion(render(host), host);
+  });
+
   it("renders nothing when a compile succeeded but had no dependent flash", () => {
     // The compile was fine; clean/reset wouldn't help a missing dependent flash.
     const host = baseHost({ _compileMissingDependent: true });

@@ -3,13 +3,14 @@ import {
   mdiBroom,
   mdiCheckCircleOutline,
   mdiDotsVertical,
+  mdiMemory,
   mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
-import { css, html, nothing } from "lit";
+import { css, html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { expertModeContext, localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -22,21 +23,29 @@ registerMdiIcons({
   broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
   "dots-vertical": mdiDotsVertical,
+  memory: mdiMemory,
   "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });
 
-/** Editor bottom-bar overflow menu: device-scoped actions (Clean build, Visit web UI, Validate, Logs). */
+/** Editor bottom-bar overflow menu: device-scoped actions (Analyze memory in
+ *  Expert Mode, Clean build, Visit web UI, Validate, Logs). */
 @customElement("esphome-device-actions-menu")
 export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  /** Expert Mode unlocks Analyze memory, which lives only in this menu. */
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  private _expertMode = false;
+
   /** A build is in flight — cleaning its files mid-build would corrupt it. */
   @property({ type: Boolean }) busy = false;
 
-  /** Unsaved edits block validation (Install validates too); disable the row. */
+  /** Unsaved edits block Validate and Analyze memory (both read the saved
+   *  YAML, so a draft would silently be left out); disable those rows. */
   @property({ type: Boolean, attribute: "validate-disabled" }) validateDisabled = false;
 
   /** Prebuilt ``buildWebUiUrl`` result; empty hides the Visit-web-UI item
@@ -111,26 +120,31 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
               <div class="backdrop" @click=${this._close}></div>
               <!-- Opens upward, so DOM order inverts distance from the
                    trigger: frequent actions (Logs) last / nearest the
-                   click, rare ones (Clean build) first / furthest. -->
+                   click, rare ones (Analyze memory, Clean build) first /
+                   furthest. -->
               <div class="menu" role="menu">
-                <div
-                  class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-                  role="menuitem"
-                  tabindex=${this.busy ? "-1" : "0"}
-                  aria-disabled=${this.busy ? "true" : "false"}
-                  title=${
-                    this.busy
-                      ? this._localize("dashboard.action_clean_build_busy")
-                      : nothing
-                  }
-                  @click=${this.busy ? undefined : this._onCleanBuild}
-                  @keydown=${this.busy ? undefined : this._onItemKeydown}
-                >
-                  <wa-icon library="mdi" name="broom"></wa-icon>
-                  <span class="menu-item-label"
-                    >${this._localize("dashboard.action_clean_build")}</span
-                  >
-                </div>
+                ${
+                  this._expertMode
+                    ? this._renderItem({
+                        icon: "memory",
+                        labelKey: "dashboard.action_analyze_memory",
+                        onSelect: this._onAnalyzeMemory,
+                        disabledTitle: this.busy
+                          ? this._localize("dashboard.action_analyze_memory_busy")
+                          : this.validateDisabled
+                            ? this._localize("device.analyze_memory_disabled_pending")
+                            : null,
+                      })
+                    : nothing
+                }
+                ${this._renderItem({
+                  icon: "broom",
+                  labelKey: "dashboard.action_clean_build",
+                  onSelect: this._onCleanBuild,
+                  disabledTitle: this.busy
+                    ? this._localize("dashboard.action_clean_build_busy")
+                    : null,
+                })}
                 <div class="menu-divider" role="separator"></div>
                 ${
                   this.webUiUrl
@@ -142,40 +156,48 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                       })
                     : nothing
                 }
-                <div
-                  class="menu-item ${this.validateDisabled ? "menu-item--disabled" : ""}"
-                  role="menuitem"
-                  tabindex=${this.validateDisabled ? "-1" : "0"}
-                  aria-disabled=${this.validateDisabled ? "true" : "false"}
-                  title=${
-                    this.validateDisabled
-                      ? this._localize("device.validate_disabled_pending")
-                      : nothing
-                  }
-                  @click=${this.validateDisabled ? undefined : this._onValidate}
-                  @keydown=${this.validateDisabled ? undefined : this._onItemKeydown}
-                >
-                  <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
-                  <span class="menu-item-label"
-                    >${this._localize("device.validate")}</span
-                  >
-                </div>
-                <div
-                  class="menu-item"
-                  role="menuitem"
-                  tabindex="0"
-                  @click=${this._onLogs}
-                  @keydown=${this._onItemKeydown}
-                >
-                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-                  <span class="menu-item-label"
-                    >${this._localize("device.show_logs")}</span
-                  >
-                </div>
+                ${this._renderItem({
+                  icon: "check-circle-outline",
+                  labelKey: "device.validate",
+                  onSelect: this._onValidate,
+                  disabledTitle: this.validateDisabled
+                    ? this._localize("device.validate_disabled_pending")
+                    : null,
+                })}
+                ${this._renderItem({
+                  icon: "text-box-outline",
+                  labelKey: "device.show_logs",
+                  onSelect: this._onLogs,
+                  disabledTitle: null,
+                })}
               </div>
             `
           : nothing
       }
+    `;
+  }
+
+  /** One menu row; a non-null ``disabledTitle`` disables it and explains why. */
+  private _renderItem(item: {
+    icon: string;
+    labelKey: string;
+    onSelect: () => void;
+    disabledTitle: string | null;
+  }): TemplateResult {
+    const disabled = item.disabledTitle !== null;
+    return html`
+      <div
+        class="menu-item ${disabled ? "menu-item--disabled" : ""}"
+        role="menuitem"
+        tabindex=${disabled ? "-1" : "0"}
+        aria-disabled=${disabled ? "true" : "false"}
+        title=${item.disabledTitle ?? nothing}
+        @click=${disabled ? undefined : item.onSelect}
+        @keydown=${disabled ? undefined : this._onItemKeydown}
+      >
+        <wa-icon library="mdi" name=${item.icon}></wa-icon>
+        <span class="menu-item-label">${this._localize(item.labelKey)}</span>
+      </div>
     `;
   }
 
@@ -194,6 +216,12 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
     if (this.busy) return;
     this._close();
     this._emit("clean-build");
+  };
+
+  private _onAnalyzeMemory = () => {
+    if (this.busy || this.validateDisabled) return;
+    this._close();
+    this._emit("analyze-memory");
   };
 }
 

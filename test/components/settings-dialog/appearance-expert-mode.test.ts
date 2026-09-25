@@ -41,8 +41,8 @@ describe("appearance Expert Mode toggle", () => {
     await el.updateComplete;
 
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
-    // Editor diff view, navigator search, YAML content search.
-    expect(el.shadowRoot!.querySelectorAll(".feature-item").length).toBe(3);
+    // Editor diff view, navigator search, YAML content search, memory analysis.
+    expect(el.shadowRoot!.querySelectorAll(".feature-item").length).toBe(4);
   });
 
   it("reflects the current value via aria-checked", async () => {

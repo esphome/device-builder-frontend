@@ -70,6 +70,16 @@ describe("device-card busy badge names the running job", () => {
     );
   });
 
+  it("shows the analyzing label for an active memory analysis", async () => {
+    const el = await mount({
+      busy: true,
+      activeJob: makeFirmwareJob({ job_type: JobType.ANALYZE_MEMORY }),
+    });
+    expect(el.shadowRoot!.querySelector(".device-status.busy")!.textContent).toContain(
+      "dashboard.status_analyzing_memory"
+    );
+  });
+
   it("keeps the installing label for an active upload job", async () => {
     const el = await mount({
       busy: true,

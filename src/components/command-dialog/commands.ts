@@ -16,6 +16,7 @@ const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.CLEAN]: "clean",
   [JobType.RESET_BUILD_ENV]: "reset",
   [JobType.RENAME]: "rename",
+  [JobType.ANALYZE_MEMORY]: "analyze_memory",
 };
 
 // The flash tail a compile head chains into — the only job types that ever
@@ -210,6 +211,9 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
         break;
       case "clean":
         job = await host._api.firmwareClean(host.configuration);
+        break;
+      case "analyze_memory":
+        job = await host._api.firmwareAnalyzeMemory(host.configuration);
         break;
       default:
         return;

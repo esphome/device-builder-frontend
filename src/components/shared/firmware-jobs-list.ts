@@ -44,6 +44,7 @@ const TYPE_ICONS: Record<JobType, string> = {
   [JobType.CLEAN]: "broom",
   [JobType.RESET_BUILD_ENV]: "cog-refresh",
   [JobType.RENAME]: "rename-outline",
+  [JobType.ANALYZE_MEMORY]: "memory",
 };
 
 /** Sort + split a jobs Map into active / terminal lists; wrap in memoizeOne per host. */
