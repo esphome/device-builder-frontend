@@ -5,6 +5,7 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { formatUsbId } from "../../util/flash-log.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import {
   parseUf2Image,
@@ -21,7 +22,11 @@ import {
   requestPicobootDevice,
 } from "../../util/web-usb.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { downloadBuildArtifact, resetForRetry } from "./browser-flash-steps.js";
+import {
+  downloadBuildArtifact,
+  installLog,
+  resetForRetry,
+} from "./browser-flash-steps.js";
 import { downloadSelectedBinary } from "./install-flow.js";
 
 /**
@@ -94,7 +99,7 @@ export async function rp2DoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     // The picker outlives a dismissed dialog; don't reset a port picked for
     // an install that no longer exists.
     if (!stillCurrent()) return;
-    await resetToBootloader(port);
+    await resetToBootloader(port, installLog(host, stillCurrent));
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
@@ -121,6 +126,10 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const dev = await openPicoboot(host, stillCurrent);
   if (stillCurrent()) host._flashBusy = false;
   if (!dev || !stillCurrent()) return;
+  const log = installLog(host, stillCurrent);
+  log(
+    `Claimed the RP2 Boot device (${formatUsbId(dev.device.vendorId, dev.device.productId)})`
+  );
 
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
@@ -129,14 +138,13 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashAbort = abort;
   try {
     const { flashUf2 } = await loadPicoboot();
-    await flashUf2(
-      dev,
-      image,
-      (percent) => {
+    await flashUf2(dev, image, {
+      signal: abort.signal,
+      onProgress: (percent) => {
         if (stillCurrent()) host._flashPercent = percent;
       },
-      { signal: abort.signal }
-    );
+      onLog: log,
+    });
   } catch (err) {
     if (stillCurrent()) {
       host._fail(

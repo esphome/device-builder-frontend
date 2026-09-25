@@ -1,6 +1,7 @@
 import { unzipSync } from "fflate";
 
 import { concat, int32LE } from "./bytes.js";
+import { tenthLogger } from "./flash-log.js";
 import {
   markSerialActivity,
   openLiveSerialPort,
@@ -298,17 +299,13 @@ class DfuSession extends SerialStreamSession {
   async sendFirmware(bin: Uint8Array, onPercent: (p: number) => void): Promise<void> {
     const chunkCount = Math.ceil(bin.length / DFU_PACKET_MAX_SIZE);
     this.log(`Transferring in ${chunkCount} packets`);
-    let previous = 0;
+    const tenth = tenthLogger(this.log, "Transferring");
     for (let i = 0; i < chunkCount; i++) {
       const chunk = bin.subarray(i * DFU_PACKET_MAX_SIZE, (i + 1) * DFU_PACKET_MAX_SIZE);
       await this.sendPacket(concat(int32LE(DFU_DATA_PACKET), chunk));
       const percent = Math.floor(((i + 1) / chunkCount) * 100);
       onPercent(percent);
-      // A line every ten percent, like the other engines.
-      if (Math.floor(percent / 10) > Math.floor(previous / 10)) {
-        this.log(`Transferring: ${Math.floor(percent / 10) * 10}%`);
-      }
-      previous = percent;
+      tenth(percent);
       if (i > 0 && i % 8 === 0) await this.race(sleep(PAGE_WRITE_MS));
     }
 
