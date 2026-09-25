@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getPicobootDevices,
   isUsbAccessDenied,
   isUsbDeviceLost,
   isWebUsbSupported,
@@ -66,6 +67,16 @@ describe("requestPicobootDevice", () => {
     await expect(requestPicobootDevice()).rejects.toMatchObject({
       name: "SecurityError",
     });
+  });
+});
+
+describe("getPicobootDevices", () => {
+  it("keeps only granted RP2 bootloaders", async () => {
+    const bootsel = { vendorId: RASPBERRY_PI_USB_VID, productId: 0x0003 };
+    const rp2350 = { vendorId: RASPBERRY_PI_USB_VID, productId: 0x000f };
+    const cdc = { vendorId: RASPBERRY_PI_USB_VID, productId: 0xf00a };
+    setUsb({ getDevices: vi.fn(async () => [cdc, bootsel, rp2350]) });
+    await expect(getPicobootDevices()).resolves.toEqual([bootsel, rp2350]);
   });
 });
 

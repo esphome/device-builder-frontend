@@ -5,12 +5,15 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import { PicoStrandedError, resetPicoForLogs } from "./rp2-logs-reset.js";
+import { isRp2Platform } from "./rp2-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import {
   openLiveSerialPort,
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
+import { isWebUsbSupported } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,
@@ -89,6 +92,45 @@ export async function reconnectWebSerialLogs(
     return;
   }
   await attachSerialLogStream(port, logsDialog, localize, baudRate);
+}
+
+/**
+ * Reset Device hook for a Pico logs session, or undefined where the dialog's
+ * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
+ * so the button stays hidden). Ends like a reconnect: a fresh stream attached,
+ * or ``setSerialOpenFailed`` with the cause.
+ */
+export function picoResetHook(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  targetPlatform: string,
+  baudRate: number
+): ((port: SerialPort) => Promise<void>) | undefined {
+  if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
+  return async (port) => {
+    let live: SerialPort | null;
+    try {
+      live = await resetPicoForLogs(port, baudRate);
+    } catch (err) {
+      const message = localize(
+        err instanceof PicoStrandedError
+          ? "dashboard.logs_rp2_reset_stranded"
+          : "dashboard.logs_reset_failed"
+      );
+      logsDialog.setSerialOpenFailed(message);
+      notifyError(message);
+      return;
+    }
+    if (!live) {
+      const message = localize("dashboard.logs_port_reopen_failed", {
+        port: formatSerialPortLabel(port),
+      });
+      logsDialog.setSerialOpenFailed(message);
+      notifyError(message);
+      return;
+    }
+    await attachSerialLogStream(live, logsDialog, localize, baudRate);
+  };
 }
 
 /**

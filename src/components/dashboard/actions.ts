@@ -433,7 +433,7 @@ export function streamSerialToDialog(
     _noteSerialActivity(): void;
     _enqueueLine(line: string): void;
   }
-): () => void {
+): () => Promise<void> {
   return streamSerialLines(port, {
     onLine: (line) => {
       // Keep draining while paused (Stop) but don't display (#526).

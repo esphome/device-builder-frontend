@@ -110,11 +110,21 @@ describe("streamSerialLines", () => {
       onDisconnect,
     });
     await flush();
-    cancel();
+    void cancel();
     await vi.waitFor(() => expect(port.close).toHaveBeenCalledOnce());
 
     expect(onDisconnect).not.toHaveBeenCalled();
     void ctrl;
+  });
+
+  it("cancel resolves once the port is closed, and again on a repeat call", async () => {
+    const port = makeOpenPort(() => {});
+    const cancel = streamSerialLines(port as unknown as SerialPort, { onLine: () => {} });
+    await flush();
+    await cancel();
+    expect(port.close).toHaveBeenCalledOnce();
+    await cancel();
+    expect(port.close).toHaveBeenCalledOnce();
   });
 
   it("cancel closes the port after the read loop releases the lock", async () => {
@@ -124,7 +134,7 @@ describe("streamSerialLines", () => {
     });
     const cancel = streamSerialLines(port as unknown as SerialPort, { onLine: () => {} });
     await flush();
-    cancel();
+    void cancel();
     // cancel → await loopDone (releaseLock) → port.close(): several ticks.
     await vi.waitFor(() => expect(port.close).toHaveBeenCalledOnce());
     void ctrl;

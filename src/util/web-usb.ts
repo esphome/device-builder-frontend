@@ -37,6 +37,12 @@ export function classifyUsbDevice(
   return "not-bootsel";
 }
 
+/** RP2 bootloaders this origin was already granted, so a repeat pick can skip the chooser. */
+export async function getPicobootDevices(): Promise<USBDevice[]> {
+  const devices = await navigator.usb.getDevices();
+  return devices.filter((d) => classifyUsbDevice(d) !== "not-bootsel");
+}
+
 /**
  * Chooser limited to RP2 bootloaders, so a Pico still running its app never
  * shows up; an RP2350 is listed so it can be refused with a specific message.

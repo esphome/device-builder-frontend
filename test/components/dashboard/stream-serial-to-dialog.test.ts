@@ -95,7 +95,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     expect(dialog._lines).toEqual([
       expect.stringMatching(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[app:100\]: Booting$/),
       expect.stringMatching(/^\[\d{2}:\d{2}:\d{2}\]\[W\]\[gpio:5\]: strapping$/),
@@ -107,7 +107,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     expect(dialog._lines).toHaveLength(1);
     expect(dialog._lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[app:100\]: Hello$/);
     expect(dialog._lines[0].endsWith("\r")).toBe(false);
@@ -122,7 +122,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     expect(dialog._lines).toHaveLength(3);
     expect(dialog._lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[a:1\]: hi$/);
     expect(dialog._lines[1]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]$/);
@@ -137,7 +137,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     expect(dialog._lines).toHaveLength(1);
     expect(dialog._lines[0]).toMatch(/\[I\]\[app:1\]: ok$/);
   });
@@ -147,7 +147,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     expect(dialog._lines).toHaveLength(1);
     expect(dialog._lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[app:100\]: partial$/);
   });
@@ -160,7 +160,7 @@ describe("streamSerialToDialog", () => {
     const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
-    cancel();
+    void cancel();
     await flush();
     expect(port._reader.releaseLock).toHaveBeenCalled();
     expect(port.close).toHaveBeenCalledTimes(1);

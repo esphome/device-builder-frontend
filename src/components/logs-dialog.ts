@@ -50,6 +50,7 @@ import {
   onStop,
   openOta,
   openPassive,
+  resetSerialDevice,
   resumeAfterReconnect,
   setSerialOpenFailed,
   setSerialStream,
@@ -171,6 +172,8 @@ export class ESPHomeLogsDialog extends LitElement {
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   _reconnect: (() => Promise<void>) | null = null;
+  /** Session-supplied Reset Device; null means the RTS pulse. */
+  _resetDevice: ((port: SerialPort) => Promise<void>) | null = null;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in
@@ -220,9 +223,10 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // Reset Device is an RTS pulse. A Pico has no reset line on its CDC and
-  // arduino-pico gates output on DTR, so the pulse would only silence it.
-  private _canResetDevice = true;
+  // The RTS-pulse Reset Device works here. A Pico has no reset line on its
+  // CDC and arduino-pico gates output on DTR, so the pulse would only silence
+  // it; a Pico resets through the session's hook instead (WebUSB browsers).
+  private _pulseResets = true;
 
   static styles = [
     espHomeStyles,
@@ -244,7 +248,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      this._canResetDevice = !isRp2Platform(this._targetPlatform);
+      this._pulseResets = !isRp2Platform(this._targetPlatform);
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
@@ -282,13 +286,14 @@ export class ESPHomeLogsDialog extends LitElement {
   public openPassive(options: {
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
+    onResetDevice?: (port: SerialPort) => Promise<void>;
   }) {
     openPassive(this, options);
   }
 
   /** Register the Web Serial reader (its loop-cancel) + port. Called by
    *  `attachSerialLogStream` once a port is open and streaming. */
-  public setSerialStream(port: SerialPort, cancel: () => void) {
+  public setSerialStream(port: SerialPort, cancel: () => Promise<void>) {
     setSerialStream(this, port, cancel);
   }
 
@@ -410,7 +415,7 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
-              passive && this._canResetDevice
+              passive && (this._resetDevice !== null || this._pulseResets)
                 ? // Web Serial only; disabled until a port is attached.
                   renderTermButton({
                     icon: "restart",
@@ -558,6 +563,7 @@ export class ESPHomeLogsDialog extends LitElement {
   // console; the reader stays attached so the boot log follows. Resumes display
   // first so a Stopped log shows the boot output instead of dropping it.
   private _onResetDevice = async () => {
+    if (this._resetDevice) return resetSerialDevice(this);
     const s = this._session;
     if (s.kind !== "serial") return;
     this._session = { ...s, paused: false };

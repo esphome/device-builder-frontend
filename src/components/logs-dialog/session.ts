@@ -17,6 +17,7 @@ export function openOta(
 ): void {
   beginSession(host, options.onBackToInstall);
   host._reconnect = null;
+  host._resetDevice = null;
   host._session = { kind: "ota", port, streamId: null };
   host._open = true;
   host._resetAnsiLogScroll();
@@ -34,10 +35,14 @@ export function openPassive(
     // path — Start re-runs it; otherwise the Start button would be a dead end.
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
+    // Replaces the RTS-pulse Reset Device: gets the closed port and ends by
+    // attaching a fresh stream (or ``setSerialOpenFailed``), like onReconnect.
+    onResetDevice?: (port: SerialPort) => Promise<void>;
   }
 ): void {
   beginSession(host, options.onBackToInstall);
   host._reconnect = options.onReconnect;
+  host._resetDevice = options.onResetDevice ?? null;
   // The attach (`attachSerialLogStream` -> `setSerialStream`) follows
   // immediately; show it as connecting/streaming until the reader lands.
   host._session = { kind: "reconnecting", paused: false };
@@ -62,20 +67,20 @@ function beginSession(host: ESPHomeLogsDialog, onBackToInstall?: () => void): vo
 export function setSerialStream(
   host: ESPHomeLogsDialog,
   port: SerialPort,
-  cancel: () => void
+  cancel: () => Promise<void>
 ): void {
   // The attach is async (the reopen path retries for up to 5s). If the dialog
   // closed or switched to a non-passive session while it was in flight, don't
   // register — tear it down (cancel stops the reader and closes the port) so
   // the handle isn't leaked, leaving the next open to fail "already open".
   if (!host._open || !isPassive(host._session)) {
-    cancel();
+    void cancel();
     return;
   }
   // Honor a Stop pressed during the in-flight attach; replace any prior
   // reader (defensive — `reconnecting` holds none).
   const paused = host._session.kind === "reconnecting" ? host._session.paused : false;
-  if (host._session.kind === "serial") host._session.cancel();
+  if (host._session.kind === "serial") void host._session.cancel();
   host._session = { kind: "serial", port, cancel, paused, outputSeen: false };
 }
 
@@ -121,7 +126,7 @@ export function teardownSession(host: ESPHomeLogsDialog): Promise<void> {
   const s = host._session;
   host._session = { kind: "idle" };
   if (s.kind === "serial") {
-    s.cancel();
+    void s.cancel();
     return Promise.resolve();
   }
   if (s.kind === "ota" && s.streamId !== null) {
@@ -301,6 +306,25 @@ function markOtaStopped(host: ESPHomeLogsDialog, streamId: string): void {
   const s = host._session;
   if (s.kind === "ota" && s.streamId === streamId) {
     host._session = { kind: "ota", port: s.port, streamId: null };
+  }
+}
+
+/** Reset Device through the session's hook: stop the reader and close the
+ *  port first, since the hook reopens it, then let the hook re-attach. */
+export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> {
+  const s = host._session;
+  const reset = host._resetDevice;
+  if (s.kind !== "serial" || !reset) return;
+  host._session = { kind: "reconnecting", paused: false };
+  await s.cancel();
+  try {
+    await reset(s.port);
+  } catch {
+    // The hook reports its own failures (setSerialOpenFailed -> dead); only
+    // an unhandled rejection leaves the session reconnecting.
+    if (host._session.kind !== "reconnecting") return;
+    host._session = { kind: "dead" };
+    notifyError(host._localize("dashboard.logs_reset_failed"));
   }
 }
 

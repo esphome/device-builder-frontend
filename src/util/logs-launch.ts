@@ -8,6 +8,7 @@ import { notifyError, notifyInfo } from "./notify.js";
 import {
   attachSerialLogStream,
   openNetworkLogsFallback,
+  picoResetHook,
   reconnectWebSerialLogs,
 } from "./post-install-logs.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
@@ -143,6 +144,12 @@ export async function launchLogsWithMethod(
           baudRate,
           device.logger_interface
         ),
+      onResetDevice: picoResetHook(
+        host.logsDialog,
+        host.localize,
+        device.target_platform,
+        baudRate
+      ),
     });
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.

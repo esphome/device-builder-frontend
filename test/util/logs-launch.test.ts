@@ -4,6 +4,20 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+const launch = vi.hoisted(() => ({
+  requestSerialPort: vi.fn<() => Promise<SerialPort | null>>(),
+  attachSerialLogStream: vi.fn(async () => {}),
+  picoResetHook: vi.fn<() => ((port: SerialPort) => Promise<void>) | undefined>(),
+}));
+vi.mock("../../src/util/web-serial.js", () => ({
+  requestSerialPort: launch.requestSerialPort,
+}));
+vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/post-install-logs.js")>()),
+  attachSerialLogStream: launch.attachSerialLogStream,
+  picoResetHook: launch.picoResetHook,
+}));
+
 import toast from "sonner-js";
 import { withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
@@ -184,5 +198,48 @@ describe("launchLogsWithMethod", () => {
     const host = makeHost(async () => []);
     await launchLogsWithMethod(host, makeDevice(), "server-serial");
     expect(host.logsDialog.open).not.toHaveBeenCalled();
+  });
+});
+
+describe("launchLogsWithMethod web-serial", () => {
+  function makeSerialHost() {
+    const host = makeHost(async () => []) as unknown as LogsLaunchHost & {
+      logsDialog: { openPassive: ReturnType<typeof vi.fn> };
+    };
+    (host.logsDialog as { openPassive: unknown }).openPassive = vi.fn();
+    return host;
+  }
+
+  it("hands the Pico reset hook to the passive session", async () => {
+    const restore = withWebSerial(true);
+    const port = {
+      getInfo: () => ({}),
+      open: vi.fn(async () => {}),
+    } as unknown as SerialPort;
+    launch.requestSerialPort.mockResolvedValue(port);
+    const hook = async () => {};
+    launch.picoResetHook.mockReturnValue(hook);
+    const host = makeSerialHost();
+    try {
+      const device = { ...makeDevice(), target_platform: "rp2", logger_baud_rate: null };
+      await launchLogsWithMethod(host, device, "web-serial");
+      expect(launch.picoResetHook).toHaveBeenCalledWith(
+        host.logsDialog,
+        host.localize,
+        "rp2",
+        115200
+      );
+      expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
+        expect.objectContaining({ onResetDevice: hook })
+      );
+      expect(launch.attachSerialLogStream).toHaveBeenCalledWith(
+        port,
+        host.logsDialog,
+        host.localize,
+        115200
+      );
+    } finally {
+      restore();
+    }
   });
 });

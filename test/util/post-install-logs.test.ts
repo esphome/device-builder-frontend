@@ -18,15 +18,29 @@ const { toastError, toastInfo } = vi.hoisted(() => ({
   toastInfo: vi.fn(),
 }));
 vi.mock("sonner-js", () => ({ default: { error: toastError, info: toastInfo } }));
+const picoReset = vi.hoisted(() => ({
+  resetPicoForLogs:
+    vi.fn<(port: SerialPort, baud: number) => Promise<SerialPort | null>>(),
+  webUsb: true,
+}));
+vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
+  resetPicoForLogs: picoReset.resetPicoForLogs,
+}));
+vi.mock("../../src/util/web-usb.js", () => ({
+  isWebUsbSupported: () => picoReset.webUsb,
+}));
 
 import { defaultLocalize } from "../../src/common/localize.js";
 import {
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
+  picoResetHook,
   type PostInstallShowLogsDetail,
   reconnectWebSerialLogs,
 } from "../../src/util/post-install-logs.js";
+import { PicoStrandedError } from "../../src/util/rp2-logs-reset.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function openPort(
@@ -213,6 +227,61 @@ describe("reconnectWebSerialLogs", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("picoResetHook", () => {
+  it("is offered only for rp2 on a WebUSB browser", () => {
+    const dialog = stubDialog() as never;
+    expect(picoResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeTypeOf("function");
+    expect(picoResetHook(dialog, defaultLocalize, "esp32", 115200)).toBeUndefined();
+    picoReset.webUsb = false;
+    try {
+      expect(picoResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeUndefined();
+    } finally {
+      picoReset.webUsb = true;
+    }
+  });
+
+  it("streams the reopened port after the reboot", async () => {
+    const dialog = stubDialog();
+    const closed = deadPort();
+    const live = openPort();
+    picoReset.resetPicoForLogs.mockResolvedValue(live);
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 9600)!(closed);
+    expect(picoReset.resetPicoForLogs).toHaveBeenCalledWith(closed, 9600);
+    expect(dialog.setSerialStream).toHaveBeenCalledWith(live, expect.any(Function));
+    // The port came back open, so no DTR/RTS clear (a Pico needs DTR high).
+    expect(live.setSignals).not.toHaveBeenCalled();
+  });
+
+  it("names the stranded Pico when the reboot could not be sent", async () => {
+    const dialog = stubDialog();
+    picoReset.resetPicoForLogs.mockRejectedValue(new PicoStrandedError(new Error("x")));
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!(deadPort());
+    const message = defaultLocalize("dashboard.logs_rp2_reset_stranded");
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
+    expect(toastError).toHaveBeenCalledWith(message, expect.anything());
+  });
+
+  it("reports a failed touch as a plain reset failure", async () => {
+    const dialog = stubDialog();
+    picoReset.resetPicoForLogs.mockRejectedValue(
+      new DOMException("gone", "NetworkError")
+    );
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!(deadPort());
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_reset_failed")
+    );
+  });
+
+  it("reports a port that never came back, naming it", async () => {
+    const dialog = stubDialog();
+    picoReset.resetPicoForLogs.mockResolvedValue(null);
+    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!(deadPort());
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_port_reopen_failed", { port: "USB 303a:1001" })
+    );
   });
 });
 

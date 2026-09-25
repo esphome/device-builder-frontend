@@ -91,6 +91,7 @@
     "logs_states": "States",
     "logs_reset_device": "Reset device",
     "logs_reset_failed": "Failed to reset the device.",
+    "logs_rp2_reset_stranded": "The Pico is waiting in BOOTSEL mode. Unplug and replug it to start the firmware, then click Start.",
     "logs_web_serial_open_failed": "Failed to open the serial port.",
     "logs_hide_states": "Hide states",
     "logs_show_states": "Show states",

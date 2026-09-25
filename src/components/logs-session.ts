@@ -45,7 +45,7 @@ export type LogsSession =
   | {
       readonly kind: "serial";
       readonly port: SerialPort;
-      readonly cancel: () => void;
+      readonly cancel: () => Promise<void>;
       readonly paused: boolean;
       readonly outputSeen: boolean;
     }
