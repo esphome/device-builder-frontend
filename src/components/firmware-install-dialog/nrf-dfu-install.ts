@@ -4,6 +4,7 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -104,7 +105,7 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        touching ? withManualBootloaderHint(host, err) : getErrorMessage(err)
+        touching ? manualBootloaderHint(host, err) : getErrorMessage(err)
       );
     }
     return;
@@ -155,7 +156,7 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.nrf_flash_failed"),
-        flashing ? withManualBootloaderHint(host, err) : getErrorMessage(err)
+        flashing ? manualBootloaderHint(host, err) : getErrorMessage(err)
       );
     }
     return;
@@ -167,17 +168,5 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._step = "done";
 }
 
-// A failed touch or a bootloader that never answered both have the same way
-// out: enter the bootloader by hand. An abort is the dialog's own teardown.
-function withManualBootloaderHint(
-  host: ESPHomeFirmwareInstallDialog,
-  err: unknown
-): string {
-  const message = getErrorMessage(err);
-  if (err instanceof DOMException && err.name === "AbortError") return message;
-  // The joined sentence is one translatable string; a browser message that
-  // already ends with a period would otherwise double it.
-  return host._localize("firmware.nrf_manual_bootloader_hint", {
-    error: message.replace(/\.\s*$/, ""),
-  });
-}
+const manualBootloaderHint = (host: ESPHomeFirmwareInstallDialog, err: unknown): string =>
+  withManualBootloaderHint(err, host._localize, "firmware.nrf_manual_bootloader_hint");

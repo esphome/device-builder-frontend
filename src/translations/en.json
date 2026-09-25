@@ -2036,12 +2036,13 @@
       "install_done": "Firmware installed successfully.",
       "install_done_hint": "Your device has been updated and is rebooting.",
       "install_resetting": "Resetting device into DFU mode…",
-      "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready.",
+      "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready. If no new port appears, the firmware on the board did not act on the reset: double-press the board's reset button to enter the bootloader by hand, then click Continue.",
       "install_flashing": "Installing firmware…",
       "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
       "install_error_no_file": "Select a DFU package first.",
       "install_error_bad_package": "Invalid DFU package: {error}",
-      "install_error_flash": "Firmware update failed: {error}"
+      "install_error_flash": "Firmware update failed: {error}",
+      "install_manual_bootloader_hint": "{error}. Double-press the board's reset button to enter the bootloader by hand, then retry and pick the new port."
     }
   },
   "remote_build_dashboard": {
