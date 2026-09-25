@@ -62,6 +62,7 @@ export function openPassive(
  *  view state. ``_showStates`` resets each open so the dialog behaves the same
  *  way every time unless the user flips it this session. */
 function beginSession(host: ESPHomeLogsDialog, onBackToInstall?: () => void): void {
+  host._sessionGen += 1;
   void teardownSession(host);
   host._clearLogs();
   host._expanded = false;
@@ -334,10 +335,9 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   if (s.kind !== "serial" || !resetOffered(host)) return;
   const hook = host._resetDevice;
   if (hook) {
-    const cancelled = () => !host._open || host._session.kind !== "reconnecting";
     await runReconnecting(
       host,
-      async () => {
+      async (cancelled) => {
         await s.cancel();
         await hook.run(s.port, cancelled);
       },
@@ -362,22 +362,32 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
 
 // Run a session hook (reconnect or reset) as `reconnecting`. The hook reports
 // its own failures (setSerialOpenFailed -> `dead`, with its own toast); still
-// `reconnecting` afterwards means a genuinely unhandled rejection, so only
+// `reconnecting` afterwards means it neither attached nor failed, so only
 // that gets surfaced (no double toast).
 async function runReconnecting(
   host: ESPHomeLogsDialog,
-  task: () => Promise<void>,
+  task: (cancelled: () => boolean) => Promise<void>,
   failKey: string
 ): Promise<void> {
+  const gen = host._sessionGen;
+  // Also true once the dialog was closed and reopened: that is a new session
+  // this task must not attach to or fail.
+  const cancelled = () =>
+    host._sessionGen !== gen || host._session.kind !== "reconnecting";
   host._session = { kind: "reconnecting", paused: false };
+  let failure: unknown;
   try {
-    await task();
+    await task(cancelled);
   } catch (err) {
-    if (host._session.kind !== "reconnecting") return;
     console.warn("Serial session hook failed", err);
-    host._session = { kind: "dead" };
-    notifyError(host._localize(failKey));
+    failure = err;
   }
+  if (cancelled()) return;
+  // A hook that returned without attaching or failing would strand the dialog
+  // in `reconnecting`; treat it like a rejection.
+  if (failure === undefined) console.warn("Serial session hook ended without a stream");
+  host._session = { kind: "dead" };
+  notifyError(host._localize(failKey));
 }
 
 function reconnectSerial(host: ESPHomeLogsDialog): void {

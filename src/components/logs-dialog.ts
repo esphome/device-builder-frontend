@@ -175,6 +175,9 @@ export class ESPHomeLogsDialog extends LitElement {
   // Session-supplied Reset Device (a Pico's BOOTSEL round trip); without it
   // Reset Device is the RTS pulse, offered only where that works.
   _resetDevice: SerialResetHook | null = null;
+  // Bumped per open, so a hook still running for a closed dialog can tell
+  // the session it started in from one opened since.
+  _sessionGen = 0;
 
   // Watchdog for a Web Serial reader that shows nothing (uart: repurposed
   // the console pins, wrong baud). Armed/disarmed off the session state in

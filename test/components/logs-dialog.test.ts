@@ -359,6 +359,39 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(toastError).toHaveBeenCalledOnce();
   });
 
+  it("treats a reset hook that ends without a stream as a failure, not a stuck session", async () => {
+    el.openPassive({ onReconnect: () => Promise.resolve(), onResetDevice: alwaysHook });
+    el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
+    await (el as any)._onResetDevice();
+    expect(session(el).kind).toBe("dead");
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a reset once the dialog was closed and reopened, sparing the new session", async () => {
+    const gate = deferred();
+    let seen: (() => boolean) | undefined;
+    const run = vi.fn(async (_p: SerialPort, cancelled: () => boolean) => {
+      seen = cancelled;
+      await gate.promise;
+    });
+    el.openPassive({
+      onReconnect: () => Promise.resolve(),
+      onResetDevice: { ...alwaysHook, run },
+    });
+    el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
+    const reset = (el as any)._onResetDevice() as Promise<void>;
+    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
+    expect(seen!()).toBe(false);
+    call(el, "_onDialogHide");
+    expect(seen!()).toBe(true);
+    el.openPassive({ onReconnect: () => Promise.resolve() }); // a new session
+    expect(seen!()).toBe(true); // still cancelled: not the session it started in
+    gate.resolve();
+    await reset;
+    expect(session(el).kind).toBe("reconnecting"); // the new session, untouched
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
   it("Reset Device resumes a paused log so the boot output shows", async () => {
     startPassive();
     call(el, "_onStop"); // user had Stopped (paused) the log
