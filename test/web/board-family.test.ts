@@ -11,10 +11,18 @@ describe("boardFamilyOfPort", () => {
     expect(boardFamilyOfPort(port(0x2e8a, 0x000c))).toBeNull();
   });
 
-  it("reads the known nRF52 vendors", () => {
+  it("reads the known nRF52 boards, and Nordic's own id outright", () => {
     expect(boardFamilyOfPort(port(0x239a, 0x8029))).toBe("nrf");
+    expect(boardFamilyOfPort(port(0x239a, 0x0029))).toBe("nrf");
     expect(boardFamilyOfPort(port(0x1915, 0x520f))).toBe("nrf");
     expect(boardFamilyOfPort(port(0x2886, 0x8045))).toBe("nrf");
+  });
+
+  it("stays silent for Adafruit's or Seeed's other boards", () => {
+    // Feather RP2040 under arduino-pico, a tinyuf2 ESP32-S3 bootloader.
+    expect(boardFamilyOfPort(port(0x239a, 0x80f1))).toBeNull();
+    expect(boardFamilyOfPort(port(0x239a, 0x0110))).toBeNull();
+    expect(boardFamilyOfPort(port(0x2886, 0x802f))).toBeNull();
   });
 
   it("reads an Espressif native-USB device or a UART bridge as the ESP flow", () => {

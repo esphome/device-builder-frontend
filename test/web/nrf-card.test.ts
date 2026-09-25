@@ -153,9 +153,7 @@ describe("esphome-web-nrf-card port announcement", () => {
     mocks.openPortForLogs.mockResolvedValue(true);
     const el = await mount();
     const picked = vi.fn();
-    document.body.addEventListener("port-picked", (e) =>
-      picked((e as CustomEvent).detail)
-    );
+    el.addEventListener("port-picked", (e) => picked((e as CustomEvent).detail));
     await (el as any)._showSerialLogs();
     expect(picked).toHaveBeenCalledWith(port);
   });

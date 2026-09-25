@@ -107,6 +107,8 @@ export class ESPHomeWebApp extends LitElement {
   };
 
   private _setMode(mode: WebMode): void {
+    // A stale toast clicked after a manual switch must not push the URL twice.
+    if (mode === this._mode) return;
     this._mode = mode;
     writeMode(mode);
   }

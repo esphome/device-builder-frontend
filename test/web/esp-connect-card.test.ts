@@ -147,9 +147,7 @@ describe("esphome-web-esp-connect-card port announcement", () => {
     document.body.appendChild(el);
     await el.updateComplete;
     const picked = vi.fn();
-    document.body.addEventListener("port-picked", (e) =>
-      picked((e as CustomEvent).detail)
-    );
+    el.addEventListener("port-picked", (e) => picked((e as CustomEvent).detail));
     await (el as any)._connect();
     expect(picked).toHaveBeenCalledWith(port);
   });

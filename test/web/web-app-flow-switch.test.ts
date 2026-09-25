@@ -51,8 +51,9 @@ afterEach(() => {
 const mountApp = () => mount(new ESPHomeWebApp());
 const pick = (el: ESPHomeWebApp, p: SerialPort) =>
   el.dispatchEvent(new CustomEvent("port-picked", { detail: p, bubbles: true }));
+// Current Chromium fires connect at the port itself (event.target).
 const plugIn = (p: SerialPort) =>
-  serialListeners.connect({ port: p } as unknown as Event);
+  serialListeners.connect({ target: p } as unknown as Event);
 
 describe("web app flow-switch suggestion", () => {
   it("offers the Pico flow when a picked port looks like a Pico, and switches on the action", async () => {
@@ -79,6 +80,23 @@ describe("web app flow-switch suggestion", () => {
     plugIn(PICO);
     expect(notifyInfo).toHaveBeenCalledTimes(1);
     expect(notifyInfo.mock.lastCall![0]).toBe("web.flow_switch.pico");
+  });
+
+  it("also reads the legacy event.port shape", async () => {
+    await mountApp();
+    serialListeners.connect({ port: PICO, target: null } as unknown as Event);
+    expect(notifyInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not push the URL twice when a stale toast is clicked after a manual switch", async () => {
+    const el = await mountApp();
+    pick(el, PICO);
+    const { onClick } = notifyInfo.mock.lastCall![1].action;
+    const before = window.history.length;
+    (el as unknown as { _setMode: (m: string) => void })._setMode("pico");
+    onClick();
+    expect(window.history.length).toBe(before + 1);
+    expect(window.location.search).toBe("?pico");
   });
 
   it("ignores a plug-in that is our own touch or flash re-enumerating", async () => {
