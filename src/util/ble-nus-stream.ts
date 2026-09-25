@@ -140,7 +140,11 @@ async function subscribe(
     txChar.addEventListener("characteristicvaluechanged", onValue);
     // Chrome caches its subscribed flag per characteristic; a device that
     // reset the CCCD on disconnect would otherwise never be re-subscribed.
-    await txChar.stopNotifications().catch(() => {});
+    await txChar.stopNotifications().catch((err: unknown) => {
+      // Nothing subscribed is the usual answer; anything else may leave the
+      // CCCD unwritten below, so it is worth a trace.
+      console.warn("BLE NUS stopNotifications failed", err);
+    });
     await txChar.startNotifications();
     // A drop during the subscribe fails it here rather than streaming nothing.
     if (!device.gatt?.connected) {

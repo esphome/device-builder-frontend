@@ -89,6 +89,21 @@ describe("streamBleNus", () => {
     expect(d.deviceListeners.size).toBe(0);
   });
 
+  it("logs a failed pre-subscribe unsubscribe instead of swallowing it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const d = fakeDevice();
+    d.char.stopNotifications.mockRejectedValueOnce(
+      new DOMException("GATT", "NetworkError")
+    );
+    const cancel = await streamBleNus(d.device, { onLine: () => {} });
+    expect(warn).toHaveBeenCalledWith(
+      "BLE NUS stopNotifications failed",
+      expect.anything()
+    );
+    await cancel();
+    warn.mockRestore();
+  });
+
   it("reports a remote disconnect once, flushing a partial last line, and detaches", async () => {
     const d = fakeDevice();
     const onDisconnect = vi.fn();

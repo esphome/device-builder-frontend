@@ -269,6 +269,22 @@ describe("launchLogsWithMethod ble-nus", () => {
     expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(cancel);
   });
 
+  it("toasts instead of leaving an unhandled rejection when the BLE attach throws", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    ble.requestBleNusDevice.mockResolvedValue({} as BluetoothDevice);
+    ble.streamBleNus.mockRejectedValue(new Error("boom"));
+    const host = makeHost(async () => []);
+    host.logsDialog.openPassive.mockReturnValue(() => false);
+    host.logsDialog.setBleStream.mockImplementation(() => {
+      throw new Error("late");
+    });
+    await expect(
+      launchLogsWithMethod(host, makeDevice(), "ble-nus")
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("says Bluetooth is off or blocked when the adapter is unavailable", async () => {
     ble.requestBleNusDevice.mockRejectedValue(new BleUnavailableError());
     const host = makeHost(async () => []);

@@ -183,7 +183,14 @@ export async function launchLogsWithMethod(
       onReconnect: (cancelled) =>
         attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled),
     });
-    await attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled);
+    // attach reports its own failures; cover any other rejection so it can't
+    // escape this fire-and-forget call as an unhandled rejection.
+    try {
+      await attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled);
+    } catch (err) {
+      console.warn("BLE NUS attach failed", err);
+      notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
+    }
   }
 }
 
