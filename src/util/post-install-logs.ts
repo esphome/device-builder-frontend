@@ -328,7 +328,7 @@ export async function handlePostInstallShowLogs(
       });
       return;
     }
-    logsDialog.openPassive({
+    const cancelled = logsDialog.openPassive({
       onBackToInstall: reopenInstall,
       // "click Start to reconnect" after a reopen failure (#636). Re-acquire a
       // fresh port via the picker rather than reopening the cached esptool
@@ -352,7 +352,7 @@ export async function handlePostInstallShowLogs(
     /* The install just left the port closed via ``resetAndDisconnect``;
        the attach reopens the still-granted port (retrying the native-USB
        re-enumeration window) and starts reading. */
-    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate);
+    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate, cancelled);
   } else {
     logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }

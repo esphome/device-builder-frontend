@@ -47,7 +47,7 @@ export function openPassive(
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
   }
-): void {
+): () => boolean {
   beginSession(host, options.onBackToInstall);
   host._reconnect = options.onReconnect;
   host._resetDevice = options.onResetDevice ?? null;
@@ -56,6 +56,16 @@ export function openPassive(
   host._session = { kind: "reconnecting", paused: false };
   host._open = true;
   host._resetAnsiLogScroll();
+  // For that attach: it may still be settling when this session is gone.
+  return sessionMovedOn(host);
+}
+
+/** Whether the session current at the call has ended or been replaced,
+ *  also once the dialog was closed and reopened (a new session the caller
+ *  must not attach to or fail). */
+function sessionMovedOn(host: ESPHomeLogsDialog): () => boolean {
+  const gen = host._sessionGen;
+  return () => host._sessionGen !== gen || host._session.kind !== "reconnecting";
 }
 
 /** Shared open prologue: tear down any prior session and reset the per-session
@@ -376,11 +386,7 @@ async function runReconnecting(
   task: (cancelled: () => boolean) => Promise<void>,
   failKey: string
 ): Promise<void> {
-  const gen = host._sessionGen;
-  // Also true once the dialog was closed and reopened: that is a new session
-  // this task must not attach to or fail.
-  const cancelled = () =>
-    host._sessionGen !== gen || host._session.kind !== "reconnecting";
+  const cancelled = sessionMovedOn(host);
   host._session = { kind: "reconnecting", paused: false };
   let failure: unknown;
   try {

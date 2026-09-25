@@ -136,7 +136,7 @@ export async function launchLogsWithMethod(
     }
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
     // port via the picker — the cached handle can be dead after a device reset.
-    host.logsDialog.openPassive({
+    const cancelled = host.logsDialog.openPassive({
       onReconnect: (cancelled) =>
         reconnectWebSerialLogs(
           host.logsDialog,
@@ -155,7 +155,13 @@ export async function launchLogsWithMethod(
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.
     try {
-      await attachSerialLogStream(serialPort, host.logsDialog, host.localize, baudRate);
+      await attachSerialLogStream(
+        serialPort,
+        host.logsDialog,
+        host.localize,
+        baudRate,
+        cancelled
+      );
     } catch {
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }

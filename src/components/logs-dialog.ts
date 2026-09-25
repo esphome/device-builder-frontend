@@ -287,12 +287,13 @@ export class ESPHomeLogsDialog extends LitElement {
     openOta(this, port, options);
   }
 
+  /** Returns the cancel predicate for this session's own attach. */
   public openPassive(options: {
     onReconnect: (cancelled: () => boolean) => Promise<void>;
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
-  }) {
-    openPassive(this, options);
+  }): () => boolean {
+    return openPassive(this, options);
   }
 
   /** Register the Web Serial reader (its loop-cancel) + port. Called by

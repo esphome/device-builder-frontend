@@ -385,6 +385,15 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     return { gate, reset, cancelled: () => seen() };
   }
 
+  it("hands the opener a predicate that trips once this session is gone", () => {
+    const cancelled = el.openPassive({ onReconnect: () => Promise.resolve() });
+    expect(cancelled()).toBe(false);
+    closeDialog(el);
+    expect(cancelled()).toBe(true);
+    el.openPassive({ onReconnect: () => Promise.resolve() }); // a new session
+    expect(cancelled()).toBe(true);
+  });
+
   it("cancels an in-flight reset as soon as the close is requested", async () => {
     const { gate, reset, cancelled } = await startGatedReset();
     expect(cancelled()).toBe(false);
