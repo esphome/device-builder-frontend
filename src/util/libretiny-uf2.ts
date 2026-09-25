@@ -6,7 +6,6 @@
  * to. This resolves the UART flasher's scheme (always the first OTA slot, as
  * ltchiptool does) into absolute flash runs.
  */
-import { concat } from "./bytes.js";
 import {
   parseUf2Blocks,
   requireUf2Family,
@@ -149,7 +148,10 @@ export function parseLibreTinyImage(
   if (!table) throw new Error("Invalid UF2: no partition table");
   const partitions = parsePartitionTable(table);
 
-  const runs: { address: number; parts: Uint8Array[]; length: number }[] = [];
+  // A run grows at its cursor; LibreTiny writes an image's header as a
+  // later group that lands back on the partition start, which rewinds the
+  // cursor and overwrites the first pages in place (the body stays).
+  const runs: { address: number; bytes: number[]; cursor: number }[] = [];
   let part: LibreTinyPartition | null = null;
   let grouped = false;
   for (const b of blocks) {
@@ -170,23 +172,23 @@ export function parseLibreTinyImage(
       );
     }
     const address = part.offset + b.address;
-    const tail = runs.find((r) => r.address + r.length === address);
-    if (tail) {
-      tail.parts.push(b.data);
-      tail.length += b.data.length;
-      continue;
+    let run = runs.find((r) => r.address + r.cursor === address);
+    if (!run) {
+      run = runs.find((r) => r.address === address);
+      if (run) run.cursor = 0;
     }
-    // A group that restarts at a known offset rewrites that run from its start.
-    const existing = runs.find((r) => r.address === address);
-    if (existing) {
-      existing.parts = [b.data];
-      existing.length = b.data.length;
-    } else {
-      runs.push({ address, parts: [b.data], length: b.data.length });
+    if (!run) {
+      run = { address, bytes: [], cursor: 0 };
+      runs.push(run);
     }
+    for (let i = 0; i < b.data.length; i++) run.bytes[run.cursor + i] = b.data[i];
+    run.cursor += b.data.length;
   }
   if (runs.length === 0) throw new Error("Invalid UF2: nothing to flash");
-  const ranges = runs.map((r) => ({ address: r.address, data: concat(...r.parts) }));
+  const ranges = runs.map((r) => ({
+    address: r.address,
+    data: new Uint8Array(r.bytes) as Uint8Array<ArrayBuffer>,
+  }));
   return {
     familyId,
     board,

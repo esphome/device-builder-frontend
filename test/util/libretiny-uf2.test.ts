@@ -63,18 +63,24 @@ describe("parseLibreTinyImage", () => {
     expect(parse(uf2).runs.map((r) => r.address)).toEqual([0x4000]);
   });
 
-  it("restarts a run when a later group lands on a known offset", () => {
+  it("overwrites a run's first pages in place when a later group restarts it (the image header)", () => {
     const uf2 = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, fill: 0x11, tags: info(BOOT_INFO) },
+        { addr: 0x0, fill: 0x11, tags: info(OTA_INFO) },
         { addr: 0x100, fill: 0x12 },
-        { addr: 0x0, fill: 0x21, tags: info(BOOT_INFO) },
+        { addr: 0x200, fill: 0x13 },
+        // The header, written last so a partial flash never looks bootable.
+        { addr: 0x0, fill: 0x21, tags: info(OTA_INFO) },
+        { addr: 0x100, fill: 0x22 },
       ],
     });
     const runs = parse(uf2).runs;
     expect(runs).toHaveLength(1);
-    expect(runs[0].data.length).toBe(256);
-    expect(runs[0].data[0]).toBe(0x21);
+    expect(runs[0].address).toBe(0xc000);
+    expect(runs[0].data.length).toBe(768);
+    expect([runs[0].data[0], runs[0].data[0x100], runs[0].data[0x200]]).toEqual([
+      0x21, 0x22, 0x13,
+    ]);
   });
 
   it("refuses another Realtek family, naming it", () => {
