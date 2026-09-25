@@ -59,7 +59,12 @@ export class ESPHomeInstallDetailsLog extends LitElement {
   protected render() {
     return html`
       <div class="logs-header">
-        <button class="logs-toggle" @click=${this._toggle}>
+        <button
+          class="logs-toggle"
+          aria-expanded=${this.expanded ? "true" : "false"}
+          aria-controls=${this.expanded ? "log" : nothing}
+          @click=${this._toggle}
+        >
           <wa-icon
             library="mdi"
             name=${this.expanded ? "chevron-up" : "chevron-down"}
@@ -73,7 +78,7 @@ export class ESPHomeInstallDetailsLog extends LitElement {
       </div>
       ${
         this.expanded
-          ? html`<div class="logs-container">
+          ? html`<div class="logs-container" id="log">
               <esphome-ansi-log
                 .lines=${this.lines}
                 .targetPlatform=${this.targetPlatform}

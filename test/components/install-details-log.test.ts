@@ -39,9 +39,12 @@ describe("esphome-install-details-log", () => {
     const changed = vi.fn();
     el.addEventListener("expanded-changed", (e) => changed((e as CustomEvent).detail));
     expect(ansiLog(el)).toBeNull();
+    expect(toggle(el).getAttribute("aria-expanded")).toBe("false");
     toggle(el).click();
     await el.updateComplete;
     expect(changed).toHaveBeenLastCalledWith(true);
+    expect(toggle(el).getAttribute("aria-expanded")).toBe("true");
+    expect(toggle(el).getAttribute("aria-controls")).toBe("log");
     expect(ansiLog(el).lines).toEqual(["a", "b"]);
     expect(ansiLog(el).targetPlatform).toBe("esp32");
     expect(toggle(el).textContent).toContain("firmware.hide_details");
