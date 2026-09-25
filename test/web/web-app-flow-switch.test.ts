@@ -127,6 +127,15 @@ describe("web app flow-switch suggestion", () => {
     expect(window.location.search).toBe("");
   });
 
+  it("keeps the offer for a replug once the dialog that suppressed it has closed", async () => {
+    await mountApp();
+    hasOpenDialog.mockReturnValue(true);
+    plugIn(PICO);
+    hasOpenDialog.mockReturnValue(false);
+    plugIn(PICO);
+    expect(notifyInfo).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores a plug-in that is our own touch or flash re-enumerating", async () => {
     await mountApp();
     isRecentSerialActivity.mockReturnValue(true);

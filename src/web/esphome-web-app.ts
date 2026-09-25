@@ -128,25 +128,30 @@ export class ESPHomeWebApp extends LitElement {
   private _onSerialConnect = (e: Event): void => {
     if (isOwnSerialReenumeration()) return;
     const port = portOfSerialConnectEvent(e);
-    if (port && this._connectAnnouncements.shouldAnnounce(port))
-      this._suggestFlowFor(port);
+    if (port) this._suggestFlowFor(port, this._connectAnnouncements);
   };
 
-  /**
-   * The ids alone never decide the flow: a port that clearly belongs to
-   * another board family gets a toast offering the switch, an unknown one
-   * nothing, and the flow the user is in carries on either way.
-   */
   // Switching flows unmounts the current one: never offer or apply it while
   // a dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
   private _operationInProgress(): boolean {
     return hasOpenDialog() || isImprovDialogMounted();
   }
 
-  private _suggestFlowFor(port: SerialPort): void {
+  /**
+   * The ids alone never decide the flow: a port that clearly belongs to
+   * another board family gets a toast offering the switch, an unknown one
+   * nothing, and the flow the user is in carries on either way. A plug-in
+   * passes its ``announced`` memory so a reboot-looping board is offered
+   * once; it is consumed only when a toast actually shows.
+   */
+  private _suggestFlowFor(
+    port: SerialPort,
+    announced?: SerialConnectAnnouncements
+  ): void {
     if (this._operationInProgress()) return;
     const family = boardFamilyOfPort(port);
     if (family === null || family === this._mode) return;
+    if (announced && !announced.shouldAnnounce(port)) return;
     notifyInfo(this._localize(`web.flow_switch.${family}`), {
       id: "esphome-web-flow-switch",
       duration: LONG_TOAST_DURATION_MS,
