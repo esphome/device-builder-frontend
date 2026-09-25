@@ -9,6 +9,7 @@ import {
   PicobootDevice,
   PicobootError,
 } from "../../src/util/rp2-picoboot.js";
+import { isRecentSerialActivity } from "../../src/util/serial-reacquire.js";
 import type { Uf2Image } from "../../src/util/uf2.js";
 import { classifyUsbDevice } from "../../src/util/web-usb.js";
 
@@ -286,6 +287,8 @@ describe("flashUf2", () => {
     expect(packetArgs(d, PicobootCmd.EXCLUSIVE_ACCESS).map((a) => a[0])).toEqual([1]);
     const [reboot] = packetArgs(d, PicobootCmd.REBOOT);
     expect([u32(reboot, 0), u32(reboot, 4), u32(reboot, 8)]).toEqual([0, 0, 500]);
+    // The CDC re-enumerating after the reboot must not raise the connect toast.
+    expect(isRecentSerialActivity()).toBe(true);
     expect(progress[progress.length - 1]).toBe(100);
     expect(progress.every((p, i) => i === 0 || p >= progress[i - 1])).toBe(true);
     expect(d.log.slice(-2)).toEqual([{ kind: "release", iface: 1 }, { kind: "close" }]);

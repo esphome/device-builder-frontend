@@ -4,6 +4,7 @@
  * install flows; nothing here touches the DOM.
  */
 import { concat, int32LE } from "./bytes.js";
+import { markSerialActivity } from "./serial-reacquire.js";
 import type { Uf2Image } from "./uf2.js";
 import { isUsbDeviceLost } from "./web-usb.js";
 
@@ -250,6 +251,8 @@ export class PicobootDevice {
 
   /** RP2040 reboot into flash. The device may drop off the bus before the ACK arrives. */
   async reboot(): Promise<void> {
+    // The firmware's CDC port re-enumerates next; that connect event is ours.
+    markSerialActivity();
     await this.command(
       { id: PicobootCmd.REBOOT, args: u32Args(0, 0, REBOOT_DELAY_MS) },
       undefined,

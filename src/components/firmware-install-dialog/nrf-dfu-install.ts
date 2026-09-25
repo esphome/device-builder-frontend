@@ -5,7 +5,6 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
-import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
@@ -180,8 +179,6 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
         },
       }
     );
-    // The flashed firmware re-enumerates as a CDC port: expected, not a new device.
-    markSerialActivity();
   } catch (err) {
     if (stillCurrent()) {
       host._fail(host._localize("firmware.nrf_flash_failed"), getErrorMessage(err));

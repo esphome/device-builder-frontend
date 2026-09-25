@@ -232,6 +232,18 @@ describe("reconnectWebSerialLogs", () => {
 });
 
 describe("picoResetHook", () => {
+  // The port only reaches the mocked resetPicoForLogs, so any handle serves.
+  const runHook = (
+    dialog: ReturnType<typeof stubDialog>,
+    cancelled: boolean,
+    baud = 115200,
+    port: SerialPort = openPort()
+  ) =>
+    picoResetHook(dialog as never, defaultLocalize, "rp2", baud)!.run(
+      port,
+      () => cancelled
+    );
+
   it("is offered only for rp2 on a WebUSB browser", () => {
     const dialog = stubDialog() as never;
     expect(picoResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeTypeOf("object");
@@ -258,10 +270,7 @@ describe("picoResetHook", () => {
   it("stays quiet when the dialog closed during the reset", async () => {
     const dialog = stubDialog();
     picoReset.resetPicoForLogs.mockResolvedValue(null);
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => true
-    );
+    await runHook(dialog, true, 115200);
     expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
   });
@@ -269,10 +278,7 @@ describe("picoResetHook", () => {
   it("only toasts a stranding once the dialog closed, leaving newer sessions alone", async () => {
     const dialog = stubDialog();
     picoReset.resetPicoForLogs.mockRejectedValue(new PicoStrandedError("pick"));
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => true
-    );
+    await runHook(dialog, true, 115200);
     expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_rp2_reset_stranded"),
@@ -284,10 +290,7 @@ describe("picoResetHook", () => {
     const dialog = stubDialog();
     const live = openPort();
     picoReset.resetPicoForLogs.mockResolvedValue(live);
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => true
-    );
+    await runHook(dialog, true, 115200);
     expect(live.close).toHaveBeenCalledOnce();
     expect(dialog.setSerialStream).not.toHaveBeenCalled();
   });
@@ -297,10 +300,7 @@ describe("picoResetHook", () => {
     const closed = deadPort();
     const live = openPort();
     picoReset.resetPicoForLogs.mockResolvedValue(live);
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 9600)!.run(
-      closed,
-      () => false
-    );
+    await runHook(dialog, false, 9600, closed);
     expect(picoReset.resetPicoForLogs).toHaveBeenCalledWith(
       closed,
       9600,
@@ -316,10 +316,7 @@ describe("picoResetHook", () => {
     picoReset.resetPicoForLogs.mockRejectedValue(
       new PicoStrandedError("reboot", new Error("x"))
     );
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => false
-    );
+    await runHook(dialog, false, 115200);
     const message = defaultLocalize("dashboard.logs_rp2_reset_stranded");
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
     expect(toastError).toHaveBeenCalledWith(message, expect.anything());
@@ -333,10 +330,7 @@ describe("picoResetHook", () => {
         new DOMException("Access denied.", "SecurityError")
       )
     );
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => false
-    );
+    await runHook(dialog, false, 115200);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("firmware.rp2_usb_access_denied")
     );
@@ -347,10 +341,7 @@ describe("picoResetHook", () => {
     picoReset.resetPicoForLogs.mockRejectedValue(
       new DOMException("gone", "NetworkError")
     );
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => false
-    );
+    await runHook(dialog, false, 115200);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_reset_failed")
     );
@@ -359,10 +350,7 @@ describe("picoResetHook", () => {
   it("reports a port that never came back, naming it", async () => {
     const dialog = stubDialog();
     picoReset.resetPicoForLogs.mockResolvedValue(null);
-    await picoResetHook(dialog as never, defaultLocalize, "rp2", 115200)!.run(
-      deadPort(),
-      () => false
-    );
+    await runHook(dialog, false, 115200);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_port_reopen_failed", { port: "USB 303a:1001" })
     );

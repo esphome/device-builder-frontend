@@ -419,6 +419,9 @@ export async function flashDfuPackage(
     } catch {
       // ignore
     }
+    // The bootloader or the flashed app re-enumerates next; that connect
+    // event is ours.
+    markSerialActivity();
   }
 }
 
@@ -448,8 +451,6 @@ export async function flashDfuPackageWithReconnect(
   } catch (err) {
     if (signal?.aborted || !isDeviceLost(err)) throw err;
     onReconnecting?.();
-    // The bootloader coming back is expected; keep the connect toast quiet.
-    markSerialActivity();
     const live = await openLiveSerialPort(port, {
       baudRate: 115200,
       timeoutMs: SERIAL_REOPEN_TIMEOUT_MS,

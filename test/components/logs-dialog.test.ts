@@ -339,7 +339,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     });
     el.openPassive({
       onReconnect: () => Promise.resolve(),
-      onResetDevice: { supports: () => true, run },
+      onResetDevice: { ...alwaysHook, run },
     });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     await (el as any)._onResetDevice();
@@ -351,10 +351,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
   it("drops to dead with a toast when the reset hook rejects unhandled", async () => {
     el.openPassive({
       onReconnect: () => Promise.resolve(),
-      onResetDevice: {
-        supports: () => true,
-        run: () => Promise.reject(new Error("boom")),
-      },
+      onResetDevice: { ...alwaysHook, run: () => Promise.reject(new Error("boom")) },
     });
     el.setSerialStream(port as any, cancel as unknown as () => Promise<void>);
     await (el as any)._onResetDevice();

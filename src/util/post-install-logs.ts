@@ -125,28 +125,24 @@ export function picoResetHook(
   return {
     supports: (port) => port.getInfo().usbVendorId === RASPBERRY_PI_USB_VID,
     run: async (port, cancelled) => {
-      let live: SerialPort | null;
+      let live: SerialPort | null = null;
+      let failure: string | undefined;
       try {
         live = await resetPicoForLogs(port, baudRate, cancelled);
       } catch (err) {
         console.warn("Pico reset failed", err);
-        const message = localize(picoResetFailureKey(err));
-        // Once the session moved on, only the toast: the Pico may still be
-        // sitting in BOOTSEL, but a newer session must not be flipped dead.
-        if (cancelled()) notifyError(message);
-        else failSerialOpen(logsDialog, message);
-        return;
-      }
-      if (!live) {
-        if (!cancelled()) failPortReopen(logsDialog, localize, port);
-        return;
+        failure = localize(picoResetFailureKey(err));
       }
       if (cancelled()) {
-        // Reopened for a session that is gone; nothing will stream it.
-        await live.close().catch(() => {});
+        // The session moved on: a newer one must not be flipped dead, a
+        // stranded Pico still gets its toast, a reopened port has no reader.
+        if (failure) notifyError(failure);
+        else await live?.close().catch(() => {});
         return;
       }
-      await attachSerialLogStream(live, logsDialog, localize, baudRate);
+      if (failure) failSerialOpen(logsDialog, failure);
+      else if (!live) failPortReopen(logsDialog, localize, port);
+      else await attachSerialLogStream(live, logsDialog, localize, baudRate);
     },
   };
 }

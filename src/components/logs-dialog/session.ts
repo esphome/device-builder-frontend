@@ -334,13 +334,15 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   if (s.kind !== "serial" || !resetOffered(host)) return;
   const hook = host._resetDevice;
   if (hook) {
-    host._session = { kind: "reconnecting", paused: false };
-    await s.cancel();
     const cancelled = () => !host._open || host._session.kind !== "reconnecting";
-    await hook.run(s.port, cancelled).catch((err: unknown) => {
-      console.warn("Reset hook failed", err);
-      failIfStillReconnecting(host, "dashboard.logs_reset_failed");
-    });
+    await runReconnecting(
+      host,
+      async () => {
+        await s.cancel();
+        await hook.run(s.port, cancelled);
+      },
+      "dashboard.logs_reset_failed"
+    );
     return;
   }
   host._session = { ...s, paused: false };
@@ -358,21 +360,30 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   }
 }
 
-// The hook reports its own failures (setSerialOpenFailed -> `dead`, with its
-// own toast); still `reconnecting` means a genuinely unhandled rejection, so
-// only that gets surfaced (no double toast).
-function failIfStillReconnecting(host: ESPHomeLogsDialog, key: string): void {
-  if (host._session.kind !== "reconnecting") return;
-  host._session = { kind: "dead" };
-  notifyError(host._localize(key));
+// Run a session hook (reconnect or reset) as `reconnecting`. The hook reports
+// its own failures (setSerialOpenFailed -> `dead`, with its own toast); still
+// `reconnecting` afterwards means a genuinely unhandled rejection, so only
+// that gets surfaced (no double toast).
+async function runReconnecting(
+  host: ESPHomeLogsDialog,
+  task: () => Promise<void>,
+  failKey: string
+): Promise<void> {
+  host._session = { kind: "reconnecting", paused: false };
+  try {
+    await task();
+  } catch (err) {
+    if (host._session.kind !== "reconnecting") return;
+    console.warn("Serial session hook failed", err);
+    host._session = { kind: "dead" };
+    notifyError(host._localize(failKey));
+  }
 }
 
 function reconnectSerial(host: ESPHomeLogsDialog): void {
-  if (!host._reconnect) return;
-  host._session = { kind: "reconnecting", paused: false };
-  host
-    ._reconnect()
-    .catch(() => failIfStillReconnecting(host, "dashboard.logs_web_serial_open_failed"));
+  const reconnect = host._reconnect;
+  if (!reconnect) return;
+  void runReconnecting(host, reconnect, "dashboard.logs_web_serial_open_failed");
 }
 
 /* The --no-states flag is baked into the esphome subprocess at spawn time,

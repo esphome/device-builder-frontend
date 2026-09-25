@@ -4,7 +4,6 @@
  * PICOBOOT reboot over WebUSB, after which the CDC port re-enumerates.
  */
 import { resetToBootloader } from "./serial-bootloader-touch.js";
-import { markSerialActivity } from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 import { openLiveSerialPort } from "./web-serial.js";
 import {
@@ -29,7 +28,7 @@ export class PicoStrandedError extends Error {
   constructor(
     readonly step: "pick" | "refused" | "reboot",
     // Error.cause needs lib ES2022; the field is declared here instead.
-    readonly cause: unknown = null
+    readonly cause?: unknown
   ) {
     super(`Pico left in BOOTSEL (${step})`);
     this.name = "PicoStrandedError";
@@ -45,7 +44,7 @@ export class PicoStrandedError extends Error {
 export async function resetPicoForLogs(
   port: SerialPort,
   baudRate: number,
-  cancelled: () => boolean = () => false
+  cancelled: () => boolean
 ): Promise<SerialPort | null> {
   const deadline = Date.now() + BOOTSEL_WAIT_MS;
   // Only a bootloader that appears after the touch is this Pico; another
@@ -65,7 +64,7 @@ export async function resetPicoForLogs(
   }
   // The chooser also lists RP2350 bootloaders; REBOOT is RP2040-only.
   if (classifyUsbDevice(usb) !== "rp2040") {
-    throw new PicoStrandedError("reboot", new Error("RP2350 is not supported"));
+    throw new PicoStrandedError("reboot", "RP2350 is not supported");
   }
   const { PicobootDevice } = await loadPicoboot();
   const dev = await PicobootDevice.open(usb).catch((err: unknown) => {
@@ -78,8 +77,6 @@ export async function resetPicoForLogs(
   } finally {
     await dev.close();
   }
-  // The CDC port is about to come back; that connect event is ours too.
-  markSerialActivity();
   return openLiveSerialPort(port, { baudRate, cancelled });
 }
 
@@ -93,14 +90,9 @@ async function findBootselDevice(
 ): Promise<USBDevice | null> {
   for (;;) {
     if (cancelled()) return null;
-    const granted = (await getPicobootDevices()).find(
-      (d) => classifyUsbDevice(d) === "rp2040" && !before.some((b) => sameDevice(b, d))
-    );
+    const granted = (await getPicobootDevices()).find((d) => !before.includes(d));
     if (granted) return granted;
     if (Date.now() >= deadline) return requestPicobootDevice();
     await sleep(BOOTSEL_POLL_MS);
   }
 }
-
-const sameDevice = (a: USBDevice, b: USBDevice): boolean =>
-  a === b || (a.serialNumber !== undefined && a.serialNumber === b.serialNumber);

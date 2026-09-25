@@ -8,25 +8,19 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn<(usb: USBDevice) => Promise<unknown>>(),
   reboot: vi.fn<() => Promise<void>>(),
   close: vi.fn<() => Promise<void>>(),
-  markSerialActivity: vi.fn(),
 }));
 
 vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
   resetToBootloader: mocks.resetToBootloader,
 }));
-vi.mock("../../src/util/web-usb.js", () => ({
-  classifyUsbDevice: (d: USBDevice) => (d.productId === 3 ? "rp2040" : "rp2350"),
-  isUsbAccessDenied: (e: unknown) =>
-    e instanceof DOMException && e.name === "SecurityError",
+vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-usb.js")>()),
   getPicobootDevices: mocks.getPicobootDevices,
   loadPicoboot: async () => ({ PicobootDevice: { open: mocks.open } }),
   requestPicobootDevice: mocks.requestPicobootDevice,
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
-}));
-vi.mock("../../src/util/serial-reacquire.js", () => ({
-  markSerialActivity: mocks.markSerialActivity,
 }));
 
 import { PicoStrandedError, resetPicoForLogs } from "../../src/util/rp2-logs-reset.js";
@@ -51,8 +45,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function run(cancelled?: () => boolean): Promise<SerialPort | null> {
-  const result = resetPicoForLogs(port, 115200, cancelled);
+async function run({
+  cancelled = () => false,
+  from = port,
+}: { cancelled?: () => boolean; from?: SerialPort } = {}): Promise<SerialPort | null> {
+  const result = resetPicoForLogs(from, 115200, cancelled);
   // Silence the rejection until the test inspects it; the poll below needs
   // the timers advanced either way.
   result.catch(() => {});
@@ -60,9 +57,13 @@ async function run(cancelled?: () => boolean): Promise<SerialPort | null> {
   return result;
 }
 
+// The bootloader shows up as granted only after the pre-touch snapshot.
+const grantedAfterTouch = () =>
+  mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
+
 describe("resetPicoForLogs", () => {
   it("touches, reboots a granted bootloader without the chooser, and reopens the port", async () => {
-    mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
+    grantedAfterTouch();
     await expect(run()).resolves.toBe(live);
     expect(mocks.resetToBootloader).toHaveBeenCalledWith(port);
     expect(mocks.requestPicobootDevice).not.toHaveBeenCalled();
@@ -73,32 +74,20 @@ describe("resetPicoForLogs", () => {
       baudRate: 115200,
       cancelled: expect.any(Function),
     });
-    // The CDC coming back is expected; the connect toast must stay quiet.
-    expect(mocks.markSerialActivity).toHaveBeenCalledOnce();
   });
 
   it("ignores a bootloader that was already present before the touch", async () => {
-    const other = { vendorId: 0x2e8a, productId: 3, serialNumber: "other" } as USBDevice;
+    const other = { vendorId: 0x2e8a, productId: 3 } as USBDevice;
     mocks.getPicobootDevices.mockResolvedValue([other]);
     await expect(run()).resolves.toBe(live);
     expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
     expect(mocks.open).toHaveBeenCalledWith(usb);
   });
 
-  it("skips a granted RP2350 bootloader", async () => {
-    const rp2350 = { vendorId: 0x2e8a, productId: 0xf } as USBDevice;
-    mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([rp2350]);
-    await expect(run()).resolves.toBe(live);
-    expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
-  });
-
   it("reports a plain failure when the CDC port never left (touch ignored)", async () => {
     const stillThere = { getInfo: () => ({}), connected: true } as unknown as SerialPort;
     mocks.requestPicobootDevice.mockResolvedValue(null);
-    const result = resetPicoForLogs(stillThere, 115200);
-    result.catch(() => {});
-    await vi.runAllTimersAsync();
-    await expect(result).rejects.not.toBeInstanceOf(PicoStrandedError);
+    await expect(run({ from: stillThere })).rejects.not.toBeInstanceOf(PicoStrandedError);
   });
 
   it("fails fast on a chooser-picked RP2350 instead of sending the RP2040 reboot", async () => {
@@ -111,7 +100,7 @@ describe("resetPicoForLogs", () => {
   });
 
   it("stops before the chooser once cancelled", async () => {
-    await expect(run(() => true)).rejects.toMatchObject({ step: "pick", cause: null });
+    await expect(run({ cancelled: () => true })).rejects.toMatchObject({ step: "pick" });
     expect(mocks.requestPicobootDevice).not.toHaveBeenCalled();
     expect(mocks.reboot).not.toHaveBeenCalled();
   });
@@ -140,7 +129,7 @@ describe("resetPicoForLogs", () => {
   });
 
   it("keeps the WebUSB refusal as the cause when the open is denied", async () => {
-    mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
+    grantedAfterTouch();
     const denied = new DOMException("Access denied.", "SecurityError");
     mocks.open.mockRejectedValue(denied);
     await expect(run()).rejects.toMatchObject({
@@ -151,7 +140,7 @@ describe("resetPicoForLogs", () => {
   });
 
   it("reports the Pico stranded when the reboot fails, still releasing the device", async () => {
-    mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
+    grantedAfterTouch();
     mocks.reboot.mockRejectedValue(new Error("stall"));
     await expect(run()).rejects.toMatchObject({
       name: "PicoStrandedError",
@@ -170,7 +159,7 @@ describe("resetPicoForLogs", () => {
   });
 
   it("returns null when the CDC port never comes back", async () => {
-    mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
+    grantedAfterTouch();
     mocks.openLiveSerialPort.mockResolvedValue(null);
     await expect(run()).resolves.toBeNull();
   });
