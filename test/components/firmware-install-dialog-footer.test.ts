@@ -75,6 +75,24 @@ describe("firmware-install-dialog footer", () => {
     }
   );
 
+  it("offers Flash beside Reset Device on the nrf-reset step, for a device already in DFU", () => {
+    const host = footerHost("nrf-reset");
+    host._installer = "nrf-dfu";
+    const values = footerValuesDeep(host);
+    expect(values).toContain(host._close);
+    expect(values).toContain(host._nrfDoReset);
+    expect(values).toContain(host._nrfDoFlash);
+    expect(values).not.toContain(host._cancel);
+  });
+
+  it("offers Flash alone on the nrf-wait step", () => {
+    const host = footerHost("nrf-wait");
+    host._installer = "nrf-dfu";
+    const values = footerValuesDeep(host);
+    expect(values).toContain(host._nrfDoFlash);
+    expect(values).not.toContain(host._nrfDoReset);
+  });
+
   it("swaps Flash for Download UF2 without WebUSB (Firefox)", () => {
     isWebUsbSupported.mockReturnValue(false);
     const host = footerHost("rp2-bootsel");

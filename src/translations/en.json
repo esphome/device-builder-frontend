@@ -502,7 +502,7 @@
     "flashing_keep_visible": "Keep this window visible — switching to another tab or window can interrupt the flash.",
     "status_resetting": "Restarting device…",
     "nrf_step1_title": "Ready to flash via DFU",
-    "nrf_step1_desc": "Click Reset Device to trigger the 1200-baud DFU bootloader entry, then click Flash once your device reconnects as a DFU port.",
+    "nrf_step1_desc": "Click Reset Device to trigger the 1200-baud DFU bootloader entry. If the device is already in DFU mode (e.g. from a double-press reset on nRF52840), click Flash directly.",
     "nrf_step2_title": "Device is entering DFU mode…",
     "nrf_step2_desc": "Wait a few seconds for the device to re-enumerate, then click Flash to install the firmware.",
     "browser_flash_reset_action": "Reset Device",

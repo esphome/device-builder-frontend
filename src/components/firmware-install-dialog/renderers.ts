@@ -324,10 +324,12 @@ interface FooterAction {
   labelKey: string;
 }
 
-// The two-step bootloader hand-offs: nRF gets one primary per step; the Pico
-// keeps Reset beside the write on both steps (a touch on the wrong serial port
-// "succeeds" silently, and a blank Pico skips it), and the write is a UF2
-// download where WebUSB is missing.
+// The two-step bootloader hand-offs. nRF offers Flash beside Reset on step 1
+// (a device already in DFU mode, say after a double-press reset, skips the
+// touch), then Flash alone on step 2. The Pico keeps Reset beside the write on
+// both steps (a touch on the wrong serial port "succeeds" silently, and a
+// blank Pico skips it), and the write is a UF2 download where WebUSB is
+// missing.
 function bootloaderStepActions(
   host: ESPHomeFirmwareInstallDialog
 ): { primary: FooterAction; secondary?: FooterAction } | null {
@@ -335,7 +337,10 @@ function bootloaderStepActions(
   const flash = "firmware.browser_flash_action";
   switch (host._step) {
     case "nrf-reset":
-      return { primary: { onClick: host._nrfDoReset, labelKey: reset } };
+      return {
+        secondary: { onClick: host._nrfDoFlash, labelKey: flash },
+        primary: { onClick: host._nrfDoReset, labelKey: reset },
+      };
     case "nrf-wait":
       return { primary: { onClick: host._nrfDoFlash, labelKey: flash } };
     case "rp2-bootsel":
