@@ -86,6 +86,16 @@ describe("nRF52 DFU failure hints", () => {
     expect(host._errorMessage).toContain('{"error":"Failed to open serial port"}');
   });
 
+  it("keeps a picker or permission failure bare, since the board is not the problem", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockRejectedValue(
+      new DOMException("denied", "SecurityError")
+    );
+    await nrfDoReset(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._errorMessage).toBe("denied");
+  });
+
   it("keeps a teardown abort bare", async () => {
     const host = readyHost();
     mocks.flashDfuPackageWithReconnect.mockRejectedValue(

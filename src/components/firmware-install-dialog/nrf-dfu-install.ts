@@ -85,6 +85,9 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
   host._flashBusy = true;
   host._statusMessage = host._localize("firmware.nrf_resetting");
+  // Only a touch that failed earns the manual-bootloader hint; a picker or
+  // permission failure has nothing to do with the board.
+  let touching = false;
   try {
     const port = await requestSerialPort();
     if (!port) {
@@ -95,12 +98,13 @@ export async function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<vo
     // The picker outlives a dismissed dialog; don't reset a port picked for
     // an install that no longer exists.
     if (!stillCurrent()) return;
+    touching = true;
     await resetToBootloader(port, installLog(host, stillCurrent));
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        withManualBootloaderHint(host, err)
+        touching ? withManualBootloaderHint(host, err) : getErrorMessage(err)
       );
     }
     return;
