@@ -54,6 +54,10 @@ export function renderInto(tpl: unknown): HTMLElement {
 /** Identity localize stub for host fakes: returns the key unchanged. */
 export const identityLocalize = (key: string): string => key;
 
+/** Localize stub that keeps the key and its argument values visible: "key | arg | arg". */
+export const argsLocalize = (key: string, args?: Record<string, unknown>): string =>
+  [key, ...Object.values(args ?? {})].join(" | ");
+
 /**
  * Click ``target`` and return which of ``names`` fired on ``listenOn``,
  * in order — the "emits A, not B" assertion is then a single

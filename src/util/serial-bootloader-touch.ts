@@ -4,18 +4,38 @@
  * nRF52 core on the line coding alone, arduino-pico once DTR also drops),
  * re-enumerating as a different USB device.
  */
+import { getErrorMessage } from "./error-message.js";
 import { markSerialActivity } from "./serial-reacquire.js";
 import { requestSerialPort } from "./web-serial.js";
+
+/** The touch itself failed (not the picker before it); ``message`` is the cause's. */
+export class BootloaderTouchError extends Error {
+  constructor(readonly cause: unknown) {
+    super(getErrorMessage(cause));
+    this.name = "BootloaderTouchError";
+  }
+}
 
 const isPortLost = (err: unknown): boolean =>
   err instanceof DOMException &&
   (err.name === "NetworkError" || err.name === "InvalidStateError");
 
-/** ``onLog`` gets one line per step, for an install dialog's details log. */
+/**
+ * ``onLog`` gets one line per step, for an install dialog's details log.
+ * Fails as ``BootloaderTouchError``.
+ */
 export async function resetToBootloader(
   port: SerialPort,
   onLog: (line: string) => void = () => {}
 ): Promise<void> {
+  try {
+    await touch(port, onLog);
+  } catch (err) {
+    throw new BootloaderTouchError(err);
+  }
+}
+
+async function touch(port: SerialPort, onLog: (line: string) => void): Promise<void> {
   // The re-enumeration is ours; keep the "USB device connected" toast quiet.
   markSerialActivity();
   // A handle left open by an earlier touch whose close raced the reboot
@@ -46,7 +66,8 @@ export async function resetToBootloader(
 /**
  * The touch from a button click: pick the CDC port (narrowed by ``filters``
  * where the board's ids are known), then reset. False when the picker was
- * dismissed; a failed touch throws as ``resetToBootloader``.
+ * dismissed; a failed touch throws ``BootloaderTouchError``, a failed pick
+ * the browser's own error.
  */
 export async function touchIntoBootloader({
   onLog,

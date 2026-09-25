@@ -2041,8 +2041,7 @@
       "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
       "install_error_no_file": "Select a DFU package first.",
       "install_error_bad_package": "Invalid DFU package: {error}",
-      "install_error_flash": "Firmware update failed: {error}",
-      "install_manual_bootloader_hint": "{error}. Double-press the board's reset button to enter the bootloader by hand, then retry and pick the new port."
+      "install_error_flash": "Firmware update failed: {error}"
     }
   },
   "remote_build_dashboard": {

@@ -10,7 +10,10 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
 import type { DfuPackage } from "../../util/nrf-dfu.js";
-import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import {
+  BootloaderTouchError,
+  touchIntoBootloader,
+} from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
 import { renderProgressCard } from "./install-progress.js";
@@ -111,21 +114,20 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
 
     this._state = "resetting";
-    // Only a touch that failed earns the manual-bootloader hint; a picker or
-    // permission failure has nothing to do with the board.
-    let touching = false;
     try {
-      const port = await requestSerialPort();
-      if (!port) {
+      if (!(await touchIntoBootloader())) {
         this._state = "idle";
         return;
       }
-      touching = true;
-      await resetToBootloader(port);
     } catch (err) {
+      // A failed pick has nothing to do with the board; only the touch earns
+      // the manual-bootloader hint.
       this._fail(
         this._localize("web.connect.failed", {
-          error: touching ? this._manualBootloaderHint(err) : getErrorMessage(err),
+          error:
+            err instanceof BootloaderTouchError
+              ? withManualBootloaderHint(err, this._localize)
+              : getErrorMessage(err),
         })
       );
       return;
@@ -152,12 +154,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._state = "flashing";
     this._progress = 0;
     this._reconnecting = false;
-    // Only the flash itself earns the manual-bootloader hint; a failed engine
-    // chunk load is the site's problem, not the board's.
-    let flashing = false;
     try {
+      // A cache hit: the engine loaded when the package was parsed.
       const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-      flashing = true;
       await flashDfuPackageWithReconnect(port, pkg, {
         onProgress: (percent) => {
           this._progress = Math.round(percent);
@@ -168,18 +167,10 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     } catch (err) {
       this._fail(
         this._localize("web.nrf.install_error_flash", {
-          error: flashing ? this._manualBootloaderHint(err) : getErrorMessage(err),
+          error: withManualBootloaderHint(err, this._localize),
         })
       );
     }
-  }
-
-  private _manualBootloaderHint(err: unknown): string {
-    return withManualBootloaderHint(
-      err,
-      this._localize,
-      "web.nrf.install_manual_bootloader_hint"
-    );
   }
 
   private _onAfterHide(): void {
