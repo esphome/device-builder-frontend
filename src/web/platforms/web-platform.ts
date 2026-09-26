@@ -18,10 +18,14 @@ export interface WebPlatform<Mode extends string = string> {
   renderCard(): TemplateResult;
   /** Shows the legacy ``?dashboard_logs`` / install / wizard hint. */
   readonly dashboardHints?: boolean;
-  /**
-   * Whether a port's USB ids clearly belong to this family, so the site
-   * offers switching to it (copy ``web.flow_switch.<mode>`` and
-   * ``web.flow_switch.action_<mode>``).
-   */
-  claimsPort?(port: SerialPort): boolean;
+  /** Offer switching to this family when a picked or plugged-in port is its. */
+  readonly flowSwitch?: FlowSwitch;
+}
+
+export interface FlowSwitch {
+  /** Whether a port's USB ids clearly belong to the family. */
+  claimsPort(port: SerialPort): boolean;
+  /** The toast's message and its switch button. */
+  readonly messageKey: string;
+  readonly actionKey: string;
 }

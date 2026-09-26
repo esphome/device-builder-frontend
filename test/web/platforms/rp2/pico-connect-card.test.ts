@@ -62,7 +62,9 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
     );
 
     expect((el as any)._setupOpen).toBe(false);
-    expect(openImprovDialog).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(openImprovDialog).toHaveBeenCalledWith(port, expect.any(Function), {
+      keepLines: true,
+    });
     expect((el as any)._port).toBe(port);
   });
 

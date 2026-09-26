@@ -12,9 +12,8 @@ vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openLiveSerialPort: mocks.openLiveSerialPort,
 }));
-vi.mock("../../src/platforms/rp2/rp2-logs-reset.js", () => ({ rebootPico: vi.fn() }));
 
-import { RTS_PULSE } from "../../src/web/logs/serial-reset.js";
+import { RTS_PULSE } from "../../src/web/logs/logs-policy.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
 
 const hooks = { onLine: () => {}, onEnd: () => {} } as never;

@@ -34,5 +34,9 @@ export const nrfWebMode: WebPlatform<"nrf"> = {
   labelKey: "web.header.mode_nrf",
   introKey: "web.intro.body_nrf",
   renderCard: () => html`<esphome-web-nrf-card></esphome-web-nrf-card>`,
-  claimsPort: isNrf52Port,
+  flowSwitch: {
+    claimsPort: isNrf52Port,
+    messageKey: "web.flow_switch.nrf",
+    actionKey: "web.flow_switch.action_nrf",
+  },
 };

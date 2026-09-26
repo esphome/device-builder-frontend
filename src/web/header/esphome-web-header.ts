@@ -7,7 +7,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
-import { WEB_PLATFORMS } from "../platforms/registry.js";
+import { DEFAULT_WEB_MODE, WEB_PLATFORMS } from "../platforms/registry.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "./esphome-web-header-actions.js";
@@ -18,7 +18,7 @@ import "./esphome-web-header-actions.js";
  */
 @customElement("esphome-web-header")
 export class ESPHomeWebHeader extends LitElement {
-  @property() mode: WebMode = "esp";
+  @property() mode: WebMode = DEFAULT_WEB_MODE;
 
   /** Hide the mode picker (flash-receiver mode has no device family). */
   @property({ type: Boolean }) minimal = false;

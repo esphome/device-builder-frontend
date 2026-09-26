@@ -14,6 +14,10 @@ export const espWebMode: WebPlatform<"esp"> = {
   renderCard: () => html`<esphome-web-esp-connect-card></esphome-web-esp-connect-card>`,
   // Only ESP has the Logs / Install / Prepare actions the hint points at.
   dashboardHints: true,
-  // An Espressif native-USB device; a UART bridge could be anything.
-  claimsPort: (port) => port.getInfo().usbVendorId === ESPRESSIF_USB_VID,
+  flowSwitch: {
+    // An Espressif native-USB device; a UART bridge could be anything.
+    claimsPort: (port) => port.getInfo().usbVendorId === ESPRESSIF_USB_VID,
+    messageKey: "web.flow_switch.esp",
+    actionKey: "web.flow_switch.action_esp",
+  },
 };

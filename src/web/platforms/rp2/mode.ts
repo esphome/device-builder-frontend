@@ -12,6 +12,10 @@ export const picoWebMode: WebPlatform<"pico"> = {
   labelKey: "web.header.mode_pico",
   introKey: "web.intro.body_pico",
   renderCard: () => html`<esphome-web-pico-connect-card></esphome-web-pico-connect-card>`,
-  // A Pico's own CDC console, not a Raspberry Pi debug probe.
-  claimsPort: isRp2CdcPort,
+  flowSwitch: {
+    // A Pico's own CDC console, not a Raspberry Pi debug probe.
+    claimsPort: isRp2CdcPort,
+    messageKey: "web.flow_switch.pico",
+    actionKey: "web.flow_switch.action_pico",
+  },
 };

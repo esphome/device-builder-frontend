@@ -32,9 +32,9 @@ import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/serial-reacquire.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
-import { RTS_PULSE, type WebSerialReset } from "../../src/web/logs/serial-reset.js";
+import { RTS_PULSE, type WebSerialReset } from "../../src/web/logs/logs-policy.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
-import { PICO_RESET } from "../../src/web/platforms/rp2/logs-reset.js";
+import { PICO_RESET } from "../../src/web/platforms/rp2/logs-policy.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -51,7 +51,7 @@ async function mount(
 ): Promise<ESPHomeWebLogsDialog> {
   const el = new ESPHomeWebLogsDialog();
   (el as any)._localize = (k: string) => k;
-  el.reset = reset ?? undefined;
+  el.policy = reset ? { reset } : {};
   document.body.appendChild(el);
   await el.updateComplete;
   return el;

@@ -7,7 +7,7 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import { parseDashboardHint } from "../dashboard-hint.js";
-import { webPlatform } from "../platforms/registry.js";
+import { DEFAULT_WEB_MODE, webPlatform } from "../platforms/registry.js";
 import type { WebMode } from "../web-mode.js";
 import "./esphome-web-unsupported-card.js";
 
@@ -18,7 +18,7 @@ import "./esphome-web-unsupported-card.js";
  */
 @customElement("esphome-web-dashboard")
 export class ESPHomeWebDashboard extends LitElement {
-  @property() mode: WebMode = "esp";
+  @property() mode: WebMode = DEFAULT_WEB_MODE;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

@@ -17,7 +17,7 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
 import { openPortForLogs } from "../../../../src/web/logs/open-port-for-logs.js";
 import { ESPHomeWebPicoDeviceCard } from "../../../../src/web/platforms/rp2/esphome-web-pico-device-card.js";
-import { PICO_RESET } from "../../../../src/web/platforms/rp2/logs-reset.js";
+import { PICO_LOGS } from "../../../../src/web/platforms/rp2/logs-policy.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -67,7 +67,7 @@ describe("esphome-web-pico-device-card", () => {
     document.body.appendChild(el);
     await el.updateComplete;
     const dialog = el.shadowRoot!.querySelector("esphome-web-logs-dialog") as any;
-    expect(dialog.reset).toBe(PICO_RESET);
+    expect(dialog.policy).toBe(PICO_LOGS);
   });
 
   it("anchors every action tooltip to a real button id", async () => {

@@ -8,6 +8,7 @@ import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import {
   flashPico,
+  isRp2CdcPort,
   isWebUsbSupported,
   loadPicoboot,
   PicoFlashError,
@@ -17,11 +18,11 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import type { Uf2Image } from "../../../util/uf2.js";
-import { PortNotAcceptedError, requestSerialPort } from "../../../util/web-serial.js";
+import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { loadPicoImage, picoUf2Url } from "./pico-image.js";
-import { isPicoPort, picoPortFilters } from "./pico-port-filter.js";
+import { pickPicoPort, picoPortFilters } from "./pico-port-filter.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -130,7 +131,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     try {
       const touched = await touchIntoBootloader({
         filters: picoPortFilters,
-        accept: isPicoPort,
+        accept: isRp2CdcPort,
         onLog: this._log,
       });
       this._state = touched ? "waiting" : "idle";
@@ -188,17 +189,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _continue(): Promise<void> {
-    let port: SerialPort | null;
-    try {
-      port = await requestSerialPort({ filters: picoPortFilters }, isPicoPort);
-    } catch (err) {
-      toast.error(
-        err instanceof PortNotAcceptedError
-          ? this._localize("web.pico.probe_picked")
-          : this._localize("web.connect.failed", { error: getErrorMessage(err) })
-      );
-      return;
-    }
+    const port = await pickPicoPort(this._localize);
     if (!port) return;
     this.dispatchEvent(
       new CustomEvent<SerialPort>("pico-connected", {

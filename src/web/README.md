@@ -40,11 +40,12 @@ hardware classes behave differently:
 - **RTL8720C kits** (BW15 and the like, behind a CH340): RTS drives CEN
   and DTR drives the PA00 download strap, so a plain open (Chromium
   asserts both lines) holds the chip in reset. Every logs open releases
-  both lines right away (`release-lines` on the logs dialog); the install
+  both lines right away (`RTL_LOGS` in `platforms/rtl87xx/logs-policy.ts`); the install
   dialog's engine drives them itself and falls back to the manual strap.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
-  BOOTSEL and reboots it over WebUSB (`src/platforms/rp2/rp2-logs-reset.ts`),
+  BOOTSEL and reboots it over WebUSB (`PICO_RESET` in `platforms/rp2/logs-reset.ts`,
+  on top of `src/platforms/rp2/rp2-logs-reset.ts`),
   after which the CDC port re-enumerates; without WebUSB the button is
   hidden. Flashing goes through UF2 (its own connect card and install
   dialog).
@@ -68,11 +69,13 @@ hardware classes behave differently:
 A family is a directory under `platforms/` with a `mode.ts` exporting its
 `WebPlatform` (`platforms/web-platform.ts`): its mode flag, header logo and
 label, intro copy, connect card, and the USB ids that claim a port for the
-flow switch toast. Add it to `WEB_PLATFORMS` in `platforms/registry.ts`, put
-its logo in `public/web/static/logo/`, and its copy in `en.json`. The header,
-the dashboard, the mode URL and the flow switch need no edits. Its logs card
-hands the logs dialog its own Reset device (`reset`, a `WebSerialReset` from
-`logs/serial-reset.ts`; the RTS pulse by default, `undefined` for none).
+flow switch toast, with its copy. Add it to `WEB_PLATFORMS` in
+`platforms/registry.ts`, put its logo in `public/web/static/logo/`, and its
+copy in `en.json`. The header, the dashboard, the mode URL and the flow switch
+need no edits. Its logs card passes its `logs-policy.ts` (a `WebLogsPolicy`
+from `logs/logs-policy.ts`: its Reset device and whether opens drop DTR and
+RTS) to both the port open and the logs dialog's `policy`; the dialog's
+default is no reset and no release.
 
 New copy goes in `src/translations/en.json` under the `web.*`
 namespace. Tests live in `test/web/` (platform tests in

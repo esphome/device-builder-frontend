@@ -2,7 +2,6 @@ import { consume } from "@lit/context";
 import { mdiRocketLaunch, mdiUsb } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
@@ -10,7 +9,6 @@ import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { sleep } from "../../../util/sleep.js";
-import { PortNotAcceptedError, requestSerialPort } from "../../../util/web-serial.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import "./esphome-web-install-pico-dialog.js";
 import {
@@ -18,7 +16,7 @@ import {
   openImprovDialog,
 } from "../../improv/open-improv-dialog.js";
 import { PortDisconnectWatcher } from "../../util/port-disconnect-watcher.js";
-import { isPicoPort, picoPortFilters } from "./pico-port-filter.js";
+import { pickPicoPort } from "./pico-port-filter.js";
 import "../../dashboard/esphome-web-card.js";
 import "./esphome-web-pico-device-card.js";
 
@@ -100,7 +98,8 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
     // A flow switch accepted during the pause unmounted this card; Wi-Fi
     // setup would open with nobody to adopt the port.
     if (!this.isConnected) return;
-    const { improv } = await openImprovDialog(port, this._localize);
+    // The Pico's CDC only transmits while DTR is asserted.
+    const { improv } = await openImprovDialog(port, this._localize, { keepLines: true });
     if (improv) this._adoptPort(port);
   }
 
@@ -111,19 +110,7 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
   }
 
   private async _connect(): Promise<void> {
-    let port: SerialPort | null;
-    try {
-      port = await requestSerialPort({ filters: picoPortFilters }, isPicoPort);
-    } catch (err) {
-      toast.error(
-        err instanceof PortNotAcceptedError
-          ? this._localize("web.pico.probe_picked")
-          : this._localize("web.connect.failed", {
-              error: err instanceof Error ? err.message : String(err),
-            })
-      );
-      return;
-    }
+    const port = await pickPicoPort(this._localize);
     if (port) this._adoptPort(port);
   }
 

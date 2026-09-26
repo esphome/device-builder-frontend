@@ -25,7 +25,7 @@ import { readMode, type WebMode, writeMode } from "./web-mode.js";
  * Standalone ESPHome Web app shell.
  *
  * The backend-free counterpart to ``<esphome-app>``: it owns the theme,
- * localization, and the ESP ⇄ Pico mode, but there is no WebSocket, auth, or
+ * localization, and the device family mode, but there is no WebSocket, auth, or
  * device list. It provides only the two contexts the reused dialogs need
  * (``localize`` + ``darkMode``) and renders the header / dashboard chrome.
  */
@@ -149,14 +149,16 @@ export class ESPHomeWebApp extends LitElement {
     announced?: SerialConnectAnnouncements
   ): void {
     if (this._operationInProgress()) return;
-    const family = webPlatformOfPort(port)?.mode;
-    if (family === undefined || family === this._mode) return;
+    const platform = webPlatformOfPort(port);
+    const flowSwitch = platform?.flowSwitch;
+    if (!platform || !flowSwitch || platform.mode === this._mode) return;
+    const family = platform.mode;
     if (announced && !announced.shouldAnnounce(port)) return;
-    notifyInfo(this._localize(`web.flow_switch.${family}`), {
+    notifyInfo(this._localize(flowSwitch.messageKey), {
       id: "esphome-web-flow-switch",
       duration: LONG_TOAST_DURATION_MS,
       action: {
-        label: this._localize(`web.flow_switch.action_${family}`),
+        label: this._localize(flowSwitch.actionKey),
         // The toast outlives the moment; a dialog may have opened since.
         onClick: () => {
           if (this._operationInProgress()) {

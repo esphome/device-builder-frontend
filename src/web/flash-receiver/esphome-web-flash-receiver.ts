@@ -16,6 +16,7 @@ import "../dashboard/esphome-web-unsupported-card.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import type { FlashPart } from "../platforms/esp/firmware-build.js";
 import { validateEspImage } from "../platforms/esp/image-magic.js";
+import { ESP_LOGS } from "../platforms/esp/logs-policy.js";
 import { runFlash } from "../platforms/esp/run-flash.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
 import { openLiveLogPort } from "./live-log-port.js";
@@ -389,7 +390,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     const port = this._logPort;
     if (!port) return;
     const gen = this._bootLogsGen;
-    if (!(await openPortForLogs(port, this._localize))) return;
+    if (!(await openPortForLogs(port, this._localize, ESP_LOGS))) return;
     // A flash started (or the receiver unmounted) during the reopen: the
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
@@ -509,6 +510,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .port=${this._logPort}
         ?open=${this._logsOpen}
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
+        .policy=${ESP_LOGS}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}

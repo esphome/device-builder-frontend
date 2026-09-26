@@ -16,8 +16,8 @@ export type WebMode = (typeof WEB_PLATFORMS)[number]["mode"];
 
 export const DEFAULT_WEB_MODE: WebMode = WEB_PLATFORMS[0].mode;
 
-/** The family for a mode (the default one for anything unknown). */
-export function webPlatform(mode: WebMode): WebPlatform {
+/** The family for a mode; the default one if the mode was set to anything else. */
+export function webPlatform(mode: WebMode): WebPlatform<WebMode> {
   return WEB_PLATFORMS.find((p) => p.mode === mode) ?? WEB_PLATFORMS[0];
 }
 
@@ -27,5 +27,5 @@ export function webPlatform(mode: WebMode): WebPlatform {
  * the order never decides between two families.
  */
 export function webPlatformOfPort(port: SerialPort): WebPlatform<WebMode> | undefined {
-  return WEB_PLATFORMS.find((p) => p.claimsPort?.(port));
+  return WEB_PLATFORMS.find((p) => p.flowSwitch?.claimsPort(port));
 }

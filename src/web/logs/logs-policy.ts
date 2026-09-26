@@ -1,9 +1,21 @@
 import { sleep } from "../../util/sleep.js";
 
 /**
- * How Reset Device reaches a board in the logs. The card that opens the logs
- * hands its family's in (``reset`` on the logs dialog); ``undefined`` means
- * the port has no way to reset the board (an nRF52's CDC).
+ * A family's Web Serial logs policy, which its card hands to both the port
+ * open (``pickPortForLogs`` / ``openLogsPortForCard``) and the logs dialog
+ * (``policy``). Each family states its own in ``platforms/<name>/logs-policy.ts``;
+ * the dialog's default is no reset and no line release.
+ */
+export interface WebLogsPolicy {
+  /** How Reset device reaches the board; without one there is no button. */
+  readonly reset?: WebSerialReset;
+  /** Drop DTR and RTS right after every (re)open (the RTL8720C's strap and reset lines). */
+  readonly releaseLines?: boolean;
+}
+
+/**
+ * How Reset device reaches a board in the logs. ``undefined`` in a policy
+ * means the port has no way to reset the board (an nRF52's CDC).
  */
 export interface WebSerialReset {
   /** The browser can send it; the button stays hidden otherwise. */

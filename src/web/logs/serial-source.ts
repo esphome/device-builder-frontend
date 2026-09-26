@@ -7,7 +7,7 @@ import { releaseControlLines } from "../../util/serial-control-lines.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import type { WebLogSource } from "./log-source.js";
-import type { WebSerialReset } from "./serial-reset.js";
+import type { WebSerialReset } from "./logs-policy.js";
 
 // ESPHome logs over UART default to 115200 baud. The dashboard resolves a
 // per-device override from config; ESPHome Web has no device config, so the

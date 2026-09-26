@@ -8,16 +8,15 @@ import { DEFAULT_WEB_MODE, WEB_PLATFORMS, type WebMode } from "./platforms/regis
 
 export type { WebMode };
 
-const DEFAULT_MODE = DEFAULT_WEB_MODE;
 // Every family but the default, in registry order (the first flag present wins).
 const FLAGGED_MODES: readonly WebMode[] = WEB_PLATFORMS.map((p) => p.mode).filter(
-  (mode) => mode !== DEFAULT_MODE
+  (mode) => mode !== DEFAULT_WEB_MODE
 );
 
 /** Read the current mode from a query string (defaults to the live URL). */
 export function readMode(search: string = window.location.search): WebMode {
   const params = new URLSearchParams(search);
-  return FLAGGED_MODES.find((mode) => params.has(mode)) ?? DEFAULT_MODE;
+  return FLAGGED_MODES.find((mode) => params.has(mode)) ?? DEFAULT_WEB_MODE;
 }
 
 /**
@@ -31,7 +30,7 @@ export function modeUrl(mode: WebMode, url: URL = new URL(window.location.href))
   // URLSearchParams ``pico=`` spelling without touching other params' form.
   for (const flag of FLAGGED_MODES) next.searchParams.delete(flag);
   let search = next.search;
-  if (mode !== DEFAULT_MODE) {
+  if (mode !== DEFAULT_WEB_MODE) {
     search = search ? `${search}&${mode}` : `?${mode}`;
   }
   return next.pathname + search + next.hash;

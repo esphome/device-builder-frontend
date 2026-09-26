@@ -13,6 +13,7 @@ import "./esphome-web-install-nrf-dialog.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
+import { NRF_LOGS } from "./logs-policy.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -124,7 +125,7 @@ export class ESPHomeWebNrfCard extends LitElement {
         .bleDevice=${logs && "ble" in logs ? logs.ble : undefined}
         ?open=${logs !== undefined}
         .deviceLabel=${this._localize("web.nrf.title")}
-        .reset=${undefined}
+        .policy=${NRF_LOGS}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;

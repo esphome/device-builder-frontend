@@ -98,9 +98,11 @@ describe("openImprovDialog", () => {
     expect(isImprovInProgress()).toBe(false);
   });
 
-  it("keeps DTR asserted on a Pico, whose CDC only transmits while DTR is up", async () => {
+  it("keeps DTR asserted when asked (a Pico's CDC only transmits while DTR is up)", async () => {
     const port = makePort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
-    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    const promise = openImprovDialog(port as unknown as SerialPort, localize, {
+      keepLines: true,
+    });
     await flush();
     expect(port.setSignals).not.toHaveBeenCalled();
     expect(dialogEl()).toBeTruthy();

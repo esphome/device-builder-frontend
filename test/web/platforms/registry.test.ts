@@ -10,23 +10,13 @@ import { describe, expect, it } from "vitest";
 import "../../_mock-webawesome.js";
 
 import { makeUsbPort as port } from "../_make-web-serial-port.js";
-import enMessages from "../../../src/translations/en.json";
+import { english } from "../../_en-json.js";
 import {
   DEFAULT_WEB_MODE,
   WEB_PLATFORMS,
   webPlatform,
   webPlatformOfPort,
 } from "../../../src/web/platforms/registry.js";
-
-// A dotted key's English copy, or undefined when en.json lacks it.
-function english(key: string): unknown {
-  let node: unknown = enMessages;
-  for (const part of key.split(".")) {
-    node =
-      typeof node === "object" && node !== null ? Reflect.get(node, part) : undefined;
-  }
-  return node;
-}
 
 const familyOf = (p: SerialPort) => webPlatformOfPort(p)?.mode ?? null;
 
@@ -41,8 +31,8 @@ describe("WEB_PLATFORMS", () => {
     "%s has English copy for its header, intro and flow switch",
     (mode, platform) => {
       const keys = [platform.labelKey, platform.introKey];
-      if (platform.claimsPort) {
-        keys.push(`web.flow_switch.${mode}`, `web.flow_switch.action_${mode}`);
+      if (platform.flowSwitch) {
+        keys.push(platform.flowSwitch.messageKey, platform.flowSwitch.actionKey);
       }
       for (const key of keys) {
         expect(english(key), `missing en.json key "${key}"`).toBeTruthy();
