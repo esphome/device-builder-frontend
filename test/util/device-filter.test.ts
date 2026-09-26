@@ -37,6 +37,8 @@ const emptySelection: FacetSelection = {
   selectedLabels: [],
   selectedAreas: [],
   selectedPlatforms: [],
+  selectedProjects: [],
+  selectedNetworks: [],
   selectedStates: [],
   selectedUpdateStatus: [],
 };
