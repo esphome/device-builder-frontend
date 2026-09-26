@@ -11,6 +11,7 @@ import type { WebMode } from "../web-mode.js";
 import "./esphome-web-esp-connect-card.js";
 import "./esphome-web-nrf-card.js";
 import "./esphome-web-pico-connect-card.js";
+import "./esphome-web-rtl-card.js";
 import "./esphome-web-unsupported-card.js";
 
 /**
@@ -61,12 +62,16 @@ export class ESPHomeWebDashboard extends LitElement {
     if (this.mode === "nrf") {
       return html`<esphome-web-nrf-card></esphome-web-nrf-card>`;
     }
+    if (this.mode === "rtl") {
+      return html`<esphome-web-rtl-card></esphome-web-rtl-card>`;
+    }
     return html`<esphome-web-esp-connect-card></esphome-web-esp-connect-card>`;
   }
 
   private _introBody(): string {
     if (this.mode === "pico") return this._localize("web.intro.body_pico");
     if (this.mode === "nrf") return this._localize("web.intro.body_nrf");
+    if (this.mode === "rtl") return this._localize("web.intro.body_rtl");
     return this._localize("web.intro.body_esp");
   }
 

@@ -14,6 +14,12 @@ import { type XmodemIo, xmodemSend } from "./xmodem.js";
 const AMBZ2_BAUD_RATE = 115200;
 /** How long the automatic DTR/RTS reset gets to produce a linked ROM. */
 const AUTO_LINK_MS = 2000;
+/**
+ * The automatic reset is tried this many times before the strap guide: on
+ * macOS a CH340's first session after a replug does not reach the wire, so
+ * the first pulse is often lost.
+ */
+const AUTO_RESET_ATTEMPTS = 3;
 /** Relinking after a transfer; the ROM answers within a second normally. */
 const RELINK_MS = 10000;
 /** The strap guide keeps polling this long before giving up. */
@@ -156,17 +162,38 @@ class RomLink extends SerialStreamSession implements XmodemIo {
 /**
  * Boards wired like the BW15 kit tie RTS to CEN and DTR to PA00, so holding
  * DTR through an RTS pulse boots the ROM downloader. Adapters without those
- * lines ignore this, and the strap guide covers them.
+ * lines ignore this, and the strap guide covers them. False when the adapter
+ * has no control lines to drive.
  */
-async function autoReset(port: SerialPort): Promise<void> {
+async function autoReset(port: SerialPort): Promise<boolean> {
   try {
     await port.setSignals({ dataTerminalReady: true, requestToSend: true });
     await sleep(RESET_HOLD_MS);
     await port.setSignals({ requestToSend: false });
     await sleep(ROM_SETTLE_MS);
+    return true;
   } catch {
-    // No control lines on this adapter.
+    return false;
   }
+}
+
+/** Reset into download mode over DTR/RTS, retrying; true once the ROM answers. */
+async function autoLink(
+  port: SerialPort,
+  rom: RomLink,
+  log: (line: string) => void
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= AUTO_RESET_ATTEMPTS; attempt++) {
+    log(
+      attempt === 1
+        ? "Resetting the board into download mode over DTR/RTS"
+        : `No answer from the ROM; resetting again (attempt ${attempt} of ${AUTO_RESET_ATTEMPTS})`
+    );
+    const driven = await autoReset(port);
+    if (await linkRom(rom, AUTO_LINK_MS)) return true;
+    if (!driven) return false;
+  }
+  return false;
 }
 
 /**
@@ -313,9 +340,7 @@ export async function flashAmbz2(
   let rebooted = false;
   try {
     rom = new RomLink(port, hooks.signal);
-    log("Resetting the board into download mode over DTR/RTS");
-    await autoReset(port);
-    if (!(await linkRom(rom, AUTO_LINK_MS))) {
+    if (!(await autoLink(port, rom, log))) {
       log("No answer from the ROM; waiting for download mode (PA00 to 3.3V, then reset)");
       hooks.onWaitingForStrap?.();
       if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();

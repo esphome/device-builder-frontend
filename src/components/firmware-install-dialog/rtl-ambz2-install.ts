@@ -6,8 +6,7 @@
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { parseLibreTinyImage, UF2_FAMILY_AMBZ2 } from "../../util/libretiny-uf2.js";
-import { Uf2FamilyError } from "../../util/uf2.js";
+import { Ambz2ImageError, parseAmbz2Image } from "../../util/libretiny-uf2.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
@@ -33,16 +32,10 @@ export async function startRtlAmbz2Install(
   );
   if (!artifact) return;
   try {
-    host._rtlImage = parseLibreTinyImage(artifact.bytes, [UF2_FAMILY_AMBZ2]);
+    host._rtlImage = parseAmbz2Image(artifact.bytes);
   } catch (err) {
-    // Another Realtek family (AmebaZ) is a real build for a chip this engine
-    // cannot flash; anything else is a bad file.
     host._fail(
-      host._localize(
-        err instanceof Uf2FamilyError
-          ? "firmware.rtl_wrong_family"
-          : "firmware.rtl_bad_uf2"
-      ),
+      host._localize(err instanceof Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"),
       getErrorMessage(err)
     );
     return;

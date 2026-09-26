@@ -4,7 +4,8 @@ The standalone, backend-free Web Serial tool published to
 [web.esphome.io](https://web.esphome.io). Everything runs in the
 browser: connect an ESP or Raspberry Pi Pico W over USB to install
 firmware, stream logs, and provision Wi-Fi via Improv; an nRF52 gets DFU
-installs and logs over USB or Bluetooth. It shares the
+installs and logs over USB or Bluetooth; an RTL8720C gets a LibreTiny UF2
+flashed through its ROM downloader and logs over its serial adapter. It shares the
 repo's `src/` tree (design system, the esptool-js flash engine in
 `src/util/web-serial.ts`, localization) and adds only this app.
 
@@ -36,6 +37,11 @@ hardware classes behave differently:
   same one — test both.
 - **UART bridges** (CP210x, CH34x): no re-enumeration; DTR/RTS reset
   pulses work.
+- **RTL8720C kits** (BW15 and the like, behind a CH340): RTS drives CEN
+  and DTR drives the PA00 download strap, so a plain open (Chromium
+  asserts both lines) holds the chip in reset. Every logs open releases
+  both lines right away (`release-lines` on the logs dialog); the install
+  dialog's engine drives them itself and falls back to the manual strap.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
   BOOTSEL and reboots it over WebUSB (`src/util/rp2-logs-reset.ts`),

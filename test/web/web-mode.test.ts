@@ -24,6 +24,11 @@ describe("readMode", () => {
     expect(readMode("?foo=bar&nrf")).toBe("nrf");
   });
 
+  it("returns rtl when the rtl param is present", () => {
+    expect(readMode("?rtl")).toBe("rtl");
+    expect(modeUrl("rtl", new URL("https://web.esphome.io/"))).toBe("/?rtl");
+  });
+
   it("reads window.location.search by default", () => {
     window.history.pushState(null, "", "/?pico");
     expect(readMode()).toBe("pico");

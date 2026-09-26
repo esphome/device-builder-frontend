@@ -26,12 +26,7 @@ import { isWebUsbSupported } from "../../util/web-usb.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import {
-  LOG_BAUD_RATE,
-  LOG_BUFFER_SIZE,
-  SerialLogSource,
-  type SerialResetMode,
-} from "./serial-source.js";
+import { SerialLogSource, type SerialResetMode } from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
 import "../../components/base-dialog.js";
@@ -52,40 +47,6 @@ const MAX_LOG_LINES = 10000;
 // Consecutive reconnect cycles that produced no log lines before giving up:
 // a flapping bridge or a device stuck resetting must not churn forever.
 const MAX_SILENT_RECONNECTS = 3;
-
-/**
- * Open a port for the logs view before showing the dialog. Returns ``true`` if
- * the port is ready to stream. Opening here (in the caller's click gesture)
- * rather than inside the dialog keeps the failure path out of the dialog's
- * show/hide lifecycle. An already-open port (``InvalidStateError`` — a prior
- * action or reset race left it open) is fine; the dialog streams it as-is.
- */
-export async function openPortForLogs(
-  port: SerialPort,
-  localize: LocalizeFunc
-): Promise<boolean> {
-  try {
-    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
-  } catch (err) {
-    // ``InvalidStateError`` means the port is already open. That's fine ONLY if
-    // nothing else holds its reader — streamSerialLines() calls getReader(), so
-    // a locked readable stream (another action mid-op) would fail. Bail loudly.
-    if (err instanceof DOMException && err.name === "InvalidStateError") {
-      if (port.readable?.locked) {
-        toast.error(localize("web.logs.port_busy"));
-        return false;
-      }
-      return true;
-    }
-    toast.error(
-      localize("web.logs.open_failed", {
-        error: err instanceof Error ? err.message : String(err),
-      })
-    );
-    return false;
-  }
-  return true;
-}
 
 /**
  * Log viewer for ESPHome Web.
@@ -117,6 +78,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
    * reboot goes over WebUSB, so the button hides where that is missing.
    */
   @property() resetMode: SerialResetMode = "rts";
+
+  /** Drop DTR and RTS after every (re)open: the RTL8720C's strap and reset lines. */
+  @property({ type: Boolean, attribute: "release-lines" }) releaseLines = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -212,6 +176,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
       reset: this.canReset ? this.resetMode : "none",
+      releaseLinesAfterOpen: this.releaseLines,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>

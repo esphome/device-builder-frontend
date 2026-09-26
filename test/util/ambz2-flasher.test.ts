@@ -25,6 +25,8 @@ interface RomOptions {
   console?: boolean;
   /** Fail setSignals as an adapter without control lines would. */
   noSignals?: boolean;
+  /** Resets that do not reach the chip before one does (a CH340's first session). */
+  lostResets?: number;
 }
 
 /**
@@ -38,6 +40,7 @@ function fakeRom(opts: RomOptions = {}) {
   const signals: SerialOutputSignals[] = [];
   const written = new Map<number, number[]>();
   let pings = 0;
+  let resets = 0;
   let xmodem: { offset: number; buf: number[] } | null = null;
   let text = "";
   const reply = (s: string | Uint8Array) =>
@@ -48,7 +51,11 @@ function fakeRom(opts: RomOptions = {}) {
     const [cmd, ...args] = line.split(" ");
     if (cmd === "ping") {
       if (opts.console) reply("\r\n$8710c>\r\n$8710c>");
-      else if (pings++ >= (opts.linkAfterPings ?? 0)) reply("ping");
+      else if (
+        (opts.noSignals || resets > (opts.lostResets ?? 0)) &&
+        pings++ >= (opts.linkAfterPings ?? 0)
+      )
+        reply("ping");
     } else if (cmd === "DW") {
       reply(`${args[0]}: 00000020 00000000 00000000 00000000\r\n`);
     } else if (cmd === "EW") {
@@ -106,6 +113,8 @@ function fakeRom(opts: RomOptions = {}) {
     setSignals: vi.fn(async (s: SerialOutputSignals) => {
       if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
       signals.push(s);
+      // The reset lands when RTS drops with the strap held.
+      if (s.requestToSend === false && s.dataTerminalReady === undefined) resets++;
     }),
   };
   return {
@@ -192,6 +201,23 @@ describe("flashAmbz2", () => {
     expect(last(progress)).toBe(100);
     expect(progress.every((p, i) => i === 0 || p >= progress[i - 1])).toBe(true);
     expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
+  it("retries the automatic reset when the first pulse does not reach the chip", async () => {
+    const rom = fakeRom({ lostResets: 1 });
+    const onWaitingForStrap = vi.fn();
+    const log: string[] = [];
+    await expect(
+      driveFakeTimers(
+        flashAmbz2(rom.port, image, {
+          onProgress: () => {},
+          onLog: (l) => log.push(l),
+          onWaitingForStrap,
+        })
+      )
+    ).resolves.toBe(true);
+    expect(onWaitingForStrap).not.toHaveBeenCalled();
+    expect(log).toContain("No answer from the ROM; resetting again (attempt 2 of 3)");
   });
 
   it("falls back to the strap guide and keeps polling until the ROM answers", async () => {

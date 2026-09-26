@@ -32,7 +32,7 @@ import { ESPHomeWebApp } from "../../src/web/esphome-web-app.js";
 import { makeUsbPort } from "./_make-web-serial-port.js";
 
 const PICO = makeUsbPort(0x2e8a, 0xf00a);
-const ESP = makeUsbPort(0x10c4, 0xea60);
+const ESP = makeUsbPort(0x303a, 0x1001);
 
 let serialListeners: Record<string, (e: Event) => void>;
 let restoreSerial: () => void;

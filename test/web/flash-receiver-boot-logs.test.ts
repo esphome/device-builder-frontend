@@ -10,7 +10,8 @@ vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("../../src/components/ansi-log.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: vi.fn(async () => true),
 }));
 
@@ -22,7 +23,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 import toast from "sonner-js";
 
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
-import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { openPortForLogs } from "../../src/web/logs/open-port-for-logs.js";
 import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

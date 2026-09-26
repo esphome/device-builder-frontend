@@ -15,6 +15,7 @@ const MODES: { mode: WebMode; logo: string; labelKey: string }[] = [
   { mode: "esp", logo: "espressif.png", labelKey: "web.header.mode_esp" },
   { mode: "pico", logo: "raspberry.png", labelKey: "web.header.mode_pico" },
   { mode: "nrf", logo: "nordic.svg", labelKey: "web.header.mode_nrf" },
+  { mode: "rtl", logo: "rtl8720c.svg", labelKey: "web.header.mode_rtl" },
 ];
 
 /**

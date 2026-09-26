@@ -2,20 +2,15 @@ import { consume } from "@lit/context";
 import { mdiBluetooth, mdiTextBoxOutline, mdiUpload } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { pickBleNusDevice } from "../../util/ble-nus-picker.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { requestSerialPort } from "../../util/web-serial.js";
 import "../install/esphome-web-install-nrf-dialog.js";
-import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
-import { releaseOrphanedPort } from "../util/release-port.js";
+import { pickPortForLogs } from "../util/pick-port-for-logs.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -52,32 +47,12 @@ export class ESPHomeWebNrfCard extends LitElement {
     return this._picking || this._logs !== undefined;
   }
 
-  // Pick and open the CDC port in the click gesture, so a failure lands as a
-  // toast instead of an empty terminal (the dialog streams an open port).
   private async _showSerialLogs(): Promise<void> {
     if (this._busy) return;
     this._picking = true;
     try {
-      let port: SerialPort | null;
-      try {
-        port = await requestSerialPort();
-      } catch (err) {
-        toast.error(
-          this._localize("web.connect.failed", { error: getErrorMessage(err) })
-        );
-        return;
-      }
-      if (!port) return;
-      // The shell may offer another board flow from the port's ids.
-      fireEvent(this, "port-picked", port);
-      if (!(await openPortForLogs(port, this._localize))) return;
-      // A flow switch accepted while the open was pending unmounted this
-      // card: nothing is left to own the port, so release it.
-      if (!this.isConnected) {
-        await releaseOrphanedPort(port);
-        return;
-      }
-      this._logs = { port };
+      const port = await pickPortForLogs(this, this._localize);
+      if (port) this._logs = { port };
     } finally {
       this._picking = false;
     }

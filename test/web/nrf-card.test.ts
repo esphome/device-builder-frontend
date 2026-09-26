@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   pickBleNusDevice: vi.fn(),
   toastError: vi.fn(),
 }));
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: mocks.openPortForLogs,
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
@@ -56,7 +57,7 @@ describe("esphome-web-nrf-card", () => {
     mocks.openPortForLogs.mockResolvedValue(true);
     await (el as any)._showSerialLogs();
     await el.updateComplete;
-    expect(mocks.openPortForLogs).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(mocks.openPortForLogs).toHaveBeenCalledWith(port, expect.any(Function), {});
     expect(logsDialog(el).port).toBe(port);
     expect(logsDialog(el).bleDevice).toBeUndefined();
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
