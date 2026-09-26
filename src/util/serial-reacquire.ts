@@ -60,9 +60,9 @@ export function isOwnSerialReenumeration(): boolean {
 }
 
 /**
- * The port a ``navigator.serial`` ``connect`` event is for: current Chromium
- * fires it at the port (``event.target``); an older draft carried it as
- * ``event.port``. ``null`` for anything else.
+ * The port a ``navigator.serial`` ``connect`` or ``disconnect`` event is
+ * for: current Chromium fires it at the port (``event.target``); an older
+ * draft carried it as ``event.port``. ``null`` for anything else.
  */
 export function portOfSerialConnectEvent(event: Event): SerialPort | null {
   const isPort = (candidate: unknown): candidate is SerialPort =>
