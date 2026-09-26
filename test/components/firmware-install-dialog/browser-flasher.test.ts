@@ -9,7 +9,7 @@
 import { html } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import "../../_mock-webawesome.js";
 
 import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
