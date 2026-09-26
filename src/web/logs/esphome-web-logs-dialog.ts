@@ -435,6 +435,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
       toast.error(this._localize("web.logs.reset_failed"));
       return;
     }
+    // Mark the reset in the log: the boot output that follows would otherwise
+    // look like the log just restarted.
+    this._enqueueLine("");
+    this._enqueueLine(this._localize("serial.resetting"));
     if (!source.resetDropsStream) {
       try {
         await reset(() => false);
@@ -452,8 +456,6 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._cancel = undefined;
     this._streaming = false;
     const wasPaused = this._paused;
-    this._enqueueLine("");
-    this._enqueueLine(this._localize("web.logs.rebooting"));
     this._flushPending();
     await cancel?.().catch((err) => {
       console.error("[Logs] Failed to release the stream before a reboot:", err);

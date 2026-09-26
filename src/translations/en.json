@@ -1997,7 +1997,6 @@
       "reset_failed": "Could not reset the device.",
       "port_busy": "The device is busy with another operation. Close it and try again.",
       "terminal_disconnected": "Terminal disconnected",
-      "rebooting": "Rebooting the device…",
       "reconnecting": "Waiting for the device to come back…",
       "reconnected": "Reconnected",
       "reconnect_failed": "The device did not come back. Close the logs and reconnect it.",

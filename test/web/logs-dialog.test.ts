@@ -116,6 +116,8 @@ describe("esphome-web-logs-dialog", () => {
       requestToSend: false,
     });
     expect(sleep).toHaveBeenCalledWith(1000);
+    (el as any)._flushPending();
+    expect((el as any)._lines.slice(-2)).toEqual(["", "serial.resetting"]);
   });
 
   // The Pico's Reset Device: the stream ends, the routine touches into
@@ -151,7 +153,7 @@ describe("esphome-web-logs-dialog", () => {
     expect(replaced).toHaveBeenCalledWith(live);
     expect((el as any)._streaming).toBe(true);
     (el as any)._flushPending();
-    expect((el as any)._lines).toContain("web.logs.rebooting");
+    expect((el as any)._lines).toContain("serial.resetting");
     expect((el as any)._lines).toContain("web.logs.reconnected");
   });
 
