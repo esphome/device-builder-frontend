@@ -305,12 +305,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
     }
     if (!detection) return; // picker dismissed
 
-    // A board that names its platform by its USB ids, or one we can't tell:
-    // narrow the picker to the platform, or leave it open (#1856).
+    // A board that names its platform by its USB ids narrows the picker to
+    // the platform; one we can't tell leaves it open and says so, since the
+    // user picked that port on purpose (#1856).
     if (detection.kind !== "esp") {
-      this._applyDetection(
-        detection.kind === "family" ? platformToPreset(detection.family) : null
-      );
+      if (detection.kind === "family") {
+        this._applyDetection(platformToPreset(detection.family));
+      } else {
+        this._applyDetection(null);
+        this._detectError = this._localize("wizard.connect_your_board_unrecognized");
+      }
       void this._fetchBoards();
       return;
     }

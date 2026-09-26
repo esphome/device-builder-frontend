@@ -632,6 +632,7 @@
     "connect_your_board_back": "Back",
     "connect_your_board_detecting": "Detecting the connected board…",
     "connect_your_board_detect_failed": "Could not detect the connected board. Check the cable and try another port.",
+    "connect_your_board_unrecognized": "Could not tell which board this is from its USB ids. Pick it from the list below.",
     "detected_chip_family": "{family} detected — pick your specific board",
     "show_all_boards": "Show all boards",
     "how_create": "How would you like to create your project?",

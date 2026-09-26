@@ -23,9 +23,8 @@ export function webPlatform(mode: WebMode): WebPlatform<WebMode> {
 }
 
 /**
- * The family a port's USB ids clearly point at, or undefined for a generic
- * UART bridge or an unknown device. The claims use disjoint vendor ids, so
- * the order never decides between two families.
+ * The mode whose family ``portFamily`` names for a port, or undefined for a
+ * UART bridge or an unknown device.
  */
 export function webPlatformOfPort(port: SerialPort): WebPlatform<WebMode> | undefined {
   const family = portFamily(port);

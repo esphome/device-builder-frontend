@@ -111,5 +111,18 @@ describe("wizard-step-board WebSerial detect errors", () => {
     );
     expect(esptool.connectToPort).not.toHaveBeenCalled();
   });
+
+  it("says when the picked device's USB ids name no board it knows", async () => {
+    seams.requestSerialPort.mockResolvedValueOnce({
+      getInfo: () => ({ usbVendorId: 0x2341, usbProductId: 0x8036 }),
+    } as SerialPort);
+    const el = await mount();
+
+    await (el as any)._connectViaWebSerial();
+    await el.updateComplete;
+
+    expect(detectError(el)?.textContent).toContain("Could not tell which board this is");
+    expect(esptool.connectToPort).not.toHaveBeenCalled();
+  });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
