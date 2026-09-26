@@ -10,21 +10,20 @@ vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}))
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
-const wsSerial = vi.hoisted(() => ({
+const esptool = vi.hoisted(() => ({
   detectChip: vi.fn(),
   disconnect: vi.fn(),
-  isWebSerialSupported: () => true,
   readDeviceManifest: vi.fn(),
 }));
-// Keep the rest of the module real — notably the genuine isPortPickerCancel
+// Keep the rest of the module real; notably the genuine isPortPickerCancel
 // driving the cancel-vs-fail split under test.
 vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
-  ...wsSerial,
+  isWebSerialSupported: () => true,
 }));
 vi.mock("../../../src/platforms/esp/esptool.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/platforms/esp/esptool.js")>()),
-  ...wsSerial,
+  ...esptool,
 }));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
@@ -56,7 +55,7 @@ afterEach(() => {
 
 describe("wizard-step-board WebSerial detect errors", () => {
   it("renders the connect failure in the boards view", async () => {
-    wsSerial.detectChip.mockRejectedValueOnce(
+    esptool.detectChip.mockRejectedValueOnce(
       new Error("Failed to connect with the device")
     );
     const el = await mount();
@@ -68,7 +67,7 @@ describe("wizard-step-board WebSerial detect errors", () => {
   });
 
   it("stays silent when the user cancels the port picker", async () => {
-    wsSerial.detectChip.mockRejectedValueOnce(
+    esptool.detectChip.mockRejectedValueOnce(
       new DOMException("No port selected by the user.", "NotFoundError")
     );
     const el = await mount();
@@ -80,20 +79,20 @@ describe("wizard-step-board WebSerial detect errors", () => {
   });
 
   it("clears a previous error on retry", async () => {
-    wsSerial.detectChip.mockRejectedValueOnce(new Error("boom"));
+    esptool.detectChip.mockRejectedValueOnce(new Error("boom"));
     const el = await mount();
     await (el as any)._connectViaWebSerial();
     await el.updateComplete;
     expect(detectError(el)).not.toBeNull();
 
-    wsSerial.detectChip.mockResolvedValueOnce({
+    esptool.detectChip.mockResolvedValueOnce({
       chipName: "ESP32-S3",
       transport: {},
       port: {},
       loader: {},
     });
-    wsSerial.readDeviceManifest.mockResolvedValueOnce(null);
-    wsSerial.disconnect.mockResolvedValueOnce(undefined);
+    esptool.readDeviceManifest.mockResolvedValueOnce(null);
+    esptool.disconnect.mockResolvedValueOnce(undefined);
     await (el as any)._connectViaWebSerial();
     await el.updateComplete;
     expect(detectError(el)).toBeNull();

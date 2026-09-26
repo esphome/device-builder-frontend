@@ -6,21 +6,15 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const wsSerial = vi.hoisted(() => ({
+const esptool = vi.hoisted(() => ({
   detectChip: vi.fn(),
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
   resetAndDisconnect: vi.fn(),
 }));
-// Keep the rest of the module real — the cancel-vs-fail split under test
-// routes through the genuine isPortPickerCancel.
-vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
-  ...wsSerial,
-}));
 vi.mock("../../../src/platforms/esp/esptool.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/platforms/esp/esptool.js")>()),
-  ...wsSerial,
+  ...esptool,
 }));
 vi.mock("../../../src/util/download-text.js", () => ({ triggerDownload: vi.fn() }));
 vi.mock("../../../src/util/post-install-logs.js", () => ({
@@ -93,10 +87,10 @@ afterEach(() => {
 describe("Web Serial install — HTTP byte download", () => {
   it("fetches firmware bytes over HTTP and flashes them", async () => {
     const { host, api } = makeHost();
-    wsSerial.detectChip.mockResolvedValue(CHIP);
-    wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.flashFirmware.mockResolvedValue(undefined);
-    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.detectChip.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
@@ -104,8 +98,8 @@ describe("Web Serial install — HTTP byte download", () => {
       "device.yaml",
       "firmware.factory.bin"
     );
-    expect(wsSerial.flashFirmware).toHaveBeenCalledTimes(1);
-    const [, bytes, address] = wsSerial.flashFirmware.mock.calls[0];
+    expect(esptool.flashFirmware).toHaveBeenCalledTimes(1);
+    const [, bytes, address] = esptool.flashFirmware.mock.calls[0];
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(Array.from(bytes as Uint8Array)).toEqual([1, 2, 3, 4]);
     expect(address).toBe(0x0); // factory image flashes at 0x0
@@ -115,18 +109,18 @@ describe("Web Serial install — HTTP byte download", () => {
   it("streams esptool detect + flash output into the log (#346)", async () => {
     const { host } = makeHost();
     let captured: ((l: string) => void) | undefined;
-    wsSerial.detectChip.mockImplementation(async (onLog?: (l: string) => void) => {
+    esptool.detectChip.mockImplementation(async (onLog?: (l: string) => void) => {
       captured = onLog;
       onLog?.("Detecting chip type... ESP32");
       return CHIP;
     });
     // Flash output reaches the log through the terminal wired at detect: the
     // session stays open across compile and flash, so no reconnect is needed.
-    wsSerial.flashFirmware.mockImplementation(async () => {
+    esptool.flashFirmware.mockImplementation(async () => {
       captured?.("Writing at 0x00010000...");
     });
-    wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
@@ -136,24 +130,24 @@ describe("Web Serial install — HTTP byte download", () => {
 
   it("releases the port when the post-flash reset throws", async () => {
     const { host } = makeHost();
-    wsSerial.detectChip.mockResolvedValue(CHIP);
-    wsSerial.flashFirmware.mockResolvedValue(undefined);
-    wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.resetAndDisconnect.mockRejectedValueOnce(new Error("reset boom"));
+    esptool.detectChip.mockResolvedValue(CHIP);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockRejectedValueOnce(new Error("reset boom"));
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     // Flash succeeded, so the install still completes; the failed reset must not
     // leak the held port.
     expect(host._step).toBe("done");
-    expect(wsSerial.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
   });
 
   it("closes the port directly when disconnect throws on an early return", async () => {
     const { host, api } = makeHost();
     const port = { close: vi.fn().mockResolvedValue(undefined) };
-    wsSerial.detectChip.mockResolvedValue({ ...CHIP, port });
-    wsSerial.disconnect.mockRejectedValue(new Error("disconnect boom"));
+    esptool.detectChip.mockResolvedValue({ ...CHIP, port });
+    esptool.disconnect.mockRejectedValue(new Error("disconnect boom"));
     api.firmwareDownloadBytes.mockRejectedValueOnce(new Error("boom"));
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
@@ -165,7 +159,7 @@ describe("Web Serial install — HTTP byte download", () => {
 
   it("closes silently when the user cancels the port picker", async () => {
     const { host } = makeHost();
-    wsSerial.detectChip.mockRejectedValueOnce(
+    esptool.detectChip.mockRejectedValueOnce(
       new DOMException("No port selected by the user.", "NotFoundError")
     );
 
@@ -177,7 +171,7 @@ describe("Web Serial install — HTTP byte download", () => {
 
   it("surfaces a connect failure instead of closing the dialog (#1414)", async () => {
     const { host } = makeHost();
-    wsSerial.detectChip.mockRejectedValueOnce(
+    esptool.detectChip.mockRejectedValueOnce(
       new Error("Failed to connect with the device")
     );
 
@@ -192,16 +186,16 @@ describe("Web Serial install — HTTP byte download", () => {
 
   it("fails cleanly when the HTTP byte fetch errors", async () => {
     const { host, api } = makeHost();
-    wsSerial.detectChip.mockResolvedValue(CHIP);
-    wsSerial.disconnect.mockResolvedValue(undefined);
+    esptool.detectChip.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
     api.firmwareDownloadBytes.mockRejectedValueOnce(new Error("boom"));
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     expect(host._fail).toHaveBeenCalledWith("firmware.download_failed");
-    expect(wsSerial.flashFirmware).not.toHaveBeenCalled();
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
     // The held session must be released on the bail-out, not leaked into a retry.
-    expect(wsSerial.disconnect).toHaveBeenCalledTimes(1);
+    expect(esptool.disconnect).toHaveBeenCalledTimes(1);
   });
 
   // ESP8285 is an ESP8266 with embedded flash; `board: esp8285` resolves to the
@@ -214,16 +208,16 @@ describe("Web Serial install — HTTP byte download", () => {
     api.firmwareGetBinaries.mockResolvedValue([
       { title: "Firmware", file: "firmware.bin" },
     ]);
-    wsSerial.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
-    wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.flashFirmware.mockResolvedValue(undefined);
-    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     expect(host._fail).not.toHaveBeenCalled();
-    expect(wsSerial.flashFirmware).toHaveBeenCalledTimes(1);
-    expect(wsSerial.flashFirmware.mock.calls[0][2]).toBe(0x0); // esp8266 flashes at 0x0
+    expect(esptool.flashFirmware).toHaveBeenCalledTimes(1);
+    expect(esptool.flashFirmware.mock.calls[0][2]).toBe(0x0); // esp8266 flashes at 0x0
     expect(host._step).toBe("done");
   });
 
@@ -232,23 +226,23 @@ describe("Web Serial install — HTTP byte download", () => {
     host._device.target_platform = "esp8266";
     host._device.board_id = "esp8285";
     api.getBoard.mockResolvedValue({ esphome: { platform: "esp8266" } });
-    wsSerial.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP32" });
-    wsSerial.disconnect.mockResolvedValue(undefined);
+    esptool.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP32" });
+    esptool.disconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     expect(host._fail).toHaveBeenCalledWith("firmware.chip_mismatch");
     // The kind routes the footer to the change-board hand-off.
     expect(host._failureKind).toBe("chip-mismatch");
-    expect(wsSerial.flashFirmware).not.toHaveBeenCalled();
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
   });
 
   it("leaves the chip-mismatch flag unset on a matching chip", async () => {
     const { host } = makeHost();
-    wsSerial.detectChip.mockResolvedValue(CHIP);
-    wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.flashFirmware.mockResolvedValue(undefined);
-    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.detectChip.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 

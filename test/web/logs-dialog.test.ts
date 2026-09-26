@@ -8,7 +8,6 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn() }));
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
-vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }));
 vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openLiveSerialPort: vi.fn(),
