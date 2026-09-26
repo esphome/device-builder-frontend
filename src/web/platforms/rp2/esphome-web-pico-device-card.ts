@@ -5,13 +5,13 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { RP2_SERIAL_LOGS } from "../../../platforms/rp2/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import { openImprovDialog } from "../../improv/open-improv-dialog.js";
 import { openLogsPortForCard } from "../../util/pick-port-for-logs.js";
-import { PICO_LOGS } from "./logs-policy.js";
 import "../../logs/esphome-web-logs-dialog.js";
 import "../../dashboard/esphome-web-card.js";
 
@@ -41,7 +41,8 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
   private async _showLogs(): Promise<void> {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
-    if (!(await openLogsPortForCard(this, this.port, this._localize, PICO_LOGS))) return;
+    if (!(await openLogsPortForCard(this, this.port, this._localize, RP2_SERIAL_LOGS)))
+      return;
     this._logsOpen = true;
   }
 
@@ -93,7 +94,7 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.pico.title")}
-        .policy=${PICO_LOGS}
+        .policy=${RP2_SERIAL_LOGS}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

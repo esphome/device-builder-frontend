@@ -15,7 +15,8 @@ import {
   rebootNrf,
 } from "../../../src/platforms/nrf52/nrf-logs-reset.js";
 import { isNrfAppCdcPort } from "../../../src/platforms/nrf52/nrf-platform.js";
-import { NRF_RESET } from "../../../src/web/platforms/nrf52/logs-policy.js";
+import { NRF52_SERIAL_LOGS } from "../../../src/platforms/nrf52/serial-logs.js";
+import { platformReset } from "../../../src/platforms/serial-logs.js";
 
 function makePort(connected: boolean | undefined = true) {
   const port = Object.assign(new EventTarget(), {
@@ -104,10 +105,14 @@ describe("nRF52 reset helpers", () => {
     expect(isNrfAppCdcPort(otherZephyr as unknown as SerialPort)).toBe(false);
   });
 
-  it("offers Reset on web.esphome.io only on ESPHome's own CDC", () => {
-    expect(NRF_RESET.supports?.(makePort() as unknown as SerialPort)).toBe(true);
+  it("offers Reset only on ESPHome's own CDC", () => {
+    expect(
+      platformReset(NRF52_SERIAL_LOGS)?.supports?.(makePort() as unknown as SerialPort)
+    ).toBe(true);
     // The Adafruit bootloader of an ItsyBitsy nRF52840.
     const bootloader = { getInfo: () => ({ usbVendorId: 0x239a, usbProductId: 0x0051 }) };
-    expect(NRF_RESET.supports?.(bootloader as unknown as SerialPort)).toBe(false);
+    expect(
+      platformReset(NRF52_SERIAL_LOGS)?.supports?.(bootloader as unknown as SerialPort)
+    ).toBe(false);
   });
 });

@@ -7,6 +7,7 @@
 export type * from "./ambz2-flasher.js";
 export type * from "./libretiny-uf2.js";
 export * from "./rtl87xx-platform.js";
+export * from "./serial-logs.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
 export const loadLibreTinyParser = () => import("./libretiny-uf2.js");

@@ -512,22 +512,38 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
 });
 
 describe("attachSerialLogStream reopen", () => {
+  // The Device Builder knows the platform, so an RP2 board keeps DTR (its CDC
+  // only transmits with it up) whatever USB ids its maker gave it.
   it.each([
-    ["rp2", false],
-    ["esp32", true],
+    ["a Pico's own CDC", { usbVendorId: 0x2e8a, usbProductId: 0xf00a }, "rp2040", false],
+    [
+      "an Adafruit Feather RP2040 (maker ids)",
+      { usbVendorId: 0x239a, usbProductId: 0x80f1 },
+      "rp2040",
+      false,
+    ],
+    ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, "esp32", true],
+    ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, "esp32", true],
+    // The policy's release wins, whatever bridge the kit sits behind.
+    [
+      "an RTL8720C kit on an unlisted bridge",
+      { usbVendorId: 0x1234, usbProductId: 1 },
+      "rtl87xx",
+      true,
+    ],
   ])(
-    "on a %s reopen, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
-    async (targetPlatform, released) => {
-      const live = openPort();
+    "on a reopen of %s, drops DTR and RTS: %s",
+    async (_name, info, platform, released) => {
+      const live = openPort(info);
       const restore = withGetPorts(async () => [live]);
       try {
         await attachSerialLogStream(
-          deadPort(),
+          { ...deadPort(), getInfo: () => info } as SerialPort,
           stubDialog() as never,
           defaultLocalize,
           115200,
           () => false,
-          targetPlatform
+          platform
         );
         if (released) expect(live.setSignals).toHaveBeenCalled();
         else expect(live.setSignals).not.toHaveBeenCalled();

@@ -26,16 +26,21 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: (ms: number) => sleep(ms) }))
 
 import toast from "sonner-js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
+import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
 import { streamBleNus } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { NRF52_SERIAL_LOGS } from "../../src/platforms/nrf52/serial-logs.js";
 import { PicoStrandedError, rebootPico } from "../../src/platforms/rp2/rp2-logs-reset.js";
+import { RP2_SERIAL_LOGS } from "../../src/platforms/rp2/serial-logs.js";
+import {
+  platformReset,
+  type SerialLogsPolicy,
+  type SerialPlatformReset,
+} from "../../src/platforms/serial-logs.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/serial-reacquire.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
-import { RTS_PULSE, type WebSerialReset } from "../../src/web/logs/logs-policy.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
-import { NRF_RESET } from "../../src/web/platforms/nrf52/logs-policy.js";
-import { PICO_RESET } from "../../src/web/platforms/rp2/logs-policy.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,13 +51,16 @@ function toolbarLabels(el: ESPHomeWebLogsDialog): string[] {
   );
 }
 
-// ``null`` for a card with no reset (a default argument would turn undefined into the pulse).
+// Asserted, not defaulted: an undefined here would silently fall back to the
+// pulse and test the wrong reset.
+const picoReset = platformReset(RP2_SERIAL_LOGS)!;
+
 async function mount(
-  reset: WebSerialReset | null = RTS_PULSE
+  policy: SerialLogsPolicy = ESP_SERIAL_LOGS
 ): Promise<ESPHomeWebLogsDialog> {
   const el = new ESPHomeWebLogsDialog();
   (el as any)._localize = (k: string) => k;
-  el.policy = reset ? { reset } : {};
+  el.policy = policy;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -63,7 +71,7 @@ async function mount(
 function serialSession(
   el: ESPHomeWebLogsDialog,
   port: unknown,
-  reset: WebSerialReset = RTS_PULSE
+  reset: "rts-pulse" | SerialPlatformReset = "rts-pulse"
 ): SerialLogSource {
   const source = new SerialLogSource(port as SerialPort, {
     reset,
@@ -102,7 +110,7 @@ const drainMacrotasks = () => new Promise((r) => setTimeout(r, 0));
 
 describe("esphome-web-logs-dialog", () => {
   it("offers the nRF52 Reset only on ESPHome's own CDC, never over Bluetooth", async () => {
-    const el = await mount(NRF_RESET);
+    const el = await mount(NRF52_SERIAL_LOGS);
     const port = (usbVendorId: number, usbProductId: number) =>
       ({ getInfo: () => ({ usbVendorId, usbProductId }) }) as unknown as SerialPort;
     el.port = port(0x2fe3, 0x0100);
@@ -142,13 +150,13 @@ describe("esphome-web-logs-dialog", () => {
     el.open = true;
     const port = makeWebSerialPort();
     const cancel = vi.fn(async () => {});
-    serialSession(el, port, PICO_RESET);
+    serialSession(el, port, picoReset);
     (el as any)._cancel = cancel;
     return { port, cancel };
   }
 
   it("reboots a Pico through the routine and resumes on the returned port", async () => {
-    const el = await mount(PICO_RESET);
+    const el = await mount(RP2_SERIAL_LOGS);
     const { port, cancel } = picoSession(el);
     const live = makeWebSerialPort();
     vi.mocked(rebootPico).mockResolvedValue(true);
@@ -173,7 +181,7 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("prints no reset marker while the port is still being reacquired", async () => {
-    const el = await mount(PICO_RESET);
+    const el = await mount(RP2_SERIAL_LOGS);
     picoSession(el);
     (el as any)._cancel = undefined; // a reconnect or an earlier reset in flight
     await (el as any)._resetDevice();
@@ -186,7 +194,7 @@ describe("esphome-web-logs-dialog", () => {
     { why: "the reboot leaves it stranded", stranded: true },
     { why: "it never comes back", stranded: false },
   ])("ends the session when $why", async ({ stranded }) => {
-    const el = await mount(PICO_RESET);
+    const el = await mount(RP2_SERIAL_LOGS);
     picoSession(el);
     if (stranded) vi.mocked(rebootPico).mockRejectedValue(new PicoStrandedError("pick"));
     else {
@@ -203,7 +211,7 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("ignores a second Reset click while the reboot is still reacquiring the port", async () => {
-    const el = await mount(PICO_RESET);
+    const el = await mount(RP2_SERIAL_LOGS);
     picoSession(el);
     let finish!: (rebooted: boolean) => void;
     vi.mocked(rebootPico).mockReturnValue(new Promise((r) => (finish = r)));
@@ -228,10 +236,26 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("offers the Pico reset only where WebUSB exists", async () => {
-    expect(resetButtons(await mount(PICO_RESET)).length).toBe(0);
+    expect(resetButtons(await mount(RP2_SERIAL_LOGS)).length).toBe(0);
     Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
     try {
-      expect(resetButtons(await mount(PICO_RESET)).length).toBe(1);
+      expect(resetButtons(await mount(RP2_SERIAL_LOGS)).length).toBe(1);
+    } finally {
+      delete (navigator as any).usb;
+    }
+  });
+
+  it("offers the Pico reset only on the Pico's own CDC, like the Device Builder", async () => {
+    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+    try {
+      const el = await mount(RP2_SERIAL_LOGS);
+      const port = (usbVendorId: number, usbProductId: number) =>
+        ({ getInfo: () => ({ usbVendorId, usbProductId }) }) as unknown as SerialPort;
+      el.port = port(0x2e8a, 0xf00a);
+      expect(el.canReset).toBe(true);
+      // A CH340 bridge on the console pins never gets a BOOTSEL touch.
+      el.port = port(0x1a86, 0x7523);
+      expect(el.canReset).toBe(false);
     } finally {
       delete (navigator as any).usb;
     }
@@ -243,7 +267,7 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("hides the reset button when the card says so (no reset line behind the CDC)", async () => {
-    const el = await mount(null);
+    const el = await mount({});
     expect(resetButtons(el).length).toBe(0);
   });
 
@@ -266,7 +290,7 @@ describe("esphome-web-logs-dialog", () => {
     const el = await mount();
     const order: string[] = [];
     const stale = { close: vi.fn(async () => order.push("close")) };
-    const live = { readable: {}, close: vi.fn(async () => {}) };
+    const live = makeWebSerialPort();
     (openLiveSerialPort as any).mockImplementation(async () => {
       order.push("reopen");
       return live;
@@ -295,6 +319,8 @@ describe("esphome-web-logs-dialog", () => {
     const el = await mount();
     (openLiveSerialPort as any).mockResolvedValue({
       readable: {},
+      getInfo: () => ({}),
+      setSignals: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     });
     el.open = true;
@@ -325,6 +351,8 @@ describe("esphome-web-logs-dialog", () => {
     const el = await mount();
     (openLiveSerialPort as any).mockResolvedValue({
       readable: {},
+      getInfo: () => ({}),
+      setSignals: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     });
     el.open = true;
@@ -353,6 +381,8 @@ describe("esphome-web-logs-dialog", () => {
     const el = await mount();
     (openLiveSerialPort as any).mockResolvedValue({
       readable: {},
+      getInfo: () => ({}),
+      setSignals: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     });
     (streamSerialLines as any).mockImplementation(() => {
@@ -393,6 +423,8 @@ describe("esphome-web-logs-dialog", () => {
     });
     (openLiveSerialPort as any).mockResolvedValue({
       readable: {},
+      getInfo: () => ({}),
+      setSignals: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     });
     el.open = true;
@@ -415,7 +447,7 @@ describe("esphome-web-logs-dialog", () => {
     (el as any)._onDisconnect();
     await drainMacrotasks();
     (el as any)._stop();
-    const late = { readable: {}, close: vi.fn(async () => {}) };
+    const late = makeWebSerialPort();
     resolve!(late);
     await drainMacrotasks();
 

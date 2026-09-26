@@ -7,7 +7,9 @@ import {
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
 import type { BleLogsSupport } from "../platforms/platform-support.js";
-import { platformFor } from "../platforms/registry.js";
+import { serialLogsFor } from "../platforms/registry.js";
+import { platformReset } from "../platforms/serial-logs.js";
+import { releaseLinesAfterReopen } from "../platforms/serial-reopen.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -140,7 +142,7 @@ export async function openPortForLogs(
   targetPlatform: string | null | undefined
 ): Promise<void> {
   await openSerialPort(port, { baudRate });
-  if (platformFor(targetPlatform)?.logs?.serial?.releasesLinesAfterOpen) {
+  if (serialLogsFor(targetPlatform).releaseLinesAfterOpen) {
     await releaseControlLines(port);
   }
 }
@@ -156,7 +158,7 @@ export function sessionResetHook(
   targetPlatform: string | null | undefined,
   baudRate: number
 ): SerialResetHook | undefined {
-  const support = platformFor(targetPlatform)?.logs?.serial?.reset;
+  const support = platformReset(serialLogsFor(targetPlatform));
   if (!support?.available()) return undefined;
   return {
     supports: (port) => support.supports(port),
@@ -270,8 +272,8 @@ export function postInstallShowLogsHandler(
  * the dialog's reconnect-after-failure). A closed port is reopened through the
  * re-enumeration window — resolving the live granted handle, since a native-USB
  * chip's cached handle can be dead after the reset — with DTR/RTS cleared
- * unless the platform's CDC needs DTR up (a Pico); an already-open port
- * streams as-is.
+ * unless the board keeps them (``releaseLinesAfterReopen``); an already-open
+ * port streams as-is.
  */
 export async function attachSerialLogStream(
   port: SerialPort,
@@ -279,8 +281,8 @@ export async function attachSerialLogStream(
   localize: LocalizeFunc,
   baudRate: number,
   cancelled: () => boolean = () => false,
-  // Required, so a new caller can't forget it: without it a Pico's reopen
-  // would drop DTR and go silent.
+  // Required, so a new caller can't forget it: it decides whether a reopen
+  // drops DTR, which would silence an RP2 board's CDC.
   targetPlatform: string | null | undefined
 ): Promise<void> {
   if (!port.readable) {
@@ -294,11 +296,7 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    // Drop the lines the reopen asserted, unless the board's CDC needs DTR
-    // up to transmit at all (a Pico).
-    if (!platformFor(targetPlatform)?.logs?.serial?.keepLinesOnReopen) {
-      await releaseControlLines(port);
-    }
+    await releaseLinesAfterReopen(port, serialLogsFor(targetPlatform), targetPlatform);
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.

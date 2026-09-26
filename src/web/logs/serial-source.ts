@@ -1,4 +1,6 @@
-import { releaseControlLines } from "../../util/serial-control-lines.js";
+import type { SerialPlatformReset } from "../../platforms/serial-logs.js";
+import { releaseLinesAfterReopen } from "../../platforms/serial-reopen.js";
+import { pulseRts } from "../../util/serial-control-lines.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)
  * before the dialog showed; a drop mid-stream is ridden out the way the
@@ -6,8 +8,8 @@ import { releaseControlLines } from "../../util/serial-control-lines.js";
  */
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
+import { sleep } from "../../util/sleep.js";
 import type { WebLogSource } from "./log-source.js";
-import type { WebSerialReset } from "./logs-policy.js";
 
 // ESPHome logs over UART default to 115200 baud. The dashboard resolves a
 // per-device override from config; ESPHome Web has no device config, so the
@@ -19,9 +21,9 @@ export const LOG_BAUD_RATE = 115200;
 export const LOG_BUFFER_SIZE = 8192;
 
 export interface SerialLogSourceOptions {
-  /** How Reset Device reaches the board; none without one. */
-  reset?: WebSerialReset;
-  /** Drop DTR and RTS right after a reopen (the RTL8720C's strap lines). */
+  /** How Reset Device reaches the board (``offeredReset``); none without one. */
+  reset?: "rts-pulse" | SerialPlatformReset;
+  /** The policy's line release, honoured after a reopen too (``releaseLinesAfterReopen``). */
   releaseLinesAfterOpen?: boolean;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
@@ -38,11 +40,20 @@ export class SerialLogSource implements WebLogSource {
     private readonly options: SerialLogSourceOptions
   ) {
     const reset = options.reset;
-    if (reset) {
-      // A dropping reset runs after the stream's cancel closed the port, which
-      // it expects; the dialog resumes afterwards, reacquiring the port.
-      this.reset = (cancelled) => reset.run(this.activePort ?? this.port, cancelled);
-      this.resetDropsStream = reset.dropsStream;
+    if (reset === "rts-pulse") {
+      // Matches legacy ewt-console.reset(): the pulse, then a 1s settle for
+      // the device to come back up. Best-effort: some bridges don't wire it.
+      this.reset = async () => {
+        await pulseRts(this.activePort ?? this.port);
+        await sleep(1000);
+      };
+    } else if (reset) {
+      // The reboot runs after the stream's cancel closed the port, which it
+      // expects; the dialog resumes afterwards, reacquiring the port.
+      this.reset = async (cancelled) => {
+        await reset.reboot(this.activePort ?? this.port, cancelled);
+      };
+      this.resetDropsStream = true;
     }
   }
 
@@ -86,7 +97,7 @@ export class SerialLogSource implements WebLogSource {
       return null;
     }
     if (!live) return null;
-    if (this.options.releaseLinesAfterOpen) await releaseControlLines(live);
+    await releaseLinesAfterReopen(live, this.options);
     const cancel = this.stream(live, hooks);
     this.options.onPortReplaced?.(live);
     return cancel;

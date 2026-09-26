@@ -12,6 +12,11 @@ import {
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
 import {
+  offeredReset,
+  platformReset,
+  type SerialLogsPolicy,
+} from "../../platforms/serial-logs.js";
+import {
   classifyLine,
   type CrashKind,
   latchCrashKind,
@@ -24,7 +29,6 @@ import type { SerialLineHooks } from "../../util/serial-log-stream.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import type { WebLogsPolicy } from "./logs-policy.js";
 import { SerialLogSource } from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
@@ -74,10 +78,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   /**
    * The family's logs policy, handed in by its card: how Reset device
-   * reaches the board and whether reopens drop DTR and RTS. The default is
-   * neither, so a card that forgets it gets no reset rather than a wrong one.
+   * reaches the board and which lines a reopen keeps. The default has no
+   * reset, so a card that forgets it gets no reset rather than a wrong one.
    */
-  @property({ attribute: false }) policy: WebLogsPolicy = {};
+  @property({ attribute: false }) policy: SerialLogsPolicy = {};
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -139,9 +143,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
    * behind the port takes it; never over Bluetooth.
    */
   get canReset(): boolean {
-    const reset = this.policy.reset;
-    if (this.bleDevice || !reset?.available()) return false;
-    return !this.port || (reset.supports?.(this.port) ?? true);
+    return !this.bleDevice && offeredReset(this.policy, this.port) !== undefined;
   }
 
   /**
@@ -176,8 +178,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (this.bleDevice) return new BleLogSource(this.bleDevice);
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
-      reset: this.canReset ? this.policy.reset : undefined,
-      releaseLinesAfterOpen: this.policy.releaseLines ?? false,
+      reset: offeredReset(this.policy, this.port),
+      releaseLinesAfterOpen: this.policy.releaseLinesAfterOpen,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>
@@ -428,7 +430,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   private _resetFailureKey(err: unknown): string {
-    return this.policy.reset?.failureKey?.(err) ?? "web.logs.reset_failed";
+    return platformReset(this.policy)?.failureKey(err) ?? "web.logs.reset_failed";
   }
 
   // Mark the reset in the log once it is going ahead: the boot output that

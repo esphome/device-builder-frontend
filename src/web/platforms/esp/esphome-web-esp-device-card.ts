@@ -11,21 +11,21 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { ESP_SERIAL_LOGS } from "../../../platforms/esp/serial-logs.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { sleep } from "../../../util/sleep.js";
-import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import "./esphome-web-install-adoptable-dialog.js";
 import "./esphome-web-install-upload-dialog.js";
+import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import {
   IMPROV_OPEN_DELAY_MS,
   type ImprovResult,
   openImprovDialog,
 } from "../../improv/open-improv-dialog.js";
-import { openLogsPortForCard } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
-import { ESP_LOGS } from "./logs-policy.js";
+import { openLogsPortForCard } from "../../util/pick-port-for-logs.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -59,7 +59,8 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _showLogs(): Promise<void> {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
-    if (!(await openLogsPortForCard(this, this.port, this._localize, ESP_LOGS))) return;
+    if (!(await openLogsPortForCard(this, this.port, this._localize, ESP_SERIAL_LOGS)))
+      return;
     this._logsOpen = true;
   }
 
@@ -182,7 +183,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.esp.title")}
-        .policy=${ESP_LOGS}
+        .policy=${ESP_SERIAL_LOGS}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

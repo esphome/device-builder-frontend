@@ -1,15 +1,10 @@
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
 import { openFailureMessage, openSerialPort } from "../../util/serial-open-error.js";
 import { LOG_BAUD_RATE, LOG_BUFFER_SIZE } from "./serial-source.js";
-
-/** Per-board line handling for a logs open. */
-export interface LogsOpenOptions {
-  /** Drop DTR and RTS right after the open (the RTL8720C's strap and reset lines). */
-  releaseLines?: boolean;
-}
 
 /**
  * Open a port for the logs view before showing the dialog. Returns ``true`` if
@@ -21,13 +16,13 @@ export interface LogsOpenOptions {
 export async function openPortForLogs(
   port: SerialPort,
   localize: LocalizeFunc,
-  options: LogsOpenOptions = {}
+  policy: SerialLogsPolicy
 ): Promise<boolean> {
   try {
     await openSerialPort(port, { baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
     // Chromium asserts DTR and RTS on open; on the RTL8720C kits those are
     // the download strap and the reset, so drop them before the board boots.
-    if (options.releaseLines) await releaseControlLines(port);
+    if (policy.releaseLinesAfterOpen) await releaseControlLines(port);
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader — streamSerialLines() calls getReader(), so
@@ -38,7 +33,7 @@ export async function openPortForLogs(
         return false;
       }
       // Left open by an earlier action, possibly with the lines still up.
-      if (options.releaseLines) await releaseControlLines(port);
+      if (policy.releaseLinesAfterOpen) await releaseControlLines(port);
       return true;
     }
     toast.error(openFailureMessage(err, localize));
