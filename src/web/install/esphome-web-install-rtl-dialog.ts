@@ -114,11 +114,11 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
         parser = mod;
         image = mod.parseAmbz2Image(new Uint8Array(bytes));
       } catch (err) {
-        const refused = parser !== undefined && err instanceof parser.Ambz2ImageError;
-        this._fail(
-          this._localize(refused ? err.key : "firmware.rtl_bad_uf2"),
-          getErrorMessage(err)
-        );
+        const key =
+          parser && err instanceof parser.Ambz2ImageError
+            ? err.key
+            : "firmware.rtl_bad_uf2";
+        this._fail(this._localize(key), getErrorMessage(err));
         return;
       }
       try {
