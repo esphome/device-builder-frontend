@@ -11,7 +11,11 @@ import {
 } from "../../components/process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
-import { platformReset, type SerialLogsPolicy } from "../../platforms/serial-logs.js";
+import {
+  offeredReset,
+  platformReset,
+  type SerialLogsPolicy,
+} from "../../platforms/serial-logs.js";
 import {
   classifyLine,
   type CrashKind,
@@ -25,7 +29,6 @@ import type { SerialLineHooks } from "../../util/serial-log-stream.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import { type WebSerialReset, webSerialReset } from "./logs-policy.js";
 import { SerialLogSource } from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
@@ -140,11 +143,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
    * behind the port takes it; never over Bluetooth.
    */
   get canReset(): boolean {
-    return !this.bleDevice && this._reset() !== undefined;
-  }
-
-  private _reset(): WebSerialReset | undefined {
-    return webSerialReset(this.policy, this.port);
+    return !this.bleDevice && offeredReset(this.policy, this.port) !== undefined;
   }
 
   /**
@@ -179,8 +178,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (this.bleDevice) return new BleLogSource(this.bleDevice);
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
-      reset: this.bleDevice ? undefined : this._reset(),
-      keepLinesOnReopen: this.policy.keepLinesOnReopen ?? false,
+      reset: offeredReset(this.policy, this.port),
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>
@@ -431,7 +429,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   private _resetFailureKey(err: unknown): string {
-    return platformReset(this.policy)?.failureKey?.(err) ?? "web.logs.reset_failed";
+    return platformReset(this.policy)?.failureKey(err) ?? "web.logs.reset_failed";
   }
 
   // Mark the reset in the log once it is going ahead: the boot output that

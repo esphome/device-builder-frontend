@@ -513,21 +513,21 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
 
 describe("attachSerialLogStream reopen", () => {
   it.each([
-    ["rp2", false],
-    ["esp32", true],
+    ["a Pico's own CDC", { usbVendorId: 0x2e8a, usbProductId: 0xf00a }, false],
+    ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, true],
+    ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, true],
   ])(
-    "on a %s reopen, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
-    async (targetPlatform, released) => {
-      const live = openPort();
+    "on a reopen of %s, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
+    async (_name, info, released) => {
+      const live = openPort(info);
       const restore = withGetPorts(async () => [live]);
       try {
         await attachSerialLogStream(
-          deadPort(),
+          { ...deadPort(), getInfo: () => info } as SerialPort,
           stubDialog() as never,
           defaultLocalize,
           115200,
-          () => false,
-          targetPlatform
+          () => false
         );
         if (released) expect(live.setSignals).toHaveBeenCalled();
         else expect(live.setSignals).not.toHaveBeenCalled();
@@ -549,8 +549,7 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false,
-        undefined
+        () => false
       );
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream.mock.calls[0][0]).toBe(live); // streamed the live handle
@@ -577,8 +576,7 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         19200,
-        () => false,
-        undefined
+        () => false
       );
       expect(live.open).toHaveBeenCalledWith({ baudRate: 19200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -607,8 +605,7 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false,
-        undefined
+        () => false
       );
       expect(cached.open).toHaveBeenCalledWith({ baudRate: 115200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -632,8 +629,7 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false,
-        undefined
+        () => false
       );
       await vi.advanceTimersByTimeAsync(8100);
       await done;

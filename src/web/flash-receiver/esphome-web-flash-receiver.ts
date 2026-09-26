@@ -6,7 +6,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { DEFAULT_SERIAL_LOGS } from "../../platforms/serial-logs.js";
+import { ESP_SERIAL_LOGS } from "../../platforms/esp/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -387,7 +387,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     const port = this._logPort;
     if (!port) return;
     const gen = this._bootLogsGen;
-    if (!(await openPortForLogs(port, this._localize, DEFAULT_SERIAL_LOGS))) return;
+    if (!(await openPortForLogs(port, this._localize, ESP_SERIAL_LOGS))) return;
     // A flash started (or the receiver unmounted) during the reopen: the
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
@@ -507,7 +507,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .port=${this._logPort}
         ?open=${this._logsOpen}
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
-        .policy=${DEFAULT_SERIAL_LOGS}
+        .policy=${ESP_SERIAL_LOGS}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}

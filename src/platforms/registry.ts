@@ -1,3 +1,4 @@
+import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 /**
  * The Device Builder's platforms beyond ESP, one ``PlatformSupport`` each
  * (see ``platform-support.ts``). Adding a platform is a new directory whose
@@ -10,7 +11,7 @@ import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
 import { rp2Platform } from "./rp2/dashboard.js";
 import { rtl87xxPlatform } from "./rtl87xx/dashboard.js";
-import { DEFAULT_SERIAL_LOGS, type SerialLogsPolicy } from "./serial-logs.js";
+import type { SerialLogsPolicy } from "./serial-logs.js";
 
 export const PLATFORMS: readonly PlatformSupport[] = [
   nrf52Platform,
@@ -25,11 +26,11 @@ export function platformFor(
   return PLATFORMS.find((p) => p.matches(targetPlatform));
 }
 
-/** A device's Web Serial logs policy; ESP (no descriptor) gets the RTS pulse. */
+/** A device's Web Serial logs policy; ESP has no descriptor, so it gets its policy here. */
 export function serialLogsFor(
   targetPlatform: string | null | undefined
 ): SerialLogsPolicy {
-  return platformFor(targetPlatform)?.logs?.serial ?? DEFAULT_SERIAL_LOGS;
+  return platformFor(targetPlatform)?.logs?.serial ?? ESP_SERIAL_LOGS;
 }
 
 /** The install flow an install method string selects, if any. */

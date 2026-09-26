@@ -226,7 +226,7 @@ describe("launchLogsWithMethod", () => {
 
 describe("launchLogsWithMethod web-serial", () => {
   // Chromium asserts DTR and RTS on open; an RTL8720C kit needs them released
-  // (see releasesLinesAfterOpen), an ESP board must keep the open's state.
+  // (see releaseLinesAfterOpen), an ESP board must keep the open's state.
   it.each([
     ["rtl87xx", true],
     ["esp32", false],
@@ -260,8 +260,7 @@ describe("launchLogsWithMethod web-serial", () => {
         host.logsDialog,
         host.localize,
         115200,
-        undefined,
-        platform
+        undefined
       );
     } finally {
       restore();

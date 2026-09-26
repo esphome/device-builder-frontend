@@ -8,7 +8,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
 import type { BleLogsSupport } from "../platforms/platform-support.js";
 import { serialLogsFor } from "../platforms/registry.js";
-import { platformReset } from "../platforms/serial-logs.js";
+import { platformReset, releaseLinesAfterReopen } from "../platforms/serial-logs.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -124,14 +124,7 @@ export async function reconnectWebSerialLogs(
     failSerialOpen(logsDialog, openFailureMessage(err, localize), cancelled);
     return;
   }
-  await attachSerialLogStream(
-    port,
-    logsDialog,
-    localize,
-    baudRate,
-    cancelled,
-    targetPlatform
-  );
+  await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
 }
 
 /** Open ``port`` for a logs session and apply the platform's line policy; rejects as ``open`` does. */
@@ -160,7 +153,7 @@ export function sessionResetHook(
   const support = platformReset(serialLogsFor(targetPlatform));
   if (!support?.available()) return undefined;
   return {
-    supports: (port) => support.supports?.(port) ?? true,
+    supports: (port) => support.supports(port),
     run: async (port, cancelled) => {
       let live: SerialPort | null = null;
       let failure: string | undefined;
@@ -171,7 +164,7 @@ export function sessionResetHook(
         }
       } catch (err) {
         console.warn("Reset Device failed", err);
-        failure = localize(support.failureKey?.(err) ?? "dashboard.logs_reset_failed");
+        failure = localize(support.failureKey(err) ?? "dashboard.logs_reset_failed");
       }
       if (failure) {
         // A stranded device still gets its toast once the session moved on,
@@ -181,14 +174,7 @@ export function sessionResetHook(
       } else if (!live) {
         failPortReopen(logsDialog, localize, port, cancelled);
       } else {
-        await attachSerialLogStream(
-          live,
-          logsDialog,
-          localize,
-          baudRate,
-          cancelled,
-          targetPlatform
-        );
+        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
       }
     },
   };
@@ -271,18 +257,15 @@ export function postInstallShowLogsHandler(
  * the dialog's reconnect-after-failure). A closed port is reopened through the
  * re-enumeration window — resolving the live granted handle, since a native-USB
  * chip's cached handle can be dead after the reset — with DTR/RTS cleared
- * unless the platform's CDC needs DTR up (a Pico); an already-open port
- * streams as-is.
+ * unless the port is a Pico's CDC (``releaseLinesAfterReopen``); an
+ * already-open port streams as-is.
  */
 export async function attachSerialLogStream(
   port: SerialPort,
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  cancelled: () => boolean = () => false,
-  // Required, so a new caller can't forget it: without it a Pico's reopen
-  // would drop DTR and go silent.
-  targetPlatform: string | null | undefined
+  cancelled: () => boolean = () => false
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
@@ -295,11 +278,7 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    // Drop the lines the reopen asserted, unless the board's CDC needs DTR
-    // up to transmit at all (a Pico).
-    if (!serialLogsFor(targetPlatform).keepLinesOnReopen) {
-      await releaseControlLines(port);
-    }
+    await releaseLinesAfterReopen(port);
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.
@@ -368,14 +347,7 @@ export async function handlePostInstallShowLogs(
     /* The install just left the port closed via ``resetAndDisconnect``;
        the attach reopens the still-granted port (retrying the native-USB
        re-enumeration window) and starts reading. */
-    await attachSerialLogStream(
-      webSerialPort,
-      logsDialog,
-      localize,
-      baudRate,
-      cancelled,
-      targetPlatform
-    );
+    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate, cancelled);
   } else {
     logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }

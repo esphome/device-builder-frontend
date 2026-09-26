@@ -22,7 +22,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 
 import toast from "sonner-js";
 
-import { DEFAULT_SERIAL_LOGS } from "../../src/platforms/serial-logs.js";
+import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
 import { openPortForLogs } from "../../src/web/logs/open-port-for-logs.js";
 import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
@@ -175,7 +175,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     expect(openPortForLogs).toHaveBeenCalledWith(
       port,
       expect.anything(),
-      DEFAULT_SERIAL_LOGS
+      ESP_SERIAL_LOGS
     );
     expect((el as any)._logsOpen).toBe(true);
   });

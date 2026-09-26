@@ -13,14 +13,16 @@ vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
 }));
 
-import { RTS_PULSE } from "../../src/web/logs/logs-policy.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
 
 const hooks = { onLine: () => {}, onEnd: () => {} } as never;
 
-function ports() {
+function ports(info: SerialPortInfo = { usbVendorId: 0x303a, usbProductId: 0x1001 }) {
   const dead = { close: vi.fn(async () => {}) } as unknown as SerialPort;
-  const live = { setSignals: vi.fn(async () => {}) } as unknown as SerialPort;
+  const live = {
+    setSignals: vi.fn(async () => {}),
+    getInfo: () => info,
+  } as unknown as SerialPort;
   mocks.openLiveSerialPort.mockResolvedValue(live);
   return { dead, live };
 }
@@ -33,7 +35,7 @@ describe("SerialLogSource reopen line policy", () => {
   // A UART bridge's auto-reset circuit must not be left holding the lines.
   it("drops DTR and RTS on the reopened handle before streaming by default", async () => {
     const { dead, live } = ports();
-    const source = new SerialLogSource(dead, { reset: RTS_PULSE });
+    const source = new SerialLogSource(dead, { reset: "rts-pulse" });
     await source.resume(hooks, () => false);
     const setSignals = vi.mocked(live.setSignals);
     expect(setSignals).toHaveBeenCalledWith({
@@ -47,12 +49,9 @@ describe("SerialLogSource reopen line policy", () => {
   });
 
   // arduino-pico's CDC only transmits while DTR is asserted.
-  it("leaves the lines as reopened when the policy keeps them (a Pico)", async () => {
-    const { dead, live } = ports();
-    const source = new SerialLogSource(dead, {
-      reset: RTS_PULSE,
-      keepLinesOnReopen: true,
-    });
+  it("leaves the lines as reopened on a Pico's own CDC, whichever card reached it", async () => {
+    const { dead, live } = ports({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
+    const source = new SerialLogSource(dead, { reset: "rts-pulse" });
     await source.resume(hooks, () => false);
     expect(live.setSignals).not.toHaveBeenCalled();
     expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);

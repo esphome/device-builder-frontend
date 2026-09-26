@@ -166,8 +166,7 @@ export async function launchLogsWithMethod(
         host.logsDialog,
         host.localize,
         baudRate,
-        cancelled,
-        device.target_platform
+        cancelled
       );
     } catch {
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));

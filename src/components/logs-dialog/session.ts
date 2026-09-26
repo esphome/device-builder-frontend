@@ -6,6 +6,7 @@
  */
 import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
+import { pulseRts } from "../../util/serial-control-lines.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
 import { hasPause, isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
 
@@ -387,8 +388,7 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   }
   host._session = { ...s, paused: false };
   try {
-    await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    await pulseRts(s.port);
     // Boot output can't precede the pulse; expecting it only once the pulse
     // has landed keeps a stale pre-reset line from retiring the watchdog
     // for a reset that never took.

@@ -10,11 +10,13 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 
 import { english } from "../_en-json.js";
 import { PLATFORM_INSTALLS } from "../_platform-installs.js";
+import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
 import type { FlasherStepView } from "../../src/platforms/platform-support.js";
 import {
   installForMethod,
   platformFor,
   PLATFORMS,
+  serialLogsFor,
 } from "../../src/platforms/registry.js";
 
 // Every key a step detail can resolve to, with and without WebUSB.
@@ -74,48 +76,24 @@ describe("PLATFORMS", () => {
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release only on RTL8720C kits,
-  // DTR held up and its own reset for the Pico, its own reset for nRF52, and
-  // Bluetooth only on nRF52.
+  // their own reset for the Pico and nRF52, and Bluetooth only on nRF52.
   it.each([
-    [
-      "nrf52",
-      {
-        pulseResets: false,
-        releasesLinesAfterOpen: false,
-        keepLinesOnReopen: false,
-        reset: true,
-        ble: true,
-      },
-    ],
-    [
-      "rp2",
-      {
-        pulseResets: false,
-        releasesLinesAfterOpen: false,
-        keepLinesOnReopen: true,
-        reset: true,
-        ble: false,
-      },
-    ],
-    [
-      "rtl87xx",
-      {
-        pulseResets: true,
-        releasesLinesAfterOpen: true,
-        keepLinesOnReopen: false,
-        reset: false,
-        ble: false,
-      },
-    ],
+    ["nrf52", { reset: "platform", releaseLinesAfterOpen: false, ble: true }],
+    ["rp2", { reset: "platform", releaseLinesAfterOpen: false, ble: false }],
+    ["rtl87xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
+    const reset = logs?.serial?.reset;
     expect({
-      pulseResets: logs?.serial?.reset === "rts-pulse",
-      releasesLinesAfterOpen: logs?.serial?.releaseLinesAfterOpen ?? false,
-      keepLinesOnReopen: logs?.serial?.keepLinesOnReopen ?? false,
-      reset: typeof logs?.serial?.reset === "object",
+      reset: typeof reset === "object" ? "platform" : reset,
+      releaseLinesAfterOpen: logs?.serial?.releaseLinesAfterOpen ?? false,
       ble: logs?.ble !== undefined,
     }).toEqual(expected);
+  });
+
+  it("gives ESP, which has no descriptor, the RTS pulse", () => {
+    expect(serialLogsFor("esp32")).toBe(ESP_SERIAL_LOGS);
+    expect(ESP_SERIAL_LOGS).toEqual({ reset: "rts-pulse" });
   });
 
   it("covers every registered platform in the logs policy table", () => {

@@ -11,7 +11,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { DEFAULT_SERIAL_LOGS } from "../../../platforms/serial-logs.js";
+import { ESP_SERIAL_LOGS } from "../../../platforms/esp/serial-logs.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -59,9 +59,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _showLogs(): Promise<void> {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
-    if (
-      !(await openLogsPortForCard(this, this.port, this._localize, DEFAULT_SERIAL_LOGS))
-    )
+    if (!(await openLogsPortForCard(this, this.port, this._localize, ESP_SERIAL_LOGS)))
       return;
     this._logsOpen = true;
   }
@@ -185,7 +183,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.esp.title")}
-        .policy=${DEFAULT_SERIAL_LOGS}
+        .policy=${ESP_SERIAL_LOGS}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;
