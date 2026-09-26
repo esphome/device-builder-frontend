@@ -152,44 +152,45 @@ describe("disconnect", () => {
     await disconnect(transport as never);
     expect(vi.getTimerCount()).toBe(0);
   });
+});
 
-  describe("resetAndDisconnect", () => {
-    // The reset's own setSignals are stubbed out; the release afterwards is
-    // what this pins.
-    const transportFor = (port: SerialPort) => ({
-      disconnect: () => state.disconnect(),
-      device: port,
-      setDTR: async () => {},
-      setRTS: async () => {},
+describe("resetAndDisconnect", () => {
+  // The reset's own setSignals are stubbed out; the release afterwards is
+  // what this pins.
+  const transportFor = (port: SerialPort) => ({
+    disconnect: () => state.disconnect(),
+    device: port,
+    setDTR: async () => {},
+    setRTS: async () => {},
+    setSignals: async () => {},
+  });
+  const loader = {} as never;
+
+  it("closes the port directly when the disconnect after the reset rejects", async () => {
+    state.disconnect = () => Promise.reject(new Error("stream gone"));
+    const usbPort = {
+      ...port,
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
       setSignals: async () => {},
-    });
-    const loader = {} as never;
+    } as unknown as SerialPort;
+    const done = resetAndDisconnect(loader, transportFor(usbPort) as never, usbPort);
+    await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS); // the reset's own pulse sleeps
+    await done;
+    expect(usbPort.close).toHaveBeenCalledOnce();
+  });
 
-    it("closes the port directly when the disconnect after the reset rejects", async () => {
-      state.disconnect = () => Promise.reject(new Error("stream gone"));
-      const usbPort = {
-        ...port,
-        getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
-        setSignals: async () => {},
-      } as unknown as SerialPort;
-      const transport = transportFor(usbPort);
-      await resetAndDisconnect(loader, transport as never, usbPort);
-      expect(usbPort.close).toHaveBeenCalledOnce();
-    });
-
-    it("resolves past the release deadline when the disconnect hangs", async () => {
-      state.disconnect = () => new Promise(() => {});
-      const usbPort = {
-        ...port,
-        getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
-        setSignals: async () => {},
-      } as unknown as SerialPort;
-      const done = resetAndDisconnect(loader, transportFor(usbPort) as never, usbPort);
-      await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS);
-      await done;
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining("Could not release the port")
-      );
-    });
+  it("resolves past the release deadline when the disconnect hangs", async () => {
+    state.disconnect = () => new Promise(() => {});
+    const usbPort = {
+      ...port,
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      setSignals: async () => {},
+    } as unknown as SerialPort;
+    const done = resetAndDisconnect(loader, transportFor(usbPort) as never, usbPort);
+    await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS);
+    await done;
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Could not release the port")
+    );
   });
 });
