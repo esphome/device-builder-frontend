@@ -58,6 +58,12 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
     if (!(await openPortForLogs(this.port, this._localize))) return;
+    // A flow switch accepted while the open was pending unmounted this
+    // card: nothing is left to own the port, so release it.
+    if (!this.isConnected) {
+      await this.port.close().catch(() => {});
+      return;
+    }
     this._logsOpen = true;
   }
 
