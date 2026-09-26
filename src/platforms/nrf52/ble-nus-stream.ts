@@ -1,3 +1,8 @@
+/**
+ * Log streaming over the BLE Nordic UART Service (Web Bluetooth, Chromium
+ * only). Lines go through the same assembler as Web Serial so both surfaces
+ * render identically.
+ */
 import {
   createLogLineAssembler,
   safeFlush,
@@ -5,11 +10,6 @@ import {
 } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
-/**
- * Log streaming over the BLE Nordic UART Service (Web Bluetooth, Chromium
- * only). Lines go through the same assembler as Web Serial so both surfaces
- * render identically.
- */
 import { isNrfPlatform } from "./nrf-platform.js";
 
 export const BLE_NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";

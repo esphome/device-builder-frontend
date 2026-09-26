@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/web-serial.js", () => ({
-  connectToPort: vi.fn(),
-  flashFirmware: vi.fn(),
-  resetAndDisconnect: vi.fn(async () => {}),
-  disconnect: vi.fn(async () => {}),
   isPortPickerCancel: vi.fn(() => false),
 }));
 vi.mock("../../src/platforms/esp/esptool.js", () => ({
@@ -12,7 +8,6 @@ vi.mock("../../src/platforms/esp/esptool.js", () => ({
   flashFirmware: vi.fn(),
   resetAndDisconnect: vi.fn(async () => {}),
   disconnect: vi.fn(async () => {}),
-  isPortPickerCancel: vi.fn(() => false),
 }));
 
 import {
