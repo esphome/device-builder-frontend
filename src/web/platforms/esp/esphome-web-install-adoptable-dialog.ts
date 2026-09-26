@@ -10,10 +10,10 @@ import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { downloadBuildParts, selectBuild } from "./firmware-build.js";
 import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
+import { webFlashMessages } from "./run-flash.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
-import { webFlashMessages } from "./run-flash.js";
 
 /**
  * "Prepare for first use": flash the prebuilt esphome-web firmware fetched

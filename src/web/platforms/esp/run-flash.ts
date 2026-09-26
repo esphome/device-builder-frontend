@@ -1,4 +1,3 @@
-import type { LocalizeFunc } from "../../../common/localize.js";
 /**
  * The ESPHome Web flash engine, shared by the upload and adoptable install
  * dialogs. Reuses ``web-serial.ts`` end to end: connect + detect the chip,
@@ -8,6 +7,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
  * Pure orchestration over callbacks — no DOM — so a dialog just renders the
  * reported state.
  */
+import type { LocalizeFunc } from "../../../common/localize.js";
 import {
   connectToPort,
   type DetectedChip,

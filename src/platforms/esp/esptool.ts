@@ -128,9 +128,13 @@ export async function connectToPort(
   // open". A locked stream is another action mid-read or mid-write; leave it
   // to fail as busy. On a closed port close() just rejects.
   if (!port.readable?.locked && !port.writable?.locked) {
+    const wasOpen = port.readable !== null || port.writable !== null;
     await port.close().then(
       () => console.debug("[Web Serial] Closed a leftover open handle before connecting"),
-      () => {}
+      (err: unknown) => {
+        // A closed port rejects too; only a handle that was open is news.
+        if (wasOpen) console.warn("[Web Serial] Could not close a leftover handle:", err);
+      }
     );
   }
   const transport = new Transport(port, false);

@@ -8,9 +8,9 @@ import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
+import { webFlashMessages } from "./run-flash.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
-import { webFlashMessages } from "./run-flash.js";
 
 /**
  * Install an existing ESPHome project by uploading its factory ``.bin`` and

@@ -255,10 +255,19 @@ async function releasePort(port: SerialPort): Promise<void> {
   const deadline = Date.now() + RELEASE_TIMEOUT_MS;
   for (;;) {
     try {
-      await port.close();
+      // A wedged driver can leave close() pending; never hold the caller past the deadline.
+      const closed = await Promise.race([
+        port.close().then(() => true),
+        sleep(Math.max(deadline - Date.now(), 0)).then(() => false),
+      ]);
+      if (!closed) console.warn("[Improv] Port close still pending; moving on");
       return;
-    } catch {
-      if (!port.readable?.locked || Date.now() >= deadline) return;
+    } catch (err) {
+      const locked = port.readable?.locked ?? false;
+      if (!locked || Date.now() >= deadline) {
+        console.warn("[Improv] Could not close the port:", err, { locked });
+        return;
+      }
       await sleep(50);
     }
   }

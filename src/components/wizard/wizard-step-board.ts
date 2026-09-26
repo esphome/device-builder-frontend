@@ -16,6 +16,7 @@ import { type DeploymentEnvironment, detectEnvironment } from "../../util/enviro
 import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { portInUseMessage } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import { isPortPickerCancel, isWebSerialSupported } from "../../util/web-serial.js";
 import {
@@ -30,7 +31,6 @@ import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./wizard-step-board-list.js";
 import "./wizard-step-board-port-select.js";
-import { portInUseMessage } from "../../util/serial-open-error.js";
 
 registerMdiIcons({
   "usb-port": mdiUsbPort,
