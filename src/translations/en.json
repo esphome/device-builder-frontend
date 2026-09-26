@@ -550,7 +550,7 @@
     "no_uf2": "This build did not produce a UF2 image (firmware.uf2).",
     "rp2_bad_uf2": "Invalid UF2 image",
     "rtl_ready_title": "Ready to flash over USB",
-    "rtl_ready_desc": "Connect the board's USB serial adapter, click Flash and pick its port. Where the adapter's DTR and RTS lines reach the board, it is reset into download mode automatically.",
+    "rtl_ready_desc": "Connect the board over USB, click Flash and pick its port. A development kit with its own USB port (such as the BW15 kit) is switched into flashing mode automatically. A separate adapter wired only to TX, RX and GND cannot do that, so you will be shown how to do it by hand.",
     "rtl_connecting": "Connecting to the board…",
     "rtl_connect_desc": "Resetting the board into download mode and waiting for its ROM to answer.",
     "rtl_wait_title": "Waiting for download mode…",
@@ -2038,7 +2038,7 @@
     },
     "rtl": {
       "title": "RTL8720C Device",
-      "connect_hint": "Install a LibreTiny UF2 on your RTL8720C (AmebaZ2) board through its USB serial adapter, or read its logs. The board is reset into download mode automatically where the adapter's DTR and RTS lines reach it.",
+      "connect_hint": "Install a LibreTiny UF2 on your RTL8720C (AmebaZ2) board over USB, or read its logs. A development kit with its own USB port (such as the BW15 kit) is switched into flashing mode automatically; with a separate adapter wired only to TX, RX and GND you will be shown how to do it by hand.",
       "logs": "Serial logs",
       "install_title": "Install firmware on an RTL8720C",
       "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
