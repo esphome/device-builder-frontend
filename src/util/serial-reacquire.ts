@@ -73,52 +73,26 @@ export function portOfSerialConnectEvent(event: Event): SerialPort | null {
 }
 
 /**
- * How soon after its own ``disconnect`` a port's ``connect`` is a hub
- * re-enumeration rather than a plug-in. Plugging anything into a USB hub
- * can bounce the hub's other ports: every granted board on it drops and
- * comes back about half a second later (measured on macOS), while a hand
- * unplug and replug takes seconds.
- */
-export const SERIAL_REENUMERATION_BLIP_MS = 1000;
-
-/**
- * Per-port memory for the plug-in toasts. Two rules: a ``connect`` that
- * follows the same port's ``disconnect`` within ``blipMs`` is a hub
- * re-enumeration and is never announced (#1850); otherwise a port is
- * announced once per ``windowMs``, since a bare-flash board can
- * reboot-loop and re-enumerate every cycle. ``SerialPort`` identity is
- * stable across re-enums, so the port itself is the key; stale entries
- * are evicted lazily, since ``navigator.serial`` holds every permitted
- * port for the page's lifetime anyway.
+ * Per-port "already told the user" memory for the connect toasts. A
+ * bare-flash board can reboot-loop, re-enumerating every cycle; the same
+ * port is announced once per window. ``SerialPort`` identity is stable
+ * across re-enums, so the port itself is the key; stale entries are
+ * evicted lazily, since ``navigator.serial`` holds every permitted port
+ * for the page's lifetime anyway.
  */
 export class SerialConnectAnnouncements {
-  private _announcedMs = new Map<SerialPort, number>();
-  private _disconnectedMs = new Map<SerialPort, number>();
+  private _lastMs = new Map<SerialPort, number>();
 
-  constructor(
-    private readonly _windowMs = 60_000,
-    private readonly _blipMs = SERIAL_REENUMERATION_BLIP_MS
-  ) {}
-
-  /** A ``disconnect`` for *port*; the next ``connect`` within the blip is a re-enumeration. */
-  noteDisconnect(port: SerialPort, now = Date.now()): void {
-    this._disconnectedMs.set(port, now);
-  }
+  constructor(private readonly _windowMs = 60_000) {}
 
   /** Whether to announce *port* now; records it when so. */
   shouldAnnounce(port: SerialPort, now = Date.now()): boolean {
-    for (const [p, ts] of this._disconnectedMs) {
-      if (now - ts >= this._blipMs) this._disconnectedMs.delete(p);
+    for (const [p, ts] of this._lastMs) {
+      if (now - ts >= this._windowMs) this._lastMs.delete(p);
     }
-    // A re-enumerated board was never gone as far as the user is concerned:
-    // stay quiet and leave the once-per-window slot for a real plug-in.
-    if (this._disconnectedMs.delete(port)) return false;
-    for (const [p, ts] of this._announcedMs) {
-      if (now - ts >= this._windowMs) this._announcedMs.delete(p);
-    }
-    const last = this._announcedMs.get(port);
+    const last = this._lastMs.get(port);
     if (last !== undefined && now - last < this._windowMs) return false;
-    this._announcedMs.set(port, now);
+    this._lastMs.set(port, now);
     return true;
   }
 }

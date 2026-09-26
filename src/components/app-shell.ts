@@ -68,10 +68,9 @@ import {
 } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
+import { watchSerialPlugIns } from "../util/serial-plug-ins.js";
 import {
-  isOwnSerialReenumeration,
   markSerialActivity,
-  portOfSerialConnectEvent,
   SerialConnectAnnouncements,
 } from "../util/serial-reacquire.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
@@ -342,17 +341,14 @@ export class ESPHomeApp extends LitElement {
   ];
 
   private _connectAnnouncements = new SerialConnectAnnouncements();
+  private _unwatchPlugIns: (() => void) | null = null;
 
-  private _onSerialConnect = (event: Event) => {
-    // esptool-js's chip reset re-enumerates native-USB chips, firing a fresh
-    // connect event for the port we are working on: not a new device.
-    if (isOwnSerialReenumeration()) return;
-    const port = portOfSerialConnectEvent(event);
-    if (port && !this._connectAnnouncements.shouldAnnounce(port)) return;
+  private _onSerialPlugIn = (port: SerialPort) => {
+    if (!this._connectAnnouncements.shouldAnnounce(port)) return;
     notifyInfo(this._localize("layout.usb_device_connected"), {
       // Stable id so multiple connect events collapse onto the same
       // toast instead of stacking — defence in depth on top of the
-      // time-window suppression above.
+      // once-per-window memory above.
       id: "esphome-usb-device-connected",
       duration: LONG_TOAST_DURATION_MS,
       action: {
@@ -369,13 +365,6 @@ export class ESPHomeApp extends LitElement {
     });
   };
 
-  // A hub re-enumerating its other ports fires disconnect then connect for
-  // each board on it; the memory tells that blip from a plug-in (#1850).
-  private _onSerialDisconnect = (event: Event) => {
-    const port = portOfSerialConnectEvent(event);
-    if (port) this._connectAnnouncements.noteDisconnect(port);
-  };
-
   private _onSecretsSaved = () => {
     void loadOnboardingState(this);
   };
@@ -384,8 +373,7 @@ export class ESPHomeApp extends LitElement {
     super.connectedCallback();
     void this._init();
     if ("serial" in navigator) {
-      navigator.serial.addEventListener("connect", this._onSerialConnect);
-      navigator.serial.addEventListener("disconnect", this._onSerialDisconnect);
+      this._unwatchPlugIns = watchSerialPlugIns(this._onSerialPlugIn);
     }
     window.addEventListener("secrets-saved", this._onSecretsSaved);
   }
@@ -395,10 +383,8 @@ export class ESPHomeApp extends LitElement {
     this._api.disconnect();
     this._pillGate.connected();
     clearRecentJobs(this);
-    if ("serial" in navigator) {
-      navigator.serial.removeEventListener("connect", this._onSerialConnect);
-      navigator.serial.removeEventListener("disconnect", this._onSerialDisconnect);
-    }
+    this._unwatchPlugIns?.();
+    this._unwatchPlugIns = null;
     window.removeEventListener("secrets-saved", this._onSecretsSaved);
   }
 

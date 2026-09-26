@@ -53,7 +53,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreSerial();
   vi.clearAllMocks();
-  vi.useRealTimers();
   isRecentSerialActivity.mockReturnValue(false);
   hasOpenDialog.mockReturnValue(false);
   isImprovInProgress.mockReturnValue(false);
@@ -150,22 +149,14 @@ describe("web app flow-switch suggestion", () => {
     expect(notifyInfo).not.toHaveBeenCalled();
   });
 
-  it("stays quiet for a board a hub re-enumerated, and still offers a hand replug", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(1_000_000);
+  it("stays quiet for a board a hub re-enumerated", async () => {
     await mountApp();
     // Plugging something else into the hub bounces the Pico: disconnect,
-    // then connect about half a second later.
+    // then connect right after. The timing rule itself is pinned in
+    // serial-plug-ins.test.ts; this is the wiring through watchSerialPlugIns.
     unplug(PICO);
-    vi.setSystemTime(1_000_500);
     plugIn(PICO);
     expect(notifyInfo).not.toHaveBeenCalled();
-    // A hand unplug and replug takes seconds.
-    unplug(PICO);
-    vi.setSystemTime(1_005_000);
-    plugIn(PICO);
-    expect(notifyInfo).toHaveBeenCalledTimes(1);
-    expect(notifyInfo.mock.lastCall![0]).toBe("web.flow_switch.pico");
   });
 
   it("stops listening for plug-ins and unplugs when unmounted", async () => {
