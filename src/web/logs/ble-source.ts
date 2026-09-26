@@ -4,10 +4,10 @@
  * before the first reconnect, since a peripheral that rebooted is not
  * advertising again straight away.
  */
-import { BLE_CONNECT_ATTEMPTS, streamBleNus } from "../../../platforms/nrf52/index.js";
-import type { SerialLineHooks } from "../../../util/serial-log-stream.js";
-import { sleep } from "../../../util/sleep.js";
-import type { WebLogSource } from "../../logs/log-source.js";
+import { BLE_CONNECT_ATTEMPTS, streamBleNus } from "../../platforms/nrf52/index.js";
+import type { SerialLineHooks } from "../../util/serial-log-stream.js";
+import { sleep } from "../../util/sleep.js";
+import type { WebLogSource } from "./log-source.js";
 
 const REATTACH_DELAY_MS = 1000;
 

@@ -22,7 +22,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { SerialLineHooks } from "../../util/serial-log-stream.js";
-import { BleLogSource } from "../platforms/nrf52/ble-source.js";
+import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
 import { SerialLogSource, type SerialResetMode } from "./serial-source.js";

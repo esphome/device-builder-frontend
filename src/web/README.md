@@ -58,7 +58,7 @@ hardware classes behave differently:
 | `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                           |
 | `platforms/<name>/`                    | Each platform's connect and device cards and install dialogs (`esp`, `rp2`, `nrf52`, `rtl87xx`) |
 | `install/`                             | Pieces the install dialogs share: the progress card and the file picker                         |
-| `logs/`                                | Log viewer dialog and its Web Serial source                                                     |
+| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                             |
 | `improv/`                              | Wi-Fi provisioning dialog                                                                       |
 | `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                         |
 | `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)                 |

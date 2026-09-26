@@ -14,7 +14,7 @@ import {
   flashFirmware,
   resetAndDisconnect,
 } from "../../../platforms/esp/index.js";
-import type { FlashPart } from "../../util/esphome-web-firmware.js";
+import type { FlashPart } from "./firmware-build.js";
 
 export type FlashStep =
   "connecting" | "preparing" | "erasing" | "flashing" | "done" | "error";

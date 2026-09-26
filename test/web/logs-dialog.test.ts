@@ -30,12 +30,12 @@ import { streamBleNus } from "../../src/platforms/nrf52/ble-nus-stream.js";
 import { PicoStrandedError, rebootPico } from "../../src/platforms/rp2/rp2-logs-reset.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/serial-reacquire.js";
+import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import {
   SerialLogSource,
   type SerialResetMode,
 } from "../../src/web/logs/serial-source.js";
-import { BleLogSource } from "../../src/web/platforms/nrf52/ble-source.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

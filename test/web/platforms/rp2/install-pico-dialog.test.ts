@@ -6,7 +6,6 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 
 const fetchEsphomeWebManifest = vi.fn();
-const picoUf2Url = vi.fn();
 vi.mock("../../../../src/web/util/esphome-web-firmware.js", () => ({
   fetchEsphomeWebManifest: (...args: unknown[]) => fetchEsphomeWebManifest(...args),
 }));
@@ -15,13 +14,14 @@ vi.mock("../../../../src/components/process-terminal/process-terminal.js", () =>
 vi.mock("../../../../src/components/install-details-log.js", () => ({}));
 const mocks = vi.hoisted(() => ({
   loadPicoImage: vi.fn(),
+  picoUf2Url: vi.fn(),
   flashPico: vi.fn(),
   touchIntoBootloader: vi.fn(),
   loadPicoboot: vi.fn(async () => ({})),
 }));
 vi.mock("../../../../src/web/platforms/rp2/pico-image.js", () => ({
   loadPicoImage: mocks.loadPicoImage,
-  picoUf2Url: (...args: unknown[]) => picoUf2Url(...args),
+  picoUf2Url: mocks.picoUf2Url,
 }));
 vi.mock("../../../../src/platforms/rp2/rp2-flash.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -79,7 +79,7 @@ const button = (el: ESPHomeWebInstallPicoDialog, label: string): HTMLElement =>
 describe("esphome-web-install-pico-dialog", () => {
   it("renders the download link once the manifest loads", async () => {
     fetchEsphomeWebManifest.mockResolvedValue({});
-    picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
+    mocks.picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
 
     const el = await mount();
 
@@ -119,7 +119,7 @@ describe("esphome-web-install-pico-dialog", () => {
 
     // Reopen with a now-working fetch: the prior failure clears and the link renders.
     fetchEsphomeWebManifest.mockResolvedValue({});
-    picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
+    mocks.picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
     el.open = false;
     await settle(el);
     el.open = true;
@@ -150,7 +150,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   it("keeps the download steps where WebUSB is missing, without fetching the image", async () => {
     delete (navigator as any).usb;
     fetchEsphomeWebManifest.mockResolvedValue({ version: "1" });
-    picoUf2Url.mockReturnValue("https://example/x.uf2");
+    mocks.picoUf2Url.mockReturnValue("https://example/x.uf2");
     const el = await mount();
     expect(text(el)).toContain("web.pico.setup_step_4");
     expect(button(el, "dashboard.install")).toBeUndefined();

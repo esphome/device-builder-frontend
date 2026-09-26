@@ -6,11 +6,8 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import {
-  downloadBuildParts,
-  fetchEsphomeWebManifest,
-  selectBuild,
-} from "../../util/esphome-web-firmware.js";
+import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
+import { downloadBuildParts, selectBuild } from "./firmware-build.js";
 import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
 

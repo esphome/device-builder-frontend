@@ -1,4 +1,4 @@
-import type { FlashPart } from "../../util/esphome-web-firmware.js";
+import type { FlashPart } from "./firmware-build.js";
 
 /**
  * ESP32/ESP8266 firmware (and the bootloader a factory image starts with)
