@@ -157,6 +157,16 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._lines).toContain("web.logs.reconnected");
   });
 
+  it("prints no reset marker while the port is still being reacquired", async () => {
+    const el = await mount(PICO_RESET);
+    picoSession(el);
+    (el as any)._cancel = undefined; // a reconnect or an earlier reset in flight
+    await (el as any)._resetDevice();
+    (el as any)._flushPending();
+    expect(rebootPico).not.toHaveBeenCalled();
+    expect((el as any)._lines).not.toContain("serial.resetting");
+  });
+
   it.each([
     { why: "the reboot leaves it stranded", stranded: true },
     { why: "it never comes back", stranded: false },

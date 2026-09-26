@@ -426,6 +426,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     return this.policy.reset?.failureKey?.(err) ?? "web.logs.reset_failed";
   }
 
+  // Mark the reset in the log once it is going ahead: the boot output that
+  // follows would otherwise look like the log just restarted.
+  private _markReset(): void {
+    this._enqueueLine("");
+    this._enqueueLine(this._localize("serial.resetting"));
+  }
+
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
     const source = this._source;
@@ -435,11 +442,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
       toast.error(this._localize("web.logs.reset_failed"));
       return;
     }
-    // Mark the reset in the log: the boot output that follows would otherwise
-    // look like the log just restarted.
-    this._enqueueLine("");
-    this._enqueueLine(this._localize("serial.resetting"));
     if (!source.resetDropsStream) {
+      this._markReset();
       try {
         await reset(() => false);
       } catch (err) {
@@ -452,6 +456,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     // Not while a reconnect or an earlier reset is still reacquiring the port.
     const cancel = this._cancel;
     if (!cancel) return;
+    this._markReset();
     const generation = ++this._generation;
     this._cancel = undefined;
     this._streaming = false;
