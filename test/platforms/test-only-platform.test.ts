@@ -75,6 +75,7 @@ const platform = {
       pick: vi.fn(async () => bleDevice),
       connect: vi.fn(async () => bleCancel),
       failureKey: () => "dashboard.logs_ble_nus_open_failed",
+      disconnectedKey: "dashboard.logs_ble_nus_disconnected",
     },
   },
 } satisfies PlatformSupport;

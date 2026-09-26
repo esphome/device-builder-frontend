@@ -104,6 +104,8 @@ export interface BleLogsSupport {
   ): Promise<() => Promise<void>>;
   /** Localize key for a failed connect. */
   failureKey(err: unknown): string;
+  /** Localize key for the device dropping the link mid-stream. */
+  disconnectedKey: string;
 }
 
 export interface PlatformLogs {

@@ -28,6 +28,7 @@ export const nrf52Platform: PlatformSupport = {
         err instanceof BleNusServiceNotFoundError
           ? "dashboard.logs_ble_nus_service_not_found"
           : "dashboard.logs_ble_nus_open_failed",
+      disconnectedKey: "dashboard.logs_ble_nus_disconnected",
     },
   },
 };
