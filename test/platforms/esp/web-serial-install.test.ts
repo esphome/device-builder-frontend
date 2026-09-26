@@ -27,6 +27,7 @@ import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../../src/platforms/esp/web-serial-install.js";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
+import { markOpenFailure } from "../../../src/util/serial-open-error.js";
 
 function makeHost() {
   const api = {
@@ -181,6 +182,20 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(host._fail).toHaveBeenCalledWith(
       "serial.connect_failed",
       "Failed to connect with the device"
+    );
+  });
+
+  it("says the port may be in use when the open fails with NetworkError", async () => {
+    const { host } = makeHost();
+    const inUse = new DOMException("Failed to open serial port.", "NetworkError");
+    markOpenFailure(inUse);
+    esptool.detectChip.mockRejectedValueOnce(inUse);
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith(
+      "serial.port_in_use",
+      "Failed to open serial port."
     );
   });
 

@@ -8,6 +8,7 @@ import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
+import { webFlashMessages } from "./run-flash.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -44,10 +45,7 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
     await this._flow.start(this.port, {
       erase: true,
       filesCallback: async () => [{ data, address: 0 }],
-      messages: {
-        connectFailed: this._localize("web.install.connect_failed_hint"),
-        noFirmware: this._localize("web.install.no_firmware"),
-      },
+      messages: webFlashMessages(this._localize),
     });
   }
 

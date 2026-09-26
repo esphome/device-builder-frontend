@@ -7,6 +7,7 @@
  * Pure orchestration over callbacks — no DOM — so a dialog just renders the
  * reported state.
  */
+import type { LocalizeFunc } from "../../../common/localize.js";
 import {
   connectToPort,
   type DetectedChip,
@@ -14,6 +15,8 @@ import {
   flashFirmware,
   resetAndDisconnect,
 } from "../../../platforms/esp/index.js";
+import { getErrorMessage } from "../../../util/error-message.js";
+import { portInUseMessage } from "../../../util/serial-open-error.js";
 import type { FlashPart } from "./firmware-build.js";
 
 export type FlashStep =
@@ -30,8 +33,19 @@ export interface FlashMessages {
    * "hold the BOOT button" hint (a bare S2/S3/C3 module needs it).
    */
   connectFailed?: string;
+  /** The "may be open elsewhere" copy for a failed open (see ``portInUseMessage``). */
+  portInUse?: (err: unknown) => string | undefined;
   /** Shown when the plan yields no parts to write. */
   noFirmware?: string;
+}
+
+/** The copy every web.esphome.io ESP flash shows; one place so no caller misses one. */
+export function webFlashMessages(localize: LocalizeFunc): FlashMessages {
+  return {
+    connectFailed: localize("web.install.connect_failed_hint"),
+    portInUse: (err) => portInUseMessage(err, localize),
+    noFirmware: localize("web.install.no_firmware"),
+  };
 }
 
 export interface FlashPlan {
@@ -78,12 +92,15 @@ export async function runFlash(
     detected = await connectToPort(port, hooks.onLog);
   } catch (err) {
     // The port is already authorized (connectToPort never shows a picker), so a
-    // failure here is the chip handshake — surface the hold-BOOT hint if the
-    // caller gave us one, and keep the raw error in the console for debugging.
+    // failure here is another tab or program holding the port, or the chip
+    // handshake — surface the hold-BOOT hint for the latter if the caller gave
+    // us one, and keep the raw error in the console for debugging.
     console.error(err);
     hooks.onStep("error");
     hooks.onError(
-      plan.messages?.connectFailed ?? (err instanceof Error ? err.message : String(err))
+      plan.messages?.portInUse?.(err) ??
+        plan.messages?.connectFailed ??
+        getErrorMessage(err)
     );
     return false;
   }

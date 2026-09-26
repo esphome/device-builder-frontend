@@ -10,6 +10,7 @@ import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { downloadBuildParts, selectBuild } from "./firmware-build.js";
 import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
+import { webFlashMessages } from "./run-flash.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -50,10 +51,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         }
         return downloadBuildParts(build);
       },
-      messages: {
-        connectFailed: this._localize("web.install.connect_failed_hint"),
-        noFirmware: this._localize("web.install.no_firmware"),
-      },
+      messages: webFlashMessages(this._localize),
     });
     // On success the dialog stays in its "done" state showing the Continue
     // button (see render). We do NOT auto-open Improv here: this dialog is a

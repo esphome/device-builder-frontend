@@ -14,6 +14,8 @@ vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
+
+import { markOpenFailure } from "../../src/util/serial-open-error.js";
 import {
   isImprovInProgress,
   openImprovDialog,
@@ -134,8 +136,14 @@ describe("openImprovDialog", () => {
       window.dispatchEvent(ev);
       return ev.defaultPrevented;
     };
+    // Stands in for the dev server's error overlay, a plain window listener.
+    const overlay = vi.fn();
+    window.addEventListener("unhandledrejection", overlay);
     expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    expect(overlay).not.toHaveBeenCalled();
     expect(rejection(new Error("something else"))).toBe(false);
+    expect(overlay).toHaveBeenCalledOnce();
+    window.removeEventListener("unhandledrejection", overlay);
     // A device error on the same request is real news, not the SDK's race.
     expect(rejection(new Error("Error fetching current state: BAD_HOSTNAME"))).toBe(
       false
@@ -164,6 +172,22 @@ describe("openImprovDialog", () => {
     );
     await expect(promise).resolves.toEqual({ improv: true, provisioned: false });
     expect(port.close).toHaveBeenCalledOnce();
+  });
+
+  it("resolves only once the port closed, retrying while the SDK's reader holds it (#1839)", async () => {
+    const close = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new TypeError("stream is locked"))
+      .mockImplementationOnce(async () => {
+        port.readable = null;
+      });
+    const port = { ...makePort(), close };
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    port.readable = { locked: true };
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+    expect(close).toHaveBeenCalledTimes(2);
   });
 
   it("coerces a missing detail to a false/false result", async () => {
@@ -367,5 +391,24 @@ describe("openImprovDialog", () => {
     expect(result).toEqual({ improv: false, provisioned: false });
     expect(toast.error).toHaveBeenCalledOnce();
     expect(dialogEl()).toBeNull();
+  });
+
+  // A manual open says why it failed; right after a reset a NetworkError can
+  // be the board re-enumerating, so that keeps the restart advice.
+  it.each([
+    [false, "NetworkError", "serial.port_in_use"],
+    [false, "SecurityError", "serial.open_failed"],
+    [true, "NetworkError", "web.improv.open_failed"],
+  ])("afterReset %s with a %s open toasts %s", async (afterReset, name, key) => {
+    const err = new DOMException("Failed to open serial port.", name);
+    markOpenFailure(err);
+    openLiveSerialPort.mockImplementation(
+      async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
+        opts.onFailed?.(err);
+        return null;
+      }
+    );
+    await openImprovDialog(makePort() as unknown as SerialPort, localize, { afterReset });
+    expect(toast.error).toHaveBeenCalledWith(key);
   });
 });

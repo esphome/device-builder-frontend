@@ -8,7 +8,9 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
+import { sleep } from "../../util/sleep.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
@@ -150,6 +152,7 @@ async function acquirePort(
     await port.close().catch(() => {});
   }
   let weOpened = false;
+  let failure: unknown = null;
   const live = await openLiveSerialPort(port, {
     baudRate: IMPROV_BAUD_RATE,
     bufferSize: IMPROV_BUFFER_SIZE,
@@ -157,9 +160,15 @@ async function acquirePort(
     onOpened: () => {
       weOpened = true;
     },
+    // Right after a reset a NetworkError can be the board re-enumerating, so
+    // only a manual open reads it as another tab or program holding the port.
+    onFailed: afterReset ? undefined : (err) => (failure = err),
   });
   if (!live) {
-    toast.error(localize("web.improv.open_failed"));
+    // A manual open says why it failed; after a reset keep the restart advice.
+    toast.error(
+      failure ? openFailureMessage(failure, localize) : localize("web.improv.open_failed")
+    );
     return null;
   }
   // openLiveSerialPort only screens readable.locked; a handle it found open
@@ -222,17 +231,47 @@ async function runImprov(
           improv: Boolean(detail.improv),
           provisioned: Boolean(detail.provisioned),
         };
-        // Release the port only if we opened it. The SDK already cancelled its
-        // reader in its own close handler, so this just frees the device for the
-        // next action. Best-effort: the device may have been unplugged.
-        if (weOpened) void port.close().catch(() => {});
         dialogClosed();
-        resolve(result);
+        // Release the port only if we opened it, and resolve only once it is
+        // closed so the card's next action finds it free (#1839).
+        void (weOpened ? releasePort(port) : Promise.resolve()).then(() =>
+          resolve(result)
+        );
       },
       { once: true }
     );
     document.body.appendChild(dialog);
   });
+}
+
+/** How long ``releasePort`` keeps retrying a close the SDK's reader still blocks. */
+const RELEASE_TIMEOUT_MS = 1000;
+
+/**
+ * Close a port the session opened. The SDK cancels its reader in its own close
+ * handler, but that release can land after ours, and a close while the stream
+ * is still locked fails; retry briefly. Best-effort: the device may be gone.
+ */
+async function releasePort(port: SerialPort): Promise<void> {
+  const deadline = Date.now() + RELEASE_TIMEOUT_MS;
+  for (;;) {
+    try {
+      // A wedged driver can leave close() pending; never hold the caller past the deadline.
+      const closed = await Promise.race([
+        port.close().then(() => true),
+        sleep(Math.max(deadline - Date.now(), 0)).then(() => false),
+      ]);
+      if (!closed) console.warn("[Improv] Port close still pending; moving on");
+      return;
+    } catch (err) {
+      const locked = port.readable?.locked ?? false;
+      if (!locked || Date.now() >= deadline) {
+        console.warn("[Improv] Could not close the port:", err, { locked });
+        return;
+      }
+      await sleep(50);
+    }
+  }
 }
 
 /** The SDK's RPC timeout: how long after a close its late rejection can still land. */
@@ -258,13 +297,22 @@ function dialogMounted(): void {
   mountedDialogs++;
   if (listening) return;
   listening = true;
-  window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
-    if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
-    const reason = ev.reason as { message?: unknown } | undefined;
-    const message =
-      typeof reason?.message === "string" ? reason.message : String(ev.reason);
-    if (message === LATE_STATE_ERROR) ev.preventDefault();
-  });
+  // Capture phase, so this runs before other window listeners (the dev
+  // server's error overlay reports every unhandled rejection, handled or not),
+  // and stopping propagation keeps the swallowed one from reaching them.
+  window.addEventListener(
+    "unhandledrejection",
+    (ev: PromiseRejectionEvent) => {
+      if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
+      const reason = ev.reason as { message?: unknown } | undefined;
+      const message =
+        typeof reason?.message === "string" ? reason.message : String(ev.reason);
+      if (message !== LATE_STATE_ERROR) return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    },
+    { capture: true }
+  );
 }
 
 function dialogClosed(): void {

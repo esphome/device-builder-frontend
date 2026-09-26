@@ -607,7 +607,9 @@
     "flashing": "Flashing firmware…",
     "resetting": "Resetting device…",
     "connect_failed": "Could not connect to the device. Unplug and replug the cable, hold the BOOT button while plugging in, or try another USB port or browser.",
-    "unsupported_chip": "This looks like an {chip}, which browser flashing doesn't support yet. Download the firmware and flash it from the command line with esptool instead."
+    "unsupported_chip": "This looks like an {chip}, which browser flashing doesn't support yet. Download the firmware and flash it from the command line with esptool instead.",
+    "open_failed": "Could not open the serial port: {error}",
+    "port_in_use": "Could not open the serial port; it may be open in another tab or program. Close it there and try again. ({error})"
   },
   "wizard": {
     "title_create": "Create configuration",
@@ -1992,7 +1994,6 @@
       "waiting_ble": "Connecting over Bluetooth…",
       "connect_failed": "Could not connect: {error}",
       "download": "Download logs",
-      "open_failed": "Could not open the serial port: {error}",
       "reset_failed": "Could not reset the device.",
       "port_busy": "The device is busy with another operation. Close it and try again.",
       "terminal_disconnected": "Terminal disconnected",

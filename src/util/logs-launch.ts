@@ -15,6 +15,7 @@ import {
   sessionResetHook,
 } from "./post-install-logs.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
+import { openFailureMessage } from "./serial-open-error.js";
 import { requestSerialPort } from "./web-serial.js";
 
 /** The host bits both logs entry points need, decoupled from any page class. */
@@ -133,9 +134,9 @@ export async function launchLogsWithMethod(
     }
     try {
       await openPortForLogs(serialPort, baudRate, device.target_platform);
-    } catch {
+    } catch (err) {
       // The port couldn't open (claimed by another tab, driver error).
-      notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
+      notifyError(openFailureMessage(err, host.localize));
       return;
     }
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh

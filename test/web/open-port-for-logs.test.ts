@@ -97,4 +97,14 @@ describe("openPortForLogs", () => {
     );
     expect(toast.error).toHaveBeenCalledOnce();
   });
+
+  it("says the port is in use when another tab or program holds it", async () => {
+    const port = makePort(async () => {
+      throw new DOMException("Failed to open serial port.", "NetworkError");
+    });
+    await expect(openPortForLogs(port as unknown as SerialPort, localize)).resolves.toBe(
+      false
+    );
+    expect(toast.error).toHaveBeenCalledWith("serial.port_in_use");
+  });
 });

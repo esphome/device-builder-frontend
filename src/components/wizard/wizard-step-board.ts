@@ -16,6 +16,7 @@ import { type DeploymentEnvironment, detectEnvironment } from "../../util/enviro
 import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { portInUseMessage } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import { isPortPickerCancel, isWebSerialSupported } from "../../util/web-serial.js";
 import {
@@ -322,10 +323,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
       void this._fetchBoards();
     } catch (err) {
       if (isPortPickerCancel(err)) return;
-      this._detectError = this._extractErrorDetail(
-        err,
-        this._localize("wizard.connect_your_board_detect_failed")
-      );
+      this._detectError =
+        portInUseMessage(err, this._localize) ??
+        this._extractErrorDetail(
+          err,
+          this._localize("wizard.connect_your_board_detect_failed")
+        );
     }
   }
 

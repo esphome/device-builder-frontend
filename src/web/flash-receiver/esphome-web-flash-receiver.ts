@@ -17,7 +17,7 @@ import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import type { FlashPart } from "../platforms/esp/firmware-build.js";
 import { validateEspImage } from "../platforms/esp/image-magic.js";
 import { ESP_LOGS } from "../platforms/esp/logs-policy.js";
-import { runFlash } from "../platforms/esp/run-flash.js";
+import { runFlash, webFlashMessages } from "../platforms/esp/run-flash.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
 import { openLiveLogPort } from "./live-log-port.js";
 import type { FirmwareMessage, FlashState } from "./protocol.js";
@@ -271,10 +271,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       {
         erase,
         filesCallback: async () => parts,
-        messages: {
-          connectFailed: this._localize("web.install.connect_failed_hint"),
-          noFirmware: this._localize("web.install.no_firmware"),
-        },
+        messages: webFlashMessages(this._localize),
       },
       {
         onStep: (step) => {

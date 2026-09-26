@@ -31,6 +31,8 @@ vi.mock("esptool-js", () => {
       public trace: boolean
     ) {}
 
+    async connect() {}
+
     async disconnect() {}
   }
   class ESPLoader {
@@ -152,5 +154,32 @@ describe("connectToPort failure log", () => {
     const detected = await connectToPort(fakePort);
     const { ESPLoader } = await import("esptool-js");
     expect(detected.loader.debug).toBe(ESPLoader.prototype.debug);
+  });
+});
+
+describe("connectToPort leftover handle", () => {
+  function portWith(streams: { readable?: unknown; writable?: unknown }) {
+    const close = vi.fn(async () => {});
+    return { port: { readable: null, writable: null, ...streams, close }, close };
+  }
+
+  it.each([
+    ["open", { readable: { locked: false } }],
+    ["open with readable null after a fatal read error", {}],
+  ])("closes a %s handle before connecting", async (_label, streams) => {
+    state.main = async () => "ESP32";
+    const { port, close } = portWith(streams);
+    await connectToPort(port as unknown as SerialPort);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["reading", { readable: { locked: true } }],
+    ["writing", { readable: { locked: false }, writable: { locked: true } }],
+  ])("leaves a handle another action is %s", async (_label, streams) => {
+    state.main = async () => "ESP32";
+    const { port, close } = portWith(streams);
+    await connectToPort(port as unknown as SerialPort);
+    expect(close).not.toHaveBeenCalled();
   });
 });

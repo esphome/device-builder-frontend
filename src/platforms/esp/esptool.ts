@@ -5,6 +5,7 @@
 import { ESPLoader, Transport } from "esptool-js";
 
 import { getErrorMessage } from "../../util/error-message.js";
+import { markOpenFailure } from "../../util/serial-open-error.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
@@ -111,6 +112,9 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
  * browser picker) and follow-on reconnects (install-flow's resume
  * after compile, the connect-event fast-path that skips the picker).
  *
+ * Every caller passes a port it expects closed, so a handle still open here
+ * is a leftover and is closed first.
+ *
  * On ``loader.main()`` failure, tries ``transport.disconnect()`` first
  * and falls back to ``port.close()`` so we never leak an open port —
  * a still-open port silently breaks the next ``port.open()`` call.
@@ -120,7 +124,32 @@ export async function connectToPort(
   onLog?: LogCallback
 ): Promise<DetectedChip> {
   markSerialActivity();
+  // A handle an earlier action failed to close (readable can even be null
+  // after a fatal read error) would make esptool-js's open() throw "already
+  // open". A locked stream is another action mid-read or mid-write; leave it
+  // to fail as busy. On a closed port close() just rejects.
+  if (!port.readable?.locked && !port.writable?.locked) {
+    const wasOpen = port.readable !== null || port.writable !== null;
+    await port.close().then(
+      () => console.debug("[Web Serial] Closed a leftover open handle before connecting"),
+      (err: unknown) => {
+        // A closed port rejects too; only a handle that was open is news.
+        if (wasOpen) console.warn("[Web Serial] Could not close a leftover handle:", err);
+      }
+    );
+  }
   const transport = new Transport(port, false);
+  // Mark esptool-js's open() failure so it can be told apart from a
+  // NetworkError later in the handshake (the device dropping mid-read).
+  const connect = transport.connect.bind(transport);
+  transport.connect = async (...args) => {
+    try {
+      return await connect(...args);
+    } catch (err) {
+      markOpenFailure(err);
+      throw err;
+    }
+  };
 
   const loader = new ESPLoader({
     transport,

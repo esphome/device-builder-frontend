@@ -159,10 +159,31 @@ describe("openLiveSerialPort", () => {
       }),
     });
     stubGetPorts(async () => []);
+    const onFailed = vi.fn();
 
-    expect(await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1 })).toBe(
-      null
+    expect(
+      await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1, onFailed })
+    ).toBe(null);
+    // The caller gets the last error, so it can say why the open failed.
+    expect(onFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "NetworkError" })
     );
+  });
+
+  it("reports the failed open, not a stale candidate's disconnect, when it gives up", async () => {
+    const inUse = new DOMException("Failed to open serial port.", "NetworkError");
+    const fresh = fakePort({
+      readable: null,
+      open: vi.fn(async () => {
+        throw inUse;
+      }),
+    });
+    const cached = fakePort({ connected: false });
+    stubGetPorts(async () => [fresh]);
+    const onFailed = vi.fn();
+
+    await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1, onFailed });
+    expect(onFailed).toHaveBeenCalledWith(inUse);
   });
 
   it("forwards bufferSize to open (the 8k logs buffer must survive the reopen)", async () => {

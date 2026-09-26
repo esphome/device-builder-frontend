@@ -170,6 +170,22 @@ describe("reconnectWebSerialLogs", () => {
     }
   });
 
+  it("says the port may be in use when the reopen's open fails with NetworkError", async () => {
+    const port = openPort();
+    vi.mocked(port.open).mockRejectedValue(
+      new DOMException("Failed to open serial port.", "NetworkError")
+    );
+    const restore = withRequestPort(async () => port);
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(dialog as never, (k) => k, 115200, null);
+      expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith("serial.port_in_use");
+      expect(dialog.setSerialStream).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("acquires a fresh port via requestPort and streams it", async () => {
     const restore = withRequestPort(async () => openPort());
     const dialog = stubDialog();

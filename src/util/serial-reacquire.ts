@@ -8,6 +8,7 @@
  * retry loops. Everything here is re-exported from ``web-serial.ts`` so
  * existing import paths keep working.
  */
+import { openSerialPort } from "./serial-open-error.js";
 import { sleep } from "./sleep.js";
 
 /**
@@ -182,7 +183,8 @@ export async function reacquirePort(
  *
  * ``onOpened`` fires only when this call performed the ``open()``; a
  * candidate found already open belongs to whoever opened it, so a caller
- * that closes on teardown can tell the two apart.
+ * that closes on teardown can tell the two apart. ``onFailed`` gets the last
+ * error when it gives up at the deadline, so the caller can say why.
  */
 export async function openLiveSerialPort(
   cachedPort: SerialPort,
@@ -192,6 +194,7 @@ export async function openLiveSerialPort(
     timeoutMs?: number;
     cancelled?: () => boolean;
     onOpened?: (port: SerialPort) => void;
+    onFailed?: (err: unknown) => void;
   }
 ): Promise<SerialPort | null> {
   const {
@@ -200,9 +203,14 @@ export async function openLiveSerialPort(
     timeoutMs = SERIAL_REOPEN_TIMEOUT_MS,
     cancelled = () => false,
     onOpened,
+    onFailed,
   } = options;
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
+  // The last error from an actual open() attempt: the one that says why the
+  // port won't open (another tab or program holds it), where lastErr can be
+  // a stale candidate's "disconnected".
+  let openErr: unknown = null;
   while (!cancelled()) {
     const { fresh } = await grantedHandlesFor(cachedPort);
     const candidates = [...fresh, cachedPort];
@@ -225,11 +233,12 @@ export async function openLiveSerialPort(
         return p; // already open (a reset race left it usable)
       }
       try {
-        await p.open(bufferSize ? { baudRate, bufferSize } : { baudRate });
+        await openSerialPort(p, bufferSize ? { baudRate, bufferSize } : { baudRate });
         onOpened?.(p);
         return p;
       } catch (err) {
         lastErr = err;
+        openErr = err;
         const name = err instanceof DOMException ? err.name : "";
         const message = err instanceof Error ? err.message : "";
         // Already open (a reset race / another candidate) — usable only
@@ -253,6 +262,7 @@ export async function openLiveSerialPort(
     }
     if (Date.now() >= deadline) {
       console.error("[Web Serial] Failed to reopen port:", lastErr);
+      onFailed?.(openErr ?? lastErr);
       return null;
     }
     // Re-check before the inter-round sleep so a teardown that landed

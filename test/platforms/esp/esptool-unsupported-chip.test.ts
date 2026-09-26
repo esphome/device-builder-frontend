@@ -29,6 +29,8 @@ vi.mock("esptool-js", () => {
       public trace: boolean
     ) {}
 
+    async connect() {}
+
     async disconnect() {}
   }
   class ESPLoader {

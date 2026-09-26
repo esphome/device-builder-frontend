@@ -7,7 +7,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 // Fail the flash so the dialog enters its "error" (in-progress) state, where the
 // setup <input> is unrendered — the scenario a retry used to throw in.
-vi.mock("../../../../src/web/platforms/esp/run-flash.js", () => ({
+vi.mock("../../../../src/web/platforms/esp/run-flash.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   runFlash: vi.fn(async (_port, _plan, hooks) => {
     hooks.onStep("error");
     hooks.onError("boom");
