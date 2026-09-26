@@ -4,15 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/web/dashboard/esphome-web-dashboard.js", () => ({}));
 vi.mock("../../src/web/flash-receiver/esphome-web-flash-receiver.js", () => ({}));
 vi.mock("../../src/web/header/esphome-web-header.js", () => ({}));
-const { notifyInfo, isRecentSerialActivity, hasOpenDialog, isImprovDialogMounted } =
+const { notifyInfo, isRecentSerialActivity, hasOpenDialog, isImprovInProgress } =
   vi.hoisted(() => ({
     notifyInfo: vi.fn(),
     isRecentSerialActivity: vi.fn(() => false),
     hasOpenDialog: vi.fn(() => false),
-    isImprovDialogMounted: vi.fn(() => false),
+    isImprovInProgress: vi.fn(() => false),
   }));
 vi.mock("../../src/components/base-dialog.js", () => ({ hasOpenDialog }));
-vi.mock("../../src/web/improv/open-improv-dialog.js", () => ({ isImprovDialogMounted }));
+vi.mock("../../src/web/improv/open-improv-dialog.js", () => ({ isImprovInProgress }));
 vi.mock("../../src/util/notify.js", () => ({ LONG_TOAST_DURATION_MS: 8000, notifyInfo }));
 vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -53,7 +53,7 @@ afterEach(() => {
   vi.clearAllMocks();
   isRecentSerialActivity.mockReturnValue(false);
   hasOpenDialog.mockReturnValue(false);
-  isImprovDialogMounted.mockReturnValue(false);
+  isImprovInProgress.mockReturnValue(false);
 });
 
 const mountApp = () => mount(new ESPHomeWebApp());
@@ -113,7 +113,7 @@ describe("web app flow-switch suggestion", () => {
     pick(el, PICO);
     plugIn(PICO);
     hasOpenDialog.mockReturnValue(false);
-    isImprovDialogMounted.mockReturnValue(true);
+    isImprovInProgress.mockReturnValue(true);
     pick(el, PICO);
     expect(notifyInfo).not.toHaveBeenCalled();
   });

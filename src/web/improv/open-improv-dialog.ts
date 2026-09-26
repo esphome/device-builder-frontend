@@ -71,6 +71,17 @@ const activePorts = new WeakSet<SerialPort>();
  * fires ``closed`` and then removes itself, so a second removal here nulls its
  * ``parentNode`` and crashes its ``removeChild``.
  */
+/**
+ * Whether Wi-Fi setup is in progress on any port: from the first await of
+ * ``openImprovDialog`` (port acquisition, the lazy SDK import) until its
+ * dialog has closed. The SDK owns that dialog, so it is not a wrapper dialog.
+ */
+export function isImprovInProgress(): boolean {
+  return inFlight > 0;
+}
+
+let inFlight = 0;
+
 export async function openImprovDialog(
   port: SerialPort,
   localize: LocalizeFunc,
@@ -81,12 +92,14 @@ export async function openImprovDialog(
   // ``port-replaced`` adoption the card's next click passes the fresh handle.
   const guarded = [port];
   activePorts.add(port);
+  inFlight++;
   try {
     return await runImprov(port, localize, options, (live) => {
       guarded.push(live);
       activePorts.add(live);
     });
   } finally {
+    inFlight--;
     for (const p of guarded) activePorts.delete(p);
   }
 }
@@ -225,11 +238,6 @@ const LATE_STATE_ERROR = "Error fetching current state: TIMEOUT";
 let mountedDialogs = 0;
 let swallowUntil = 0;
 let listening = false;
-
-/** Whether a Wi-Fi setup dialog is up (the SDK owns it, so it is not a wrapper dialog). */
-export function isImprovDialogMounted(): boolean {
-  return mountedDialogs > 0;
-}
 
 function dialogMounted(): void {
   mountedDialogs++;

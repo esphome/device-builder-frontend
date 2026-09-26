@@ -17,7 +17,7 @@ import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
-import { isImprovDialogMounted } from "./improv/open-improv-dialog.js";
+import { isImprovInProgress } from "./improv/open-improv-dialog.js";
 import { boardFamilyOfPort } from "./util/board-family.js";
 import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
@@ -134,7 +134,7 @@ export class ESPHomeWebApp extends LitElement {
   // Switching flows unmounts the current one: never offer or apply it while
   // a dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
   private _operationInProgress(): boolean {
-    return hasOpenDialog() || isImprovDialogMounted();
+    return hasOpenDialog() || isImprovInProgress();
   }
 
   /**
