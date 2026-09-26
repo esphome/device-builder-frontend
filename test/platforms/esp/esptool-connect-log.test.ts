@@ -156,19 +156,28 @@ describe("connectToPort failure log", () => {
 });
 
 describe("connectToPort leftover handle", () => {
-  it("closes a handle an earlier action left open before connecting", async () => {
-    state.main = async () => "ESP32";
+  function portWith(streams: { readable?: unknown; writable?: unknown }) {
     const close = vi.fn(async () => {});
-    const port = { readable: { locked: false }, close } as unknown as SerialPort;
-    await connectToPort(port);
+    return { port: { readable: null, writable: null, ...streams, close }, close };
+  }
+
+  it.each([
+    ["open", { readable: { locked: false } }],
+    ["open with readable null after a fatal read error", {}],
+  ])("closes a %s handle before connecting", async (_label, streams) => {
+    state.main = async () => "ESP32";
+    const { port, close } = portWith(streams);
+    await connectToPort(port as unknown as SerialPort);
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("leaves a handle another action is reading", async () => {
+  it.each([
+    ["reading", { readable: { locked: true } }],
+    ["writing", { readable: { locked: false }, writable: { locked: true } }],
+  ])("leaves a handle another action is %s", async (_label, streams) => {
     state.main = async () => "ESP32";
-    const close = vi.fn(async () => {});
-    const port = { readable: { locked: true }, close } as unknown as SerialPort;
-    await connectToPort(port);
+    const { port, close } = portWith(streams);
+    await connectToPort(port as unknown as SerialPort);
     expect(close).not.toHaveBeenCalled();
   });
 });

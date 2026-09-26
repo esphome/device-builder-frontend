@@ -206,6 +206,10 @@ export async function openLiveSerialPort(
   } = options;
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
+  // The last error from an actual open() attempt: the one that says why the
+  // port won't open (another tab or program holds it), where lastErr can be
+  // a stale candidate's "disconnected".
+  let openErr: unknown = null;
   while (!cancelled()) {
     const { fresh } = await grantedHandlesFor(cachedPort);
     const candidates = [...fresh, cachedPort];
@@ -233,6 +237,7 @@ export async function openLiveSerialPort(
         return p;
       } catch (err) {
         lastErr = err;
+        openErr = err;
         const name = err instanceof DOMException ? err.name : "";
         const message = err instanceof Error ? err.message : "";
         // Already open (a reset race / another candidate) — usable only
@@ -256,7 +261,7 @@ export async function openLiveSerialPort(
     }
     if (Date.now() >= deadline) {
       console.error("[Web Serial] Failed to reopen port:", lastErr);
-      onFailed?.(lastErr);
+      onFailed?.(openErr ?? lastErr);
       return null;
     }
     // Re-check before the inter-round sleep so a teardown that landed

@@ -123,10 +123,16 @@ export async function connectToPort(
   onLog?: LogCallback
 ): Promise<DetectedChip> {
   markSerialActivity();
-  // A handle an earlier action failed to close would make esptool-js's open()
-  // throw "already open". A locked one is another action mid-read; leave it
-  // to fail as busy.
-  if (port.readable && !port.readable.locked) await port.close().catch(() => {});
+  // A handle an earlier action failed to close (readable can even be null
+  // after a fatal read error) would make esptool-js's open() throw "already
+  // open". A locked stream is another action mid-read or mid-write; leave it
+  // to fail as busy. On a closed port close() just rejects.
+  if (!port.readable?.locked && !port.writable?.locked) {
+    await port.close().then(
+      () => console.debug("[Web Serial] Closed a leftover open handle before connecting"),
+      () => {}
+    );
+  }
   const transport = new Transport(port, false);
 
   const loader = new ESPLoader({
