@@ -11,12 +11,16 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 import { english } from "../_en-json.js";
 import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
-import type { FlasherStepView } from "../../src/platforms/platform-support.js";
+import type {
+  FlasherStepView,
+  PlatformSupport,
+} from "../../src/platforms/platform-support.js";
 import {
   installForMethod,
   platformFor,
   PLATFORMS,
   serialLogsFor,
+  serialLogsOf,
 } from "../../src/platforms/registry.js";
 
 // Every key a step detail can resolve to, with and without WebUSB.
@@ -93,7 +97,13 @@ describe("PLATFORMS", () => {
 
   it("gives ESP, which has no descriptor, the RTS pulse", () => {
     expect(serialLogsFor("esp32")).toBe(ESP_SERIAL_LOGS);
+    expect(serialLogsOf(undefined)).toBe(ESP_SERIAL_LOGS);
     expect(ESP_SERIAL_LOGS).toEqual({ reset: "rts-pulse" });
+  });
+
+  it("gives a platform without serial logs no reset, not ESP's pulse", () => {
+    const bleOnly: PlatformSupport = { id: "ble-only", matches: () => true, logs: {} };
+    expect(serialLogsOf(bleOnly)).toEqual({});
   });
 
   it("covers every registered platform in the logs policy table", () => {

@@ -125,7 +125,14 @@ export async function reconnectWebSerialLogs(
     failSerialOpen(logsDialog, openFailureMessage(err, localize), cancelled);
     return;
   }
-  await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
+  await attachSerialLogStream(
+    port,
+    logsDialog,
+    localize,
+    baudRate,
+    cancelled,
+    targetPlatform
+  );
 }
 
 /** Open ``port`` for a logs session and apply the platform's line policy; rejects as ``open`` does. */
@@ -175,7 +182,14 @@ export function sessionResetHook(
       } else if (!live) {
         failPortReopen(logsDialog, localize, port, cancelled);
       } else {
-        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
+        await attachSerialLogStream(
+          live,
+          logsDialog,
+          localize,
+          baudRate,
+          cancelled,
+          targetPlatform
+        );
       }
     },
   };
@@ -258,15 +272,18 @@ export function postInstallShowLogsHandler(
  * the dialog's reconnect-after-failure). A closed port is reopened through the
  * re-enumeration window — resolving the live granted handle, since a native-USB
  * chip's cached handle can be dead after the reset — with DTR/RTS cleared
- * unless the port is a Pico's CDC (``releaseLinesAfterReopen``); an
- * already-open port streams as-is.
+ * unless the board keeps them (``releaseLinesAfterReopen``); an already-open
+ * port streams as-is.
  */
 export async function attachSerialLogStream(
   port: SerialPort,
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  cancelled: () => boolean = () => false
+  cancelled: () => boolean = () => false,
+  // Required, so a new caller can't forget it: it decides whether a reopen
+  // drops DTR, which would silence an RP2 board's CDC.
+  targetPlatform: string | null | undefined
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
@@ -279,7 +296,7 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    await releaseLinesAfterReopen(port);
+    await releaseLinesAfterReopen(port, targetPlatform);
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.
@@ -348,7 +365,14 @@ export async function handlePostInstallShowLogs(
     /* The install just left the port closed via ``resetAndDisconnect``;
        the attach reopens the still-granted port (retrying the native-USB
        re-enumeration window) and starts reading. */
-    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate, cancelled);
+    await attachSerialLogStream(
+      webSerialPort,
+      logsDialog,
+      localize,
+      baudRate,
+      cancelled,
+      targetPlatform
+    );
   } else {
     logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }

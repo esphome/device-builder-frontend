@@ -32,28 +32,38 @@ afterEach(() => {
 });
 
 describe("SerialLogSource reopen line policy", () => {
-  // A UART bridge's auto-reset circuit must not be left holding the lines.
-  it("drops DTR and RTS on the reopened handle before streaming by default", async () => {
-    const { dead, live } = ports();
-    const source = new SerialLogSource(dead, { reset: "rts-pulse" });
-    await source.resume(hooks, () => false);
-    const setSignals = vi.mocked(live.setSignals);
-    expect(setSignals).toHaveBeenCalledWith({
-      dataTerminalReady: false,
-      requestToSend: false,
-    });
-    expect(setSignals.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.streamSerialLines.mock.invocationCallOrder[0]
-    );
-    expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);
-  });
-
-  // arduino-pico's CDC only transmits while DTR is asserted.
-  it("leaves the lines as reopened on a Pico's own CDC, whichever card reached it", async () => {
-    const { dead, live } = ports({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
-    const source = new SerialLogSource(dead, { reset: "rts-pulse" });
-    await source.resume(hooks, () => false);
-    expect(live.setSignals).not.toHaveBeenCalled();
-    expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);
-  });
+  // web.esphome.io doesn't know the board's platform, so the rule is by port:
+  // an auto-reset circuit (a UART bridge, an Espressif chip) gets the lines
+  // dropped; any other native CDC keeps them, since arduino-pico's only
+  // transmits with DTR up and ships under many makers' USB ids.
+  it.each([
+    ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, true],
+    ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, true],
+    ["a Pico's own CDC", { usbVendorId: 0x2e8a, usbProductId: 0xf00a }, false],
+    [
+      "an Adafruit Feather RP2040 reached through the ESP card",
+      { usbVendorId: 0x239a, usbProductId: 0x80f1 },
+      false,
+    ],
+  ])(
+    "on a reopen of %s, drops DTR and RTS before streaming: %s",
+    async (_n, info, released) => {
+      const { dead, live } = ports(info);
+      const source = new SerialLogSource(dead, { reset: "rts-pulse" });
+      await source.resume(hooks, () => false);
+      const setSignals = vi.mocked(live.setSignals);
+      if (released) {
+        expect(setSignals).toHaveBeenCalledWith({
+          dataTerminalReady: false,
+          requestToSend: false,
+        });
+        expect(setSignals.mock.invocationCallOrder[0]).toBeLessThan(
+          mocks.streamSerialLines.mock.invocationCallOrder[0]
+        );
+      } else {
+        expect(setSignals).not.toHaveBeenCalled();
+      }
+      expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);
+    }
+  );
 });

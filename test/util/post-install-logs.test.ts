@@ -512,13 +512,21 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
 });
 
 describe("attachSerialLogStream reopen", () => {
+  // The Device Builder knows the platform, so an RP2 board keeps DTR (its CDC
+  // only transmits with it up) whatever USB ids its maker gave it.
   it.each([
-    ["a Pico's own CDC", { usbVendorId: 0x2e8a, usbProductId: 0xf00a }, false],
-    ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, true],
-    ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, true],
+    ["a Pico's own CDC", { usbVendorId: 0x2e8a, usbProductId: 0xf00a }, "rp2040", false],
+    [
+      "an Adafruit Feather RP2040 (maker ids)",
+      { usbVendorId: 0x239a, usbProductId: 0x80f1 },
+      "rp2040",
+      false,
+    ],
+    ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, "esp32", true],
+    ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, "esp32", true],
   ])(
-    "on a reopen of %s, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
-    async (_name, info, released) => {
+    "on a reopen of %s, drops DTR and RTS: %s",
+    async (_name, info, platform, released) => {
       const live = openPort(info);
       const restore = withGetPorts(async () => [live]);
       try {
@@ -527,7 +535,8 @@ describe("attachSerialLogStream reopen", () => {
           stubDialog() as never,
           defaultLocalize,
           115200,
-          () => false
+          () => false,
+          platform
         );
         if (released) expect(live.setSignals).toHaveBeenCalled();
         else expect(live.setSignals).not.toHaveBeenCalled();
@@ -549,7 +558,8 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false
+        () => false,
+        undefined
       );
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream.mock.calls[0][0]).toBe(live); // streamed the live handle
@@ -576,7 +586,8 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         19200,
-        () => false
+        () => false,
+        undefined
       );
       expect(live.open).toHaveBeenCalledWith({ baudRate: 19200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -605,7 +616,8 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false
+        () => false,
+        undefined
       );
       expect(cached.open).toHaveBeenCalledWith({ baudRate: 115200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
@@ -629,7 +641,8 @@ describe("attachSerialLogStream reopen", () => {
         dialog as never,
         defaultLocalize,
         115200,
-        () => false
+        () => false,
+        undefined
       );
       await vi.advanceTimersByTimeAsync(8100);
       await done;

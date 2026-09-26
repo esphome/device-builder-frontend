@@ -26,11 +26,19 @@ export function platformFor(
   return PLATFORMS.find((p) => p.matches(targetPlatform));
 }
 
-/** A device's Web Serial logs policy; ESP has no descriptor, so it gets its policy here. */
+/**
+ * A platform's Web Serial logs policy: ESP's for a device with no descriptor
+ * (ESP has none), and none at all for a platform without serial logs.
+ */
+export function serialLogsOf(platform: PlatformSupport | undefined): SerialLogsPolicy {
+  return platform ? (platform.logs?.serial ?? {}) : ESP_SERIAL_LOGS;
+}
+
+/** ``serialLogsOf`` for a device's target platform. */
 export function serialLogsFor(
   targetPlatform: string | null | undefined
 ): SerialLogsPolicy {
-  return platformFor(targetPlatform)?.logs?.serial ?? ESP_SERIAL_LOGS;
+  return serialLogsOf(platformFor(targetPlatform));
 }
 
 /** The install flow an install method string selects, if any. */

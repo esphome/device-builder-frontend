@@ -51,6 +51,10 @@ function toolbarLabels(el: ESPHomeWebLogsDialog): string[] {
   );
 }
 
+// Asserted, not defaulted: an undefined here would silently fall back to the
+// pulse and test the wrong reset.
+const picoReset = platformReset(RP2_SERIAL_LOGS)!;
+
 async function mount(
   policy: SerialLogsPolicy = ESP_SERIAL_LOGS
 ): Promise<ESPHomeWebLogsDialog> {
@@ -146,7 +150,7 @@ describe("esphome-web-logs-dialog", () => {
     el.open = true;
     const port = makeWebSerialPort();
     const cancel = vi.fn(async () => {});
-    serialSession(el, port, platformReset(RP2_SERIAL_LOGS));
+    serialSession(el, port, picoReset);
     (el as any)._cancel = cancel;
     return { port, cancel };
   }

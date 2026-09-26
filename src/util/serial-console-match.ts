@@ -1,17 +1,6 @@
 import type { LocalizeFunc } from "../common/localize.js";
 import { isEspressifUsbJtagPort } from "../platforms/esp/index.js";
-
-// Vendors that make dedicated USB-UART bridge chips and nothing that
-// enumerates as a device's native USB console. A port from one of these can
-// only be wired to external UART pins. Mirrors the backend's picker-hint
-// taxonomy in controllers/config/serial_ports.py (_BRIDGE_VIDS) - keep the
-// two sets in lockstep.
-const UART_BRIDGE_VENDOR_IDS = new Set([
-  0x1a86, // WCH (CH340 / CH9102)
-  0x10c4, // Silicon Labs (CP210x)
-  0x0403, // FTDI
-  0x067b, // Prolific (PL2303)
-]);
+import { UART_BRIDGE_VENDOR_IDS } from "./uart-bridge-ids.js";
 
 // Spellings come from the backend's logger_interface_values vocabulary
 // (platform_capabilities.index.json, snapshotted from esphome's logger) -
