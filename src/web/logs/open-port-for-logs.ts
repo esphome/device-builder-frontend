@@ -36,6 +36,8 @@ export async function openPortForLogs(
         toast.error(localize("web.logs.port_busy"));
         return false;
       }
+      // Left open by an earlier action, possibly with the lines still up.
+      if (options.releaseLines) await releaseControlLines(port);
       return true;
     }
     toast.error(

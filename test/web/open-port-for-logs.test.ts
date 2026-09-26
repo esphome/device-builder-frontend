@@ -42,6 +42,26 @@ describe("openPortForLogs", () => {
     });
   });
 
+  it("drops DTR and RTS on an already-open port too when asked to", async () => {
+    const setSignals = vi.fn(async () => {});
+    const port = {
+      ...makePort(
+        async () => {
+          throw new DOMException("already open", "InvalidStateError");
+        },
+        { locked: false }
+      ),
+      setSignals,
+    };
+    await expect(
+      openPortForLogs(port as unknown as SerialPort, localize, { releaseLines: true })
+    ).resolves.toBe(true);
+    expect(setSignals).toHaveBeenCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
+  });
+
   it("treats an already-open port with an unlocked reader as ready", async () => {
     const port = makePort(
       async () => {
