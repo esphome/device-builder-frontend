@@ -232,8 +232,9 @@ async function runImprov(
           provisioned: Boolean(detail.provisioned),
         };
         dialogClosed();
-        // Release the port only if we opened it, and resolve only once it is
-        // closed so the card's next action finds it free (#1839).
+        // Release the port only if we opened it, and resolve once it is closed
+        // (or releasePort gave up at its deadline) so the card's next action
+        // normally finds it free (#1839).
         void (weOpened ? releasePort(port) : Promise.resolve()).then(() =>
           resolve(result)
         );
@@ -250,7 +251,8 @@ const RELEASE_TIMEOUT_MS = 1000;
 /**
  * Close a port the session opened. The SDK cancels its reader in its own close
  * handler, but that release can land after ours, and a close while either
- * stream is still locked fails; retry briefly. Best-effort: the device may be gone.
+ * stream is still locked fails; retry briefly. Best-effort: resolves at the
+ * deadline even if the close is still pending or failing (the device may be gone).
  */
 async function releasePort(port: SerialPort): Promise<void> {
   const deadline = Date.now() + RELEASE_TIMEOUT_MS;
