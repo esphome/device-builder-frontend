@@ -97,6 +97,11 @@ describe("nRF52 reset helpers", () => {
     expect(isNrfAppCdcPort(makePort() as unknown as SerialPort)).toBe(true);
     const bridge = { getInfo: () => ({ usbVendorId: 0x10c4, usbProductId: 0xea60 }) };
     expect(isNrfAppCdcPort(bridge as unknown as SerialPort)).toBe(false);
+    // Another Zephyr firmware under the same vendor id is not ESPHome.
+    const otherZephyr = {
+      getInfo: () => ({ usbVendorId: 0x2fe3, usbProductId: 0x0004 }),
+    };
+    expect(isNrfAppCdcPort(otherZephyr as unknown as SerialPort)).toBe(false);
   });
 
   it("offers Reset on web.esphome.io only on ESPHome's own CDC", () => {

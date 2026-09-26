@@ -1,6 +1,6 @@
 import { html } from "lit";
 
-import { isNrfAppCdcPort } from "../../../platforms/nrf52/index.js";
+import { ZEPHYR_USB_VID } from "../../../platforms/nrf52/index.js";
 import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-nrf-card.js";
@@ -21,9 +21,10 @@ const NRF52_USB_IDS = new Set([
 ]);
 
 function isNrf52Port(port: SerialPort): boolean {
-  if (isNrfAppCdcPort(port)) return true;
   const { usbVendorId, usbProductId } = port.getInfo();
-  if (usbVendorId === NORDIC_USB_VID) return true;
+  // Any Zephyr device counts as the family here; Reset device narrows it to
+  // ESPHome's own ids (isNrfAppCdcPort).
+  if (usbVendorId === ZEPHYR_USB_VID || usbVendorId === NORDIC_USB_VID) return true;
   if (usbVendorId === undefined || usbProductId === undefined) return false;
   return NRF52_USB_IDS.has(usbVendorId * 0x1_0000 + usbProductId);
 }

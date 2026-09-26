@@ -34,6 +34,7 @@ import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import { RTS_PULSE, type WebSerialReset } from "../../src/web/logs/logs-policy.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
+import { NRF_RESET } from "../../src/web/platforms/nrf52/logs-policy.js";
 import { PICO_RESET } from "../../src/web/platforms/rp2/logs-policy.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
@@ -100,6 +101,20 @@ beforeEach(() => {
 const drainMacrotasks = () => new Promise((r) => setTimeout(r, 0));
 
 describe("esphome-web-logs-dialog", () => {
+  it("offers the nRF52 Reset only on ESPHome's own CDC, never over Bluetooth", async () => {
+    const el = await mount(NRF_RESET);
+    const port = (usbVendorId: number, usbProductId: number) =>
+      ({ getInfo: () => ({ usbVendorId, usbProductId }) }) as unknown as SerialPort;
+    el.port = port(0x2fe3, 0x0100);
+    expect(el.canReset).toBe(true);
+    // The ItsyBitsy's Adafruit bootloader would only get a misleading "update ESPHome".
+    el.port = port(0x239a, 0x0051);
+    expect(el.canReset).toBe(false);
+    el.port = port(0x2fe3, 0x0100);
+    el.bleDevice = {} as BluetoothDevice;
+    expect(el.canReset).toBe(false);
+  });
+
   it("pulses RTS high→low then settles 1s (legacy ewt-console reset shape)", async () => {
     const el = await mount();
     const setSignals = vi.fn(async () => {});
