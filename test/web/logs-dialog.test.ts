@@ -32,10 +32,9 @@ import { streamSerialLines } from "../../src/util/serial-log-stream.js";
 import { openLiveSerialPort } from "../../src/util/serial-reacquire.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
-import {
-  SerialLogSource,
-  type SerialResetMode,
-} from "../../src/web/logs/serial-source.js";
+import { RTS_PULSE, type WebSerialReset } from "../../src/web/logs/logs-policy.js";
+import { SerialLogSource } from "../../src/web/logs/serial-source.js";
+import { PICO_RESET } from "../../src/web/platforms/rp2/logs-policy.js";
 import { makeWebSerialPort } from "./_make-web-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,10 +45,13 @@ function toolbarLabels(el: ESPHomeWebLogsDialog): string[] {
   );
 }
 
-async function mount(resetMode: SerialResetMode = "rts"): Promise<ESPHomeWebLogsDialog> {
+// ``null`` for a card with no reset (a default argument would turn undefined into the pulse).
+async function mount(
+  reset: WebSerialReset | null = RTS_PULSE
+): Promise<ESPHomeWebLogsDialog> {
   const el = new ESPHomeWebLogsDialog();
   (el as any)._localize = (k: string) => k;
-  el.resetMode = resetMode;
+  el.policy = reset ? { reset } : {};
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -60,7 +62,7 @@ async function mount(resetMode: SerialResetMode = "rts"): Promise<ESPHomeWebLogs
 function serialSession(
   el: ESPHomeWebLogsDialog,
   port: unknown,
-  reset: SerialResetMode = "rts"
+  reset: WebSerialReset = RTS_PULSE
 ): SerialLogSource {
   const source = new SerialLogSource(port as SerialPort, {
     reset,
@@ -123,13 +125,13 @@ describe("esphome-web-logs-dialog", () => {
     el.open = true;
     const port = makeWebSerialPort();
     const cancel = vi.fn(async () => {});
-    serialSession(el, port, "pico");
+    serialSession(el, port, PICO_RESET);
     (el as any)._cancel = cancel;
     return { port, cancel };
   }
 
   it("reboots a Pico through the routine and resumes on the returned port", async () => {
-    const el = await mount("pico");
+    const el = await mount(PICO_RESET);
     const { port, cancel } = picoSession(el);
     const live = makeWebSerialPort();
     vi.mocked(rebootPico).mockResolvedValue(true);
@@ -157,7 +159,7 @@ describe("esphome-web-logs-dialog", () => {
     { why: "the reboot leaves it stranded", stranded: true },
     { why: "it never comes back", stranded: false },
   ])("ends the session when $why", async ({ stranded }) => {
-    const el = await mount("pico");
+    const el = await mount(PICO_RESET);
     picoSession(el);
     if (stranded) vi.mocked(rebootPico).mockRejectedValue(new PicoStrandedError("pick"));
     else {
@@ -174,7 +176,7 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("ignores a second Reset click while the reboot is still reacquiring the port", async () => {
-    const el = await mount("pico");
+    const el = await mount(PICO_RESET);
     picoSession(el);
     let finish!: (rebooted: boolean) => void;
     vi.mocked(rebootPico).mockReturnValue(new Promise((r) => (finish = r)));
@@ -199,10 +201,10 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("offers the Pico reset only where WebUSB exists", async () => {
-    expect(resetButtons(await mount("pico")).length).toBe(0);
+    expect(resetButtons(await mount(PICO_RESET)).length).toBe(0);
     Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
     try {
-      expect(resetButtons(await mount("pico")).length).toBe(1);
+      expect(resetButtons(await mount(PICO_RESET)).length).toBe(1);
     } finally {
       delete (navigator as any).usb;
     }
@@ -214,7 +216,7 @@ describe("esphome-web-logs-dialog", () => {
   });
 
   it("hides the reset button when the card says so (no reset line behind the CDC)", async () => {
-    const el = await mount("none");
+    const el = await mount(null);
     expect(resetButtons(el).length).toBe(0);
   });
 

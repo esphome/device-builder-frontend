@@ -16,19 +16,17 @@ vi.mock("../../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../../src/web/platforms/rp2/esphome-web-pico-device-card.js", () => ({}));
 vi.mock("../../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 const reacquirePort = vi.fn();
-vi.mock("../../../../src/util/web-serial.js", () => ({
-  isPortPickerCancel: vi.fn(() => false),
-}));
+vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
-vi.mock("../../../../src/web/platforms/rp2/pico-port-filter.js", () => ({
-  picoPortFilters: [],
-}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
+import toast from "sonner-js";
+
+import { makeUsbPort } from "../../_make-web-serial-port.js";
 import { flush } from "../../../_dom.js";
 import { makeDisconnectPort } from "../../../_web-serial.js";
 import { ESPHomeWebPicoConnectCard } from "../../../../src/web/platforms/rp2/esphome-web-pico-connect-card.js";
@@ -64,7 +62,9 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
     );
 
     expect((el as any)._setupOpen).toBe(false);
-    expect(openImprovDialog).toHaveBeenCalledWith(port, expect.any(Function));
+    expect(openImprovDialog).toHaveBeenCalledWith(port, expect.any(Function), {
+      keepLines: true,
+    });
     expect((el as any)._port).toBe(port);
   });
 
@@ -135,5 +135,34 @@ describe("esphome-web-pico-connect-card disconnect resilience", () => {
     await flush();
 
     expect((el as any)._port).toBeUndefined();
+  });
+});
+
+describe("esphome-web-pico-connect-card connect", () => {
+  const pick = (picked: SerialPort) =>
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { requestPort: vi.fn(async () => picked) },
+    });
+
+  it("adopts a Pico's own port", async () => {
+    const el = await mount();
+    pick(
+      Object.assign(makeUsbPort(0x2e8a, 0xf00a), {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })
+    );
+    await (el as any)._connect();
+    expect((el as any)._port).toBeDefined();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("turns away a Raspberry Pi debug probe the widened picker also lists", async () => {
+    const el = await mount();
+    pick(makeUsbPort(0x2e8a, 0x000c));
+    await (el as any)._connect();
+    expect((el as any)._port).toBeUndefined();
+    expect(toast.error).toHaveBeenCalledWith("web.pico.probe_picked");
   });
 });

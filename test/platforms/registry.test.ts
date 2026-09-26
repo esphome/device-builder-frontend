@@ -8,6 +8,7 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   isWebUsbSupported,
 }));
 
+import { english } from "../_en-json.js";
 import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import type { FlasherStepView } from "../../src/platforms/platform-support.js";
 import {
@@ -15,17 +16,6 @@ import {
   platformFor,
   PLATFORMS,
 } from "../../src/platforms/registry.js";
-import enMessages from "../../src/translations/en.json";
-
-// A dotted key's English copy, or undefined when en.json lacks it.
-function english(key: string): unknown {
-  let node: unknown = enMessages;
-  for (const part of key.split(".")) {
-    node =
-      typeof node === "object" && node !== null ? Reflect.get(node, part) : undefined;
-  }
-  return node;
-}
 
 // Every key a step detail can resolve to, with and without WebUSB.
 function detailKeys(view: FlasherStepView): string[] {

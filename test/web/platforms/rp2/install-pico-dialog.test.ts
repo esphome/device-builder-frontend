@@ -37,6 +37,7 @@ vi.mock("../../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 
 import toast from "sonner-js";
 
+import { makeUsbPort } from "../../_make-web-serial-port.js";
 import { PicoFlashError } from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
 import { picoPortFilters } from "../../../../src/web/platforms/rp2/pico-port-filter.js";
@@ -188,7 +189,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(card(el).statusMessage).toBe("web.pico.setup_step_5");
     const connected = vi.fn();
     el.addEventListener("pico-connected", connected);
-    const port = {};
+    const port = makeUsbPort(0x2e8a, 0xf00a);
     Object.defineProperty(navigator, "serial", {
       configurable: true,
       value: { requestPort: vi.fn(async () => port) },
@@ -196,6 +197,16 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     button(el, "onboarding.wizard.continue").click();
     await settle(el);
     expect(connected).toHaveBeenCalledOnce();
+    // The picker lists every Raspberry Pi device; a debug probe is turned away.
+    connected.mockClear();
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { requestPort: vi.fn(async () => makeUsbPort(0x2e8a, 0x000c)) },
+    });
+    button(el, "onboarding.wizard.continue").click();
+    await settle(el);
+    expect(connected).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("web.pico.probe_picked");
   });
 
   it("streams the engine's step lines into the card's details log", async () => {

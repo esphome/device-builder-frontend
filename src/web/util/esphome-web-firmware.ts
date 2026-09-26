@@ -27,9 +27,39 @@ export interface FirmwareManifest {
   builds: FirmwareManifestBuild[];
 }
 
-/** Download and parse the esphome-web manifest. */
-export async function fetchEsphomeWebManifest(): Promise<FirmwareManifest> {
-  const resp = await fetch(MANIFEST_URL);
+// The Pico install dialog and the ESP adoptable dialog share one manifest
+// for a while, across opens. A failure is not kept, so Retry fetches again; a
+// tab left open picks up a new release once the cached one has aged out.
+const MANIFEST_MAX_AGE_MS = 15 * 60 * 1000;
+// A stalled request must not hold every later open waiting on it.
+const MANIFEST_TIMEOUT_MS = 30 * 1000;
+
+let manifest: { promise: Promise<FirmwareManifest>; fetchedAt: number } | undefined;
+
+/** Download and parse the esphome-web manifest, reusing a recent one. */
+export function fetchEsphomeWebManifest(): Promise<FirmwareManifest> {
+  if (!manifest || Date.now() - manifest.fetchedAt > MANIFEST_MAX_AGE_MS) {
+    const entry = {
+      promise: downloadManifest().catch((err: unknown) => {
+        if (manifest === entry) manifest = undefined;
+        throw err;
+      }),
+      fetchedAt: Date.now(),
+    };
+    manifest = entry;
+  }
+  return manifest.promise;
+}
+
+/** Forget the cached manifest (tests). */
+export function resetEsphomeWebManifest(): void {
+  manifest = undefined;
+}
+
+async function downloadManifest(): Promise<FirmwareManifest> {
+  const resp = await fetch(MANIFEST_URL, {
+    signal: AbortSignal.timeout(MANIFEST_TIMEOUT_MS),
+  });
   if (!resp.ok) {
     throw new Error(`Downloading ESPHome manifest failed (${resp.status})`);
   }

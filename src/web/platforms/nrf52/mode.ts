@@ -1,6 +1,8 @@
-import { ESPRESSIF_USB_VID } from "../../platforms/esp/index.js";
-import { isRp2CdcPort } from "../../platforms/rp2/index.js";
-import type { WebMode } from "../web-mode.js";
+import { html } from "lit";
+
+import type { WebPlatform } from "../web-platform.js";
+
+import "./esphome-web-nrf-card.js";
 
 // An nRF52 running ESPHome is a Zephyr USB device (ESPHome's only Zephyr
 // platform), and Nordic's own id is nRF52 outright. Adafruit and Seeed also
@@ -25,16 +27,16 @@ function isNrf52Port(port: SerialPort): boolean {
   return NRF52_USB_IDS.has(usbVendorId * 0x1_0000 + usbProductId);
 }
 
-/**
- * The site flow a Web Serial port's USB ids point at: a Pico's own CDC
- * console, a known nRF52 board, or an Espressif native-USB device. ``null``
- * when the ids say nothing certain: a dedicated UART bridge (CH340, CP210x)
- * sits in front of an ESP as readily as an RTL8720C, so it never counts, nor
- * does a debug probe, an unknown board or a non-USB port.
- */
-export function boardFamilyOfPort(port: SerialPort): WebMode | null {
-  if (isRp2CdcPort(port)) return "pico";
-  if (isNrf52Port(port)) return "nrf";
-  const { usbVendorId } = port.getInfo();
-  return usbVendorId === ESPRESSIF_USB_VID ? "esp" : null;
-}
+/** nRF52 boards running ESPHome (Zephyr). */
+export const nrfWebMode: WebPlatform<"nrf"> = {
+  mode: "nrf",
+  logo: "nordic.svg",
+  labelKey: "web.header.mode_nrf",
+  introKey: "web.intro.body_nrf",
+  renderCard: () => html`<esphome-web-nrf-card></esphome-web-nrf-card>`,
+  flowSwitch: {
+    claimsPort: isNrf52Port,
+    messageKey: "web.flow_switch.nrf",
+    actionKey: "web.flow_switch.action_nrf",
+  },
+};

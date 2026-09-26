@@ -7,16 +7,10 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
+import { DEFAULT_WEB_MODE, WEB_PLATFORMS } from "../platforms/registry.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "./esphome-web-header-actions.js";
-
-const MODES: { mode: WebMode; logo: string; labelKey: string }[] = [
-  { mode: "esp", logo: "espressif.png", labelKey: "web.header.mode_esp" },
-  { mode: "pico", logo: "raspberry.png", labelKey: "web.header.mode_pico" },
-  { mode: "nrf", logo: "nordic.svg", labelKey: "web.header.mode_nrf" },
-  { mode: "rtl", logo: "rtl8720c.svg", labelKey: "web.header.mode_rtl" },
-];
 
 /**
  * ESPHome Web top bar. The device-family picker on the right is hidden
@@ -24,7 +18,7 @@ const MODES: { mode: WebMode; logo: string; labelKey: string }[] = [
  */
 @customElement("esphome-web-header")
 export class ESPHomeWebHeader extends LitElement {
-  @property() mode: WebMode = "esp";
+  @property() mode: WebMode = DEFAULT_WEB_MODE;
 
   /** Hide the mode picker (flash-receiver mode has no device family). */
   @property({ type: Boolean }) minimal = false;
@@ -58,7 +52,7 @@ export class ESPHomeWebHeader extends LitElement {
                   role="group"
                   aria-label=${this._localize("web.header.mode_picker_label")}
                 >
-                  ${MODES.map(({ mode, logo, labelKey }) => {
+                  ${WEB_PLATFORMS.map(({ mode, logo, labelKey }) => {
                     const label = this._localize(labelKey);
                     // Below 870px the label is display:none, so the button needs its own name.
                     return html`

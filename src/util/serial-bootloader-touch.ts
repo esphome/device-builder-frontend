@@ -65,18 +65,21 @@ async function touch(port: SerialPort, onLog: (line: string) => void): Promise<v
 
 /**
  * The touch from a button click: pick the CDC port (narrowed by ``filters``
- * where the board's ids are known), then reset. False when the picker was
- * dismissed; a failed touch throws ``BootloaderTouchError``, a failed pick
- * the browser's own error.
+ * where the board's ids are known, and checked by ``accept`` where the ids
+ * alone can't tell), then reset. False when the picker was dismissed; a
+ * failed touch throws ``BootloaderTouchError``, a refused pick
+ * ``PortNotAcceptedError`` (untouched), a failed pick the browser's own error.
  */
 export async function touchIntoBootloader({
   onLog,
   filters,
+  accept,
 }: {
   onLog?: (line: string) => void;
   filters?: SerialPortRequestOptions["filters"];
+  accept?: (port: SerialPort) => boolean;
 } = {}): Promise<boolean> {
-  const port = await requestSerialPort(filters ? { filters } : undefined);
+  const port = await requestSerialPort(filters ? { filters } : undefined, accept);
   if (!port) return false;
   await resetToBootloader(port, onLog);
   return true;

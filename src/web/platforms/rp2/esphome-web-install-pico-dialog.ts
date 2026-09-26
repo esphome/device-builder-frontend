@@ -17,11 +17,11 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import type { Uf2Image } from "../../../util/uf2.js";
-import { isPortPickerCancel } from "../../../util/web-serial.js";
+import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { loadPicoImage, picoUf2Url } from "./pico-image.js";
-import { picoPortFilters } from "./pico-port-filter.js";
+import { pickPicoPort, PICO_PICK, PROBE_PICKED_KEY } from "./pico-port-filter.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -128,12 +128,14 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._logLines = [];
     this._state = "resetting";
     try {
-      const touched = await touchIntoBootloader({
-        filters: picoPortFilters,
-        onLog: this._log,
-      });
+      const touched = await touchIntoBootloader({ ...PICO_PICK, onLog: this._log });
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
+      if (err instanceof PortNotAcceptedError) {
+        this._state = "idle";
+        toast.error(this._localize(PROBE_PICKED_KEY));
+        return;
+      }
       this._fail(
         this._localize("firmware.browser_flash_connect_failed"),
         getErrorMessage(err)
@@ -182,17 +184,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _continue(): Promise<void> {
-    let port: SerialPort;
-    try {
-      port = await navigator.serial.requestPort({ filters: picoPortFilters });
-    } catch (err) {
-      if (!isPortPickerCancel(err)) {
-        toast.error(
-          this._localize("web.connect.failed", { error: getErrorMessage(err) })
-        );
-      }
-      return;
-    }
+    const port = await pickPicoPort(this._localize);
+    if (!port) return;
     this.dispatchEvent(
       new CustomEvent<SerialPort>("pico-connected", {
         detail: port,

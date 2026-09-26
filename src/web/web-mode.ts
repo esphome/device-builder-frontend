@@ -1,22 +1,22 @@
 /**
- * ESP ⇄ Pico ⇄ nRF ⇄ RTL mode, encoded in the URL query so a link is shareable and
- * a reload keeps the chosen device family (matching the legacy site's ``/?pico``
- * convention). ``esp`` is the default and carries no query param; other modes
- * are a bare ``?<mode>`` flag.
+ * The device family (``platforms/registry.ts``), encoded in the URL query so a
+ * link is shareable and a reload keeps the chosen family (matching the legacy
+ * site's ``/?pico`` convention). The default (ESP) carries no query param;
+ * the others are a bare ``?<mode>`` flag.
  */
-export type WebMode = "esp" | "pico" | "nrf" | "rtl";
+import { DEFAULT_WEB_MODE, WEB_PLATFORMS, type WebMode } from "./platforms/registry.js";
 
-const DEFAULT_MODE: WebMode = "esp";
-const FLAGGED_MODES: readonly Exclude<WebMode, typeof DEFAULT_MODE>[] = [
-  "pico",
-  "nrf",
-  "rtl",
-];
+export type { WebMode };
+
+// Every family but the default, in registry order (the first flag present wins).
+const FLAGGED_MODES: readonly WebMode[] = WEB_PLATFORMS.map((p) => p.mode).filter(
+  (mode) => mode !== DEFAULT_WEB_MODE
+);
 
 /** Read the current mode from a query string (defaults to the live URL). */
 export function readMode(search: string = window.location.search): WebMode {
   const params = new URLSearchParams(search);
-  return FLAGGED_MODES.find((mode) => params.has(mode)) ?? DEFAULT_MODE;
+  return FLAGGED_MODES.find((mode) => params.has(mode)) ?? DEFAULT_WEB_MODE;
 }
 
 /**
@@ -30,7 +30,7 @@ export function modeUrl(mode: WebMode, url: URL = new URL(window.location.href))
   // URLSearchParams ``pico=`` spelling without touching other params' form.
   for (const flag of FLAGGED_MODES) next.searchParams.delete(flag);
   let search = next.search;
-  if (mode !== DEFAULT_MODE) {
+  if (mode !== DEFAULT_WEB_MODE) {
     search = search ? `${search}&${mode}` : `?${mode}`;
   }
   return next.pathname + search + next.hash;

@@ -28,6 +28,15 @@ const NO_IMPROV: ImprovResult = { improv: false, provisioned: false };
 
 export interface ImprovOptions {
   /**
+   * Leave DTR and RTS as opened. Needed where the board's CDC only transmits
+   * while DTR is asserted (a Pico), so clearing it silences the device and
+   * Improv never answers. Unset, a Pico's own port still keeps them (it can
+   * reach Improv from the ESP card when its flow switch toast was dismissed);
+   * anything else has them cleared, which keeps an auto-reset circuit on a
+   * UART-bridge board from holding EN low.
+   */
+  keepLines?: boolean;
+  /**
    * Called when the session had to reopen on a different handle than the one
    * passed in (a native-USB chip re-enumerated after its post-flash reset).
    * The card should adopt it for its other actions; see ``port-replaced``.
@@ -120,7 +129,8 @@ export async function openImprovDialog(
 async function acquirePort(
   port: SerialPort,
   localize: LocalizeFunc,
-  afterReset: boolean
+  afterReset: boolean,
+  keepLines: boolean | undefined
 ): Promise<{ port: SerialPort; weOpened: boolean } | null> {
   // An open handle is reused only while its device is still attached: a
   // reset that threw out of transport.disconnect() can leave the pre-reset
@@ -159,9 +169,8 @@ async function acquirePort(
     return null;
   }
   // Clearing the lines keeps an auto-reset circuit on a UART-bridge board
-  // from holding EN low. Not on a Pico: its CDC only transmits while DTR is
-  // asserted, so clearing it silences the device and Improv never answers.
-  if (weOpened && !isRp2CdcPort(live)) {
+  // from holding EN low (see ImprovOptions.keepLines for the exception).
+  if (weOpened && !(keepLines ?? isRp2CdcPort(live))) {
     try {
       await live.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {
@@ -177,7 +186,12 @@ async function runImprov(
   options: ImprovOptions,
   onReplaced: (port: SerialPort) => void
 ): Promise<ImprovResult> {
-  const acquired = await acquirePort(cachedPort, localize, options.afterReset ?? false);
+  const acquired = await acquirePort(
+    cachedPort,
+    localize,
+    options.afterReset ?? false,
+    options.keepLines
+  );
   if (!acquired) return NO_IMPROV;
   const { port, weOpened } = acquired;
   if (port !== cachedPort) {

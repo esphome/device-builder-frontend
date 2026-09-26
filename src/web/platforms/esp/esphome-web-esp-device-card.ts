@@ -25,6 +25,7 @@ import {
 } from "../../improv/open-improv-dialog.js";
 import { openLogsPortForCard } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
+import { ESP_LOGS } from "./logs-policy.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -58,7 +59,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _showLogs(): Promise<void> {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
-    if (!(await openLogsPortForCard(this, this.port, this._localize))) return;
+    if (!(await openLogsPortForCard(this, this.port, this._localize, ESP_LOGS))) return;
     this._logsOpen = true;
   }
 
@@ -181,6 +182,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.esp.title")}
+        .policy=${ESP_LOGS}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

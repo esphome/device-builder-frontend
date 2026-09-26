@@ -6,8 +6,9 @@
  * project, or prepare the device for first use). The new dashboard doesn't use
  * these — this only keeps the legacy deep-links from landing hint-less.
  *
- * These map to ESP device-card actions; Pico has no equivalent, so the caller
- * only surfaces the hint in ESP mode (matching the legacy ESP-only promos).
+ * These map to ESP device-card actions, so the dashboard only surfaces the
+ * hint for a family whose descriptor sets ``dashboardHints`` (ESP, matching
+ * the legacy ESP-only promos).
  */
 export type DashboardHint = "logs" | "install" | "wizard";
 

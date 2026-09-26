@@ -12,16 +12,13 @@ import "./esphome-web-install-rtl-dialog.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
+import { RTL_LOGS } from "./logs-policy.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
-
-// The usual kits wire RTS to CEN and DTR to the PA00 download strap; every
-// logs open (the first one here, reopens in the dialog) drops both lines.
-const RTL_LOGS = { releaseLines: true };
 
 /**
  * RTL8720C (AmebaZ2) card: no connected state; each install picks its own
@@ -89,8 +86,7 @@ export class ESPHomeWebRtlCard extends LitElement {
         .port=${this._logsPort}
         ?open=${this._logsPort !== undefined}
         .deviceLabel=${this._localize("web.rtl.title")}
-        .resetMode=${"rts"}
-        ?release-lines=${RTL_LOGS.releaseLines}
+        .policy=${RTL_LOGS}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;
