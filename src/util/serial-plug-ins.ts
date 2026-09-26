@@ -45,12 +45,13 @@ export function watchSerialPlugIns(onPlugIn: (port: SerialPort) => void): () => 
     if (port) disconnectedMs.set(deviceKey(port), Date.now());
   };
   const onConnect = (event: Event): void => {
-    if (isOwnSerialReenumeration()) return;
     const port = portOfSerialConnectEvent(event);
     if (!port) return;
+    // The first connect after a disconnect consumes the entry on every path.
     const key = deviceKey(port);
     const gone = disconnectedMs.get(key);
     disconnectedMs.delete(key);
+    if (isOwnSerialReenumeration()) return;
     if (gone !== undefined && Date.now() - gone < SERIAL_REENUMERATION_BLIP_MS) return;
     onPlugIn(port);
   };

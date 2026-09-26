@@ -99,12 +99,18 @@ describe("watchSerialPlugIns", () => {
     expect(onPlugIn).toHaveBeenCalledTimes(1);
   });
 
-  it("drops our own reset re-enumerating the device", () => {
+  it("drops our own reset re-enumerating the device, consuming its disconnect", () => {
     const onPlugIn = vi.fn();
     watchSerialPlugIns(onPlugIn);
+    const p = port();
+    unplug(p);
     isOwnSerialReenumeration.mockReturnValue(true);
-    plugIn(port());
+    plugIn(p);
     expect(onPlugIn).not.toHaveBeenCalled();
+    // The own reset's disconnect never lingers to swallow a later plug-in.
+    isOwnSerialReenumeration.mockReturnValue(false);
+    plugIn(p);
+    expect(onPlugIn).toHaveBeenCalledWith(p);
   });
 
   it("ignores an event that carries no port", () => {
