@@ -297,13 +297,22 @@ function dialogMounted(): void {
   mountedDialogs++;
   if (listening) return;
   listening = true;
-  window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
-    if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
-    const reason = ev.reason as { message?: unknown } | undefined;
-    const message =
-      typeof reason?.message === "string" ? reason.message : String(ev.reason);
-    if (message === LATE_STATE_ERROR) ev.preventDefault();
-  });
+  // Capture phase, so this runs before other window listeners (the dev
+  // server's error overlay reports every unhandled rejection, handled or not),
+  // and stopping propagation keeps the swallowed one from reaching them.
+  window.addEventListener(
+    "unhandledrejection",
+    (ev: PromiseRejectionEvent) => {
+      if (mountedDialogs === 0 && Date.now() >= swallowUntil) return;
+      const reason = ev.reason as { message?: unknown } | undefined;
+      const message =
+        typeof reason?.message === "string" ? reason.message : String(ev.reason);
+      if (message !== LATE_STATE_ERROR) return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    },
+    { capture: true }
+  );
 }
 
 function dialogClosed(): void {

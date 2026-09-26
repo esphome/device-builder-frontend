@@ -348,14 +348,6 @@ const createWebRspackConfig = ({ isProdBuild = false } = {}) => ({
       webSocketURL: {
         pathname: "/hmr-ws",
       },
-      overlay: {
-        // The Improv SDK leaves this rejection unhandled when a device never
-        // answers; the page swallows it (src/web/improv/open-improv-dialog.ts),
-        // but the overlay reports every unhandled rejection. The dev server
-        // stringifies this function into the client, so keep it self-contained.
-        runtimeErrors: (error) =>
-          error?.message !== "Error fetching current state: TIMEOUT",
-      },
     },
     webSocketServer: {
       options: {

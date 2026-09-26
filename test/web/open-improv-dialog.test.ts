@@ -136,8 +136,14 @@ describe("openImprovDialog", () => {
       window.dispatchEvent(ev);
       return ev.defaultPrevented;
     };
+    // Stands in for the dev server's error overlay, a plain window listener.
+    const overlay = vi.fn();
+    window.addEventListener("unhandledrejection", overlay);
     expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+    expect(overlay).not.toHaveBeenCalled();
     expect(rejection(new Error("something else"))).toBe(false);
+    expect(overlay).toHaveBeenCalledOnce();
+    window.removeEventListener("unhandledrejection", overlay);
     // A device error on the same request is real news, not the SDK's race.
     expect(rejection(new Error("Error fetching current state: BAD_HOSTNAME"))).toBe(
       false
