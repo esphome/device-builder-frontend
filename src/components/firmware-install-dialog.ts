@@ -30,6 +30,7 @@ import {
   startWebSerialInstall,
 } from "../platforms/esp/dashboard.js";
 import type { DetectedChip } from "../platforms/esp/index.js";
+import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
@@ -40,7 +41,6 @@ import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
-import type { AnyBrowserFlasher } from "./firmware-install-dialog/browser-flasher.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
@@ -200,7 +200,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // The browser flasher running this install (nRF52, Pico, RTL8720C), and its
   // parsed image, read through the flasher's own FlashImageSlot.
   // Not @state: it only changes with _installer, which is.
-  _flasher: AnyBrowserFlasher | null = null;
+  _flasher: AnyBrowserInstall | null = null;
   _flashImage: unknown = null;
   // The port a browser flash went through; backs "Show logs" on Done.
   _logsPort: SerialPort | null = null;
@@ -256,8 +256,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startDownload(this);
   }
 
-  // A platform's compile-then-flash flow (src/platforms/browser-flashers.ts).
-  installBrowserFlasher(flasher: AnyBrowserFlasher, device: ConfiguredDevice) {
+  // A platform's compile-then-flash flow (its PlatformSupport's install, src/platforms/registry.ts).
+  installBrowserFlasher(flasher: AnyBrowserInstall, device: ConfiguredDevice) {
     this._begin(device, flasher.id);
     this._flasher = flasher;
     void flasher.start(this);
@@ -476,7 +476,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // A failed reset or flash (device dropped mid-transfer, wrong port picked)
   // keeps the parsed image, so go back to the flasher's first step without
   // recompiling; a failure before the image existed runs the whole install.
-  private _retryFlasher(flasher: AnyBrowserFlasher, device: ConfiguredDevice) {
+  private _retryFlasher(flasher: AnyBrowserInstall, device: ConfiguredDevice) {
     if (flasher.image.get(this) === null) {
       this.installBrowserFlasher(flasher, device);
       return;

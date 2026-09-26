@@ -1,6 +1,6 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
-import { browserFlasherForMethod } from "../platforms/browser-flashers.js";
+import { installForMethod } from "../platforms/registry.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 
 export interface InstallMethodHandlers {
@@ -48,7 +48,7 @@ export function applyInstallMethod(
       break;
     default: {
       // A platform's browser flasher (nRF52 DFU, Pico UF2, RTL8720C ROM).
-      const flasher = browserFlasherForMethod(method);
+      const flasher = installForMethod(method);
       if (flasher) h.firmwareDialog?.installBrowserFlasher(flasher, h.device);
     }
   }

@@ -28,7 +28,7 @@ import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.j
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import {
-  rtlAmbz2Flasher,
+  rtlAmbz2Install,
   rtlDoFlash,
   rtlImage,
   startRtlAmbz2Install,
@@ -275,11 +275,11 @@ describe("rtlDoFlash", () => {
   });
 });
 
-describe("rtlAmbz2Flasher", () => {
+describe("rtlAmbz2Install", () => {
   it("goes back to the ready step as the Retry target", () => {
     const host = readyHost();
     host._step = "error";
-    rtlAmbz2Flasher.showFirstStep(asHost(host));
+    rtlAmbz2Install.showFirstStep(asHost(host));
     expect(host._step).toBe("rtl-ready");
     expect(host._statusMessage).toBe("firmware.rtl_ready_title");
   });

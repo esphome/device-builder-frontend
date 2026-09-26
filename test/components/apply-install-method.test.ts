@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { applyInstallMethod } from "../../src/components/apply-install-method.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { BROWSER_FLASHERS } from "../../src/platforms/browser-flashers.js";
+import { PLATFORMS } from "../../src/platforms/registry.js";
+
+const INSTALLS = PLATFORMS.flatMap((p) => (p.install ? [p.install] : []));
 
 const device = { configuration: "x.yaml", name: "x" } as ConfiguredDevice;
 
@@ -56,7 +58,7 @@ describe("applyInstallMethod", () => {
     expect(d.firmwareDialog.installWebSerial).not.toHaveBeenCalled();
   });
 
-  it.each(BROWSER_FLASHERS.map((f) => [f.id, f] as const))(
+  it.each(INSTALLS.map((f) => [f.id, f] as const))(
     "%s routes to the dialog's browser flasher",
     (id, flasher) => {
       const d = deps();

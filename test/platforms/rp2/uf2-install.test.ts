@@ -41,7 +41,7 @@ import {
   rp2DoFlash,
   rp2DoReset,
   rp2Image,
-  rp2Uf2Flasher,
+  rp2Uf2Install,
   startRp2Uf2Install,
 } from "../../../src/platforms/rp2/uf2-install.js";
 import {
@@ -325,7 +325,7 @@ describe("retry and download", () => {
   it("goes back to the BOOTSEL step as the Retry target", () => {
     const host = readyHost();
     host._step = "error";
-    rp2Uf2Flasher.showFirstStep(asHost(host));
+    rp2Uf2Install.showFirstStep(asHost(host));
     expect(host._step).toBe("rp2-bootsel");
     expect(host._statusMessage).toBe("firmware.rp2_bootsel_title");
   });

@@ -9,13 +9,6 @@ import {
   installLog,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import {
-  type BrowserFlasher,
-  FLASH_ACTION_KEY,
-  type FlasherFooter,
-  FlashImageSlot,
-  RESET_ACTION_KEY,
-} from "../../components/firmware-install-dialog/browser-flasher.js";
 import { downloadSelectedBinary } from "../../components/firmware-install-dialog/install-flow.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import {
@@ -25,11 +18,17 @@ import {
   Uf2FamilyError,
   type Uf2Image,
 } from "../../util/uf2.js";
+import {
+  type BrowserInstall,
+  FLASH_ACTION_KEY,
+  type FlasherFooter,
+  FlashImageSlot,
+  RESET_ACTION_KEY,
+} from "../platform-support.js";
 import { flashPico, PicoFlashError, picoFlashFailureCopy } from "./rp2-flash.js";
-import { isRp2Platform } from "./rp2-platform.js";
 import { isWebUsbSupported } from "./web-usb.js";
 
-declare module "../../components/firmware-install-dialog/types.js" {
+declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
     "rp2-uf2": "rp2-bootsel" | "rp2-wait";
   }
@@ -155,9 +154,8 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
-export const rp2Uf2Flasher: BrowserFlasher<"rp2-uf2"> = {
+export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",
-  matches: isRp2Platform,
   methodKey: "rp2_uf2",
   holdsPort: false,
   image: rp2Image,

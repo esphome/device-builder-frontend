@@ -6,11 +6,11 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { browserFlasherForPlatform } from "../platforms/browser-flashers.js";
 import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
+import { platformFor } from "../platforms/registry.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -176,7 +176,7 @@ export function renderPlatformFlashOption(
   hasWebSerial: boolean
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs" || !hasWebSerial) return nothing;
-  const flasher = browserFlasherForPlatform(platform);
+  const flasher = platformFor(platform)?.install;
   if (!flasher) return nothing;
   return renderMethodRow({
     icon: "chip",

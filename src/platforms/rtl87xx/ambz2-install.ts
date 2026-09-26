@@ -13,22 +13,21 @@ import {
   installLog,
   pickSerialPortOrFail,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import {
-  type BrowserFlasher,
-  FLASH_ACTION_KEY,
-  FlashImageSlot,
-} from "../../components/firmware-install-dialog/browser-flasher.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import {
+  type BrowserInstall,
+  FLASH_ACTION_KEY,
+  FlashImageSlot,
+} from "../platform-support.js";
 import { loadAmbz2Engine } from "./index.js";
 import {
   Ambz2ImageError,
   type LibreTinyImage,
   parseAmbz2Image,
 } from "./libretiny-uf2.js";
-import { isRtl87xxPlatform } from "./rtl87xx-platform.js";
 
-declare module "../../components/firmware-install-dialog/types.js" {
+declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
     "rtl-ambz2": "rtl-ready" | "rtl-connect" | "rtl-wait";
   }
@@ -124,9 +123,8 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   finishWithLogsPort(host, port, rebooted);
 }
 
-export const rtlAmbz2Flasher: BrowserFlasher<"rtl-ambz2"> = {
+export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   id: "rtl-ambz2",
-  matches: isRtl87xxPlatform,
   methodKey: "rtl_ambz2",
   // The logs reopen the flash's port (Show logs on Done, the after-install toggle).
   holdsPort: true,

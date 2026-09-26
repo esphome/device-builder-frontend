@@ -1,13 +1,4 @@
-/**
- * The browser flashers' own steps, keyed by installer id. Each platform's
- * install module adds its entry with ``declare module`` (see
- * ``browser-flasher.ts``), so a new flasher needs no edit here.
- */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface BrowserFlasherSteps {}
-
-export type FlasherId = keyof BrowserFlasherSteps;
-export type FlasherStep = BrowserFlasherSteps[FlasherId];
+import type { FlasherId, FlasherStep } from "../../platforms/platform-support.js";
 
 /** Steps every installer shares; the dialog renders these itself. */
 export type SharedInstallStep =
