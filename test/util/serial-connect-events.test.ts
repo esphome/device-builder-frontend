@@ -5,9 +5,12 @@ import {
   portOfSerialConnectEvent,
   SERIAL_ACTIVITY_WINDOW_MS,
   SerialConnectAnnouncements,
+  serialDeviceKey,
 } from "../../src/util/serial-reacquire.js";
 
-const port = () => ({ getInfo: () => ({}) }) as unknown as SerialPort;
+let nextProductId = 1;
+const port = (usbProductId = nextProductId++) =>
+  ({ getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId }) }) as unknown as SerialPort;
 
 afterEach(() => {
   vi.useRealTimers();
@@ -44,8 +47,18 @@ describe("isOwnSerialReenumeration", () => {
   });
 });
 
+describe("serialDeviceKey", () => {
+  it("keys a port by its USB ids, and gives an id-less port none", () => {
+    expect(serialDeviceKey(port(0xf00a))).toBe(`${0x2e8a}:${0xf00a}`);
+    expect(serialDeviceKey({ getInfo: () => ({}) } as unknown as SerialPort)).toBeNull();
+    expect(
+      serialDeviceKey({ getInfo: () => ({ usbVendorId: 1 }) } as unknown as SerialPort)
+    ).toBeNull();
+  });
+});
+
 describe("SerialConnectAnnouncements", () => {
-  it("announces a port once per window, per port", () => {
+  it("announces a device once per window, per device", () => {
     const seen = new SerialConnectAnnouncements(1000);
     const a = port();
     const b = port();
@@ -53,5 +66,19 @@ describe("SerialConnectAnnouncements", () => {
     expect(seen.shouldAnnounce(a, 500)).toBe(false);
     expect(seen.shouldAnnounce(b, 500)).toBe(true);
     expect(seen.shouldAnnounce(a, 1000)).toBe(true);
+  });
+
+  it("recognises the fresh port object Chrome hands out after a re-enumeration", () => {
+    const seen = new SerialConnectAnnouncements(1000);
+    expect(seen.shouldAnnounce(port(0xf00a), 0)).toBe(true);
+    // A reboot-looping board comes back as a new object with the same ids.
+    expect(seen.shouldAnnounce(port(0xf00a), 500)).toBe(false);
+  });
+
+  it("announces a port without USB ids every time", () => {
+    const seen = new SerialConnectAnnouncements(1000);
+    const rfcomm = { getInfo: () => ({}) } as unknown as SerialPort;
+    expect(seen.shouldAnnounce(rfcomm, 0)).toBe(true);
+    expect(seen.shouldAnnounce(rfcomm, 1)).toBe(true);
   });
 });

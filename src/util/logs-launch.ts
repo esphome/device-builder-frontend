@@ -42,7 +42,7 @@ export async function launchLogs(
   openMethodPicker: () => void
 ): Promise<void> {
   const hasWebSerial = "serial" in navigator;
-  const hasBleNus = platformFor(device.target_platform)?.logs?.ble?.available() ?? false;
+  const hasBleLogs = platformFor(device.target_platform)?.logs?.ble?.available() ?? false;
   let hasServerPorts = false;
   if (!hasWebSerial) {
     // Only pay the backend round-trip when WebSerial can't already provide a
@@ -62,7 +62,7 @@ export async function launchLogs(
       hasServerPorts = false;
     }
   }
-  if (hasWebSerial || hasServerPorts || hasBleNus) {
+  if (hasWebSerial || hasServerPorts || hasBleLogs) {
     openMethodPicker();
     return;
   }

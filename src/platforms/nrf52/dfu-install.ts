@@ -55,7 +55,7 @@ export async function startNrfDfuInstall(
     ({ parseDfuPackage } = await loadDfuEngine());
   } catch (err) {
     if (!stale())
-      host._fail(host._localize("firmware.download_failed"), getErrorMessage(err));
+      host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
     return;
   }
   if (stale()) return;

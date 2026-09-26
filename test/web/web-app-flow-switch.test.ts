@@ -43,7 +43,9 @@ beforeEach(() => {
     addEventListener: (type: string, fn: (e: Event) => void) => {
       serialListeners[type] = fn;
     },
-    removeEventListener: () => {},
+    removeEventListener: (type: string) => {
+      delete serialListeners[type];
+    },
   });
   window.history.replaceState({}, "", "/");
 });
@@ -59,9 +61,11 @@ afterEach(() => {
 const mountApp = () => mount(new ESPHomeWebApp());
 const pick = (el: ESPHomeWebApp, p: SerialPort) =>
   el.dispatchEvent(new CustomEvent("port-picked", { detail: p, bubbles: true }));
-// Current Chromium fires connect at the port itself (event.target).
+// Current Chromium fires connect and disconnect at the port itself (event.target).
 const plugIn = (p: SerialPort) =>
   serialListeners.connect({ target: p } as unknown as Event);
+const unplug = (p: SerialPort) =>
+  serialListeners.disconnect({ target: p } as unknown as Event);
 
 describe("web app flow-switch suggestion", () => {
   it("offers the Pico flow when a picked port looks like a Pico, and switches on the action", async () => {
@@ -143,5 +147,22 @@ describe("web app flow-switch suggestion", () => {
     isRecentSerialActivity.mockReturnValue(true);
     plugIn(PICO);
     expect(notifyInfo).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for a board a hub re-enumerated", async () => {
+    await mountApp();
+    // Plugging something else into the hub bounces the Pico: disconnect,
+    // then connect right after. The timing rule itself is pinned in
+    // serial-plug-ins.test.ts; this is the wiring through watchSerialPlugIns.
+    unplug(PICO);
+    plugIn(PICO);
+    expect(notifyInfo).not.toHaveBeenCalled();
+  });
+
+  it("stops listening for plug-ins and unplugs when unmounted", async () => {
+    const el = await mountApp();
+    expect(Object.keys(serialListeners).sort()).toEqual(["connect", "disconnect"]);
+    el.remove();
+    expect(serialListeners).toEqual({});
   });
 });

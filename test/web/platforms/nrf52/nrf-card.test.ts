@@ -28,8 +28,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
+import { NRF52_SERIAL_LOGS } from "../../../../src/platforms/nrf52/serial-logs.js";
 import { ESPHomeWebNrfCard } from "../../../../src/web/platforms/nrf52/esphome-web-nrf-card.js";
-import { NRF_LOGS, NRF_RESET } from "../../../../src/web/platforms/nrf52/logs-policy.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -64,13 +64,13 @@ describe("esphome-web-nrf-card", () => {
     expect(mocks.openPortForLogs).toHaveBeenCalledWith(
       port,
       expect.any(Function),
-      NRF_LOGS
+      NRF52_SERIAL_LOGS
     );
     expect(logsDialog(el).port).toBe(port);
     expect(logsDialog(el).bleDevice).toBeUndefined();
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
     // Reset device reboots ESPHome through the 2001-baud touch.
-    expect(logsDialog(el).policy.reset).toBe(NRF_RESET);
+    expect(logsDialog(el).policy).toBe(NRF52_SERIAL_LOGS);
   });
 
   it("stays closed when the picker is dismissed, fails, or the port will not open", async () => {

@@ -5,19 +5,18 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { pickBleNusDevice } from "../../../platforms/nrf52/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./esphome-web-install-nrf-dialog.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
-import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
-import { NRF_LOGS } from "./logs-policy.js";
+import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
+import { NRF52_SERIAL_LOGS, pickBleNusDevice } from "../../../platforms/nrf52/index.js";
 
 registerMdiIcons({
   upload: mdiUpload,
@@ -53,7 +52,7 @@ export class ESPHomeWebNrfCard extends LitElement {
     if (this._busy) return;
     this._picking = true;
     try {
-      const port = await pickPortForLogs(this, this._localize, NRF_LOGS);
+      const port = await pickPortForLogs(this, this._localize, NRF52_SERIAL_LOGS);
       if (port) this._logs = { port };
     } finally {
       this._picking = false;
@@ -125,7 +124,7 @@ export class ESPHomeWebNrfCard extends LitElement {
         .bleDevice=${logs && "ble" in logs ? logs.ble : undefined}
         ?open=${logs !== undefined}
         .deviceLabel=${this._localize("web.nrf.title")}
-        .policy=${NRF_LOGS}
+        .policy=${NRF52_SERIAL_LOGS}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;

@@ -1,6 +1,9 @@
 /**
  * ESP chip detection and firmware flashing over Web Serial with esptool-js.
  * No backend involvement; talks directly to the USB-connected ESP device.
+ * Loaded on demand through ``loadEsptool`` (index.ts): esptool-js is only
+ * needed once a detect or a flash starts. The ids and errors callers need
+ * without it live in ``esp-usb.ts``.
  */
 import { ESPLoader, Transport } from "esptool-js";
 
@@ -9,34 +12,18 @@ import { markOpenFailure } from "../../util/serial-open-error.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
-
-/** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
-export const ESPRESSIF_USB_VID = 0x303a;
-
-/** The on-chip USB-Serial-JTAG device's product id — esptool-js's own
- *  discriminator (it gates on this PID alone). The vendor id alone is not
- *  native-USB proof: Espressif also ships real UART bridges under it
- *  (ESP-USB-Bridge, 0x1002); we pair both as the conservative check. */
-const ESPRESSIF_USB_JTAG_PID = 0x1001;
-
-/** Whether *port* is a chip's own USB-Serial-JTAG device (vs any bridge). */
-export function isEspressifUsbJtagPort(port: SerialPort): boolean {
-  const { usbVendorId, usbProductId } = port.getInfo();
-  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
-}
+import {
+  type DeviceManifest,
+  type FlashProgress,
+  isEspressifUsbJtagPort,
+  UnsupportedChipError,
+} from "./esp-usb.js";
 
 export interface DetectedChip {
   chipName: string;
   port: SerialPort;
   transport: Transport;
   loader: ESPLoader;
-}
-
-export interface FlashProgress {
-  fileIndex: number;
-  written: number;
-  total: number;
-  percent: number;
 }
 
 /** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
@@ -57,22 +44,6 @@ const UNSUPPORTED_CHIP_NAMES: Record<number, string> = {
   31: "ESP32-E22",
   32: "ESP32-S31",
 };
-
-/** The connected chip has no esptool-js target; flashing needs the esptool CLI. */
-export class UnsupportedChipError extends Error {
-  readonly chipName: string;
-
-  constructor(chipName: string) {
-    // Surfaces raw through err.message on the wizard / dashboard-scan paths,
-    // so the message itself carries the next step.
-    super(
-      `${chipName} is not supported by browser flashing yet — download the ` +
-        `firmware and flash it with esptool from the command line instead`
-    );
-    this.name = "UnsupportedChipError";
-    this.chipName = chipName;
-  }
-}
 
 /**
  * Refuse a "detected ESP32-P4" that is really a newer, unsupported chip.
@@ -108,8 +79,8 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
 /**
  * Open an already-authorized serial port and detect the connected chip.
  *
- * Used for both first-time detect (via ``detectChip`` after the
- * browser picker) and follow-on reconnects (install-flow's resume
+ * Used for both first-time detect (after the browser picker) and
+ * follow-on reconnects (install-flow's resume
  * after compile, the connect-event fast-path that skips the picker).
  *
  * Every caller passes a port it expects closed, so a handle still open here
@@ -212,16 +183,6 @@ export async function connectToPort(
 }
 
 /**
- * Prompt the user to select a serial port and detect the connected chip.
- * Returns chip info + the open connection for subsequent operations.
- */
-export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
-  markSerialActivity();
-  const port = await navigator.serial.requestPort();
-  return connectToPort(port, onLog);
-}
-
-/**
  * Read the base MAC address from the chip's eFuse, normalized to the
  * uppercase colon-separated form the backend stores in
  * ``ConfiguredDevice.mac_address``. esptool-js returns lowercase; the
@@ -232,27 +193,6 @@ export async function readMacAddress(loader: ESPLoader): Promise<string> {
   markSerialActivity();
   const raw = await loader.chip.readMac(loader);
   return raw.toUpperCase();
-}
-
-/**
- * Manifest fields read from the ESP-IDF app descriptor
- * (``esp_app_desc_t``) — a 256-byte struct at offset 0x20 of every
- * IDF app image. With ESPHome's default partition layout the app
- * partition starts at 0x10000, so the descriptor lives at 0x10020
- * and is readable from the ROM bootloader over USB-CDC. No custom
- * partition table required.
- *
- * ``board_id`` is sourced from ``esp_app_desc_t.project_name`` (the
- * CMake project name baked in at build time, which ESPHome currently
- * populates from ``esphome.name``). A vendor flashing a factory
- * image just sets ``esphome.name`` to the catalog id; the wizard
- * routes off it via ``api.getBoard(board_id)``.
- */
-export interface DeviceManifest {
-  /** Board catalog id — ``esp_app_desc_t.project_name``. Routes the wizard. */
-  board_id?: string;
-  /** ``esp_app_desc_t.version``. */
-  version?: string;
 }
 
 const APP_DESC_OFFSET = 0x10020;
@@ -293,7 +233,7 @@ export async function readDeviceManifest(
 
 /**
  * Flash firmware binary data to a connected ESP device.
- * Assumes detectChip() was already called and the loader is connected.
+ * Assumes connectToPort() was already called and the loader is connected.
  */
 export async function flashFirmware(
   loader: ESPLoader,

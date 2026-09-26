@@ -1,6 +1,5 @@
 import { html } from "lit";
 
-import { isRp2CdcPort } from "../../../platforms/rp2/index.js";
 import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-pico-connect-card.js";
@@ -14,7 +13,7 @@ export const picoWebMode: WebPlatform<"pico"> = {
   renderCard: () => html`<esphome-web-pico-connect-card></esphome-web-pico-connect-card>`,
   flowSwitch: {
     // A Pico's own CDC console, not a Raspberry Pi debug probe.
-    claimsPort: isRp2CdcPort,
+    family: "rp2",
     messageKey: "web.flow_switch.pico",
     actionKey: "web.flow_switch.action_pico",
   },

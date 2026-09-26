@@ -5,14 +5,14 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { RTL87XX_SERIAL_LOGS } from "../../../platforms/rtl87xx/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./esphome-web-install-rtl-dialog.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
-import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../logs/esphome-web-logs-dialog.js";
-import { RTL_LOGS } from "./logs-policy.js";
+import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -40,7 +40,7 @@ export class ESPHomeWebRtlCard extends LitElement {
     if (this._picking || this._logsPort) return;
     this._picking = true;
     try {
-      const port = await pickPortForLogs(this, this._localize, RTL_LOGS);
+      const port = await pickPortForLogs(this, this._localize, RTL87XX_SERIAL_LOGS);
       if (port) this._logsPort = port;
     } finally {
       this._picking = false;
@@ -86,7 +86,7 @@ export class ESPHomeWebRtlCard extends LitElement {
         .port=${this._logsPort}
         ?open=${this._logsPort !== undefined}
         .deviceLabel=${this._localize("web.rtl.title")}
-        .policy=${RTL_LOGS}
+        .policy=${RTL87XX_SERIAL_LOGS}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;

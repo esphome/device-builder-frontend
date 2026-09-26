@@ -24,10 +24,16 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock("../../src/platforms/registry.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/platforms/registry.js")>();
+  const platformFor = (targetPlatform: string | null | undefined) =>
+    targetPlatform === "test-only" ? fake.platform : actual.platformFor(targetPlatform);
   return {
     ...actual,
-    platformFor: (targetPlatform: string | null | undefined) =>
-      targetPlatform === "test-only" ? fake.platform : actual.platformFor(targetPlatform),
+    platformFor,
+    // Its own module calls the real platformFor, so route it through the fake too.
+    serialLogsFor: (targetPlatform: string | null | undefined) =>
+      targetPlatform === "test-only"
+        ? fake.platform!.logs!.serial!
+        : actual.serialLogsFor(targetPlatform),
   };
 });
 
@@ -56,8 +62,7 @@ const platform = {
   matches: (p: string | null | undefined) => p === "test-only",
   logs: {
     serial: {
-      pulseResets: false,
-      releasesLinesAfterOpen: true,
+      releaseLinesAfterOpen: true,
       reset: {
         available: () => true,
         supports: () => true,
@@ -70,6 +75,7 @@ const platform = {
       pick: vi.fn(async () => bleDevice),
       connect: vi.fn(async () => bleCancel),
       failureKey: () => "dashboard.logs_ble_nus_open_failed",
+      disconnectedKey: "dashboard.logs_ble_nus_disconnected",
     },
   },
 } satisfies PlatformSupport;

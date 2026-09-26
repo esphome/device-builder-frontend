@@ -6,17 +6,17 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { ESP_SERIAL_LOGS } from "../../platforms/esp/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
-import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
+import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import type { FlashPart } from "../platforms/esp/firmware-build.js";
 import { validateEspImage } from "../platforms/esp/image-magic.js";
-import { ESP_LOGS } from "../platforms/esp/logs-policy.js";
 import { runFlash, webFlashMessages } from "../platforms/esp/run-flash.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
 import { openLiveLogPort } from "./live-log-port.js";
@@ -25,6 +25,7 @@ import type { FirmwareMessage, FlashState } from "./protocol.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
 import "../logs/esphome-web-logs-dialog.js";
+import { preloadEsptool } from "../../platforms/esp/index.js";
 
 const MAX_LOG_LINES = 10000;
 const LOG_BAUD_RATE = 115200;
@@ -81,6 +82,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    // The page exists to flash: warm the esptool chunk while the hand-off arrives.
+    preloadEsptool();
     const params = parseFlasherParams(window.location.hash);
     this._hasOpener = window.opener != null;
     if (params && window.opener) {
@@ -387,7 +390,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     const port = this._logPort;
     if (!port) return;
     const gen = this._bootLogsGen;
-    if (!(await openPortForLogs(port, this._localize, ESP_LOGS))) return;
+    if (!(await openPortForLogs(port, this._localize, ESP_SERIAL_LOGS))) return;
     // A flash started (or the receiver unmounted) during the reopen: the
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
@@ -507,7 +510,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .port=${this._logPort}
         ?open=${this._logsOpen}
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
-        .policy=${ESP_LOGS}
+        .policy=${ESP_SERIAL_LOGS}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}

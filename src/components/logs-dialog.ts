@@ -25,7 +25,7 @@ import {
   devicesContext,
   localizeContext,
 } from "../context/index.js";
-import { platformFor } from "../platforms/registry.js";
+import { serialLogsFor } from "../platforms/registry.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -254,9 +254,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
-      // ESP (no descriptor) keeps the RTS pulse.
-      this._pulseResets =
-        platformFor(this._targetPlatform)?.logs?.serial?.pulseResets ?? true;
+      this._pulseResets = serialLogsFor(this._targetPlatform).reset === "rts-pulse";
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);

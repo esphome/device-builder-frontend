@@ -4,6 +4,7 @@
  * exporting its ``WebPlatform`` (see ``web-platform.ts``), its logo in
  * ``public/web/static/logo/``, its copy, and one entry here.
  */
+import { portFamily } from "../../platforms/port-family.js";
 import { espWebMode } from "./esp/mode.js";
 import { nrfWebMode } from "./nrf52/mode.js";
 import { picoWebMode } from "./rp2/mode.js";
@@ -22,10 +23,10 @@ export function webPlatform(mode: WebMode): WebPlatform<WebMode> {
 }
 
 /**
- * The family a port's USB ids clearly point at, or undefined for a generic
- * UART bridge or an unknown device. The claims use disjoint vendor ids, so
- * the order never decides between two families.
+ * The mode whose family ``portFamily`` names for a port, or undefined for a
+ * UART bridge or an unknown device.
  */
 export function webPlatformOfPort(port: SerialPort): WebPlatform<WebMode> | undefined {
-  return WEB_PLATFORMS.find((p) => p.flowSwitch?.claimsPort(port));
+  const family = portFamily(port);
+  return family && WEB_PLATFORMS.find((p) => p.flowSwitch?.family === family);
 }

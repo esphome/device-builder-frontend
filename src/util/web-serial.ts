@@ -34,7 +34,7 @@ export function isWebSerialSupported(): boolean {
 /**
  * True when the user dismissed the browser's port picker —
  * ``requestPort()`` rejects with DOMException ``NotFoundError``.
- * Anything else out of ``detectChip`` is a real connect failure and
+ * Anything else out of ``connectToPort`` is a real connect failure and
  * must be surfaced, not treated as a cancel (#1414).
  */
 export function isPortPickerCancel(err: unknown): boolean {

@@ -32,6 +32,7 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
+import type { WizardBoardPreset } from "./wizard-step-board-platforms.js";
 import "./wizard-step-board.js";
 import "./wizard-step-empty-config.js";
 import "./wizard-step-import-partial.js";
@@ -99,13 +100,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  parking a slim entry in ``_selectedBoard``. */
   private _pickedBoardId: string | null = null;
 
-  /** Initial platform-filter label for the board step. Set by
-   *  ``openAtBoardStep`` when the caller knows the chip family
-   *  (e.g. from serial chip detection) so the picker opens with
-   *  the matching chip's filter chip already active. ``null``
-   *  means no preset — the picker shows everything. */
+  /** Initial filter for the board step. Set by ``openAtBoardStep``
+   *  when the caller knows the chip family (e.g. from serial chip
+   *  detection) so the picker opens narrowed to that chip, or to a
+   *  whole platform when only the family is known. ``null`` means no
+   *  preset — the picker shows everything. */
   @state()
-  private _initialBoardFilter: string | null = null;
+  private _initialBoardFilter: WizardBoardPreset | null = null;
 
   @state()
   private _creationMethod: CreationMethod = "basic";
@@ -185,14 +186,14 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   /** Open directly at the board-picker step with an optional
-   *  platform filter pre-applied. Used by the serial-detect flow
-   *  when the chip family is known but no specific board is
-   *  recognised — the user lands on a picker already narrowed to
-   *  their chip instead of the full catalog. */
-  public openAtBoardStep(filterLabel?: string) {
+   *  filter pre-applied. Used by the serial-detect flow when the
+   *  chip family is known but no specific board is recognised — the
+   *  user lands on a picker already narrowed to their chip (or their
+   *  platform) instead of the full catalog. */
+  public openAtBoardStep(preset: WizardBoardPreset | null = null) {
     this._step = "board";
     this._selectedBoard = null;
-    this._initialBoardFilter = filterLabel ?? null;
+    this._initialBoardFilter = preset;
     this._resetTransientState();
   }
 
@@ -345,7 +346,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         ></esphome-wizard-step-method>`;
       case "board":
         return html`<esphome-wizard-step-board
-          .presetFilterLabel=${this._initialBoardFilter}
+          .preset=${this._initialBoardFilter}
         ></esphome-wizard-step-board>`;
       case "setup":
         return html`<esphome-wizard-step-setup

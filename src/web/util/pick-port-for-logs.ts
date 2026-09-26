@@ -1,10 +1,11 @@
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { requestSerialPort } from "../../util/web-serial.js";
-import { type LogsOpenOptions, openPortForLogs } from "../logs/open-port-for-logs.js";
+import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import { releaseOrphanedPort } from "./release-port.js";
 
 /**
@@ -17,9 +18,9 @@ export async function openLogsPortForCard(
   host: HTMLElement,
   port: SerialPort,
   localize: LocalizeFunc,
-  options: LogsOpenOptions = {}
+  policy: SerialLogsPolicy
 ): Promise<boolean> {
-  if (!(await openPortForLogs(port, localize, options))) return false;
+  if (!(await openPortForLogs(port, localize, policy))) return false;
   if (!host.isConnected) {
     await releaseOrphanedPort(port);
     return false;
@@ -37,7 +38,7 @@ export async function openLogsPortForCard(
 export async function pickPortForLogs(
   host: HTMLElement,
   localize: LocalizeFunc,
-  options: LogsOpenOptions = {}
+  policy: SerialLogsPolicy
 ): Promise<SerialPort | null> {
   let port: SerialPort | null;
   try {
@@ -48,5 +49,5 @@ export async function pickPortForLogs(
   }
   if (!port) return null;
   fireEvent(host, "port-picked", port);
-  return (await openLogsPortForCard(host, port, localize, options)) ? port : null;
+  return (await openLogsPortForCard(host, port, localize, policy)) ? port : null;
 }

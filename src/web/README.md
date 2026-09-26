@@ -40,12 +40,12 @@ hardware classes behave differently:
 - **RTL8720C kits** (BW15 and the like, behind a CH340): RTS drives CEN
   and DTR drives the PA00 download strap, so a plain open (Chromium
   asserts both lines) holds the chip in reset. Every logs open releases
-  both lines right away (`RTL_LOGS` in `platforms/rtl87xx/logs-policy.ts`); the install
+  both lines right away (`RTL87XX_SERIAL_LOGS` in `src/platforms/rtl87xx/serial-logs.ts`); the install
   dialog's engine drives them itself and falls back to the manual strap.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
-  BOOTSEL and reboots it over WebUSB (`PICO_RESET` in `platforms/rp2/logs-policy.ts`,
-  on top of `src/platforms/rp2/rp2-logs-reset.ts`),
+  BOOTSEL and reboots it over WebUSB (`RP2_SERIAL_LOGS` in
+  `src/platforms/rp2/serial-logs.ts`, shared with the Device Builder),
   after which the CDC port re-enumerates; without WebUSB the button is
   hidden. Flashing goes through UF2 (its own connect card and install
   dialog).
@@ -72,10 +72,10 @@ label, intro copy, connect card, and the USB ids that claim a port for the
 flow switch toast, with its copy. Add it to `WEB_PLATFORMS` in
 `platforms/registry.ts`, put its logo in `public/web/static/logo/`, and its
 copy in `en.json`. The header, the dashboard, the mode URL and the flow switch
-need no edits. Its logs card passes its `logs-policy.ts` (a `WebLogsPolicy`
-from `logs/logs-policy.ts`: its Reset device and whether opens drop DTR and
-RTS) to both the port open and the logs dialog's `policy`; the dialog's
-default is no reset and no release.
+need no edits. Its logs card passes the platform's `SerialLogsPolicy` (from
+`src/platforms/serial-logs.ts`, shared with the Device Builder: its Reset device
+and which lines an open or a reopen leaves up) to both the port open and the
+logs dialog's `policy`; the dialog's default is no reset.
 
 New copy goes in `src/translations/en.json` under the `web.*`
 namespace. Tests live in `test/web/` (platform tests in
