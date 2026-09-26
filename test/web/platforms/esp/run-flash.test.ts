@@ -9,6 +9,10 @@ vi.mock("../../../../src/platforms/esp/esptool.js", () => ({
   resetAndDisconnect: vi.fn(async () => {}),
   disconnect: vi.fn(async () => {}),
 }));
+const seams = vi.hoisted(() => ({ loadEsptool: vi.fn() }));
+vi.mock("../../../../src/platforms/esp/esptool-loader.js", () => ({
+  loadEsptool: seams.loadEsptool,
+}));
 
 import {
   connectToPort,
@@ -56,6 +60,9 @@ function detected(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  seams.loadEsptool.mockImplementation(
+    () => import("../../../../src/platforms/esp/esptool.js")
+  );
   vi.mocked(isPortPickerCancel).mockReturnValue(false);
   vi.mocked(flashFirmware).mockResolvedValue(undefined);
   vi.mocked(resetAndDisconnect).mockResolvedValue(undefined);
@@ -276,5 +283,19 @@ describe("runFlash", () => {
       hooks
     );
     expect(hooks.errors).toEqual(["web.install.connect_failed_hint"]);
+  });
+
+  it("reports a failed engine chunk fetch and never connects", async () => {
+    seams.loadEsptool.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const hooks = makeHooks();
+    const ok = await runFlash(
+      port,
+      { filesCallback: async () => [], messages: webFlashMessages((k) => k) },
+      hooks
+    );
+    expect(ok).toBe(false);
+    expect(hooks.steps).toEqual(["connecting", "error"]);
+    expect(hooks.errors).toEqual(["firmware.engine_load_failed"]);
+    expect(connectToPort).not.toHaveBeenCalled();
   });
 });

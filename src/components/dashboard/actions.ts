@@ -4,11 +4,9 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  connectToPort,
-  detectChip,
-  disconnect,
-  readDeviceManifest,
-  readMacAddress,
+  type DetectedBoard,
+  detectEspBoard,
+  EngineLoadError,
   UnsupportedChipError,
 } from "../../platforms/esp/index.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
@@ -23,7 +21,6 @@ import {
 } from "../../util/notify.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 /** Open the editor. ``section`` deep-links a component section (read from
@@ -319,80 +316,68 @@ export async function detectAndOpenWizard(
     localize?: LocalizeFunc;
   } = {}
 ): Promise<void> {
+  let board: DetectedBoard | null;
   try {
-    const detected = options.port
-      ? await connectToPort(options.port)
-      : await detectChip();
-    const chipName = detected.chipName;
-
-    // MAC lookup is best-effort — a failure here shouldn't sink the
-    // wizard fallback. Wrap in its own try so we always disconnect.
-    let recognized: ConfiguredDevice | null = null;
-    if (options.devices?.length && options.onRecognized) {
-      try {
-        const mac = await readMacAddress(detected.loader);
-        recognized =
-          options.devices.find(
-            (d) => d.mac_address && d.mac_address.toUpperCase() === mac
-          ) ?? null;
-      } catch {
-        // MAC read failed (unsupported chip family, transport flap);
-        // fall through to the wizard.
-      }
-    }
-
-    // Manifest lookup — runs only when MAC didn't match an existing
-    // device. ``readDeviceManifest`` already swallows read / parse
-    // failures and returns null, so this can't throw.
-    const manifest = recognized ? null : await readDeviceManifest(detected.loader);
-
-    await disconnect(detected.transport);
-
-    if (recognized && options.onRecognized) {
-      if (options.localize) {
-        notifySuccess(
-          options.localize("dashboard.serial_recognized", {
-            name: recognized.friendly_name || recognized.name,
-          })
-        );
-      }
-      options.onRecognized(recognized);
-      return;
-    }
-
-    if (manifest?.board_id) {
-      const board = await fetchBoard(api, manifest.board_id);
-      if (board) {
-        if (options.localize) {
-          notifySuccess(
-            options.localize("dashboard.serial_starterkit_detected", {
-              name: board.name,
-            })
-          );
-        }
-        createDialog.openWithBoard(board);
-        return;
-      }
-      // ``board_id`` in the manifest but the catalog doesn't know it
-      // (older dashboard / unreleased product). Fall through to the
-      // chip-family picker rather than failing — the user still
-      // gets a useful onboarding path.
-    }
-
-    createDialog.openAtBoardStep(chipNameToFilterLabel(chipName) ?? undefined);
+    board = await detectEspBoard(options.port ?? null, {
+      readMac: Boolean(options.devices?.length && options.onRecognized),
+    });
   } catch (err) {
-    // Detection failed (or the picker was cancelled) — the wizard still
-    // opens so the user can pick a board by hand, but a real connect
-    // failure gets named instead of vanishing (#1414).
-    if (!isPortPickerCancel(err) && options.localize) {
+    // Detection failed — the wizard still opens so the user can pick a board
+    // by hand, but the failure gets named instead of vanishing (#1414).
+    if (options.localize) {
       notifyError(
-        err instanceof UnsupportedChipError
-          ? options.localize("serial.unsupported_chip", { chip: err.chipName })
-          : openFailureMessage(err, options.localize, "dashboard.serial_connect_failed")
+        err instanceof EngineLoadError
+          ? options.localize("firmware.engine_load_failed")
+          : err instanceof UnsupportedChipError
+            ? options.localize("serial.unsupported_chip", { chip: err.chipName })
+            : openFailureMessage(err, options.localize, "dashboard.serial_connect_failed")
       );
     }
     createDialog.open("board");
+    return;
   }
+  // A dismissed picker still opens the wizard for a manual board pick.
+  if (!board) {
+    createDialog.open("board");
+    return;
+  }
+
+  const recognized =
+    board.mac && options.onRecognized
+      ? (options.devices?.find(
+          (d) => d.mac_address && d.mac_address.toUpperCase() === board.mac
+        ) ?? null)
+      : null;
+  if (recognized && options.onRecognized) {
+    if (options.localize) {
+      notifySuccess(
+        options.localize("dashboard.serial_recognized", {
+          name: recognized.friendly_name || recognized.name,
+        })
+      );
+    }
+    options.onRecognized(recognized);
+    return;
+  }
+
+  if (board.manifest?.board_id) {
+    // A catalog miss (older dashboard, unreleased product) or a request
+    // failure (fetchBoard logs it and resolves null) falls through to the
+    // chip-family picker rather than failing: the user still gets a useful
+    // onboarding path.
+    const known = await fetchBoard(api, board.manifest.board_id);
+    if (known) {
+      if (options.localize) {
+        notifySuccess(
+          options.localize("dashboard.serial_starterkit_detected", { name: known.name })
+        );
+      }
+      createDialog.openWithBoard(known);
+      return;
+    }
+  }
+
+  createDialog.openAtBoardStep(chipNameToFilterLabel(board.chipName) ?? undefined);
 }
 
 export async function fetchEncryptionKey(

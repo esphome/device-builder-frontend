@@ -14,15 +14,13 @@ import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.j
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
 import {
-  detectChip,
   type DetectedChip,
-  disconnect,
-  flashFirmware,
-  resetAndDisconnect,
+  EngineLoadError,
+  pickPortAndLoadEsptool,
+  releaseSerial,
   UnsupportedChipError,
-} from "./esptool.js";
+} from "./index.js";
 
 /**
  * Choose which binary to flash over Web Serial and its flash offset.
@@ -68,15 +66,29 @@ export async function startWebSerialInstall(
     host._log.enqueue(line);
   };
 
-  // 1. Connect and detect chip
+  // 1. Pick the port in the click (the engine chunk fetches meanwhile), then
+  // connect and detect the chip. A dismissed picker closes the dialog.
+  let picked: Awaited<ReturnType<typeof pickPortAndLoadEsptool>>;
+  try {
+    picked = await pickPortAndLoadEsptool();
+  } catch (err) {
+    host._fail(
+      err instanceof EngineLoadError
+        ? host._localize("firmware.engine_load_failed")
+        : openFailureMessage(err, host._localize, "serial.connect_failed"),
+      getErrorMessage(err)
+    );
+    return;
+  }
+  if (!picked) {
+    host._close();
+    return;
+  }
+  const { port, esptool } = picked;
   let detected: DetectedChip;
   try {
-    detected = await detectChip(onLog);
+    detected = await esptool.connectToPort(port, onLog);
   } catch (err) {
-    if (isPortPickerCancel(err)) {
-      host._close();
-      return;
-    }
     if (err instanceof UnsupportedChipError) {
       host._fail(host._localize("serial.unsupported_chip", { chip: err.chipName }));
       return;
@@ -125,7 +137,7 @@ export async function startWebSerialInstall(
     detectedVariant !== expectedNorm &&
     !(expectedIsCoarseEsp32 && detectedVariant.startsWith("esp32"))
   ) {
-    await releaseSerial(detected);
+    await releaseSerial(esptool, detected);
     host._failureKind = "chip-mismatch";
     host._fail(
       host._localize("firmware.chip_mismatch", {
@@ -148,7 +160,7 @@ export async function startWebSerialInstall(
   host._step = "queued";
   host._statusMessage = host._localize("firmware.status_queued");
   if (!(await compileOrFail(host, device.configuration))) {
-    await releaseSerial(detected);
+    await releaseSerial(esptool, detected);
     return;
   }
 
@@ -160,7 +172,7 @@ export async function startWebSerialInstall(
     const binaries = await host._api.firmwareGetBinaries(device.configuration);
     const target = pickFlashTarget(detected.chipName, binaries);
     if (!target) {
-      await releaseSerial(detected);
+      await releaseSerial(esptool, detected);
       host._fail(host._localize("serial.no_firmware"));
       return;
     }
@@ -169,7 +181,7 @@ export async function startWebSerialInstall(
       await host._api.firmwareDownloadBytes(device.configuration, target.binary.file)
     );
   } catch {
-    await releaseSerial(detected);
+    await releaseSerial(esptool, detected);
     host._fail(host._localize("firmware.download_failed"));
     return;
   }
@@ -179,14 +191,14 @@ export async function startWebSerialInstall(
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
   try {
-    await flashFirmware(detected.loader, firmwareBytes, flashAddress, (p) => {
+    await esptool.flashFirmware(detected.loader, firmwareBytes, flashAddress, (p) => {
       host._flashPercent = p.percent;
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
     // 100% reached: treat as success — device may have reset during verification.
     if (host._flashPercent < 100) {
-      await releaseSerial(detected);
+      await releaseSerial(esptool, detected);
       host._fail(formatApiError(err, host._localize, "firmware.flash_failed"));
       return;
     }
@@ -195,29 +207,13 @@ export async function startWebSerialInstall(
   // 6. Reset
   host._statusMessage = host._localize("firmware.status_resetting");
   try {
-    await resetAndDisconnect(detected.loader, detected.transport, detected.port);
+    await esptool.resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
     // resetAndDisconnect disconnects in its own finally; if that threw through
     // and left the port held, release it so it doesn't leak into a retry.
-    await releaseSerial(detected);
+    await releaseSerial(esptool, detected);
   }
 
   host._statusMessage = host._localize("firmware.status_done");
   finishWithLogsPort(host, detected.port);
-}
-
-// Best-effort release of the held serial port on an early return, so a failed
-// compile / download / flash doesn't leak an open port into the next attempt.
-// Falls back to closing the port directly when transport.disconnect throws,
-// mirroring connectToPort — a still-open port breaks the next port.open.
-async function releaseSerial(detected: DetectedChip): Promise<void> {
-  try {
-    await disconnect(detected.transport);
-  } catch {
-    try {
-      await detected.port.close();
-    } catch {
-      /* best-effort */
-    }
-  }
 }

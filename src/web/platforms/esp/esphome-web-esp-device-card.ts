@@ -30,6 +30,7 @@ import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
+import { preloadEsptool } from "../../../platforms/esp/index.js";
 
 registerMdiIcons({
   "rocket-launch": mdiRocketLaunch,
@@ -55,6 +56,13 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   @state() private _logsOpen = false;
   @state() private _uploadOpen = false;
   @state() private _adoptableOpen = false;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Warm the esptool chunk once a board is connected; a miss only costs the
+    // fetch when an action starts.
+    preloadEsptool();
+  }
 
   private async _showLogs(): Promise<void> {
     // Open the port before showing the dialog so a connect failure surfaces a

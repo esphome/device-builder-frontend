@@ -62,10 +62,8 @@ vi.mock("esptool-js", () => {
   return { ESPLoader, Transport };
 });
 
-import {
-  connectToPort,
-  UnsupportedChipError,
-} from "../../../src/platforms/esp/esptool.js";
+import { UnsupportedChipError } from "../../../src/platforms/esp/esp-usb.js";
+import { connectToPort } from "../../../src/platforms/esp/esptool.js";
 
 const fakePort = { close: vi.fn().mockResolvedValue(undefined) } as unknown as SerialPort;
 

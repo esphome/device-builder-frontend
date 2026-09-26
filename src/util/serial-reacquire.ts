@@ -21,7 +21,7 @@ import { sleep } from "./sleep.js";
  *
  * Whatever causes a re-enumeration stamps ``_lastSerialActivityMs`` via
  * ``markSerialActivity``: the serial entry points in ``web-serial.ts``
- * (connectToPort, detectChip, flashFirmware, resetAndDisconnect, ...), the
+ * (connectToPort, flashFirmware, resetAndDisconnect, ...), the
  * 1200-baud touch, the PICOBOOT reboot and the nRF DFU close; the toast
  * click handler in ``app-shell`` does the same to cover the gap between the
  * user's click and the first internal op. The reacquire/reopen loops below
