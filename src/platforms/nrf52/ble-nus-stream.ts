@@ -10,7 +10,6 @@ import {
 } from "../../util/serial-log-stream.js";
 import { sleep } from "../../util/sleep.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
-import { isNrfPlatform } from "./nrf-platform.js";
 
 export const BLE_NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 // TX characteristic: device -> host (notify).
@@ -56,10 +55,6 @@ async function isBraveBrowser(): Promise<boolean> {
     return false;
   }
 }
-
-/** BLE NUS logs are an nRF52 feature and need Web Bluetooth. */
-export const bleNusLogsAvailable = (targetPlatform: string | null | undefined): boolean =>
-  isWebBluetoothSupported() && isNrfPlatform(targetPlatform);
 
 /** The picked device has no NUS service: the wrong device, not a bad link. */
 export class BleNusServiceNotFoundError extends Error {

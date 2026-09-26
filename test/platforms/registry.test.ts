@@ -81,6 +81,20 @@ describe("PLATFORMS", () => {
     }
   );
 
+  it.each(byId)("%s has a well-formed logs policy", (_id, platform) => {
+    const serial = platform.logs?.serial;
+    if (serial) {
+      expect(typeof serial.pulseResets).toBe("boolean");
+      expect(typeof serial.releasesLinesAfterOpen).toBe("boolean");
+    }
+    const ble = platform.logs?.ble;
+    if (ble) {
+      expect(ble.available).toBeTypeOf("function");
+      expect(ble.pick).toBeTypeOf("function");
+      expect(ble.attach).toBeTypeOf("function");
+    }
+  });
+
   it.each(["esp32", "esp8266", "bk72xx", null])(
     "leaves %s to the built-in paths",
     (platform) => {

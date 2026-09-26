@@ -5,25 +5,18 @@ import {
   streamSerialToDialog,
 } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import type { SerialResetHook } from "../components/logs-dialog/session.js";
-import {
-  BLE_CONNECT_ATTEMPTS,
-  BleNusServiceNotFoundError,
-  streamBleNus,
-} from "../platforms/nrf52/index.js";
-import {
-  isRp2CdcPort,
-  isRp2Platform,
-  isWebUsbSupported,
-  picoResetFailureKey,
-  resetPicoForLogs,
-} from "../platforms/rp2/index.js";
+import type {
+  LogsSessionContext,
+  SerialLogsContext,
+  SerialResetHook,
+} from "../platforms/platform-support.js";
+import { platformFor } from "../platforms/registry.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import type { PostInstallShowLogsDetail } from "./post-install-dispatch.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
-import { releaseControlLines, releasesLinesAfterOpen } from "./serial-control-lines.js";
+import { releaseControlLines } from "./serial-control-lines.js";
 import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { requestSerialPort } from "./web-serial.js";
 
@@ -146,87 +139,47 @@ export async function openPortForLogs(
   targetPlatform: string | null | undefined
 ): Promise<void> {
   await port.open({ baudRate });
-  if (releasesLinesAfterOpen(targetPlatform)) await releaseControlLines(port);
+  if (platformFor(targetPlatform)?.logs?.serial?.releasesLinesAfterOpen) {
+    await releaseControlLines(port);
+  }
 }
 
-/**
- * Reset Device hook for a Pico logs session, or undefined where the dialog's
- * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
- * so the button stays hidden). The BOOTSEL touch only reaches the Pico over
- * its own CDC, not a UART bridge on its console pins.
- */
-export function picoResetHook(
-  logsDialog: ESPHomeLogsDialog,
-  localize: LocalizeFunc,
-  targetPlatform: string,
-  baudRate: number
-): SerialResetHook | undefined {
-  if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
+/** What a platform's Bluetooth logs code may do to ``dialog``'s session. */
+export function logsSessionContext(
+  dialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc
+): LogsSessionContext {
   return {
-    supports: isRp2CdcPort,
-    run: async (port, cancelled) => {
-      let live: SerialPort | null = null;
-      let failure: string | undefined;
-      try {
-        live = await resetPicoForLogs(port, baudRate, cancelled);
-      } catch (err) {
-        console.warn("Pico reset failed", err);
-        failure = localize(picoResetFailureKey(err, "dashboard.logs_reset_failed"));
-      }
-      if (failure) {
-        // A stranded Pico still gets its toast once the session moved on,
-        // but a newer session must not be flipped dead.
-        if (cancelled()) notifyError(failure);
-        else failSerialOpen(logsDialog, failure);
-      } else if (!live) {
-        failPortReopen(logsDialog, localize, port, cancelled);
-      } else {
-        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
-      }
-    },
+    localize,
+    lineHooks: dialogLineHooks(dialog),
+    end: (message) => dialog.setSerialOpenFailed(message),
+    fail: (message, cancelled) => failSerialOpen(dialog, message, cancelled),
+    setBleStream: (cancel) => dialog.setBleStream(cancel),
   };
 }
 
 /**
- * The BLE twin of ``attachSerialLogStream``: a stream registered, or the
- * session dead with the reason in the pane. A remote disconnect goes dead
- * quietly (Start reconnects); a failed connect also toasts.
+ * The platform's own Reset Device for a Web Serial logs session, or
+ * undefined where the dialog's RTS pulse applies (or the platform's reset
+ * can't run in this browser, which hides the button).
  */
-export async function attachBleNusLogs(
-  dialog: ESPHomeLogsDialog,
+export function sessionResetHook(
+  logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  device: BluetoothDevice,
-  cancelled: () => boolean
-): Promise<void> {
-  let cancel: () => Promise<void>;
-  try {
-    cancel = await streamBleNus(
-      device,
-      {
-        ...dialogLineHooks(dialog),
-        onDisconnect: () =>
-          dialog.setSerialOpenFailed(localize("dashboard.logs_ble_nus_disconnected")),
-      },
-      { attempts: BLE_CONNECT_ATTEMPTS, cancelled }
-    );
-  } catch (err) {
-    console.warn("BLE NUS connect failed", err);
-    failSerialOpen(
-      dialog,
-      localize(
-        err instanceof BleNusServiceNotFoundError
-          ? "dashboard.logs_ble_nus_service_not_found"
-          : "dashboard.logs_ble_nus_open_failed"
-      ),
-      cancelled
-    );
-    return;
-  }
-  if (cancelled()) {
-    void cancel();
-    return;
-  }
-  dialog.setBleStream(cancel);
+  targetPlatform: string | null | undefined,
+  baudRate: number
+): SerialResetHook | undefined {
+  const resetHook = platformFor(targetPlatform)?.logs?.serial?.resetHook;
+  if (!resetHook) return undefined;
+  const ctx: SerialLogsContext = {
+    ...logsSessionContext(logsDialog, localize),
+    baudRate,
+    attach: (port, cancelled) =>
+      attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled),
+    failReopen: (port, cancelled) =>
+      failPortReopen(logsDialog, localize, port, cancelled),
+  };
+  return resetHook(ctx);
 }
 
 /**
@@ -348,7 +301,7 @@ export async function handlePostInstallShowLogs(
           cancelled,
           targetPlatform ?? ""
         ),
-      onResetDevice: picoResetHook(logsDialog, localize, targetPlatform ?? "", baudRate),
+      onResetDevice: sessionResetHook(logsDialog, localize, targetPlatform, baudRate),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

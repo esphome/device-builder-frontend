@@ -25,8 +25,8 @@ import {
   devicesContext,
   localizeContext,
 } from "../context/index.js";
-import { isNrfPlatform } from "../platforms/nrf52/index.js";
-import { isRp2Platform } from "../platforms/rp2/index.js";
+import type { SerialResetHook } from "../platforms/platform-support.js";
+import { platformFor } from "../platforms/registry.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -42,7 +42,6 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
-import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
   beginClose,
@@ -228,10 +227,9 @@ export class ESPHomeLogsDialog extends LitElement {
   // Derived in willUpdate, not per render: the dialog re-renders per frame
   // while streaming and the device list can be long.
   private _targetPlatform = "";
-  // The RTS-pulse Reset Device works here, RTL8720C kits included (see
-  // releasesLinesAfterOpen). A Pico or an nRF52 has no reset line on its CDC
-  // and the pulse's DTR drop only detaches the host; a Pico resets through
-  // the session's hook instead (WebUSB browsers).
+  // The RTS-pulse Reset Device works unless the platform's logs policy says
+  // its port has no reset line (Pico, nRF52: the pulse's DTR drop only
+  // detaches the host); a Pico resets through the session's hook instead.
   _pulseResets = true;
   // Set by openPassive; see PassiveSource.
   _passiveSource: PassiveSource = "serial";
@@ -257,7 +255,7 @@ export class ESPHomeLogsDialog extends LitElement {
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
       this._pulseResets =
-        !isRp2Platform(this._targetPlatform) && !isNrfPlatform(this._targetPlatform);
+        platformFor(this._targetPlatform)?.logs?.serial?.pulseResets ?? true;
     }
     if (changedProperties.has("_expanded")) {
       this.toggleAttribute("expanded", this._expanded);
