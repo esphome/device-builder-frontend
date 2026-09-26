@@ -18,7 +18,7 @@ export interface WebPlatform<Mode extends string = string> {
   renderCard(): TemplateResult;
   /** Shows the legacy ``?dashboard_logs`` / install / wizard hint. */
   readonly dashboardHints?: boolean;
-  /** Offer switching to this family when a picked or plugged-in port is its. */
+  /** Offer switching to this family when a picked or plugged-in port belongs to it. */
   readonly flowSwitch?: FlowSwitch;
 }
 

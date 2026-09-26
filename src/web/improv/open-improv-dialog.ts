@@ -7,6 +7,7 @@ import type {} from "improv-wifi-serial-sdk/dist/serial-provision-dialog";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import { isRp2CdcPort } from "../../platforms/rp2/index.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
@@ -29,8 +30,10 @@ export interface ImprovOptions {
   /**
    * Leave DTR and RTS as opened. Needed where the board's CDC only transmits
    * while DTR is asserted (a Pico), so clearing it silences the device and
-   * Improv never answers; off by default, which keeps an auto-reset circuit
-   * on a UART-bridge board from holding EN low.
+   * Improv never answers. Unset, a Pico's own port still keeps them (it can
+   * reach Improv from the ESP card when its flow switch toast was dismissed);
+   * anything else has them cleared, which keeps an auto-reset circuit on a
+   * UART-bridge board from holding EN low.
    */
   keepLines?: boolean;
   /**
@@ -127,7 +130,7 @@ async function acquirePort(
   port: SerialPort,
   localize: LocalizeFunc,
   afterReset: boolean,
-  keepLines: boolean
+  keepLines: boolean | undefined
 ): Promise<{ port: SerialPort; weOpened: boolean } | null> {
   // An open handle is reused only while its device is still attached: a
   // reset that threw out of transport.disconnect() can leave the pre-reset
@@ -167,7 +170,7 @@ async function acquirePort(
   }
   // Clearing the lines keeps an auto-reset circuit on a UART-bridge board
   // from holding EN low (see ImprovOptions.keepLines for the exception).
-  if (weOpened && !keepLines) {
+  if (weOpened && !(keepLines ?? isRp2CdcPort(live))) {
     try {
       await live.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {
@@ -187,7 +190,7 @@ async function runImprov(
     cachedPort,
     localize,
     options.afterReset ?? false,
-    options.keepLines ?? false
+    options.keepLines
   );
   if (!acquired) return NO_IMPROV;
   const { port, weOpened } = acquired;

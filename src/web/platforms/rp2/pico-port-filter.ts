@@ -16,16 +16,25 @@ export const picoPortFilters: SerialPortRequestOptions["filters"] = [
 ];
 
 /**
+ * The Pico's pick: the filters above plus the check that turns a debug probe
+ * away. Spread into ``touchIntoBootloader``; ``pickPicoPort`` uses it too.
+ */
+export const PICO_PICK = { filters: picoPortFilters, accept: isRp2CdcPort };
+
+/** Toasted when the pick turned out to be a debug probe. */
+export const PROBE_PICKED_KEY = "web.pico.probe_picked";
+
+/**
  * Pick a Pico's own CDC port. Null when the picker was dismissed or the pick
  * failed; a failure, or a debug probe picked by mistake, is toasted here.
  */
 export async function pickPicoPort(localize: LocalizeFunc): Promise<SerialPort | null> {
   try {
-    return await requestSerialPort({ filters: picoPortFilters }, isRp2CdcPort);
+    return await requestSerialPort({ filters: PICO_PICK.filters }, PICO_PICK.accept);
   } catch (err) {
     toast.error(
       err instanceof PortNotAcceptedError
-        ? localize("web.pico.probe_picked")
+        ? localize(PROBE_PICKED_KEY)
         : localize("web.connect.failed", { error: getErrorMessage(err) })
     );
     return null;

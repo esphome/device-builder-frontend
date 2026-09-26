@@ -8,7 +8,6 @@ import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import {
   flashPico,
-  isRp2CdcPort,
   isWebUsbSupported,
   loadPicoboot,
   PicoFlashError,
@@ -22,7 +21,7 @@ import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { loadPicoImage, picoUf2Url } from "./pico-image.js";
-import { pickPicoPort, picoPortFilters } from "./pico-port-filter.js";
+import { pickPicoPort, PICO_PICK, PROBE_PICKED_KEY } from "./pico-port-filter.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -129,16 +128,12 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._logLines = [];
     this._state = "resetting";
     try {
-      const touched = await touchIntoBootloader({
-        filters: picoPortFilters,
-        accept: isRp2CdcPort,
-        onLog: this._log,
-      });
+      const touched = await touchIntoBootloader({ ...PICO_PICK, onLog: this._log });
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
       if (err instanceof PortNotAcceptedError) {
         this._state = "idle";
-        toast.error(this._localize("web.pico.probe_picked"));
+        toast.error(this._localize(PROBE_PICKED_KEY));
         return;
       }
       this._fail(

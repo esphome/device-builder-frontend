@@ -98,17 +98,29 @@ describe("openImprovDialog", () => {
     expect(isImprovInProgress()).toBe(false);
   });
 
-  it("keeps DTR asserted when asked (a Pico's CDC only transmits while DTR is up)", async () => {
-    const port = makePort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a });
-    const promise = openImprovDialog(port as unknown as SerialPort, localize, {
-      keepLines: true,
-    });
-    await flush();
-    expect(port.setSignals).not.toHaveBeenCalled();
-    expect(dialogEl()).toBeTruthy();
-    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
-    await promise;
-  });
+  it.each([
+    [
+      "a Pico's own port, even unasked (the ESP card after a dismissed flow switch)",
+      { usbVendorId: 0x2e8a, usbProductId: 0xf00a },
+      {},
+    ],
+    [
+      "any port when asked",
+      { usbVendorId: 0x303a, usbProductId: 0x1001 },
+      { keepLines: true },
+    ],
+  ])(
+    "keeps DTR asserted on %s (a Pico's CDC only transmits while DTR is up)",
+    async (_name, info, options) => {
+      const port = makePort(info);
+      const promise = openImprovDialog(port as unknown as SerialPort, localize, options);
+      await flush();
+      expect(port.setSignals).not.toHaveBeenCalled();
+      expect(dialogEl()).toBeTruthy();
+      dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+      await promise;
+    }
+  );
 
   it("swallows the SDK's late state-request rejection while a dialog is up, and nothing else", async () => {
     const port = makePort();

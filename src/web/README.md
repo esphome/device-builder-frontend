@@ -44,7 +44,7 @@ hardware classes behave differently:
   dialog's engine drives them itself and falls back to the manual strap.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
-  BOOTSEL and reboots it over WebUSB (`PICO_RESET` in `platforms/rp2/logs-reset.ts`,
+  BOOTSEL and reboots it over WebUSB (`PICO_RESET` in `platforms/rp2/logs-policy.ts`,
   on top of `src/platforms/rp2/rp2-logs-reset.ts`),
   after which the CDC port re-enumerates; without WebUSB the button is
   hidden. Flashing goes through UF2 (its own connect card and install

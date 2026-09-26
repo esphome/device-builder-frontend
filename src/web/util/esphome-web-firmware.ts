@@ -27,8 +27,8 @@ export interface FirmwareManifest {
   builds: FirmwareManifestBuild[];
 }
 
-// The Pico install dialog's opens and the ESP adoptable dialog share one
-// manifest for a while. A failure is not kept, so Retry fetches again; a
+// The Pico install dialog and the ESP adoptable dialog share one manifest
+// for a while, across opens. A failure is not kept, so Retry fetches again; a
 // tab left open picks up a new release once the cached one has aged out.
 const MANIFEST_MAX_AGE_MS = 15 * 60 * 1000;
 // A stalled request must not hold every later open waiting on it.

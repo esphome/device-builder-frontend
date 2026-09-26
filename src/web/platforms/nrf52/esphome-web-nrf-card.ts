@@ -53,7 +53,7 @@ export class ESPHomeWebNrfCard extends LitElement {
     if (this._busy) return;
     this._picking = true;
     try {
-      const port = await pickPortForLogs(this, this._localize);
+      const port = await pickPortForLogs(this, this._localize, NRF_LOGS);
       if (port) this._logs = { port };
     } finally {
       this._picking = false;
