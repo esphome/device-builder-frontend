@@ -89,9 +89,11 @@ export function serialDeviceKey(port: SerialPort): string | null {
 /**
  * Per-device "already told the user" memory for the connect toasts. A
  * bare-flash board can reboot-loop, re-enumerating every cycle; the same
- * device is announced once per window. Two identical boards share the
- * window, and a port without USB ids is announced every time. Stale
- * entries are evicted lazily; there is at most one per granted device.
+ * device is announced once per window. Any two ports with the same USB ids
+ * share it, which is often different boards on a common bridge chip (CH340,
+ * CP2102, the ESP32 native USB-JTAG): swapping one for another inside the
+ * window costs that one toast. A port without USB ids is announced every
+ * time. Stale entries are evicted lazily; there is at most one per key.
  */
 export class SerialConnectAnnouncements {
   private _lastMs = new Map<string, number>();
