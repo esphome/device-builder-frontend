@@ -1959,6 +1959,7 @@
       "connected_hint": "Your Pico is connected. Use the actions below to view logs or configure Wi-Fi.",
       "first_time_setup": "First-time setup",
       "manifest_failed": "Could not load the firmware manifest: {error}",
+      "probe_picked": "That is a Raspberry Pi debug probe, not a Pico. Pick the Pico's own USB port.",
       "setup_title": "Prepare your Raspberry Pi Pico W for first use",
       "setup_intro": "To get started, ESPHome needs to be installed on your Pico. You can do this with your computer's file explorer — no extra programs required.",
       "setup_step_1": "Disconnect your Raspberry Pi Pico from your computer.",

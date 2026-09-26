@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchEsphomeWebManifest,
   type FirmwareManifest,
+  resetEsphomeWebManifest,
 } from "../../src/web/util/esphome-web-firmware.js";
 
 const MANIFEST: FirmwareManifest = {
@@ -17,6 +18,7 @@ const MANIFEST: FirmwareManifest = {
 };
 
 afterEach(() => {
+  resetEsphomeWebManifest();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -40,5 +42,30 @@ describe("fetchEsphomeWebManifest", () => {
       vi.fn(async () => new Response("nope", { status: 404 }))
     );
     await expect(fetchEsphomeWebManifest()).rejects.toThrow(/404/);
+  });
+
+  it("fetches once per page, so every dialog open shares it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(MANIFEST), { status: 200 }))
+    );
+    const [first, second] = await Promise.all([
+      fetchEsphomeWebManifest(),
+      fetchEsphomeWebManifest(),
+    ]);
+    expect(await fetchEsphomeWebManifest()).toBe(first);
+    expect(second).toBe(first);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("drops a failed fetch, so Retry fetches again", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("nope", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(MANIFEST), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchEsphomeWebManifest()).rejects.toThrow(/503/);
+    expect((await fetchEsphomeWebManifest()).version).toBe("26.5.1");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

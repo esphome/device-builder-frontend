@@ -18,7 +18,7 @@ import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
 import { isImprovInProgress } from "./improv/open-improv-dialog.js";
-import { boardFamilyOfPort } from "./util/board-family.js";
+import { webPlatformOfPort } from "./platforms/registry.js";
 import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
 /**
@@ -149,8 +149,8 @@ export class ESPHomeWebApp extends LitElement {
     announced?: SerialConnectAnnouncements
   ): void {
     if (this._operationInProgress()) return;
-    const family = boardFamilyOfPort(port);
-    if (family === null || family === this._mode) return;
+    const family = webPlatformOfPort(port)?.mode;
+    if (family === undefined || family === this._mode) return;
     if (announced && !announced.shouldAnnounce(port)) return;
     notifyInfo(this._localize(`web.flow_switch.${family}`), {
       id: "esphome-web-flow-switch",

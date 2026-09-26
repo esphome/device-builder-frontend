@@ -7,11 +7,8 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import { parseDashboardHint } from "../dashboard-hint.js";
+import { webPlatform } from "../platforms/registry.js";
 import type { WebMode } from "../web-mode.js";
-import "../platforms/esp/esphome-web-esp-connect-card.js";
-import "../platforms/nrf52/esphome-web-nrf-card.js";
-import "../platforms/rp2/esphome-web-pico-connect-card.js";
-import "../platforms/rtl87xx/esphome-web-rtl-card.js";
 import "./esphome-web-unsupported-card.js";
 
 /**
@@ -45,8 +42,10 @@ export class ESPHomeWebDashboard extends LitElement {
     // Legacy ``?dashboard_logs/install/wizard`` deep-link hint (ESP-only). Read
     // fresh each render so it isn't stale after a navigation changed the query.
     const hint = parseDashboardHint();
-    // Only ESP has the Logs / Install / Prepare actions the hint points at.
-    if (!hint || this.mode !== "esp" || !isWebSerialSupported()) return null;
+    // Only a family with the Logs / Install / Prepare actions the hint points at.
+    if (!hint || !webPlatform(this.mode).dashboardHints || !isWebSerialSupported()) {
+      return null;
+    }
     return html`<div class="hint" role="note">
       ${this._localize(`web.dashboard_hint.${hint}`)}
     </div>`;
@@ -56,23 +55,11 @@ export class ESPHomeWebDashboard extends LitElement {
     if (!isWebSerialSupported()) {
       return html`<esphome-web-unsupported-card></esphome-web-unsupported-card>`;
     }
-    if (this.mode === "pico") {
-      return html`<esphome-web-pico-connect-card></esphome-web-pico-connect-card>`;
-    }
-    if (this.mode === "nrf") {
-      return html`<esphome-web-nrf-card></esphome-web-nrf-card>`;
-    }
-    if (this.mode === "rtl") {
-      return html`<esphome-web-rtl-card></esphome-web-rtl-card>`;
-    }
-    return html`<esphome-web-esp-connect-card></esphome-web-esp-connect-card>`;
+    return webPlatform(this.mode).renderCard();
   }
 
   private _introBody(): string {
-    if (this.mode === "pico") return this._localize("web.intro.body_pico");
-    if (this.mode === "nrf") return this._localize("web.intro.body_nrf");
-    if (this.mode === "rtl") return this._localize("web.intro.body_rtl");
-    return this._localize("web.intro.body_esp");
+    return this._localize(webPlatform(this.mode).introKey);
   }
 
   protected render() {

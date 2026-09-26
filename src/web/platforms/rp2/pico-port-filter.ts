@@ -1,19 +1,14 @@
-import { RASPBERRY_PI_USB_VID } from "../../../platforms/rp2/index.js";
+import { isRp2CdcPort, RASPBERRY_PI_USB_VID } from "../../../platforms/rp2/index.js";
 
 /**
- * Web Serial port filters that narrow the browser picker to Raspberry Pi Pico
- * boards running ESPHome (RP2040 USB CDC). Vendor 0x2E8A is Raspberry Pi;
- * the two product IDs are the Pico and Pico W CDC interfaces.
+ * Web Serial port filters for a Raspberry Pi Pico running ESPHome: any
+ * Raspberry Pi USB device, the same boards the site's Pico detection claims.
+ * A filter can't exclude a product id, so the picker also lists Raspberry Pi
+ * debug probes; pass ``isPicoPort`` as the pick's ``accept`` to turn them away.
  */
 export const picoPortFilters: SerialPortRequestOptions["filters"] = [
-  {
-    // Pico (RP2040)
-    usbProductId: 0x000a,
-    usbVendorId: RASPBERRY_PI_USB_VID,
-  },
-  {
-    // Pico W (RP2040)
-    usbProductId: 0xf00a,
-    usbVendorId: RASPBERRY_PI_USB_VID,
-  },
+  { usbVendorId: RASPBERRY_PI_USB_VID },
 ];
+
+/** A Pico's own CDC console, not a debug probe (Picoprobe, Debug Probe). */
+export const isPicoPort = isRp2CdcPort;

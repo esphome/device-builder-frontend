@@ -10,8 +10,9 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./esphome-web-install-rtl-dialog.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
-import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
+import { RTS_PULSE } from "../../logs/serial-reset.js";
 import "../../logs/esphome-web-logs-dialog.js";
+import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
 import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -89,7 +90,7 @@ export class ESPHomeWebRtlCard extends LitElement {
         .port=${this._logsPort}
         ?open=${this._logsPort !== undefined}
         .deviceLabel=${this._localize("web.rtl.title")}
-        .resetMode=${"rts"}
+        .reset=${RTS_PULSE}
         ?release-lines=${RTL_LOGS.releaseLines}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>

@@ -17,11 +17,11 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import type { Uf2Image } from "../../../util/uf2.js";
-import { isPortPickerCancel } from "../../../util/web-serial.js";
+import { PortNotAcceptedError, requestSerialPort } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { loadPicoImage, picoUf2Url } from "./pico-image.js";
-import { picoPortFilters } from "./pico-port-filter.js";
+import { isPicoPort, picoPortFilters } from "./pico-port-filter.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -130,10 +130,16 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     try {
       const touched = await touchIntoBootloader({
         filters: picoPortFilters,
+        accept: isPicoPort,
         onLog: this._log,
       });
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
+      if (err instanceof PortNotAcceptedError) {
+        this._state = "idle";
+        toast.error(this._localize("web.pico.probe_picked"));
+        return;
+      }
       this._fail(
         this._localize("firmware.browser_flash_connect_failed"),
         getErrorMessage(err)
@@ -182,17 +188,18 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _continue(): Promise<void> {
-    let port: SerialPort;
+    let port: SerialPort | null;
     try {
-      port = await navigator.serial.requestPort({ filters: picoPortFilters });
+      port = await requestSerialPort({ filters: picoPortFilters }, isPicoPort);
     } catch (err) {
-      if (!isPortPickerCancel(err)) {
-        toast.error(
-          this._localize("web.connect.failed", { error: getErrorMessage(err) })
-        );
-      }
+      toast.error(
+        err instanceof PortNotAcceptedError
+          ? this._localize("web.pico.probe_picked")
+          : this._localize("web.connect.failed", { error: getErrorMessage(err) })
+      );
       return;
     }
+    if (!port) return;
     this.dispatchEvent(
       new CustomEvent<SerialPort>("pico-connected", {
         detail: port,

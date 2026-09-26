@@ -42,22 +42,39 @@ export function isPortPickerCancel(err: unknown): boolean {
 }
 
 /**
+ * The user picked a port the caller can't use: the picker's filters can only
+ * narrow by USB ids, not exclude one (a Raspberry Pi debug probe shares the
+ * Pico's vendor id), so ``accept`` turns the rest away after the pick.
+ */
+export class PortNotAcceptedError extends Error {
+  constructor(readonly port: SerialPort) {
+    super("The selected port is not one this flow can use");
+    this.name = "PortNotAcceptedError";
+  }
+}
+
+/**
  * Prompt for a Web Serial port without opening it. Returns ``null`` if the
  * user dismissed the picker; throws on a real requestPort failure. Callers
  * that only need the USB identity can decide before ever opening (no DTR/RTS
- * pulse on a port that won't be used).
+ * pulse on a port that won't be used). A pick ``accept`` refuses throws
+ * ``PortNotAcceptedError``, before anything opens it.
  */
 export async function requestSerialPort(
-  options?: SerialPortRequestOptions
+  options?: SerialPortRequestOptions,
+  accept?: (port: SerialPort) => boolean
 ): Promise<SerialPort | null> {
+  let port: SerialPort;
   try {
-    return await navigator.serial.requestPort(options);
+    port = await navigator.serial.requestPort(options);
   } catch (err) {
     if (isPortPickerCancel(err)) {
       return null; // User dismissed the port picker.
     }
     throw err; // A real requestPort failure — let the caller surface it.
   }
+  if (accept && !accept(port)) throw new PortNotAcceptedError(port);
+  return port;
 }
 
 /**

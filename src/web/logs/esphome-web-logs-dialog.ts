@@ -11,7 +11,6 @@ import {
 } from "../../components/process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
-import { isWebUsbSupported, picoResetFailureKey } from "../../platforms/rp2/index.js";
 import {
   classifyLine,
   type CrashKind,
@@ -25,7 +24,8 @@ import type { SerialLineHooks } from "../../util/serial-log-stream.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";
-import { SerialLogSource, type SerialResetMode } from "./serial-source.js";
+import { RTS_PULSE, type WebSerialReset } from "./serial-reset.js";
+import { SerialLogSource } from "./serial-source.js";
 import { renderWebLogsToolbar } from "./toolbar.js";
 
 import "../../components/base-dialog.js";
@@ -73,10 +73,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @property() deviceLabel = "";
 
   /**
-   * How Reset Device reaches the board (see ``SerialResetMode``). The Pico's
-   * reboot goes over WebUSB, so the button hides where that is missing.
+   * How Reset Device reaches the board, handed in by the family's card: the
+   * RTS pulse by default, the Pico's own reboot, or none (an nRF52).
    */
-  @property() resetMode: SerialResetMode = "rts";
+  @property({ attribute: false }) reset?: WebSerialReset = RTS_PULSE;
 
   /** Drop DTR and RTS after every (re)open: the RTL8720C's strap and reset lines. */
   @property({ type: Boolean, attribute: "release-lines" }) releaseLines = false;
@@ -138,8 +138,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
 
   /** Reset Device is a serial RTS pulse; never over Bluetooth. */
   get canReset(): boolean {
-    if (this.bleDevice || this.resetMode === "none") return false;
-    return this.resetMode !== "pico" || isWebUsbSupported();
+    return !this.bleDevice && (this.reset?.available() ?? false);
   }
 
   /**
@@ -174,7 +173,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (this.bleDevice) return new BleLogSource(this.bleDevice);
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
-      reset: this.canReset ? this.resetMode : "none",
+      reset: this.canReset ? this.reset : undefined,
       releaseLinesAfterOpen: this.releaseLines,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
@@ -425,6 +424,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._lines = [];
   }
 
+  private _resetFailureKey(err: unknown): string {
+    return this.reset?.failureKey?.(err) ?? "web.logs.reset_failed";
+  }
+
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
     const source = this._source;
@@ -437,8 +440,8 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!source.resetDropsStream) {
       try {
         await reset(() => false);
-      } catch {
-        toast.error(this._localize("web.logs.reset_failed"));
+      } catch (err) {
+        toast.error(this._localize(this._resetFailureKey(err)));
       }
       return;
     }
@@ -461,7 +464,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
       await reset(() => generation !== this._generation);
     } catch (err) {
       console.warn("[Logs] reset failed:", err);
-      toast.error(this._localize(picoResetFailureKey(err, "web.logs.reset_failed")));
+      toast.error(this._localize(this._resetFailureKey(err)));
       if (generation === this._generation) this._failReconnect(source);
       return;
     }

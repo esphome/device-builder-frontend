@@ -25,6 +25,7 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import { identityLocalize, mount } from "../../../_dom.js";
 import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
+import { RTS_PULSE } from "../../../../src/web/logs/serial-reset.js";
 import { ESPHomeWebRtlCard } from "../../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -64,7 +65,7 @@ describe("esphome-web-rtl-card", () => {
     const dialog = logsDialog(el);
     expect(dialog.port).toBe(port);
     expect(dialog.hasAttribute("open")).toBe(true);
-    expect(dialog.resetMode).toBe("rts");
+    expect(dialog.reset).toBe(RTS_PULSE);
     expect(dialog.hasAttribute("release-lines")).toBe(true);
   });
 

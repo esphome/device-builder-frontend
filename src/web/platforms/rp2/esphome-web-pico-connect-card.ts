@@ -10,7 +10,7 @@ import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { sleep } from "../../../util/sleep.js";
-import { isPortPickerCancel } from "../../../util/web-serial.js";
+import { PortNotAcceptedError, requestSerialPort } from "../../../util/web-serial.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import "./esphome-web-install-pico-dialog.js";
 import {
@@ -18,7 +18,7 @@ import {
   openImprovDialog,
 } from "../../improv/open-improv-dialog.js";
 import { PortDisconnectWatcher } from "../../util/port-disconnect-watcher.js";
-import { picoPortFilters } from "./pico-port-filter.js";
+import { isPicoPort, picoPortFilters } from "./pico-port-filter.js";
 import "../../dashboard/esphome-web-card.js";
 import "./esphome-web-pico-device-card.js";
 
@@ -111,20 +111,20 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
   }
 
   private async _connect(): Promise<void> {
-    let port: SerialPort;
+    let port: SerialPort | null;
     try {
-      port = await navigator.serial.requestPort({ filters: picoPortFilters });
+      port = await requestSerialPort({ filters: picoPortFilters }, isPicoPort);
     } catch (err) {
-      if (!isPortPickerCancel(err)) {
-        toast.error(
-          this._localize("web.connect.failed", {
-            error: err instanceof Error ? err.message : String(err),
-          })
-        );
-      }
+      toast.error(
+        err instanceof PortNotAcceptedError
+          ? this._localize("web.pico.probe_picked")
+          : this._localize("web.connect.failed", {
+              error: err instanceof Error ? err.message : String(err),
+            })
+      );
       return;
     }
-    this._adoptPort(port);
+    if (port) this._adoptPort(port);
   }
 
   private _adoptPort(port: SerialPort): void {

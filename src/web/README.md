@@ -54,14 +54,25 @@ hardware classes behave differently:
 | Path                                   | What                                                                                            |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                       |
-| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header                                   |
+| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header, both read from the registry      |
 | `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                           |
-| `platforms/<name>/`                    | Each platform's connect and device cards and install dialogs (`esp`, `rp2`, `nrf52`, `rtl87xx`) |
+| `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them          |
 | `install/`                             | Pieces the install dialogs share: the progress card and the file picker                         |
 | `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                             |
 | `improv/`                              | Wi-Fi provisioning dialog                                                                       |
 | `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                         |
 | `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)                 |
+
+### Adding a device family
+
+A family is a directory under `platforms/` with a `mode.ts` exporting its
+`WebPlatform` (`platforms/web-platform.ts`): its mode flag, header logo and
+label, intro copy, connect card, and the USB ids that claim a port for the
+flow switch toast. Add it to `WEB_PLATFORMS` in `platforms/registry.ts`, put
+its logo in `public/web/static/logo/`, and its copy in `en.json`. The header,
+the dashboard, the mode URL and the flow switch need no edits. Its logs card
+hands the logs dialog its own Reset device (`reset`, a `WebSerialReset` from
+`logs/serial-reset.ts`; the RTS pulse by default, `undefined` for none).
 
 New copy goes in `src/translations/en.json` under the `web.*`
 namespace. Tests live in `test/web/` (platform tests in

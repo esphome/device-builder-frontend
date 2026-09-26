@@ -14,6 +14,7 @@ vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
 }));
 vi.mock("../../src/platforms/rp2/rp2-logs-reset.js", () => ({ rebootPico: vi.fn() }));
 
+import { RTS_PULSE } from "../../src/web/logs/serial-reset.js";
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
 
 const hooks = { onLine: () => {}, onEnd: () => {} } as never;
@@ -33,7 +34,7 @@ describe("SerialLogSource reopen line policy", () => {
   it("drops DTR and RTS on the reopened handle before streaming when asked to", async () => {
     const { dead, live } = ports();
     const source = new SerialLogSource(dead, {
-      reset: "rts",
+      reset: RTS_PULSE,
       releaseLinesAfterOpen: true,
     });
     await source.resume(hooks, () => false);
@@ -50,7 +51,7 @@ describe("SerialLogSource reopen line policy", () => {
 
   it("leaves the lines as opened otherwise", async () => {
     const { dead, live } = ports();
-    const source = new SerialLogSource(dead, { reset: "rts" });
+    const source = new SerialLogSource(dead, { reset: RTS_PULSE });
     await source.resume(hooks, () => false);
     expect(live.setSignals).not.toHaveBeenCalled();
     expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);

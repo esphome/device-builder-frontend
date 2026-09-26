@@ -1,17 +1,18 @@
 /**
- * ESP ⇄ Pico ⇄ nRF ⇄ RTL mode, encoded in the URL query so a link is shareable and
- * a reload keeps the chosen device family (matching the legacy site's ``/?pico``
- * convention). ``esp`` is the default and carries no query param; other modes
- * are a bare ``?<mode>`` flag.
+ * The device family (``platforms/registry.ts``), encoded in the URL query so a
+ * link is shareable and a reload keeps the chosen family (matching the legacy
+ * site's ``/?pico`` convention). The default (ESP) carries no query param;
+ * the others are a bare ``?<mode>`` flag.
  */
-export type WebMode = "esp" | "pico" | "nrf" | "rtl";
+import { DEFAULT_WEB_MODE, WEB_PLATFORMS, type WebMode } from "./platforms/registry.js";
 
-const DEFAULT_MODE: WebMode = "esp";
-const FLAGGED_MODES: readonly Exclude<WebMode, typeof DEFAULT_MODE>[] = [
-  "pico",
-  "nrf",
-  "rtl",
-];
+export type { WebMode };
+
+const DEFAULT_MODE = DEFAULT_WEB_MODE;
+// Every family but the default, in registry order (the first flag present wins).
+const FLAGGED_MODES: readonly WebMode[] = WEB_PLATFORMS.map((p) => p.mode).filter(
+  (mode) => mode !== DEFAULT_MODE
+);
 
 /** Read the current mode from a query string (defaults to the live URL). */
 export function readMode(search: string = window.location.search): WebMode {

@@ -11,6 +11,7 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import { openImprovDialog } from "../../improv/open-improv-dialog.js";
 import { openLogsPortForCard } from "../../util/pick-port-for-logs.js";
+import { PICO_RESET } from "./logs-reset.js";
 import "../../logs/esphome-web-logs-dialog.js";
 import "../../dashboard/esphome-web-card.js";
 
@@ -91,7 +92,7 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.pico.title")}
-        .resetMode=${"pico"}
+        .reset=${PICO_RESET}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

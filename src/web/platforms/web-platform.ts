@@ -1,0 +1,27 @@
+import type { TemplateResult } from "lit";
+
+/**
+ * One device family on web.esphome.io: its mode in the URL and the header,
+ * the connect card the dashboard shows for it, and the USB ids that point a
+ * picked or plugged-in port at it. ``registry.ts`` lists them; the header, the
+ * dashboard, the mode URL and the flow-switch toast read everything from
+ * there, so a new family is a new ``platforms/<name>/`` plus one entry.
+ */
+export interface WebPlatform<Mode extends string = string> {
+  /** The URL flag (a bare ``?pico``); the default mode has none. */
+  readonly mode: Mode;
+  /** Header logo under ``/static/logo/``. */
+  readonly logo: string;
+  readonly labelKey: string;
+  /** The intro copy under the connect card. */
+  readonly introKey: string;
+  renderCard(): TemplateResult;
+  /** Shows the legacy ``?dashboard_logs`` / install / wizard hint. */
+  readonly dashboardHints?: boolean;
+  /**
+   * Whether a port's USB ids clearly belong to this family, so the site
+   * offers switching to it (copy ``web.flow_switch.<mode>`` and
+   * ``web.flow_switch.action_<mode>``).
+   */
+  claimsPort?(port: SerialPort): boolean;
+}
