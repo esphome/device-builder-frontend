@@ -229,7 +229,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
               </ul>
               <p>${this._localize("web.pico.install_step_install")}</p>
             `
-          : renderProgressCard({ ...this._card(), log: this._logLines })
+          : renderProgressCard({ ...this._card(), log: this._logLines }, this._localize)
       }
       ${
         this._state === "success"

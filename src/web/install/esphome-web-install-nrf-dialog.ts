@@ -220,17 +220,20 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   private _renderProgress() {
     const errored = this._state === "error";
     const done = this._state === "success";
-    return renderProgressCard({
-      state: installTerminalState(this._state),
-      message: this._statusMessage(),
-      detail: errored
-        ? this._errorMessage
-        : done
-          ? this._localize("web.nrf.install_done_hint")
-          : "",
-      progress: this._state === "flashing" ? this._progress : null,
-      log: this._logLines,
-    });
+    return renderProgressCard(
+      {
+        state: installTerminalState(this._state),
+        message: this._statusMessage(),
+        detail: errored
+          ? this._errorMessage
+          : done
+            ? this._localize("web.nrf.install_done_hint")
+            : "",
+        progress: this._state === "flashing" ? this._progress : null,
+        log: this._logLines,
+      },
+      this._localize
+    );
   }
 
   private _renderAction() {

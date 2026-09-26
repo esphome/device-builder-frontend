@@ -222,13 +222,16 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
 
   private _renderProgress() {
     return html`
-      ${renderProgressCard({
-        state: installTerminalState(this._state),
-        message: this._statusMessage(),
-        detail: this._statusDetail(),
-        progress: this._state === "flashing" ? this._progress : null,
-        log: this._logLines,
-      })}
+      ${renderProgressCard(
+        {
+          state: installTerminalState(this._state),
+          message: this._statusMessage(),
+          detail: this._statusDetail(),
+          progress: this._state === "flashing" ? this._progress : null,
+          log: this._logLines,
+        },
+        this._localize
+      )}
       ${
         this._state === "waiting"
           ? html`<p class="guide">

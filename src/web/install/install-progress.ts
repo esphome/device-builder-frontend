@@ -43,13 +43,16 @@ export function renderInstallProgress(
   flow: InstallFlowController,
   localize: LocalizeFunc
 ): TemplateResult {
-  return renderProgressCard({
-    state: terminalState(flow),
-    message: statusMessage(flow, localize),
-    detail: flow.errored ? flow.errorMessage : "",
-    progress: flow.step === "flashing" ? flow.progress : null,
-    log: flow.logLines,
-  });
+  return renderProgressCard(
+    {
+      state: terminalState(flow),
+      message: statusMessage(flow, localize),
+      detail: flow.errored ? flow.errorMessage : "",
+      progress: flow.step === "flashing" ? flow.progress : null,
+      log: flow.logLines,
+    },
+    localize
+  );
 }
 
 export interface ProgressCard {
@@ -61,14 +64,23 @@ export interface ProgressCard {
   log?: readonly string[];
 }
 
-/** The progress card itself, for the dialogs that drive their own steps. */
-export function renderProgressCard(card: ProgressCard): TemplateResult {
+/**
+ * The progress card itself, for the dialogs that drive their own steps.
+ * While a write shows its progress bar the detail asks the user to keep the
+ * window visible: hidden tabs throttle timers, which can stall the Web Serial
+ * write and fail the flash, and there is no API to opt out.
+ */
+export function renderProgressCard(
+  card: ProgressCard,
+  localize: LocalizeFunc
+): TemplateResult {
+  const writing = card.progress !== undefined && card.progress !== null;
   return html`
     <esphome-process-terminal
       variant="card"
       .state=${card.state}
       .statusMessage=${card.message}
-      .statusDetail=${card.detail ?? ""}
+      .statusDetail=${card.detail || (writing ? localize("firmware.flashing_keep_visible") : "")}
       .progress=${card.progress ?? null}
     >
       ${
