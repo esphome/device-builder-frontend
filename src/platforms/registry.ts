@@ -1,4 +1,3 @@
-import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 /**
  * The Device Builder's platforms beyond ESP, one ``PlatformSupport`` each
  * (see ``platform-support.ts``). Adding a platform is a new directory whose
@@ -7,6 +6,7 @@ import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
  * everything from it. A device with no entry (ESP) gets the built-in
  * behaviour. Never imported from ``src/web``.
  */
+import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
 import { rp2Platform } from "./rp2/dashboard.js";
