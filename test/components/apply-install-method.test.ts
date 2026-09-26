@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { applyInstallMethod } from "../../src/components/apply-install-method.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { BROWSER_FLASHERS } from "../../src/platforms/browser-flashers.js";
 
 const device = { configuration: "x.yaml", name: "x" } as ConfiguredDevice;
 
@@ -10,8 +11,7 @@ function deps() {
     installWebSerial: vi.fn(),
     installUsbFlash: vi.fn(),
     installBinaryDownload: vi.fn(),
-    installRp2Uf2: vi.fn(),
-    installRtlAmbz2: vi.fn(),
+    installBrowserFlasher: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;
   return { device, openInstall: vi.fn(), firmwareDialog };
 }
@@ -56,17 +56,23 @@ describe("applyInstallMethod", () => {
     expect(d.firmwareDialog.installWebSerial).not.toHaveBeenCalled();
   });
 
-  it("rtl-ambz2 routes to the dialog's RTL8720C flow", () => {
-    const d = deps();
-    applyInstallMethod("rtl-ambz2", undefined, d);
-    expect(d.firmwareDialog.installRtlAmbz2).toHaveBeenCalledWith(device);
-    expect(d.openInstall).not.toHaveBeenCalled();
-  });
+  it.each(BROWSER_FLASHERS.map((f) => [f.id, f] as const))(
+    "%s routes to the dialog's browser flasher",
+    (id, flasher) => {
+      const d = deps();
+      applyInstallMethod(id, undefined, d);
+      expect(d.firmwareDialog.installBrowserFlasher).toHaveBeenCalledWith(
+        flasher,
+        device
+      );
+      expect(d.openInstall).not.toHaveBeenCalled();
+    }
+  );
 
-  it("rp2-uf2 routes to the dialog's Pico flow", () => {
+  it("ignores a method nothing handles", () => {
     const d = deps();
-    applyInstallMethod("rp2-uf2", undefined, d);
-    expect(d.firmwareDialog.installRp2Uf2).toHaveBeenCalledWith(device);
+    applyInstallMethod("carrier-pigeon", undefined, d);
+    expect(d.firmwareDialog.installBrowserFlasher).not.toHaveBeenCalled();
     expect(d.openInstall).not.toHaveBeenCalled();
   });
 

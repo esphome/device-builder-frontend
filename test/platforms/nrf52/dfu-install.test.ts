@@ -20,7 +20,11 @@ vi.mock("../../../src/platforms/nrf52/nrf-dfu.js", () => ({
 }));
 
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
-import { nrfDoFlash, nrfDoReset } from "../../../src/platforms/nrf52/dfu-install.js";
+import {
+  nrfDoFlash,
+  nrfDoReset,
+  nrfPackage,
+} from "../../../src/platforms/nrf52/dfu-install.js";
 import type { DfuPackage } from "../../../src/platforms/nrf52/nrf-dfu.js";
 import {
   asHost,
@@ -40,11 +44,11 @@ const pkg: DfuPackage = {
 };
 
 function readyHost() {
-  const host = makeFlashHost(
-    device,
-    { binaries: [bin("firmware.zip")], downloadBytes: new ArrayBuffer(0) },
-    { _nrfPkg: pkg as DfuPackage | null, installNrfDfu: vi.fn() }
-  );
+  const host = makeFlashHost(device, {
+    binaries: [bin("firmware.zip")],
+    downloadBytes: new ArrayBuffer(0),
+  });
+  nrfPackage.set(asHost(host), pkg);
   // As the reset step leaves it.
   host._step = "nrf-reset";
   host._statusMessage = "firmware.nrf_step1_title";

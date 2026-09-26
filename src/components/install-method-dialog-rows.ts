@@ -6,13 +6,11 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { browserFlasherForPlatform } from "../platforms/browser-flashers.js";
 import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
-  isNrfPlatform,
 } from "../platforms/nrf52/index.js";
-import { isRp2Platform } from "../platforms/rp2/index.js";
-import { isRtl87xxPlatform } from "../platforms/rtl87xx/index.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -168,14 +166,6 @@ export function renderBleNusOption(
   });
 }
 
-// The in-app flashers of the non-ESP platforms; the copy keys are
-// `dashboard.install_method_<key>` and its `_desc`.
-const PLATFORM_FLASHERS = [
-  { matches: isNrfPlatform, method: "nrf-dfu", key: "nrf_dfu" },
-  { matches: isRp2Platform, method: "rp2-uf2", key: "rp2_uf2" },
-  { matches: isRtl87xxPlatform, method: "rtl-ambz2", key: "rtl_ambz2" },
-] as const;
-
 /**
  * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
  * ROM), install mode only and only with Web Serial; nothing for the rest.
@@ -186,13 +176,13 @@ export function renderPlatformFlashOption(
   hasWebSerial: boolean
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs" || !hasWebSerial) return nothing;
-  const flasher = PLATFORM_FLASHERS.find((f) => f.matches(platform));
+  const flasher = browserFlasherForPlatform(platform);
   if (!flasher) return nothing;
   return renderMethodRow({
     icon: "chip",
-    title: ctx.localize(`dashboard.install_method_${flasher.key}`),
-    desc: ctx.localize(`dashboard.install_method_${flasher.key}_desc`),
-    onClick: () => ctx.onSelect(flasher.method),
+    title: ctx.localize(`dashboard.install_method_${flasher.methodKey}`),
+    desc: ctx.localize(`dashboard.install_method_${flasher.methodKey}_desc`),
+    onClick: () => ctx.onSelect(flasher.id),
   });
 }
 

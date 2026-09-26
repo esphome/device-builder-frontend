@@ -30,26 +30,6 @@ import {
   startWebSerialInstall,
 } from "../platforms/esp/dashboard.js";
 import type { DetectedChip } from "../platforms/esp/index.js";
-import {
-  nrfDoFlash,
-  nrfDoReset,
-  retryNrfDfu,
-  startNrfDfuInstall,
-} from "../platforms/nrf52/dashboard.js";
-import type { DfuPackage } from "../platforms/nrf52/index.js";
-import {
-  retryRp2Uf2,
-  rp2DoDownload,
-  rp2DoFlash,
-  rp2DoReset,
-  startRp2Uf2Install,
-} from "../platforms/rp2/dashboard.js";
-import {
-  retryRtlAmbz2,
-  rtlDoFlash,
-  startRtlAmbz2Install,
-} from "../platforms/rtl87xx/dashboard.js";
-import type { LibreTinyImage } from "../platforms/rtl87xx/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
@@ -59,7 +39,8 @@ import { LogBuffer } from "../util/log-buffer.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
-import type { Uf2Image } from "../util/uf2.js";
+import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
+import type { AnyBrowserFlasher } from "./firmware-install-dialog/browser-flasher.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
@@ -216,9 +197,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  _nrfPkg: DfuPackage | null = null;
-  _rp2Image: Uf2Image | null = null;
-  _rtlImage: LibreTinyImage | null = null;
+  // The browser flasher running this install (nRF52, Pico, RTL8720C), and its
+  // parsed image, read through the flasher's own FlashImageSlot.
+  // Not @state: it only changes with _installer, which is.
+  _flasher: AnyBrowserFlasher | null = null;
+  _flashImage: unknown = null;
   // The port a browser flash went through; backs "Show logs" on Done.
   _logsPort: SerialPort | null = null;
   // Blocks a second picker while a browser-flash step's picker is open.
@@ -235,6 +218,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
+  // ESP's in-dialog esptool flash; it moves to a browser flasher descriptor
+  // in a later pass, like nRF52, Pico and RTL8720C.
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
     this._installer = "web-serial";
@@ -271,28 +256,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startDownload(this);
   }
 
-  installNrfDfu(device: ConfiguredDevice) {
-    this._begin(device, "nrf-dfu");
-    void startNrfDfuInstall(this);
+  // A platform's compile-then-flash flow (src/platforms/browser-flashers.ts).
+  installBrowserFlasher(flasher: AnyBrowserFlasher, device: ConfiguredDevice) {
+    this._begin(device, flasher.id);
+    this._flasher = flasher;
+    void flasher.start(this);
   }
-
-  installRp2Uf2(device: ConfiguredDevice) {
-    this._begin(device, "rp2-uf2");
-    void startRp2Uf2Install(this);
-  }
-
-  installRtlAmbz2(device: ConfiguredDevice) {
-    this._begin(device, "rtl-ambz2");
-    void startRtlAmbz2Install(this);
-  }
-
-  // Footer button handlers: the port / device pickers need a user gesture.
-  _nrfDoReset = () => void nrfDoReset(this);
-  _nrfDoFlash = () => void nrfDoFlash(this);
-  _rp2DoReset = () => void rp2DoReset(this);
-  _rp2DoFlash = () => void rp2DoFlash(this);
-  _rp2DoDownload = () => rp2DoDownload(this);
-  _rtlDoFlash = () => void rtlDoFlash(this);
 
   // Three-dot "Download" entry; compiles only when nothing is built.
   downloadArtifacts(device: ConfiguredDevice) {
@@ -344,9 +313,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
-    this._nrfPkg = null;
-    this._rp2Image = null;
-    this._rtlImage = null;
+    this._flasher = null;
+    this._flashImage = null;
     this._logsPort = null;
     this._flashBusy = false;
   }
@@ -501,11 +469,21 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       if (!settled) return;
     }
     if (this._installer === "web-flash") this.installUsbFlash(device);
-    else if (this._installer === "nrf-dfu") retryNrfDfu(this, device);
-    else if (this._installer === "rp2-uf2") retryRp2Uf2(this, device);
-    else if (this._installer === "rtl-ambz2") retryRtlAmbz2(this, device);
+    else if (this._flasher) this._retryFlasher(this._flasher, device);
     else this.installWebSerial(device);
   };
+
+  // A failed reset or flash (device dropped mid-transfer, wrong port picked)
+  // keeps the parsed image, so go back to the flasher's first step without
+  // recompiling; a failure before the image existed runs the whole install.
+  private _retryFlasher(flasher: AnyBrowserFlasher, device: ConfiguredDevice) {
+    if (flasher.image.get(this) === null) {
+      this.installBrowserFlasher(flasher, device);
+      return;
+    }
+    resetForRetry(this);
+    flasher.showFirstStep(this);
+  }
 
   _cancel = async () => {
     // Stop owns the job from here: a dismissal racing the round-trip must

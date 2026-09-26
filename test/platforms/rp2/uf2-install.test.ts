@@ -37,10 +37,11 @@ import { makeUf2Block } from "../../_make-uf2-block.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import {
-  retryRp2Uf2,
   rp2DoDownload,
   rp2DoFlash,
   rp2DoReset,
+  rp2Image,
+  rp2Uf2Flasher,
   startRp2Uf2Install,
 } from "../../../src/platforms/rp2/uf2-install.js";
 import {
@@ -69,23 +70,19 @@ const image: Uf2Image = {
 };
 
 function makeHost(opts: { binaries?: FirmwareBinary[]; uf2Family?: number } = {}) {
-  return makeFlashHost(
-    device,
-    {
-      binaries: opts.binaries ?? [
-        bin("firmware.uf2", "uf2"),
-        bin("firmware.ota.bin", "ota"),
-      ],
-      downloadBytes: uf2(opts.uf2Family ?? UF2_FAMILY_RP2040),
-    },
-    { _rp2Image: null as Uf2Image | null, installRp2Uf2: vi.fn() }
-  );
+  return makeFlashHost(device, {
+    binaries: opts.binaries ?? [
+      bin("firmware.uf2", "uf2"),
+      bin("firmware.ota.bin", "ota"),
+    ],
+    downloadBytes: uf2(opts.uf2Family ?? UF2_FAMILY_RP2040),
+  });
 }
 type Host = ReturnType<typeof makeHost>;
 
 function readyHost(): Host {
   const host = makeHost();
-  host._rp2Image = image;
+  rp2Image.set(asHost(host), image);
   host._binaries = [bin("firmware.uf2", "uf2")];
   // As showBootselStep leaves it.
   host._step = "rp2-bootsel";
@@ -105,7 +102,7 @@ describe("startRp2Uf2Install", () => {
       "pico.yaml",
       "firmware.uf2"
     );
-    expect(host._rp2Image?.totalBytes).toBe(256);
+    expect(rp2Image.get(asHost(host))?.totalBytes).toBe(256);
     expect(host._binaries.map((b) => b.file)).toEqual(["firmware.uf2"]);
     expect(host._step).toBe("rp2-bootsel");
     expect(host._statusMessage).toBe("firmware.rp2_bootsel_title");
@@ -124,7 +121,7 @@ describe("startRp2Uf2Install", () => {
     await startRp2Uf2Install(asHost(host));
     expect(host._statusMessage).toBe("firmware.rp2_rp2350_unsupported");
     expect(host._errorMessage).toContain("0xe48bff59");
-    expect(host._rp2Image).toBeNull();
+    expect(rp2Image.get(asHost(host))).toBeNull();
   });
 
   it("treats a UF2 without a family id as a bad file, not an RP2350 image", async () => {
@@ -144,7 +141,7 @@ describe("startRp2Uf2Install", () => {
       return uf2(UF2_FAMILY_RP2040);
     });
     await startRp2Uf2Install(asHost(host));
-    expect(host._rp2Image).toBeNull();
+    expect(rp2Image.get(asHost(host))).toBeNull();
     expect(host._step).not.toBe("rp2-bootsel");
   });
 });
@@ -325,20 +322,12 @@ describe("rp2DoFlash", () => {
 });
 
 describe("retry and download", () => {
-  it("retries to the BOOTSEL step without recompiling when the image is held", () => {
+  it("goes back to the BOOTSEL step as the Retry target", () => {
     const host = readyHost();
     host._step = "error";
-    host._errorMessage = "x";
-    retryRp2Uf2(asHost(host), device);
+    rp2Uf2Flasher.showFirstStep(asHost(host));
     expect(host._step).toBe("rp2-bootsel");
-    expect(host._errorMessage).toBe("");
-    expect(host.installRp2Uf2).not.toHaveBeenCalled();
-  });
-
-  it("retries from scratch when no image is held", () => {
-    const host = makeHost();
-    retryRp2Uf2(asHost(host), device);
-    expect(host.installRp2Uf2).toHaveBeenCalledWith(device);
+    expect(host._statusMessage).toBe("firmware.rp2_bootsel_title");
   });
 
   it("downloads the held UF2 through the shared binary download", () => {

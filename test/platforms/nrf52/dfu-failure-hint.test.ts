@@ -19,7 +19,11 @@ vi.mock("../../../src/platforms/nrf52/nrf-dfu.js", () => ({
 
 import { argsLocalize } from "../../_dom.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
-import { nrfDoFlash, nrfDoReset } from "../../../src/platforms/nrf52/dfu-install.js";
+import {
+  nrfDoFlash,
+  nrfDoReset,
+  nrfPackage,
+} from "../../../src/platforms/nrf52/dfu-install.js";
 import type { DfuPackage } from "../../../src/platforms/nrf52/nrf-dfu.js";
 import { BootloaderTouchError } from "../../../src/util/serial-bootloader-touch.js";
 import {
@@ -40,11 +44,11 @@ const pkg: DfuPackage = {
 };
 
 function readyHost() {
-  const host = makeFlashHost(
-    device,
-    { binaries: [bin("firmware.zip")], downloadBytes: new ArrayBuffer(0) },
-    { _nrfPkg: pkg as DfuPackage | null, installNrfDfu: vi.fn() }
-  );
+  const host = makeFlashHost(device, {
+    binaries: [bin("firmware.zip")],
+    downloadBytes: new ArrayBuffer(0),
+  });
+  nrfPackage.set(asHost(host), pkg);
   host._step = "nrf-reset";
   host._localize = argsLocalize as typeof host._localize;
   return host;

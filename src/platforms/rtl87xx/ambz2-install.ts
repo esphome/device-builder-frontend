@@ -4,18 +4,38 @@
  * that picks the port and flashes through the ROM downloader. The engine
  * loads on demand so it stays out of the main chunk.
  */
-import type { ConfiguredDevice } from "../../api/types/devices.js";
+import { html } from "lit";
+
+import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  resetForRetry,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import {
+  type BrowserFlasher,
+  FLASH_ACTION_KEY,
+  FlashImageSlot,
+} from "../../components/firmware-install-dialog/browser-flasher.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { loadAmbz2Engine } from "./index.js";
-import { Ambz2ImageError, parseAmbz2Image } from "./libretiny-uf2.js";
+import {
+  Ambz2ImageError,
+  type LibreTinyImage,
+  parseAmbz2Image,
+} from "./libretiny-uf2.js";
+import { isRtl87xxPlatform } from "./rtl87xx-platform.js";
+
+declare module "../../components/firmware-install-dialog/types.js" {
+  interface BrowserFlasherSteps {
+    "rtl-ambz2": "rtl-ready" | "rtl-connect" | "rtl-wait";
+  }
+}
+
+/** The parsed LibreTiny image, kept for Retry. */
+export const rtlImage = new FlashImageSlot<LibreTinyImage>();
 
 /** Compile, download and parse the UF2, then hand off to the flash step. */
 export async function startRtlAmbz2Install(
@@ -31,7 +51,7 @@ export async function startRtlAmbz2Install(
   );
   if (!artifact) return;
   try {
-    host._rtlImage = parseAmbz2Image(artifact.bytes);
+    rtlImage.set(host, parseAmbz2Image(artifact.bytes));
   } catch (err) {
     host._fail(
       host._localize(err instanceof Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"),
@@ -48,29 +68,16 @@ function showReadyStep(host: ESPHomeFirmwareInstallDialog): void {
   host._statusMessage = host._localize("firmware.rtl_ready_title");
 }
 
-/** Retry after a failed flash: the image is still parsed, so skip the compile. */
-export function retryRtlAmbz2(
-  host: ESPHomeFirmwareInstallDialog,
-  device: ConfiguredDevice
-): void {
-  if (!host._rtlImage) {
-    host.installRtlAmbz2(device);
-    return;
-  }
-  resetForRetry(host);
-  showReadyStep(host);
-}
-
 /**
  * Pick the port and flash. The engine resets the board into download mode
  * by itself where the adapter's control lines allow it; otherwise the dialog
  * moves to the strap guide while the engine keeps polling for the ROM.
  */
 export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  const image = host._rtlImage;
+  const image = rtlImage.get(host);
   if (!image || host._flashBusy) return;
   const device = host._device;
-  const stillCurrent = () => host._device === device && host._rtlImage === image;
+  const stillCurrent = () => host._device === device && rtlImage.get(host) === image;
   const port = await pickSerialPortOrFail(host, stillCurrent);
   if (!port) return;
 
@@ -116,3 +123,34 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   // follows; not while the manual-reset instruction is showing.
   finishWithLogsPort(host, port, rebooted);
 }
+
+export const rtlAmbz2Flasher: BrowserFlasher<"rtl-ambz2"> = {
+  id: "rtl-ambz2",
+  matches: isRtl87xxPlatform,
+  methodKey: "rtl_ambz2",
+  // The logs reopen the flash's port (Show logs on Done, the after-install toggle).
+  holdsPort: true,
+  image: rtlImage,
+  start: startRtlAmbz2Install,
+  showFirstStep: showReadyStep,
+  steps: {
+    // One click: the engine resets the board itself, or shows the strap guide.
+    "rtl-ready": {
+      detailKey: "firmware.rtl_ready_desc",
+      footer: () => ({ primary: { run: rtlDoFlash, labelKey: FLASH_ACTION_KEY } }),
+    },
+    "rtl-connect": { detailKey: "firmware.rtl_connect_desc" },
+    // Where to read on when the strap step does not get the board into download mode.
+    "rtl-wait": {
+      detailKey: "firmware.rtl_wait_desc",
+      extra: (host) =>
+        html`<a
+          class="reset-suggestion-link"
+          href=${LIBRETINY_AMBZ2_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${host._localize("firmware.rtl_guide_link")}</a
+        >`,
+    },
+  },
+};

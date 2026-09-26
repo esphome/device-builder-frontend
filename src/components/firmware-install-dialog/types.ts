@@ -1,4 +1,16 @@
-export type InstallStep =
+/**
+ * The browser flashers' own steps, keyed by installer id. Each platform's
+ * install module adds its entry with ``declare module`` (see
+ * ``browser-flasher.ts``), so a new flasher needs no edit here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BrowserFlasherSteps {}
+
+export type FlasherId = keyof BrowserFlasherSteps;
+export type FlasherStep = BrowserFlasherSteps[FlasherId];
+
+/** Steps every installer shares; the dialog renders these itself. */
+export type SharedInstallStep =
   | "connecting"
   | "queued"
   | "installing"
@@ -8,29 +20,13 @@ export type InstallStep =
   | "choose-binary"
   | "downloading"
   | "download-ready"
-  | "nrf-reset"
-  | "nrf-wait"
-  | "rp2-bootsel"
-  | "rp2-wait"
-  | "rtl-ready"
-  | "rtl-connect"
-  | "rtl-wait"
   | "error";
 
-export type Installer =
-  | "web-serial"
-  | "binary-download"
-  | "web-flash"
-  | "nrf-dfu"
-  | "rp2-uf2"
-  | "rtl-ambz2"
-  | null;
+export type InstallStep = SharedInstallStep | FlasherStep;
 
-/** Installers whose flash leaves a port the logs can reopen (Show logs on Done, the after-install toggle). */
-export const PORT_HOLDING_INSTALLERS: ReadonlySet<Installer> = new Set<Installer>([
-  "web-serial",
-  "rtl-ambz2",
-]);
+// The ESP installers (web-serial, web-flash) are still built into the dialog;
+// they move to a browser flasher descriptor in a later pass.
+export type Installer = "web-serial" | "binary-download" | "web-flash" | FlasherId | null;
 
 export type InstallFailureKind =
   "compile" | "validate" | "chip-mismatch" | "unsupported-browser" | null;

@@ -19,7 +19,25 @@ import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
 } from "../../src/components/firmware-install-dialog.js";
+import {
+  type AnyBrowserFlasher,
+  FLASH_ACTION_KEY,
+  flasherStepView,
+  RESET_ACTION_KEY,
+} from "../../src/components/firmware-install-dialog/browser-flasher.js";
 import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
+import {
+  nrfDfuFlasher,
+  nrfDoFlash,
+  nrfDoReset,
+} from "../../src/platforms/nrf52/dashboard.js";
+import {
+  rp2DoDownload,
+  rp2DoFlash,
+  rp2DoReset,
+  rp2Uf2Flasher,
+} from "../../src/platforms/rp2/dashboard.js";
+import { rtlAmbz2Flasher, rtlDoFlash } from "../../src/platforms/rtl87xx/dashboard.js";
 
 function footerHost(step: string) {
   return {
@@ -36,12 +54,16 @@ function footerHost(step: string) {
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),
     _flashBusy: false,
-    _nrfDoReset: vi.fn(),
-    _nrfDoFlash: vi.fn(),
-    _rp2DoReset: vi.fn(),
-    _rp2DoFlash: vi.fn(),
-    _rp2DoDownload: vi.fn(),
+    _flasher: null as AnyBrowserFlasher | null,
   };
+}
+
+// The platform functions a flasher step's buttons run, secondary first.
+function stepRuns(host: ReturnType<typeof footerHost>) {
+  const footer = flasherStepView(
+    host as unknown as ESPHomeFirmwareInstallDialog
+  )?.footer?.();
+  return [footer?.secondary?.run, footer?.primary.run].filter(Boolean);
 }
 
 const footerValues = (host: ReturnType<typeof footerHost>) =>
@@ -65,42 +87,59 @@ describe("firmware-install-dialog footer", () => {
     (step) => {
       isWebUsbSupported.mockReturnValue(true);
       const host = footerHost(step);
-      host._installer = "rp2-uf2";
+      host._flasher = rp2Uf2Flasher;
       const values = footerValuesDeep(host);
       expect(values).toContain(host._close);
-      expect(values).toContain(host._rp2DoReset);
-      expect(values).toContain(host._rp2DoFlash);
-      expect(values).not.toContain(host._rp2DoDownload);
+      expect(values).toContain(RESET_ACTION_KEY);
+      expect(values).toContain(FLASH_ACTION_KEY);
       expect(values).not.toContain(host._cancel);
+      expect(stepRuns(host)).toEqual([rp2DoReset, rp2DoFlash]);
     }
   );
 
   it("offers Flash beside Reset Device on the nrf-reset step, for a device already in DFU", () => {
     const host = footerHost("nrf-reset");
-    host._installer = "nrf-dfu";
+    host._flasher = nrfDfuFlasher;
     const values = footerValuesDeep(host);
     expect(values).toContain(host._close);
-    expect(values).toContain(host._nrfDoReset);
-    expect(values).toContain(host._nrfDoFlash);
+    expect(values).toContain(RESET_ACTION_KEY);
+    expect(values).toContain(FLASH_ACTION_KEY);
     expect(values).not.toContain(host._cancel);
+    expect(stepRuns(host)).toEqual([nrfDoFlash, nrfDoReset]);
   });
 
   it("offers Flash alone on the nrf-wait step", () => {
     const host = footerHost("nrf-wait");
-    host._installer = "nrf-dfu";
+    host._flasher = nrfDfuFlasher;
     const values = footerValuesDeep(host);
-    expect(values).toContain(host._nrfDoFlash);
-    expect(values).not.toContain(host._nrfDoReset);
+    expect(values).toContain(FLASH_ACTION_KEY);
+    expect(values).not.toContain(RESET_ACTION_KEY);
+    expect(stepRuns(host)).toEqual([nrfDoFlash]);
+  });
+
+  it("offers Flash alone on the rtl-ready step", () => {
+    const host = footerHost("rtl-ready");
+    host._flasher = rtlAmbz2Flasher;
+    const values = footerValuesDeep(host);
+    expect(values).toContain(FLASH_ACTION_KEY);
+    expect(values).not.toContain(host._cancel);
+    expect(stepRuns(host)).toEqual([rtlDoFlash]);
+  });
+
+  it("keeps Stop on a flasher step without buttons (rtl-connect)", () => {
+    const host = footerHost("rtl-connect");
+    host._flasher = rtlAmbz2Flasher;
+    expect(footerValues(host)).toContain(host._cancel);
   });
 
   it("swaps Flash for Download UF2 without WebUSB (Firefox)", () => {
     isWebUsbSupported.mockReturnValue(false);
     const host = footerHost("rp2-bootsel");
-    host._installer = "rp2-uf2";
+    host._flasher = rp2Uf2Flasher;
     const values = footerValuesDeep(host);
-    expect(values).toContain(host._rp2DoReset);
-    expect(values).toContain(host._rp2DoDownload);
-    expect(values).not.toContain(host._rp2DoFlash);
+    expect(values).toContain("firmware.rp2_download_action");
+    expect(values).not.toContain(FLASH_ACTION_KEY);
+    expect(stepRuns(host)).toEqual([rp2DoReset, rp2DoDownload]);
   });
 
   it("offers Retry on a Pico flash failure", () => {

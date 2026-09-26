@@ -16,12 +16,12 @@ export const bin = (file: string, type?: string): FirmwareBinary => ({
 /**
  * The install dialog as the compile-first browser flashers see it: an API
  * whose compile completes at once, a device, the step and status fields, and
- * a real `_fail`. `extra` adds the flow's own image field and install entry.
+ * a real `_fail`. `extra` adds what a flow needs beyond that (the logs port).
  */
 export function makeFlashHost<E extends object>(
   device: ConfiguredDevice,
   opts: { binaries: FirmwareBinary[]; downloadBytes: ArrayBuffer },
-  extra: E
+  extra: E = {} as E
 ) {
   const api = {
     firmwareCompile: vi.fn().mockResolvedValue({ job_id: "j", source: "local" }),
@@ -51,6 +51,7 @@ export function makeFlashHost<E extends object>(
     _flashBusy: false,
     _flashAbort: null as AbortController | null,
     _flashPercent: 0,
+    _flashImage: null as unknown,
     _fail(title: string, detail = "") {
       this._step = "error";
       this._statusMessage = title;
