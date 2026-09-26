@@ -20,26 +20,37 @@ import {
 export const SERIAL_REENUMERATION_BLIP_MS = 1000;
 
 /**
+ * The device behind a port, for matching its ``disconnect`` to the
+ * ``connect`` that follows: Chrome hands out a fresh ``SerialPort`` object
+ * when a device re-enumerates, so the object is no key. Two identical
+ * boards share one; a hub bounces both anyway.
+ */
+function deviceKey(port: SerialPort): string {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return `${usbVendorId ?? "?"}:${usbProductId ?? "?"}`;
+}
+
+/**
  * Report real plug-ins of already-permitted ports to *onPlugIn*. A
  * ``connect`` is dropped when it is our own reset re-enumerating the device
- * (``isOwnSerialReenumeration``) or when it follows the same port's own
- * ``disconnect`` within ``SERIAL_REENUMERATION_BLIP_MS``. ``SerialPort``
- * identity is stable across re-enums, so the port itself is the key; the
- * map holds at most one entry per granted port. Returns the function that
- * stops watching.
+ * (``isOwnSerialReenumeration``) or when it follows the same device's own
+ * ``disconnect`` within ``SERIAL_REENUMERATION_BLIP_MS``. The map holds at
+ * most one entry per granted device. Returns the function that stops
+ * watching.
  */
 export function watchSerialPlugIns(onPlugIn: (port: SerialPort) => void): () => void {
-  const disconnectedMs = new Map<SerialPort, number>();
+  const disconnectedMs = new Map<string, number>();
   const onDisconnect = (event: Event): void => {
     const port = portOfSerialConnectEvent(event);
-    if (port) disconnectedMs.set(port, Date.now());
+    if (port) disconnectedMs.set(deviceKey(port), Date.now());
   };
   const onConnect = (event: Event): void => {
     if (isOwnSerialReenumeration()) return;
     const port = portOfSerialConnectEvent(event);
     if (!port) return;
-    const gone = disconnectedMs.get(port);
-    disconnectedMs.delete(port);
+    const key = deviceKey(port);
+    const gone = disconnectedMs.get(key);
+    disconnectedMs.delete(key);
     if (gone !== undefined && Date.now() - gone < SERIAL_REENUMERATION_BLIP_MS) return;
     onPlugIn(port);
   };

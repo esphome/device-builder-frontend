@@ -15,7 +15,11 @@ import {
   watchSerialPlugIns,
 } from "../../src/util/serial-plug-ins.js";
 
-const port = () => ({ getInfo: () => ({}) }) as unknown as SerialPort;
+// Distinct devices get distinct ids; Chrome keys a port by its device, and
+// hands out a fresh object for the same device after a re-enumeration.
+let nextProductId = 1;
+const port = (usbProductId = nextProductId++) =>
+  ({ getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId }) }) as unknown as SerialPort;
 
 let serialListeners: Record<string, (e: Event) => void>;
 let restoreSerial: () => void;
@@ -59,17 +63,17 @@ describe("watchSerialPlugIns", () => {
     expect(serialListeners).toEqual({});
   });
 
-  it("drops a connect that follows the port's own disconnect within the blip", () => {
+  it("drops a connect that follows the device's own disconnect within the blip", () => {
     const onPlugIn = vi.fn();
     watchSerialPlugIns(onPlugIn);
-    const hubbed = port();
-    const neighbour = port();
-    // Plugging something else into the hub bounced it: disconnect, then
-    // connect about half a second later. The port it did not touch is a
-    // plug-in as before.
+    const hubbed = port(0xf00a);
+    const neighbour = port(0xf00b);
+    // Plugging something else into the hub bounced it: disconnect, then a
+    // connect about half a second later, on a fresh object for the same
+    // device (Chrome). The device it did not touch is a plug-in as before.
     unplug(hubbed);
     vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS / 2);
-    plugIn(hubbed);
+    plugIn(port(0xf00a));
     plugIn(neighbour);
     expect(onPlugIn).toHaveBeenCalledTimes(1);
     expect(onPlugIn).toHaveBeenCalledWith(neighbour);
