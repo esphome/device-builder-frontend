@@ -5,18 +5,18 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
+import { pickRp2CdcPort } from "../../../platforms/rp2/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { sleep } from "../../../util/sleep.js";
-import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import "./esphome-web-install-pico-dialog.js";
+import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import {
   IMPROV_OPEN_DELAY_MS,
   openImprovDialog,
 } from "../../improv/open-improv-dialog.js";
 import { PortDisconnectWatcher } from "../../util/port-disconnect-watcher.js";
-import { pickPicoPort } from "./pico-port-filter.js";
 import "../../dashboard/esphome-web-card.js";
 import "./esphome-web-pico-device-card.js";
 
@@ -110,7 +110,7 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
   }
 
   private async _connect(): Promise<void> {
-    const port = await pickPicoPort(this._localize);
+    const port = await pickRp2CdcPort(this._localize, "web.connect.failed");
     if (port) this._adoptPort(port);
   }
 

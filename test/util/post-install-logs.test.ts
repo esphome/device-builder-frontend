@@ -484,6 +484,31 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
 });
 
 describe("attachSerialLogStream reopen", () => {
+  it.each([
+    ["rp2", false],
+    ["esp32", true],
+  ])(
+    "on a %s reopen, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
+    async (targetPlatform, released) => {
+      const live = openPort();
+      const restore = withGetPorts(async () => [live]);
+      try {
+        await attachSerialLogStream(
+          deadPort(),
+          stubDialog() as never,
+          defaultLocalize,
+          115200,
+          () => false,
+          targetPlatform
+        );
+        if (released) expect(live.setSignals).toHaveBeenCalled();
+        else expect(live.setSignals).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+    }
+  );
+
   it("opens a fresh getPorts() handle when the cached one is dead (Chrome re-enum)", async () => {
     // The cached esptool handle won't reopen, but getPorts() yields a live one
     // for the same device — the auto path must recover with no picker.
@@ -491,7 +516,14 @@ describe("attachSerialLogStream reopen", () => {
     const restore = withGetPorts(async () => [live]);
     const dialog = stubDialog();
     try {
-      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 115200);
+      await attachSerialLogStream(
+        deadPort(),
+        dialog as never,
+        defaultLocalize,
+        115200,
+        () => false,
+        undefined
+      );
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream.mock.calls[0][0]).toBe(live); // streamed the live handle
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
@@ -512,7 +544,14 @@ describe("attachSerialLogStream reopen", () => {
     const restore = withGetPorts(async () => [live]);
     const dialog = stubDialog();
     try {
-      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 19200);
+      await attachSerialLogStream(
+        deadPort(),
+        dialog as never,
+        defaultLocalize,
+        19200,
+        () => false,
+        undefined
+      );
       expect(live.open).toHaveBeenCalledWith({ baudRate: 19200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
     } finally {
@@ -535,7 +574,14 @@ describe("attachSerialLogStream reopen", () => {
     ]);
     const dialog = stubDialog();
     try {
-      await attachSerialLogStream(cached, dialog as never, defaultLocalize, 115200);
+      await attachSerialLogStream(
+        cached,
+        dialog as never,
+        defaultLocalize,
+        115200,
+        () => false,
+        undefined
+      );
       expect(cached.open).toHaveBeenCalledWith({ baudRate: 115200 });
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream.mock.calls[0][0]).toBe(cached);
@@ -553,7 +599,14 @@ describe("attachSerialLogStream reopen", () => {
     const dialog = stubDialog();
     try {
       const port = deadPort(new DOMException("gone", "NetworkError"));
-      const done = attachSerialLogStream(port, dialog as never, defaultLocalize, 115200);
+      const done = attachSerialLogStream(
+        port,
+        dialog as never,
+        defaultLocalize,
+        115200,
+        () => false,
+        undefined
+      );
       await vi.advanceTimersByTimeAsync(8100);
       await done;
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);

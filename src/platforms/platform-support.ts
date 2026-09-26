@@ -78,6 +78,12 @@ export interface BrowserInstall<Id extends FlasherId> {
   /** The Retry target while the parsed image is kept. */
   showFirstStep(host: Host): void;
   readonly steps: { readonly [S in BrowserFlasherSteps[Id]]: FlasherStepView };
+  /**
+   * Pick the port the logs should use after an install that ended without
+   * one (runs from the Show logs click); null when dismissed or refused, with
+   * its own toast for a refusal.
+   */
+  pickLogsPort?(localize: LocalizeFunc): Promise<SerialPort | null>;
   /** Copy for a download-ready step the flow reaches (the Pico UF2 fallback). */
   readonly downloadReady?: { titleKey: string; bodyKey: string };
 }
@@ -106,6 +112,12 @@ export interface SerialLogsPolicy {
   readonly pulseResets: boolean;
   /** Drop DTR and RTS right after opening, so the board boots its firmware. */
   readonly releasesLinesAfterOpen: boolean;
+  /**
+   * A reopen leaves DTR and RTS as opened instead of dropping them (which it
+   * does by default for a UART bridge): the CDC only transmits while DTR is
+   * asserted (arduino-pico).
+   */
+  readonly keepLinesOnReopen?: boolean;
   /** Replaces the RTS pulse with the platform's own reset. */
   readonly reset?: SerialResetSupport;
 }

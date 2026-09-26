@@ -49,6 +49,20 @@ export function isRp2CdcPort(port: SerialPort): boolean {
   );
 }
 
+/**
+ * Picking a Pico's own CDC port: any Raspberry Pi USB device in the picker,
+ * the same boards ``isRp2CdcPort`` claims. A filter can't exclude a product
+ * id, so ``accept`` turns a debug probe away after the pick (pass both to
+ * ``requestSerialPort`` / ``touchIntoBootloader``).
+ */
+export const RP2_SERIAL_PICK: {
+  filters: SerialPortFilter[];
+  accept: (port: SerialPort) => boolean;
+} = {
+  filters: [{ usbVendorId: RASPBERRY_PI_USB_VID }],
+  accept: isRp2CdcPort,
+};
+
 export function classifyUsbDevice(
   device: USBDevice
 ): "rp2040" | "rp2350" | "not-bootsel" {

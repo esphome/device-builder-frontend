@@ -260,7 +260,8 @@ describe("launchLogsWithMethod web-serial", () => {
         host.logsDialog,
         host.localize,
         115200,
-        undefined
+        undefined,
+        platform
       );
     } finally {
       restore();

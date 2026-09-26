@@ -434,8 +434,28 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;
   };
 
-  _showLogsAgain = () => {
-    if (this._logsPort) flipToLogs(this, this._logsPort);
+  // A Show logs pick in flight: a second click would open a second chooser,
+  // which the browser rejects.
+  private _pickingLogsPort = false;
+
+  _showLogsAgain = async () => {
+    if (!this._logsPort) {
+      if (this._pickingLogsPort) return;
+      const device = this._device;
+      this._pickingLogsPort = true;
+      let port: SerialPort | null | undefined;
+      try {
+        port = await this._flasher?.pickLogsPort?.(this._localize);
+      } finally {
+        this._pickingLogsPort = false;
+      }
+      // The picker outlives a dismissed dialog, or one reused for another install.
+      if (!port || this._device !== device || !this._open || this._step !== "done") {
+        return;
+      }
+      this._logsPort = port;
+    }
+    flipToLogs(this, this._logsPort);
   };
 
   // Web-flash success: the flash happened in the external tab, so view the

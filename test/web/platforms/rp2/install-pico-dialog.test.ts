@@ -38,9 +38,9 @@ vi.mock("../../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 import toast from "sonner-js";
 
 import { makeUsbPort } from "../../_make-web-serial-port.js";
+import { RP2_SERIAL_PICK } from "../../../../src/platforms/rp2/index.js";
 import { PicoFlashError } from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
-import { picoPortFilters } from "../../../../src/web/platforms/rp2/pico-port-filter.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -206,7 +206,10 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     button(el, "onboarding.wizard.continue").click();
     await settle(el);
     expect(connected).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith("web.pico.probe_picked");
+    expect(toast.error).toHaveBeenCalledWith(
+      "firmware.rp2_not_a_pico",
+      expect.anything()
+    );
   });
 
   it("streams the engine's step lines into the card's details log", async () => {
@@ -307,7 +310,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     button(el, "web.pico.install_reset_action").click();
     await settle(el);
     expect(mocks.touchIntoBootloader).toHaveBeenCalledWith(
-      expect.objectContaining({ filters: picoPortFilters })
+      expect.objectContaining({ filters: RP2_SERIAL_PICK.filters })
     );
     expect(card(el).statusMessage).toBe("firmware.rp2_wait_title");
     expect(card(el).statusDetail).toBe("web.pico.install_waiting");

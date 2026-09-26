@@ -18,6 +18,8 @@ export const rp2Platform: PlatformSupport = {
       // on its console pins.
       pulseResets: false,
       releasesLinesAfterOpen: false,
+      // arduino-pico's CDC only transmits while DTR is asserted.
+      keepLinesOnReopen: true,
       reset: {
         available: isWebUsbSupported,
         supports: isRp2CdcPort,

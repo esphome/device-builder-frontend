@@ -60,6 +60,7 @@ function footerHost(step: string) {
     _toggleShowLogsAfterInstall: vi.fn(),
     _flashBusy: false,
     _flasher: null as AnyBrowserInstall | null,
+    _logsPort: null as SerialPort | null,
   };
 }
 
@@ -220,5 +221,17 @@ describe("firmware-install-dialog footer", () => {
     expect(values).toContain(host._close);
     expect(values).not.toContain(host._retry);
     expect(values).not.toContain(host._tryChangeBoard);
+  });
+
+  it("offers Show logs on Done when the flow can pick the logs port", () => {
+    const host = footerHost("done");
+    host._flasher = rp2Uf2Install;
+    expect(footerValuesDeep(host)).toContain(host._showLogsAgain);
+  });
+
+  it("offers only Close on Done when there is no port and no way to pick one", () => {
+    const host = footerHost("done");
+    host._flasher = rtlAmbz2Install;
+    expect(footerValuesDeep(host)).not.toContain(host._showLogsAgain);
   });
 });

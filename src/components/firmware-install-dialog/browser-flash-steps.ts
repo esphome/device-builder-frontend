@@ -7,8 +7,9 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { notifyError } from "../../util/notify.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
-import { requestSerialPort } from "../../util/web-serial.js";
+import { PortNotAcceptedError, requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
 
@@ -74,6 +75,18 @@ export interface TouchStep {
   showNext: () => void;
   /** The failure detail; a flasher may add a hint for a failed touch. */
   failureDetail?: (err: unknown) => string;
+  /** The port the touch went through (closed), for a flow that wants it back later. */
+  onTouched?: (port: SerialPort) => void;
+  /**
+   * Narrow the picker to the board's own port, and turn a wrong pick (say a
+   * debug probe on the same vendor id) away with ``refusedKey`` instead of
+   * touching it.
+   */
+  pick?: {
+    filters: SerialPortFilter[];
+    accept: (port: SerialPort) => boolean;
+    refusedKey: string;
+  };
 }
 
 /**
@@ -93,7 +106,17 @@ export async function touchIntoBootloaderStep(
   host._flashBusy = true;
   host._statusMessage = host._localize(step.resettingKey);
   try {
-    const port = await requestSerialPort();
+    let port: SerialPort | null;
+    try {
+      port = step.pick
+        ? await requestSerialPort({ filters: step.pick.filters }, step.pick.accept)
+        : await requestSerialPort();
+    } catch (err) {
+      if (!step.pick || !(err instanceof PortNotAcceptedError)) throw err;
+      if (stillCurrent()) host._statusMessage = status;
+      notifyError(host._localize(step.pick.refusedKey));
+      return;
+    }
     if (!port) {
       if (stillCurrent()) host._statusMessage = status;
       return;
@@ -102,6 +125,8 @@ export async function touchIntoBootloaderStep(
     // an install that no longer exists.
     if (!stillCurrent()) return;
     await resetToBootloader(port, installLog(host, stillCurrent));
+    // Not for a dialog reused while the touch ran: the port is another board's.
+    if (stillCurrent()) step.onTouched?.(port);
   } catch (err) {
     if (stillCurrent()) {
       host._fail(

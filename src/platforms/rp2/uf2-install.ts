@@ -9,7 +9,10 @@ import {
   installLog,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import { downloadSelectedBinary } from "../../components/firmware-install-dialog/install-flow.js";
+import {
+  downloadSelectedBinary,
+  finishWithLogsPort,
+} from "../../components/firmware-install-dialog/install-flow.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import {
   parseUf2Image,
@@ -25,8 +28,9 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
+import { pickRp2CdcPort } from "./pick-cdc-port.js";
 import { flashPico, PicoFlashError, picoFlashFailureCopy } from "./rp2-flash.js";
-import { isWebUsbSupported } from "./web-usb.js";
+import { isWebUsbSupported, RP2_SERIAL_PICK } from "./web-usb.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -85,6 +89,14 @@ export function rp2DoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
       host._step = "rp2-wait";
       host._statusMessage = host._localize("firmware.rp2_wait_title");
     },
+    // Only the Pico's own CDC: a debug probe on the same vendor id is
+    // turned away instead of touched (and never kept for the logs).
+    pick: { ...RP2_SERIAL_PICK, refusedKey: "firmware.rp2_not_a_pico" },
+    // The port comes back with the new firmware; the logs reopen it after
+    // the flash (Done's Show logs only reads it from then on).
+    onTouched: (port) => {
+      host._logsPort = port;
+    },
   });
 }
 
@@ -129,7 +141,11 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   }
   if (!flashed || !stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
-  host._step = "done";
+  // The port the touch went through comes back with the new firmware; the
+  // logs reopen it once the Pico has rebooted. Without one (a Pico put into
+  // BOOTSEL by hand), Done's Show logs asks for the port instead.
+  if (host._logsPort) finishWithLogsPort(host, host._logsPort);
+  else host._step = "done";
 }
 
 /** Step 2 without WebUSB: save the UF2 for a manual copy onto the RPI-RP2 drive. */
@@ -157,10 +173,15 @@ const withoutWebUsb = (key: string) => () =>
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",
   methodKey: "rp2_uf2",
-  holdsPort: false,
+  // Only the WebUSB write can end in logs; the UF2 download path never does.
+  get holdsPort() {
+    return isWebUsbSupported();
+  },
   image: rp2Image,
   start: startRp2Uf2Install,
   showFirstStep: showBootselStep,
+  pickLogsPort: (localize) =>
+    pickRp2CdcPort(localize, "dashboard.logs_web_serial_open_failed"),
   steps: {
     "rp2-bootsel": {
       detailKey: withoutWebUsb("firmware.rp2_bootsel_desc"),

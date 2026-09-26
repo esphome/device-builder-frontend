@@ -192,3 +192,68 @@ describe("Retry for a browser flasher", () => {
     }
   );
 });
+
+describe("Show logs after an install that ended without a port", () => {
+  it("picks the port through the flow, keeps it and hands it to the logs", async () => {
+    const picked = {} as SerialPort;
+    const flasher = {
+      ...fakeFlasher,
+      pickLogsPort: vi.fn(async () => picked),
+    } as unknown as AnyBrowserInstall;
+    const dialog = dialogRunning(flasher);
+    dialog._step = "done";
+    const handoff = vi.fn();
+    dialog.addEventListener("request-show-logs-after-install", handoff);
+    await dialog._showLogsAgain();
+    expect(dialog._logsPort).toBe(picked);
+    expect(handoff).toHaveBeenCalledOnce();
+    expect((handoff.mock.calls[0][0] as CustomEvent).detail.webSerialPort).toBe(picked);
+  });
+
+  it("ignores a second click while the picker is open", async () => {
+    let finish: (port: SerialPort | null) => void = () => {};
+    const pickLogsPort = vi.fn(
+      () => new Promise<SerialPort | null>((resolve) => (finish = resolve))
+    );
+    const flasher = { ...fakeFlasher, pickLogsPort } as unknown as AnyBrowserInstall;
+    const dialog = dialogRunning(flasher);
+    dialog._step = "done";
+    const first = dialog._showLogsAgain();
+    await dialog._showLogsAgain();
+    expect(pickLogsPort).toHaveBeenCalledOnce();
+    finish(null);
+    await first;
+  });
+
+  it("drops a pick that lands after the dialog moved to another install", async () => {
+    let finish: (port: SerialPort | null) => void = () => {};
+    const flasher = {
+      ...fakeFlasher,
+      pickLogsPort: () => new Promise<SerialPort | null>((resolve) => (finish = resolve)),
+    } as unknown as AnyBrowserInstall;
+    const dialog = dialogRunning(flasher);
+    dialog._step = "done";
+    const handoff = vi.fn();
+    dialog.addEventListener("request-show-logs-after-install", handoff);
+    const click = dialog._showLogsAgain();
+    dialog._device = { configuration: "other.yaml", name: "other" } as ConfiguredDevice;
+    finish({} as SerialPort);
+    await click;
+    expect(dialog._logsPort).toBeNull();
+    expect(handoff).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the pick is dismissed", async () => {
+    const flasher = {
+      ...fakeFlasher,
+      pickLogsPort: vi.fn(async () => null),
+    } as unknown as AnyBrowserInstall;
+    const dialog = dialogRunning(flasher);
+    dialog._step = "done";
+    const handoff = vi.fn();
+    dialog.addEventListener("request-show-logs-after-install", handoff);
+    await dialog._showLogsAgain();
+    expect(dialog._logsPort).toBeNull();
+    expect(handoff).not.toHaveBeenCalled();
+  });
+});
