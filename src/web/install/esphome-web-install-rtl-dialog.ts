@@ -8,7 +8,7 @@ import "../../components/base-dialog.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { Ambz2ImageError, type LibreTinyImage } from "../../util/libretiny-uf2.js";
+import type { LibreTinyImage } from "../../util/libretiny-uf2.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
 import { filePickerStyles, renderFilePicker } from "./file-picker.js";
@@ -104,17 +104,17 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     let image: LibreTinyImage;
     let port: SerialPort | null;
     try {
+      // The parser module is loaded here, not imported statically, so its
+      // error class comes from the loaded module too.
+      let parser: Awaited<ReturnType<typeof loadParser>> | undefined;
       try {
-        const [{ parseAmbz2Image }, bytes] = await Promise.all([
-          loadParser(),
-          file.arrayBuffer(),
-        ]);
-        image = parseAmbz2Image(new Uint8Array(bytes));
+        const [mod, bytes] = await Promise.all([loadParser(), file.arrayBuffer()]);
+        parser = mod;
+        image = mod.parseAmbz2Image(new Uint8Array(bytes));
       } catch (err) {
+        const refused = parser !== undefined && err instanceof parser.Ambz2ImageError;
         this._fail(
-          this._localize(
-            err instanceof Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"
-          ),
+          this._localize(refused ? err.key : "firmware.rtl_bad_uf2"),
           getErrorMessage(err)
         );
         return;
