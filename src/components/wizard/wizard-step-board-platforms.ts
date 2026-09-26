@@ -29,11 +29,15 @@ export interface WizardBoardPlatform {
 }
 
 /**
- * What a detection narrows the picker to: one chip's filter, or a whole
- * platform when the detection only knows the family (a Pico's USB ids say
- * rp2, not RP2040 versus RP2350).
+ * What a detection narrows the picker to, with the name the banner shows:
+ * one chip's filter (``label`` is that chip's), or a whole platform when the
+ * detection only knows the family (a Pico's USB ids say rp2, not RP2040
+ * versus RP2350; ``label`` then names its chips).
  */
-export type WizardBoardPreset = { label: string } | { platform: string };
+export interface WizardBoardPreset {
+  readonly label: string;
+  readonly platform?: string;
+}
 
 export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "esp32", variant: "esp32", label: "ESP32" },
@@ -73,14 +77,8 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
 export function platformToPreset(platform: string): WizardBoardPreset | null {
   const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
   if (chips.length === 0) return null;
-  return chips.length === 1 ? { label: chips[0].label } : { platform };
-}
-
-/** The user-facing name of a platform-wide preset: its chips, joined. */
-export function platformPresetName(platform: string): string {
-  return WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform)
-    .map((p) => p.label)
-    .join(" / ");
+  if (chips.length === 1) return { label: chips[0].label };
+  return { label: chips.map((p) => p.label).join(" / "), platform };
 }
 
 /**

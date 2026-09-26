@@ -190,10 +190,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  chip family is known but no specific board is recognised — the
    *  user lands on a picker already narrowed to their chip (or their
    *  platform) instead of the full catalog. */
-  public openAtBoardStep(preset?: WizardBoardPreset) {
+  public openAtBoardStep(preset: WizardBoardPreset | null = null) {
     this._step = "board";
     this._selectedBoard = null;
-    this._initialBoardFilter = preset ?? null;
+    this._initialBoardFilter = preset;
     this._resetTransientState();
   }
 

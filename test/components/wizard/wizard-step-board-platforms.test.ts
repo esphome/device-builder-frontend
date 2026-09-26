@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   chipNameToFilterLabel,
-  platformPresetName,
   platformToPreset,
   WIZARD_BOARD_PLATFORMS,
 } from "../../../src/components/wizard/wizard-step-board-platforms.js";
@@ -173,9 +172,11 @@ describe("wizard step-board platform chips", () => {
       expect(platformToPreset("nrf52")).toEqual({ label: "nRF52" });
     });
 
-    it("narrows to the whole platform when it has several chips", () => {
-      expect(platformToPreset("rp2")).toEqual({ platform: "rp2" });
-      expect(platformPresetName("rp2")).toBe("RP2040 / RP2350");
+    it("narrows to the whole platform when it has several chips, named by them", () => {
+      expect(platformToPreset("rp2")).toEqual({
+        label: "RP2040 / RP2350",
+        platform: "rp2",
+      });
     });
 
     it("has no preset for a platform the picker doesn't know", () => {

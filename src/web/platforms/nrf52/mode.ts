@@ -1,6 +1,5 @@
 import { html } from "lit";
 
-import { isNrf52Port } from "../../../platforms/nrf52/index.js";
 import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-nrf-card.js";
@@ -13,7 +12,7 @@ export const nrfWebMode: WebPlatform<"nrf"> = {
   introKey: "web.intro.body_nrf",
   renderCard: () => html`<esphome-web-nrf-card></esphome-web-nrf-card>`,
   flowSwitch: {
-    claimsPort: isNrf52Port,
+    family: "nrf52",
     messageKey: "web.flow_switch.nrf",
     actionKey: "web.flow_switch.action_nrf",
   },

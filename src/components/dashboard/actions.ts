@@ -3,13 +3,8 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  type DetectedBoard,
-  detectEspBoard,
-  EngineLoadError,
-  UnsupportedChipError,
-} from "../../platforms/esp/index.js";
-import { platformOfPort } from "../../platforms/registry.js";
+import { type BoardDetection, detectBoard } from "../../platforms/detect-board.js";
+import { EngineLoadError, UnsupportedChipError } from "../../platforms/esp/index.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -302,7 +297,7 @@ export async function detectAndOpenWizard(
   createDialog: {
     open(step?: string): void;
     openWithBoard(board: BoardCatalogEntry): void;
-    openAtBoardStep(preset?: WizardBoardPreset): void;
+    openAtBoardStep(preset: WizardBoardPreset | null): void;
   },
   options: {
     /** Port captured from the ``navigator.serial`` ``connect`` event —
@@ -321,17 +316,9 @@ export async function detectAndOpenWizard(
     localize?: LocalizeFunc;
   } = {}
 ): Promise<void> {
-  // A Pico or an nRF52 says what it is by its USB ids, and the ESP detect
-  // would sit on its CDC waiting for a ROM loader that never answers
-  // (#1856). Espressif ports and UART bridges go on to the detect.
-  const family = options.port ? platformOfPort(options.port) : undefined;
-  if (family) {
-    createDialog.openAtBoardStep(platformToPreset(family.id) ?? undefined);
-    return;
-  }
-  let board: DetectedBoard | null;
+  let detection: BoardDetection | null;
   try {
-    board = await detectEspBoard(options.port ?? null, {
+    detection = await detectBoard(options.port ?? null, {
       readMac: Boolean(options.devices?.length && options.onRecognized),
     });
   } catch (err) {
@@ -350,10 +337,20 @@ export async function detectAndOpenWizard(
     return;
   }
   // A dismissed picker still opens the wizard for a manual board pick.
-  if (!board) {
+  if (!detection) {
     createDialog.open("board");
     return;
   }
+  // A board that names its platform by its USB ids lands on that platform's
+  // boards; one we can't tell lands on the full picker. Neither ran esptool,
+  // which would sit on a Pico's CDC waiting for a ROM loader (#1856).
+  if (detection.kind !== "esp") {
+    createDialog.openAtBoardStep(
+      detection.kind === "family" ? platformToPreset(detection.family) : null
+    );
+    return;
+  }
+  const board = detection.board;
 
   const recognized =
     board.mac && options.onRecognized
@@ -391,7 +388,7 @@ export async function detectAndOpenWizard(
   }
 
   const label = chipNameToFilterLabel(board.chipName);
-  createDialog.openAtBoardStep(label ? { label } : undefined);
+  createDialog.openAtBoardStep(label ? { label } : null);
 }
 
 export async function fetchEncryptionKey(

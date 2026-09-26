@@ -84,23 +84,15 @@ export interface DetectedBoard {
 }
 
 /**
- * Detect the ESP behind *port*, or behind a port picked here when none is
- * given: connect, read the app descriptor (and the MAC when asked), and
- * disconnect. ``null`` when the picker was dismissed; throws
- * ``EngineLoadError``, ``UnsupportedChipError`` or the connect failure.
+ * Detect the ESP behind *port*: connect, read the app descriptor (and the
+ * MAC when asked), and disconnect. Throws ``EngineLoadError``,
+ * ``UnsupportedChipError`` or the connect failure.
  */
 export async function detectEspBoard(
-  port: SerialPort | null,
+  port: SerialPort,
   options: { readMac?: boolean } = {}
-): Promise<DetectedBoard | null> {
-  let esptool: Esptool;
-  if (port) {
-    esptool = await loadEsptoolOrThrow();
-  } else {
-    const picked = await pickPortAndLoadEsptool();
-    if (!picked) return null;
-    ({ port, esptool } = picked);
-  }
+): Promise<DetectedBoard> {
+  const esptool = await loadEsptoolOrThrow();
   const detected = await esptool.connectToPort(port);
   try {
     // Best-effort: an unsupported chip family or a transport flap must not

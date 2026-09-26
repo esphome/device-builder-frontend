@@ -1,4 +1,5 @@
 import type { TemplateResult } from "lit";
+import type { PortFamily } from "../../platforms/port-family.js";
 
 /**
  * One device family on web.esphome.io: its mode in the URL and the header,
@@ -23,8 +24,8 @@ export interface WebPlatform<Mode extends string = string> {
 }
 
 export interface FlowSwitch {
-  /** Whether a port's USB ids clearly belong to the family. */
-  claimsPort(port: SerialPort): boolean;
+  /** The family a port's USB ids must name (``portFamily``) to be this one's. */
+  readonly family: PortFamily;
   /** The toast's message and its switch button. */
   readonly messageKey: string;
   readonly actionKey: string;

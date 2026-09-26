@@ -1,6 +1,5 @@
 import { html } from "lit";
 
-import { ESPRESSIF_USB_VID } from "../../../platforms/esp/index.js";
 import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-esp-connect-card.js";
@@ -16,7 +15,7 @@ export const espWebMode: WebPlatform<"esp"> = {
   dashboardHints: true,
   flowSwitch: {
     // An Espressif native-USB device; a UART bridge could be anything.
-    claimsPort: (port) => port.getInfo().usbVendorId === ESPRESSIF_USB_VID,
+    family: "esp",
     messageKey: "web.flow_switch.esp",
     actionKey: "web.flow_switch.action_esp",
   },

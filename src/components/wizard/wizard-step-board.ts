@@ -8,12 +8,8 @@ import type { SlimBoard } from "../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import {
-  type DetectedBoard,
-  detectEspBoard,
-  EngineLoadError,
-  preloadEsptool,
-} from "../../platforms/esp/index.js";
+import { type BoardDetection, detectBoard } from "../../platforms/detect-board.js";
+import { EngineLoadError, preloadEsptool } from "../../platforms/esp/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
@@ -26,7 +22,7 @@ import { SerialPortsPollController } from "../../util/serial-ports-poll-controll
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
-  platformPresetName,
+  platformToPreset,
   WIZARD_BOARD_PLATFORMS,
   type WizardBoardPreset,
 } from "./wizard-step-board-platforms.js";
@@ -62,10 +58,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @property({ attribute: false })
   preset: WizardBoardPreset | null = null;
 
-  /** The platform a platform-wide preset narrows to, while it is on. */
-  @state()
-  private _presetPlatform: string | null = null;
-
   private _list = new PagedListController<SlimBoard>(this);
 
   @state()
@@ -74,16 +66,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @state()
   private _selectedFilter = "";
 
-  /** True while the active filter was applied by chip detection
-   *  (preset from the parent, or set by the Connect-your-board
-   *  button after a chip was identified) rather than a manual chip
-   *  click. In detection mode the picker drops the filter chips,
-   *  the Connect-your-board button, and the "don't know" link —
-   *  the user has already engaged with detection and just needs
-   *  to pick a specific board for the chip we found. Reset by
-   *  manual filter clicks and by the "Show all boards" escape. */
+  /** The detection the active filter came from (preset from the parent,
+   *  or the Connect-your-board button after a board was identified), or
+   *  null for a manual chip click. In detection mode the picker drops the
+   *  filter chips, the Connect-your-board button, and the "don't know"
+   *  link: the user has already engaged with detection and just needs to
+   *  pick a specific board for what we found. Its ``label`` is the
+   *  banner's text; its ``platform``, when set, is the whole-platform
+   *  filter. */
   @state()
-  private _filterFromDetection = false;
+  private _detection: WizardBoardPreset | null = null;
 
   /** Which inner view the step is rendering: the boards picker, or
    *  the server-side serial-port selector reached when the user
@@ -113,25 +105,22 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // path handles the common case. ``willUpdate`` below covers the
     // parent-updates-after-mount case where the element is reused and
     // the preset arrives later.
-    this._applyPreset();
+    if (this.preset) this._applyDetection(this.preset);
     this._fetchBoards();
   }
 
   willUpdate(changed: PropertyValues<this>) {
     super.willUpdate(changed);
-    if (changed.has("preset") && !this._selectedFilter && !this._presetPlatform) {
-      if (this._applyPreset()) this._fetchBoards();
+    if (
+      changed.has("preset") &&
+      this.preset &&
+      !this._selectedFilter &&
+      !this._detection
+    ) {
+      this._applyDetection(this.preset);
+      this._fetchBoards();
     }
     this._portsPoll.set(this._view === "select-port");
-  }
-
-  /** Narrow the picker to the preset, if any; true when one applied. */
-  private _applyPreset(): boolean {
-    if (!this.preset) return false;
-    if ("label" in this.preset) this._selectedFilter = this.preset.label;
-    else this._presetPlatform = this.preset.platform;
-    this._filterFromDetection = true;
-    return true;
   }
 
   private _fetchBoards() {
@@ -139,7 +128,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     const filter = ESPHomeWizardStepBoard.PLATFORMS.find(
       (p) => p.label === this._selectedFilter
     );
-    const platform = filter?.platform || this._presetPlatform || undefined;
+    const platform = filter?.platform || this._detection?.platform || undefined;
     const variant = filter?.variant || undefined;
     const mcu = filter?.mcu || undefined;
     this._list.reset((offset, limit) =>
@@ -181,14 +170,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
       />
 
       ${
-        this._filterFromDetection
+        this._detection
           ? html`
               <div class="detection-banner" role="status">
                 <span>
                   ${this._localize("wizard.detected_chip_family", {
-                    family:
-                      this._selectedFilter ||
-                      platformPresetName(this._presetPlatform ?? ""),
+                    family: this._detection.label,
                   })}
                 </span>
                 <button
@@ -274,8 +261,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // Manual filter click takes the user out of detection mode —
     // they've decided to browse, possibly narrower or wider than
     // the chip they plugged in.
-    this._presetPlatform = null;
-    this._filterFromDetection = false;
+    this._detection = null;
     this._fetchBoards();
   }
 
@@ -306,9 +292,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private async _connectViaWebSerial() {
     this._detectError = "";
-    let board: DetectedBoard | null;
+    let detection: BoardDetection | null;
     try {
-      board = await detectEspBoard(null);
+      detection = await detectBoard(null);
     } catch (err) {
       this._detectError =
         err instanceof EngineLoadError
@@ -320,7 +306,18 @@ export class ESPHomeWizardStepBoard extends LitElement {
             ));
       return;
     }
-    if (!board) return; // picker dismissed
+    if (!detection) return; // picker dismissed
+
+    // A board that names its platform by its USB ids, or one we can't tell:
+    // narrow the picker to the platform, or leave it open (#1856).
+    if (detection.kind !== "esp") {
+      this._applyDetection(
+        detection.kind === "family" ? platformToPreset(detection.family) : null
+      );
+      void this._fetchBoards();
+      return;
+    }
+    const board = detection.board;
 
     // A factory-flashed firmware that sets ``esphome.name`` to a catalog id
     // names the board outright through the app descriptor; same flow as
@@ -426,20 +423,23 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._detectError = "";
   };
 
-  // Apply a detected chip's filter, clearing any prior filter when the
-  // chip maps to no picker chip (null) so the picker is genuinely
-  // unfiltered rather than keeping a stale manual/preset selection.
-  private _applyDetectedFilter(label: string | null) {
-    this._selectedFilter = label ?? "";
-    this._presetPlatform = null;
-    this._filterFromDetection = label !== null;
+  // Apply a detection's filter, clearing any prior filter when it maps to
+  // no picker chip (null) so the picker is genuinely unfiltered rather
+  // than keeping a stale manual/preset selection.
+  private _applyDetection(preset: WizardBoardPreset | null) {
+    this._selectedFilter = preset && !preset.platform ? preset.label : "";
+    this._detection = preset;
     this._search = "";
+  }
+
+  /** ``_applyDetection`` for a detected chip's filter label, if any. */
+  private _applyDetectedFilter(label: string | null) {
+    this._applyDetection(label ? { label } : null);
   }
 
   private _exitDetectionMode() {
     this._selectedFilter = "";
-    this._presetPlatform = null;
-    this._filterFromDetection = false;
+    this._detection = null;
     void this._fetchBoards();
   }
 }
