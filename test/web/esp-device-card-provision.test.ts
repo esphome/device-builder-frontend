@@ -14,7 +14,10 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: () => Promise.resolve() }));
 // Heavy child modules — only their side-effect registration matters here.
 vi.mock("../../src/web/install/esphome-web-install-adoptable-dialog.js", () => ({}));
 vi.mock("../../src/web/install/esphome-web-install-upload-dialog.js", () => ({}));
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+const openPortForLogs = vi.fn();
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+  openPortForLogs: (...a: unknown[]) => openPortForLogs(...a),
+}));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -58,6 +61,13 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
     );
   });
 
+  it("skips Wi-Fi setup when a flow switch removed the card during the pause", async () => {
+    const el = await mount();
+    el.remove();
+    await (el as any)._onProvisionWifi();
+    expect(openImprovDialog).not.toHaveBeenCalled();
+  });
+
   it("re-dispatches Improv's replacement handle as a bubbling port-replaced event", async () => {
     const el = await mount();
     const seen = vi.fn();
@@ -89,5 +99,26 @@ describe("esphome-web-esp-device-card Improv hand-off", () => {
   it("anchors every action tooltip to a real button id", async () => {
     const el = await mount();
     expectTooltipsAnchored(el, 4);
+  });
+});
+
+describe("esphome-web-esp-device-card logs", () => {
+  it("releases a logs port that opened after a flow switch removed the card", async () => {
+    const close = vi.fn(async () => {});
+    const el = new ESPHomeWebEspDeviceCard();
+    (el as any)._localize = (k: string) => k;
+    el.port = { close } as unknown as SerialPort;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let opened!: (ok: boolean) => void;
+    openPortForLogs.mockImplementation(
+      () => new Promise<boolean>((resolve) => (opened = resolve))
+    );
+    const pending = (el as any)._showLogs();
+    el.remove();
+    opened(true);
+    await pending;
+    expect(close).toHaveBeenCalledTimes(1);
+    expect((el as any)._logsOpen).toBe(false);
   });
 });

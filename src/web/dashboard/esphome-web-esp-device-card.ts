@@ -104,6 +104,9 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _onProvisionWifi(): Promise<void> {
     this._adoptableOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);
+    // A flow switch accepted during the pause unmounted this card; Wi-Fi
+    // setup would open with nobody to hand the result to.
+    if (!this.isConnected) return;
     void this._openImprov(true);
   }
 
