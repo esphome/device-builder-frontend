@@ -7,6 +7,7 @@
 import { requestSerialPort } from "../../util/web-serial.js";
 import { type DeviceManifest, EngineLoadError } from "./esp-usb.js";
 import { type Esptool, loadEsptool } from "./esptool-loader.js";
+import type { DetectedChip } from "./esptool.js";
 
 /** Warm the engine chunk on a surface about to flash; a miss only costs the fetch later. */
 export function preloadEsptool(): void {
@@ -55,6 +56,24 @@ export async function pickPortAndLoadEsptool(): Promise<{
   return { port, esptool };
 }
 
+/**
+ * Release a connected session without ever throwing: a failed
+ * ``transport.disconnect()`` falls back to closing the port directly, as
+ * ``connectToPort`` does, so a teardown hiccup neither replaces the caller's
+ * result nor leaks an open port into the next ``port.open``.
+ */
+export async function releaseSerial(
+  esptool: Esptool,
+  detected: DetectedChip
+): Promise<void> {
+  try {
+    await esptool.disconnect(detected.transport);
+  } catch (err) {
+    console.warn("[esptool] Disconnect failed, closing the port directly:", err);
+    await detected.port.close().catch(() => {});
+  }
+}
+
 export interface DetectedBoard {
   /** esptool-js's chip description, e.g. "ESP32-S3 (QFN56) (revision v0.2)". */
   chipName: string;
@@ -93,6 +112,6 @@ export async function detectEspBoard(
     const manifest = await esptool.readDeviceManifest(detected.loader);
     return { chipName: detected.chipName, mac, manifest };
   } finally {
-    await esptool.disconnect(detected.transport);
+    await releaseSerial(esptool, detected);
   }
 }

@@ -361,10 +361,11 @@ export async function detectAndOpenWizard(
   }
 
   if (board.manifest?.board_id) {
-    // A catalog miss (older dashboard, unreleased product) or a network
-    // failure falls through to the chip-family picker rather than failing:
-    // the user still gets a useful onboarding path.
-    const known = await fetchBoard(api, board.manifest.board_id).catch(() => null);
+    // A catalog miss (older dashboard, unreleased product) or a request
+    // failure (fetchBoard logs it and resolves null) falls through to the
+    // chip-family picker rather than failing: the user still gets a useful
+    // onboarding path.
+    const known = await fetchBoard(api, board.manifest.board_id);
     if (known) {
       if (options.localize) {
         notifySuccess(

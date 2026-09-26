@@ -102,4 +102,40 @@ describe("detectAndOpenWizard", () => {
     expect(dialog.open).toHaveBeenCalledWith("board");
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
+
+  it("keeps the detection and closes the port when the disconnect throws", async () => {
+    const dialog = makeDialog();
+    const closable = {
+      getInfo: () => ({}),
+      close: vi.fn(async () => {}),
+    } as unknown as SerialPort;
+    engine.connectToPort.mockResolvedValue({
+      chipName: "ESP32-S3",
+      port: closable,
+      loader: {},
+      transport: {},
+    });
+    engine.disconnect.mockRejectedValueOnce(new Error("transport gone"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize, port: closable });
+    // A teardown failure neither replaces the result nor leaks the open port.
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+    expect(closable.close).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("falls through to the chip family when the board lookup fails, logged", async () => {
+    const dialog = makeDialog();
+    engine.readDeviceManifest.mockResolvedValue({ board_id: "acme-lamp" });
+    const api = { getBoard: vi.fn().mockRejectedValue(new Error("backend down")) };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, { localize, port });
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("acme-lamp"),
+      expect.any(Error)
+    );
+    warn.mockRestore();
+  });
 });

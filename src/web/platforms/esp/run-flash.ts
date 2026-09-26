@@ -10,8 +10,8 @@
 import type { LocalizeFunc } from "../../../common/localize.js";
 import {
   type DetectedChip,
-  type Esptool,
-  loadEsptool,
+  loadEsptoolOrThrow,
+  releaseSerial,
 } from "../../../platforms/esp/index.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { portInUseMessage } from "../../../util/serial-open-error.js";
@@ -68,15 +68,6 @@ export interface FlashHooks {
   onError: (message: string) => void;
 }
 
-/** Best-effort teardown of a half-open connection after a failure. */
-async function safeDisconnect(esptool: Esptool, detected: DetectedChip): Promise<void> {
-  try {
-    await esptool.disconnect(detected.transport);
-  } catch {
-    // Port may already be closed / gone; nothing more to do.
-  }
-}
-
 /**
  * Run a flash plan against an authorized (closed) port. Returns ``true`` on a
  * completed flash + reset, ``false`` on cancel or failure (the hooks carry the
@@ -89,8 +80,7 @@ export async function runFlash(
 ): Promise<boolean> {
   hooks.onStep("connecting");
   // The port is already authorized (no picker), so the engine can load first.
-  const esptool = await loadEsptool().catch((err: unknown) => {
-    console.error(err);
+  const esptool = await loadEsptoolOrThrow().catch((err: unknown) => {
     hooks.onStep("error");
     hooks.onError(plan.messages?.loadFailed ?? getErrorMessage(err));
     return null;
@@ -126,7 +116,7 @@ export async function runFlash(
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
-    await safeDisconnect(esptool, detected);
+    await releaseSerial(esptool, detected);
     return false;
   }
 
@@ -150,7 +140,7 @@ export async function runFlash(
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
-    await safeDisconnect(esptool, detected);
+    await releaseSerial(esptool, detected);
     return false;
   }
 

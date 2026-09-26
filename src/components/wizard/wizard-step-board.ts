@@ -317,15 +317,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // names the board outright through the app descriptor; same flow as
     // ``detectAndOpenWizard`` so both entry points behave alike.
     if (board.manifest?.board_id) {
-      const knownBoard = await fetchBoard(this._api, board.manifest.board_id).catch(
-        () => null
-      );
+      const knownBoard = await fetchBoard(this._api, board.manifest.board_id);
       if (knownBoard) {
         this._onAdd(knownBoard);
         return;
       }
-      // ``board_id`` set but the catalog doesn't know it — fall through to
-      // chip-family filtering rather than failing.
+      // ``board_id`` set but the catalog doesn't know it, or the request failed
+      // (fetchBoard logs it and resolves null) — fall through to chip-family
+      // filtering rather than failing.
     }
 
     // No specific board match — narrow the picker to the detected chip

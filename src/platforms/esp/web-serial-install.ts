@@ -17,8 +17,8 @@ import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
   type DetectedChip,
   EngineLoadError,
-  type Esptool,
   pickPortAndLoadEsptool,
+  releaseSerial,
   UnsupportedChipError,
 } from "./index.js";
 
@@ -216,20 +216,4 @@ export async function startWebSerialInstall(
 
   host._statusMessage = host._localize("firmware.status_done");
   finishWithLogsPort(host, detected.port);
-}
-
-// Best-effort release of the held serial port on an early return, so a failed
-// compile / download / flash doesn't leak an open port into the next attempt.
-// Falls back to closing the port directly when transport.disconnect throws,
-// mirroring connectToPort — a still-open port breaks the next port.open.
-async function releaseSerial(esptool: Esptool, detected: DetectedChip): Promise<void> {
-  try {
-    await esptool.disconnect(detected.transport);
-  } catch {
-    try {
-      await detected.port.close();
-    } catch {
-      /* best-effort */
-    }
-  }
 }
