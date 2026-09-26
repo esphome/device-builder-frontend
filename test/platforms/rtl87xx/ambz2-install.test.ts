@@ -16,8 +16,7 @@ type FlashHooks = {
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../../src/util/post-install-logs.js", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("../../../src/util/post-install-dispatch.js", () => ({
   dispatchShowLogsAfterInstall: mocks.dispatchShowLogsAfterInstall,
 }));
 vi.mock("../../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({

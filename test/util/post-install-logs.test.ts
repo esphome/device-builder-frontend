@@ -52,13 +52,13 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 import { defaultLocalize } from "../../src/common/localize.js";
 import { BleNusServiceNotFoundError } from "../../src/platforms/nrf52/ble-nus-stream.js";
 import { PicoStrandedError } from "../../src/platforms/rp2/rp2-logs-reset.js";
+import type { PostInstallShowLogsDetail } from "../../src/util/post-install-dispatch.js";
 import {
   attachBleNusLogs,
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
   picoResetHook,
-  type PostInstallShowLogsDetail,
   reconnectWebSerialLogs,
 } from "../../src/util/post-install-logs.js";
 

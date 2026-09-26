@@ -14,7 +14,7 @@ const { dispatchShowLogsAfterInstall } = vi.hoisted(() => ({
     ) => true
   ),
 }));
-vi.mock("../../../src/util/post-install-logs.js", () => ({
+vi.mock("../../../src/util/post-install-dispatch.js", () => ({
   dispatchShowLogsAfterInstall,
 }));
 
