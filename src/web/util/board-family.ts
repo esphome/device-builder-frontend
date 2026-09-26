@@ -1,4 +1,3 @@
-import { isUartBridgePort } from "../../util/serial-console-match.js";
 import { ESPRESSIF_USB_VID } from "../../util/web-serial.js";
 import { isRp2CdcPort } from "../../util/web-usb.js";
 import type { WebMode } from "../web-mode.js";
@@ -28,14 +27,14 @@ function isNrf52Port(port: SerialPort): boolean {
 
 /**
  * The site flow a Web Serial port's USB ids point at: a Pico's own CDC
- * console, a known nRF52 board, or an Espressif native-USB device / a
- * dedicated UART bridge for the esptool path. ``null`` when the ids say
- * nothing certain (a debug probe, an unknown board, a non-USB port).
+ * console, a known nRF52 board, or an Espressif native-USB device. ``null``
+ * when the ids say nothing certain: a dedicated UART bridge (CH340, CP210x)
+ * sits in front of an ESP as readily as an RTL8720C, so it never counts, nor
+ * does a debug probe, an unknown board or a non-USB port.
  */
 export function boardFamilyOfPort(port: SerialPort): WebMode | null {
   if (isRp2CdcPort(port)) return "pico";
   if (isNrf52Port(port)) return "nrf";
   const { usbVendorId } = port.getInfo();
-  if (usbVendorId === ESPRESSIF_USB_VID || isUartBridgePort(port)) return "esp";
-  return null;
+  return usbVendorId === ESPRESSIF_USB_VID ? "esp" : null;
 }

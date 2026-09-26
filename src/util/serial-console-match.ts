@@ -23,7 +23,7 @@ const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
 const UART_CONSOLE_RE = /^UART\d/;
 
 /** A port from a dedicated USB-UART bridge chip, so wired to external UART pins. */
-export function isUartBridgePort(port: SerialPort): boolean {
+function isUartBridgePort(port: SerialPort): boolean {
   const { usbVendorId } = port.getInfo();
   return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
 }

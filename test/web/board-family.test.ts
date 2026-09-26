@@ -29,10 +29,13 @@ describe("boardFamilyOfPort", () => {
     expect(boardFamilyOfPort(port(0x2886, 0x802f))).toBeNull();
   });
 
-  it("reads an Espressif native-USB device or a UART bridge as the ESP flow", () => {
+  it("reads an Espressif native-USB device as the ESP flow", () => {
     expect(boardFamilyOfPort(port(0x303a, 0x1001))).toBe("esp");
-    expect(boardFamilyOfPort(port(0x10c4, 0xea60))).toBe("esp");
-    expect(boardFamilyOfPort(port(0x1a86, 0x55d4))).toBe("esp");
+  });
+
+  it("says nothing for a UART bridge, which fronts an ESP as readily as an RTL8720C", () => {
+    expect(boardFamilyOfPort(port(0x1a86, 0x7523))).toBeNull();
+    expect(boardFamilyOfPort(port(0x10c4, 0xea60))).toBeNull();
   });
 
   it("says nothing for an unknown vendor or a non-USB port", () => {
