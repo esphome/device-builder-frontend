@@ -54,4 +54,34 @@ describe("SerialConnectAnnouncements", () => {
     expect(seen.shouldAnnounce(b, 500)).toBe(true);
     expect(seen.shouldAnnounce(a, 1000)).toBe(true);
   });
+
+  it("stays quiet for a connect that follows the port's own disconnect within the blip", () => {
+    const seen = new SerialConnectAnnouncements(60_000, 1000);
+    const hubbed = port();
+    const other = port();
+    seen.noteDisconnect(hubbed, 0);
+    // The hub bounced it; the neighbour it did not touch still announces.
+    expect(seen.shouldAnnounce(hubbed, 500)).toBe(false);
+    expect(seen.shouldAnnounce(other, 500)).toBe(true);
+    // The blip never took the once-per-window slot: a real plug-in announces.
+    expect(seen.shouldAnnounce(hubbed, 5000)).toBe(true);
+  });
+
+  it("treats a connect past the blip as a plug-in", () => {
+    const seen = new SerialConnectAnnouncements(60_000, 1000);
+    const replugged = port();
+    seen.noteDisconnect(replugged, 0);
+    expect(seen.shouldAnnounce(replugged, 1000)).toBe(true);
+  });
+
+  it("only the first connect after a disconnect counts as the blip", () => {
+    const seen = new SerialConnectAnnouncements(1000, 1000);
+    const p = port();
+    seen.noteDisconnect(p, 0);
+    expect(seen.shouldAnnounce(p, 100)).toBe(false);
+    // A second connect inside the same second with no disconnect between is
+    // the once-per-window rule's business, not the blip's.
+    expect(seen.shouldAnnounce(p, 200)).toBe(true);
+    expect(seen.shouldAnnounce(p, 300)).toBe(false);
+  });
 });

@@ -369,6 +369,13 @@ export class ESPHomeApp extends LitElement {
     });
   };
 
+  // A hub re-enumerating its other ports fires disconnect then connect for
+  // each board on it; the memory tells that blip from a plug-in (#1850).
+  private _onSerialDisconnect = (event: Event) => {
+    const port = portOfSerialConnectEvent(event);
+    if (port) this._connectAnnouncements.noteDisconnect(port);
+  };
+
   private _onSecretsSaved = () => {
     void loadOnboardingState(this);
   };
@@ -378,6 +385,7 @@ export class ESPHomeApp extends LitElement {
     void this._init();
     if ("serial" in navigator) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
+      navigator.serial.addEventListener("disconnect", this._onSerialDisconnect);
     }
     window.addEventListener("secrets-saved", this._onSecretsSaved);
   }
@@ -389,6 +397,7 @@ export class ESPHomeApp extends LitElement {
     clearRecentJobs(this);
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
+      navigator.serial.removeEventListener("disconnect", this._onSerialDisconnect);
     }
     window.removeEventListener("secrets-saved", this._onSecretsSaved);
   }

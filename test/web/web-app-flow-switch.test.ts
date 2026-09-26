@@ -43,7 +43,9 @@ beforeEach(() => {
     addEventListener: (type: string, fn: (e: Event) => void) => {
       serialListeners[type] = fn;
     },
-    removeEventListener: () => {},
+    removeEventListener: (type: string) => {
+      delete serialListeners[type];
+    },
   });
   window.history.replaceState({}, "", "/");
 });
@@ -51,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   restoreSerial();
   vi.clearAllMocks();
+  vi.useRealTimers();
   isRecentSerialActivity.mockReturnValue(false);
   hasOpenDialog.mockReturnValue(false);
   isImprovInProgress.mockReturnValue(false);
@@ -59,9 +62,11 @@ afterEach(() => {
 const mountApp = () => mount(new ESPHomeWebApp());
 const pick = (el: ESPHomeWebApp, p: SerialPort) =>
   el.dispatchEvent(new CustomEvent("port-picked", { detail: p, bubbles: true }));
-// Current Chromium fires connect at the port itself (event.target).
+// Current Chromium fires connect and disconnect at the port itself (event.target).
 const plugIn = (p: SerialPort) =>
   serialListeners.connect({ target: p } as unknown as Event);
+const unplug = (p: SerialPort) =>
+  serialListeners.disconnect({ target: p } as unknown as Event);
 
 describe("web app flow-switch suggestion", () => {
   it("offers the Pico flow when a picked port looks like a Pico, and switches on the action", async () => {
@@ -143,5 +148,30 @@ describe("web app flow-switch suggestion", () => {
     isRecentSerialActivity.mockReturnValue(true);
     plugIn(PICO);
     expect(notifyInfo).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for a board a hub re-enumerated, and still offers a hand replug", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    await mountApp();
+    // Plugging something else into the hub bounces the Pico: disconnect,
+    // then connect about half a second later.
+    unplug(PICO);
+    vi.setSystemTime(1_000_500);
+    plugIn(PICO);
+    expect(notifyInfo).not.toHaveBeenCalled();
+    // A hand unplug and replug takes seconds.
+    unplug(PICO);
+    vi.setSystemTime(1_005_000);
+    plugIn(PICO);
+    expect(notifyInfo).toHaveBeenCalledTimes(1);
+    expect(notifyInfo.mock.lastCall![0]).toBe("web.flow_switch.pico");
+  });
+
+  it("stops listening for plug-ins and unplugs when unmounted", async () => {
+    const el = await mountApp();
+    expect(Object.keys(serialListeners).sort()).toEqual(["connect", "disconnect"]);
+    el.remove();
+    expect(serialListeners).toEqual({});
   });
 });

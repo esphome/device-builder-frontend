@@ -58,6 +58,7 @@ export class ESPHomeWebApp extends LitElement {
     // Only ports this origin already has permission for announce themselves.
     if (this._listensForPlugIns) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
+      navigator.serial.addEventListener("disconnect", this._onSerialDisconnect);
     }
     void this._init();
   }
@@ -69,6 +70,7 @@ export class ESPHomeWebApp extends LitElement {
     this.removeEventListener("port-picked", this._onPortPicked);
     if (this._listensForPlugIns) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
+      navigator.serial.removeEventListener("disconnect", this._onSerialDisconnect);
     }
   }
 
@@ -129,6 +131,13 @@ export class ESPHomeWebApp extends LitElement {
     if (isOwnSerialReenumeration()) return;
     const port = portOfSerialConnectEvent(e);
     if (port) this._suggestFlowFor(port, this._connectAnnouncements);
+  };
+
+  // A hub re-enumerating its other ports fires disconnect then connect for
+  // each board on it; the memory tells that blip from a plug-in (#1850).
+  private _onSerialDisconnect = (e: Event): void => {
+    const port = portOfSerialConnectEvent(e);
+    if (port) this._connectAnnouncements.noteDisconnect(port);
   };
 
   // Switching flows unmounts the current one: never offer or apply it while
