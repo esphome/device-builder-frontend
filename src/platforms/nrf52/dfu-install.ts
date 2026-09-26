@@ -9,19 +9,18 @@ import {
   pickSerialPortOrFail,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import { getErrorMessage } from "../../util/error-message.js";
+import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
 import {
-  type BrowserFlasher,
+  type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
   RESET_ACTION_KEY,
-} from "../../components/firmware-install-dialog/browser-flasher.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
+} from "../platform-support.js";
 import { type DfuPackage, loadDfuEngine } from "./index.js";
 import { withManualBootloaderHint } from "./manual-bootloader-hint.js";
-import { isNrfPlatform } from "./nrf-platform.js";
 
-declare module "../../components/firmware-install-dialog/types.js" {
+declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
     "nrf-dfu": "nrf-reset" | "nrf-wait";
   }
@@ -147,9 +146,8 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
  * Two user-gesture steps. Step 1 offers Flash beside Reset: a device already
  * in DFU mode (say after a double-press reset) skips the touch.
  */
-export const nrfDfuFlasher: BrowserFlasher<"nrf-dfu"> = {
+export const nrfDfuInstall: BrowserInstall<"nrf-dfu"> = {
   id: "nrf-dfu",
-  matches: isNrfPlatform,
   methodKey: "nrf_dfu",
   holdsPort: false,
   image: nrfPackage,

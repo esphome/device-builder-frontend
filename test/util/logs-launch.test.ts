@@ -7,7 +7,7 @@ vi.mock("sonner-js", () => ({
 const launch = vi.hoisted(() => ({
   requestSerialPort: vi.fn<() => Promise<SerialPort | null>>(),
   attachSerialLogStream: vi.fn(async () => {}),
-  picoResetHook: vi.fn<() => SerialResetHook | undefined>(),
+  sessionResetHook: vi.fn<() => SerialResetHook | undefined>(),
 }));
 vi.mock("../../src/util/web-serial.js", () => ({
   requestSerialPort: launch.requestSerialPort,
@@ -27,7 +27,7 @@ vi.mock("../../src/platforms/nrf52/ble-nus-stream.js", async (importOriginal) =>
 vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/post-install-logs.js")>()),
   attachSerialLogStream: launch.attachSerialLogStream,
-  picoResetHook: launch.picoResetHook,
+  sessionResetHook: launch.sessionResetHook,
 }));
 
 import toast from "sonner-js";
@@ -38,6 +38,9 @@ import type { SerialResetHook } from "../../src/components/logs-dialog/session.j
 import { BleUnavailableError } from "../../src/platforms/nrf52/ble-nus-stream.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
+
+// The platform whose logs policy offers Bluetooth.
+const nrfDevice = (): ConfiguredDevice => ({ ...makeDevice(), target_platform: "nrf52" });
 
 function makeDevice(): ConfiguredDevice {
   return {
@@ -272,12 +275,12 @@ describe("launchLogsWithMethod web-serial", () => {
     } as unknown as SerialPort;
     launch.requestSerialPort.mockResolvedValue(port);
     const hook = { supports: () => true, run: async () => {} };
-    launch.picoResetHook.mockReturnValue(hook);
+    launch.sessionResetHook.mockReturnValue(hook);
     const host = makeHost(async () => []);
     try {
       const device = { ...makeDevice(), target_platform: "rp2", logger_baud_rate: null };
       await launchLogsWithMethod(host, device, "web-serial");
-      expect(launch.picoResetHook).toHaveBeenCalledWith(
+      expect(launch.sessionResetHook).toHaveBeenCalledWith(
         host.logsDialog,
         host.localize,
         "rp2",
@@ -293,6 +296,13 @@ describe("launchLogsWithMethod web-serial", () => {
 });
 
 describe("launchLogsWithMethod ble-nus", () => {
+  it("does nothing for a platform without Bluetooth logs", async () => {
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    expect(ble.requestBleNusDevice).not.toHaveBeenCalled();
+    expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
+  });
+
   it("opens a BLE passive session and registers the stream", async () => {
     const device = {} as BluetoothDevice;
     const cancel = vi.fn(async () => {});
@@ -300,7 +310,7 @@ describe("launchLogsWithMethod ble-nus", () => {
     ble.streamBleNus.mockResolvedValue(cancel);
     const host = makeHost(async () => []);
     host.logsDialog.openPassive.mockReturnValue(() => false);
-    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    await launchLogsWithMethod(host, nrfDevice(), "ble-nus");
     expect(ble.requestBleNusDevice).toHaveBeenCalledWith(["kitchen", "Kitchen"]);
     expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
       expect.objectContaining({ source: "ble", onReconnect: expect.any(Function) })
@@ -323,7 +333,7 @@ describe("launchLogsWithMethod ble-nus", () => {
       throw new Error("late");
     });
     await expect(
-      launchLogsWithMethod(host, makeDevice(), "ble-nus")
+      launchLogsWithMethod(host, nrfDevice(), "ble-nus")
     ).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
@@ -332,7 +342,7 @@ describe("launchLogsWithMethod ble-nus", () => {
   it("says Bluetooth is off or blocked when the adapter is unavailable", async () => {
     ble.requestBleNusDevice.mockRejectedValue(new BleUnavailableError());
     const host = makeHost(async () => []);
-    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    await launchLogsWithMethod(host, nrfDevice(), "ble-nus");
     expect(toast.error).toHaveBeenCalledWith(
       "dashboard.logs_ble_nus_unavailable",
       expect.anything()
@@ -343,7 +353,7 @@ describe("launchLogsWithMethod ble-nus", () => {
   it("does nothing when the chooser is dismissed", async () => {
     ble.requestBleNusDevice.mockResolvedValue(null);
     const host = makeHost(async () => []);
-    await launchLogsWithMethod(host, makeDevice(), "ble-nus");
+    await launchLogsWithMethod(host, nrfDevice(), "ble-nus");
     expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
   });
 });

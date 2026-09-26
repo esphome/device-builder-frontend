@@ -22,13 +22,8 @@ import { esphomeWebUrl } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { isEsptoolPlatform } from "../platforms/esp/index.js";
-import {
-  bleNusLogsAvailable,
-  BleProbeController,
-  isNrfPlatform,
-} from "../platforms/nrf52/index.js";
-import { isRp2Platform } from "../platforms/rp2/index.js";
-import { isRtl87xxPlatform } from "../platforms/rtl87xx/index.js";
+import { BleProbeController } from "../platforms/nrf52/index.js";
+import { platformFor } from "../platforms/registry.js";
 import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
@@ -169,6 +164,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return isEsptoolPlatform(this.deviceTargetPlatform);
   }
 
+  // Whether the target's platform offers Bluetooth logs in this browser.
+  private get _bleLogs(): boolean {
+    return platformFor(this.deviceTargetPlatform)?.logs?.ble?.available() ?? false;
+  }
+
   protected willUpdate(changed: Map<string, unknown>) {
     // Reset to method view when dialog opens. Also collapse the
     // OTA address override and re-seed its input from the
@@ -182,9 +182,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       this._otaAddressValue = this.deviceCurrentAddress;
     }
     this._portsPoll.set(this.open && this._view === "port-select");
-    this._bleProbe.set(
-      this.open && this.mode === "logs" && bleNusLogsAvailable(this.deviceTargetPlatform)
-    );
+    this._bleProbe.set(this.open && this.mode === "logs" && this._bleLogs);
   }
 
   static styles = [
@@ -228,13 +226,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // The esptool-js and external flashers are ESP-only; nRF52, RP2 and the
     // RTL8720C get their own in-app rows (renderPlatformFlashOption).
     const isEsptool = this._isEsptoolPlatform;
-    const isNrf = isNrfPlatform(this.deviceTargetPlatform);
-    const isRp2 = isRp2Platform(this.deviceTargetPlatform);
-    const isRtl = isRtl87xxPlatform(this.deviceTargetPlatform);
     const isLogs = this.mode === "logs";
-    // Web Serial logs read the Pico's native CDC, nRF52's UART/USB-CDC and
-    // the RTL8720C's log UART; flashing stays esptool-only.
-    const webSerialPlatform = isLogs ? isEsptool || isRp2 || isNrf || isRtl : isEsptool;
+    // Web Serial logs also cover every platform whose logs policy offers them
+    // (Pico, nRF52, RTL8720C); flashing stays esptool-only.
+    const webSerialPlatform =
+      isEsptool ||
+      (isLogs && platformFor(this.deviceTargetPlatform)?.logs?.serial !== undefined);
     // Drop the redundant server-serial row only when in-app Web Serial is
     // actually available on localhost (same USB stack). Keep it on insecure
     // origins as a fallback: there a Web-Serial-incapable browser (Safari) still
@@ -258,7 +255,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // and read serial logs. ESP-only: that landing is ESPHome Web's ESP
     // connect flow, which runs esptool chip detection.
     const showLogsWebRow = isLogs && isEsptool && availability === "insecure-context";
-    const showBleNusRow = isLogs && bleNusLogsAvailable(this.deviceTargetPlatform);
+    const showBleNusRow = isLogs && this._bleLogs;
 
     const ctx = this._rowContext();
     const otaRow = renderOtaOption(ctx);

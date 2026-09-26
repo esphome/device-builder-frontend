@@ -13,13 +13,9 @@ import "../../_mock-webawesome.js";
 
 import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
+import { PLATFORM_INSTALLS } from "../../_platform-installs.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
-import {
-  type AnyBrowserFlasher,
-  type BrowserFlasher,
-  FlashImageSlot,
-} from "../../../src/components/firmware-install-dialog/browser-flasher.js";
 import {
   cardState,
   cardStatusDetail,
@@ -27,12 +23,16 @@ import {
   renderFooter,
   renderStatusExtra,
 } from "../../../src/components/firmware-install-dialog/renderers.js";
-import { BROWSER_FLASHERS } from "../../../src/platforms/browser-flashers.js";
+import {
+  type AnyBrowserInstall,
+  type BrowserInstall,
+  FlashImageSlot,
+} from "../../../src/platforms/platform-support.js";
 
 // tsc checks src and test as one program, so this widens FlasherId and
 // InstallStep there too; the ids are test-only on purpose so a stray use in
 // src stands out.
-declare module "../../../src/components/firmware-install-dialog/types.js" {
+declare module "../../../src/platforms/platform-support.js" {
   interface BrowserFlasherSteps {
     "test-only-flash": "test-only-ready" | "test-only-wait";
   }
@@ -43,9 +43,8 @@ const fakeImage = new FlashImageSlot<{ bytes: number }>();
 const doReset = vi.fn();
 const doFlash = vi.fn();
 
-const fakeFlasher: BrowserFlasher<"test-only-flash"> = {
+const fakeFlasher: BrowserInstall<"test-only-flash"> = {
   id: "test-only-flash",
-  matches: (p) => p === "fake",
   methodKey: "fake",
   holdsPort: true,
   image: fakeImage,
@@ -84,7 +83,7 @@ function makeDialog(): ESPHomeFirmwareInstallDialog {
 }
 
 // A dialog mid-install with `flasher`, without running its start.
-function dialogRunning(flasher: AnyBrowserFlasher): ESPHomeFirmwareInstallDialog {
+function dialogRunning(flasher: AnyBrowserInstall): ESPHomeFirmwareInstallDialog {
   const dialog = makeDialog();
   Object.assign(dialog, {
     _device: device,
@@ -152,7 +151,7 @@ describe("a browser flasher in the install dialog", () => {
 });
 
 describe("Retry for a browser flasher", () => {
-  it.each([...BROWSER_FLASHERS, fakeFlasher].map((f) => [f.id, f] as const))(
+  it.each([...PLATFORM_INSTALLS, fakeFlasher].map((f) => [f.id, f] as const))(
     "%s reinstalls when no image was parsed",
     async (_id, flasher) => {
       const dialog = dialogRunning(flasher);
@@ -176,7 +175,7 @@ describe("Retry for a browser flasher", () => {
     expect(install).toHaveBeenCalledWith(fakeFlasher, device);
   });
 
-  it.each([...BROWSER_FLASHERS, fakeFlasher].map((f) => [f.id, f] as const))(
+  it.each([...PLATFORM_INSTALLS, fakeFlasher].map((f) => [f.id, f] as const))(
     "%s returns to its first step without recompiling while the image is kept",
     async (_id, flasher) => {
       const dialog = dialogRunning(flasher);

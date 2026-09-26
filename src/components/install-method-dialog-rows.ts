@@ -6,11 +6,11 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { browserFlasherForPlatform } from "../platforms/browser-flashers.js";
 import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
+import { platformFor } from "../platforms/registry.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -126,7 +126,8 @@ export function renderServerSerialOption(
 }
 
 /**
- * BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth.
+ * Bluetooth logs, for a platform whose logs policy offers them (nRF52 over
+ * the Nordic UART Service today).
  * Clickable only once the adapter answered; otherwise the row is disabled,
  * with the reason once there is one. Brave gets the generic hint too (its
  * radio can be off with the flag already on), plus its extra step.
@@ -176,13 +177,13 @@ export function renderPlatformFlashOption(
   hasWebSerial: boolean
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs" || !hasWebSerial) return nothing;
-  const flasher = browserFlasherForPlatform(platform);
-  if (!flasher) return nothing;
+  const install = platformFor(platform)?.install;
+  if (!install) return nothing;
   return renderMethodRow({
     icon: "chip",
-    title: ctx.localize(`dashboard.install_method_${flasher.methodKey}`),
-    desc: ctx.localize(`dashboard.install_method_${flasher.methodKey}_desc`),
-    onClick: () => ctx.onSelect(flasher.id),
+    title: ctx.localize(`dashboard.install_method_${install.methodKey}`),
+    desc: ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
+    onClick: () => ctx.onSelect(install.id),
   });
 }
 

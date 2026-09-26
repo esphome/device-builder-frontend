@@ -51,15 +51,16 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 
 import { defaultLocalize } from "../../src/common/localize.js";
 import { BleNusServiceNotFoundError } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { nrf52Platform } from "../../src/platforms/nrf52/dashboard.js";
 import { PicoStrandedError } from "../../src/platforms/rp2/rp2-logs-reset.js";
+import type { PostInstallShowLogsDetail } from "../../src/util/post-install-dispatch.js";
 import {
-  attachBleNusLogs,
+  attachBleLogs,
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
-  picoResetHook,
-  type PostInstallShowLogsDetail,
   reconnectWebSerialLogs,
+  sessionResetHook,
 } from "../../src/util/post-install-logs.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -293,7 +294,7 @@ describe("reconnectWebSerialLogs", () => {
   });
 });
 
-describe("picoResetHook", () => {
+describe("the Pico's Reset Device hook, through sessionResetHook", () => {
   // The port only reaches the mocked resetPicoForLogs, so any handle serves.
   const runHook = (
     dialog: ReturnType<typeof stubDialog>,
@@ -301,25 +302,25 @@ describe("picoResetHook", () => {
     baud = 115200,
     port: SerialPort = openPort()
   ) =>
-    picoResetHook(dialog as never, defaultLocalize, "rp2", baud)!.run(
+    sessionResetHook(dialog as never, defaultLocalize, "rp2", baud)!.run(
       port,
       () => cancelled
     );
 
   it("is offered only for rp2 on a WebUSB browser", () => {
     const dialog = stubDialog() as never;
-    expect(picoResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeTypeOf("object");
-    expect(picoResetHook(dialog, defaultLocalize, "esp32", 115200)).toBeUndefined();
+    expect(sessionResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeTypeOf("object");
+    expect(sessionResetHook(dialog, defaultLocalize, "esp32", 115200)).toBeUndefined();
     picoReset.webUsb = false;
     try {
-      expect(picoResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeUndefined();
+      expect(sessionResetHook(dialog, defaultLocalize, "rp2", 115200)).toBeUndefined();
     } finally {
       picoReset.webUsb = true;
     }
   });
 
   it("supports only the Pico's own CDC port, not a UART bridge", () => {
-    const hook = picoResetHook(stubDialog() as never, defaultLocalize, "rp2", 115200)!;
+    const hook = sessionResetHook(stubDialog() as never, defaultLocalize, "rp2", 115200)!;
     expect(hook.supports(openPort({ usbVendorId: 0x2e8a, usbProductId: 0xf00a }))).toBe(
       true
     );
@@ -423,7 +424,8 @@ describe("picoResetHook", () => {
   });
 });
 
-describe("attachBleNusLogs", () => {
+describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
+  const nrfBle = nrf52Platform.logs!.ble!;
   const device = {} as BluetoothDevice;
   const bleDialog = () => ({ ...stubDialog(), setBleStream: vi.fn() });
 
@@ -431,7 +433,7 @@ describe("attachBleNusLogs", () => {
     const dialog = bleDialog();
     const cancel = vi.fn(async () => {});
     bleStream.streamBleNus.mockResolvedValue(cancel);
-    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setBleStream).toHaveBeenCalledWith(cancel);
     expect(bleStream.streamBleNus).toHaveBeenCalledWith(
       device,
@@ -444,7 +446,7 @@ describe("attachBleNusLogs", () => {
     const dialog = bleDialog();
     const cancel = vi.fn(async () => {});
     bleStream.streamBleNus.mockResolvedValue(cancel);
-    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => true);
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => true);
     expect(cancel).toHaveBeenCalledOnce();
     expect(dialog.setBleStream).not.toHaveBeenCalled();
   });
@@ -452,7 +454,7 @@ describe("attachBleNusLogs", () => {
   it("names the wrong device when the NUS service is missing", async () => {
     const dialog = bleDialog();
     bleStream.streamBleNus.mockRejectedValue(new BleNusServiceNotFoundError());
-    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     const message = defaultLocalize("dashboard.logs_ble_nus_service_not_found");
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
     expect(toastError).toHaveBeenCalledWith(message, expect.anything());
@@ -461,7 +463,7 @@ describe("attachBleNusLogs", () => {
   it("reports a failed connect", async () => {
     const dialog = bleDialog();
     bleStream.streamBleNus.mockRejectedValue(new DOMException("GATT", "NetworkError"));
-    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_ble_nus_open_failed")
     );
@@ -473,7 +475,7 @@ describe("attachBleNusLogs", () => {
       hooks.onDisconnect?.();
       return async () => {};
     });
-    await attachBleNusLogs(dialog as never, defaultLocalize, device, () => false);
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_ble_nus_disconnected")
     );

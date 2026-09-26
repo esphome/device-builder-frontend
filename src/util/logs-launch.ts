@@ -3,16 +3,16 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import { bleNusLogsAvailable, pickBleNusDevice } from "../platforms/nrf52/index.js";
+import { platformFor } from "../platforms/registry.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {
-  attachBleNusLogs,
+  attachBleLogs,
   attachSerialLogStream,
   openNetworkLogsFallback,
   openPortForLogs,
-  picoResetHook,
   reconnectWebSerialLogs,
+  sessionResetHook,
 } from "./post-install-logs.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { requestSerialPort } from "./web-serial.js";
@@ -41,7 +41,7 @@ export async function launchLogs(
   openMethodPicker: () => void
 ): Promise<void> {
   const hasWebSerial = "serial" in navigator;
-  const hasBleNus = bleNusLogsAvailable(device.target_platform);
+  const hasBleNus = platformFor(device.target_platform)?.logs?.ble?.available() ?? false;
   let hasServerPorts = false;
   if (!hasWebSerial) {
     // Only pay the backend round-trip when WebSerial can't already provide a
@@ -150,7 +150,7 @@ export async function launchLogsWithMethod(
           cancelled,
           device.target_platform
         ),
-      onResetDevice: picoResetHook(
+      onResetDevice: sessionResetHook(
         host.logsDialog,
         host.localize,
         device.target_platform,
@@ -171,26 +171,25 @@ export async function launchLogsWithMethod(
       notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
     }
   } else if (method === "ble-nus") {
+    const ble = platformFor(device.target_platform)?.logs?.ble;
+    if (!ble) return;
     // The firmware advertises the node name; the friendly name is a guess.
-    const bleDevice = await pickBleNusDevice(host.localize, [
-      device.name,
-      device.friendly_name,
-    ]);
+    const bleDevice = await ble.pick(host.localize, [device.name, device.friendly_name]);
     if (!bleDevice) return;
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
     const cancelled = host.logsDialog.openPassive({
       source: "ble",
       onReconnect: (cancelled) =>
-        attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled),
+        attachBleLogs(host.logsDialog, host.localize, ble, bleDevice, cancelled),
     });
     // attach reports its own failures; cover any other rejection so it can't
     // escape this fire-and-forget call as an unhandled rejection.
     try {
-      await attachBleNusLogs(host.logsDialog, host.localize, bleDevice, cancelled);
+      await attachBleLogs(host.logsDialog, host.localize, ble, bleDevice, cancelled);
     } catch (err) {
-      console.warn("BLE NUS attach failed", err);
-      notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
+      console.warn("Bluetooth logs attach failed", err);
+      notifyError(host.localize(ble.failureKey(err)));
     }
   }
 }

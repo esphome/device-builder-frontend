@@ -104,7 +104,7 @@ export function setSerialStream(
   };
 }
 
-/** Register a streaming BLE NUS link (its cancel). */
+/** Register a streaming Bluetooth logs link (its cancel). */
 export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void>): void {
   const pending = pendingPassiveAttach(host, cancel);
   if (pending) host._session = { kind: "ble", cancel, paused: pending.paused };

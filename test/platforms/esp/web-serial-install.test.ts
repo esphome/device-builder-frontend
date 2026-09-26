@@ -17,7 +17,7 @@ vi.mock("../../../src/platforms/esp/esptool.js", async (importOriginal) => ({
   ...esptool,
 }));
 vi.mock("../../../src/util/download-text.js", () => ({ triggerDownload: vi.fn() }));
-vi.mock("../../../src/util/post-install-logs.js", () => ({
+vi.mock("../../../src/util/post-install-dispatch.js", () => ({
   dispatchShowLogsAfterInstall: vi.fn(() => false),
 }));
 

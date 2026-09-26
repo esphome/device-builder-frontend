@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
+import type { FlasherStep, FlasherStepView } from "../../platforms/platform-support.js";
 import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
@@ -17,8 +18,6 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
-import { flasherStepView } from "./browser-flasher.js";
-import type { FlasherStep } from "./types.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -91,6 +90,15 @@ export function renderResetSuggestion(
 // download-ready screens have no status icon — their bespoke bodies render in
 // the status-extra slot below.
 
+/** The active browser install flow's view of the current step, if the step is its own. */
+export function flasherStepView(
+  host: ESPHomeFirmwareInstallDialog
+): FlasherStepView | undefined {
+  const steps: Partial<Record<string, FlasherStepView>> | undefined =
+    host._flasher?.steps;
+  return steps?.[host._step];
+}
+
 // Reconnecting banner over the follow-backed phases only; the job keeps
 // running server-side and the flow re-attaches on reconnect.
 export function connectionLost(host: ESPHomeFirmwareInstallDialog): boolean {
@@ -114,7 +122,7 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
     case "downloading":
       return "running";
     default:
-      // What's left is a browser flasher's own step, which always runs. A
+      // What's left is a platform install flow's own step, which always runs. A
       // shared step added without a case above is a compile error here.
       host._step satisfies FlasherStep;
       return "running";
@@ -309,7 +317,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  // A browser flasher's user-gesture step (reset into the bootloader, flash).
+  // A platform install flow's user-gesture step (reset into the bootloader, flash).
   const bootloader = flasherStepView(host)?.footer?.();
   if (bootloader) {
     const { primary, secondary } = bootloader;

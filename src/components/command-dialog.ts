@@ -45,7 +45,7 @@ import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { fireEvent } from "../util/fire-event.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { LogBuffer } from "../util/log-buffer.js";
-import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
+import { dispatchShowLogsAfterInstall } from "../util/post-install-dispatch.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import {

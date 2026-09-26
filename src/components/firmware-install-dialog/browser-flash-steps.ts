@@ -1,5 +1,5 @@
 /**
- * The steps every compile-first browser flasher (nRF52 DFU, Pico UF2,
+ * The steps every compile-first platform install flow (nRF52 DFU, Pico UF2,
  * RTL8720C ROM) shares: fetching the build artifact into memory, going back
  * to its bootloader step on Retry, the port picker with its failure
  * reported, and the 1200-baud touch into a board's bootloader.

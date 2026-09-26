@@ -1,13 +1,4 @@
-/**
- * The browser flashers' own steps, keyed by installer id. Each platform's
- * install module adds its entry with ``declare module`` (see
- * ``browser-flasher.ts``), so a new flasher needs no edit here.
- */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface BrowserFlasherSteps {}
-
-export type FlasherId = keyof BrowserFlasherSteps;
-export type FlasherStep = BrowserFlasherSteps[FlasherId];
+import type { FlasherId, FlasherStep } from "../../platforms/platform-support.js";
 
 /** Steps every installer shares; the dialog renders these itself. */
 export type SharedInstallStep =
@@ -25,7 +16,7 @@ export type SharedInstallStep =
 export type InstallStep = SharedInstallStep | FlasherStep;
 
 // The ESP installers (web-serial, web-flash) are still built into the dialog;
-// they move to a browser flasher descriptor in a later pass.
+// they move to a platform descriptor in a later pass.
 export type Installer = "web-serial" | "binary-download" | "web-flash" | FlasherId | null;
 
 export type InstallFailureKind =

@@ -6,24 +6,14 @@ import {
 } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
-import {
-  BLE_CONNECT_ATTEMPTS,
-  BleNusServiceNotFoundError,
-  streamBleNus,
-} from "../platforms/nrf52/index.js";
-import {
-  isRp2CdcPort,
-  isRp2Platform,
-  isWebUsbSupported,
-  picoResetFailureKey,
-  resetPicoForLogs,
-} from "../platforms/rp2/index.js";
-import { fireRequestEvent } from "./fire-event.js";
+import type { BleLogsSupport } from "../platforms/platform-support.js";
+import { platformFor } from "../platforms/registry.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
+import type { PostInstallShowLogsDetail } from "./post-install-dispatch.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
-import { releaseControlLines, releasesLinesAfterOpen } from "./serial-control-lines.js";
+import { releaseControlLines } from "./serial-control-lines.js";
 import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { requestSerialPort } from "./web-serial.js";
 
@@ -146,35 +136,37 @@ export async function openPortForLogs(
   targetPlatform: string | null | undefined
 ): Promise<void> {
   await port.open({ baudRate });
-  if (releasesLinesAfterOpen(targetPlatform)) await releaseControlLines(port);
+  if (platformFor(targetPlatform)?.logs?.serial?.releasesLinesAfterOpen) {
+    await releaseControlLines(port);
+  }
 }
 
 /**
- * Reset Device hook for a Pico logs session, or undefined where the dialog's
- * RTS pulse applies (other platforms) or the reboot cannot be sent (no WebUSB,
- * so the button stays hidden). The BOOTSEL touch only reaches the Pico over
- * its own CDC, not a UART bridge on its console pins.
+ * The platform's own Reset Device for a Web Serial logs session, or
+ * undefined where the dialog's RTS pulse applies or the platform's reset
+ * can't run in this browser (which hides the button).
  */
-export function picoResetHook(
+export function sessionResetHook(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  targetPlatform: string,
+  targetPlatform: string | null | undefined,
   baudRate: number
 ): SerialResetHook | undefined {
-  if (!isRp2Platform(targetPlatform) || !isWebUsbSupported()) return undefined;
+  const support = platformFor(targetPlatform)?.logs?.serial?.reset;
+  if (!support?.available()) return undefined;
   return {
-    supports: isRp2CdcPort,
+    supports: (port) => support.supports(port),
     run: async (port, cancelled) => {
       let live: SerialPort | null = null;
       let failure: string | undefined;
       try {
-        live = await resetPicoForLogs(port, baudRate, cancelled);
+        live = await support.reset(port, baudRate, cancelled);
       } catch (err) {
-        console.warn("Pico reset failed", err);
-        failure = localize(picoResetFailureKey(err, "dashboard.logs_reset_failed"));
+        console.warn("Reset Device failed", err);
+        failure = localize(support.failureKey(err));
       }
       if (failure) {
-        // A stranded Pico still gets its toast once the session moved on,
+        // A stranded device still gets its toast once the session moved on,
         // but a newer session must not be flipped dead.
         if (cancelled()) notifyError(failure);
         else failSerialOpen(logsDialog, failure);
@@ -188,38 +180,31 @@ export function picoResetHook(
 }
 
 /**
- * The BLE twin of ``attachSerialLogStream``: a stream registered, or the
- * session dead with the reason in the pane. A remote disconnect goes dead
+ * The Bluetooth twin of ``attachSerialLogStream``: a stream registered, or
+ * the session dead with the reason in the pane. A remote disconnect goes dead
  * quietly (Start reconnects); a failed connect also toasts.
  */
-export async function attachBleNusLogs(
+export async function attachBleLogs(
   dialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
+  ble: BleLogsSupport,
   device: BluetoothDevice,
   cancelled: () => boolean
 ): Promise<void> {
   let cancel: () => Promise<void>;
   try {
-    cancel = await streamBleNus(
+    cancel = await ble.connect(
       device,
       {
         ...dialogLineHooks(dialog),
         onDisconnect: () =>
           dialog.setSerialOpenFailed(localize("dashboard.logs_ble_nus_disconnected")),
       },
-      { attempts: BLE_CONNECT_ATTEMPTS, cancelled }
-    );
-  } catch (err) {
-    console.warn("BLE NUS connect failed", err);
-    failSerialOpen(
-      dialog,
-      localize(
-        err instanceof BleNusServiceNotFoundError
-          ? "dashboard.logs_ble_nus_service_not_found"
-          : "dashboard.logs_ble_nus_open_failed"
-      ),
       cancelled
     );
+  } catch (err) {
+    console.warn("Bluetooth logs connect failed", err);
+    failSerialOpen(dialog, localize(ble.failureKey(err)), cancelled);
     return;
   }
   if (cancelled()) {
@@ -227,53 +212,6 @@ export async function attachBleNusLogs(
     return;
   }
   dialog.setBleStream(cancel);
-}
-
-/**
- * Detail shape of the cancelable ``request-show-logs-after-install``
- * event dispatched by the install dialogs (command-dialog for OTA /
- * server-serial, firmware-install-dialog for Web Serial).
- *
- * ``port`` is set on the network / server-serial path. ``webSerialPort``
- * is set on the Web Serial path — the dispatching dialog disconnected
- * it for the install reset, and the handler reopens it at log baud.
- * Exactly one of those two is set per event. ``reopenInstall`` is the
- * callback the logs dialog's "Back to install" button invokes to
- * re-show the original install dialog with its preserved state.
- */
-export interface PostInstallShowLogsDetail {
-  configuration: string;
-  name: string;
-  port?: string;
-  webSerialPort?: SerialPort;
-  // Raw device logger baud_rate, only meaningful on the webSerialPort path.
-  // The handler resolves it: null / absent ⇒ 115200 default, 0 ⇒ serial
-  // logging disabled (skip with a notice).
-  loggerBaudRate?: number | null;
-  // Resolved logger output interface (Device.logger_interface), only
-  // meaningful on the webSerialPort path: a port that can't carry it
-  // reroutes to network logs.
-  loggerInterface?: string | null;
-  // Device.target_platform, so the logs get the same Reset Device wiring as
-  // a launch from the card (a Pico hook where that applies).
-  targetPlatform?: string;
-  reopenInstall: () => void;
-}
-
-/**
- * Dispatch the cancelable ``request-show-logs-after-install`` event
- * from an install dialog. Returns ``true`` iff a host claimed the
- * handoff (called ``preventDefault()``) — the install dialog uses
- * that to decide whether to hide itself or stay open. Centralised
- * here so the two install dialogs (command-dialog for OTA / server-
- * serial, firmware-install-dialog for Web Serial) don't drift on
- * the event name, the ``cancelable`` flag, or the bubble shape.
- */
-export function dispatchShowLogsAfterInstall(
-  source: HTMLElement,
-  detail: PostInstallShowLogsDetail
-): boolean {
-  return fireRequestEvent(source, "request-show-logs-after-install", detail);
 }
 
 /**
@@ -395,7 +333,7 @@ export async function handlePostInstallShowLogs(
           cancelled,
           targetPlatform ?? ""
         ),
-      onResetDevice: picoResetHook(logsDialog, localize, targetPlatform ?? "", baudRate),
+      onResetDevice: sessionResetHook(logsDialog, localize, targetPlatform, baudRate),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

@@ -6,7 +6,7 @@ import {
 import { OTA_PORT } from "../../api/types/streaming.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
-import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
+import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.js";
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
