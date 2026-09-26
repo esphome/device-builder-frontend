@@ -342,6 +342,16 @@ describe("probeAmbz2", () => {
     await expect(driveFakeTimers(probeAmbz2(rom.port))).resolves.toBe(true);
   });
 
+  it("unwinds on abort, releasing the port, and is false", async () => {
+    const rom = fakeRom({ lostResets: 99, linkAfterPings: 1000 });
+    const abort = new AbortController();
+    const p = probeAmbz2(rom.port, { signal: abort.signal });
+    await vi.advanceTimersByTimeAsync(500);
+    abort.abort();
+    await expect(driveFakeTimers(p)).resolves.toBe(false);
+    expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
   it("is false, not thrown, when the port cannot even be opened", async () => {
     const rom = fakeRom();
     rom.raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));

@@ -131,4 +131,31 @@ describe("detectBoard", () => {
     );
     expect(rtl.probeAmbz2).not.toHaveBeenCalled();
   });
+
+  it("gives up on a probe that never settles and keeps esptool's failure", async () => {
+    vi.useFakeTimers();
+    try {
+      engine.connectToPort.mockRejectedValueOnce(
+        new NoEspAnswerError(new Error("Failed to connect with the device"))
+      );
+      rtl.probeAmbz2.mockReturnValueOnce(new Promise(() => {}));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const result = detectBoard(port(0x1a86, 0x7523));
+      const assertion = expect(result).rejects.toBeInstanceOf(NoEspAnswerError);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Gave up on the probe"),
+        expect.any(Error)
+      );
+      // The session was told to stop first, before the outer deadline fired.
+      const [, hooks] = rtl.probeAmbz2.mock.calls[0] as unknown as [
+        SerialPort,
+        { signal: AbortSignal },
+      ];
+      expect(hooks.signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
