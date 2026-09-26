@@ -15,6 +15,7 @@ import {
   rebootNrf,
 } from "../../../src/platforms/nrf52/nrf-logs-reset.js";
 import { isNrfAppCdcPort } from "../../../src/platforms/nrf52/nrf-platform.js";
+import { NRF_RESET } from "../../../src/web/platforms/nrf52/logs-policy.js";
 
 function makePort(connected: boolean | undefined = true) {
   const port = Object.assign(new EventTarget(), {
@@ -61,6 +62,17 @@ describe("rebootNrf", () => {
     expect(mocks.touchPort).not.toHaveBeenCalled();
   });
 
+  it("stops quietly when the session moves on while it waits for the drop", async () => {
+    const port = makePort();
+    let moved = false;
+    mocks.sleep.mockImplementationOnce(async () => {
+      moved = true;
+    });
+    await expect(rebootNrf(port as unknown as SerialPort, () => moved)).resolves.toBe(
+      false
+    );
+  });
+
   it("gives up when the device never drops (firmware too old to react)", async () => {
     vi.useFakeTimers();
     const port = makePort();
@@ -85,5 +97,12 @@ describe("nRF52 reset helpers", () => {
     expect(isNrfAppCdcPort(makePort() as unknown as SerialPort)).toBe(true);
     const bridge = { getInfo: () => ({ usbVendorId: 0x10c4, usbProductId: 0xea60 }) };
     expect(isNrfAppCdcPort(bridge as unknown as SerialPort)).toBe(false);
+  });
+
+  it("offers Reset on web.esphome.io only on ESPHome's own CDC", () => {
+    expect(NRF_RESET.supports?.(makePort() as unknown as SerialPort)).toBe(true);
+    // The Adafruit bootloader of an ItsyBitsy nRF52840.
+    const bootloader = { getInfo: () => ({ usbVendorId: 0x239a, usbProductId: 0x0051 }) };
+    expect(NRF_RESET.supports?.(bootloader as unknown as SerialPort)).toBe(false);
   });
 });

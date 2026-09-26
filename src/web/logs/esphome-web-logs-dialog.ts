@@ -134,9 +134,14 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._stop();
   }
 
-  /** The family's Reset device, where this browser can send it; never over Bluetooth. */
+  /**
+   * The family's Reset device, where this browser can send it and the board
+   * behind the port takes it; never over Bluetooth.
+   */
   get canReset(): boolean {
-    return !this.bleDevice && (this.policy.reset?.available() ?? false);
+    const reset = this.policy.reset;
+    if (this.bleDevice || !reset?.available()) return false;
+    return !this.port || (reset.supports?.(this.port) ?? true);
   }
 
   /**

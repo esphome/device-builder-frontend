@@ -26,7 +26,7 @@ export class NrfResetIgnoredError extends Error {
 /**
  * Reboot the nRF52 behind *port* (closed by the caller) into its app; its CDC
  * port re-enumerates afterwards. False when ``cancelled`` flipped before the
- * touch. Throws ``NrfResetIgnoredError`` when the device never drops.
+ * device dropped. Throws ``NrfResetIgnoredError`` when it never drops.
  */
 export async function rebootNrf(
   port: SerialPort,
@@ -42,6 +42,8 @@ export async function rebootNrf(
     await touchPort(port, NRF_RESET_BAUD_RATE);
     const deadline = Date.now() + REBOOT_WAIT_MS;
     while (!dropped && port.connected !== false) {
+      // A session that moved on must not get a late "update ESPHome".
+      if (cancelled()) return false;
       if (Date.now() >= deadline) throw new NrfResetIgnoredError();
       await sleep(REBOOT_POLL_MS);
     }

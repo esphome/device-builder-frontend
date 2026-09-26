@@ -1,7 +1,8 @@
 import {
+  isNrfAppCdcPort,
   nrfResetFailureKey,
   rebootNrf,
-} from "../../../platforms/nrf52/nrf-logs-reset.js";
+} from "../../../platforms/nrf52/index.js";
 import type { WebLogsPolicy, WebSerialReset } from "../../logs/logs-policy.js";
 
 /**
@@ -11,6 +12,9 @@ import type { WebLogsPolicy, WebSerialReset } from "../../logs/logs-policy.js";
  */
 export const NRF_RESET: WebSerialReset = {
   available: () => true,
+  // Only ESPHome's own CDC reacts; the bootloader or other firmware would
+  // just get a misleading "update ESPHome".
+  supports: isNrfAppCdcPort,
   dropsStream: true,
   run: async (port, cancelled) => {
     await rebootNrf(port, cancelled);
