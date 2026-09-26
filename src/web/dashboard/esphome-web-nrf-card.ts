@@ -15,6 +15,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import "../install/esphome-web-install-nrf-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
+import { releaseOrphanedPort } from "../util/release-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -73,7 +74,7 @@ export class ESPHomeWebNrfCard extends LitElement {
       // A flow switch accepted while the open was pending unmounted this
       // card: nothing is left to own the port, so release it.
       if (!this.isConnected) {
-        await port.close().catch(() => {});
+        await releaseOrphanedPort(port);
         return;
       }
       this._logs = { port };

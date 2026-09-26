@@ -1904,7 +1904,8 @@
       "esp": "The connected device looks like an ESP board.",
       "action_pico": "Switch to the Pico flow",
       "action_nrf": "Switch to the nRF52 flow",
-      "action_esp": "Switch to the ESP flow"
+      "action_esp": "Switch to the ESP flow",
+      "busy": "Finish the current operation first, then switch flows."
     },
     "improv": {
       "open_failed": "Could not open the serial port for Wi-Fi setup. If the device just restarted, unplug it, plug it back in and retry.",

@@ -125,6 +125,8 @@ describe("web app flow-switch suggestion", () => {
     hasOpenDialog.mockReturnValue(true);
     onClick();
     expect(window.location.search).toBe("");
+    // The refusal is not silent.
+    expect(notifyInfo.mock.lastCall![0]).toBe("web.flow_switch.busy");
   });
 
   it("keeps the offer for a replug once the dialog that suppressed it has closed", async () => {

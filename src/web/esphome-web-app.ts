@@ -159,7 +159,13 @@ export class ESPHomeWebApp extends LitElement {
         label: this._localize(`web.flow_switch.action_${family}`),
         // The toast outlives the moment; a dialog may have opened since.
         onClick: () => {
-          if (!this._operationInProgress()) this._setMode(family);
+          if (this._operationInProgress()) {
+            notifyInfo(this._localize("web.flow_switch.busy"), {
+              id: "esphome-web-flow-switch",
+            });
+            return;
+          }
+          this._setMode(family);
         },
       },
     });
