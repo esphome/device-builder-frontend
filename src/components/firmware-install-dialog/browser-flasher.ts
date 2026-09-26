@@ -55,6 +55,8 @@ export interface BrowserFlasher<Id extends FlasherId> {
   readonly methodKey: string;
   /** The flash leaves a port the logs can reopen (the show-logs toggle). */
   readonly holdsPort: boolean;
+  /** Where the flasher keeps its parsed image; Retry skips the compile while it holds one. */
+  readonly image: FlashImageSlot<object>;
   /** Compile, download and parse, then show the first user-gesture step. */
   start(host: Host): Promise<void>;
   /** The Retry target while the parsed image is kept. */

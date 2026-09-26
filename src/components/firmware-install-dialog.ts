@@ -198,7 +198,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _detected: DetectedChip | null = null;
 
   // The browser flasher running this install (nRF52, Pico, RTL8720C), and its
-  // parsed image, read through the flasher's FlashImageSlot.
+  // parsed image, read through the flasher's own FlashImageSlot.
   // Not @state: it only changes with _installer, which is.
   _flasher: AnyBrowserFlasher | null = null;
   _flashImage: unknown = null;
@@ -477,7 +477,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // keeps the parsed image, so go back to the flasher's first step without
   // recompiling; a failure before the image existed runs the whole install.
   private _retryFlasher(flasher: AnyBrowserFlasher, device: ConfiguredDevice) {
-    if (this._flashImage === null) {
+    if (flasher.image.get(this) === null) {
       this.installBrowserFlasher(flasher, device);
       return;
     }

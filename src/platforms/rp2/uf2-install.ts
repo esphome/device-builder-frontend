@@ -160,6 +160,7 @@ export const rp2Uf2Flasher: BrowserFlasher<"rp2-uf2"> = {
   matches: isRp2Platform,
   methodKey: "rp2_uf2",
   holdsPort: false,
+  image: rp2Image,
   start: startRp2Uf2Install,
   showFirstStep: showBootselStep,
   steps: {

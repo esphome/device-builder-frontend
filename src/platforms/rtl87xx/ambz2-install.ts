@@ -130,6 +130,7 @@ export const rtlAmbz2Flasher: BrowserFlasher<"rtl-ambz2"> = {
   methodKey: "rtl_ambz2",
   // The logs reopen the flash's port (Show logs on Done, the after-install toggle).
   holdsPort: true,
+  image: rtlImage,
   start: startRtlAmbz2Install,
   showFirstStep: showReadyStep,
   steps: {

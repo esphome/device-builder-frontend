@@ -152,6 +152,7 @@ export const nrfDfuFlasher: BrowserFlasher<"nrf-dfu"> = {
   matches: isNrfPlatform,
   methodKey: "nrf_dfu",
   holdsPort: false,
+  image: nrfPackage,
   start: startNrfDfuInstall,
   showFirstStep: showResetStep,
   steps: {

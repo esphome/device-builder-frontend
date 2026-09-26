@@ -29,9 +29,12 @@ import {
 } from "../../../src/components/firmware-install-dialog/renderers.js";
 import { BROWSER_FLASHERS } from "../../../src/platforms/browser-flashers.js";
 
+// tsc checks src and test as one program, so this widens FlasherId and
+// InstallStep there too; the ids are test-only on purpose so a stray use in
+// src stands out.
 declare module "../../../src/components/firmware-install-dialog/types.js" {
   interface BrowserFlasherSteps {
-    "fake-flash": "fake-ready" | "fake-wait";
+    "test-only-flash": "test-only-ready" | "test-only-wait";
   }
 }
 
@@ -40,28 +43,29 @@ const fakeImage = new FlashImageSlot<{ bytes: number }>();
 const doReset = vi.fn();
 const doFlash = vi.fn();
 
-const fakeFlasher: BrowserFlasher<"fake-flash"> = {
-  id: "fake-flash",
+const fakeFlasher: BrowserFlasher<"test-only-flash"> = {
+  id: "test-only-flash",
   matches: (p) => p === "fake",
   methodKey: "fake",
   holdsPort: true,
+  image: fakeImage,
   start: vi.fn(async (host) => {
     fakeImage.set(host, { bytes: 1 });
     fakeFlasher.showFirstStep(host);
   }),
   showFirstStep: (host) => {
-    host._step = "fake-ready";
+    host._step = "test-only-ready";
     host._statusMessage = "fake.ready_title";
   },
   steps: {
-    "fake-ready": {
+    "test-only-ready": {
       detailKey: "fake.ready_desc",
       footer: () => ({
         secondary: { run: doFlash, labelKey: "fake.flash" },
         primary: { run: doReset, labelKey: "fake.reset" },
       }),
     },
-    "fake-wait": {
+    "test-only-wait": {
       detailKey: () => "fake.wait_desc",
       extra: () => html`<span class="fake-extra"></span>`,
     },
@@ -105,9 +109,9 @@ describe("a browser flasher in the install dialog", () => {
     dialog.installBrowserFlasher(fakeFlasher, device);
     await Promise.resolve();
     expect(fakeFlasher.start).toHaveBeenCalledWith(dialog);
-    expect(dialog._installer).toBe("fake-flash");
+    expect(dialog._installer).toBe("test-only-flash");
     expect(dialog._flasher).toBe(fakeFlasher);
-    expect(dialog._step).toBe("fake-ready");
+    expect(dialog._step).toBe("test-only-ready");
     expect(cardState(dialog)).toBe("running");
     expect(cardStatusDetail(dialog)).toBe("fake.ready_desc");
   });
@@ -115,7 +119,7 @@ describe("a browser flasher in the install dialog", () => {
   it("runs the step's buttons with the dialog from the click", () => {
     const dialog = makeDialog();
     dialog.installBrowserFlasher(fakeFlasher, device);
-    dialog._step = "fake-ready";
+    dialog._step = "test-only-ready";
     const clicks = values(renderFooter(dialog)).filter(
       (v): v is () => void =>
         typeof v === "function" && v !== dialog._close && v.length === 0
@@ -128,7 +132,7 @@ describe("a browser flasher in the install dialog", () => {
   it("uses a function detail, the step body, and keeps Stop with the logs toggle", () => {
     const dialog = makeDialog();
     dialog.installBrowserFlasher(fakeFlasher, device);
-    dialog._step = "fake-wait";
+    dialog._step = "test-only-wait";
     expect(cardStatusDetail(dialog)).toBe("fake.wait_desc");
     expect(
       findTemplatesByAnchor(renderStatusExtra(dialog), 'class="fake-extra"')
@@ -161,11 +165,22 @@ describe("Retry for a browser flasher", () => {
     }
   );
 
+  it("reinstalls when the slot holds an image the flasher did not store", async () => {
+    const dialog = dialogRunning(fakeFlasher);
+    dialog._flashImage = { bytes: 1 };
+    dialog._step = "error";
+    const install = vi
+      .spyOn(dialog, "installBrowserFlasher")
+      .mockImplementation(() => {});
+    await dialog._retry();
+    expect(install).toHaveBeenCalledWith(fakeFlasher, device);
+  });
+
   it.each([...BROWSER_FLASHERS, fakeFlasher].map((f) => [f.id, f] as const))(
     "%s returns to its first step without recompiling while the image is kept",
     async (_id, flasher) => {
       const dialog = dialogRunning(flasher);
-      dialog._flashImage = {};
+      flasher.image.set(dialog, {});
       dialog._step = "error";
       dialog._errorMessage = "failed";
       dialog._flashBusy = true;
