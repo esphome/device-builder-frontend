@@ -214,7 +214,10 @@ async function releasePort(transport: Transport): Promise<void> {
   const release = transport.disconnect().catch(async (err: unknown) => {
     if (abandoned) return;
     console.warn("[esptool] Disconnect failed, closing the port directly:", err);
-    await transport.device.close().catch(() => {});
+    await transport.device.close().catch((closeErr: unknown) => {
+      // Usually "already closed" after a re-enumeration; a hang is caught below.
+      console.warn("[esptool] Closing the port directly failed too:", closeErr);
+    });
   });
   if (!(await settledWithin(release, RELEASE_DEADLINE_MS))) {
     abandoned = true;
