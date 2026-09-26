@@ -22,7 +22,8 @@ import { SerialPortsPollController } from "../../util/serial-ports-poll-controll
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
-  platformToPreset,
+  detectedBoardId,
+  detectionPreset,
   WIZARD_BOARD_PLATFORMS,
   type WizardBoardPreset,
 } from "./wizard-step-board-platforms.js";
@@ -305,41 +306,26 @@ export class ESPHomeWizardStepBoard extends LitElement {
     }
     if (!detection) return; // picker dismissed
 
-    // A board that names its platform by its USB ids narrows the picker to
-    // the platform; one we can't tell leaves it open and says so, since the
-    // user picked that port on purpose (#1856).
-    if (detection.kind !== "esp") {
-      if (detection.kind === "family") {
-        this._applyDetection(platformToPreset(detection.family));
-      } else {
-        this._applyDetection(null);
-        this._detectError = this._localize("wizard.connect_your_board_unrecognized");
-      }
-      void this._fetchBoards();
+    // A board named outright (a factory firmware's app descriptor, or the
+    // boot banner) is added as itself; same flow as ``detectAndOpenWizard``
+    // so both entry points behave alike. A catalog miss, or a request that
+    // failed (fetchBoard logs it and resolves null), falls through to the
+    // picker narrowed to what was found.
+    const boardId = detectedBoardId(detection);
+    const knownBoard = boardId ? await fetchBoard(this._api, boardId) : null;
+    if (knownBoard) {
+      this._onAdd(knownBoard);
       return;
     }
-    const board = detection.board;
-
-    // A factory-flashed firmware that sets ``esphome.name`` to a catalog id
-    // names the board outright through the app descriptor; same flow as
-    // ``detectAndOpenWizard`` so both entry points behave alike.
-    if (board.manifest?.board_id) {
-      const knownBoard = await fetchBoard(this._api, board.manifest.board_id);
-      if (knownBoard) {
-        this._onAdd(knownBoard);
-        return;
-      }
-      // ``board_id`` set but the catalog doesn't know it, or the request failed
-      // (fetchBoard logs it and resolves null) — fall through to chip-family
-      // filtering rather than failing.
+    // Narrow the picker to the platform or chip found and let the user pick
+    // (landing on a filtered picker beats auto-advancing to a generic board:
+    // they can still pick it explicitly, or one of several boards for their
+    // chip). A device we can't tell leaves it open and says so, since the
+    // user picked that port on purpose (#1856).
+    this._applyDetection(detectionPreset(detection));
+    if (detection.kind === "unknown") {
+      this._detectError = this._localize("wizard.connect_your_board_unrecognized");
     }
-
-    // No specific board match — narrow the picker to the detected chip
-    // family and let the user pick. The generic-{family} auto-advance used to
-    // live here, but landing the user on a filtered picker is the better UX:
-    // they can still pick the generic board explicitly, or one of several
-    // boards for their chip.
-    this._applyDetectedFilter(chipNameToFilterLabel(board.chipName));
     void this._fetchBoards();
   }
 

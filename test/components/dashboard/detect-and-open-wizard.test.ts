@@ -18,6 +18,11 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
+const banner = vi.hoisted(() => ({ readBootBanner: vi.fn(async () => "") }));
+vi.mock("../../../src/platforms/boot-banner.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  readBootBanner: banner.readBootBanner,
+}));
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -174,5 +179,36 @@ describe("detectAndOpenWizard", () => {
       expect.objectContaining({ platform: "rp2" })
     );
     expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("lands a board its boot banner named on itself", async () => {
+    const dialog = makeDialog();
+    banner.readBootBanner.mockResolvedValueOnce(
+      "LibreTiny v1.13.0+sha.1 on bw15, compiled at x"
+    );
+    const bw15 = { id: "bw15", name: "BW15" };
+    const api = { getBoard: vi.fn(async () => bw15) };
+    await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, {
+      port: makeUsbPort(0x1a86, 0x7523),
+      localize,
+    });
+    expect(api.getBoard).toHaveBeenCalledWith("bw15");
+    expect(dialog.openWithBoard).toHaveBeenCalledWith(bw15);
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("narrows to the chip when the banner's board is not in the catalog", async () => {
+    const dialog = makeDialog();
+    banner.readBootBanner.mockResolvedValueOnce(
+      "== Rtl8710c IoT Platform ==\nLibreTiny v1 on some-new-kit, compiled at x"
+    );
+    const api = { getBoard: vi.fn().mockRejectedValue(new Error("no such board")) };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, {
+      port: makeUsbPort(0x1a86, 0x7523),
+      localize,
+    });
+    warn.mockRestore();
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "RTL8720C" });
   });
 });

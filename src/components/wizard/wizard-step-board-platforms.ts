@@ -18,6 +18,7 @@
  *   Absent for platforms split by ``variant`` instead.
  * - ``label`` is the user-facing chip text.
  */
+import type { BoardDetection } from "../../platforms/detect-board.js";
 import { chipPlatformFamily } from "../../util/chip-variant.js";
 import { RP2_CANONICAL_KEY } from "../../util/component-presence.js";
 
@@ -70,14 +71,20 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
 ];
 
 /**
- * The preset for a platform known only by its key: its one chip's filter
- * when it has one, else the platform as a whole. ``null`` for a platform the
- * picker has no chips for.
+ * The preset for a platform known by its key, and its chip (``mcu``) when
+ * the detection knows that too: that chip's filter, else the platform's one
+ * chip, else the platform as a whole. ``null`` for a platform the picker has
+ * no chips for.
  */
-export function platformToPreset(platform: string): WizardBoardPreset | null {
+export function platformToPreset(
+  platform: string,
+  mcu?: string
+): WizardBoardPreset | null {
   const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
+  const chip =
+    chips.find((p) => p.mcu === mcu) ?? (chips.length === 1 ? chips[0] : undefined);
+  if (chip) return { label: chip.label };
   if (chips.length === 0) return null;
-  if (chips.length === 1) return { label: chips[0].label };
   return { label: chips.map((p) => p.label).join(" / "), platform };
 }
 
@@ -101,4 +108,31 @@ export function chipNameToFilterLabel(chipName: string): string | null {
       (!p.variant && !p.mcu && p.platform === family)
   );
   return match?.label ?? null;
+}
+
+/** The catalog id a detection named, if any. */
+export function detectedBoardId(detection: BoardDetection): string | undefined {
+  switch (detection.kind) {
+    case "esp":
+      return detection.board.manifest?.board_id;
+    case "family":
+    case "board":
+      return detection.board;
+    default:
+      return undefined;
+  }
+}
+
+/** The board picker's preset for a detection that named no catalog board. */
+export function detectionPreset(detection: BoardDetection): WizardBoardPreset | null {
+  switch (detection.kind) {
+    case "esp": {
+      const label = chipNameToFilterLabel(detection.board.chipName);
+      return label ? { label } : null;
+    }
+    case "family":
+      return platformToPreset(detection.platform, detection.mcu);
+    default:
+      return null;
+  }
 }

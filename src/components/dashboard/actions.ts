@@ -18,8 +18,8 @@ import {
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
-  chipNameToFilterLabel,
-  platformToPreset,
+  detectedBoardId,
+  detectionPreset,
   type WizardBoardPreset,
 } from "../wizard/wizard-step-board-platforms.js";
 
@@ -341,54 +341,47 @@ export async function detectAndOpenWizard(
     createDialog.open("board");
     return;
   }
-  // A board that names its platform by its USB ids lands on that platform's
-  // boards; one we can't tell lands on the full picker. Neither ran esptool,
-  // which would sit on a Pico's CDC waiting for a ROM loader (#1856).
-  if (detection.kind !== "esp") {
-    createDialog.openAtBoardStep(
-      detection.kind === "family" ? platformToPreset(detection.family) : null
-    );
-    return;
-  }
-  const board = detection.board;
-
-  const recognized =
-    board.mac && options.onRecognized
-      ? (options.devices?.find(
-          (d) => d.mac_address && d.mac_address.toUpperCase() === board.mac
-        ) ?? null)
-      : null;
-  if (recognized && options.onRecognized) {
-    if (options.localize) {
-      notifySuccess(
-        options.localize("dashboard.serial_recognized", {
-          name: recognized.friendly_name || recognized.name,
-        })
-      );
-    }
-    options.onRecognized(recognized);
-    return;
-  }
-
-  if (board.manifest?.board_id) {
-    // A catalog miss (older dashboard, unreleased product) or a request
-    // failure (fetchBoard logs it and resolves null) falls through to the
-    // chip-family picker rather than failing: the user still gets a useful
-    // onboarding path.
-    const known = await fetchBoard(api, board.manifest.board_id);
-    if (known) {
+  if (detection.kind === "esp") {
+    const board = detection.board;
+    const recognized =
+      board.mac && options.onRecognized
+        ? (options.devices?.find(
+            (d) => d.mac_address && d.mac_address.toUpperCase() === board.mac
+          ) ?? null)
+        : null;
+    if (recognized && options.onRecognized) {
       if (options.localize) {
         notifySuccess(
-          options.localize("dashboard.serial_starterkit_detected", { name: known.name })
+          options.localize("dashboard.serial_recognized", {
+            name: recognized.friendly_name || recognized.name,
+          })
         );
       }
-      createDialog.openWithBoard(known);
+      options.onRecognized(recognized);
       return;
     }
   }
 
-  const label = chipNameToFilterLabel(board.chipName);
-  createDialog.openAtBoardStep(label ? { label } : null);
+  // A board named outright, by a factory firmware's app descriptor or by the
+  // boot banner, lands on itself. A catalog miss (older dashboard, unreleased
+  // product) or a request failure (fetchBoard logs it and resolves null)
+  // falls through to the chip-family picker rather than failing: the user
+  // still gets a useful onboarding path.
+  const boardId = detectedBoardId(detection);
+  const known = boardId ? await fetchBoard(api, boardId) : null;
+  if (known) {
+    if (options.localize) {
+      notifySuccess(
+        options.localize("dashboard.serial_starterkit_detected", { name: known.name })
+      );
+    }
+    createDialog.openWithBoard(known);
+    return;
+  }
+  // Else the platform's boards (from the USB ids or the banner; neither ran
+  // esptool, which would sit on a Pico's CDC waiting for a ROM loader,
+  // #1856), the ESP's chip, or the full picker.
+  createDialog.openAtBoardStep(detectionPreset(detection));
 }
 
 export async function fetchEncryptionKey(

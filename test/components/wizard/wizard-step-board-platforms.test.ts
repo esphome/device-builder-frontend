@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   chipNameToFilterLabel,
+  detectedBoardId,
+  detectionPreset,
   platformToPreset,
   WIZARD_BOARD_PLATFORMS,
 } from "../../../src/components/wizard/wizard-step-board-platforms.js";
@@ -181,6 +183,41 @@ describe("wizard step-board platform chips", () => {
 
     it("has no preset for a platform the picker doesn't know", () => {
       expect(platformToPreset("zephyr")).toBeNull();
+    });
+  });
+
+  describe("detection helpers", () => {
+    it("narrows to the chip when the detection names it", () => {
+      expect(platformToPreset("rtl87xx", "rtl8720c")).toEqual({ label: "RTL8720C" });
+    });
+
+    it("takes the board id from the app descriptor or the banner", () => {
+      expect(
+        detectedBoardId({
+          kind: "esp",
+          board: { chipName: "ESP32", mac: null, manifest: { board_id: "kit" } },
+        })
+      ).toBe("kit");
+      expect(
+        detectedBoardId({ kind: "family", platform: "rtl87xx", board: "bw15" })
+      ).toBe("bw15");
+      expect(detectedBoardId({ kind: "board", board: "cb3s" })).toBe("cb3s");
+      expect(detectedBoardId({ kind: "unknown" })).toBeUndefined();
+    });
+
+    it("presets the chip, the platform, or nothing", () => {
+      expect(
+        detectionPreset({
+          kind: "esp",
+          board: { chipName: "ESP32-S3", mac: null, manifest: null },
+        })
+      ).toEqual({ label: "ESP32-S3" });
+      expect(detectionPreset({ kind: "family", platform: "rp2" })).toEqual({
+        label: "RP2040 / RP2350",
+        platform: "rp2",
+      });
+      expect(detectionPreset({ kind: "board", board: "cb3s" })).toBeNull();
+      expect(detectionPreset({ kind: "unknown" })).toBeNull();
     });
   });
 });

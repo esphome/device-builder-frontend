@@ -14,6 +14,11 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
+const banner = vi.hoisted(() => ({ readBootBanner: vi.fn(async () => "") }));
+vi.mock("../../src/platforms/boot-banner.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  readBootBanner: banner.readBootBanner,
+}));
 
 import { detectBoard } from "../../src/platforms/detect-board.js";
 import { makeUsbPort as port } from "../web/_make-web-serial-port.js";
@@ -31,17 +36,18 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  banner.readBootBanner.mockResolvedValue("");
 });
 
 describe("detectBoard", () => {
   it("names a Pico or an nRF52 by its USB ids without touching esptool", async () => {
     expect(await detectBoard(port(0x2e8a, 0xf00a))).toEqual({
       kind: "family",
-      family: "rp2",
+      platform: "rp2",
     });
     expect(await detectBoard(port(0x2fe3, 0x0100))).toEqual({
       kind: "family",
-      family: "nrf52",
+      platform: "nrf52",
     });
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
@@ -64,7 +70,7 @@ describe("detectBoard", () => {
 
   it("picks a port when none is in hand, and classifies it the same way", async () => {
     seams.requestSerialPort.mockResolvedValueOnce(port(0x2e8a, 0xf00a));
-    expect(await detectBoard(null)).toEqual({ kind: "family", family: "rp2" });
+    expect(await detectBoard(null)).toEqual({ kind: "family", platform: "rp2" });
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 
@@ -76,5 +82,49 @@ describe("detectBoard", () => {
   it("lets the ESP path's failures through untouched", async () => {
     engine.connectToPort.mockRejectedValueOnce(new Error("no sync"));
     await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toThrow("no sync");
+  });
+
+  it("reads the boot banner on a bridge first, and names the board without esptool", async () => {
+    banner.readBootBanner.mockResolvedValueOnce(
+      "== Rtl8710c IoT Platform ==\nLibreTiny v1.13.0+sha.6514b26 on bw15, compiled at x"
+    );
+    const bridge = port(0x1a86, 0x7523);
+    expect(await detectBoard(bridge)).toEqual({
+      kind: "family",
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
+      board: "bw15",
+    });
+    expect(banner.readBootBanner).toHaveBeenCalledWith(bridge);
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("hands a LibreTiny board with no ROM line to the catalog", async () => {
+    banner.readBootBanner.mockResolvedValueOnce(
+      "LibreTiny v1.13.0+sha.1 on cb3s, compiled at x"
+    );
+    expect(await detectBoard(port(0x1a86, 0x7523))).toEqual({
+      kind: "board",
+      board: "cb3s",
+    });
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("runs esptool when the banner says ESP, says nothing, or cannot be read", async () => {
+    const bridge = port(0x1a86, 0x7523);
+    banner.readBootBanner.mockResolvedValueOnce("rst:0x1 (POWERON_RESET),boot:0x13");
+    expect(await detectBoard(bridge)).toMatchObject({ kind: "esp" });
+    banner.readBootBanner.mockResolvedValueOnce("");
+    expect(await detectBoard(bridge)).toMatchObject({ kind: "esp" });
+    banner.readBootBanner.mockRejectedValueOnce(new DOMException("held", "NetworkError"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await detectBoard(bridge)).toMatchObject({ kind: "esp" });
+    warn.mockRestore();
+    expect(engine.connectToPort).toHaveBeenCalledTimes(3);
+  });
+
+  it("never reads a banner on Espressif's own USB", async () => {
+    expect(await detectBoard(port(0x303a, 0x1001))).toMatchObject({ kind: "esp" });
+    expect(banner.readBootBanner).not.toHaveBeenCalled();
   });
 });
