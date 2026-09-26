@@ -23,6 +23,7 @@ import {
 import "../install/esphome-web-install-adoptable-dialog.js";
 import "../install/esphome-web-install-upload-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
+import { releaseOrphanedPort } from "../util/release-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -61,7 +62,7 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
     // A flow switch accepted while the open was pending unmounted this
     // card: nothing is left to own the port, so release it.
     if (!this.isConnected) {
-      await this.port.close().catch(() => {});
+      await releaseOrphanedPort(this.port);
       return;
     }
     this._logsOpen = true;
