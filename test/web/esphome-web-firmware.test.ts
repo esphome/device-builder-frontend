@@ -4,7 +4,6 @@ import {
   downloadBuildParts,
   fetchEsphomeWebManifest,
   type FirmwareManifest,
-  picoUf2Url,
   selectBuild,
 } from "../../src/web/util/esphome-web-firmware.js";
 
@@ -33,14 +32,6 @@ describe("selectBuild", () => {
 
   it("returns undefined for an unlisted chip", () => {
     expect(selectBuild(MANIFEST, "ESP32-H2")).toBeUndefined();
-  });
-});
-
-describe("picoUf2Url", () => {
-  it("builds the versioned rp2040 UF2 url", () => {
-    expect(picoUf2Url(MANIFEST)).toBe(
-      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2040.uf2"
-    );
   });
 });
 

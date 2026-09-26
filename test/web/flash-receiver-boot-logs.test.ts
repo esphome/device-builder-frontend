@@ -5,7 +5,7 @@ vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
   webSerialAvailability: vi.fn(() => "available"),
 }));
-vi.mock("../../src/web/install/run-flash.js", () => ({ runFlash: vi.fn() }));
+vi.mock("../../src/web/platforms/esp/run-flash.js", () => ({ runFlash: vi.fn() }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("../../src/components/ansi-log.js", () => ({}));

@@ -73,13 +73,3 @@ export async function fetchFirmwareFile(path: string): Promise<Uint8Array> {
   if (!resp.ok) throw new Error(`Downloading ${path} failed (${resp.status})`);
   return new Uint8Array(await resp.arrayBuffer());
 }
-
-/** The Raspberry Pi Pico W UF2's path under the prefix for the manifest's version. */
-export function picoUf2Path(manifest: FirmwareManifest): string {
-  return `${manifest.version}/esphome-web-rp2040.uf2`;
-}
-
-/** The Raspberry Pi Pico W UF2 download URL for the manifest's version. */
-export function picoUf2Url(manifest: FirmwareManifest): string {
-  return `${ESPHOME_WEB_FIRMWARE_PREFIX}/${picoUf2Path(manifest)}`;
-}

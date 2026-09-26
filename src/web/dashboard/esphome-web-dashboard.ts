@@ -8,10 +8,10 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import { parseDashboardHint } from "../dashboard-hint.js";
 import type { WebMode } from "../web-mode.js";
-import "./esphome-web-esp-connect-card.js";
-import "./esphome-web-nrf-card.js";
-import "./esphome-web-pico-connect-card.js";
-import "./esphome-web-rtl-card.js";
+import "../platforms/esp/esphome-web-esp-connect-card.js";
+import "../platforms/nrf52/esphome-web-nrf-card.js";
+import "../platforms/rp2/esphome-web-pico-connect-card.js";
+import "../platforms/rtl87xx/esphome-web-rtl-card.js";
 import "./esphome-web-unsupported-card.js";
 
 /**
