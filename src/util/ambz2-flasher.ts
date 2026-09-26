@@ -162,9 +162,9 @@ class RomLink extends SerialStreamSession implements XmodemIo {
 /**
  * Boards wired like the BW15 kit tie RTS to CEN and DTR to PA00, so holding
  * DTR through an RTS pulse boots the ROM downloader. Adapters without those
- * lines ignore this, and the strap guide covers them.
+ * lines ignore this, and the strap guide covers them. False when the adapter
+ * has no control lines to drive.
  */
-/** False when the adapter has no control lines to drive. */
 async function autoReset(port: SerialPort): Promise<boolean> {
   try {
     await port.setSignals({ dataTerminalReady: true, requestToSend: true });
