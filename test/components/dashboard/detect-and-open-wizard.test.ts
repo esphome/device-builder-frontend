@@ -28,6 +28,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { detectAndOpenWizard } from "../../../src/components/dashboard/actions.js";
+import { NoEspAnswerError } from "../../../src/platforms/esp/esp-usb.js";
 import { makeUsbPort } from "../../web/_make-web-serial-port.js";
 
 const port = { getInfo: () => ({}) } as SerialPort;
@@ -184,7 +185,7 @@ describe("detectAndOpenWizard", () => {
   it("lands an RTL8720C found behind a bridge on its chip's boards", async () => {
     const dialog = makeDialog();
     engine.connectToPort.mockRejectedValueOnce(
-      new Error("Failed to connect with the device")
+      new NoEspAnswerError(new Error("Failed to connect with the device"))
     );
     rtl.probeAmbz2.mockResolvedValueOnce(true);
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, {

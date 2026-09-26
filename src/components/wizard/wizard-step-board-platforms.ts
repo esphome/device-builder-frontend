@@ -80,10 +80,10 @@ export function platformToPreset(
   mcu?: string
 ): WizardBoardPreset | null {
   const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
-  const chip = mcu ? chips.find((p) => p.mcu === mcu) : undefined;
+  const chip =
+    chips.find((p) => p.mcu === mcu) ?? (chips.length === 1 ? chips[0] : undefined);
   if (chip) return { label: chip.label };
   if (chips.length === 0) return null;
-  if (chips.length === 1) return { label: chips[0].label };
   return { label: chips.map((p) => p.label).join(" / "), platform };
 }
 

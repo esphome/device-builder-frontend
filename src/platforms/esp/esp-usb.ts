@@ -35,6 +35,18 @@ export class EngineLoadError extends Error {
   }
 }
 
+/**
+ * esptool's handshake got no answer: nothing on the port spoke the ROM
+ * loader protocol. The one connect failure that says "not an ESP" rather
+ * than "an ESP in a bad state", so a probe for another family may follow.
+ */
+export class NoEspAnswerError extends Error {
+  constructor(readonly cause: unknown) {
+    super(getErrorMessage(cause));
+    this.name = "NoEspAnswerError";
+  }
+}
+
 /** The connected chip has no esptool-js target; flashing needs the esptool CLI. */
 export class UnsupportedChipError extends Error {
   readonly chipName: string;

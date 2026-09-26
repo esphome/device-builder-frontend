@@ -20,6 +20,7 @@ import {
   type DeviceManifest,
   type FlashProgress,
   isEspressifUsbJtagPort,
+  NoEspAnswerError,
   UnsupportedChipError,
 } from "./esp-usb.js";
 
@@ -32,6 +33,10 @@ export interface DetectedChip {
 
 /** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
 const DEBUG_TAIL_LINES = 80;
+
+const NO_ANSWER_MESSAGE = "Failed to connect with the device";
+const isNoAnswer = (error: unknown): boolean =>
+  getErrorMessage(error) === NO_ANSWER_MESSAGE;
 
 /** How long the whole esptool handshake gets; its own retries take a few seconds. */
 const CONNECT_DEADLINE_MS = 30_000;
@@ -191,7 +196,9 @@ export async function connectToPort(
     }
     sink = undefined;
     await releasePort(transport);
-    throw error;
+    // esptool-js says "Failed to connect with the device" when every sync
+    // attempt went unanswered; that alone means no ESP is on the port.
+    throw isNoAnswer(error) ? new NoEspAnswerError(error) : error;
   } finally {
     if (onLog) loader.debug = originalDebug;
   }

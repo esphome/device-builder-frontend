@@ -120,6 +120,14 @@ export interface PlatformSupport {
   matches(targetPlatform: string | null | undefined): boolean;
   readonly install?: AnyBrowserInstall;
   readonly logs?: PlatformLogs;
+  /**
+   * Ask the platform's own ROM whether one of its boards is behind a UART
+   * bridge port that no ESP answered on. Resolves to the board's chip (the
+   * board picker's ``mcu`` key) or null; never throws, loads its engine on
+   * demand, and leaves the port closed. A probe resets the board it asks,
+   * so the registry runs them in its own order.
+   */
+  probeBridgePort?(port: SerialPort): Promise<string | null>;
 }
 
 /**

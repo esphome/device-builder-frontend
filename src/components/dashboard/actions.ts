@@ -347,7 +347,7 @@ export async function detectAndOpenWizard(
   if (detection.kind !== "esp") {
     createDialog.openAtBoardStep(
       detection.kind === "family"
-        ? platformToPreset(detection.family, detection.chip)
+        ? platformToPreset(detection.platform, detection.mcu)
         : null
     );
     return;

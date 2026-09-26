@@ -21,7 +21,10 @@ vi.mock("../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
 }));
 
 import { detectBoard } from "../../src/platforms/detect-board.js";
-import { UnsupportedChipError } from "../../src/platforms/esp/esp-usb.js";
+import {
+  NoEspAnswerError,
+  UnsupportedChipError,
+} from "../../src/platforms/esp/esp-usb.js";
 import { SerialConnectTimeoutError } from "../../src/util/serial-open-error.js";
 import { makeUsbPort as port } from "../web/_make-web-serial-port.js";
 
@@ -38,18 +41,17 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
-  rtl.probeAmbz2.mockResolvedValue(false);
 });
 
 describe("detectBoard", () => {
   it("names a Pico or an nRF52 by its USB ids without touching esptool", async () => {
     expect(await detectBoard(port(0x2e8a, 0xf00a))).toEqual({
       kind: "family",
-      family: "rp2",
+      platform: "rp2",
     });
     expect(await detectBoard(port(0x2fe3, 0x0100))).toEqual({
       kind: "family",
-      family: "nrf52",
+      platform: "nrf52",
     });
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
@@ -72,7 +74,7 @@ describe("detectBoard", () => {
 
   it("picks a port when none is in hand, and classifies it the same way", async () => {
     seams.requestSerialPort.mockResolvedValueOnce(port(0x2e8a, 0xf00a));
-    expect(await detectBoard(null)).toEqual({ kind: "family", family: "rp2" });
+    expect(await detectBoard(null)).toEqual({ kind: "family", platform: "rp2" });
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 
@@ -86,35 +88,39 @@ describe("detectBoard", () => {
     await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toThrow("no sync");
   });
 
-  it("asks for an RTL8720C behind a bridge once esptool gave up, and names its chip", async () => {
+  it("lets the platforms probe a bridge once no ESP answered, and names the chip", async () => {
     engine.connectToPort.mockRejectedValueOnce(
-      new Error("Failed to connect with the device")
+      new NoEspAnswerError(new Error("Failed to connect with the device"))
     );
     rtl.probeAmbz2.mockResolvedValueOnce(true);
     const bridge = port(0x1a86, 0x7523);
     expect(await detectBoard(bridge)).toEqual({
       kind: "family",
-      family: "rtl87xx",
-      chip: "rtl8720c",
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
     });
     // esptool first: its reset is harmless to an RTL kit, the reverse is not.
     expect(engine.connectToPort).toHaveBeenCalledWith(bridge);
     expect(rtl.probeAmbz2).toHaveBeenCalledWith(bridge, expect.anything());
   });
 
-  it("keeps esptool's failure when the probe hears nothing", async () => {
+  it("keeps esptool's failure when no probe answers", async () => {
     engine.connectToPort.mockRejectedValueOnce(
-      new Error("Failed to connect with the device")
+      new NoEspAnswerError(new Error("Failed to connect with the device"))
     );
-    await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toThrow(
-      "Failed to connect with the device"
+    await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toBeInstanceOf(
+      NoEspAnswerError
     );
     expect(rtl.probeAmbz2).toHaveBeenCalledOnce();
   });
 
-  it("never probes Espressif's own USB, an unsupported chip, or a timed-out port", async () => {
-    engine.connectToPort.mockRejectedValueOnce(new Error("no sync"));
-    await expect(detectBoard(port(0x303a, 0x1001))).rejects.toThrow("no sync");
+  it("probes only after a no-answer, and never on Espressif's own USB", async () => {
+    engine.connectToPort.mockRejectedValueOnce(
+      new NoEspAnswerError(new Error("Failed to connect with the device"))
+    );
+    await expect(detectBoard(port(0x303a, 0x1001))).rejects.toBeInstanceOf(
+      NoEspAnswerError
+    );
     engine.connectToPort.mockRejectedValueOnce(new UnsupportedChipError("ESP32-H21"));
     await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toBeInstanceOf(
       UnsupportedChipError

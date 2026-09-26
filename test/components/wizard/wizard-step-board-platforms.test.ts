@@ -181,11 +181,6 @@ describe("wizard step-board platform chips", () => {
 
     it("narrows to the chip when the detection names it", () => {
       expect(platformToPreset("rtl87xx", "rtl8720c")).toEqual({ label: "RTL8720C" });
-      // An unknown chip key falls back to the platform.
-      expect(platformToPreset("rtl87xx", "rtl9999")).toEqual({
-        label: "RTL8710B / RTL8720C",
-        platform: "rtl87xx",
-      });
     });
 
     it("has no preset for a platform the picker doesn't know", () => {

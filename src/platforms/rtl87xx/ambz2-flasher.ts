@@ -20,6 +20,12 @@ const AUTO_LINK_MS = 2000;
  * the first pulse is often lost.
  */
 const AUTO_RESET_ATTEMPTS = 3;
+/**
+ * A probe runs right after esptool's session on the same port, so it is
+ * never that first session; one pulse is enough, and every non-RTL board on
+ * a bridge pays for the attempts.
+ */
+const PROBE_RESET_ATTEMPTS = 1;
 /** Relinking after a transfer; the ROM answers within a second normally. */
 const RELINK_MS = 10000;
 /** The strap guide keeps polling this long before giving up. */
@@ -181,13 +187,14 @@ async function autoReset(port: SerialPort): Promise<boolean> {
 async function autoLink(
   port: SerialPort,
   rom: RomLink,
-  log: (line: string) => void
+  log: (line: string) => void,
+  attempts: number
 ): Promise<boolean> {
-  for (let attempt = 1; attempt <= AUTO_RESET_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
     log(
       attempt === 1
         ? "Resetting the board into download mode over DTR/RTS"
-        : `No answer from the ROM; resetting again (attempt ${attempt} of ${AUTO_RESET_ATTEMPTS})`
+        : `No answer from the ROM; resetting again (attempt ${attempt} of ${attempts})`
     );
     const driven = await autoReset(port);
     if (await linkRom(rom, AUTO_LINK_MS)) return true;
@@ -321,45 +328,88 @@ async function writeRun(
   log(`Verified ${formatAddress(address)} (SHA-256 matches)`);
 }
 
+type Logger = (line: string) => void;
+
+/**
+ * The one ROM session shape: open the port at the ROM's baud rate if needed,
+ * link the downloader (``attempts`` DTR/RTS resets, then the strap wait when
+ * asked), run ``body``, and tear down whatever happened: close the link,
+ * release the strap and pulse reset so the board comes up in its firmware,
+ * close the port. A teardown failure never replaces ``body``'s error nor
+ * skips the rest. Resolves ``body``'s result and whether the board was
+ * rebooted (false when the adapter has no control lines to do that).
+ */
+async function withRomSession<T>(
+  port: SerialPort,
+  hooks: Pick<Ambz2FlashHooks, "onLog" | "signal" | "onWaitingForStrap">,
+  link: { attempts: number; strapWait: boolean },
+  body: (rom: RomLink, log: Logger) => Promise<T>
+): Promise<{ result: T; rebooted: boolean }> {
+  if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
+  const log: Logger = hooks.onLog ?? (() => {});
+  let rom: RomLink | undefined;
+  let failure: unknown;
+  let rebooted = false;
+  let result!: T;
+  try {
+    rom = new RomLink(port, hooks.signal);
+    if (!(await autoLink(port, rom, log, link.attempts))) {
+      if (!link.strapWait) throw new Ambz2LinkError();
+      log("No answer from the ROM; waiting for download mode (PA00 to 3.3V, then reset)");
+      hooks.onWaitingForStrap?.();
+      if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();
+    }
+    result = await body(rom, log);
+  } catch (err) {
+    failure = err;
+    throw err;
+  } finally {
+    await rom?.close(failure).catch(() => {});
+    // DTR still holds the strap, so a reset now would land in the ROM again:
+    // release it, then pulse RTS so the board comes up in the firmware.
+    rebooted = await bootFirmware(port);
+    if (failure === undefined) {
+      log(
+        rebooted
+          ? "Rebooting into the firmware"
+          : "No control lines to reboot the board; release PA00 and reset it by hand"
+      );
+    }
+    await port.close().catch(() => {});
+  }
+  return { result, rebooted };
+}
+
 /**
  * Whether an RTL8720C is behind *port*: reset it into the ROM downloader over
- * DTR/RTS and link, as ``flashAmbz2`` does, but stop there. A chip answering
- * from its SDK console counts too. No strap guide: a detect must end on its
- * own, so a board on an adapter without control lines is not found and the
- * user picks it by hand. The board is rebooted into its firmware and the
- * port closed either way; the install that follows resets it into the ROM
- * again itself. Never throws.
+ * DTR/RTS and link, as a flash starts, but stop there. A chip answering from
+ * its SDK console counts too. No strap wait: a detect must end on its own,
+ * so a board on an adapter without control lines is not found and the user
+ * picks it by hand. The board is reset into its firmware and the port closed
+ * either way; the install that follows resets it into the ROM again itself.
+ * Never throws.
  */
 export async function probeAmbz2(
   port: SerialPort,
   hooks: Pick<Ambz2FlashHooks, "onLog" | "signal"> = {}
 ): Promise<boolean> {
-  const log = hooks.onLog ?? (() => {});
-  let rom: RomLink | undefined;
-  let found = false;
   try {
-    if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
-    rom = new RomLink(port, hooks.signal);
-    found = await autoLink(port, rom, log);
-    log(found ? "An RTL8720C ROM answered" : "No RTL8720C ROM answered");
+    await withRomSession(
+      port,
+      hooks,
+      { attempts: PROBE_RESET_ATTEMPTS, strapWait: false },
+      async (_rom, log) => log("An RTL8720C ROM answered")
+    );
+    return true;
   } catch (err) {
-    found = err instanceof Ambz2ConsoleError;
-    log(found ? "An RTL8720C SDK console answered" : `Probe failed: ${String(err)}`);
-  } finally {
-    // Never throws, whatever the port is in the middle of.
-    try {
-      await rom?.close();
-    } catch {
-      /* best-effort */
-    }
-    if (found) await bootFirmware(port);
-    try {
-      await port.close();
-    } catch {
-      /* best-effort */
-    }
+    if (err instanceof Ambz2ConsoleError) return true;
+    hooks.onLog?.(
+      err instanceof Ambz2LinkError
+        ? "No RTL8720C ROM answered"
+        : `Probe failed: ${String(err)}`
+    );
+    return false;
   }
-  return found;
 }
 
 /**
@@ -374,60 +424,37 @@ export async function flashAmbz2(
   image: LibreTinyImage,
   hooks: Ambz2FlashHooks
 ): Promise<boolean> {
-  if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
-  const log = hooks.onLog ?? (() => {});
-  let rom: RomLink | undefined;
-  let failure: unknown;
-  let rebooted = false;
-  try {
-    rom = new RomLink(port, hooks.signal);
-    if (!(await autoLink(port, rom, log))) {
-      log("No answer from the ROM; waiting for download mode (PA00 to 3.3V, then reset)");
-      hooks.onWaitingForStrap?.();
-      if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();
-    }
-    hooks.onLinked?.();
-    const cfg = await flashInit(rom);
-    log(
-      `Linked to the ROM downloader (flash config ${cfg}); ${image.runs.length} runs to write`
-    );
-    let done = 0;
-    for (const run of image.runs) {
-      await writeRun(
-        rom,
-        cfg,
-        run.address,
-        run.data,
-        (sent) => {
-          hooks.onProgress(
-            Math.min(99, Math.floor(((done + sent) / image.totalBytes) * 100))
-          );
-        },
-        log
-      );
-      done += run.data.length;
-    }
-    // Ends the ROM session; no reply comes back. The reboot itself happens
-    // in the teardown below, with the strap released.
-    await rom.write("disc\n");
-    hooks.onProgress(100);
-  } catch (err) {
-    failure = err;
-    throw err;
-  } finally {
-    // A teardown failure must not replace the flash error nor skip the rest.
-    await rom?.close(failure).catch(() => {});
-    // DTR still holds the strap, so a reset now would land in the ROM again:
-    // release it, then pulse RTS so the board comes up in the firmware.
-    rebooted = await bootFirmware(port);
-    if (failure === undefined) {
+  const { rebooted } = await withRomSession(
+    port,
+    hooks,
+    { attempts: AUTO_RESET_ATTEMPTS, strapWait: true },
+    async (rom, log) => {
+      hooks.onLinked?.();
+      const cfg = await flashInit(rom);
       log(
-        rebooted
-          ? "Rebooting into the firmware"
-          : "No control lines to reboot the board; release PA00 and reset it by hand"
+        `Linked to the ROM downloader (flash config ${cfg}); ${image.runs.length} runs to write`
       );
+      let done = 0;
+      for (const run of image.runs) {
+        await writeRun(
+          rom,
+          cfg,
+          run.address,
+          run.data,
+          (sent) => {
+            hooks.onProgress(
+              Math.min(99, Math.floor(((done + sent) / image.totalBytes) * 100))
+            );
+          },
+          log
+        );
+        done += run.data.length;
+      }
+      // Ends the ROM session; no reply comes back. The reboot itself happens
+      // in the teardown, with the strap released.
+      await rom.write("disc\n");
+      hooks.onProgress(100);
     }
-    await port.close().catch(() => {});
-  }
+  );
   return rebooted;
 }

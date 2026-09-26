@@ -62,7 +62,10 @@ vi.mock("esptool-js", () => {
   return { ESPLoader, Transport };
 });
 
-import { UnsupportedChipError } from "../../../src/platforms/esp/esp-usb.js";
+import {
+  NoEspAnswerError,
+  UnsupportedChipError,
+} from "../../../src/platforms/esp/esp-usb.js";
 import { connectToPort } from "../../../src/platforms/esp/esptool.js";
 
 const fakePort = { close: vi.fn().mockResolvedValue(undefined) } as unknown as SerialPort;
@@ -80,8 +83,9 @@ describe("connectToPort failure log", () => {
       throw new Error("Failed to connect with the device");
     };
     const logs: string[] = [];
+    // esptool-js's unanswered sync is the one failure that says "no ESP here".
     await expect(connectToPort(fakePort, (line) => logs.push(line))).rejects.toThrow(
-      "Failed to connect with the device"
+      NoEspAnswerError
     );
     expect(logs).toContain("Sync err Error: Timeout");
     expect(logs[logs.length - 1]).toBe("Error: Failed to connect with the device");
