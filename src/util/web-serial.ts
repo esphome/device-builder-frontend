@@ -1,7 +1,7 @@
 /**
- * Web Serial helpers shared by every platform: availability, the port picker,
- * and the re-enumeration helpers. The esptool engine lives in
- * ``src/platforms/esp/esptool.ts``.
+ * Web Serial helpers shared by every platform: availability and the port
+ * picker. Re-enumeration lives in ``serial-reacquire.ts`` and the esptool
+ * engine in ``src/platforms/esp/esptool.ts``.
  */
 export type LogCallback = (line: string) => void;
 
