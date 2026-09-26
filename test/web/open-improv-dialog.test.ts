@@ -139,11 +139,14 @@ describe("openImprovDialog", () => {
     // Stands in for the dev server's error overlay, a plain window listener.
     const overlay = vi.fn();
     window.addEventListener("unhandledrejection", overlay);
-    expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
-    expect(overlay).not.toHaveBeenCalled();
-    expect(rejection(new Error("something else"))).toBe(false);
-    expect(overlay).toHaveBeenCalledOnce();
-    window.removeEventListener("unhandledrejection", overlay);
+    try {
+      expect(rejection(new Error("Error fetching current state: TIMEOUT"))).toBe(true);
+      expect(overlay).not.toHaveBeenCalled();
+      expect(rejection(new Error("something else"))).toBe(false);
+      expect(overlay).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener("unhandledrejection", overlay);
+    }
     // A device error on the same request is real news, not the SDK's race.
     expect(rejection(new Error("Error fetching current state: BAD_HOSTNAME"))).toBe(
       false
@@ -185,6 +188,22 @@ describe("openImprovDialog", () => {
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
     port.readable = { locked: true };
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps retrying the close while only the SDK's writer still holds the port", async () => {
+    const close = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new TypeError("stream is locked"))
+      .mockImplementationOnce(async () => {
+        port.writable = null;
+      });
+    const port = { ...makePort(), close };
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    port.writable = { locked: true };
     dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
     await promise;
     expect(close).toHaveBeenCalledTimes(2);
