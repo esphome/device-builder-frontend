@@ -61,7 +61,7 @@ const platform = {
       reset: {
         available: () => true,
         supports: () => true,
-        reset: vi.fn(async (_port: SerialPort, _baud: number, _c: () => boolean) => null),
+        reboot: vi.fn(async (_port: SerialPort, _c: () => boolean) => false),
         failureKey: () => "dashboard.logs_reset_failed",
       },
     },
@@ -132,18 +132,17 @@ describe("a platform added only to the registry", () => {
     });
   });
 
-  it("runs its own Reset Device at the session's baud", async () => {
+  it("runs its own Reset Device on the session's port", async () => {
     const dialog = { setSerialOpenFailed: vi.fn() } as unknown as ESPHomeLogsDialog;
     const hook = sessionResetHook(dialog, defaultLocalize, "test-only", 9600)!;
     const port = { getInfo: () => ({}) } as SerialPort;
     expect(hook.supports(port)).toBe(true);
     await hook.run(port, () => false);
-    expect(platform.logs.serial.reset.reset).toHaveBeenCalledWith(
+    expect(platform.logs.serial.reset.reboot).toHaveBeenCalledWith(
       port,
-      9600,
       expect.any(Function)
     );
-    // It never came back: the session fails, naming the port.
+    // The reboot was not sent, so there is no port to reopen: the session fails.
     expect(dialog.setSerialOpenFailed).toHaveBeenCalled();
   });
 

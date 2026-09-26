@@ -4,7 +4,6 @@
  * PICOBOOT reboot over WebUSB, after which the CDC port re-enumerates.
  */
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
-import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import {
   getPicobootDevices,
@@ -76,19 +75,6 @@ export async function rebootPico(
   return true;
 }
 
-/**
- * ``rebootPico``, then the CDC port reopened at *baudRate*: null when the
- * reboot was cancelled before the touch or the device never came back.
- */
-export async function resetPicoForLogs(
-  port: SerialPort,
-  baudRate: number,
-  cancelled: () => boolean
-): Promise<SerialPort | null> {
-  if (!(await rebootPico(port, cancelled))) return null;
-  return openLiveSerialPort(port, { baudRate, cancelled });
-}
-
 // No bootloader to reboot. A CDC handle still connected means the firmware
 // ignored the touch, a plain reset failure; unless the poll was cancelled
 // early, when the Pico may only be on its way into BOOTSEL.
@@ -133,10 +119,11 @@ async function findBootselDevice(
 /**
  * The copy key for a failed Pico reset: a stranded Pico wants a replug; a
  * refused WebUSB open (Linux without the udev rule) would strand it again
- * every time, so that cause is named instead. Anything else is ``plainKey``.
+ * every time, so that cause is named instead. Anything else has no key of
+ * its own (the logs show their generic one).
  */
-export function picoResetFailureKey(err: unknown, plainKey: string): string {
-  if (!(err instanceof PicoStrandedError)) return plainKey;
+export function picoResetFailureKey(err: unknown): string | undefined {
+  if (!(err instanceof PicoStrandedError)) return undefined;
   return err.step === "refused"
     ? "firmware.rp2_usb_access_denied"
     : "dashboard.logs_rp2_reset_stranded";

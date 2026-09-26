@@ -29,20 +29,30 @@ export async function resetToBootloader(
   onLog: (line: string) => void = () => {}
 ): Promise<void> {
   try {
-    await touch(port, onLog);
+    await touchPort(port, 1200, onLog);
+    onLog("Port released; the device re-enumerates as its bootloader");
   } catch (err) {
     throw new BootloaderTouchError(err);
   }
 }
 
-async function touch(port: SerialPort, onLog: (line: string) => void): Promise<void> {
+/**
+ * Open ``port`` at ``baudRate`` and release it: a touch at whatever rate the
+ * firmware reacts to (1200 for the bootloader; ESPHome's nRF52 reboots into
+ * its app on 2001). Tolerates the device vanishing as it reboots.
+ */
+export async function touchPort(
+  port: SerialPort,
+  baudRate: number,
+  onLog: (line: string) => void = () => {}
+): Promise<void> {
   // The re-enumeration is ours; keep the "USB device connected" toast quiet.
   markSerialActivity();
   // A handle left open by an earlier touch whose close raced the reboot
   // would make open() throw "already open"; release it first.
   if (port.readable) await port.close().catch(() => {});
-  onLog("Touching the port at 1200 baud");
-  await port.open({ baudRate: 1200 });
+  onLog(`Touching the port at ${baudRate} baud`);
+  await port.open({ baudRate });
   try {
     // Drop DTR ourselves rather than through close(): the device reboots the
     // instant it drops, and a close() racing that can leave the OS handle
@@ -60,7 +70,6 @@ async function touch(port: SerialPort, onLog: (line: string) => void): Promise<v
     // The device vanished mid-close; that is the reboot we asked for.
     if (!isPortLost(err)) throw err;
   }
-  onLog("Port released; the device re-enumerates as its bootloader");
 }
 
 /**

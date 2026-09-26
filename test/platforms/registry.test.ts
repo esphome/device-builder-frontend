@@ -74,7 +74,8 @@ describe("PLATFORMS", () => {
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release only on RTL8720C kits,
-  // DTR held up and its own reset for the Pico, and Bluetooth only on nRF52.
+  // DTR held up and its own reset for the Pico, its own reset for nRF52, and
+  // Bluetooth only on nRF52.
   it.each([
     [
       "nrf52",
@@ -82,7 +83,7 @@ describe("PLATFORMS", () => {
         pulseResets: false,
         releasesLinesAfterOpen: false,
         keepLinesOnReopen: false,
-        reset: false,
+        reset: true,
         ble: true,
       },
     ],

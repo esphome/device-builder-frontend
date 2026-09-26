@@ -164,10 +164,13 @@ export function sessionResetHook(
       let live: SerialPort | null = null;
       let failure: string | undefined;
       try {
-        live = await support.reset(port, baudRate, cancelled);
+        // The reboot re-enumerates the port; null when it never came back.
+        if (await support.reboot(port, cancelled)) {
+          live = await openLiveSerialPort(port, { baudRate, cancelled });
+        }
       } catch (err) {
         console.warn("Reset Device failed", err);
-        failure = localize(support.failureKey(err));
+        failure = localize(support.failureKey(err) ?? "dashboard.logs_reset_failed");
       }
       if (failure) {
         // A stranded device still gets its toast once the session moved on,

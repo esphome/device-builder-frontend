@@ -8,6 +8,7 @@ export * from "./ble-nus-stream.js";
 export * from "./ble-probe-controller.js";
 export * from "./manual-bootloader-hint.js";
 export type * from "./nrf-dfu.js";
+export * from "./nrf-logs-reset.js";
 export * from "./nrf-platform.js";
 
 export const loadDfuEngine = () => import("./nrf-dfu.js");

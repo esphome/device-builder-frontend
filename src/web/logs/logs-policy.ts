@@ -20,6 +20,8 @@ export interface WebLogsPolicy {
 export interface WebSerialReset {
   /** The browser can send it; the button stays hidden otherwise. */
   available(): boolean;
+  /** Whether the board behind this port takes it (every port when omitted). */
+  supports?(port: SerialPort): boolean;
   /**
    * The reset re-enumerates the port (a Pico rebooting through BOOTSEL), so
    * the stream is dropped first and resumed after.
@@ -27,7 +29,7 @@ export interface WebSerialReset {
   readonly dropsStream: boolean;
   run(port: SerialPort, cancelled: () => boolean): Promise<void>;
   /** Localize key for a failed reset (``web.logs.reset_failed`` otherwise). */
-  failureKey?(err: unknown): string;
+  failureKey?(err: unknown): string | undefined;
 }
 
 /**

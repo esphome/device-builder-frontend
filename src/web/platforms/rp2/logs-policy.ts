@@ -17,7 +17,7 @@ export const PICO_RESET: WebSerialReset = {
   run: async (port, cancelled) => {
     await rebootPico(port, cancelled);
   },
-  failureKey: (err) => picoResetFailureKey(err, "web.logs.reset_failed"),
+  failureKey: picoResetFailureKey,
 };
 
 /** The Pico's CDC has no reset line, and it only transmits while DTR is asserted. */
