@@ -8,10 +8,6 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 // Post-reset reopen goes through openLiveSerialPort (re-enumeration retry
 // loop); stub it so the suite can hand back the cached or a fresh handle.
 const { openLiveSerialPort } = vi.hoisted(() => ({ openLiveSerialPort: vi.fn() }));
-vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
-  openLiveSerialPort,
-}));
 vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openLiveSerialPort,

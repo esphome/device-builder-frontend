@@ -8,9 +8,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../src/util/serial-log-stream.js", () => ({
   streamSerialLines: mocks.streamSerialLines,
 }));
-vi.mock("../../src/util/web-serial.js", () => ({
-  openLiveSerialPort: mocks.openLiveSerialPort,
-}));
 vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openLiveSerialPort: mocks.openLiveSerialPort,
