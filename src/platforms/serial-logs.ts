@@ -2,11 +2,8 @@
  * A platform's Web Serial logs facts, stated once and applied by both the
  * Device Builder and web.esphome.io: how Reset device reaches the board, and
  * whether an open releases the control lines. Each app runs the reset its own
- * way; the line rules below are shared.
+ * way; the reopen line rule is ``releaseLinesAfterReopen`` (serial-reopen.ts).
  */
-import { releaseControlLines } from "../util/serial-control-lines.js";
-import { isRp2CdcPort } from "./rp2/web-usb.js";
-
 /** A platform's own Reset device: a reboot after which its port re-enumerates. */
 export interface SerialPlatformReset {
   /** The browser can send it; the button stays hidden otherwise. */
@@ -54,13 +51,4 @@ export function offeredReset(
   const reset = platformReset(policy);
   if (!reset?.available()) return undefined;
   return port && !reset.supports(port) ? undefined : reset;
-}
-
-/**
- * A reopen asserts DTR and RTS: drop them, which a UART bridge's auto-reset
- * circuit needs, except on a Pico's own CDC, where arduino-pico only
- * transmits while DTR is asserted (whichever flow reached the port).
- */
-export async function releaseLinesAfterReopen(port: SerialPort): Promise<void> {
-  if (!isRp2CdcPort(port)) await releaseControlLines(port);
 }

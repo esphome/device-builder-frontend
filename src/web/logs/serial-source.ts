@@ -1,7 +1,5 @@
-import {
-  releaseLinesAfterReopen,
-  type SerialPlatformReset,
-} from "../../platforms/serial-logs.js";
+import type { SerialPlatformReset } from "../../platforms/serial-logs.js";
+import { releaseLinesAfterReopen } from "../../platforms/serial-reopen.js";
 import { pulseRts } from "../../util/serial-control-lines.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)

@@ -5,8 +5,6 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { pickBleNusDevice } from "../../../platforms/nrf52/index.js";
-import { NRF52_SERIAL_LOGS } from "../../../platforms/nrf52/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import "./esphome-web-install-nrf-dialog.js";
@@ -18,6 +16,7 @@ import "../../dashboard/esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
+import { NRF52_SERIAL_LOGS, pickBleNusDevice } from "../../../platforms/nrf52/index.js";
 
 registerMdiIcons({
   upload: mdiUpload,
