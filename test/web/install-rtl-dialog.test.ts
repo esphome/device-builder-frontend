@@ -149,6 +149,25 @@ describe("esphome-web-install-rtl-dialog", () => {
     expect(card(el).statusDetail).toBe("no answer from the ROM");
   });
 
+  it("ignores a run that finishes after the dialog closed", async () => {
+    let finish!: () => void;
+    mocks.flashAmbz2.mockImplementation(async (_port, _image, hooks) => {
+      await new Promise<void>((resolve) => (finish = resolve));
+      hooks.onLog?.("late line");
+      return true;
+    });
+    const el = await mountDialog();
+    const pending = el._flash();
+    await vi.waitFor(() => expect(mocks.flashAmbz2).toHaveBeenCalled());
+    el.open = false;
+    await el.updateComplete;
+    finish();
+    await pending;
+    await el.updateComplete;
+    expect(card(el)).toBeNull();
+    expect(el._logLines).toEqual([]);
+  });
+
   it("stops the engine and stays quiet when the dialog closes mid-flash", async () => {
     let signal!: AbortSignal;
     mocks.flashAmbz2.mockImplementation(

@@ -141,7 +141,9 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
       const { flashAmbz2 } = await loadEngine();
       rebooted = await flashAmbz2(port, image, {
         signal: abort.signal,
-        onLog: this._log,
+        onLog: (line) => {
+          if (live()) this._log(line);
+        },
         onWaitingForStrap: () => {
           if (live()) this._state = "waiting";
         },
@@ -160,6 +162,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     } finally {
       if (this._abort === abort) this._abort = null;
     }
+    if (!live()) return;
     this._manualReset = !rebooted;
     this._state = "success";
   }
