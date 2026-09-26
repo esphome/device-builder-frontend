@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // runFlash drives the flow straight to "done" so the dialog shows its Continue
 // (Wi-Fi hand-off) button without touching real serial/firmware code.
-vi.mock("../../../../src/web/platforms/esp/run-flash.js", () => ({
+vi.mock("../../../../src/web/platforms/esp/run-flash.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   runFlash: vi.fn(
     async (_port: unknown, _plan: unknown, hooks: { onStep(step: string): void }) => {
       hooks.onStep("done");

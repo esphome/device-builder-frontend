@@ -388,13 +388,7 @@ export async function detectAndOpenWizard(
       notifyError(
         err instanceof UnsupportedChipError
           ? options.localize("serial.unsupported_chip", { chip: err.chipName })
-          : openFailureMessage(
-              err,
-              options.localize,
-              options.localize("dashboard.serial_connect_failed", {
-                error: getErrorMessage(err),
-              })
-            )
+          : openFailureMessage(err, options.localize, "dashboard.serial_connect_failed")
       );
     }
     createDialog.open("board");

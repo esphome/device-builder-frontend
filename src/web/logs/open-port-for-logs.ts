@@ -41,15 +41,7 @@ export async function openPortForLogs(
       if (options.releaseLines) await releaseControlLines(port);
       return true;
     }
-    toast.error(
-      openFailureMessage(
-        err,
-        localize,
-        localize("web.logs.open_failed", {
-          error: err instanceof Error ? err.message : String(err),
-        })
-      )
-    );
+    toast.error(openFailureMessage(err, localize));
     return false;
   }
   return true;

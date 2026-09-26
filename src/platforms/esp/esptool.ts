@@ -123,9 +123,9 @@ export async function connectToPort(
   onLog?: LogCallback
 ): Promise<DetectedChip> {
   markSerialActivity();
-  // A handle an earlier action left open (Improv's close losing to the SDK's
-  // reader release) would make esptool-js's open() throw "already open".
-  // A locked one is another action mid-read; leave it to fail as busy.
+  // A handle an earlier action failed to close would make esptool-js's open()
+  // throw "already open". A locked one is another action mid-read; leave it
+  // to fail as busy.
   if (port.readable && !port.readable.locked) await port.close().catch(() => {});
   const transport = new Transport(port, false);
 

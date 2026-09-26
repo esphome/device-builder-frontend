@@ -10,6 +10,7 @@ import { renderInstallProgress } from "./flow-progress.js";
 import { InstallFlowController } from "./install-flow-controller.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
+import { webFlashMessages } from "./run-flash.js";
 
 /**
  * Install an existing ESPHome project by uploading its factory ``.bin`` and
@@ -44,11 +45,7 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
     await this._flow.start(this.port, {
       erase: true,
       filesCallback: async () => [{ data, address: 0 }],
-      messages: {
-        connectFailed: this._localize("web.install.connect_failed_hint"),
-        portInUse: (error) => this._localize("serial.port_in_use", { error }),
-        noFirmware: this._localize("web.install.no_firmware"),
-      },
+      messages: webFlashMessages(this._localize),
     });
   }
 

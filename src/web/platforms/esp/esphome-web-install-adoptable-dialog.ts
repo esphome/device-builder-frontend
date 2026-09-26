@@ -13,6 +13,7 @@ import { InstallFlowController } from "./install-flow-controller.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
+import { webFlashMessages } from "./run-flash.js";
 
 /**
  * "Prepare for first use": flash the prebuilt esphome-web firmware fetched
@@ -50,11 +51,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         }
         return downloadBuildParts(build);
       },
-      messages: {
-        connectFailed: this._localize("web.install.connect_failed_hint"),
-        portInUse: (error) => this._localize("serial.port_in_use", { error }),
-        noFirmware: this._localize("web.install.no_firmware"),
-      },
+      messages: webFlashMessages(this._localize),
     });
     // On success the dialog stays in its "done" state showing the Continue
     // button (see render). We do NOT auto-open Improv here: this dialog is a

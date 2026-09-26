@@ -166,6 +166,22 @@ describe("openImprovDialog", () => {
     expect(port.close).toHaveBeenCalledOnce();
   });
 
+  it("resolves only once the port closed, retrying while the SDK's reader holds it (#1839)", async () => {
+    const close = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new TypeError("stream is locked"))
+      .mockImplementationOnce(async () => {
+        port.readable = null;
+      });
+    const port = { ...makePort(), close };
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    port.readable = { locked: true };
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await promise;
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
   it("coerces a missing detail to a false/false result", async () => {
     const port = makePort();
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
@@ -369,27 +385,18 @@ describe("openImprovDialog", () => {
     expect(dialogEl()).toBeNull();
   });
 
-  it("says the port is in use when a manual open fails with NetworkError", async () => {
-    const port = makePort();
+  // Right after a reset a NetworkError can be the board re-enumerating.
+  it.each([
+    [false, "serial.port_in_use"],
+    [true, "web.improv.open_failed"],
+  ])("a NetworkError open with afterReset %s toasts %s", async (afterReset, key) => {
     openLiveSerialPort.mockImplementation(
       async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
         opts.onFailed?.(new DOMException("Failed to open serial port.", "NetworkError"));
         return null;
       }
     );
-    await openImprovDialog(port as unknown as SerialPort, localize);
-    expect(toast.error).toHaveBeenCalledWith("serial.port_in_use");
-  });
-
-  it("keeps the restart copy when the open after a reset fails with NetworkError", async () => {
-    const port = makePort();
-    openLiveSerialPort.mockImplementation(
-      async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
-        opts.onFailed?.(new DOMException("Failed to open serial port.", "NetworkError"));
-        return null;
-      }
-    );
-    await openImprovDialog(port as unknown as SerialPort, localize, { afterReset: true });
-    expect(toast.error).toHaveBeenCalledWith("web.improv.open_failed");
+    await openImprovDialog(makePort() as unknown as SerialPort, localize, { afterReset });
+    expect(toast.error).toHaveBeenCalledWith(key);
   });
 });

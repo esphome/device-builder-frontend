@@ -8,8 +8,9 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
-import { openFailureMessage } from "../../util/serial-open-error.js";
+import { portInUseMessage } from "../../util/serial-open-error.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
+import { sleep } from "../../util/sleep.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
@@ -159,15 +160,14 @@ async function acquirePort(
     onOpened: () => {
       weOpened = true;
     },
-    onFailed: (err) => {
-      failure = err;
-    },
-  });
-  if (!live) {
     // Right after a reset a NetworkError can be the board re-enumerating, so
     // only a manual open reads it as another tab or program holding the port.
-    const fallback = localize("web.improv.open_failed");
-    toast.error(afterReset ? fallback : openFailureMessage(failure, localize, fallback));
+    onFailed: afterReset ? undefined : (err) => (failure = err),
+  });
+  if (!live) {
+    toast.error(
+      portInUseMessage(failure, localize) ?? localize("web.improv.open_failed")
+    );
     return null;
   }
   // openLiveSerialPort only screens readable.locked; a handle it found open
@@ -230,17 +230,38 @@ async function runImprov(
           improv: Boolean(detail.improv),
           provisioned: Boolean(detail.provisioned),
         };
-        // Release the port only if we opened it. The SDK already cancelled its
-        // reader in its own close handler, so this just frees the device for the
-        // next action. Best-effort: the device may have been unplugged.
-        if (weOpened) void port.close().catch(() => {});
         dialogClosed();
-        resolve(result);
+        // Release the port only if we opened it, and resolve only once it is
+        // closed so the card's next action finds it free (#1839).
+        void (weOpened ? releasePort(port) : Promise.resolve()).then(() =>
+          resolve(result)
+        );
       },
       { once: true }
     );
     document.body.appendChild(dialog);
   });
+}
+
+/** How long ``releasePort`` keeps retrying a close the SDK's reader still blocks. */
+const RELEASE_TIMEOUT_MS = 1000;
+
+/**
+ * Close a port the session opened. The SDK cancels its reader in its own close
+ * handler, but that release can land after ours, and a close while the stream
+ * is still locked fails; retry briefly. Best-effort: the device may be gone.
+ */
+async function releasePort(port: SerialPort): Promise<void> {
+  const deadline = Date.now() + RELEASE_TIMEOUT_MS;
+  for (;;) {
+    try {
+      await port.close();
+      return;
+    } catch {
+      if (!port.readable?.locked || Date.now() >= deadline) return;
+      await sleep(50);
+    }
+  }
 }
 
 /** The SDK's RPC timeout: how long after a close its late rejection can still land. */

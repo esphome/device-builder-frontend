@@ -255,10 +255,10 @@ describe("runFlash", () => {
       port,
       {
         filesCallback: async () => [],
-        messages: { connectFailed: "hold BOOT", portInUse: (e) => `in use: ${e}` },
+        messages: { connectFailed: "hold BOOT", portInUse: () => "in use" },
       },
       hooks
     );
-    expect(hooks.errors).toEqual(["in use: Failed to open serial port."]);
+    expect(hooks.errors).toEqual(["in use"]);
   });
 });

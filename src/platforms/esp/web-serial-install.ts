@@ -84,7 +84,7 @@ export async function startWebSerialInstall(
     // The picker succeeded but the chip never answered — fail loud with
     // the esptool log expanded instead of silently closing (#1414).
     host._fail(
-      openFailureMessage(err, host._localize, host._localize("serial.connect_failed")),
+      openFailureMessage(err, host._localize, "serial.connect_failed"),
       getErrorMessage(err)
     );
     return;

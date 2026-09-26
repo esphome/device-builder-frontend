@@ -30,6 +30,7 @@ import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./wizard-step-board-list.js";
 import "./wizard-step-board-port-select.js";
+import { portInUseMessage } from "../../util/serial-open-error.js";
 
 registerMdiIcons({
   "usb-port": mdiUsbPort,
@@ -322,10 +323,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
       void this._fetchBoards();
     } catch (err) {
       if (isPortPickerCancel(err)) return;
-      this._detectError = this._extractErrorDetail(
-        err,
-        this._localize("wizard.connect_your_board_detect_failed")
-      );
+      this._detectError =
+        portInUseMessage(err, this._localize) ??
+        this._extractErrorDetail(
+          err,
+          this._localize("wizard.connect_your_board_detect_failed")
+        );
     }
   }
 

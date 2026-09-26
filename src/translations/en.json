@@ -1994,7 +1994,6 @@
       "waiting_ble": "Connecting over Bluetooth…",
       "connect_failed": "Could not connect: {error}",
       "download": "Download logs",
-      "open_failed": "Could not open the serial port: {error}",
       "reset_failed": "Could not reset the device.",
       "port_busy": "The device is busy with another operation. Close it and try again.",
       "terminal_disconnected": "Terminal disconnected",

@@ -9,20 +9,28 @@ import { getErrorMessage } from "./error-message.js";
  * error. A board still re-enumerating after a reset throws the same, so only
  * use this on a manual open where nothing just restarted.
  */
-export function isPortInUse(err: unknown): boolean {
+function isPortInUse(err: unknown): boolean {
   return err instanceof DOMException && err.name === "NetworkError";
 }
 
-/**
- * The copy for a failed manual open: "likely in use" when it is, else ``fallback``
- * (by default the generic open failure with the error's text).
- */
+/** The "may be open elsewhere" copy for a failed manual open, or undefined. */
+export function portInUseMessage(
+  err: unknown,
+  localize: LocalizeFunc
+): string | undefined {
+  return isPortInUse(err)
+    ? localize("serial.port_in_use", { error: getErrorMessage(err) })
+    : undefined;
+}
+
+/** The copy for a failed manual open: "may be in use" when it is, else ``fallbackKey`` with the error. */
 export function openFailureMessage(
   err: unknown,
   localize: LocalizeFunc,
-  fallback = localize("serial.open_failed", { error: getErrorMessage(err) })
+  fallbackKey = "serial.open_failed"
 ): string {
-  return isPortInUse(err)
-    ? localize("serial.port_in_use", { error: getErrorMessage(err) })
-    : fallback;
+  return (
+    portInUseMessage(err, localize) ??
+    localize(fallbackKey, { error: getErrorMessage(err) })
+  );
 }
