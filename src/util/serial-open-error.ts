@@ -48,14 +48,38 @@ export function portInUseMessage(
     : undefined;
 }
 
-/** The copy for a failed manual open: "may be in use" when it is, else ``fallbackKey`` with the error. */
+/** A device never answered the connect handshake before the deadline. */
+export class SerialConnectTimeoutError extends Error {
+  constructor(readonly deadlineMs: number) {
+    super(`No answer from the device in ${Math.round(deadlineMs / 1000)} s`);
+    this.name = "SerialConnectTimeoutError";
+  }
+}
+
+/**
+ * The copy for a failed connect that can be named: the port held elsewhere,
+ * or the device never answering; undefined for anything else.
+ */
+export function namedConnectFailure(
+  err: unknown,
+  localize: LocalizeFunc
+): string | undefined {
+  if (err instanceof SerialConnectTimeoutError) {
+    return localize("serial.connect_timed_out", {
+      seconds: Math.round(err.deadlineMs / 1000),
+    });
+  }
+  return portInUseMessage(err, localize);
+}
+
+/** The copy for a failed manual open or connect: a named failure when it is one, else ``fallbackKey`` with the error. */
 export function openFailureMessage(
   err: unknown,
   localize: LocalizeFunc,
   fallbackKey = "serial.open_failed"
 ): string {
   return (
-    portInUseMessage(err, localize) ??
+    namedConnectFailure(err, localize) ??
     localize(fallbackKey, { error: getErrorMessage(err) })
   );
 }

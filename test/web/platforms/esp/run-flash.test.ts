@@ -20,7 +20,10 @@ import {
   flashFirmware,
   resetAndDisconnect,
 } from "../../../../src/platforms/esp/esptool.js";
-import { markOpenFailure } from "../../../../src/util/serial-open-error.js";
+import {
+  markOpenFailure,
+  SerialConnectTimeoutError,
+} from "../../../../src/util/serial-open-error.js";
 import { isPortPickerCancel } from "../../../../src/util/web-serial.js";
 import {
   type FlashHooks,
@@ -297,5 +300,16 @@ describe("runFlash", () => {
     expect(hooks.steps).toEqual(["connecting", "error"]);
     expect(hooks.errors).toEqual(["firmware.engine_load_failed"]);
     expect(connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("says the device never answered instead of the BOOT hint on a timeout", async () => {
+    vi.mocked(connectToPort).mockRejectedValue(new SerialConnectTimeoutError(30_000));
+    const hooks = makeHooks();
+    await runFlash(
+      port,
+      { filesCallback: async () => [], messages: webFlashMessages((k) => k) },
+      hooks
+    );
+    expect(hooks.errors).toEqual(["serial.connect_timed_out"]);
   });
 });

@@ -14,7 +14,7 @@ import {
   releaseSerial,
 } from "../../../platforms/esp/index.js";
 import { getErrorMessage } from "../../../util/error-message.js";
-import { portInUseMessage } from "../../../util/serial-open-error.js";
+import { namedConnectFailure } from "../../../util/serial-open-error.js";
 import type { FlashPart } from "./firmware-build.js";
 
 export type FlashStep =
@@ -31,8 +31,9 @@ export interface FlashMessages {
    * "hold the BOOT button" hint (a bare S2/S3/C3 module needs it).
    */
   connectFailed?: string;
-  /** The "may be open elsewhere" copy for a failed open (see ``portInUseMessage``). */
-  portInUse?: (err: unknown) => string | undefined;
+  /** Copy for a connect failure that can be named: the port held elsewhere, a
+   *  device that never answered (see ``namedConnectFailure``). */
+  namedFailure?: (err: unknown) => string | undefined;
   /** Shown when the plan yields no parts to write. */
   noFirmware?: string;
   /** Shown when the esptool chunk could not be fetched. */
@@ -44,7 +45,7 @@ export function webFlashMessages(localize: LocalizeFunc): FlashMessages {
   return {
     connectFailed: localize("web.install.connect_failed_hint"),
     loadFailed: localize("firmware.engine_load_failed"),
-    portInUse: (err) => portInUseMessage(err, localize),
+    namedFailure: (err) => namedConnectFailure(err, localize),
     noFirmware: localize("web.install.no_firmware"),
   };
 }
@@ -97,7 +98,7 @@ export async function runFlash(
     console.error(err);
     hooks.onStep("error");
     hooks.onError(
-      plan.messages?.portInUse?.(err) ??
+      plan.messages?.namedFailure?.(err) ??
         plan.messages?.connectFailed ??
         getErrorMessage(err)
     );
