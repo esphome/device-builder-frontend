@@ -7,8 +7,8 @@ import type {} from "improv-wifi-serial-sdk/dist/serial-provision-dialog";
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
-import { openLiveSerialPort } from "../../util/web-serial.js";
-import { isRp2CdcPort } from "../../util/web-usb.js";
+import { isRp2CdcPort } from "../../platforms/rp2/index.js";
+import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;

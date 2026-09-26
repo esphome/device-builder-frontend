@@ -1,4 +1,4 @@
-import { rebootPico } from "../../util/rp2-logs-reset.js";
+import { rebootPico } from "../../platforms/rp2/index.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)
@@ -6,8 +6,8 @@ import { releaseControlLines } from "../../util/serial-control-lines.js";
  * connect cards do: close the dead handle, reacquire a live one, resume.
  */
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
+import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
-import { openLiveSerialPort } from "../../util/web-serial.js";
 import type { WebLogSource } from "./log-source.js";
 
 // ESPHome logs over UART default to 115200 baud. The dashboard resolves a

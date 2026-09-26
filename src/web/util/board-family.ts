@@ -1,5 +1,5 @@
-import { ESPRESSIF_USB_VID } from "../../util/web-serial.js";
-import { isRp2CdcPort } from "../../util/web-usb.js";
+import { ESPRESSIF_USB_VID } from "../../platforms/esp/index.js";
+import { isRp2CdcPort } from "../../platforms/rp2/index.js";
 import type { WebMode } from "../web-mode.js";
 
 // An nRF52 running ESPHome is a Zephyr USB device (ESPHome's only Zephyr

@@ -1,4 +1,4 @@
-import { RASPBERRY_PI_USB_VID } from "../../util/web-usb.js";
+import { RASPBERRY_PI_USB_VID } from "../../platforms/rp2/index.js";
 
 /**
  * Web Serial port filters that narrow the browser picker to Raspberry Pi Pico

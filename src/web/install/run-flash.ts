@@ -13,7 +13,7 @@ import {
   disconnect,
   flashFirmware,
   resetAndDisconnect,
-} from "../../util/web-serial.js";
+} from "../../platforms/esp/index.js";
 import type { FlashPart } from "../util/esphome-web-firmware.js";
 
 export type FlashStep =

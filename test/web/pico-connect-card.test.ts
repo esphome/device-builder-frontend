@@ -15,6 +15,9 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
+}));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));

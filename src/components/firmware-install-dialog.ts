@@ -24,34 +24,50 @@ import {
   firmwareJobsContext,
   localizeContext,
 } from "../context/index.js";
+import {
+  handOffToFlasher,
+  startUsbFlash,
+  startWebSerialInstall,
+} from "../platforms/esp/dashboard.js";
+import type { DetectedChip } from "../platforms/esp/index.js";
+import {
+  nrfDoFlash,
+  nrfDoReset,
+  retryNrfDfu,
+  startNrfDfuInstall,
+} from "../platforms/nrf52/dashboard.js";
+import type { DfuPackage } from "../platforms/nrf52/index.js";
+import {
+  retryRp2Uf2,
+  rp2DoDownload,
+  rp2DoFlash,
+  rp2DoReset,
+  startRp2Uf2Install,
+} from "../platforms/rp2/dashboard.js";
+import {
+  retryRtlAmbz2,
+  rtlDoFlash,
+  startRtlAmbz2Install,
+} from "../platforms/rtl87xx/dashboard.js";
+import type { LibreTinyImage } from "../platforms/rtl87xx/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
-import type { LibreTinyImage } from "../util/libretiny-uf2.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
-import type { DfuPackage } from "../util/nrf-dfu.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { Uf2Image } from "../util/uf2.js";
-import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
   showOtaLogs,
   startArtifactDownload,
   startDownload,
-  startWebSerialInstall,
   waitForRunningJob,
 } from "./firmware-install-dialog/install-flow.js";
-import {
-  nrfDoFlash,
-  nrfDoReset,
-  retryNrfDfu,
-  startNrfDfuInstall,
-} from "./firmware-install-dialog/nrf-dfu-install.js";
 import {
   cardState,
   cardStatusDetail,
@@ -62,28 +78,12 @@ import {
   renderResetSuggestion,
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
-import {
-  retryRp2Uf2,
-  rp2DoDownload,
-  rp2DoFlash,
-  rp2DoReset,
-  startRp2Uf2Install,
-} from "./firmware-install-dialog/rp2-uf2-install.js";
-import {
-  retryRtlAmbz2,
-  rtlDoFlash,
-  startRtlAmbz2Install,
-} from "./firmware-install-dialog/rtl-ambz2-install.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
 import type {
   Installer,
   InstallFailureKind,
   InstallStep,
 } from "./firmware-install-dialog/types.js";
-import {
-  handOffToFlasher,
-  startUsbFlash,
-} from "./firmware-install-dialog/usb-handoff.js";
 import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

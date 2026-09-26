@@ -3,8 +3,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import { pickBleNusDevice } from "./ble-nus-picker.js";
-import { bleNusLogsAvailable } from "./ble-nus-stream.js";
+import { bleNusLogsAvailable, pickBleNusDevice } from "../platforms/nrf52/index.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {

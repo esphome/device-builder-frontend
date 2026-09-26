@@ -2,11 +2,11 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST, LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
+import { isWebUsbSupported } from "../../platforms/rp2/index.js";
 import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
-import { isWebUsbSupported } from "../../util/web-usb.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   renderOffloadHint,

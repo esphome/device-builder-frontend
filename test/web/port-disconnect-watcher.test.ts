@@ -8,7 +8,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const reacquirePort = vi.fn();
-vi.mock("../../src/util/web-serial.js", () => ({
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 

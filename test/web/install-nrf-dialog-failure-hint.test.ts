@@ -21,7 +21,7 @@ vi.mock("../../src/util/serial-bootloader-touch.js", async (importOriginal) => (
   ...(await importOriginal<object>()),
   touchIntoBootloader: mocks.touchIntoBootloader,
 }));
-vi.mock("../../src/util/nrf-dfu.js", () => ({
+vi.mock("../../src/platforms/nrf52/nrf-dfu.js", () => ({
   parseDfuPackage: mocks.parseDfuPackage,
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));

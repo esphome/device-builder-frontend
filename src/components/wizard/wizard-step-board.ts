@@ -8,6 +8,7 @@ import type { SlimBoard } from "../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { detectChip, disconnect, readDeviceManifest } from "../../platforms/esp/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
@@ -16,13 +17,7 @@ import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
-import {
-  detectChip,
-  disconnect,
-  isPortPickerCancel,
-  isWebSerialSupported,
-  readDeviceManifest,
-} from "../../util/web-serial.js";
+import { isPortPickerCancel, isWebSerialSupported } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
   WIZARD_BOARD_PLATFORMS,

@@ -5,10 +5,13 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
 import { localizeContext } from "../../context/index.js";
+import {
+  type DfuPackage,
+  loadDfuEngine,
+  withManualBootloaderHint,
+} from "../../platforms/nrf52/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { withManualBootloaderHint } from "../../util/manual-bootloader-hint.js";
-import type { DfuPackage } from "../../util/nrf-dfu.js";
 import {
   BootloaderTouchError,
   touchIntoBootloader,
@@ -27,9 +30,6 @@ import {
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | "error";
-
-// Loaded on demand so ESP / Pico visitors never download the engine.
-const loadDfuEngine = () => import("../../util/nrf-dfu.js");
 
 /**
  * Two-step nRF52 DFU install: 1200-baud reset, then flash over the

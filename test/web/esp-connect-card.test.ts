@@ -9,6 +9,9 @@ const isPortPickerCancel = vi.fn((..._a: unknown[]) => true);
 const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: (...a: unknown[]) => isPortPickerCancel(...a),
+}));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));

@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 const { isWebUsbSupported } = vi.hoisted(() => ({
   isWebUsbSupported: vi.fn(() => true),
 }));
-vi.mock("../../src/util/web-usb.js", () => ({ isWebUsbSupported }));
+vi.mock("../../src/platforms/rp2/web-usb.js", () => ({ isWebUsbSupported }));
 
 import { identityLocalize } from "../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";

@@ -1,20 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/web-serial.js", () => ({
+  isPortPickerCancel: vi.fn(() => false),
+}));
+vi.mock("../../src/platforms/esp/esptool.js", () => ({
   connectToPort: vi.fn(),
   flashFirmware: vi.fn(),
   resetAndDisconnect: vi.fn(async () => {}),
   disconnect: vi.fn(async () => {}),
-  isPortPickerCancel: vi.fn(() => false),
 }));
 
 import {
   connectToPort,
   disconnect,
   flashFirmware,
-  isPortPickerCancel,
   resetAndDisconnect,
-} from "../../src/util/web-serial.js";
+} from "../../src/platforms/esp/esptool.js";
+import { isPortPickerCancel } from "../../src/util/web-serial.js";
 import { type FlashHooks, runFlash } from "../../src/web/install/run-flash.js";
 
 const port = {} as SerialPort;

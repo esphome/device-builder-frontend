@@ -3,6 +3,14 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import {
+  connectToPort,
+  detectChip,
+  disconnect,
+  readDeviceManifest,
+  readMacAddress,
+  UnsupportedChipError,
+} from "../../platforms/esp/index.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -14,15 +22,7 @@ import {
   notifySuccess,
 } from "../../util/notify.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
-import {
-  connectToPort,
-  detectChip,
-  disconnect,
-  isPortPickerCancel,
-  readDeviceManifest,
-  readMacAddress,
-  UnsupportedChipError,
-} from "../../util/web-serial.js";
+import { isPortPickerCancel } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 /** Open the editor. ``section`` deep-links a component section (read from

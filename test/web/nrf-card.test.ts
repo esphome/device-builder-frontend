@@ -14,7 +14,7 @@ vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
 vi.mock("../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../src/util/ble-nus-picker.js", () => ({
+vi.mock("../../src/platforms/nrf52/ble-nus-picker.js", () => ({
   pickBleNusDevice: mocks.pickBleNusDevice,
 }));
 vi.mock("../../src/web/install/esphome-web-install-nrf-dialog.js", () => ({}));

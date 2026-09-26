@@ -7,7 +7,7 @@ firmware, stream logs, and provision Wi-Fi via Improv; an nRF52 gets DFU
 installs and logs over USB or Bluetooth; an RTL8720C gets a LibreTiny UF2
 flashed through its ROM downloader and logs over its serial adapter. It shares the
 repo's `src/` tree (design system, the esptool-js flash engine in
-`src/util/web-serial.ts`, localization) and adds only this app.
+`src/platforms/esp/esptool.ts`, localization) and adds only this app.
 
 ## Dev server
 
@@ -44,7 +44,7 @@ hardware classes behave differently:
   dialog's engine drives them itself and falls back to the manual strap.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
-  BOOTSEL and reboots it over WebUSB (`src/util/rp2-logs-reset.ts`),
+  BOOTSEL and reboots it over WebUSB (`src/platforms/rp2/rp2-logs-reset.ts`),
   after which the CDC port re-enumerates; without WebUSB the button is
   hidden. Flashing goes through UF2 (its own connect card and install
   dialog).

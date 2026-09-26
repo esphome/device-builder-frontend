@@ -23,21 +23,21 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../src/web/install/pico-image.js", () => ({
   loadPicoImage: mocks.loadPicoImage,
 }));
-vi.mock("../../src/util/rp2-flash.js", async (importOriginal) => ({
+vi.mock("../../src/platforms/rp2/rp2-flash.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   flashPico: mocks.flashPico,
 }));
 vi.mock("../../src/util/serial-bootloader-touch.js", () => ({
   touchIntoBootloader: mocks.touchIntoBootloader,
 }));
-vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
+vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadPicoboot: mocks.loadPicoboot,
 }));
 
 import toast from "sonner-js";
 
-import { PicoFlashError } from "../../src/util/rp2-flash.js";
+import { PicoFlashError } from "../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../src/web/install/esphome-web-install-pico-dialog.js";
 import { picoPortFilters } from "../../src/web/util/pico-port-filter.js";
 

@@ -263,7 +263,8 @@ for the full flow. The load-bearing rules:
 Serial tool published to web.esphome.io (`pnpm run dev:web` / `pnpm run
 build:web` → `esphome_web/`, deployed by
 `.github/workflows/deploy-web.yml`). It reuses this repo's design system,
-`src/util/web-serial.ts` (esptool-js flash engine), `process-terminal` /
+the per-platform flash engines in `src/platforms/` (esptool-js in
+`src/platforms/esp/esptool.ts`), `process-terminal` /
 `base-dialog`, and localization, but has **no WebSocket, auth, or API** — its
 shell (`esphome-web-app`) provides only the `localize` + `darkMode` contexts.
 Elements are prefixed `esphome-web-*`; new copy goes in `en.json` under
@@ -274,8 +275,8 @@ firmware from firmware.esphome.io.
 **Flash-receiver mode** (`src/web/flash-receiver/`): web.esphome.io doubles as
 the secure-context flash target the dashboard hands firmware to over
 `postMessage` when it can't flash itself (HA add-on over plain http — Web
-Serial needs https/localhost). `usb-flasher.ts` (the dashboard sender) opens
-`https://web.esphome.io/#nonce=…&origin=…`; the shell detects that hash +
+Serial needs https/localhost). `src/platforms/esp/usb-flasher.ts` (the
+dashboard sender) opens `https://web.esphome.io/#nonce=…&origin=…`; the shell detects that hash +
 `window.opener` and renders `esphome-web-flash-receiver` instead of the
 dashboard. The channel is authenticated by the one-way `nonce` +
 `event.source === opener` (no origin allowlist — the opener is arbitrary

@@ -1,11 +1,11 @@
 /** Builders for LibreTiny-flavoured UF2 files (tags, partition table, part info). */
-import { concat } from "../src/util/bytes.js";
 import {
   LT_TAG,
   PARTITION_ENTRY_SIZE,
   PARTITION_MAGIC,
   UF2_FAMILY_AMBZ2,
-} from "../src/util/libretiny-uf2.js";
+} from "../src/platforms/rtl87xx/libretiny-uf2.js";
+import { concat } from "../src/util/bytes.js";
 import { UF2_FLAG_NOT_MAIN_FLASH } from "../src/util/uf2.js";
 import { makeUf2Block, type Uf2Tag } from "./_make-uf2-block.js";
 

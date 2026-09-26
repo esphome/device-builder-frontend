@@ -1,4 +1,5 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import { isEsp32Platform } from "../platforms/esp/index.js";
 import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
@@ -16,7 +17,6 @@ import {
   TRIM_MARKER,
 } from "./crash-report-budget.js";
 import { clampTitle, suggestTitleFor, unwoundFramesOf } from "./crash-report-title.js";
-import { isEsp32Platform } from "./esptool-platform.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 
 /**

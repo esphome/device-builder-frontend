@@ -15,14 +15,16 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../src/util/libretiny-uf2.js", async (importOriginal) => ({
+vi.mock("../../src/platforms/rtl87xx/libretiny-uf2.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   parseAmbz2Image: mocks.parseAmbz2Image,
 }));
-vi.mock("../../src/util/ambz2-flasher.js", () => ({ flashAmbz2: mocks.flashAmbz2 }));
+vi.mock("../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({
+  flashAmbz2: mocks.flashAmbz2,
+}));
 
 import { identityLocalize, mount } from "../_dom.js";
-import { Ambz2ImageError } from "../../src/util/libretiny-uf2.js";
+import { Ambz2ImageError } from "../../src/platforms/rtl87xx/libretiny-uf2.js";
 import { ESPHomeWebInstallRtlDialog } from "../../src/web/install/esphome-web-install-rtl-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -1,12 +1,13 @@
 /**
  * The steps every compile-first browser flasher (nRF52 DFU, Pico UF2,
  * RTL8720C ROM) shares: fetching the build artifact into memory, going back
- * to its bootloader step on Retry, and the port picker with its failure
- * reported. Kept out of install-flow.ts for the line budget.
+ * to its bootloader step on Retry, the port picker with its failure
+ * reported, and the 1200-baud touch into a board's bootloader.
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
@@ -62,6 +63,57 @@ export function resetForRetry(host: ESPHomeFirmwareInstallDialog): void {
   host._errorMessage = "";
   host._flashPercent = 0;
   host._flashBusy = false;
+}
+
+export interface TouchStep {
+  /** The install's parsed image; identifies the install the step belongs to. */
+  image: () => unknown;
+  /** Status while the picker and the touch run. */
+  resettingKey: string;
+  /** Show the wait step once the touch is done. */
+  showNext: () => void;
+  /** The failure detail; a flasher may add a hint for a failed touch. */
+  failureDetail?: (err: unknown) => string;
+}
+
+/**
+ * The 1200-baud touch into a board's bootloader from a footer click (user
+ * gesture): pick the port, touch it, then show the wait step. Every await is
+ * followed by a check that the reused dialog still shows this install.
+ */
+export async function touchIntoBootloaderStep(
+  host: ESPHomeFirmwareInstallDialog,
+  step: TouchStep
+): Promise<void> {
+  const image = step.image();
+  if (!image || host._flashBusy) return;
+  const device = host._device;
+  const stillCurrent = () => host._device === device && step.image() === image;
+  const status = host._statusMessage;
+  host._flashBusy = true;
+  host._statusMessage = host._localize(step.resettingKey);
+  try {
+    const port = await requestSerialPort();
+    if (!port) {
+      if (stillCurrent()) host._statusMessage = status;
+      return;
+    }
+    // The picker outlives a dismissed dialog; don't reset a port picked for
+    // an install that no longer exists.
+    if (!stillCurrent()) return;
+    await resetToBootloader(port, installLog(host, stillCurrent));
+  } catch (err) {
+    if (stillCurrent()) {
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        (step.failureDetail ?? getErrorMessage)(err)
+      );
+    }
+    return;
+  } finally {
+    if (stillCurrent()) host._flashBusy = false;
+  }
+  if (stillCurrent()) step.showNext();
 }
 
 /**

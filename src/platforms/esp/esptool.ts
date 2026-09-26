@@ -1,0 +1,501 @@
+/**
+ * ESP chip detection and firmware flashing over Web Serial with esptool-js.
+ * No backend involvement; talks directly to the USB-connected ESP device.
+ */
+import { ESPLoader, Transport } from "esptool-js";
+
+import { getErrorMessage } from "../../util/error-message.js";
+import { markSerialActivity } from "../../util/serial-reacquire.js";
+import { sleep } from "../../util/sleep.js";
+import type { LogCallback } from "../../util/web-serial.js";
+
+/** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
+export const ESPRESSIF_USB_VID = 0x303a;
+
+/** The on-chip USB-Serial-JTAG device's product id — esptool-js's own
+ *  discriminator (it gates on this PID alone). The vendor id alone is not
+ *  native-USB proof: Espressif also ships real UART bridges under it
+ *  (ESP-USB-Bridge, 0x1002); we pair both as the conservative check. */
+const ESPRESSIF_USB_JTAG_PID = 0x1001;
+
+/** Whether *port* is a chip's own USB-Serial-JTAG device (vs any bridge). */
+export function isEspressifUsbJtagPort(port: SerialPort): boolean {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
+}
+
+export interface DetectedChip {
+  chipName: string;
+  port: SerialPort;
+  transport: Transport;
+  loader: ESPLoader;
+}
+
+export interface FlashProgress {
+  fileIndex: number;
+  written: number;
+  total: number;
+  percent: number;
+}
+
+/** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
+const DEBUG_TAIL_LINES = 80;
+
+/** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
+const ESP_GET_SECURITY_INFO = 0x14;
+
+/** ``chip_id`` a genuine ESP32-P4 reports in its security info. */
+const ESP32P4_CHIP_ID = 18;
+
+// chip_id values (esptool.py IMAGE_CHIP_ID) of chips esptool-js has no target
+// for. They all read 0 at the magic-detect register and get claimed as an
+// ESP32-P4 (espressif/esptool-js#248).
+const UNSUPPORTED_CHIP_NAMES: Record<number, string> = {
+  25: "ESP32-H21",
+  28: "ESP32-H4",
+  31: "ESP32-E22",
+  32: "ESP32-S31",
+};
+
+/** The connected chip has no esptool-js target; flashing needs the esptool CLI. */
+export class UnsupportedChipError extends Error {
+  readonly chipName: string;
+
+  constructor(chipName: string) {
+    // Surfaces raw through err.message on the wizard / dashboard-scan paths,
+    // so the message itself carries the next step.
+    super(
+      `${chipName} is not supported by browser flashing yet — download the ` +
+        `firmware and flash it with esptool from the command line instead`
+    );
+    this.name = "UnsupportedChipError";
+    this.chipName = chipName;
+  }
+}
+
+/**
+ * Refuse a "detected ESP32-P4" that is really a newer, unsupported chip.
+ *
+ * esptool-js identifies chips by the legacy magic register alone and maps the
+ * value 0 to ESP32-P4; newer chips (S31, H21, H4, E22, …) read 0 there too, so
+ * they get claimed as a P4 and the P4 stub flasher then wedges the session
+ * (espressif/esptool-js#248, backend log ends at "Uploading stub..."). Cross-
+ * check the ROM's GET_SECURITY_INFO chip_id — the signal esptool.py identifies
+ * these chips by — and throw ``UnsupportedChipError`` before the stub upload.
+ * Fails open on any command / response-shape problem so a genuine P4 that
+ * can't answer keeps today's behaviour.
+ */
+async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
+  if (loader.chip?.CHIP_NAME !== "ESP32-P4") return;
+  let data: Uint8Array;
+  try {
+    [, data] = await loader.command(ESP_GET_SECURITY_INFO);
+  } catch {
+    return;
+  }
+  // flags(4) + flash_crypt_cnt(1) + key_purposes(7) + chip_id(4), then
+  // api_version and trailing status bytes; chip_id parses from the front
+  // regardless of how many bytes the ROM appends after it.
+  if (data.length < 16) return;
+  const chipId = new DataView(data.buffer, data.byteOffset).getUint32(12, true);
+  if (chipId === ESP32P4_CHIP_ID) return;
+  throw new UnsupportedChipError(
+    UNSUPPORTED_CHIP_NAMES[chipId] ?? `unsupported ESP chip (chip id ${chipId})`
+  );
+}
+
+/**
+ * Open an already-authorized serial port and detect the connected chip.
+ *
+ * Used for both first-time detect (via ``detectChip`` after the
+ * browser picker) and follow-on reconnects (install-flow's resume
+ * after compile, the connect-event fast-path that skips the picker).
+ *
+ * On ``loader.main()`` failure, tries ``transport.disconnect()`` first
+ * and falls back to ``port.close()`` so we never leak an open port —
+ * a still-open port silently breaks the next ``port.open()`` call.
+ */
+export async function connectToPort(
+  port: SerialPort,
+  onLog?: LogCallback
+): Promise<DetectedChip> {
+  markSerialActivity();
+  const transport = new Transport(port, false);
+
+  const loader = new ESPLoader({
+    transport,
+    baudrate: 115200,
+    terminal: onLog
+      ? {
+          clean: () => {},
+          writeLine: (line: string) => onLog(line),
+          write: (text: string) => onLog(text),
+        }
+      : undefined,
+  });
+
+  // esptool-js reports its per-attempt connect diagnostics (boot mode, sync
+  // errors) only through debug() and throws a generic connect error; hold a
+  // bounded tail of them to replay into the log when detection fails (#2553).
+  const debugTail: string[] = [];
+  const originalDebug = loader.debug;
+  if (onLog) {
+    loader.debug = (str: string, withNewline?: boolean) => {
+      debugTail.push(str);
+      if (debugTail.length > DEBUG_TAIL_LINES) debugTail.shift();
+      originalDebug.call(loader, str, withNewline);
+    };
+  }
+
+  try {
+    // main() has no hook between magic-register chip detection and the stub
+    // upload, so wrap runStub to cross-check the chip id first. Remove when
+    // espressif/esptool-js#248 lands.
+    const runStub = loader.runStub.bind(loader);
+    loader.runStub = async () => {
+      await guardMisdetectedP4(loader);
+      return runStub();
+    };
+    const chipName = await loader.main();
+    return { chipName, port, transport, loader };
+  } catch (error) {
+    if (onLog) {
+      // An unsupported chip means the handshake succeeded; the tail would
+      // just be 80 lines of healthy connect chatter.
+      if (!(error instanceof UnsupportedChipError)) {
+        for (const line of debugTail) onLog(line);
+      }
+      onLog(`Error: ${getErrorMessage(error)}`);
+    }
+    try {
+      await transport.disconnect();
+    } catch {
+      try {
+        await port.close();
+      } catch {
+        // Best-effort cleanup; rethrow the original detection error below.
+      }
+    }
+    throw error;
+  } finally {
+    if (onLog) loader.debug = originalDebug;
+  }
+}
+
+/**
+ * Prompt the user to select a serial port and detect the connected chip.
+ * Returns chip info + the open connection for subsequent operations.
+ */
+export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
+  markSerialActivity();
+  const port = await navigator.serial.requestPort();
+  return connectToPort(port, onLog);
+}
+
+/**
+ * Read the base MAC address from the chip's eFuse, normalized to the
+ * uppercase colon-separated form the backend stores in
+ * ``ConfiguredDevice.mac_address``. esptool-js returns lowercase; the
+ * device's mDNS broadcast is normalized to uppercase at backend
+ * ingest, so callers comparing the two need the cases to match.
+ */
+export async function readMacAddress(loader: ESPLoader): Promise<string> {
+  markSerialActivity();
+  const raw = await loader.chip.readMac(loader);
+  return raw.toUpperCase();
+}
+
+/**
+ * Manifest fields read from the ESP-IDF app descriptor
+ * (``esp_app_desc_t``) — a 256-byte struct at offset 0x20 of every
+ * IDF app image. With ESPHome's default partition layout the app
+ * partition starts at 0x10000, so the descriptor lives at 0x10020
+ * and is readable from the ROM bootloader over USB-CDC. No custom
+ * partition table required.
+ *
+ * ``board_id`` is sourced from ``esp_app_desc_t.project_name`` (the
+ * CMake project name baked in at build time, which ESPHome currently
+ * populates from ``esphome.name``). A vendor flashing a factory
+ * image just sets ``esphome.name`` to the catalog id; the wizard
+ * routes off it via ``api.getBoard(board_id)``.
+ */
+export interface DeviceManifest {
+  /** Board catalog id — ``esp_app_desc_t.project_name``. Routes the wizard. */
+  board_id?: string;
+  /** ``esp_app_desc_t.version``. */
+  version?: string;
+}
+
+const APP_DESC_OFFSET = 0x10020;
+const APP_DESC_SIZE = 256;
+const APP_DESC_MAGIC = 0xabcd5432;
+
+/**
+ * Read the ESP-IDF app descriptor and pull out the identifying
+ * fields. Returns ``null`` when the magic word doesn't match (not
+ * an IDF app, or partition layout drift), when ``project_name`` is
+ * empty, or when the flash read fails — callers fall through to
+ * chip-name-based board detection in that case.
+ */
+export async function readDeviceManifest(
+  loader: ESPLoader
+): Promise<DeviceManifest | null> {
+  markSerialActivity();
+  try {
+    const bytes = await loader.readFlash(APP_DESC_OFFSET, APP_DESC_SIZE);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (view.getUint32(0, true) !== APP_DESC_MAGIC) return null;
+    // esp_app_desc_t layout: 16 B header (magic + secure_version +
+    // 8 B reserved), then version[32], then project_name[32], …
+    const decoder = new TextDecoder("utf-8");
+    const readField = (offset: number, length: number): string => {
+      const slice = bytes.subarray(offset, offset + length);
+      const nul = slice.indexOf(0);
+      return decoder.decode(slice.subarray(0, nul === -1 ? slice.length : nul));
+    };
+    const version = readField(16, 32);
+    const project_name = readField(48, 32);
+    if (!project_name) return null;
+    return { board_id: project_name, version };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Flash firmware binary data to a connected ESP device.
+ * Assumes detectChip() was already called and the loader is connected.
+ */
+export async function flashFirmware(
+  loader: ESPLoader,
+  data: Uint8Array,
+  address: number,
+  onProgress?: (progress: FlashProgress) => void
+): Promise<void> {
+  markSerialActivity();
+  await loader.writeFlash({
+    fileArray: [{ data, address }],
+    flashSize: "keep",
+    flashMode: "keep",
+    flashFreq: "keep",
+    eraseAll: false,
+    compress: true,
+    reportProgress: (fileIndex, written, total) => {
+      // Keep the suppression window alive throughout long flashes —
+      // a 60-second write would otherwise let the post-flash reset
+      // toast leak through despite the operation still being active.
+      markSerialActivity();
+      onProgress?.({
+        fileIndex,
+        written,
+        total,
+        percent: Math.round((written / total) * 100),
+      });
+    },
+  });
+}
+
+/**
+ * RTC-WDT register addresses per chip — verified against esptool
+ * python's per-target files (esptool/targets/{esp32s2,esp32s3,
+ * esp32c2,esp32c3}.py). Both the RTC_CNTL_BASE address AND the
+ * register offsets within it vary by chip (e.g. WDTCONFIG0 is at
+ * +0x84 on C2, +0x90 on C3, +0x94 on S2, +0x98 on S3), so each
+ * entry has to spell out the full absolute address.
+ *
+ * Watchdog reset is the most reliable way to exit the stub bootloader
+ * on these chips. esptool's ``--after watchdog-reset`` uses the same
+ * trick precisely because DTR/RTS-based resets are unreliable on
+ * native-USB / USB-Serial-JTAG chips and on boards whose auto-reset
+ * circuit doesn't have the cross-coupled "cancellation" behaviour the
+ * standard DTR/RTS reset sequence assumes (M5Stamp C3 with CH9102F is
+ * one such combination — the user-reported repro of this fix).
+ *
+ * Disabled on ESP32-C6 (causes full system freeze per Espressif docs)
+ * and on chips without RTC_WDT (ESP8266, classic ESP32, ESP32-H2 /
+ * H4 / E22).
+ */
+const WDT_RESET_CHIPS: Record<
+  string,
+  { wdtConfig0: number; wdtConfig1: number; wdtWProtect: number }
+> = {
+  "ESP32-S2": {
+    wdtConfig0: 0x3f408094, // base 0x3F408000 + 0x94
+    wdtConfig1: 0x3f408098, // + 0x98
+    wdtWProtect: 0x3f4080ac, // + 0xAC
+  },
+  "ESP32-S3": {
+    wdtConfig0: 0x60008098, // base 0x60008000 + 0x98
+    wdtConfig1: 0x6000809c, // + 0x9C
+    wdtWProtect: 0x600080b0, // + 0xB0
+  },
+  "ESP32-C2": {
+    wdtConfig0: 0x60008084, // + 0x84
+    wdtConfig1: 0x60008088, // + 0x88
+    wdtWProtect: 0x6000809c, // + 0x9C
+  },
+  "ESP32-C3": {
+    wdtConfig0: 0x60008090, // + 0x90
+    wdtConfig1: 0x60008094, // + 0x94
+    wdtWProtect: 0x600080a8, // + 0xA8
+  },
+};
+
+/** Magic key that unlocks the RTC WDT write-protect register. */
+const RTC_CNTL_WDT_WKEY = 0x50d83aa1;
+
+/**
+ * Trigger a full chip reset via the RTC watchdog. The chip's stub
+ * bootloader processes the writeReg commands, the WDT fires shortly
+ * after, and the chip resets all the way through ROM bootloader to
+ * the user firmware. Works even when DTR/RTS-based reset doesn't
+ * reach the chip (CH9102F / native USB-Serial-JTAG / boards with
+ * non-cross-coupled auto-reset circuits).
+ *
+ * Returns ``false`` for chip types where this isn't safe (ESP32-C6
+ * freezes; classic ESP32 / ESP8266 don't have the WDT at all).
+ */
+async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<boolean> {
+  const regs = loader.chip?.CHIP_NAME
+    ? WDT_RESET_CHIPS[loader.chip.CHIP_NAME]
+    : undefined;
+  if (!regs) return false;
+  /* Release the boot-strap pin (IO9 on C3 / IO0 on others) before
+     the WDT fires so the chip boots from flash on the new reset, not
+     back into download mode. The DTR line is wired to the strap pin
+     via the auto-reset circuit on most dev boards. */
+  try {
+    await transport.setDTR(false);
+    await transport.setRTS(false);
+  } catch {
+    /* If setSignals fails the chip might still WDT-reset OK; don't
+       abort the reset path. */
+  }
+  /* Exact sequence + magic value from esptool python's
+     ``watchdog_reset()`` (esptool/targets/esp32c3.py and siblings).
+     Order: unlock → set timeout → enable+arm → re-lock. The
+     ``(1<<31) | (5<<28) | (1<<8) | 2`` config0 bit pattern is what
+     esptool ships — exact bit semantics aren't documented per-chip;
+     trust the authoritative source. ``>>> 0`` keeps it an unsigned
+     u32 (``1 << 31`` alone is negative in JS). */
+  try {
+    await loader.writeReg(regs.wdtWProtect, RTC_CNTL_WDT_WKEY);
+    await loader.writeReg(regs.wdtConfig1, 2000);
+    await loader.writeReg(regs.wdtConfig0, ((1 << 31) | (5 << 28) | (1 << 8) | 2) >>> 0);
+    await loader.writeReg(regs.wdtWProtect, 0);
+  } catch {
+    /* A writeReg may race the actual reset firing — the chip is
+       supposed to reset within ~14ms of the timeout write. If the
+       last writeReg throws because the chip is mid-reset, the WDT
+       has already done its job. */
+  }
+  /* WDT timeout ≈ 2000 ticks of the slow clock (~14ms on the
+     150kHz default). Wait for the chip to reset + reach ROM
+     bootloader before we close the port — closing mid-reset can
+     leave the kernel-side handle in a weird state on some OSes. */
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  return true;
+}
+
+/**
+ * Boot the just-flashed firmware with an EN pulse: drive EN (RTS) low then
+ * high while leaving the boot strap (DTR / GPIO0 / GPIO9) released, so the
+ * chip resets out of the bootloader and runs the app. Mirrors esptool's
+ * ``--after hard-reset`` (``HardReset``) and the legacy dashboard's
+ * ``resetSerialDevice``.
+ *
+ * ``holdMs`` is how long EN stays low; ``postReleaseMs`` waits after release
+ * before the caller closes the port. esptool uses 100 / 0 through a UART
+ * bridge and 200 / 200 over a chip's own USB peripheral, where the device
+ * drops off the bus during reset and needs the extra time to re-enumerate.
+ */
+async function enPulseHardReset(
+  transport: Transport,
+  holdMs: number,
+  postReleaseMs: number
+): Promise<void> {
+  await transport.setDTR(false); // boot strap released → boot from flash
+  await transport.setRTS(true); // EN low (hold in reset)
+  await sleep(holdMs);
+  await transport.setRTS(false); // EN high → boot the app
+  if (postReleaseMs > 0) await sleep(postReleaseMs);
+}
+
+/** esptool's ``HardReset`` timings through an external UART bridge. */
+const classicHardReset = (transport: Transport) => enPulseHardReset(transport, 100, 0);
+
+/**
+ * esptool's ``HardReset(uses_usb=True)`` timings for a chip's own
+ * USB-Serial/JTAG peripheral. The controller maps RTS to EN and DTR to the
+ * boot strap, so the same EN pulse works; the longer delays cover the USB
+ * drop + re-enumeration that the reset causes.
+ */
+const usbJtagHardReset = (transport: Transport) => enPulseHardReset(transport, 200, 200);
+
+/**
+ * Pick a reset strategy based on the chip and how it's connected.
+ *
+ * esptool-js's ``loader.after("hard_reset")`` resolves to its
+ * ``HardReset`` class which only calls ``setRTS(false)`` — that does
+ * not pulse DTR / EN and leaves the chip running the stub bootloader
+ * after ``writeFlash``, so the just-flashed firmware never boots and
+ * the post-install logs view stays empty forever.
+ *
+ * - ESP32-S2 / S3 / C2 / C3: trigger an RTC-watchdog reset (the same
+ *   trick esptool's ``--after watchdog-reset`` uses). Most reliable
+ *   on these chips — works through external UART bridges (CH9102F,
+ *   CP210x, etc.) and the chip's own USB-Serial-JTAG alike, and
+ *   doesn't depend on the board's auto-reset circuit having the
+ *   "cancellation" behaviour the DTR/RTS sequence implicitly assumes.
+ * - Native USB-Serial/JTAG (0x303a:0x1001 — esptool-js discriminates on
+ *   the PID; other 0x303a products like the ESP-USB-Bridge are real UART
+ *   bridges) for chips not in the WDT list (ESP32-C6 / H2 / P4 …): the
+ *   EN pulse with esptool's USB timings (``usbJtagHardReset``). NOT
+ *   esptool-js's ``UsbJtagSerialReset``: that is esptool's
+ *   ``usb_jtag_bootloader_reset``, the *enter download mode* sequence
+ *   (drives the boot strap via DTR while pulsing EN), so running it after
+ *   ``writeFlash`` reset the chip straight back into the ROM bootloader.
+ *   The ROM's USB CDC re-enumerates and opens fine, so nothing looked
+ *   wrong until Improv / the logs never answered (#1678, XIAO ESP32-C6).
+ * - Everything else (classic ESP32 / ESP8266 via CP210x / CH340 /
+ *   FTDI / etc. bridges): an EN pulse with GPIO0 released
+ *   (``classicHardReset``), matching esptool's ``--after hard-reset``.
+ *   esptool-js's ``ClassicReset`` is NOT this — it's the
+ *   *enter-bootloader* sequence (drives GPIO0 low as EN releases), which
+ *   left the just-flashed chip stuck in the serial bootloader (#1529).
+ */
+async function hardResetChip(
+  loader: ESPLoader,
+  transport: Transport,
+  port: SerialPort
+): Promise<void> {
+  if (await watchdogReset(loader, transport)) return;
+  if (isEspressifUsbJtagPort(port)) {
+    await usbJtagHardReset(transport);
+  } else {
+    await classicHardReset(transport);
+  }
+}
+
+/** Hard-reset the device and disconnect. */
+export async function resetAndDisconnect(
+  loader: ESPLoader,
+  transport: Transport,
+  port: SerialPort
+): Promise<void> {
+  markSerialActivity();
+  try {
+    await hardResetChip(loader, transport, port);
+  } finally {
+    await transport.disconnect();
+    // hard_reset triggers a USB re-enumeration on native-USB chips;
+    // re-stamp so the resulting connect event lands inside the window.
+    markSerialActivity();
+  }
+}
+
+/** Disconnect without resetting. */
+export async function disconnect(transport: Transport): Promise<void> {
+  markSerialActivity();
+  await transport.disconnect();
+}

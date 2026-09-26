@@ -6,9 +6,13 @@ import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
 import { localizeContext } from "../../context/index.js";
+import {
+  type LibreTinyImage,
+  loadAmbz2Engine,
+  loadLibreTinyParser,
+} from "../../platforms/rtl87xx/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import type { LibreTinyImage } from "../../util/libretiny-uf2.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
 import { filePickerStyles, renderFilePicker } from "./file-picker.js";
@@ -23,11 +27,6 @@ import {
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
-
-// Loaded on demand so ESP / Pico / nRF visitors never download the engine
-// or the UF2 parser.
-const loadEngine = () => import("../../util/ambz2-flasher.js");
-const loadParser = () => import("../../util/libretiny-uf2.js");
 
 /**
  * RTL8720C (AmebaZ2) install: a LibreTiny UF2 the user supplies (there is no
@@ -106,9 +105,12 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     try {
       // The parser module is loaded here, not imported statically, so its
       // error class comes from the loaded module too.
-      let parser: Awaited<ReturnType<typeof loadParser>> | undefined;
+      let parser: Awaited<ReturnType<typeof loadLibreTinyParser>> | undefined;
       try {
-        const [mod, bytes] = await Promise.all([loadParser(), file.arrayBuffer()]);
+        const [mod, bytes] = await Promise.all([
+          loadLibreTinyParser(),
+          file.arrayBuffer(),
+        ]);
         parser = mod;
         image = mod.parseAmbz2Image(new Uint8Array(bytes));
       } catch (err) {
@@ -138,7 +140,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     const live = () => !abort.signal.aborted;
     let rebooted: boolean;
     try {
-      const { flashAmbz2 } = await loadEngine();
+      const { flashAmbz2 } = await loadAmbz2Engine();
       rebooted = await flashAmbz2(port, image, {
         signal: abort.signal,
         onLog: (line) => {
