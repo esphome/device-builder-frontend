@@ -85,6 +85,7 @@ export type {
   Installer,
   InstallStep,
 } from "./firmware-install-dialog/types.js";
+import { SdkDownloadWatch } from "./process-terminal/sdk-download-hint.js";
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
@@ -167,7 +168,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // The streamed output, batched into one render per frame instead of one
   // per line (#1203). Uncapped: an install log is finite and the user reads
   // back through it after a failure.
-  _log = new LogBuffer(this);
+  _sdkDownload = new SdkDownloadWatch(this);
+  _log = new LogBuffer(this, {
+    onAppend: (l, start) => this._sdkDownload.observe(l, start),
+  });
 
   // Build compile clocks — drives the compiling-step elapsed readout + the
   // offload hint. The step-based runEnded backstop freezes the span when the

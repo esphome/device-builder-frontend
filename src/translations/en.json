@@ -462,6 +462,7 @@
     "try_open_editor_button": "opening this device in the editor",
     "offload_hint": "Compiling is taking a while. You can send builds to a faster machine on your network to speed this up. {action}.",
     "offload_hint_action": "Set up a build server",
+    "sdk_download_hint": "The first nRF52 build downloads the nRF Connect SDK (about 2 GB), which takes several minutes. Leave it running.",
     "run_elapsed_title": "Total build time. Click for the compile-only breakdown",
     "timer_detail_title": "Build time breakdown",
     "compile_time_label": "Compile time",

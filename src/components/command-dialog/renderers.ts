@@ -17,6 +17,7 @@ import {
   renderBuildFailureSuggestion,
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
+import { renderSdkDownloadHint } from "../process-terminal/sdk-download-hint.js";
 import {
   renderTermButton,
   renderTermToggle,
@@ -283,6 +284,9 @@ export function renderOffloadHintSlot(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (!host._timer.isCompiling) return nothing;
+  // The first nRF52 build's SDK download comes first: it would trip the
+  // offload nudge, and cancelling it is the mistake worth heading off.
+  if (host._sdkDownload.active) return renderSdkDownloadHint(host._localize);
   const visible = shouldShowOffloadHint({
     elapsedMs: host._timer.compileElapsedMs ?? 0,
     source: resolveJobSource(host),

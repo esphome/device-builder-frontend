@@ -84,6 +84,7 @@ import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
 import "./process-terminal/process-terminal.js";
+import { SdkDownloadWatch } from "./process-terminal/sdk-download-hint.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -177,7 +178,10 @@ export class ESPHomeCommandDialog extends LitElement {
   // The streamed output, batched into one render per frame instead of one
   // per line (#348). Uncapped: a compile log is finite and users scroll back
   // through it.
-  _log = new LogBuffer(this);
+  _sdkDownload = new SdkDownloadWatch(this);
+  _log = new LogBuffer(this, {
+    onAppend: (l, start) => this._sdkDownload.observe(l, start),
+  });
 
   // Distinguishes user-stopped from backend-failed. Both flip _state to "error"
   // but only real failures get the reset-build-env hint.
