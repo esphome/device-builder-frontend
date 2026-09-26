@@ -509,6 +509,21 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
     );
     expect(toastError).not.toHaveBeenCalled();
   });
+
+  it("says the disconnect in the platform's own words", async () => {
+    const dialog = bleDialog();
+    bleStream.streamBleNus.mockImplementation(async (_d, hooks) => {
+      hooks.onDisconnect?.();
+      return async () => {};
+    });
+    // A key the nRF52 support doesn't use, so a literal in attachBleLogs
+    // would fail this.
+    const other = { ...nrfBle, disconnectedKey: "dashboard.logs_reset_failed" };
+    await attachBleLogs(dialog as never, defaultLocalize, other, device, () => false);
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+      defaultLocalize("dashboard.logs_reset_failed")
+    );
+  });
 });
 
 describe("attachSerialLogStream reopen", () => {
