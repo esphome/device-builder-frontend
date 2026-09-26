@@ -380,6 +380,16 @@ describe("logs after a Pico install", () => {
     expect((host as { _logsPort?: unknown })._logsPort ?? null).toBeNull();
   });
 
+  it("keeps no port from a touch that finished after the dialog moved on", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockResolvedValue({} as SerialPort);
+    mocks.resetToBootloader.mockImplementation(async () => {
+      host._device = { ...device, configuration: "other.yaml" };
+    });
+    await rp2DoReset(asHost(host));
+    expect((host as { _logsPort?: unknown })._logsPort ?? null).toBeNull();
+  });
+
   it("ends on done without a port when nothing was touched (BOOTSEL by hand)", async () => {
     const host = readyHost();
     flashOk();

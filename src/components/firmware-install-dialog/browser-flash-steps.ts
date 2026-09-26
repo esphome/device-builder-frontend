@@ -125,7 +125,8 @@ export async function touchIntoBootloaderStep(
     // an install that no longer exists.
     if (!stillCurrent()) return;
     await resetToBootloader(port, installLog(host, stillCurrent));
-    step.onTouched?.(port);
+    // Not for a dialog reused while the touch ran: the port is another board's.
+    if (stillCurrent()) step.onTouched?.(port);
   } catch (err) {
     if (stillCurrent()) {
       host._fail(
