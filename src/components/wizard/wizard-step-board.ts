@@ -26,7 +26,9 @@ import { SerialPortsPollController } from "../../util/serial-ports-poll-controll
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
+  platformPresetName,
   WIZARD_BOARD_PLATFORMS,
+  type WizardBoardPreset,
 } from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";
@@ -53,12 +55,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
-  /** Platform-filter chip label to apply on first mount (e.g.
-   *  ``"ESP32-C6"``). Set by the parent dialog when a chip family
-   *  is known up front — the serial-detect flow uses this to land
-   *  the user on a picker already narrowed to their hardware. */
+  /** Filter to apply on first mount: a chip's label (e.g.
+   *  ``"ESP32-C6"``) or a whole platform. Set by the parent dialog
+   *  when the hardware is known up front — the serial-detect flow
+   *  uses this to land the user on a picker already narrowed to it. */
   @property({ attribute: false })
-  presetFilterLabel: string | null = null;
+  preset: WizardBoardPreset | null = null;
+
+  /** The platform a platform-wide preset narrows to, while it is on. */
+  @state()
+  private _presetPlatform: string | null = null;
 
   private _list = new PagedListController<SlimBoard>(this);
 
@@ -102,30 +108,30 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // Warm the esptool chunk while the user reads the step; a miss only
     // costs the fetch at click time.
     if (isWebSerialSupported()) preloadEsptool();
-    // Lit usually sets ``.presetFilterLabel`` before connectedCallback
-    // fires (property bindings are applied during element upgrade), so
-    // this path handles the common case. ``willUpdate`` below covers
-    // the parent-updates-after-mount case where the element is reused
-    // and the preset arrives later.
-    if (this.presetFilterLabel) {
-      this._selectedFilter = this.presetFilterLabel;
-      this._filterFromDetection = true;
-    }
+    // Lit usually sets ``.preset`` before connectedCallback fires
+    // (property bindings are applied during element upgrade), so this
+    // path handles the common case. ``willUpdate`` below covers the
+    // parent-updates-after-mount case where the element is reused and
+    // the preset arrives later.
+    this._applyPreset();
     this._fetchBoards();
   }
 
   willUpdate(changed: PropertyValues<this>) {
     super.willUpdate(changed);
-    if (
-      changed.has("presetFilterLabel") &&
-      this.presetFilterLabel &&
-      !this._selectedFilter
-    ) {
-      this._selectedFilter = this.presetFilterLabel;
-      this._filterFromDetection = true;
-      this._fetchBoards();
+    if (changed.has("preset") && !this._selectedFilter && !this._presetPlatform) {
+      if (this._applyPreset()) this._fetchBoards();
     }
     this._portsPoll.set(this._view === "select-port");
+  }
+
+  /** Narrow the picker to the preset, if any; true when one applied. */
+  private _applyPreset(): boolean {
+    if (!this.preset) return false;
+    if ("label" in this.preset) this._selectedFilter = this.preset.label;
+    else this._presetPlatform = this.preset.platform;
+    this._filterFromDetection = true;
+    return true;
   }
 
   private _fetchBoards() {
@@ -133,7 +139,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     const filter = ESPHomeWizardStepBoard.PLATFORMS.find(
       (p) => p.label === this._selectedFilter
     );
-    const platform = filter?.platform || undefined;
+    const platform = filter?.platform || this._presetPlatform || undefined;
     const variant = filter?.variant || undefined;
     const mcu = filter?.mcu || undefined;
     this._list.reset((offset, limit) =>
@@ -180,7 +186,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
               <div class="detection-banner" role="status">
                 <span>
                   ${this._localize("wizard.detected_chip_family", {
-                    family: this._selectedFilter,
+                    family:
+                      this._selectedFilter ||
+                      platformPresetName(this._presetPlatform ?? ""),
                   })}
                 </span>
                 <button
@@ -266,6 +274,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // Manual filter click takes the user out of detection mode —
     // they've decided to browse, possibly narrower or wider than
     // the chip they plugged in.
+    this._presetPlatform = null;
     this._filterFromDetection = false;
     this._fetchBoards();
   }
@@ -422,12 +431,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
   // unfiltered rather than keeping a stale manual/preset selection.
   private _applyDetectedFilter(label: string | null) {
     this._selectedFilter = label ?? "";
+    this._presetPlatform = null;
     this._filterFromDetection = label !== null;
     this._search = "";
   }
 
   private _exitDetectionMode() {
     this._selectedFilter = "";
+    this._presetPlatform = null;
     this._filterFromDetection = false;
     void this._fetchBoards();
   }

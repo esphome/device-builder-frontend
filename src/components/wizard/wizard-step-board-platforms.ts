@@ -28,6 +28,13 @@ export interface WizardBoardPlatform {
   readonly label: string;
 }
 
+/**
+ * What a detection narrows the picker to: one chip's filter, or a whole
+ * platform when the detection only knows the family (a Pico's USB ids say
+ * rp2, not RP2040 versus RP2350).
+ */
+export type WizardBoardPreset = { label: string } | { platform: string };
+
 export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "esp32", variant: "esp32", label: "ESP32" },
   { platform: "esp32", variant: "esp32s2", label: "ESP32-S2" },
@@ -57,6 +64,24 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "ln882x", variant: "", mcu: "ln882h", label: "LN882H" },
   { platform: "nrf52", variant: "", label: "nRF52" },
 ];
+
+/**
+ * The preset for a platform known only by its key: its one chip's filter
+ * when it has one, else the platform as a whole. ``null`` for a platform the
+ * picker has no chips for.
+ */
+export function platformToPreset(platform: string): WizardBoardPreset | null {
+  const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
+  if (chips.length === 0) return null;
+  return chips.length === 1 ? { label: chips[0].label } : { platform };
+}
+
+/** The user-facing name of a platform-wide preset: its chips, joined. */
+export function platformPresetName(platform: string): string {
+  return WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform)
+    .map((p) => p.label)
+    .join(" / ");
+}
 
 /**
  * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision

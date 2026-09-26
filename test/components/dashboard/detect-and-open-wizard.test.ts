@@ -57,7 +57,7 @@ describe("detectAndOpenWizard", () => {
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize });
     expect(engine.connectToPort).toHaveBeenCalledWith(port);
     expect(engine.disconnect).toHaveBeenCalledOnce();
-    expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "ESP32-S3" });
   });
 
   it("recognises a configured device by its MAC and hands it to the caller", async () => {
@@ -119,7 +119,7 @@ describe("detectAndOpenWizard", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize, port: closable });
     // A teardown failure neither replaces the result nor leaks the open port.
-    expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "ESP32-S3" });
     expect(closable.close).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
@@ -131,11 +131,42 @@ describe("detectAndOpenWizard", () => {
     const api = { getBoard: vi.fn().mockRejectedValue(new Error("backend down")) };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, { localize, port });
-    expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "ESP32-S3" });
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("acme-lamp"),
       expect.any(Error)
     );
     warn.mockRestore();
+  });
+
+  it("sends a Pico straight to its platform's boards without the ESP detect (#1856)", async () => {
+    const dialog = makeDialog();
+    const pico = {
+      getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId: 0xf00a }),
+    } as SerialPort;
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { port: pico, localize });
+    // rp2 has two chips (RP2040 / RP2350), so the whole platform is the preset.
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ platform: "rp2" });
+    expect(seams.loadEsptool).not.toHaveBeenCalled();
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("sends an nRF52 to its one chip", async () => {
+    const dialog = makeDialog();
+    const nrf = {
+      getInfo: () => ({ usbVendorId: 0x2fe3, usbProductId: 0x0100 }),
+    } as SerialPort;
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { port: nrf, localize });
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "nRF52" });
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("still detects an Espressif port and a UART bridge, which can carry any ESP", async () => {
+    const dialog = makeDialog();
+    const bridge = {
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+    } as SerialPort;
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { port: bridge, localize });
+    expect(engine.connectToPort).toHaveBeenCalledWith(bridge);
   });
 });

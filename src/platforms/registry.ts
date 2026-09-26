@@ -19,6 +19,15 @@ export const PLATFORMS: readonly PlatformSupport[] = [
   rtl87xxPlatform,
 ];
 
+/**
+ * The descriptor whose boards a Web Serial port belongs to by its USB ids,
+ * if any. None for an Espressif port, a UART bridge or an unknown device;
+ * the caller's ESP path handles those.
+ */
+export function platformOfPort(port: SerialPort): PlatformSupport | undefined {
+  return PLATFORMS.find((p) => p.claimsPort?.(port));
+}
+
 /** The descriptor for a device's target platform, if any. */
 export function platformFor(
   targetPlatform: string | null | undefined

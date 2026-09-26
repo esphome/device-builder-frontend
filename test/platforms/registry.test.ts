@@ -18,6 +18,7 @@ import type {
 import {
   installForMethod,
   platformFor,
+  platformOfPort,
   PLATFORMS,
   serialLogsFor,
   serialLogsOf,
@@ -120,5 +121,32 @@ describe("PLATFORMS", () => {
   it("leaves ESP and unknown methods to the dialog", () => {
     expect(installForMethod("web-serial")).toBeUndefined();
     expect(installForMethod("carrier-pigeon")).toBeUndefined();
+  });
+
+  describe("platformOfPort", () => {
+    const usb = (usbVendorId?: number, usbProductId?: number) =>
+      ({ getInfo: () => ({ usbVendorId, usbProductId }) }) as SerialPort;
+
+    it("claims a board's own CDC by its USB ids, and nothing else", () => {
+      expect(platformOfPort(usb(0x2e8a, 0xf00a))?.id).toBe("rp2"); // Pico W
+      expect(platformOfPort(usb(0x2fe3, 0x0100))?.id).toBe("nrf52"); // Zephyr CDC
+      expect(platformOfPort(usb(0x239a, 0x8029))?.id).toBe("nrf52"); // Feather nRF52840
+      // Espressif, a UART bridge (which can carry an ESP or an RTL) and an
+      // id-less port belong to no descriptor.
+      expect(platformOfPort(usb(0x303a, 0x1001))).toBeUndefined();
+      expect(platformOfPort(usb(0x1a86, 0x7523))).toBeUndefined();
+      expect(platformOfPort(usb())).toBeUndefined();
+    });
+
+    it("never has two descriptors claim one port", () => {
+      const claimers = PLATFORMS.filter((p) => p.claimsPort);
+      for (const port of [
+        usb(0x2e8a, 0xf00a),
+        usb(0x2fe3, 0x0100),
+        usb(0x239a, 0x8029),
+      ]) {
+        expect(claimers.filter((p) => p.claimsPort!(port)).length).toBeLessThanOrEqual(1);
+      }
+    });
   });
 });

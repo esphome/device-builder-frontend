@@ -9,6 +9,7 @@ import {
   EngineLoadError,
   UnsupportedChipError,
 } from "../../platforms/esp/index.js";
+import { platformOfPort } from "../../platforms/registry.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -21,7 +22,11 @@ import {
 } from "../../util/notify.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
-import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
+import {
+  chipNameToFilterLabel,
+  platformToPreset,
+  type WizardBoardPreset,
+} from "../wizard/wizard-step-board-platforms.js";
 
 /** Open the editor. ``section`` deep-links a component section (read from
  *  ``?section=`` on load); ``reveal`` opts into the one-shot ``reveal=1``
@@ -297,7 +302,7 @@ export async function detectAndOpenWizard(
   createDialog: {
     open(step?: string): void;
     openWithBoard(board: BoardCatalogEntry): void;
-    openAtBoardStep(filterLabel?: string): void;
+    openAtBoardStep(preset?: WizardBoardPreset): void;
   },
   options: {
     /** Port captured from the ``navigator.serial`` ``connect`` event —
@@ -316,6 +321,14 @@ export async function detectAndOpenWizard(
     localize?: LocalizeFunc;
   } = {}
 ): Promise<void> {
+  // A Pico or an nRF52 says what it is by its USB ids, and the ESP detect
+  // would sit on its CDC waiting for a ROM loader that never answers
+  // (#1856). Espressif ports and UART bridges go on to the detect.
+  const family = options.port ? platformOfPort(options.port) : undefined;
+  if (family) {
+    createDialog.openAtBoardStep(platformToPreset(family.id) ?? undefined);
+    return;
+  }
   let board: DetectedBoard | null;
   try {
     board = await detectEspBoard(options.port ?? null, {
@@ -377,7 +390,8 @@ export async function detectAndOpenWizard(
     }
   }
 
-  createDialog.openAtBoardStep(chipNameToFilterLabel(board.chipName) ?? undefined);
+  const label = chipNameToFilterLabel(board.chipName);
+  createDialog.openAtBoardStep(label ? { label } : undefined);
 }
 
 export async function fetchEncryptionKey(
