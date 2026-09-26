@@ -244,7 +244,7 @@ async function runImprov(
   });
 }
 
-/** How long ``releasePort`` keeps retrying a close the SDK's reader still blocks. */
+/** How long ``releasePort`` keeps retrying a close the SDK's reader or writer still blocks. */
 const RELEASE_TIMEOUT_MS = 1000;
 
 /**
