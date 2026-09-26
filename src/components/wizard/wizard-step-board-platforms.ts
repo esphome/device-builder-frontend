@@ -70,12 +70,18 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
 ];
 
 /**
- * The preset for a platform known only by its key: its one chip's filter
- * when it has one, else the platform as a whole. ``null`` for a platform the
- * picker has no chips for.
+ * The preset for a platform known by its key, and its chip (``mcu``) when
+ * the detection knows that too: that chip's filter, else the platform's one
+ * chip, else the platform as a whole. ``null`` for a platform the picker has
+ * no chips for.
  */
-export function platformToPreset(platform: string): WizardBoardPreset | null {
+export function platformToPreset(
+  platform: string,
+  mcu?: string
+): WizardBoardPreset | null {
   const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
+  const chip = mcu ? chips.find((p) => p.mcu === mcu) : undefined;
+  if (chip) return { label: chip.label };
   if (chips.length === 0) return null;
   if (chips.length === 1) return { label: chips[0].label };
   return { label: chips.map((p) => p.label).join(" / "), platform };

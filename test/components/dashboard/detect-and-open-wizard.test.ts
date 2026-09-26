@@ -18,6 +18,11 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
+const rtl = vi.hoisted(() => ({ probeAmbz2: vi.fn(async () => false) }));
+vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadAmbz2Engine: async () => rtl,
+}));
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -174,5 +179,19 @@ describe("detectAndOpenWizard", () => {
       expect.objectContaining({ platform: "rp2" })
     );
     expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("lands an RTL8720C found behind a bridge on its chip's boards", async () => {
+    const dialog = makeDialog();
+    engine.connectToPort.mockRejectedValueOnce(
+      new Error("Failed to connect with the device")
+    );
+    rtl.probeAmbz2.mockResolvedValueOnce(true);
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, {
+      port: makeUsbPort(0x1a86, 0x7523),
+      localize,
+    });
+    expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "RTL8720C" });
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

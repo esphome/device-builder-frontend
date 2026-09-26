@@ -5,6 +5,7 @@ import {
   Ambz2ConsoleError,
   Ambz2VerifyError,
   flashAmbz2,
+  probeAmbz2,
 } from "../../../src/platforms/rtl87xx/ambz2-flasher.js";
 import type { LibreTinyImage } from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
 
@@ -295,5 +296,56 @@ describe("flashAmbz2", () => {
     rom.dropLink();
     await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
     expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe("probeAmbz2", () => {
+  it("finds the ROM after the DTR/RTS reset and boots the firmware back", async () => {
+    const rom = fakeRom();
+    const log: string[] = [];
+    await expect(
+      driveFakeTimers(probeAmbz2(rom.port, { onLog: (l) => log.push(l) }))
+    ).resolves.toBe(true);
+    // Only the link: no flash setup, no write.
+    expect(rom.commands).toEqual(["ping"]);
+    expect(rom.signals).toEqual([
+      { dataTerminalReady: true, requestToSend: true },
+      { requestToSend: false },
+      { dataTerminalReady: false, requestToSend: true },
+      { dataTerminalReady: false, requestToSend: false },
+    ]);
+    expect(last(log)).toBe("An RTL8720C ROM answered");
+    expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
+  it("gives up after the automatic resets, never waiting for the strap", async () => {
+    const rom = fakeRom({ lostResets: 99 });
+    await expect(driveFakeTimers(probeAmbz2(rom.port))).resolves.toBe(false);
+    expect(rom.commands.filter((c) => c === "ping").length).toBeLessThan(40);
+    // Nothing answered, so nothing to boot; the port is still released.
+    expect(rom.signals.filter((s) => s.dataTerminalReady === false)).toEqual([]);
+    expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
+  it("counts a chip answering from its SDK console as found", async () => {
+    const rom = fakeRom({ console: true });
+    await expect(driveFakeTimers(probeAmbz2(rom.port))).resolves.toBe(true);
+  });
+
+  it("gives up at once on an adapter without control lines, unless the ROM is already up", async () => {
+    // No lines to drive and nothing answering: one attempt, then out.
+    const silent = fakeRom({ noSignals: true, linkAfterPings: 1000 });
+    await expect(driveFakeTimers(probeAmbz2(silent.port))).resolves.toBe(false);
+    expect(silent.commands.filter((c) => c === "ping").length).toBeLessThan(10);
+    expect(silent.raw.close).toHaveBeenCalledOnce();
+    // A board strapped into the ROM by hand still answers.
+    const strapped = fakeRom({ noSignals: true });
+    await expect(driveFakeTimers(probeAmbz2(strapped.port))).resolves.toBe(true);
+  });
+
+  it("is false, not thrown, when the port cannot even be opened", async () => {
+    const rom = fakeRom();
+    rom.raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));
+    await expect(driveFakeTimers(probeAmbz2(rom.port))).resolves.toBe(false);
   });
 });

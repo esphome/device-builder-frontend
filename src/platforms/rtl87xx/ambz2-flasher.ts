@@ -322,6 +322,47 @@ async function writeRun(
 }
 
 /**
+ * Whether an RTL8720C is behind *port*: reset it into the ROM downloader over
+ * DTR/RTS and link, as ``flashAmbz2`` does, but stop there. A chip answering
+ * from its SDK console counts too. No strap guide: a detect must end on its
+ * own, so a board on an adapter without control lines is not found and the
+ * user picks it by hand. The board is rebooted into its firmware and the
+ * port closed either way; the install that follows resets it into the ROM
+ * again itself. Never throws.
+ */
+export async function probeAmbz2(
+  port: SerialPort,
+  hooks: Pick<Ambz2FlashHooks, "onLog" | "signal"> = {}
+): Promise<boolean> {
+  const log = hooks.onLog ?? (() => {});
+  let rom: RomLink | undefined;
+  let found = false;
+  try {
+    if (!port.readable) await port.open({ baudRate: AMBZ2_BAUD_RATE });
+    rom = new RomLink(port, hooks.signal);
+    found = await autoLink(port, rom, log);
+    log(found ? "An RTL8720C ROM answered" : "No RTL8720C ROM answered");
+  } catch (err) {
+    found = err instanceof Ambz2ConsoleError;
+    log(found ? "An RTL8720C SDK console answered" : `Probe failed: ${String(err)}`);
+  } finally {
+    // Never throws, whatever the port is in the middle of.
+    try {
+      await rom?.close();
+    } catch {
+      /* best-effort */
+    }
+    if (found) await bootFirmware(port);
+    try {
+      await port.close();
+    } catch {
+      /* best-effort */
+    }
+  }
+  return found;
+}
+
+/**
  * Flash ``image`` onto the chip behind ``port`` (opened here at 115200 if
  * needed, closed after). The automatic reset is tried first; failing that
  * the ROM is polled until the user straps the board or ``signal`` aborts.

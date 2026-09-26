@@ -310,7 +310,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // user picked that port on purpose (#1856).
     if (detection.kind !== "esp") {
       if (detection.kind === "family") {
-        this._applyDetection(platformToPreset(detection.family));
+        this._applyDetection(platformToPreset(detection.family, detection.chip));
       } else {
         this._applyDetection(null);
         this._detectError = this._localize("wizard.connect_your_board_unrecognized");

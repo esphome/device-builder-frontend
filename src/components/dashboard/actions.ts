@@ -346,7 +346,9 @@ export async function detectAndOpenWizard(
   // which would sit on a Pico's CDC waiting for a ROM loader (#1856).
   if (detection.kind !== "esp") {
     createDialog.openAtBoardStep(
-      detection.kind === "family" ? platformToPreset(detection.family) : null
+      detection.kind === "family"
+        ? platformToPreset(detection.family, detection.chip)
+        : null
     );
     return;
   }
