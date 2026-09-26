@@ -21,7 +21,7 @@ export const bin = (file: string, type?: string): FirmwareBinary => ({
 export function makeFlashHost<E extends object>(
   device: ConfiguredDevice,
   opts: { binaries: FirmwareBinary[]; downloadBytes: ArrayBuffer },
-  extra: E
+  extra: E = {} as E
 ) {
   const api = {
     firmwareCompile: vi.fn().mockResolvedValue({ job_id: "j", source: "local" }),

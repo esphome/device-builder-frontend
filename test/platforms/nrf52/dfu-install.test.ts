@@ -44,11 +44,10 @@ const pkg: DfuPackage = {
 };
 
 function readyHost() {
-  const host = makeFlashHost(
-    device,
-    { binaries: [bin("firmware.zip")], downloadBytes: new ArrayBuffer(0) },
-    {}
-  );
+  const host = makeFlashHost(device, {
+    binaries: [bin("firmware.zip")],
+    downloadBytes: new ArrayBuffer(0),
+  });
   nrfPackage.set(asHost(host), pkg);
   // As the reset step leaves it.
   host._step = "nrf-reset";

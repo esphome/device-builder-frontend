@@ -112,18 +112,17 @@ describe("a browser flasher in the install dialog", () => {
     expect(cardStatusDetail(dialog)).toBe("fake.ready_desc");
   });
 
-  it("renders the step's buttons with one handler per action across renders", () => {
+  it("runs the step's buttons with the dialog from the click", () => {
     const dialog = makeDialog();
     dialog.installBrowserFlasher(fakeFlasher, device);
     dialog._step = "fake-ready";
-    const first = values(renderFooter(dialog));
-    const second = values(renderFooter(dialog));
-    const bound = dialog._flashAction(doReset);
-    expect(first).toContain(bound);
-    expect(second).toContain(bound);
-    expect(first).toContain(dialog._flashAction(doFlash));
-    bound();
+    const clicks = values(renderFooter(dialog)).filter(
+      (v): v is () => void =>
+        typeof v === "function" && v !== dialog._close && v.length === 0
+    );
+    for (const click of clicks) click();
     expect(doReset).toHaveBeenCalledWith(dialog);
+    expect(doFlash).toHaveBeenCalledWith(dialog);
   });
 
   it("uses a function detail, the step body, and keeps Stop with the logs toggle", () => {

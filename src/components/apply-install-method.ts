@@ -35,8 +35,6 @@ export function applyInstallMethod(
     case "bootloader":
       h.openInstall(OTA_PORT, { bootloader: true });
       break;
-    // ESP's installers, still built into the dialog; they move to browser
-    // flasher descriptors in a later pass.
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);
       break;

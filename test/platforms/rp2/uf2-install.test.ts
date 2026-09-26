@@ -70,17 +70,13 @@ const image: Uf2Image = {
 };
 
 function makeHost(opts: { binaries?: FirmwareBinary[]; uf2Family?: number } = {}) {
-  return makeFlashHost(
-    device,
-    {
-      binaries: opts.binaries ?? [
-        bin("firmware.uf2", "uf2"),
-        bin("firmware.ota.bin", "ota"),
-      ],
-      downloadBytes: uf2(opts.uf2Family ?? UF2_FAMILY_RP2040),
-    },
-    {}
-  );
+  return makeFlashHost(device, {
+    binaries: opts.binaries ?? [
+      bin("firmware.uf2", "uf2"),
+      bin("firmware.ota.bin", "ota"),
+    ],
+    downloadBytes: uf2(opts.uf2Family ?? UF2_FAMILY_RP2040),
+  });
 }
 type Host = ReturnType<typeof makeHost>;
 

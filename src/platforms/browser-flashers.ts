@@ -4,8 +4,7 @@
  * ``dashboard.ts`` exports a ``BrowserFlasher`` (see
  * ``components/firmware-install-dialog/browser-flasher.ts``) plus one entry
  * here; the install dialog, the method rows and ``applyInstallMethod`` read
- * everything from it. ESP's flows are still built into the dialog. Never
- * imported from ``src/web``.
+ * everything from it. Never imported from ``src/web``.
  */
 import type { AnyBrowserFlasher } from "../components/firmware-install-dialog/browser-flasher.js";
 import { nrfDfuFlasher } from "./nrf52/dashboard.js";

@@ -42,7 +42,7 @@ export interface FlasherStepView {
   /** Localize key for the card detail; a function when it depends on the browser. */
   detailKey: string | (() => string);
   /** The step's buttons; without one the step shows the running footer (Stop). */
-  footer?: (host: Host) => FlasherFooter;
+  footer?: () => FlasherFooter;
   /** Body under the status text. */
   extra?: (host: Host) => TemplateResult;
 }

@@ -40,10 +40,7 @@ import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
-import type {
-  AnyBrowserFlasher,
-  FlasherAction,
-} from "./firmware-install-dialog/browser-flasher.js";
+import type { AnyBrowserFlasher } from "./firmware-install-dialog/browser-flasher.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
@@ -202,7 +199,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   // The browser flasher running this install (nRF52, Pico, RTL8720C), and its
   // parsed image, read through the flasher's FlashImageSlot.
-  @state() _flasher: AnyBrowserFlasher | null = null;
+  // Not @state: it only changes with _installer, which is.
+  _flasher: AnyBrowserFlasher | null = null;
   _flashImage: unknown = null;
   // The port a browser flash went through; backs "Show logs" on Done.
   _logsPort: SerialPort | null = null;
@@ -238,10 +236,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_queued");
   }
 
-  // "Flash via USB" (ESP, built in like installWebSerial): compile + download
-  // the factory image here (logs/errors visible), then land on the ready step.
-  // The flasher tab is opened only when the user clicks Open USB flasher —
-  // never before a working image exists.
+  // "Flash via USB": compile + download the factory image here (logs/errors
+  // visible), then land on the ready step. The flasher tab is opened only when
+  // the user clicks Open USB flasher — never before a working image exists.
   installUsbFlash(device: ConfiguredDevice) {
     this._begin(device, "web-flash");
     void startUsbFlash(this);
@@ -264,18 +261,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._begin(device, flasher.id);
     this._flasher = flasher;
     void flasher.start(this);
-  }
-
-  // A flasher step's footer handler, bound once per action so the button
-  // keeps its listener across renders. The pickers need the click's gesture.
-  private _flashActions = new WeakMap<FlasherAction, () => void>();
-  _flashAction(run: FlasherAction): () => void {
-    let bound = this._flashActions.get(run);
-    if (!bound) {
-      bound = () => void run(this);
-      this._flashActions.set(run, bound);
-    }
-    return bound;
   }
 
   // Three-dot "Download" entry; compiles only when nothing is built.

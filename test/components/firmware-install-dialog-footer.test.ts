@@ -19,9 +19,11 @@ import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
 } from "../../src/components/firmware-install-dialog.js";
-import type {
-  AnyBrowserFlasher,
-  FlasherAction,
+import {
+  type AnyBrowserFlasher,
+  FLASH_ACTION_KEY,
+  flasherStepView,
+  RESET_ACTION_KEY,
 } from "../../src/components/firmware-install-dialog/browser-flasher.js";
 import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
 import {
@@ -53,10 +55,15 @@ function footerHost(step: string) {
     _toggleShowLogsAfterInstall: vi.fn(),
     _flashBusy: false,
     _flasher: null as AnyBrowserFlasher | null,
-    // The real dialog binds each action once; handing it back as is lets the
-    // assertions look for the platform's own functions.
-    _flashAction: (run: FlasherAction) => run,
   };
+}
+
+// The platform functions a flasher step's buttons run, secondary first.
+function stepRuns(host: ReturnType<typeof footerHost>) {
+  const footer = flasherStepView(
+    host as unknown as ESPHomeFirmwareInstallDialog
+  )?.footer?.();
+  return [footer?.secondary?.run, footer?.primary.run].filter(Boolean);
 }
 
 const footerValues = (host: ReturnType<typeof footerHost>) =>
@@ -83,10 +90,10 @@ describe("firmware-install-dialog footer", () => {
       host._flasher = rp2Uf2Flasher;
       const values = footerValuesDeep(host);
       expect(values).toContain(host._close);
-      expect(values).toContain(rp2DoReset);
-      expect(values).toContain(rp2DoFlash);
-      expect(values).not.toContain(rp2DoDownload);
+      expect(values).toContain(RESET_ACTION_KEY);
+      expect(values).toContain(FLASH_ACTION_KEY);
       expect(values).not.toContain(host._cancel);
+      expect(stepRuns(host)).toEqual([rp2DoReset, rp2DoFlash]);
     }
   );
 
@@ -95,25 +102,28 @@ describe("firmware-install-dialog footer", () => {
     host._flasher = nrfDfuFlasher;
     const values = footerValuesDeep(host);
     expect(values).toContain(host._close);
-    expect(values).toContain(nrfDoReset);
-    expect(values).toContain(nrfDoFlash);
+    expect(values).toContain(RESET_ACTION_KEY);
+    expect(values).toContain(FLASH_ACTION_KEY);
     expect(values).not.toContain(host._cancel);
+    expect(stepRuns(host)).toEqual([nrfDoFlash, nrfDoReset]);
   });
 
   it("offers Flash alone on the nrf-wait step", () => {
     const host = footerHost("nrf-wait");
     host._flasher = nrfDfuFlasher;
     const values = footerValuesDeep(host);
-    expect(values).toContain(nrfDoFlash);
-    expect(values).not.toContain(nrfDoReset);
+    expect(values).toContain(FLASH_ACTION_KEY);
+    expect(values).not.toContain(RESET_ACTION_KEY);
+    expect(stepRuns(host)).toEqual([nrfDoFlash]);
   });
 
   it("offers Flash alone on the rtl-ready step", () => {
     const host = footerHost("rtl-ready");
     host._flasher = rtlAmbz2Flasher;
     const values = footerValuesDeep(host);
-    expect(values).toContain(rtlDoFlash);
+    expect(values).toContain(FLASH_ACTION_KEY);
     expect(values).not.toContain(host._cancel);
+    expect(stepRuns(host)).toEqual([rtlDoFlash]);
   });
 
   it("keeps Stop on a flasher step without buttons (rtl-connect)", () => {
@@ -127,9 +137,9 @@ describe("firmware-install-dialog footer", () => {
     const host = footerHost("rp2-bootsel");
     host._flasher = rp2Uf2Flasher;
     const values = footerValuesDeep(host);
-    expect(values).toContain(rp2DoReset);
-    expect(values).toContain(rp2DoDownload);
-    expect(values).not.toContain(rp2DoFlash);
+    expect(values).toContain("firmware.rp2_download_action");
+    expect(values).not.toContain(FLASH_ACTION_KEY);
+    expect(stepRuns(host)).toEqual([rp2DoReset, rp2DoDownload]);
   });
 
   it("offers Retry on a Pico flash failure", () => {

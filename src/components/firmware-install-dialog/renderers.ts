@@ -310,7 +310,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     `;
   }
   // A browser flasher's user-gesture step (reset into the bootloader, flash).
-  const bootloader = flasherStepView(host)?.footer?.(host);
+  const bootloader = flasherStepView(host)?.footer?.();
   if (bootloader) {
     const { primary, secondary } = bootloader;
     return html`
@@ -323,7 +323,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
             ? html`<button
                 class="btn btn--ghost"
                 ?disabled=${host._flashBusy}
-                @click=${host._flashAction(secondary.run)}
+                @click=${() => void secondary.run(host)}
               >
                 ${host._localize(secondary.labelKey)}
               </button>`
@@ -332,7 +332,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         <button
           class="btn btn--primary"
           ?disabled=${host._flashBusy}
-          @click=${host._flashAction(primary.run)}
+          @click=${() => void primary.run(host)}
         >
           ${host._localize(primary.labelKey)}
         </button>
