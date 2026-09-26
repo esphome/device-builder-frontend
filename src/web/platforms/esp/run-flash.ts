@@ -9,11 +9,9 @@
  */
 import type { LocalizeFunc } from "../../../common/localize.js";
 import {
-  connectToPort,
   type DetectedChip,
-  disconnect,
-  flashFirmware,
-  resetAndDisconnect,
+  type Esptool,
+  loadEsptool,
 } from "../../../platforms/esp/index.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { portInUseMessage } from "../../../util/serial-open-error.js";
@@ -37,12 +35,15 @@ export interface FlashMessages {
   portInUse?: (err: unknown) => string | undefined;
   /** Shown when the plan yields no parts to write. */
   noFirmware?: string;
+  /** Shown when the esptool chunk could not be fetched. */
+  loadFailed?: string;
 }
 
 /** The copy every web.esphome.io ESP flash shows; one place so no caller misses one. */
 export function webFlashMessages(localize: LocalizeFunc): FlashMessages {
   return {
     connectFailed: localize("web.install.connect_failed_hint"),
+    loadFailed: localize("firmware.engine_load_failed"),
     portInUse: (err) => portInUseMessage(err, localize),
     noFirmware: localize("web.install.no_firmware"),
   };
@@ -68,9 +69,9 @@ export interface FlashHooks {
 }
 
 /** Best-effort teardown of a half-open connection after a failure. */
-async function safeDisconnect(detected: DetectedChip): Promise<void> {
+async function safeDisconnect(esptool: Esptool, detected: DetectedChip): Promise<void> {
   try {
-    await disconnect(detected.transport);
+    await esptool.disconnect(detected.transport);
   } catch {
     // Port may already be closed / gone; nothing more to do.
   }
@@ -87,9 +88,19 @@ export async function runFlash(
   hooks: FlashHooks
 ): Promise<boolean> {
   hooks.onStep("connecting");
+  // The port is already authorized (no picker), so the engine can load first.
+  let esptool: Esptool;
+  try {
+    esptool = await loadEsptool();
+  } catch (err) {
+    console.error(err);
+    hooks.onStep("error");
+    hooks.onError(plan.messages?.loadFailed ?? getErrorMessage(err));
+    return false;
+  }
   let detected: DetectedChip;
   try {
-    detected = await connectToPort(port, hooks.onLog);
+    detected = await esptool.connectToPort(port, hooks.onLog);
   } catch (err) {
     // The port is already authorized (connectToPort never shows a picker), so a
     // failure here is another tab or program holding the port, or the chip
@@ -117,7 +128,7 @@ export async function runFlash(
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
-    await safeDisconnect(detected);
+    await safeDisconnect(esptool, detected);
     return false;
   }
 
@@ -130,7 +141,7 @@ export async function runFlash(
     const total = parts.reduce((sum, p) => sum + p.data.length, 0);
     let flashed = 0;
     for (const part of parts) {
-      await flashFirmware(detected.loader, part.data, part.address, (p) => {
+      await esptool.flashFirmware(detected.loader, part.data, part.address, (p) => {
         const current = flashed + (p.percent / 100) * part.data.length;
         hooks.onProgress(total === 0 ? 100 : Math.round((current / total) * 100));
       });
@@ -141,7 +152,7 @@ export async function runFlash(
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
-    await safeDisconnect(detected);
+    await safeDisconnect(esptool, detected);
     return false;
   }
 
@@ -152,7 +163,7 @@ export async function runFlash(
   // successful flash into a reported failure (which would also skip the
   // adoptable flow's Wi-Fi hand-off).
   try {
-    await resetAndDisconnect(detected.loader, detected.transport, detected.port);
+    await esptool.resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
     // Device already rebooting into the new firmware; nothing to recover.
   }

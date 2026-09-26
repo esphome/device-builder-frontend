@@ -8,7 +8,7 @@ import type { SlimBoard } from "../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { detectChip, disconnect, readDeviceManifest } from "../../platforms/esp/index.js";
+import { loadEsptool } from "../../platforms/esp/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
@@ -18,7 +18,7 @@ import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { portInUseMessage } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
-import { isPortPickerCancel, isWebSerialSupported } from "../../util/web-serial.js";
+import { isWebSerialSupported, requestSerialPort } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
   WIZARD_BOARD_PLATFORMS,
@@ -94,6 +94,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Warm the esptool chunk while the user reads the step; a miss only
+    // costs the fetch at click time.
+    if (isWebSerialSupported()) void loadEsptool().catch(() => {});
     // Lit usually sets ``.presetFilterLabel`` before connectedCallback
     // fires (property bindings are applied during element upgrade), so
     // this path handles the common case. ``willUpdate`` below covers
@@ -289,8 +292,29 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private async _connectViaWebSerial() {
     this._detectError = "";
+    // The picker runs in the click, before the engine chunk is fetched.
+    let port: SerialPort | null;
     try {
-      const detected = await detectChip();
+      port = await requestSerialPort();
+    } catch (err) {
+      this._detectError =
+        portInUseMessage(err, this._localize) ??
+        this._extractErrorDetail(
+          err,
+          this._localize("wizard.connect_your_board_detect_failed")
+        );
+      return;
+    }
+    if (!port) return;
+    let esptool: Awaited<ReturnType<typeof loadEsptool>>;
+    try {
+      esptool = await loadEsptool();
+    } catch {
+      this._detectError = this._localize("firmware.engine_load_failed");
+      return;
+    }
+    try {
+      const detected = await esptool.connectToPort(port);
       // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
       const chipName = detected.chipName;
 
@@ -299,9 +323,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
       // ``esphome.name`` to a catalog id, ``project_name`` points us
       // straight at the right board. Same flow as
       // ``detectAndOpenWizard`` so both entry points behave alike.
-      const manifest = await readDeviceManifest(detected.loader);
+      const manifest = await esptool.readDeviceManifest(detected.loader);
 
-      await disconnect(detected.transport);
+      await esptool.disconnect(detected.transport);
 
       if (manifest?.board_id) {
         const knownBoard = await fetchBoard(this._api, manifest.board_id);
@@ -322,7 +346,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._applyDetectedFilter(chipNameToFilterLabel(chipName));
       void this._fetchBoards();
     } catch (err) {
-      if (isPortPickerCancel(err)) return;
       this._detectError =
         portInUseMessage(err, this._localize) ??
         this._extractErrorDetail(

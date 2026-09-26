@@ -20,12 +20,8 @@ import {
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
-import { loadAmbz2Engine } from "./index.js";
-import {
-  Ambz2ImageError,
-  type LibreTinyImage,
-  parseAmbz2Image,
-} from "./libretiny-uf2.js";
+import { loadAmbz2Engine, loadLibreTinyParser } from "./index.js";
+import type { LibreTinyImage } from "./libretiny-uf2.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -49,11 +45,22 @@ export async function startRtlAmbz2Install(
     "firmware.no_uf2"
   );
   if (!artifact) return;
+  // The parser loads on demand, like the engine; a failed fetch is named.
+  let parser: Awaited<ReturnType<typeof loadLibreTinyParser>>;
   try {
-    rtlImage.set(host, parseAmbz2Image(artifact.bytes));
+    parser = await loadLibreTinyParser();
+  } catch (err) {
+    host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
+    return;
+  }
+  if (host._device !== device) return;
+  try {
+    rtlImage.set(host, parser.parseAmbz2Image(artifact.bytes));
   } catch (err) {
     host._fail(
-      host._localize(err instanceof Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"),
+      host._localize(
+        err instanceof parser.Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"
+      ),
       getErrorMessage(err)
     );
     return;

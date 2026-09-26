@@ -4,11 +4,8 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  connectToPort,
-  detectChip,
-  disconnect,
-  readDeviceManifest,
-  readMacAddress,
+  type Esptool,
+  loadEsptool,
   UnsupportedChipError,
 } from "../../platforms/esp/index.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
@@ -23,7 +20,7 @@ import {
 } from "../../util/notify.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
+import { requestSerialPort } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 /** Open the editor. ``section`` deep-links a component section (read from
@@ -319,10 +316,37 @@ export async function detectAndOpenWizard(
     localize?: LocalizeFunc;
   } = {}
 ): Promise<void> {
+  // The picker runs in the click, before the engine chunk is fetched, so the
+  // load can't eat the user activation. A dismissed picker still opens the
+  // wizard for a manual board pick.
+  let port: SerialPort | null = options.port ?? null;
+  if (!port) {
+    try {
+      port = await requestSerialPort();
+    } catch (err) {
+      if (options.localize) {
+        notifyError(
+          openFailureMessage(err, options.localize, "dashboard.serial_connect_failed")
+        );
+      }
+      createDialog.open("board");
+      return;
+    }
+    if (!port) {
+      createDialog.open("board");
+      return;
+    }
+  }
+  let esptool: Esptool;
   try {
-    const detected = options.port
-      ? await connectToPort(options.port)
-      : await detectChip();
+    esptool = await loadEsptool();
+  } catch {
+    if (options.localize) notifyError(options.localize("firmware.engine_load_failed"));
+    createDialog.open("board");
+    return;
+  }
+  try {
+    const detected = await esptool.connectToPort(port);
     const chipName = detected.chipName;
 
     // MAC lookup is best-effort — a failure here shouldn't sink the
@@ -330,7 +354,7 @@ export async function detectAndOpenWizard(
     let recognized: ConfiguredDevice | null = null;
     if (options.devices?.length && options.onRecognized) {
       try {
-        const mac = await readMacAddress(detected.loader);
+        const mac = await esptool.readMacAddress(detected.loader);
         recognized =
           options.devices.find(
             (d) => d.mac_address && d.mac_address.toUpperCase() === mac
@@ -344,9 +368,11 @@ export async function detectAndOpenWizard(
     // Manifest lookup — runs only when MAC didn't match an existing
     // device. ``readDeviceManifest`` already swallows read / parse
     // failures and returns null, so this can't throw.
-    const manifest = recognized ? null : await readDeviceManifest(detected.loader);
+    const manifest = recognized
+      ? null
+      : await esptool.readDeviceManifest(detected.loader);
 
-    await disconnect(detected.transport);
+    await esptool.disconnect(detected.transport);
 
     if (recognized && options.onRecognized) {
       if (options.localize) {
@@ -381,10 +407,9 @@ export async function detectAndOpenWizard(
 
     createDialog.openAtBoardStep(chipNameToFilterLabel(chipName) ?? undefined);
   } catch (err) {
-    // Detection failed (or the picker was cancelled) — the wizard still
-    // opens so the user can pick a board by hand, but a real connect
-    // failure gets named instead of vanishing (#1414).
-    if (!isPortPickerCancel(err) && options.localize) {
+    // Detection failed — the wizard still opens so the user can pick a board
+    // by hand, but the connect failure gets named instead of vanishing (#1414).
+    if (options.localize) {
       notifyError(
         err instanceof UnsupportedChipError
           ? options.localize("serial.unsupported_chip", { chip: err.chipName })
