@@ -66,4 +66,17 @@ describe("SerialLogSource reopen line policy", () => {
       expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);
     }
   );
+
+  it("honours the policy's line release on a reopen, whatever bridge the kit sits behind", async () => {
+    const { dead, live } = ports({ usbVendorId: 0x1234, usbProductId: 1 });
+    const source = new SerialLogSource(dead, {
+      reset: "rts-pulse",
+      releaseLinesAfterOpen: true,
+    });
+    await source.resume(hooks, () => false);
+    expect(live.setSignals).toHaveBeenCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
+  });
 });

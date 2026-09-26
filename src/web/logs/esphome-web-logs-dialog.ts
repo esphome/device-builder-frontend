@@ -179,6 +179,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
       reset: offeredReset(this.policy, this.port),
+      releaseLinesAfterOpen: this.policy.releaseLinesAfterOpen,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>

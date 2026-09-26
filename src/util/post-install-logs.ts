@@ -296,7 +296,7 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    await releaseLinesAfterReopen(port, targetPlatform);
+    await releaseLinesAfterReopen(port, serialLogsFor(targetPlatform), targetPlatform);
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.

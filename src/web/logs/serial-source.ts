@@ -23,6 +23,8 @@ export const LOG_BUFFER_SIZE = 8192;
 export interface SerialLogSourceOptions {
   /** How Reset Device reaches the board (``offeredReset``); none without one. */
   reset?: "rts-pulse" | SerialPlatformReset;
+  /** The policy's line release, honoured after a reopen too (``releaseLinesAfterReopen``). */
+  releaseLinesAfterOpen?: boolean;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
 }
@@ -95,7 +97,7 @@ export class SerialLogSource implements WebLogSource {
       return null;
     }
     if (!live) return null;
-    await releaseLinesAfterReopen(live);
+    await releaseLinesAfterReopen(live, this.options);
     const cancel = this.stream(live, hooks);
     this.options.onPortReplaced?.(live);
     return cancel;

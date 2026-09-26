@@ -524,6 +524,13 @@ describe("attachSerialLogStream reopen", () => {
     ],
     ["an ESP32-S3's CDC", { usbVendorId: 0x303a, usbProductId: 0x1001 }, "esp32", true],
     ["a CH340 bridge", { usbVendorId: 0x1a86, usbProductId: 0x7523 }, "esp32", true],
+    // The policy's release wins, whatever bridge the kit sits behind.
+    [
+      "an RTL8720C kit on an unlisted bridge",
+      { usbVendorId: 0x1234, usbProductId: 1 },
+      "rtl87xx",
+      true,
+    ],
   ])(
     "on a reopen of %s, drops DTR and RTS: %s",
     async (_name, info, platform, released) => {
