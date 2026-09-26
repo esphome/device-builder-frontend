@@ -23,6 +23,7 @@ import {
 import "../install/esphome-web-install-adoptable-dialog.js";
 import "../install/esphome-web-install-upload-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
+import { releaseOrphanedPort } from "../util/release-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -58,6 +59,12 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
     if (!(await openPortForLogs(this.port, this._localize))) return;
+    // A flow switch accepted while the open was pending unmounted this
+    // card: nothing is left to own the port, so release it.
+    if (!this.isConnected) {
+      await releaseOrphanedPort(this.port);
+      return;
+    }
     this._logsOpen = true;
   }
 
@@ -98,6 +105,9 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
   private async _onProvisionWifi(): Promise<void> {
     this._adoptableOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);
+    // A flow switch accepted during the pause unmounted this card; Wi-Fi
+    // setup would open with nobody to hand the result to.
+    if (!this.isConnected) return;
     void this._openImprov(true);
   }
 

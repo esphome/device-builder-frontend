@@ -137,3 +137,18 @@ describe("esphome-web-esp-connect-card disconnect resilience", () => {
     expect((el as any)._port).toBeUndefined();
   });
 });
+
+describe("esphome-web-esp-connect-card port announcement", () => {
+  it("announces the picked port so the shell can offer another flow", async () => {
+    const port = makeDisconnectPort();
+    (navigator as any).serial = { requestPort: vi.fn(async () => port) };
+    const el = new ESPHomeWebEspConnectCard();
+    (el as any)._localize = (k: string) => k;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const picked = vi.fn();
+    el.addEventListener("port-picked", (e) => picked((e as CustomEvent).detail));
+    await (el as any)._connect();
+    expect(picked).toHaveBeenCalledWith(port);
+  });
+});

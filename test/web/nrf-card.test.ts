@@ -145,3 +145,36 @@ describe("esphome-web-nrf-card", () => {
     expect(logsDialog(el).hasAttribute("open")).toBe(true);
   });
 });
+
+describe("esphome-web-nrf-card port announcement", () => {
+  it("announces the picked port before opening it for logs", async () => {
+    const port = { getInfo: () => ({}) };
+    mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.openPortForLogs.mockResolvedValue(true);
+    const el = await mount();
+    const picked = vi.fn();
+    el.addEventListener("port-picked", (e) => picked((e as CustomEvent).detail));
+    await (el as any)._showSerialLogs();
+    expect(picked).toHaveBeenCalledWith(port);
+  });
+});
+
+describe("esphome-web-nrf-card unmounted mid-open", () => {
+  it("releases a port that opened after a flow switch removed the card", async () => {
+    const port = { getInfo: () => ({}), close: vi.fn(async () => {}) };
+    mocks.requestSerialPort.mockResolvedValue(port);
+    let opened!: (ok: boolean) => void;
+    mocks.openPortForLogs.mockImplementation(
+      () => new Promise<boolean>((resolve) => (opened = resolve))
+    );
+    const el = await mount();
+    const pending = (el as any)._showSerialLogs();
+    // Let the pick resolve so the open is in flight, then unmount the card.
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    el.remove();
+    opened(true);
+    await pending;
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect((el as any)._logs).toBeUndefined();
+  });
+});

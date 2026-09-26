@@ -12,7 +12,7 @@ import { markSerialActivity } from "./serial-reacquire.js";
 import { sleep } from "./sleep.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
-const ESPRESSIF_USB_VID = 0x303a;
+export const ESPRESSIF_USB_VID = 0x303a;
 
 /** The on-chip USB-Serial-JTAG device's product id — esptool-js's own
  *  discriminator (it gates on this PID alone). The vendor id alone is not
@@ -183,13 +183,16 @@ export function secureLoopbackUrl(): string | null {
 // here so long-standing import paths (and their tests) keep working.
 export {
   grantedHandlesFor,
+  isOwnSerialReenumeration,
   isRecentSerialActivity,
   markSerialActivity,
   matchesDevice,
   openLiveSerialPort,
+  portOfSerialConnectEvent,
   reacquirePort,
   SERIAL_ACTIVITY_WINDOW_MS,
   SERIAL_REOPEN_TIMEOUT_MS,
+  SerialConnectAnnouncements,
 } from "./serial-reacquire.js";
 
 /**

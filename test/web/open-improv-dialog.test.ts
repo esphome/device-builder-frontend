@@ -14,7 +14,10 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
-import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";
+import {
+  isImprovInProgress,
+  openImprovDialog,
+} from "../../src/web/improv/open-improv-dialog.js";
 
 const localize: (k: string, v?: Record<string, string | number>) => string = (k) => k;
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -80,6 +83,19 @@ describe("openImprovDialog", () => {
       new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
     );
     await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
+  });
+
+  it("counts as in progress from the first await, before any dialog mounts", async () => {
+    let opened!: (port: SerialPort | null) => void;
+    openLiveSerialPort.mockImplementationOnce(
+      () => new Promise<SerialPort | null>((resolve) => (opened = resolve))
+    );
+    const port = makePort();
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    expect(isImprovInProgress()).toBe(true);
+    opened(null);
+    await promise;
+    expect(isImprovInProgress()).toBe(false);
   });
 
   it("keeps DTR asserted on a Pico, whose CDC only transmits while DTR is up", async () => {

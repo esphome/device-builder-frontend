@@ -58,6 +58,18 @@ export const IMPROV_OPEN_DELAY_MS = 1000;
 // the second would fight the first for the port's reader/writer.
 const activePorts = new WeakSet<SerialPort>();
 
+// Sessions between ``openImprovDialog``'s first await and its dialog closing.
+let inFlight = 0;
+
+/**
+ * Whether Wi-Fi setup is in progress on any port: from the first await of
+ * ``openImprovDialog`` (port acquisition, the lazy SDK import) until its
+ * dialog has closed. The SDK owns that dialog, so it is not a wrapper dialog.
+ */
+export function isImprovInProgress(): boolean {
+  return inFlight > 0;
+}
+
 /**
  * Open the Improv Wi-Fi serial provisioning dialog for an authorized port and
  * resolve once it closes. Returns whether the device spoke Improv and whether
@@ -81,12 +93,14 @@ export async function openImprovDialog(
   // ``port-replaced`` adoption the card's next click passes the fresh handle.
   const guarded = [port];
   activePorts.add(port);
+  inFlight++;
   try {
     return await runImprov(port, localize, options, (live) => {
       guarded.push(live);
       activePorts.add(live);
     });
   } finally {
+    inFlight--;
     for (const p of guarded) activePorts.delete(p);
   }
 }

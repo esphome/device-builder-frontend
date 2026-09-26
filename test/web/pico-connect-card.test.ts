@@ -60,6 +60,15 @@ describe("esphome-web-pico-connect-card first-time setup", () => {
     expect((el as any)._port).toBe(port);
   });
 
+  it("skips Wi-Fi setup when a flow switch removed the card during the pause", async () => {
+    const el = await mount();
+    el.remove();
+    await (el as any)._onPicoConnected(
+      new CustomEvent("pico-connected", { detail: port })
+    );
+    expect(openImprovDialog).not.toHaveBeenCalled();
+  });
+
   it("does NOT adopt when Improv was not detected (improv === false)", async () => {
     openImprovDialog.mockResolvedValue({ improv: false, provisioned: false });
     const el = await mount();

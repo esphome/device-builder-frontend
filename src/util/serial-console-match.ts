@@ -22,6 +22,12 @@ const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
 // an interface this code doesn't know - fail open.
 const UART_CONSOLE_RE = /^UART\d/;
 
+/** A port from a dedicated USB-UART bridge chip, so wired to external UART pins. */
+export function isUartBridgePort(port: SerialPort): boolean {
+  const { usbVendorId } = port.getInfo();
+  return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
+}
+
 /**
  * Whether a granted Web Serial port provably cannot carry the device's log
  * console. Deliberately fails open: a mismatch is claimed only when the
@@ -39,8 +45,7 @@ export function serialPortCannotCarryConsole(
     // A dedicated bridge chip can't be the chip's own USB device. An
     // unknown or absent vendor could be a native CDC console (RP2040's
     // 0x2e8a, nRF52) - assume it works.
-    const { usbVendorId } = port.getInfo();
-    return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
+    return isUartBridgePort(port);
   }
   if (!UART_CONSOLE_RE.test(loggerInterface)) return false;
   // UART-family console: only the on-chip USB-Serial-JTAG device provably

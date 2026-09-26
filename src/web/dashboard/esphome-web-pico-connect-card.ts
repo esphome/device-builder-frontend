@@ -94,6 +94,9 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
     const port = ev.detail;
     this._setupOpen = false;
     await sleep(IMPROV_OPEN_DELAY_MS);
+    // A flow switch accepted during the pause unmounted this card; Wi-Fi
+    // setup would open with nobody to adopt the port.
+    if (!this.isConnected) return;
     const { improv } = await openImprovDialog(port, this._localize);
     if (improv) this._adoptPort(port);
   }

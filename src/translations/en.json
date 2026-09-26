@@ -1898,6 +1898,15 @@
     "connect": {
       "failed": "Failed to connect: {error}"
     },
+    "flow_switch": {
+      "pico": "The connected device looks like a Raspberry Pi Pico.",
+      "nrf": "The connected device looks like an nRF52 board.",
+      "esp": "The connected device looks like an ESP board.",
+      "action_pico": "Switch to the Pico flow",
+      "action_nrf": "Switch to the nRF52 flow",
+      "action_esp": "Switch to the ESP flow",
+      "busy": "Finish the current operation first, then switch flows."
+    },
     "improv": {
       "open_failed": "Could not open the serial port for Wi-Fi setup. If the device just restarted, unplug it, plug it back in and retry.",
       "port_busy": "The device is busy with another operation. Close it and try again.",

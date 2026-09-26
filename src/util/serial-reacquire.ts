@@ -47,6 +47,55 @@ export function isRecentSerialActivity(
   return Date.now() - _lastSerialActivityMs < windowMs;
 }
 
+/**
+ * Whether a ``connect`` event is our own touch, reset or flash
+ * re-enumerating the device. A burst of re-enum events extends the window,
+ * so a slow re-enumeration cannot leak past the static floor.
+ */
+export function isOwnSerialReenumeration(): boolean {
+  if (!isRecentSerialActivity()) return false;
+  markSerialActivity();
+  return true;
+}
+
+/**
+ * The port a ``navigator.serial`` ``connect`` event is for: current Chromium
+ * fires it at the port (``event.target``); an older draft carried it as
+ * ``event.port``. ``null`` for anything else.
+ */
+export function portOfSerialConnectEvent(event: Event): SerialPort | null {
+  const isPort = (candidate: unknown): candidate is SerialPort =>
+    typeof (candidate as SerialPort | null)?.getInfo === "function";
+  const legacy = (event as { port?: unknown }).port;
+  if (isPort(legacy)) return legacy;
+  return isPort(event.target) ? event.target : null;
+}
+
+/**
+ * Per-port "already told the user" memory for the connect toasts. A
+ * bare-flash board can reboot-loop, re-enumerating every cycle; the same
+ * port is announced once per window. ``SerialPort`` identity is stable
+ * across re-enums, so the port itself is the key; stale entries are
+ * evicted lazily, since ``navigator.serial`` holds every permitted port
+ * for the page's lifetime anyway.
+ */
+export class SerialConnectAnnouncements {
+  private _lastMs = new Map<SerialPort, number>();
+
+  constructor(private readonly _windowMs = 60_000) {}
+
+  /** Whether to announce *port* now; records it when so. */
+  shouldAnnounce(port: SerialPort, now = Date.now()): boolean {
+    for (const [p, ts] of this._lastMs) {
+      if (now - ts >= this._windowMs) this._lastMs.delete(p);
+    }
+    const last = this._lastMs.get(port);
+    if (last !== undefined && now - last < this._windowMs) return false;
+    this._lastMs.set(port, now);
+    return true;
+  }
+}
+
 // Budget for finding a usable handle after a disconnect / post-reset close:
 // covers the native-USB re-enumeration window (SERIAL_ACTIVITY_WINDOW_MS) with
 // margin for a slower first enumeration on a brand-new board.

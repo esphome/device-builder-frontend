@@ -15,6 +15,7 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import { expectTooltipsAnchored } from "../_tooltip-anchors.js";
 import { ESPHomeWebPicoDeviceCard } from "../../src/web/dashboard/esphome-web-pico-device-card.js";
+import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -36,6 +37,25 @@ describe("esphome-web-pico-device-card", () => {
 
     expect(close).toHaveBeenCalledOnce();
     expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("releases a logs port that opened after a flow switch removed the card", async () => {
+    const el = new ESPHomeWebPicoDeviceCard();
+    (el as any)._localize = (k: string) => k;
+    const close = vi.fn(async () => {});
+    el.port = { close } as unknown as SerialPort;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let opened!: (ok: boolean) => void;
+    vi.mocked(openPortForLogs).mockImplementation(
+      () => new Promise<boolean>((resolve) => (opened = resolve))
+    );
+    const pending = (el as any)._showLogs();
+    el.remove();
+    opened(true);
+    await pending;
+    expect(close).toHaveBeenCalledTimes(1);
+    expect((el as any)._logsOpen).toBe(false);
   });
 
   it("asks the logs dialog for the Pico's reboot reset", async () => {

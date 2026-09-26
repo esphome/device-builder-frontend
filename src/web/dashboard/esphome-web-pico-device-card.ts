@@ -10,6 +10,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { openImprovDialog } from "../improv/open-improv-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
+import { releaseOrphanedPort } from "../util/release-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -40,6 +41,12 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
     // Open the port before showing the dialog so a connect failure surfaces a
     // toast instead of an empty terminal (the dialog streams an open port).
     if (!(await openPortForLogs(this.port, this._localize))) return;
+    // A flow switch accepted while the open was pending unmounted this
+    // card: nothing is left to own the port, so release it.
+    if (!this.isConnected) {
+      await releaseOrphanedPort(this.port);
+      return;
+    }
     this._logsOpen = true;
   }
 

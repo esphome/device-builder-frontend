@@ -4,12 +4,21 @@ import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
+import { hasOpenDialog } from "../components/base-dialog.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
+import {
+  isOwnSerialReenumeration,
+  portOfSerialConnectEvent,
+  SerialConnectAnnouncements,
+} from "../util/serial-reacquire.js";
 import "./dashboard/esphome-web-dashboard.js";
 import "./flash-receiver/esphome-web-flash-receiver.js";
 import { parseFlasherParams } from "./flash-receiver/flash-handshake.js";
 import "./header/esphome-web-header.js";
+import { isImprovInProgress } from "./improv/open-improv-dialog.js";
+import { boardFamilyOfPort } from "./util/board-family.js";
 import { readMode, type WebMode, writeMode } from "./web-mode.js";
 
 /**
@@ -45,6 +54,11 @@ export class ESPHomeWebApp extends LitElement {
     this._applySystemTheme();
     this._darkModeQuery.addEventListener("change", this._applySystemTheme);
     window.addEventListener("popstate", this._syncModeFromUrl);
+    this.addEventListener("port-picked", this._onPortPicked);
+    // Only ports this origin already has permission for announce themselves.
+    if (this._listensForPlugIns) {
+      navigator.serial.addEventListener("connect", this._onSerialConnect);
+    }
     void this._init();
   }
 
@@ -52,6 +66,10 @@ export class ESPHomeWebApp extends LitElement {
     super.disconnectedCallback();
     this._darkModeQuery.removeEventListener("change", this._applySystemTheme);
     window.removeEventListener("popstate", this._syncModeFromUrl);
+    this.removeEventListener("port-picked", this._onPortPicked);
+    if (this._listensForPlugIns) {
+      navigator.serial.removeEventListener("connect", this._onSerialConnect);
+    }
   }
 
   private async _init(): Promise<void> {
@@ -87,9 +105,71 @@ export class ESPHomeWebApp extends LitElement {
   };
 
   private _onSetMode = (e: CustomEvent<WebMode>): void => {
-    this._mode = e.detail;
-    writeMode(e.detail);
+    this._setMode(e.detail);
   };
+
+  private _setMode(mode: WebMode): void {
+    // A stale toast clicked after a manual switch must not push the URL twice.
+    if (mode === this._mode) return;
+    this._mode = mode;
+    writeMode(mode);
+  }
+
+  private _onPortPicked = (e: Event): void => {
+    this._suggestFlowFor((e as CustomEvent<SerialPort>).detail);
+  };
+
+  private get _listensForPlugIns(): boolean {
+    return !this._flasherMode && "serial" in navigator;
+  }
+
+  private _connectAnnouncements = new SerialConnectAnnouncements();
+
+  private _onSerialConnect = (e: Event): void => {
+    if (isOwnSerialReenumeration()) return;
+    const port = portOfSerialConnectEvent(e);
+    if (port) this._suggestFlowFor(port, this._connectAnnouncements);
+  };
+
+  // Switching flows unmounts the current one: never offer or apply it while
+  // a dialog is up, since a flash, a log stream or Wi-Fi setup may be running.
+  private _operationInProgress(): boolean {
+    return hasOpenDialog() || isImprovInProgress();
+  }
+
+  /**
+   * The ids alone never decide the flow: a port that clearly belongs to
+   * another board family gets a toast offering the switch, an unknown one
+   * nothing, and the flow the user is in carries on either way. A plug-in
+   * passes its ``announced`` memory so a reboot-looping board is offered
+   * once; it is consumed only when a toast actually shows.
+   */
+  private _suggestFlowFor(
+    port: SerialPort,
+    announced?: SerialConnectAnnouncements
+  ): void {
+    if (this._operationInProgress()) return;
+    const family = boardFamilyOfPort(port);
+    if (family === null || family === this._mode) return;
+    if (announced && !announced.shouldAnnounce(port)) return;
+    notifyInfo(this._localize(`web.flow_switch.${family}`), {
+      id: "esphome-web-flow-switch",
+      duration: LONG_TOAST_DURATION_MS,
+      action: {
+        label: this._localize(`web.flow_switch.action_${family}`),
+        // The toast outlives the moment; a dialog may have opened since.
+        onClick: () => {
+          if (this._operationInProgress()) {
+            notifyInfo(this._localize("web.flow_switch.busy"), {
+              id: "esphome-web-flow-switch",
+            });
+            return;
+          }
+          this._setMode(family);
+        },
+      },
+    });
+  }
 
   protected render() {
     return html`

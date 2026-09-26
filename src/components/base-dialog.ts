@@ -13,6 +13,11 @@ import { EnterController } from "../util/enter-controller.js";
  *  the wrapper don't participate. */
 const openDialogs = new Set<ESPHomeBaseDialog>();
 
+/** Whether any wrapper-based dialog is open (an operation may be running in it). */
+export function hasOpenDialog(): boolean {
+  return openDialogs.size > 0;
+}
+
 /**
  * Request-close every open dialog except those inside *except*'s composed
  * tree.
