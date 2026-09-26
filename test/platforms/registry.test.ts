@@ -8,6 +8,7 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   isWebUsbSupported,
 }));
 
+import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import type { FlasherStepView } from "../../src/platforms/platform-support.js";
 import {
   installForMethod,
@@ -49,7 +50,7 @@ describe("PLATFORMS", () => {
   it("has one entry per platform and per install method", () => {
     const ids = PLATFORMS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
-    const methods = PLATFORMS.flatMap((p) => (p.install ? [p.install.id] : []));
+    const methods = PLATFORM_INSTALLS.map((i) => i.id);
     expect(new Set(methods).size).toBe(methods.length);
   });
 
@@ -80,6 +81,36 @@ describe("PLATFORMS", () => {
       }
     }
   );
+
+  // The behaviour each platform's logs policy must keep: the RTS pulse only
+  // where the port has a reset line, the line release only on RTL8720C kits,
+  // the Pico's own reset, and Bluetooth only on nRF52.
+  it.each([
+    [
+      "nrf52",
+      { pulseResets: false, releasesLinesAfterOpen: false, reset: false, ble: true },
+    ],
+    [
+      "rp2",
+      { pulseResets: false, releasesLinesAfterOpen: false, reset: true, ble: false },
+    ],
+    [
+      "rtl87xx",
+      { pulseResets: true, releasesLinesAfterOpen: true, reset: false, ble: false },
+    ],
+  ] as const)("%s keeps its logs policy", (id, expected) => {
+    const logs = PLATFORMS.find((p) => p.id === id)?.logs;
+    expect({
+      pulseResets: logs?.serial?.pulseResets,
+      releasesLinesAfterOpen: logs?.serial?.releasesLinesAfterOpen,
+      reset: logs?.serial?.reset !== undefined,
+      ble: logs?.ble !== undefined,
+    }).toEqual(expected);
+  });
+
+  it("covers every registered platform in the logs policy table", () => {
+    expect(PLATFORMS.map((p) => p.id).sort()).toEqual(["nrf52", "rp2", "rtl87xx"]);
+  });
 
   it.each(["esp32", "esp8266", "bk72xx", null])(
     "leaves %s to the built-in paths",

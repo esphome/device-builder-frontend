@@ -188,8 +188,8 @@ export async function launchLogsWithMethod(
     try {
       await attachBleLogs(host.logsDialog, host.localize, ble, bleDevice, cancelled);
     } catch (err) {
-      console.warn("BLE NUS attach failed", err);
-      notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));
+      console.warn("Bluetooth logs attach failed", err);
+      notifyError(host.localize(ble.failureKey(err)));
     }
   }
 }

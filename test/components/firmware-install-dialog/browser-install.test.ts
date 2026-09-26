@@ -13,6 +13,7 @@ import "../../_mock-webawesome.js";
 
 import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
+import { PLATFORM_INSTALLS } from "../../_platform-installs.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import {
@@ -27,7 +28,6 @@ import {
   type BrowserInstall,
   FlashImageSlot,
 } from "../../../src/platforms/platform-support.js";
-import { PLATFORMS } from "../../../src/platforms/registry.js";
 
 // tsc checks src and test as one program, so this widens FlasherId and
 // InstallStep there too; the ids are test-only on purpose so a stray use in
@@ -151,19 +151,18 @@ describe("a browser flasher in the install dialog", () => {
 });
 
 describe("Retry for a browser flasher", () => {
-  it.each(
-    [...PLATFORMS.flatMap((p) => (p.install ? [p.install] : [])), fakeFlasher].map(
-      (f) => [f.id, f] as const
-    )
-  )("%s reinstalls when no image was parsed", async (_id, flasher) => {
-    const dialog = dialogRunning(flasher);
-    dialog._step = "error";
-    const install = vi
-      .spyOn(dialog, "installBrowserFlasher")
-      .mockImplementation(() => {});
-    await dialog._retry();
-    expect(install).toHaveBeenCalledWith(flasher, device);
-  });
+  it.each([...PLATFORM_INSTALLS, fakeFlasher].map((f) => [f.id, f] as const))(
+    "%s reinstalls when no image was parsed",
+    async (_id, flasher) => {
+      const dialog = dialogRunning(flasher);
+      dialog._step = "error";
+      const install = vi
+        .spyOn(dialog, "installBrowserFlasher")
+        .mockImplementation(() => {});
+      await dialog._retry();
+      expect(install).toHaveBeenCalledWith(flasher, device);
+    }
+  );
 
   it("reinstalls when the slot holds an image the flasher did not store", async () => {
     const dialog = dialogRunning(fakeFlasher);
@@ -176,11 +175,7 @@ describe("Retry for a browser flasher", () => {
     expect(install).toHaveBeenCalledWith(fakeFlasher, device);
   });
 
-  it.each(
-    [...PLATFORMS.flatMap((p) => (p.install ? [p.install] : [])), fakeFlasher].map(
-      (f) => [f.id, f] as const
-    )
-  )(
+  it.each([...PLATFORM_INSTALLS, fakeFlasher].map((f) => [f.id, f] as const))(
     "%s returns to its first step without recompiling while the image is kept",
     async (_id, flasher) => {
       const dialog = dialogRunning(flasher);
