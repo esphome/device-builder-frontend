@@ -244,13 +244,13 @@ async function runImprov(
   });
 }
 
-/** How long ``releasePort`` keeps retrying a close the SDK's reader still blocks. */
+/** How long ``releasePort`` keeps retrying a close the SDK's reader or writer still blocks. */
 const RELEASE_TIMEOUT_MS = 1000;
 
 /**
  * Close a port the session opened. The SDK cancels its reader in its own close
- * handler, but that release can land after ours, and a close while the stream
- * is still locked fails; retry briefly. Best-effort: the device may be gone.
+ * handler, but that release can land after ours, and a close while either
+ * stream is still locked fails; retry briefly. Best-effort: the device may be gone.
  */
 async function releasePort(port: SerialPort): Promise<void> {
   const deadline = Date.now() + RELEASE_TIMEOUT_MS;
@@ -264,7 +264,8 @@ async function releasePort(port: SerialPort): Promise<void> {
       if (!closed) console.warn("[Improv] Port close still pending; moving on");
       return;
     } catch (err) {
-      const locked = port.readable?.locked ?? false;
+      // The SDK holds a reader and a writer; either one still locked blocks the close.
+      const locked = (port.readable?.locked ?? false) || (port.writable?.locked ?? false);
       if (!locked || Date.now() >= deadline) {
         console.warn("[Improv] Could not close the port:", err, { locked });
         return;
