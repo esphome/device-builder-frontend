@@ -10,13 +10,18 @@ import {
   BLE_CONNECT_ATTEMPTS,
   BleNusServiceNotFoundError,
   streamBleNus,
-} from "./ble-nus-stream.js";
+} from "../platforms/nrf52/index.js";
+import {
+  isRp2CdcPort,
+  isRp2Platform,
+  isWebUsbSupported,
+  picoResetFailureKey,
+  resetPicoForLogs,
+} from "../platforms/rp2/index.js";
 import { fireRequestEvent } from "./fire-event.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
-import { picoResetFailureKey, resetPicoForLogs } from "./rp2-logs-reset.js";
-import { isRp2Platform } from "./rp2-platform.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { releaseControlLines, releasesLinesAfterOpen } from "./serial-control-lines.js";
 import {
@@ -24,7 +29,6 @@ import {
   requestSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "./web-serial.js";
-import { isRp2CdcPort, isWebUsbSupported } from "./web-usb.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,

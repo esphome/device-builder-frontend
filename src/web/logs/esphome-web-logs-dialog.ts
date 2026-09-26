@@ -11,6 +11,7 @@ import {
 } from "../../components/process-terminal/crash-callout.js";
 import type { ESPHomeProcessTerminal } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
+import { isWebUsbSupported, picoResetFailureKey } from "../../platforms/rp2/index.js";
 import {
   classifyLine,
   type CrashKind,
@@ -20,9 +21,7 @@ import { downloadAnsiText } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeLogLine } from "../../util/log-line.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { picoResetFailureKey } from "../../util/rp2-logs-reset.js";
 import type { SerialLineHooks } from "../../util/serial-log-stream.js";
-import { isWebUsbSupported } from "../../util/web-usb.js";
 import { BleLogSource } from "./ble-source.js";
 import { webLogsDialogStyles } from "./esphome-web-logs-dialog.styles.js";
 import type { WebLogSource } from "./log-source.js";

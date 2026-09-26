@@ -1,4 +1,4 @@
-import { isRtl87xxPlatform } from "./rtl87xx-platform.js";
+import { isRtl87xxPlatform } from "../platforms/rtl87xx/index.js";
 
 /**
  * Whether a logs session releases DTR and RTS right after opening a port.

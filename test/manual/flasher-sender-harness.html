@@ -2,7 +2,7 @@
 <!--
   Manual test harness for the ESPHome Web postMessage flash receiver
   (src/web/flash-receiver/). Plays the dashboard's sender role — mirrors
-  src/util/usb-flasher.ts — so the receiver can be tested end to end against a
+  src/platforms/esp/usb-flasher.ts — so the receiver can be tested end to end against a
   real ESP without standing up the backend. Not an automated test (vitest only
   runs test/**/*.test.ts); flashing needs real hardware.
 
@@ -87,7 +87,7 @@
     <div id="log">Ready.</div>
 
     <script>
-      // Wire protocol — must match src/util/usb-flasher.ts / src/web/flash-receiver/protocol.ts
+      // Wire protocol — must match src/platforms/esp/usb-flasher.ts / src/web/flash-receiver/protocol.ts
       const MSG_READY = "esphome-web-flash:ready";
       const MSG_FIRMWARE = "esphome-web-flash:firmware";
       const MSG_STATE = "esphome-web-flash:state";

@@ -16,6 +16,14 @@ vi.mock("../../src/util/web-serial.js", () => ({
   resetAndDisconnect: vi.fn(),
   SERIAL_ACTIVITY_WINDOW_MS: 6000,
 }));
+vi.mock("../../src/platforms/esp/esptool.js", () => ({
+  connectToPort: vi.fn(),
+  detectChip: vi.fn(),
+  disconnect: vi.fn(),
+  flashFirmware: vi.fn(),
+  resetAndDisconnect: vi.fn(),
+  SERIAL_ACTIVITY_WINDOW_MS: 6000,
+}));
 const { downloadAnsiText } = vi.hoisted(() => ({ downloadAnsiText: vi.fn() }));
 vi.mock("../../src/util/download-text.js", () => ({
   configurationStem: vi.fn(() => "device"),

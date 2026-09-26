@@ -7,9 +7,11 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
+import type { InstallStep } from "./types.js";
 
 export interface BuildArtifact {
   binary: FirmwareBinary;
@@ -62,6 +64,79 @@ export function resetForRetry(host: ESPHomeFirmwareInstallDialog): void {
   host._errorMessage = "";
   host._flashPercent = 0;
   host._flashBusy = false;
+}
+
+/**
+ * Retry with the image already parsed: back to the flasher's first step,
+ * skipping the compile. Without an image the whole install starts over.
+ */
+export function retryParsedInstall(
+  host: ESPHomeFirmwareInstallDialog,
+  image: unknown,
+  install: () => void,
+  showFirstStep: () => void
+): void {
+  if (!image) {
+    install();
+    return;
+  }
+  resetForRetry(host);
+  showFirstStep();
+}
+
+export interface TouchStep {
+  /** The install's parsed image; identifies the install the step belongs to. */
+  image: () => unknown;
+  /** Status while the picker and the touch run. */
+  resettingKey: string;
+  /** Status to restore when the picker is dismissed. */
+  dismissedKey: string;
+  /** The wait step shown once the touch is done. */
+  next: InstallStep;
+  nextTitleKey: string;
+  /** The failure detail; a flasher may add a hint for a failed touch. */
+  failureDetail?: (err: unknown) => string;
+}
+
+/**
+ * The 1200-baud touch into a board's bootloader from a footer click (user
+ * gesture): pick the port, touch it, then show the wait step. Every await is
+ * followed by a check that the reused dialog still shows this install.
+ */
+export async function touchIntoBootloaderStep(
+  host: ESPHomeFirmwareInstallDialog,
+  step: TouchStep
+): Promise<void> {
+  const image = step.image();
+  if (!image || host._flashBusy) return;
+  const device = host._device;
+  const stillCurrent = () => host._device === device && step.image() === image;
+  host._flashBusy = true;
+  host._statusMessage = host._localize(step.resettingKey);
+  try {
+    const port = await requestSerialPort();
+    if (!port) {
+      if (stillCurrent()) host._statusMessage = host._localize(step.dismissedKey);
+      return;
+    }
+    // The picker outlives a dismissed dialog; don't reset a port picked for
+    // an install that no longer exists.
+    if (!stillCurrent()) return;
+    await resetToBootloader(port, installLog(host, stillCurrent));
+  } catch (err) {
+    if (stillCurrent()) {
+      host._fail(
+        host._localize("firmware.browser_flash_connect_failed"),
+        (step.failureDetail ?? getErrorMessage)(err)
+      );
+    }
+    return;
+  } finally {
+    if (stillCurrent()) host._flashBusy = false;
+  }
+  if (!stillCurrent()) return;
+  host._step = step.next;
+  host._statusMessage = host._localize(step.nextTitleKey);
 }
 
 /**

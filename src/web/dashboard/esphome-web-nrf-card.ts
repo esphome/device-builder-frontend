@@ -5,9 +5,9 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { pickBleNusDevice } from "../../platforms/nrf52/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { pickBleNusDevice } from "../../util/ble-nus-picker.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "../install/esphome-web-install-nrf-dialog.js";
 import { pickPortForLogs } from "../util/pick-port-for-logs.js";

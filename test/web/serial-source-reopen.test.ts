@@ -11,7 +11,7 @@ vi.mock("../../src/util/serial-log-stream.js", () => ({
 vi.mock("../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
 }));
-vi.mock("../../src/util/rp2-logs-reset.js", () => ({ rebootPico: vi.fn() }));
+vi.mock("../../src/platforms/rp2/rp2-logs-reset.js", () => ({ rebootPico: vi.fn() }));
 
 import { SerialLogSource } from "../../src/web/logs/serial-source.js";
 

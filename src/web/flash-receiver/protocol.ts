@@ -1,7 +1,7 @@
 /**
  * The postMessage flash contract between the Device Builder dashboard (the
  * opener, on any http/https origin) and this receiver (a fixed secure-context
- * origin, web.esphome.io). Mirrors the sender in ``src/util/usb-flasher.ts``
+ * origin, web.esphome.io). Mirrors the sender in ``src/platforms/esp/usb-flasher.ts``
  * and the reference in the device-builder repo's ``flasher/src/protocol.ts``.
  *
  * The opener origin is unknown (the HA add-on runs on an arbitrary http

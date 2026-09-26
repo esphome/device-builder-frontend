@@ -6,12 +6,14 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { BRAVE_WEB_BLUETOOTH_FLAG } from "../util/ble-nus-stream.js";
-import type { BleProbeState } from "../util/ble-probe-controller.js";
+import {
+  type BleProbeState,
+  BRAVE_WEB_BLUETOOTH_FLAG,
+  isNrfPlatform,
+} from "../platforms/nrf52/index.js";
+import { isRp2Platform } from "../platforms/rp2/index.js";
+import { isRtl87xxPlatform } from "../platforms/rtl87xx/index.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
-import { isNrfPlatform } from "../util/nrf-platform.js";
-import { isRp2Platform } from "../util/rp2-platform.js";
-import { isRtl87xxPlatform } from "../util/rtl87xx-platform.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
 export interface MethodRowContext {

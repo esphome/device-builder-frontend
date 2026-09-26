@@ -1,5 +1,5 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { isEspressifUsbJtagPort } from "./web-serial.js";
+import { isEspressifUsbJtagPort } from "../platforms/esp/index.js";
 
 // Vendors that make dedicated USB-UART bridge chips and nothing that
 // enumerates as a device's native USB console. A port from one of these can

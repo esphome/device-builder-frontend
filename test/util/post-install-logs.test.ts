@@ -24,8 +24,8 @@ const picoReset = vi.hoisted(() => ({
     vi.fn<(port: SerialPort, baud: number) => Promise<SerialPort | null>>(),
   webUsb: true,
 }));
-vi.mock("../../src/util/rp2-logs-reset.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/util/rp2-logs-reset.js")>()),
+vi.mock("../../src/platforms/rp2/rp2-logs-reset.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/platforms/rp2/rp2-logs-reset.js")>()),
   resetPicoForLogs: picoReset.resetPicoForLogs,
 }));
 const bleStream = vi.hoisted(() => ({
@@ -38,17 +38,20 @@ const bleStream = vi.hoisted(() => ({
       ) => Promise<() => Promise<void>>
     >(),
 }));
-vi.mock("../../src/util/ble-nus-stream.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/util/ble-nus-stream.js")>()),
+vi.mock("../../src/platforms/nrf52/ble-nus-stream.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../src/platforms/nrf52/ble-nus-stream.js")
+  >()),
   streamBleNus: bleStream.streamBleNus,
 }));
-vi.mock("../../src/util/web-usb.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/util/web-usb.js")>()),
+vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/platforms/rp2/web-usb.js")>()),
   isWebUsbSupported: () => picoReset.webUsb,
 }));
 
 import { defaultLocalize } from "../../src/common/localize.js";
-import { BleNusServiceNotFoundError } from "../../src/util/ble-nus-stream.js";
+import { BleNusServiceNotFoundError } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { PicoStrandedError } from "../../src/platforms/rp2/rp2-logs-reset.js";
 import {
   attachBleNusLogs,
   attachSerialLogStream,
@@ -58,7 +61,6 @@ import {
   type PostInstallShowLogsDetail,
   reconnectWebSerialLogs,
 } from "../../src/util/post-install-logs.js";
-import { PicoStrandedError } from "../../src/util/rp2-logs-reset.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function openPort(

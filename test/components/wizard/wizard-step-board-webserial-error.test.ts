@@ -22,6 +22,10 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
   ...wsSerial,
 }));
+vi.mock("../../../src/platforms/esp/esptool.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/platforms/esp/esptool.js")>()),
+  ...wsSerial,
+}));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";

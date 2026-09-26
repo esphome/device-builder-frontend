@@ -21,6 +21,14 @@ import { OTA_PORT } from "../api/types/streaming.js";
 import { esphomeWebUrl } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { isEsptoolPlatform } from "../platforms/esp/index.js";
+import {
+  bleNusLogsAvailable,
+  BleProbeController,
+  isNrfPlatform,
+} from "../platforms/nrf52/index.js";
+import { isRp2Platform } from "../platforms/rp2/index.js";
+import { isRtl87xxPlatform } from "../platforms/rtl87xx/index.js";
 import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
@@ -30,15 +38,9 @@ import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { bleNusLogsAvailable } from "../util/ble-nus-stream.js";
-import { BleProbeController } from "../util/ble-probe-controller.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../util/environment.js";
-import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { fireEvent } from "../util/fire-event.js";
-import { isNrfPlatform } from "../util/nrf-platform.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { isRp2Platform } from "../util/rp2-platform.js";
-import { isRtl87xxPlatform } from "../util/rtl87xx-platform.js";
 import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
   secureLoopbackUrl,
@@ -320,7 +322,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * Web-Serial-incapable browser there still gets the enabled external-flasher
    * row. The flasher tab (a secure origin) then feature-detects for real and
    * advertises the result on its ready frame, and the dashboard declines the
-   * hand-off with an unsupported-browser error (see ``util/usb-flasher.ts``).
+   * hand-off with an unsupported-browser error (see ``platforms/esp/usb-flasher.ts``).
    */
   private _renderUsbOption(availability: WebSerialAvailability) {
     const title = this._localize("dashboard.install_method_usb_local");

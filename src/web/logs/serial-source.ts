@@ -1,4 +1,4 @@
-import { rebootPico } from "../../util/rp2-logs-reset.js";
+import { rebootPico } from "../../platforms/rp2/index.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)

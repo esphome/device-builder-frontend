@@ -6,13 +6,18 @@ import toast from "sonner-js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
 import { localizeContext } from "../../context/index.js";
+import {
+  flashPico,
+  isWebUsbSupported,
+  loadPicoboot,
+  PicoFlashError,
+  picoFlashFailureCopy,
+} from "../../platforms/rp2/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { flashPico, PicoFlashError, picoFlashFailureCopy } from "../../util/rp2-flash.js";
 import { touchIntoBootloader } from "../../util/serial-bootloader-touch.js";
 import type { Uf2Image } from "../../util/uf2.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
-import { isWebUsbSupported, loadPicoboot } from "../../util/web-usb.js";
 import { fetchEsphomeWebManifest, picoUf2Url } from "../util/esphome-web-firmware.js";
 import { picoPortFilters } from "../util/pico-port-filter.js";
 import { type ProgressCard, renderProgressCard } from "./install-progress.js";

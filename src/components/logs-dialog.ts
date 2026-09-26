@@ -25,6 +25,8 @@ import {
   devicesContext,
   localizeContext,
 } from "../context/index.js";
+import { isNrfPlatform } from "../platforms/nrf52/index.js";
+import { isRp2Platform } from "../platforms/rp2/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -35,10 +37,8 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { normalizeLogLine } from "../util/log-line.js";
-import { isNrfPlatform } from "../util/nrf-platform.js";
 import { QuietTimerController } from "../util/quiet-timer-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { isRp2Platform } from "../util/rp2-platform.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
