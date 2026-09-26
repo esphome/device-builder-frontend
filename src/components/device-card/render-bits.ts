@@ -5,6 +5,7 @@ import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
+import { ageOf, formatDuration } from "../../util/relative-time.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
 // Busy-badge copy per active job type; anything else (upload, install,
@@ -125,6 +126,18 @@ export function renderEncryptionIcon(
     <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
+/**
+ * "Offline", or "Offline 2h" when the user has opted in and some channel
+ * has seen the device. The backend's age is a snapshot, so advance it by
+ * the wall-clock elapsed since the listing arrived before formatting.
+ */
+function offlineLabel(card: ESPHomeDeviceCard): string {
+  const base = card._localize("dashboard.offline");
+  if (!card._offlineDurationVisible) return base;
+  const age = ageOf(card.offlineSeconds, card.offlineAnchor, card.nowMs || Date.now());
+  return age === null ? base : `${base} ${formatDuration(age)}`;
+}
+
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   if (card.busy) {
     const labelKey =
@@ -198,7 +211,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     card.state === DeviceState.ONLINE
       ? card._localize("dashboard.online")
       : card.state === DeviceState.OFFLINE
-        ? card._localize("dashboard.offline")
+        ? offlineLabel(card)
         : card._localize("dashboard.unknown");
   if (card.state !== DeviceState.ONLINE && !card.selectMode) {
     // Non-online badges open the troubleshooting dialog. Passive while

@@ -5,6 +5,7 @@ import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
 import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
+  formatDuration,
   formatSecondsAgo,
   getNumberFormatter,
 } from "../../../util/relative-time.js";
@@ -78,9 +79,29 @@ export function renderReachabilitySection(
   ];
   const anySignal = rows.some((row) => row.age !== null);
 
+  // Independent of the per-source rows: a device asleep since before the
+  // dashboard started has no per-source ages at all, which is exactly when
+  // "how long has it been gone" is the only thing worth showing.
+  const offlineFor = deviceOffline
+    ? ageOf(host.device?.runtime_state.offline_seconds ?? null, anchor, now)
+    : null;
+
   return html`
     <div class="section">
       <h4 class="section-title">${host._localize("dashboard.drawer_reachability")}</h4>
+      ${
+        offlineFor === null
+          ? nothing
+          : html`<div class="row">
+              <div class="icon">
+                <wa-icon library="mdi" name="clock-outline"></wa-icon>
+              </div>
+              <div class="content">
+                <div class="label">${host._localize("dashboard.drawer_offline_for")}</div>
+                <div class="value">${formatDuration(offlineFor, { language: lang })}</div>
+              </div>
+            </div>`
+      }
       ${
         !anySignal
           ? html`<div class="value muted">

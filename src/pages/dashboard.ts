@@ -101,6 +101,7 @@ import {
   importableDevicesContext,
   labelsContext,
   localizeContext,
+  offlineDurationVisibleContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteComputeOnlyContext,
@@ -196,6 +197,20 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   _devices: ConfiguredDevice[] = [];
+  // Wall-clock when the current ``_devices`` arrived. The cards' offline
+  // durations are ages measured at send time, so they need this to advance
+  // between listings. Deliberately non-reactive: it's written from
+  // ``updated()`` and only ever read alongside ``_devices``.
+  _devicesReceivedAt = Date.now();
+  @consume({ context: offlineDurationVisibleContext, subscribe: true })
+  @state()
+  _offlineDurationVisible = false;
+  // One repaint tick shared by every offline card: the durations advance
+  // with wall-clock rather than with any incoming event, and a timer per
+  // card would be dozens of intervals doing identical work.
+  @state()
+  _offlineTickMs = Date.now();
+  private _offlineTimer: ReturnType<typeof setInterval> | null = null;
   @consume({ context: importableDevicesContext, subscribe: true })
   @state()
   _importableDevices: AdoptableDevice[] = [];
@@ -542,6 +557,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this._stopOfflineTick();
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
     window.removeEventListener(
       "esphome-show-ignored-changed",
@@ -590,6 +606,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._stacks.show && !this._stacks.remoteCollapsed
     );
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
+    if (changed.has("_devices")) this._devicesReceivedAt = Date.now();
+    this._reconcileOfflineTick();
     // The catalog arrives over WS after ``connectedCallback`` runs.
     // Resolve any URL-sourced pending label names the moment it does.
     if (changed.has("_labelsCatalog")) this._resolvePendingLabelNames();
@@ -615,6 +633,26 @@ export class ESPHomePageDashboard extends LitElement {
         this._installMethodDevice = null;
         this._installMethodOpen = false;
       }
+    }
+  }
+
+  private _reconcileOfflineTick(): void {
+    const wanted =
+      this._offlineDurationVisible &&
+      this._devices.some((d) => d.runtime_state.offline_seconds !== null);
+    if (wanted && this._offlineTimer === null) {
+      this._offlineTimer = setInterval(() => {
+        this._offlineTickMs = Date.now();
+      }, 1000);
+    } else if (!wanted) {
+      this._stopOfflineTick();
+    }
+  }
+
+  private _stopOfflineTick(): void {
+    if (this._offlineTimer !== null) {
+      clearInterval(this._offlineTimer);
+      this._offlineTimer = null;
     }
   }
 

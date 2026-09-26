@@ -26,7 +26,11 @@ import type { Label } from "../api/types/devices.js";
 import { DeviceState } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { labelsContext, localizeContext } from "../context/index.js";
+import {
+  labelsContext,
+  localizeContext,
+  offlineDurationVisibleContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
@@ -75,6 +79,20 @@ export class ESPHomeDeviceCard extends LitElement {
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] =
     [];
+  @consume({ context: offlineDurationVisibleContext, subscribe: true })
+  @state()
+  _offlineDurationVisible = false;
+
+  // Seconds offline as of ``offlineAnchor``; ``null`` while online or
+  // never observed.
+  @property({ attribute: false }) offlineSeconds: number | null = null;
+  // ``Date.now()`` when the listing carrying ``offlineSeconds`` arrived, so
+  // the rendered duration advances with wall-clock between listings.
+  @property({ attribute: false }) offlineAnchor = 0;
+  // Shared repaint tick from the dashboard; the offline duration advances
+  // with wall-clock, not with events, so the card needs a changing property
+  // to re-render against. 0 falls back to reading the clock at render time.
+  @property({ attribute: false }) nowMs = 0;
 
   // Resolved against the catalog at render time so a recolor / rename in
   // another client repaints every card without per-card state.
