@@ -101,22 +101,19 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // costs the fetch at click time.
     if (isWebSerialSupported()) preloadEsptool();
     // Lit usually sets ``.preset`` before connectedCallback fires
-    // (property bindings are applied during element upgrade), so this
-    // path handles the common case. ``willUpdate`` below covers the
-    // parent-updates-after-mount case where the element is reused and
-    // the preset arrives later.
+    // (property bindings are applied during element upgrade); ``willUpdate``
+    // below covers the dialog re-opening this step while it stays mounted.
     if (this.preset) this._applyDetection(this.preset);
     this._fetchBoards();
   }
 
   willUpdate(changed: PropertyValues<this>) {
     super.willUpdate(changed);
-    if (
-      changed.has("preset") &&
-      this.preset &&
-      !this._selectedFilter &&
-      !this._detection
-    ) {
+    // A preset change after mount is the dialog re-opening the step (the
+    // next board's detection, or a plain open with none), and it replaces
+    // whatever the step showed for the last one. The mount itself is
+    // handled above; there the old value is undefined.
+    if (changed.has("preset") && changed.get("preset") !== undefined) {
       this._applyDetection(this.preset);
       this._fetchBoards();
     }

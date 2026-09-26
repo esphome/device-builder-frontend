@@ -83,4 +83,23 @@ describe("wizard-step-board detection preset", () => {
     expect(lastFetch(getBoards)).toMatchObject({ platform: "esp8266" });
     expect(banner(el)).toBeUndefined();
   });
+
+  it("takes the next board's detection when the step is re-opened for it", async () => {
+    // The step stays mounted inside the dialog, so "Set it up" for a second
+    // board hands it a new preset in place.
+    const { el, getBoards } = await mount({ label: "ESP32-S3" });
+    expect(banner(el)).toContain("ESP32-S3");
+    el.preset = { label: "RP2040 / RP2350", platform: "rp2" };
+    await settle(el);
+    expect(lastFetch(getBoards)).toMatchObject({ platform: "rp2", variant: undefined });
+    expect(banner(el)).toContain("RP2040 / RP2350");
+  });
+
+  it("shows the full picker again when re-opened without a detection", async () => {
+    const { el, getBoards } = await mount({ label: "ESP32-S3" });
+    el.preset = null;
+    await settle(el);
+    expect(lastFetch(getBoards)).toMatchObject({ platform: undefined });
+    expect(banner(el)).toBeUndefined();
+  });
 });
