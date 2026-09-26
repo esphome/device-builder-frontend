@@ -21,9 +21,8 @@ import { namedConnectFailure } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
-  chipNameToFilterLabel,
-  detectedBoardId,
-  detectionPreset,
+  chipPreset,
+  resolveDetection,
   WIZARD_BOARD_PLATFORMS,
   type WizardBoardPreset,
 } from "./wizard-step-board-platforms.js";
@@ -306,23 +305,17 @@ export class ESPHomeWizardStepBoard extends LitElement {
     }
     if (!detection) return; // picker dismissed
 
-    // A board named outright (a factory firmware's app descriptor, or the
-    // boot banner) is added as itself; same flow as ``detectAndOpenWizard``
-    // so both entry points behave alike. A catalog miss, or a request that
-    // failed (fetchBoard logs it and resolves null), falls through to the
-    // picker narrowed to what was found.
-    const boardId = detectedBoardId(detection);
-    const knownBoard = boardId ? await fetchBoard(this._api, boardId) : null;
-    if (knownBoard) {
-      this._onAdd(knownBoard);
+    // The board it named is added as itself; else the picker narrows to what
+    // was found and the user picks (a filtered picker beats auto-advancing to
+    // a generic board: they can still pick it explicitly, or one of several
+    // boards for their chip). A device we can't tell leaves it open and says
+    // so, since the user picked that port on purpose (#1856).
+    const landing = await resolveDetection(this._api, detection);
+    if ("board" in landing) {
+      this._onAdd(landing.board);
       return;
     }
-    // Narrow the picker to the platform or chip found and let the user pick
-    // (landing on a filtered picker beats auto-advancing to a generic board:
-    // they can still pick it explicitly, or one of several boards for their
-    // chip). A device we can't tell leaves it open and says so, since the
-    // user picked that port on purpose (#1856).
-    this._applyDetection(detectionPreset(detection));
+    this._applyDetection(landing.preset);
     if (detection.kind === "unknown") {
       this._detectError = this._localize("wizard.connect_your_board_unrecognized");
     }
@@ -365,9 +358,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       // Resolve to an existing filter chip (same as the WebSerial path);
       // a recognised-but-unfiltered variant (e.g. ESP32-S31) yields null,
       // so the picker is left unfiltered instead of keeping a dead filter.
-      this._applyDetectedFilter(
-        result.chip_family ? chipNameToFilterLabel(result.chip_family) : null
-      );
+      this._applyDetection(result.chip_family ? chipPreset(result.chip_family) : null);
       this._view = "boards";
       void this._fetchBoards();
     } catch (err) {
@@ -417,11 +408,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._selectedFilter = preset && !preset.platform ? preset.label : "";
     this._detection = preset;
     this._search = "";
-  }
-
-  /** ``_applyDetection`` for a detected chip's filter label, if any. */
-  private _applyDetectedFilter(label: string | null) {
-    this._applyDetection(label ? { label } : null);
   }
 
   private _exitDetectionMode() {

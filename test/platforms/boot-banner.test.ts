@@ -79,32 +79,33 @@ describe("matchBootBanner", () => {
   });
 });
 
-/** A port whose readable stream plays ``chunks`` after the reset pulse. */
+/** A port whose readable stream plays ``chunks`` once the reset is released. */
 function fakePort(chunks: string[], opts: { noSignals?: boolean } = {}) {
   const enc = new TextEncoder();
   const signals: SerialOutputSignals[] = [];
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
-  const port = {
+  const raw = {
     readable: null as ReadableStream<Uint8Array> | null,
     open: vi.fn(async () => {
-      port.readable = new ReadableStream<Uint8Array>({
+      raw.readable = new ReadableStream<Uint8Array>({
         start: (c) => {
           controller = c;
         },
       });
     }),
     close: vi.fn(async () => {
-      port.readable = null;
+      raw.readable = null;
     }),
     setSignals: vi.fn(async (s: SerialOutputSignals) => {
       if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
       signals.push(s);
-      // The board prints once the reset is released.
       if (s.requestToSend === false)
         for (const c of chunks) controller?.enqueue(enc.encode(c));
     }),
   };
-  return { port: port as unknown as SerialPort, raw: port, signals };
+  // Not the shared makeWebSerialPort: ``readable`` must be the live field the
+  // open() above sets, not a copy taken at creation.
+  return { port: raw as unknown as SerialPort, raw, signals };
 }
 
 beforeEach(() => {
@@ -116,18 +117,20 @@ afterEach(() => {
 });
 
 describe("readBootBanner", () => {
-  it("pulses reset with the strap released and reads what the board prints", async () => {
+  it("pulses reset with the strap released and names what the board prints", async () => {
     const { port, raw, signals } = fakePort([RTL_PLAIN]);
     const pending = readBootBanner(port);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS);
-    const text = await pending;
+    expect(await pending).toEqual({
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
+      board: "bw15",
+    });
     expect(raw.open).toHaveBeenCalledWith({ baudRate: 115200 });
     expect(signals).toEqual([
       { dataTerminalReady: false, requestToSend: true },
       { dataTerminalReady: false, requestToSend: false },
     ]);
-    expect(text).toContain("Rtl8710c IoT Platform");
-    expect(text).toContain("on bw15");
     expect(raw.close).toHaveBeenCalledOnce();
   });
 
@@ -135,24 +138,25 @@ describe("readBootBanner", () => {
     const { port } = fakePort([ESP32]);
     const pending = readBootBanner(port);
     await vi.advanceTimersByTimeAsync(50);
-    expect(matchBootBanner(await pending)).toEqual({ platform: "esp" });
+    expect(await pending).toEqual({ platform: "esp" });
   });
 
-  it("returns whatever came in the window from a silent board, and from an adapter without lines", async () => {
+  it("is null for a silent board, and for an adapter without lines", async () => {
     const silent = fakePort([]);
     const pending = readBootBanner(silent.port);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
-    expect(await pending).toBe("");
+    expect(await pending).toBeNull();
     expect(silent.raw.close).toHaveBeenCalledOnce();
     const noLines = fakePort([RTL_PLAIN], { noSignals: true });
     const p2 = readBootBanner(noLines.port);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
-    expect(await p2).toBe("");
+    expect(await p2).toBeNull();
   });
 
-  it("rejects when the port will not open, closing nothing", async () => {
+  it("rejects when the port will not open", async () => {
     const { port, raw } = fakePort([]);
     raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));
     await expect(readBootBanner(port)).rejects.toThrow("held");
+    expect(raw.close).not.toHaveBeenCalled();
   });
 });

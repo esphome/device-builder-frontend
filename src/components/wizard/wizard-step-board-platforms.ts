@@ -18,7 +18,10 @@
  *   Absent for platforms split by ``variant`` instead.
  * - ``label`` is the user-facing chip text.
  */
-import type { BoardDetection } from "../../platforms/detect-board.js";
+import type { ESPHomeAPI } from "../../api/index.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import { type BoardDetection, detectedBoardId } from "../../platforms/detect-board.js";
+import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipPlatformFamily } from "../../util/chip-variant.js";
 import { RP2_CANONICAL_KEY } from "../../util/component-presence.js";
 
@@ -110,29 +113,39 @@ export function chipNameToFilterLabel(chipName: string): string | null {
   return match?.label ?? null;
 }
 
-/** The catalog id a detection named, if any. */
-export function detectedBoardId(detection: BoardDetection): string | undefined {
-  switch (detection.kind) {
-    case "esp":
-      return detection.board.manifest?.board_id;
-    case "family":
-    case "board":
-      return detection.board;
-    default:
-      return undefined;
-  }
+/** A chip's filter as a preset, or null when the picker has no chip for it. */
+export function chipPreset(chipName: string): WizardBoardPreset | null {
+  const label = chipNameToFilterLabel(chipName);
+  return label ? { label } : null;
 }
 
 /** The board picker's preset for a detection that named no catalog board. */
 export function detectionPreset(detection: BoardDetection): WizardBoardPreset | null {
   switch (detection.kind) {
-    case "esp": {
-      const label = chipNameToFilterLabel(detection.board.chipName);
-      return label ? { label } : null;
-    }
-    case "family":
-      return platformToPreset(detection.platform, detection.mcu);
+    case "esp":
+      return chipPreset(detection.board.chipName);
+    case "named":
+      return detection.platform
+        ? platformToPreset(detection.platform, detection.mcu)
+        : null;
     default:
       return null;
   }
+}
+
+/**
+ * Where a detection lands: the catalog board it named (a factory firmware's
+ * app descriptor, or the boot banner), else the picker's preset for what it
+ * found. A catalog miss (older dashboard, unreleased product) or a request
+ * failure (``fetchBoard`` logs it and resolves null) falls through to the
+ * preset rather than failing, so the user still gets a useful onboarding
+ * path. Both entry points go through here so they behave alike.
+ */
+export async function resolveDetection(
+  api: ESPHomeAPI,
+  detection: BoardDetection
+): Promise<{ board: BoardCatalogEntry } | { preset: WizardBoardPreset | null }> {
+  const boardId = detectedBoardId(detection);
+  const board = boardId ? await fetchBoard(api, boardId) : null;
+  return board ? { board } : { preset: detectionPreset(detection) };
 }

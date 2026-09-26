@@ -5,7 +5,6 @@ import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js
 import type { LocalizeFunc } from "../../common/localize.js";
 import { type BoardDetection, detectBoard } from "../../platforms/detect-board.js";
 import { EngineLoadError, UnsupportedChipError } from "../../platforms/esp/index.js";
-import { fetchBoard } from "../../util/board-body-cache.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { navigate } from "../../util/navigation.js";
@@ -18,8 +17,7 @@ import {
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
-  detectedBoardId,
-  detectionPreset,
+  resolveDetection,
   type WizardBoardPreset,
 } from "../wizard/wizard-step-board-platforms.js";
 
@@ -362,26 +360,23 @@ export async function detectAndOpenWizard(
     }
   }
 
-  // A board named outright, by a factory firmware's app descriptor or by the
-  // boot banner, lands on itself. A catalog miss (older dashboard, unreleased
-  // product) or a request failure (fetchBoard logs it and resolves null)
-  // falls through to the chip-family picker rather than failing: the user
-  // still gets a useful onboarding path.
-  const boardId = detectedBoardId(detection);
-  const known = boardId ? await fetchBoard(api, boardId) : null;
-  if (known) {
+  // The board it named, else the picker narrowed to what was found (a
+  // platform from the USB ids or the banner, neither of which ran esptool,
+  // which would sit on a Pico's CDC waiting for a ROM loader, #1856; the
+  // ESP's chip; or nothing).
+  const landing = await resolveDetection(api, detection);
+  if ("board" in landing) {
     if (options.localize) {
       notifySuccess(
-        options.localize("dashboard.serial_starterkit_detected", { name: known.name })
+        options.localize("dashboard.serial_starterkit_detected", {
+          name: landing.board.name,
+        })
       );
     }
-    createDialog.openWithBoard(known);
+    createDialog.openWithBoard(landing.board);
     return;
   }
-  // Else the platform's boards (from the USB ids or the banner; neither ran
-  // esptool, which would sit on a Pico's CDC waiting for a ROM loader,
-  // #1856), the ESP's chip, or the full picker.
-  createDialog.openAtBoardStep(detectionPreset(detection));
+  createDialog.openAtBoardStep(landing.preset);
 }
 
 export async function fetchEncryptionKey(

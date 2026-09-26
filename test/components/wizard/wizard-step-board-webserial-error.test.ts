@@ -101,7 +101,7 @@ describe("wizard-step-board WebSerial detect errors", () => {
   it("names a failed engine chunk fetch", async () => {
     const el = await mount();
     // After mount: the step warms the chunk on connect, which must not eat this.
-    seams.loadEsptool.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    seams.loadEsptool.mockRejectedValue(new TypeError("Failed to fetch"));
 
     await (el as any)._connectViaWebSerial();
     await el.updateComplete;

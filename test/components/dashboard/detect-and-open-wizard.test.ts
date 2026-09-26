@@ -18,7 +18,9 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
-const banner = vi.hoisted(() => ({ readBootBanner: vi.fn(async () => "") }));
+const banner = vi.hoisted(() => ({
+  readBootBanner: vi.fn(async (): Promise<unknown> => null),
+}));
 vi.mock("../../../src/platforms/boot-banner.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   readBootBanner: banner.readBootBanner,
@@ -28,6 +30,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { detectAndOpenWizard } from "../../../src/components/dashboard/actions.js";
+import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
 import { makeUsbPort } from "../../web/_make-web-serial-port.js";
 
 const port = { getInfo: () => ({}) } as SerialPort;
@@ -39,6 +42,7 @@ function makeDialog() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  _clearBoardBodyCache();
   seams.requestSerialPort.mockResolvedValue(port);
   seams.loadEsptool.mockResolvedValue(engine);
   engine.connectToPort.mockResolvedValue({
@@ -99,7 +103,8 @@ describe("detectAndOpenWizard", () => {
 
   it("names a failed engine chunk fetch and still opens the wizard", async () => {
     const dialog = makeDialog();
-    seams.loadEsptool.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    // The bridge branch warms the chunk too, so the rejection must outlast one call.
+    seams.loadEsptool.mockRejectedValue(new TypeError("Failed to fetch"));
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize });
     expect(toast.error).toHaveBeenCalledWith(
       "firmware.engine_load_failed",
@@ -183,9 +188,7 @@ describe("detectAndOpenWizard", () => {
 
   it("lands a board its boot banner named on itself", async () => {
     const dialog = makeDialog();
-    banner.readBootBanner.mockResolvedValueOnce(
-      "LibreTiny v1.13.0+sha.1 on bw15, compiled at x"
-    );
+    banner.readBootBanner.mockResolvedValueOnce({ board: "bw15" });
     const bw15 = { id: "bw15", name: "BW15" };
     const api = { getBoard: vi.fn(async () => bw15) };
     await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, {
@@ -199,9 +202,11 @@ describe("detectAndOpenWizard", () => {
 
   it("narrows to the chip when the banner's board is not in the catalog", async () => {
     const dialog = makeDialog();
-    banner.readBootBanner.mockResolvedValueOnce(
-      "== Rtl8710c IoT Platform ==\nLibreTiny v1 on some-new-kit, compiled at x"
-    );
+    banner.readBootBanner.mockResolvedValueOnce({
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
+      board: "some-new-kit",
+    });
     const api = { getBoard: vi.fn().mockRejectedValue(new Error("no such board")) };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, {
