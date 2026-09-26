@@ -119,4 +119,42 @@ describe("watchSerialPlugIns", () => {
     serialListeners.connect({ target: {} } as unknown as Event);
     expect(onPlugIn).not.toHaveBeenCalled();
   });
+
+  it("drops the blip for both of two identical boards on the hub", () => {
+    const onPlugIn = vi.fn();
+    watchSerialPlugIns(onPlugIn);
+    // Both disconnect before either comes back; each connect consumes one.
+    unplug(port(0xf00a));
+    unplug(port(0xf00a));
+    vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS / 2);
+    plugIn(port(0xf00a));
+    plugIn(port(0xf00a));
+    expect(onPlugIn).not.toHaveBeenCalled();
+    // The memory is spent: the next connect is a plug-in.
+    plugIn(port(0xf00a));
+    expect(onPlugIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("never matches ports without USB ids to each other", () => {
+    const onPlugIn = vi.fn();
+    watchSerialPlugIns(onPlugIn);
+    const rfcomm = () => ({ getInfo: () => ({}) }) as unknown as SerialPort;
+    unplug(rfcomm());
+    const other = rfcomm();
+    plugIn(other);
+    expect(onPlugIn).toHaveBeenCalledWith(other);
+  });
+
+  it("ignores a stale disconnect from a twin unplugged for good", () => {
+    const onPlugIn = vi.fn();
+    watchSerialPlugIns(onPlugIn);
+    unplug(port(0xf00a)); // one of two identical boards, gone for good
+    vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS * 5);
+    // The other one bounces on the hub: its own disconnect is the one that
+    // counts, not the stale twin's.
+    unplug(port(0xf00a));
+    vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS / 2);
+    plugIn(port(0xf00a));
+    expect(onPlugIn).not.toHaveBeenCalled();
+  });
 });
