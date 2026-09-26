@@ -17,6 +17,15 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
     }
   ),
 }));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openLiveSerialPort: vi.fn(
+    async (port: SerialPort, opts: { onOpened?: (p: SerialPort) => void }) => {
+      opts.onOpened?.(port);
+      return port;
+    }
+  ),
+}));
 
 import toast from "sonner-js";
 import { openImprovDialog } from "../../src/web/improv/open-improv-dialog.js";

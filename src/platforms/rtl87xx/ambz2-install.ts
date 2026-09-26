@@ -10,7 +10,7 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  retryParsedInstall,
+  resetForRetry,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -53,12 +53,12 @@ export function retryRtlAmbz2(
   host: ESPHomeFirmwareInstallDialog,
   device: ConfiguredDevice
 ): void {
-  retryParsedInstall(
-    host,
-    host._rtlImage,
-    () => host.installRtlAmbz2(device),
-    () => showReadyStep(host)
-  );
+  if (!host._rtlImage) {
+    host.installRtlAmbz2(device);
+    return;
+  }
+  resetForRetry(host);
+  showReadyStep(host);
 }
 
 /**

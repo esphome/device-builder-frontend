@@ -73,7 +73,7 @@ import {
   markSerialActivity,
   portOfSerialConnectEvent,
   SerialConnectAnnouncements,
-} from "../util/web-serial.js";
+} from "../util/serial-reacquire.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
   connectionOverlayStyles,

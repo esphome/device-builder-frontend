@@ -11,6 +11,10 @@ const reacquirePort = vi.fn();
 vi.mock("../../src/util/web-serial.js", () => ({
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  reacquirePort: (...a: unknown[]) => reacquirePort(...a),
+}));
 
 import { flush } from "../_dom.js";
 import { FakeHost } from "../_fake-host.js";

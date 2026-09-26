@@ -23,6 +23,10 @@ vi.mock("../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 vi.mock("../../../src/util/web-serial.js", () => ({
   openLiveSerialPort: mocks.openLiveSerialPort,
 }));
+vi.mock("../../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openLiveSerialPort: mocks.openLiveSerialPort,
+}));
 
 import {
   PicoStrandedError,

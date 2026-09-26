@@ -12,6 +12,10 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
   openLiveSerialPort,
 }));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openLiveSerialPort,
+}));
 
 import toast from "sonner-js";
 import {

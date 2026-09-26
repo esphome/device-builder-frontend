@@ -24,11 +24,8 @@ import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { releaseControlLines, releasesLinesAfterOpen } from "./serial-control-lines.js";
-import {
-  openLiveSerialPort,
-  requestSerialPort,
-  SERIAL_REOPEN_TIMEOUT_MS,
-} from "./web-serial.js";
+import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
+import { requestSerialPort } from "./web-serial.js";
 
 /**
  * Route a device whose serial console is provably silent (logger baud_rate 0,

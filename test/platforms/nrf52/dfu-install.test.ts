@@ -45,7 +45,9 @@ function readyHost() {
     { binaries: [bin("firmware.zip")], downloadBytes: new ArrayBuffer(0) },
     { _nrfPkg: pkg as DfuPackage | null, installNrfDfu: vi.fn() }
   );
+  // As the reset step leaves it.
   host._step = "nrf-reset";
+  host._statusMessage = "firmware.nrf_step1_title";
   return host;
 }
 

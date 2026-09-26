@@ -8,7 +8,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-ins
 import {
   downloadBuildArtifact,
   installLog,
-  retryParsedInstall,
+  resetForRetry,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { downloadSelectedBinary } from "../../components/firmware-install-dialog/install-flow.js";
@@ -65,12 +65,12 @@ export function retryRp2Uf2(
   host: ESPHomeFirmwareInstallDialog,
   device: ConfiguredDevice
 ): void {
-  retryParsedInstall(
-    host,
-    host._rp2Image,
-    () => host.installRp2Uf2(device),
-    () => showBootselStep(host)
-  );
+  if (!host._rp2Image) {
+    host.installRp2Uf2(device);
+    return;
+  }
+  resetForRetry(host);
+  showBootselStep(host);
 }
 
 /** Step 1: 1200-baud touch into BOOTSEL. Runs from a button click (user gesture). */
@@ -78,9 +78,10 @@ export function rp2DoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   return touchIntoBootloaderStep(host, {
     image: () => host._rp2Image,
     resettingKey: "firmware.rp2_resetting",
-    dismissedKey: "firmware.rp2_bootsel_title",
-    next: "rp2-wait",
-    nextTitleKey: "firmware.rp2_wait_title",
+    showNext: () => {
+      host._step = "rp2-wait";
+      host._statusMessage = host._localize("firmware.rp2_wait_title");
+    },
   });
 }
 

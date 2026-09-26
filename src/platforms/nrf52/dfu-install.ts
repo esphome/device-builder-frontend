@@ -1,6 +1,6 @@
 /**
- * nRF52 Nordic Legacy DFU install flow, split from install-flow.ts for the
- * line budget. The engine loads on demand so it stays out of the main chunk.
+ * The Device Builder's nRF52 install: Nordic legacy DFU over the bootloader's
+ * CDC. The engine loads on demand so it stays out of the main chunk.
  */
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
@@ -8,7 +8,7 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  retryParsedInstall,
+  resetForRetry,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -66,12 +66,12 @@ export function retryNrfDfu(
   host: ESPHomeFirmwareInstallDialog,
   device: ConfiguredDevice
 ): void {
-  retryParsedInstall(
-    host,
-    host._nrfPkg,
-    () => host.installNrfDfu(device),
-    () => showResetStep(host)
-  );
+  if (!host._nrfPkg) {
+    host.installNrfDfu(device);
+    return;
+  }
+  resetForRetry(host);
+  showResetStep(host);
 }
 
 function showResetStep(host: ESPHomeFirmwareInstallDialog): void {
@@ -84,9 +84,10 @@ export function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   return touchIntoBootloaderStep(host, {
     image: () => host._nrfPkg,
     resettingKey: "firmware.nrf_resetting",
-    dismissedKey: "firmware.nrf_step1_title",
-    next: "nrf-wait",
-    nextTitleKey: "firmware.nrf_step2_title",
+    showNext: () => {
+      host._step = "nrf-wait";
+      host._statusMessage = host._localize("firmware.nrf_step2_title");
+    },
     // A failed pick has nothing to do with the board; only the touch earns
     // the manual-bootloader hint.
     failureDetail: (err) =>

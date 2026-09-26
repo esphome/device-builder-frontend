@@ -7,8 +7,8 @@
  * already authorized. Ported from the device-builder flasher reference.
  */
 
+import { matchesDevice } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
-import { matchesDevice } from "../../util/web-serial.js";
 
 export interface LiveLogPortResult {
   port: SerialPort | null;

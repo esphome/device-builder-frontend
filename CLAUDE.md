@@ -183,7 +183,7 @@ for the full flow. The load-bearing rules:
   misdescribes them; say "over the network" (or OTA where the
   surrounding UI already uses it). Outside contributors have had
   to correct this twice (#1409, #1521), both times for a string
-  that shipped inside an unrelated PR. Key _names_ are frozen API
+  that shipped inside an unrelated PR. Key *names* are frozen API
   (`logs_method_wireless` keeps its name); the rule is about
   user-visible values.
 - The language picker is data-driven: each locale's autonym +
@@ -246,16 +246,16 @@ for the full flow. The load-bearing rules:
 
 ## Useful entry points
 
-| Path                                | What                                                                              |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| `src/components/app-shell.ts`       | Top-level component owning WS lifecycle, contexts, and most cross-component state |
-| `src/components/settings-dialog.ts` | Settings page; sidebar pattern, one section per `_renderXxx()` method             |
-| `src/api/esphome-api.ts`            | WS client; typed wrappers for backend commands                                    |
-| `src/api/types.ts`                  | All WS request/response types organized by domain                                 |
-| `src/context/contexts.ts`           | Lit context definitions (provided by `app-shell`, consumed everywhere)            |
-| `src/translations/en.json`          | English source-of-truth copy                                                      |
-| `test/api/esphome-api.test.ts`      | Typed-wrapper tests; canonical pattern for new API methods                        |
-| `src/web/`                          | Standalone **ESPHome Web** site (web.esphome.io) — see below                      |
+| Path | What |
+|---|---|
+| `src/components/app-shell.ts` | Top-level component owning WS lifecycle, contexts, and most cross-component state |
+| `src/components/settings-dialog.ts` | Settings page; sidebar pattern, one section per `_renderXxx()` method |
+| `src/api/esphome-api.ts` | WS client; typed wrappers for backend commands |
+| `src/api/types.ts` | All WS request/response types organized by domain |
+| `src/context/contexts.ts` | Lit context definitions (provided by `app-shell`, consumed everywhere) |
+| `src/translations/en.json` | English source-of-truth copy |
+| `test/api/esphome-api.test.ts` | Typed-wrapper tests; canonical pattern for new API methods |
+| `src/web/` | Standalone **ESPHome Web** site (web.esphome.io) — see below |
 
 ## ESPHome Web (standalone site)
 
@@ -263,7 +263,8 @@ for the full flow. The load-bearing rules:
 Serial tool published to web.esphome.io (`pnpm run dev:web` / `pnpm run
 build:web` → `esphome_web/`, deployed by
 `.github/workflows/deploy-web.yml`). It reuses this repo's design system,
-the per-platform flash engines in `src/platforms/` (esptool-js in `src/platforms/esp/esptool.ts`), `process-terminal` /
+the per-platform flash engines in `src/platforms/` (esptool-js in
+`src/platforms/esp/esptool.ts`), `process-terminal` /
 `base-dialog`, and localization, but has **no WebSocket, auth, or API** — its
 shell (`esphome-web-app`) provides only the `localize` + `darkMode` contexts.
 Elements are prefixed `esphome-web-*`; new copy goes in `en.json` under
@@ -274,8 +275,8 @@ firmware from firmware.esphome.io.
 **Flash-receiver mode** (`src/web/flash-receiver/`): web.esphome.io doubles as
 the secure-context flash target the dashboard hands firmware to over
 `postMessage` when it can't flash itself (HA add-on over plain http — Web
-Serial needs https/localhost). `src/platforms/esp/usb-flasher.ts` (the dashboard sender) opens
-`https://web.esphome.io/#nonce=…&origin=…`; the shell detects that hash +
+Serial needs https/localhost). `src/platforms/esp/usb-flasher.ts` (the
+dashboard sender) opens `https://web.esphome.io/#nonce=…&origin=…`; the shell detects that hash +
 `window.opener` and renders `esphome-web-flash-receiver` instead of the
 dashboard. The channel is authenticated by the one-way `nonce` +
 `event.source === opener` (no origin allowlist — the opener is arbitrary

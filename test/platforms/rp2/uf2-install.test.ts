@@ -87,7 +87,9 @@ function readyHost(): Host {
   const host = makeHost();
   host._rp2Image = image;
   host._binaries = [bin("firmware.uf2", "uf2")];
+  // As showBootselStep leaves it.
   host._step = "rp2-bootsel";
+  host._statusMessage = "firmware.rp2_bootsel_title";
   return host;
 }
 

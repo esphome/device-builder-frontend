@@ -17,6 +17,10 @@ vi.mock("../../src/util/web-serial.js", () => ({
   isPortPickerCancel: vi.fn(() => false),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
 }));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  reacquirePort: (...a: unknown[]) => reacquirePort(...a),
+}));
 vi.mock("../../src/web/util/pico-port-filter.js", () => ({ picoPortFilters: [] }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));

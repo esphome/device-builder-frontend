@@ -1,6 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-import { reacquirePort } from "../../util/web-serial.js";
+import { reacquirePort } from "../../util/serial-reacquire.js";
 
 /**
  * Keeps a card's authorized SerialPort across the spurious disconnect that

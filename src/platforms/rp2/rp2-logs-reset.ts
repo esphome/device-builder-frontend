@@ -4,8 +4,8 @@
  * PICOBOOT reboot over WebUSB, after which the CDC port re-enumerates.
  */
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
-import { openLiveSerialPort } from "../../util/web-serial.js";
 import {
   getPicobootDevices,
   isUsbAccessDenied,

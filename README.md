@@ -79,8 +79,8 @@ python3 -m build --wheel
 
 ### Other scripts
 
-| Script                | Description                            |
-| --------------------- | -------------------------------------- |
+| Script               | Description                            |
+| -------------------- | -------------------------------------- |
 | `pnpm run lint`       | TypeScript type-check (`tsc --noEmit`) |
 | `pnpm test`           | Run the Vitest suite once              |
 | `pnpm run test:watch` | Run tests in watch mode                |
@@ -203,7 +203,7 @@ These rules apply to all new code in `src/`. Existing files that pre-date them a
 - One `@customElement` per `.ts` file. File name matches element name: `esphome-foo-bar.ts` → `<esphome-foo-bar>`.
 - If a feature grows beyond 2–3 files, give it its own subfolder (see `src/components/settings-dialog/` for the pattern).
 - Create folders proactively when grouping related files makes sense — don't pile everything flat.
-- In-browser flashing and logs code lives in one directory per platform under `src/platforms/` (`esp/`, `nrf52/`, `rp2/`, `rtl87xx/`). Each has an `index.ts` with the API both the Device Builder and ESPHome Web use (the platform predicate, helpers, types, and loaders for the flash engines), and a `dashboard.ts` with the Device Builder's install flow. Code outside a platform imports only those two files. An engine loaded on demand (`nrf-dfu`, `ambz2-flasher`, `rp2-picoboot`, the LibreTiny UF2 parser) is exported from `index.ts` only as types plus a `load*` function, so it stays out of the main chunk. Transport-neutral pieces (UF2 container parsing, XModem, the serial touch / reacquire / log-line helpers, generic Web Serial in `src/util/web-serial.ts`) stay in `src/util/`. Tests mirror this under `test/platforms/<name>/`. A new platform (BK72xx, #1795) is a new directory plus one install-method row and one dispatch case.
+- In-browser flashing and logs code lives in one directory per platform under `src/platforms/` (`esp/`, `nrf52/`, `rp2/`, `rtl87xx/`), with tests mirrored under `test/platforms/`. Each has an `index.ts` for the API both the Device Builder and ESPHome Web use, and a `dashboard.ts` for the Device Builder's install flow; `src/` code outside a platform imports only those two. A flash engine loaded on demand is exported from `index.ts` only as types plus a `load*` function, so it stays out of the main chunk.
 
 ### TypeScript
 

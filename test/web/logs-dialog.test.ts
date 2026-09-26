@@ -9,6 +9,10 @@ vi.mock("../../src/util/serial-log-stream.js", () => ({ streamSerialLines: vi.fn
 vi.mock("../../src/util/download-text.js", () => ({ downloadAnsiText: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("../../src/util/web-serial.js", () => ({ openLiveSerialPort: vi.fn() }));
+vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openLiveSerialPort: vi.fn(),
+}));
 vi.mock("../../src/platforms/rp2/rp2-logs-reset.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/platforms/rp2/rp2-logs-reset.js")>()),
   rebootPico: vi.fn(),
@@ -26,7 +30,7 @@ import { crashCalloutStyles } from "../../src/components/process-terminal/crash-
 import { streamBleNus } from "../../src/platforms/nrf52/ble-nus-stream.js";
 import { PicoStrandedError, rebootPico } from "../../src/platforms/rp2/rp2-logs-reset.js";
 import { streamSerialLines } from "../../src/util/serial-log-stream.js";
-import { openLiveSerialPort } from "../../src/util/web-serial.js";
+import { openLiveSerialPort } from "../../src/util/serial-reacquire.js";
 import { BleLogSource } from "../../src/web/logs/ble-source.js";
 import { ESPHomeWebLogsDialog } from "../../src/web/logs/esphome-web-logs-dialog.js";
 import {

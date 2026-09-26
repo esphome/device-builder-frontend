@@ -8,7 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
-import { openLiveSerialPort } from "../../util/web-serial.js";
+import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
