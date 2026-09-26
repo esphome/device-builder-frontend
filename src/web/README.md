@@ -51,18 +51,21 @@ hardware classes behave differently:
 
 ## Where things live
 
-| Path                                   | What                                                                    |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                               |
-| `dashboard/`                           | Connect cards (ESP + Pico) and per-device action cards                  |
-| `install/`                             | Flash dialogs and the install flow controller                           |
-| `logs/`                                | Log viewer dialog (Web Serial, or Bluetooth NUS for nRF52)              |
-| `improv/`                              | Wi-Fi provisioning dialog                                               |
-| `flash-receiver/`                      | Receives images from a Device Builder over the local network            |
-| `util/`                                | Web-only helpers (port disconnect watcher, firmware fetch, Pico filter) |
+| Path                                   | What                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                       |
+| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header                                   |
+| `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                           |
+| `platforms/<name>/`                    | Each platform's connect and device cards and install dialogs (`esp`, `rp2`, `nrf52`, `rtl87xx`) |
+| `install/`                             | Pieces the install dialogs share: the progress card and the file picker                         |
+| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                             |
+| `improv/`                              | Wi-Fi provisioning dialog                                                                       |
+| `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                         |
+| `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)                 |
 
 New copy goes in `src/translations/en.json` under the `web.*`
-namespace. Tests live in `test/web/` and run with the main suite
+namespace. Tests live in `test/web/` (platform tests in
+`test/web/platforms/<name>/`) and run with the main suite
 (`corepack pnpm test`); lint with `corepack pnpm run lint`.
 
 ## Build and deploy

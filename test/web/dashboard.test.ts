@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Connect cards drag in the whole serial/improv stack — only their custom-element
 // registration matters for rendering the dashboard shell.
-vi.mock("../../src/web/dashboard/esphome-web-esp-connect-card.js", () => ({}));
-vi.mock("../../src/web/dashboard/esphome-web-pico-connect-card.js", () => ({}));
-vi.mock("../../src/web/dashboard/esphome-web-nrf-card.js", () => ({}));
-vi.mock("../../src/web/dashboard/esphome-web-rtl-card.js", () => ({}));
+vi.mock("../../src/web/platforms/esp/esphome-web-esp-connect-card.js", () => ({}));
+vi.mock("../../src/web/platforms/rp2/esphome-web-pico-connect-card.js", () => ({}));
+vi.mock("../../src/web/platforms/nrf52/esphome-web-nrf-card.js", () => ({}));
+vi.mock("../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-unsupported-card.js", () => ({}));
 vi.mock("../../src/util/web-serial.js", () => ({ isWebSerialSupported: () => true }));
 
