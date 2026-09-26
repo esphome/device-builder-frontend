@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   downloadSelectedBinary: vi.fn(),
   finishWithLogsPort: vi.fn(),
   notifyError: vi.fn(),
+  webUsb: true,
 }));
 vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -24,6 +25,7 @@ vi.mock("../../../src/util/serial-bootloader-touch.js", () => ({
 vi.mock("../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestPicobootDevice: mocks.requestPicobootDevice,
+  isWebUsbSupported: () => mocks.webUsb,
 }));
 vi.mock("../../../src/platforms/rp2/rp2-picoboot.js", () => ({
   PicobootDevice: { open: mocks.picobootOpen },
@@ -89,9 +91,7 @@ type Host = ReturnType<typeof makeHost>;
 
 function readyHost(): Host {
   const host = makeHost();
-  // A fresh image per install, as a real parse gives: the touched port is
-  // recorded against it.
-  rp2Image.set(asHost(host), { ...image });
+  rp2Image.set(asHost(host), image);
   host._binaries = [bin("firmware.uf2", "uf2")];
   // As showBootselStep leaves it.
   host._step = "rp2-bootsel";
@@ -365,6 +365,21 @@ describe("logs after a Pico install", () => {
     expect(mocks.finishWithLogsPort).toHaveBeenCalledWith(host, cdc);
   });
 
+  it("touches only the Pico's own port, turning a debug probe away untouched", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockRejectedValue(new PortNotAcceptedError({} as SerialPort));
+    await rp2DoReset(asHost(host));
+    expect(mocks.requestSerialPort).toHaveBeenCalledWith(
+      { filters: RP2_SERIAL_PICK.filters },
+      RP2_SERIAL_PICK.accept
+    );
+    expect(mocks.resetToBootloader).not.toHaveBeenCalled();
+    expect(mocks.notifyError).toHaveBeenCalledWith("firmware.rp2_not_a_pico");
+    expect(host._step).toBe("rp2-bootsel");
+    expect(host._statusMessage).toBe("firmware.rp2_bootsel_title");
+    expect((host as { _logsPort?: unknown })._logsPort ?? null).toBeNull();
+  });
+
   it("ends on done without a port when nothing was touched (BOOTSEL by hand)", async () => {
     const host = readyHost();
     flashOk();
@@ -374,12 +389,13 @@ describe("logs after a Pico install", () => {
   });
 
   it("holds a port only where the WebUSB write runs", () => {
-    const had = "usb" in navigator;
-    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
-    expect(rp2Uf2Install.holdsPort).toBe(true);
-    Reflect.deleteProperty(navigator, "usb");
-    expect(rp2Uf2Install.holdsPort).toBe(false);
-    if (had) Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+    try {
+      expect(rp2Uf2Install.holdsPort).toBe(true);
+      mocks.webUsb = false;
+      expect(rp2Uf2Install.holdsPort).toBe(false);
+    } finally {
+      mocks.webUsb = true;
+    }
   });
 
   describe("pickLogsPort", () => {

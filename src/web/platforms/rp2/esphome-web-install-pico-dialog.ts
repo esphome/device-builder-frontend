@@ -10,18 +10,20 @@ import {
   flashPico,
   isWebUsbSupported,
   loadPicoboot,
+  pickRp2CdcPort,
   PicoFlashError,
   picoFlashFailureCopy,
+  RP2_SERIAL_PICK,
 } from "../../../platforms/rp2/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { notifyError } from "../../../util/notify.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import type { Uf2Image } from "../../../util/uf2.js";
 import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import { loadPicoImage, picoUf2Url } from "./pico-image.js";
-import { pickPicoPort, PICO_PICK, PROBE_PICKED_KEY } from "./pico-port-filter.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -128,12 +130,12 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._logLines = [];
     this._state = "resetting";
     try {
-      const touched = await touchIntoBootloader({ ...PICO_PICK, onLog: this._log });
+      const touched = await touchIntoBootloader({ ...RP2_SERIAL_PICK, onLog: this._log });
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
       if (err instanceof PortNotAcceptedError) {
         this._state = "idle";
-        toast.error(this._localize(PROBE_PICKED_KEY));
+        notifyError(this._localize("firmware.rp2_not_a_pico"));
         return;
       }
       this._fail(
@@ -184,7 +186,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _continue(): Promise<void> {
-    const port = await pickPicoPort(this._localize);
+    const port = await pickRp2CdcPort(this._localize, "web.connect.failed");
     if (!port) return;
     this.dispatchEvent(
       new CustomEvent<SerialPort>("pico-connected", {

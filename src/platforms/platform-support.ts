@@ -113,10 +113,11 @@ export interface SerialLogsPolicy {
   /** Drop DTR and RTS right after opening, so the board boots its firmware. */
   readonly releasesLinesAfterOpen: boolean;
   /**
-   * The CDC only transmits while DTR is asserted (arduino-pico), so a reopen
-   * must not drop the lines the way it does for a UART bridge.
+   * A reopen leaves DTR and RTS as opened instead of dropping them (which it
+   * does by default for a UART bridge): the CDC only transmits while DTR is
+   * asserted (arduino-pico).
    */
-  readonly needsDtr?: boolean;
+  readonly keepLinesOnReopen?: boolean;
   /** Replaces the RTS pulse with the platform's own reset. */
   readonly reset?: SerialResetSupport;
 }

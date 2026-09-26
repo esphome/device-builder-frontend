@@ -163,6 +163,9 @@ describe("esphome-web-pico-connect-card connect", () => {
     pick(makeUsbPort(0x2e8a, 0x000c));
     await (el as any)._connect();
     expect((el as any)._port).toBeUndefined();
-    expect(toast.error).toHaveBeenCalledWith("web.pico.probe_picked");
+    expect(toast.error).toHaveBeenCalledWith(
+      "firmware.rp2_not_a_pico",
+      expect.anything()
+    );
   });
 });

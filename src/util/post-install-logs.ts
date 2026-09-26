@@ -126,7 +126,14 @@ export async function reconnectWebSerialLogs(
     );
     return;
   }
-  await attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled);
+  await attachSerialLogStream(
+    port,
+    logsDialog,
+    localize,
+    baudRate,
+    cancelled,
+    targetPlatform
+  );
 }
 
 /** Open ``port`` for a logs session and apply the platform's line policy; rejects as ``open`` does. */
@@ -173,7 +180,14 @@ export function sessionResetHook(
       } else if (!live) {
         failPortReopen(logsDialog, localize, port, cancelled);
       } else {
-        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
+        await attachSerialLogStream(
+          live,
+          logsDialog,
+          localize,
+          baudRate,
+          cancelled,
+          targetPlatform
+        );
       }
     },
   };
@@ -255,8 +269,9 @@ export function postInstallShowLogsHandler(
  * Begins a passive session (user-initiated logs, post-install hand-off, or
  * the dialog's reconnect-after-failure). A closed port is reopened through the
  * re-enumeration window — resolving the live granted handle, since a native-USB
- * chip's cached handle can be dead after the reset — with DTR/RTS cleared; an
- * already-open port streams as-is.
+ * chip's cached handle can be dead after the reset — with DTR/RTS cleared
+ * unless the platform's CDC needs DTR up (a Pico); an already-open port
+ * streams as-is.
  */
 export async function attachSerialLogStream(
   port: SerialPort,
@@ -264,7 +279,9 @@ export async function attachSerialLogStream(
   localize: LocalizeFunc,
   baudRate: number,
   cancelled: () => boolean = () => false,
-  targetPlatform?: string | null
+  // Required, so a new caller can't forget it: without it a Pico's reopen
+  // would drop DTR and go silent.
+  targetPlatform: string | null | undefined
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
@@ -279,7 +296,7 @@ export async function attachSerialLogStream(
     port = live;
     // Drop the lines the reopen asserted, unless the board's CDC needs DTR
     // up to transmit at all (a Pico).
-    if (!platformFor(targetPlatform)?.logs?.serial?.needsDtr) {
+    if (!platformFor(targetPlatform)?.logs?.serial?.keepLinesOnReopen) {
       await releaseControlLines(port);
     }
   }

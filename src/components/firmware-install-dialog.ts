@@ -436,8 +436,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   _showLogsAgain = async () => {
     if (!this._logsPort) {
+      const device = this._device;
       const port = await this._flasher?.pickLogsPort?.(this._localize);
-      if (!port) return;
+      // The picker outlives a dismissed dialog, or one reused for another install.
+      if (!port || this._device !== device || !this._open) return;
       this._logsPort = port;
     }
     flipToLogs(this, this._logsPort);

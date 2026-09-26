@@ -450,9 +450,8 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   }
   // Browser-flash success — surface "Logs" so users can flip back after
   // they've clicked logs-dialog's "Back to install". _logsPort survives
-  // _onClose but not _close, so the button only renders while the SerialPort
-  // reference is still around.
-  // A flow that ended without a port can still pick one from the click.
+  // _onClose but not _close. A flow that ended without a port (a Pico put
+  // into BOOTSEL by hand) can still pick one from the click.
   const canShowLogs =
     host._step === "done" &&
     (host._logsPort !== null || host._flasher?.pickLogsPort !== undefined);

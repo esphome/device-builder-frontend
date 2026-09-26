@@ -81,7 +81,7 @@ describe("PLATFORMS", () => {
       {
         pulseResets: false,
         releasesLinesAfterOpen: false,
-        needsDtr: false,
+        keepLinesOnReopen: false,
         reset: false,
         ble: true,
       },
@@ -91,7 +91,7 @@ describe("PLATFORMS", () => {
       {
         pulseResets: false,
         releasesLinesAfterOpen: false,
-        needsDtr: true,
+        keepLinesOnReopen: true,
         reset: true,
         ble: false,
       },
@@ -101,7 +101,7 @@ describe("PLATFORMS", () => {
       {
         pulseResets: true,
         releasesLinesAfterOpen: true,
-        needsDtr: false,
+        keepLinesOnReopen: false,
         reset: false,
         ble: false,
       },
@@ -111,7 +111,7 @@ describe("PLATFORMS", () => {
     expect({
       pulseResets: logs?.serial?.pulseResets,
       releasesLinesAfterOpen: logs?.serial?.releasesLinesAfterOpen,
-      needsDtr: logs?.serial?.needsDtr ?? false,
+      keepLinesOnReopen: logs?.serial?.keepLinesOnReopen ?? false,
       reset: logs?.serial?.reset !== undefined,
       ble: logs?.ble !== undefined,
     }).toEqual(expected);
