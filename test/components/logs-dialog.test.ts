@@ -352,7 +352,14 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("Reset Device pulses RTS then releases it (auto-reset), without closing the port", async () => {
     startPassive();
+    const logged = vi.spyOn(el as any, "_enqueueLine");
     await (el as any)._onResetDevice();
+    // The marker lands before the pulse, so it precedes the boot output.
+    expect(logged).toHaveBeenLastCalledWith("serial.resetting");
+    const order = logged.mock.invocationCallOrder;
+    expect(order[order.length - 1]).toBeLessThan(
+      port.setSignals.mock.invocationCallOrder[0]
+    );
     expect(port.setSignals).toHaveBeenNthCalledWith(1, {
       dataTerminalReady: false,
       requestToSend: true,
@@ -367,7 +374,9 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
   it("Reset Device runs the session hook on the closed port instead of the pulse", async () => {
     cancel = vi.fn(async () => {});
     const fresh = makePort();
+    const logged = vi.spyOn(el as any, "_enqueueLine");
     const run = vi.fn(async (p: SerialPort, cancelled: () => boolean) => {
+      expect(logged).toHaveBeenCalledWith("serial.resetting");
       expect(cancel).toHaveBeenCalledOnce(); // reader stopped and port closed first
       expect(p).toBe(port);
       expect(session(el).kind).toBe("reconnecting");

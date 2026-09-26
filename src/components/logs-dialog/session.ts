@@ -369,6 +369,10 @@ export function resetOffered(host: ESPHomeLogsDialog): boolean {
 export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> {
   const s = host._session;
   if (s.kind !== "serial" || !resetOffered(host)) return;
+  // Mark the reset in the log: the boot output that follows would otherwise
+  // look like the log just restarted.
+  host._enqueueLine("");
+  host._enqueueLine(host._localize("serial.resetting"));
   const hook = host._resetDevice;
   if (hook) {
     await runReconnecting(

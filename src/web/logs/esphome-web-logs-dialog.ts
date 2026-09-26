@@ -426,6 +426,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
     return this.policy.reset?.failureKey?.(err) ?? "web.logs.reset_failed";
   }
 
+  // Mark the reset in the log once it is going ahead: the boot output that
+  // follows would otherwise look like the log just restarted.
+  private _markReset(): void {
+    this._enqueueLine("");
+    this._enqueueLine(this._localize("serial.resetting"));
+  }
+
   // Best-effort — some USB bridges don't wire the reset lines.
   async _resetDevice(): Promise<void> {
     const source = this._source;
@@ -436,6 +443,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
       return;
     }
     if (!source.resetDropsStream) {
+      this._markReset();
       try {
         await reset(() => false);
       } catch (err) {
@@ -448,12 +456,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
     // Not while a reconnect or an earlier reset is still reacquiring the port.
     const cancel = this._cancel;
     if (!cancel) return;
+    this._markReset();
     const generation = ++this._generation;
     this._cancel = undefined;
     this._streaming = false;
     const wasPaused = this._paused;
-    this._enqueueLine("");
-    this._enqueueLine(this._localize("web.logs.rebooting"));
     this._flushPending();
     await cancel?.().catch((err) => {
       console.error("[Logs] Failed to release the stream before a reboot:", err);
