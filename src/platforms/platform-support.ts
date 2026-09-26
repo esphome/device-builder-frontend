@@ -96,14 +96,14 @@ export interface SerialResetSupport {
   available(): boolean;
   /** Whether the device behind this port can be reset this way. */
   supports(port: SerialPort): boolean;
-  /** Resets the device and returns its port reopened, or null when it never came back. */
-  reset(
-    port: SerialPort,
-    baudRate: number,
-    cancelled: () => boolean
-  ): Promise<SerialPort | null>;
-  /** Localize key for a failed reset. */
-  failureKey(err: unknown): string;
+  /**
+   * Reboots the device behind *port* (closed by the caller); its CDC port
+   * re-enumerates and the session reopens it. False when ``cancelled``
+   * flipped before anything was sent.
+   */
+  reboot(port: SerialPort, cancelled: () => boolean): Promise<boolean>;
+  /** Localize key for a platform-specific failure; the logs' generic key otherwise. */
+  failureKey(err: unknown): string | undefined;
 }
 
 /** Web Serial logs for the platform; its presence offers them in the logs picker. */

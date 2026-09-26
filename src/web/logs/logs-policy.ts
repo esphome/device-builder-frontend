@@ -27,7 +27,7 @@ export interface WebSerialReset {
   readonly dropsStream: boolean;
   run(port: SerialPort, cancelled: () => boolean): Promise<void>;
   /** Localize key for a failed reset (``web.logs.reset_failed`` otherwise). */
-  failureKey?(err: unknown): string;
+  failureKey?(err: unknown): string | undefined;
 }
 
 /**

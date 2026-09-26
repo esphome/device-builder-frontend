@@ -15,7 +15,7 @@ export const NRF_RESET: WebSerialReset = {
   run: async (port, cancelled) => {
     await rebootNrf(port, cancelled);
   },
-  failureKey: (err) => nrfResetFailureKey(err, "web.logs.reset_failed"),
+  failureKey: nrfResetFailureKey,
 };
 
 /** The nRF52's CDC has no reset line, and ignores the lines otherwise. */

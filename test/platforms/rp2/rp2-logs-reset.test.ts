@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   resetToBootloader: vi.fn<(port: SerialPort) => Promise<void>>(),
   getPicobootDevices: vi.fn<() => Promise<USBDevice[]>>(),
   requestPicobootDevice: vi.fn<() => Promise<USBDevice | null>>(),
-  openLiveSerialPort: vi.fn<() => Promise<SerialPort | null>>(),
   open: vi.fn<(usb: USBDevice) => Promise<unknown>>(),
   reboot: vi.fn<() => Promise<void>>(),
   close: vi.fn<() => Promise<void>>(),
@@ -20,18 +19,13 @@ vi.mock("../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   loadPicoboot: mocks.loadPicoboot,
   requestPicobootDevice: mocks.requestPicobootDevice,
 }));
-vi.mock("../../../src/util/serial-reacquire.js", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  openLiveSerialPort: mocks.openLiveSerialPort,
-}));
 
 import {
   PicoStrandedError,
-  resetPicoForLogs,
+  rebootPico,
 } from "../../../src/platforms/rp2/rp2-logs-reset.js";
 
 const port = { getInfo: () => ({}) } as unknown as SerialPort;
-const live = { readable: {} } as unknown as SerialPort;
 const usb = { vendorId: 0x2e8a, productId: 3 } as USBDevice;
 // A CDC handle the browser still sees as attached.
 const stillThere = { getInfo: () => ({}), connected: true } as unknown as SerialPort;
@@ -41,7 +35,6 @@ beforeEach(() => {
   mocks.resetToBootloader.mockResolvedValue(undefined);
   mocks.getPicobootDevices.mockResolvedValue([]);
   mocks.requestPicobootDevice.mockResolvedValue(usb);
-  mocks.openLiveSerialPort.mockResolvedValue(live);
   mocks.open.mockResolvedValue({ reboot: mocks.reboot, close: mocks.close });
   mocks.loadPicoboot.mockResolvedValue({ PicobootDevice: { open: mocks.open } });
   mocks.reboot.mockResolvedValue(undefined);
@@ -56,8 +49,8 @@ afterEach(() => {
 async function run({
   cancelled = () => false,
   from = port,
-}: { cancelled?: () => boolean; from?: SerialPort } = {}): Promise<SerialPort | null> {
-  const result = resetPicoForLogs(from, 115200, cancelled);
+}: { cancelled?: () => boolean; from?: SerialPort } = {}): Promise<boolean> {
+  const result = rebootPico(from, cancelled);
   // Silence the rejection until the test inspects it; the poll below needs
   // the timers advanced either way.
   result.catch(() => {});
@@ -69,25 +62,21 @@ async function run({
 const grantedAfterTouch = () =>
   mocks.getPicobootDevices.mockResolvedValueOnce([]).mockResolvedValue([usb]);
 
-describe("resetPicoForLogs", () => {
-  it("touches, reboots a granted bootloader without the chooser, and reopens the port", async () => {
+describe("rebootPico", () => {
+  it("touches and reboots a granted bootloader without the chooser", async () => {
     grantedAfterTouch();
-    await expect(run()).resolves.toBe(live);
+    await expect(run()).resolves.toBe(true);
     expect(mocks.resetToBootloader).toHaveBeenCalledWith(port);
     expect(mocks.requestPicobootDevice).not.toHaveBeenCalled();
     expect(mocks.open).toHaveBeenCalledWith(usb);
     expect(mocks.reboot).toHaveBeenCalledOnce();
     expect(mocks.close).toHaveBeenCalledOnce();
-    expect(mocks.openLiveSerialPort).toHaveBeenCalledWith(port, {
-      baudRate: 115200,
-      cancelled: expect.any(Function),
-    });
   });
 
   it("ignores a bootloader that was already present before the touch", async () => {
     const other = { vendorId: 0x2e8a, productId: 3 } as USBDevice;
     mocks.getPicobootDevices.mockResolvedValue([other]);
-    await expect(run()).resolves.toBe(live);
+    await expect(run()).resolves.toBe(true);
     expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
     expect(mocks.open).toHaveBeenCalledWith(usb);
   });
@@ -113,12 +102,12 @@ describe("resetPicoForLogs", () => {
   it("reboots a chooser-picked RP2350 too (the engine picks REBOOT2 for it)", async () => {
     const rp2350 = { vendorId: 0x2e8a, productId: 0xf } as USBDevice;
     mocks.requestPicobootDevice.mockResolvedValue(rp2350);
-    await expect(run()).resolves.toBe(live);
+    await expect(run()).resolves.toBe(true);
     expect(mocks.open).toHaveBeenCalledWith(rp2350);
   });
 
   it("returns without touching when cancelled before the touch", async () => {
-    await expect(run({ cancelled: () => true })).resolves.toBeNull();
+    await expect(run({ cancelled: () => true })).resolves.toBe(false);
     expect(mocks.resetToBootloader).not.toHaveBeenCalled();
   });
 
@@ -126,7 +115,7 @@ describe("resetPicoForLogs", () => {
     const first = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
     const again = { vendorId: 0x2e8a, productId: 3, serialNumber: "E66" } as USBDevice;
     mocks.getPicobootDevices.mockResolvedValueOnce([first]).mockResolvedValue([again]);
-    await expect(run()).resolves.toBe(live);
+    await expect(run()).resolves.toBe(true);
     expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce(); // `again` is not new
     expect(mocks.open).toHaveBeenCalledWith(usb);
   });
@@ -142,7 +131,7 @@ describe("resetPicoForLogs", () => {
   });
 
   it("falls back to the chooser when no granted bootloader appears in time", async () => {
-    await expect(run()).resolves.toBe(live);
+    await expect(run()).resolves.toBe(true);
     expect(mocks.getPicobootDevices.mock.calls.length).toBeGreaterThan(1);
     expect(mocks.requestPicobootDevice).toHaveBeenCalledOnce();
     expect(mocks.reboot).toHaveBeenCalledOnce();
@@ -154,7 +143,6 @@ describe("resetPicoForLogs", () => {
       name: "PicoStrandedError",
       step: "pick",
     });
-    expect(mocks.openLiveSerialPort).not.toHaveBeenCalled();
   });
 
   it("treats a chooser SecurityError as a lapsed pick, not a refused device", async () => {
@@ -201,11 +189,5 @@ describe("resetPicoForLogs", () => {
     expect(mocks.getPicobootDevices).toHaveBeenCalledOnce(); // the pre-touch snapshot only
     expect(mocks.requestPicobootDevice).not.toHaveBeenCalled();
     expect(mocks.open).not.toHaveBeenCalled();
-  });
-
-  it("returns null when the CDC port never comes back", async () => {
-    grantedAfterTouch();
-    mocks.openLiveSerialPort.mockResolvedValue(null);
-    await expect(run()).resolves.toBeNull();
   });
 });

@@ -8,12 +8,8 @@ import {
   streamBleNus,
 } from "./ble-nus-stream.js";
 import { nrfDfuInstall } from "./dfu-install.js";
-import {
-  isNrfAppCdcPort,
-  nrfResetFailureKey,
-  resetNrfForLogs,
-} from "./nrf-logs-reset.js";
-import { isNrfPlatform } from "./nrf-platform.js";
+import { nrfResetFailureKey, rebootNrf } from "./nrf-logs-reset.js";
+import { isNrfAppCdcPort, isNrfPlatform } from "./nrf-platform.js";
 
 export * from "./dfu-install.js";
 
@@ -30,8 +26,8 @@ export const nrf52Platform: PlatformSupport = {
       reset: {
         available: () => true,
         supports: isNrfAppCdcPort,
-        reset: resetNrfForLogs,
-        failureKey: (err) => nrfResetFailureKey(err, "dashboard.logs_reset_failed"),
+        reboot: rebootNrf,
+        failureKey: nrfResetFailureKey,
       },
     },
     ble: {
