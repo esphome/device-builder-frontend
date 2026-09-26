@@ -301,7 +301,7 @@ export class ESPHomeLogsDialog extends LitElement {
     return openPassive(this, options);
   }
 
-  /** Register a streaming BLE NUS link once notifications flow. */
+  /** Register a streaming Bluetooth logs link once notifications flow. */
   public setBleStream(cancel: () => Promise<void>) {
     setBleStream(this, cancel);
   }

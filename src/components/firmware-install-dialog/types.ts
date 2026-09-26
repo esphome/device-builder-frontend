@@ -16,7 +16,7 @@ export type SharedInstallStep =
 export type InstallStep = SharedInstallStep | FlasherStep;
 
 // The ESP installers (web-serial, web-flash) are still built into the dialog;
-// they move to a browser flasher descriptor in a later pass.
+// they move to a platform descriptor in a later pass.
 export type Installer = "web-serial" | "binary-download" | "web-flash" | FlasherId | null;
 
 export type InstallFailureKind =

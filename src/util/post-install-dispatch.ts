@@ -32,7 +32,7 @@ export interface PostInstallShowLogsDetail {
   // reroutes to network logs.
   loggerInterface?: string | null;
   // Device.target_platform, so the logs get the same Reset Device wiring as
-  // a launch from the card (a Pico hook where that applies).
+  // a launch from the card (the platform's own reset where it has one).
   targetPlatform?: string;
   reopenInstall: () => void;
 }

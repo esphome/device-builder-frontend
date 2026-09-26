@@ -122,7 +122,7 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
     case "downloading":
       return "running";
     default:
-      // What's left is a browser flasher's own step, which always runs. A
+      // What's left is a platform install flow's own step, which always runs. A
       // shared step added without a case above is a compile error here.
       host._step satisfies FlasherStep;
       return "running";
@@ -317,7 +317,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  // A browser flasher's user-gesture step (reset into the bootloader, flash).
+  // A platform install flow's user-gesture step (reset into the bootloader, flash).
   const bootloader = flasherStepView(host)?.footer?.();
   if (bootloader) {
     const { primary, secondary } = bootloader;

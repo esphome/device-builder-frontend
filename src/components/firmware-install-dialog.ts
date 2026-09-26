@@ -197,8 +197,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  // The browser flasher running this install (nRF52, Pico, RTL8720C), and its
-  // parsed image, read through the flasher's own FlashImageSlot.
+  // The platform install flow running this install (nRF52, Pico, RTL8720C), and its
+  // parsed image, read through the flow's own FlashImageSlot.
   // Not @state: it only changes with _installer, which is.
   _flasher: AnyBrowserInstall | null = null;
   _flashImage: unknown = null;
@@ -218,7 +218,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
-  // ESP's in-dialog esptool flash; it moves to a browser flasher descriptor
+  // ESP's in-dialog esptool flash; it moves to a platform descriptor
   // in a later pass, like nRF52, Pico and RTL8720C.
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);

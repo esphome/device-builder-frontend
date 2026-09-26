@@ -126,7 +126,8 @@ export function renderServerSerialOption(
 }
 
 /**
- * BLE NUS logs: stream serial logs from an nRF52 device over Bluetooth.
+ * Bluetooth logs, for a platform whose logs policy offers them (nRF52 over
+ * the Nordic UART Service today).
  * Clickable only once the adapter answered; otherwise the row is disabled,
  * with the reason once there is one. Brave gets the generic hint too (its
  * radio can be off with the flag already on), plus its extra step.
