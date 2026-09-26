@@ -268,6 +268,25 @@ describe("launchLogsWithMethod web-serial", () => {
     }
   });
 
+  it("says the port may be in use, with the error, when the open fails", async () => {
+    const restore = withWebSerial(true);
+    const port = {
+      getInfo: () => ({}),
+      open: vi.fn(async () => {
+        throw new DOMException("Failed to open serial port.", "NetworkError");
+      }),
+    } as unknown as SerialPort;
+    launch.requestSerialPort.mockResolvedValue(port);
+    const host = makeHost(async () => []);
+    try {
+      await launchLogsWithMethod(host, makeDevice(), "web-serial");
+      expect(toast.error).toHaveBeenCalledWith("serial.port_in_use", expect.anything());
+      expect(launch.attachSerialLogStream).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("hands the Pico reset hook to the passive session", async () => {
     const restore = withWebSerial(true);
     const port = {

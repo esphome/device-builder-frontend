@@ -8,6 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
@@ -150,6 +151,7 @@ async function acquirePort(
     await port.close().catch(() => {});
   }
   let weOpened = false;
+  let failure: unknown = null;
   const live = await openLiveSerialPort(port, {
     baudRate: IMPROV_BAUD_RATE,
     bufferSize: IMPROV_BUFFER_SIZE,
@@ -157,9 +159,15 @@ async function acquirePort(
     onOpened: () => {
       weOpened = true;
     },
+    onFailed: (err) => {
+      failure = err;
+    },
   });
   if (!live) {
-    toast.error(localize("web.improv.open_failed"));
+    // Right after a reset a NetworkError can be the board re-enumerating, so
+    // only a manual open reads it as another tab or program holding the port.
+    const fallback = localize("web.improv.open_failed");
+    toast.error(afterReset ? fallback : openFailureMessage(failure, localize, fallback));
     return null;
   }
   // openLiveSerialPort only screens readable.locked; a handle it found open

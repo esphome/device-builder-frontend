@@ -14,6 +14,7 @@ import {
   flashFirmware,
   resetAndDisconnect,
 } from "../../../platforms/esp/index.js";
+import { isPortInUse } from "../../../util/serial-open-error.js";
 import type { FlashPart } from "./firmware-build.js";
 
 export type FlashStep =
@@ -30,6 +31,8 @@ export interface FlashMessages {
    * "hold the BOOT button" hint (a bare S2/S3/C3 module needs it).
    */
   connectFailed?: string;
+  /** Shown instead, with the error's text, when another tab or program likely holds the port. */
+  portInUse?: (error: string) => string;
   /** Shown when the plan yields no parts to write. */
   noFirmware?: string;
 }
@@ -78,12 +81,16 @@ export async function runFlash(
     detected = await connectToPort(port, hooks.onLog);
   } catch (err) {
     // The port is already authorized (connectToPort never shows a picker), so a
-    // failure here is the chip handshake — surface the hold-BOOT hint if the
-    // caller gave us one, and keep the raw error in the console for debugging.
+    // failure here is another tab or program holding the port, or the chip
+    // handshake — surface the hold-BOOT hint for the latter if the caller gave
+    // us one, and keep the raw error in the console for debugging.
     console.error(err);
     hooks.onStep("error");
+    const error = err instanceof Error ? err.message : String(err);
     hooks.onError(
-      plan.messages?.connectFailed ?? (err instanceof Error ? err.message : String(err))
+      (isPortInUse(err) ? plan.messages?.portInUse?.(error) : undefined) ??
+        plan.messages?.connectFailed ??
+        error
     );
     return false;
   }

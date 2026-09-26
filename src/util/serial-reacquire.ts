@@ -182,7 +182,8 @@ export async function reacquirePort(
  *
  * ``onOpened`` fires only when this call performed the ``open()``; a
  * candidate found already open belongs to whoever opened it, so a caller
- * that closes on teardown can tell the two apart.
+ * that closes on teardown can tell the two apart. ``onFailed`` gets the last
+ * error when it gives up at the deadline, so the caller can say why.
  */
 export async function openLiveSerialPort(
   cachedPort: SerialPort,
@@ -192,6 +193,7 @@ export async function openLiveSerialPort(
     timeoutMs?: number;
     cancelled?: () => boolean;
     onOpened?: (port: SerialPort) => void;
+    onFailed?: (err: unknown) => void;
   }
 ): Promise<SerialPort | null> {
   const {
@@ -200,6 +202,7 @@ export async function openLiveSerialPort(
     timeoutMs = SERIAL_REOPEN_TIMEOUT_MS,
     cancelled = () => false,
     onOpened,
+    onFailed,
   } = options;
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
@@ -253,6 +256,7 @@ export async function openLiveSerialPort(
     }
     if (Date.now() >= deadline) {
       console.error("[Web Serial] Failed to reopen port:", lastErr);
+      onFailed?.(lastErr);
       return null;
     }
     // Re-check before the inter-round sleep so a teardown that landed

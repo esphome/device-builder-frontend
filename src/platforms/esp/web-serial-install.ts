@@ -13,6 +13,7 @@ import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 import {
   detectChip,
@@ -82,7 +83,10 @@ export async function startWebSerialInstall(
     }
     // The picker succeeded but the chip never answered — fail loud with
     // the esptool log expanded instead of silently closing (#1414).
-    host._fail(host._localize("serial.connect_failed"), getErrorMessage(err));
+    host._fail(
+      openFailureMessage(err, host._localize, host._localize("serial.connect_failed")),
+      getErrorMessage(err)
+    );
     return;
   }
   host._detected = detected;

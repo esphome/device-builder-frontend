@@ -154,3 +154,21 @@ describe("connectToPort failure log", () => {
     expect(detected.loader.debug).toBe(ESPLoader.prototype.debug);
   });
 });
+
+describe("connectToPort leftover handle", () => {
+  it("closes a handle an earlier action left open before connecting", async () => {
+    state.main = async () => "ESP32";
+    const close = vi.fn(async () => {});
+    const port = { readable: { locked: false }, close } as unknown as SerialPort;
+    await connectToPort(port);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("leaves a handle another action is reading", async () => {
+    state.main = async () => "ESP32";
+    const close = vi.fn(async () => {});
+    const port = { readable: { locked: true }, close } as unknown as SerialPort;
+    await connectToPort(port);
+    expect(close).not.toHaveBeenCalled();
+  });
+});

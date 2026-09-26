@@ -273,6 +273,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         filesCallback: async () => parts,
         messages: {
           connectFailed: this._localize("web.install.connect_failed_hint"),
+          portInUse: (error) => this._localize("serial.port_in_use", { error }),
           noFirmware: this._localize("web.install.no_firmware"),
         },
       },

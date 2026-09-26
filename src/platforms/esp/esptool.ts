@@ -111,6 +111,9 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
  * browser picker) and follow-on reconnects (install-flow's resume
  * after compile, the connect-event fast-path that skips the picker).
  *
+ * Every caller passes a port it expects closed, so a handle still open here
+ * is a leftover and is closed first.
+ *
  * On ``loader.main()`` failure, tries ``transport.disconnect()`` first
  * and falls back to ``port.close()`` so we never leak an open port —
  * a still-open port silently breaks the next ``port.open()`` call.
@@ -120,6 +123,10 @@ export async function connectToPort(
   onLog?: LogCallback
 ): Promise<DetectedChip> {
   markSerialActivity();
+  // A handle an earlier action left open (Improv's close losing to the SDK's
+  // reader release) would make esptool-js's open() throw "already open".
+  // A locked one is another action mid-read; leave it to fail as busy.
+  if (port.readable && !port.readable.locked) await port.close().catch(() => {});
   const transport = new Transport(port, false);
 
   const loader = new ESPLoader({

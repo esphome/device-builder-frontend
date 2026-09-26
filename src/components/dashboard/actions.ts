@@ -22,6 +22,7 @@ import {
   notifySuccess,
 } from "../../util/notify.js";
 import { type SerialLineHooks, streamSerialLines } from "../../util/serial-log-stream.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
@@ -387,9 +388,13 @@ export async function detectAndOpenWizard(
       notifyError(
         err instanceof UnsupportedChipError
           ? options.localize("serial.unsupported_chip", { chip: err.chipName })
-          : options.localize("dashboard.serial_connect_failed", {
-              error: getErrorMessage(err),
-            })
+          : openFailureMessage(
+              err,
+              options.localize,
+              options.localize("dashboard.serial_connect_failed", {
+                error: getErrorMessage(err),
+              })
+            )
       );
     }
     createDialog.open("board");

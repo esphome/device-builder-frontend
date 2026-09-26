@@ -159,9 +159,14 @@ describe("openLiveSerialPort", () => {
       }),
     });
     stubGetPorts(async () => []);
+    const onFailed = vi.fn();
 
-    expect(await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1 })).toBe(
-      null
+    expect(
+      await openLiveSerialPort(cached, { baudRate: 115200, timeoutMs: 1, onFailed })
+    ).toBe(null);
+    // The caller gets the last error, so it can say why the open failed.
+    expect(onFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "NetworkError" })
     );
   });
 

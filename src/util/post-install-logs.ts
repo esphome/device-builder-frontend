@@ -14,6 +14,7 @@ import { notifyError, notifyInfo } from "./notify.js";
 import type { PostInstallShowLogsDetail } from "./post-install-dispatch.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { releaseControlLines } from "./serial-control-lines.js";
+import { openFailureMessage } from "./serial-open-error.js";
 import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { requestSerialPort } from "./web-serial.js";
 
@@ -118,12 +119,8 @@ export async function reconnectWebSerialLogs(
   }
   try {
     await openPortForLogs(port, baudRate, targetPlatform);
-  } catch {
-    failSerialOpen(
-      logsDialog,
-      localize("dashboard.logs_web_serial_open_failed"),
-      cancelled
-    );
+  } catch (err) {
+    failSerialOpen(logsDialog, openFailureMessage(err, localize), cancelled);
     return;
   }
   await attachSerialLogStream(

@@ -245,4 +245,20 @@ describe("runFlash", () => {
     await runFlash(port, { filesCallback }, makeHooks());
     expect(filesCallback).toHaveBeenCalledWith("ESP32-C3 (rev 3)");
   });
+
+  it("says the port is in use instead of the BOOT hint on a NetworkError", async () => {
+    vi.mocked(connectToPort).mockRejectedValue(
+      new DOMException("Failed to open serial port.", "NetworkError")
+    );
+    const hooks = makeHooks();
+    await runFlash(
+      port,
+      {
+        filesCallback: async () => [],
+        messages: { connectFailed: "hold BOOT", portInUse: (e) => `in use: ${e}` },
+      },
+      hooks
+    );
+    expect(hooks.errors).toEqual(["in use: Failed to open serial port."]);
+  });
 });

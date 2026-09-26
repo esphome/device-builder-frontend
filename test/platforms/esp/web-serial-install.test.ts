@@ -184,6 +184,20 @@ describe("Web Serial install — HTTP byte download", () => {
     );
   });
 
+  it("says the port may be in use when the open fails with NetworkError", async () => {
+    const { host } = makeHost();
+    esptool.detectChip.mockRejectedValueOnce(
+      new DOMException("Failed to open serial port.", "NetworkError")
+    );
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith(
+      "serial.port_in_use",
+      "Failed to open serial port."
+    );
+  });
+
   it("fails cleanly when the HTTP byte fetch errors", async () => {
     const { host, api } = makeHost();
     esptool.detectChip.mockResolvedValue(CHIP);

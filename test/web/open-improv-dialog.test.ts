@@ -368,4 +368,28 @@ describe("openImprovDialog", () => {
     expect(toast.error).toHaveBeenCalledOnce();
     expect(dialogEl()).toBeNull();
   });
+
+  it("says the port is in use when a manual open fails with NetworkError", async () => {
+    const port = makePort();
+    openLiveSerialPort.mockImplementation(
+      async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
+        opts.onFailed?.(new DOMException("Failed to open serial port.", "NetworkError"));
+        return null;
+      }
+    );
+    await openImprovDialog(port as unknown as SerialPort, localize);
+    expect(toast.error).toHaveBeenCalledWith("serial.port_in_use");
+  });
+
+  it("keeps the restart copy when the open after a reset fails with NetworkError", async () => {
+    const port = makePort();
+    openLiveSerialPort.mockImplementation(
+      async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
+        opts.onFailed?.(new DOMException("Failed to open serial port.", "NetworkError"));
+        return null;
+      }
+    );
+    await openImprovDialog(port as unknown as SerialPort, localize, { afterReset: true });
+    expect(toast.error).toHaveBeenCalledWith("web.improv.open_failed");
+  });
 });

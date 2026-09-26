@@ -2,6 +2,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { LOG_BAUD_RATE, LOG_BUFFER_SIZE } from "./serial-source.js";
 
 /** Per-board line handling for a logs open. */
@@ -41,9 +42,13 @@ export async function openPortForLogs(
       return true;
     }
     toast.error(
-      localize("web.logs.open_failed", {
-        error: err instanceof Error ? err.message : String(err),
-      })
+      openFailureMessage(
+        err,
+        localize,
+        localize("web.logs.open_failed", {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
     );
     return false;
   }
