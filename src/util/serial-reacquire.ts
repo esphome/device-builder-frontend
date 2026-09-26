@@ -73,26 +73,41 @@ export function portOfSerialConnectEvent(event: Event): SerialPort | null {
 }
 
 /**
- * Per-port "already told the user" memory for the connect toasts. A
+ * The device behind a port, as a map key. Chrome hands out a fresh
+ * ``SerialPort`` object when a device re-enumerates, so the object is no
+ * key. Ports without USB ids (Bluetooth RFCOMM, for one) get none, as in
+ * ``matchesDevice``: two of them would otherwise read as the same device.
+ * Web Serial exposes no per-device serial, so two identical boards share a
+ * key; each caller says what that costs it.
+ */
+export function serialDeviceKey(port: SerialPort): string | null {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  if (usbVendorId === undefined || usbProductId === undefined) return null;
+  return `${usbVendorId}:${usbProductId}`;
+}
+
+/**
+ * Per-device "already told the user" memory for the connect toasts. A
  * bare-flash board can reboot-loop, re-enumerating every cycle; the same
- * port is announced once per window. ``SerialPort`` identity is stable
- * across re-enums, so the port itself is the key; stale entries are
- * evicted lazily, since ``navigator.serial`` holds every permitted port
- * for the page's lifetime anyway.
+ * device is announced once per window. Two identical boards share the
+ * window, and a port without USB ids is announced every time. Stale
+ * entries are evicted lazily; there is at most one per granted device.
  */
 export class SerialConnectAnnouncements {
-  private _lastMs = new Map<SerialPort, number>();
+  private _lastMs = new Map<string, number>();
 
   constructor(private readonly _windowMs = 60_000) {}
 
   /** Whether to announce *port* now; records it when so. */
   shouldAnnounce(port: SerialPort, now = Date.now()): boolean {
-    for (const [p, ts] of this._lastMs) {
-      if (now - ts >= this._windowMs) this._lastMs.delete(p);
+    const key = serialDeviceKey(port);
+    if (key === null) return true;
+    for (const [k, ts] of this._lastMs) {
+      if (now - ts >= this._windowMs) this._lastMs.delete(k);
     }
-    const last = this._lastMs.get(port);
+    const last = this._lastMs.get(key);
     if (last !== undefined && now - last < this._windowMs) return false;
-    this._lastMs.set(port, now);
+    this._lastMs.set(key, now);
     return true;
   }
 }

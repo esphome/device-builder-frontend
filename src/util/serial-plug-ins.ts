@@ -8,6 +8,7 @@
 import {
   isOwnSerialReenumeration,
   portOfSerialConnectEvent,
+  serialDeviceKey,
 } from "./serial-reacquire.js";
 
 /**
@@ -20,35 +21,21 @@ import {
 export const SERIAL_REENUMERATION_BLIP_MS = 1000;
 
 /**
- * The device behind a port, for matching its ``disconnect`` to the
- * ``connect`` that follows: Chrome hands out a fresh ``SerialPort`` object
- * when a device re-enumerates, so the object is no key. Ports without USB
- * ids (Bluetooth RFCOMM, for one) get none, as in ``matchesDevice``: two of
- * them would otherwise read as the same device. Web Serial exposes no
- * per-device serial, so two identical boards share a key: swapping one for
- * the other inside the blip reads as a bounce and costs one toast, which a
- * hand swap never manages in under a second.
- */
-function deviceKey(port: SerialPort): string | null {
-  const { usbVendorId, usbProductId } = port.getInfo();
-  if (usbVendorId === undefined || usbProductId === undefined) return null;
-  return `${usbVendorId}:${usbProductId}`;
-}
-
-/**
  * Report real plug-ins of already-permitted ports to *onPlugIn*. A
  * ``connect`` is dropped when it is our own reset re-enumerating the device
  * (``isOwnSerialReenumeration``) or when it follows the same device's own
  * ``disconnect`` within ``SERIAL_REENUMERATION_BLIP_MS``. Two identical
- * boards share a key, so each disconnect is kept and each connect consumes
- * one; the map holds at most one stamp per granted port. Returns the
- * function that stops watching.
+ * boards share a key (``serialDeviceKey``), so each disconnect is kept and
+ * each connect consumes one; swapping one for the other inside the blip
+ * reads as a bounce and costs one toast, which a hand swap never manages in
+ * under a second. The map holds at most one stamp per granted port. Returns
+ * the function that stops watching.
  */
 export function watchSerialPlugIns(onPlugIn: (port: SerialPort) => void): () => void {
   const disconnectedMs = new Map<string, number[]>();
   const onDisconnect = (event: Event): void => {
     const port = portOfSerialConnectEvent(event);
-    const key = port && deviceKey(port);
+    const key = port && serialDeviceKey(port);
     if (!key) return;
     const stamps = disconnectedMs.get(key) ?? [];
     stamps.push(Date.now());
@@ -60,7 +47,7 @@ export function watchSerialPlugIns(onPlugIn: (port: SerialPort) => void): () => 
     // Only disconnects inside the blip count; a stale one (a twin unplugged
     // for good) must not stand in for this connect. The first connect after
     // a disconnect consumes it on every path.
-    const key = deviceKey(port);
+    const key = serialDeviceKey(port);
     const now = Date.now();
     const recent = key
       ? (disconnectedMs.get(key) ?? []).filter(
