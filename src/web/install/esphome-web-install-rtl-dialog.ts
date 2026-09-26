@@ -66,13 +66,10 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     if (changed.has("open") && !this.open) this._reset();
   }
 
+  // Only a write in progress holds the dialog open. While the engine resets
+  // the board or waits for the strap, closing aborts it and releases the port.
   private get _busy(): boolean {
-    return (
-      this._pending ||
-      this._state === "connecting" ||
-      this._state === "waiting" ||
-      this._state === "flashing"
-    );
+    return this._pending || this._state === "flashing";
   }
 
   private _reset(): void {

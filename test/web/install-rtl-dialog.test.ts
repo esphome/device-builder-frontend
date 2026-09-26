@@ -99,6 +99,8 @@ describe("esphome-web-install-rtl-dialog", () => {
     );
     expect(card(el).state).toBeNull();
     expect(text(el)).toContain("firmware.rtl_guide_link");
+    // Giving up is allowed while waiting: the close aborts the engine.
+    expect(el._busy).toBe(false);
     strapped();
     await pending;
     await el.updateComplete;
