@@ -40,15 +40,15 @@ The new-issue chooser on this repo only surfaces redirect links — there's no w
 
 ## Contributing — keep it simple
 
-ESPHome is already a lot to take in for someone setting up their first device. The dashboard's job is to make that easier, not to add to it, so we keep the UI small and opinionated and we say no to complexity that only some users want.
+ESPHome is already a lot to take in for someone setting up their first device. The dashboard's job is to make that easier, not to add to it, so we keep the UI small and opinionated. We do not add flags, preferences or toggles to gate behaviour without a very strong justification and sign-off from the maintainers.
 
 What that means for a PR:
 
-- **We will most likely reject a PR that adds a flag, preference, toggle, or setting to switch a behaviour on or off.** Every switch is one more thing a new user has to understand, one more state the code has to handle, and one more combination nobody tests. If a behaviour is worth having, it is worth having for everyone; pick the one behaviour that serves the most people and ship that.
+- **Expect a PR that adds a flag, preference, toggle, or setting to be rejected unless it was agreed with a maintainer first.** Every switch is one more thing a new user has to understand, one more state the code has to handle, and one more combination nobody tests. If a behaviour is worth having, it is worth having for everyone; pick the one behaviour that serves the most people and ship that.
 - "Off by default so it doesn't affect anyone" is not a reason to add a switch. It hides the feature from the users it was built for and still adds the complexity.
 - Expert mode is not a catch-all home for extra switches. It exists for the few controls that are unsafe or confusing to show a beginner (the version history off switch is the model), not for personal preferences. A PR that reaches for expert mode to justify a new toggle is still unlikely to be accepted.
 - Before adding a setting, ask whether the feature can simply be the default, or whether the UI can work out the right thing from context (device state, platform, what is paired). Most of the time it can.
-- If you think a switch really is unavoidable, make the case in a discussion or on the backlog before writing the code. The discussion is cheap; a PR that gets closed is not.
+- If you think a switch really is unavoidable, make the case in a discussion or on the backlog and get a maintainer's sign-off before writing the code. The discussion is cheap; a PR that gets closed is not.
 
 The same goes for options in dialogs, extra buttons in menus, and "advanced" sections: fewer, clearer choices beat more of them.
 

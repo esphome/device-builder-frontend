@@ -84,10 +84,13 @@ Product policy set by the maintainers; the full text is in
 [README.md → "Contributing — keep it
 simple"](README.md#contributing--keep-it-simple). ESPHome is
 already hard enough to onboard into, and the dashboard must not
-add to that. Practical consequences:
+add to that, so flags, preferences and toggles that gate
+behaviour need a very strong justification and maintainer
+sign-off. Practical consequences:
 
 - **Don't add a preference, toggle, or setting to gate a new
-  behaviour.** A PR that does will most likely be rejected. Pick
+  behaviour** unless a maintainer has signed off on it. A PR
+  that adds one on its own will most likely be rejected. Pick
   the one behaviour that serves the most users and make it the
   default; there is no "opt in" tier.
 - **"Default off" is not a mitigation.** It hides the feature
@@ -103,8 +106,8 @@ add to that. Practical consequences:
   instead of asking the user to set it.
 - **If a change seems to need a switch, stop and say so** in the
   PR or discussion before building it. That is a maintainer
-  decision, and the usual answer is to drop the switch and ship
-  one behaviour.
+  decision that needs a very strong justification, and the usual
+  answer is to drop the switch and ship one behaviour.
 
 The "Settings dialog conventions" section below describes how a
 setting is wired once a maintainer has agreed one is needed. It
@@ -332,7 +335,8 @@ the backend's `flasher/src/protocol.ts`, and don't set a
 
 - **Don't add backwards-compatibility shims for older backends**
   (see top of file).
-- **Don't add flags, preferences, or toggles to gate behaviour**,
+- **Don't add flags, preferences, or toggles to gate behaviour**
+  without a very strong justification and maintainer sign-off,
   in expert mode or otherwise (see "Keep the UI simple: no new
   flags"). Such PRs are most likely rejected.
 - **Don't add `Co-Authored-By: Claude` to commits.**
