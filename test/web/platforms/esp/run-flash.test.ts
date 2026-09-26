@@ -16,10 +16,12 @@ import {
   flashFirmware,
   resetAndDisconnect,
 } from "../../../../src/platforms/esp/esptool.js";
+import { markOpenFailure } from "../../../../src/util/serial-open-error.js";
 import { isPortPickerCancel } from "../../../../src/util/web-serial.js";
 import {
   type FlashHooks,
   runFlash,
+  webFlashMessages,
 } from "../../../../src/web/platforms/esp/run-flash.js";
 
 const port = {} as SerialPort;
@@ -247,18 +249,32 @@ describe("runFlash", () => {
   });
 
   it("says the port is in use instead of the BOOT hint on a NetworkError", async () => {
-    vi.mocked(connectToPort).mockRejectedValue(
-      new DOMException("Failed to open serial port.", "NetworkError")
-    );
+    const inUse = new DOMException("Failed to open serial port.", "NetworkError");
+    markOpenFailure(inUse);
+    vi.mocked(connectToPort).mockRejectedValue(inUse);
     const hooks = makeHooks();
     await runFlash(
       port,
       {
         filesCallback: async () => [],
-        messages: { connectFailed: "hold BOOT", portInUse: () => "in use" },
+        messages: webFlashMessages((k) => k),
       },
       hooks
     );
-    expect(hooks.errors).toEqual(["in use"]);
+    expect(hooks.errors).toEqual(["serial.port_in_use"]);
+  });
+
+  it("keeps the BOOT hint for a NetworkError later in the handshake", async () => {
+    // A device dropping mid-read throws NetworkError too, but not from open().
+    vi.mocked(connectToPort).mockRejectedValue(
+      new DOMException("The device has been lost.", "NetworkError")
+    );
+    const hooks = makeHooks();
+    await runFlash(
+      port,
+      { filesCallback: async () => [], messages: webFlashMessages((k) => k) },
+      hooks
+    );
+    expect(hooks.errors).toEqual(["web.install.connect_failed_hint"]);
   });
 });

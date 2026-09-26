@@ -14,7 +14,7 @@ import { notifyError, notifyInfo } from "./notify.js";
 import type { PostInstallShowLogsDetail } from "./post-install-dispatch.js";
 import { serialConsoleMismatch } from "./serial-console-match.js";
 import { releaseControlLines } from "./serial-control-lines.js";
-import { openFailureMessage } from "./serial-open-error.js";
+import { openFailureMessage, openSerialPort } from "./serial-open-error.js";
 import { openLiveSerialPort, SERIAL_REOPEN_TIMEOUT_MS } from "./serial-reacquire.js";
 import { requestSerialPort } from "./web-serial.js";
 
@@ -139,7 +139,7 @@ export async function openPortForLogs(
   baudRate: number,
   targetPlatform: string | null | undefined
 ): Promise<void> {
-  await port.open({ baudRate });
+  await openSerialPort(port, { baudRate });
   if (platformFor(targetPlatform)?.logs?.serial?.releasesLinesAfterOpen) {
     await releaseControlLines(port);
   }

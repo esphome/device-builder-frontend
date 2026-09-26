@@ -8,6 +8,7 @@
  * retry loops. Everything here is re-exported from ``web-serial.ts`` so
  * existing import paths keep working.
  */
+import { openSerialPort } from "./serial-open-error.js";
 import { sleep } from "./sleep.js";
 
 /**
@@ -232,7 +233,7 @@ export async function openLiveSerialPort(
         return p; // already open (a reset race left it usable)
       }
       try {
-        await p.open(bufferSize ? { baudRate, bufferSize } : { baudRate });
+        await openSerialPort(p, bufferSize ? { baudRate, bufferSize } : { baudRate });
         onOpened?.(p);
         return p;
       } catch (err) {

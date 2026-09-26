@@ -5,6 +5,7 @@
 import { ESPLoader, Transport } from "esptool-js";
 
 import { getErrorMessage } from "../../util/error-message.js";
+import { markOpenFailure } from "../../util/serial-open-error.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
@@ -138,6 +139,17 @@ export async function connectToPort(
     );
   }
   const transport = new Transport(port, false);
+  // Mark esptool-js's open() failure so it can be told apart from a
+  // NetworkError later in the handshake (the device dropping mid-read).
+  const connect = transport.connect.bind(transport);
+  transport.connect = async (...args) => {
+    try {
+      return await connect(...args);
+    } catch (err) {
+      markOpenFailure(err);
+      throw err;
+    }
+  };
 
   const loader = new ESPLoader({
     transport,

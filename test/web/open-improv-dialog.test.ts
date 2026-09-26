@@ -14,6 +14,8 @@ vi.mock("../../src/util/serial-reacquire.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
+
+import { markOpenFailure } from "../../src/util/serial-open-error.js";
 import {
   isImprovInProgress,
   openImprovDialog,
@@ -385,14 +387,18 @@ describe("openImprovDialog", () => {
     expect(dialogEl()).toBeNull();
   });
 
-  // Right after a reset a NetworkError can be the board re-enumerating.
+  // A manual open says why it failed; right after a reset a NetworkError can
+  // be the board re-enumerating, so that keeps the restart advice.
   it.each([
-    [false, "serial.port_in_use"],
-    [true, "web.improv.open_failed"],
-  ])("a NetworkError open with afterReset %s toasts %s", async (afterReset, key) => {
+    [false, "NetworkError", "serial.port_in_use"],
+    [false, "SecurityError", "serial.open_failed"],
+    [true, "NetworkError", "web.improv.open_failed"],
+  ])("afterReset %s with a %s open toasts %s", async (afterReset, name, key) => {
+    const err = new DOMException("Failed to open serial port.", name);
+    markOpenFailure(err);
     openLiveSerialPort.mockImplementation(
       async (_p: SerialPort, opts: { onFailed?: (err: unknown) => void }) => {
-        opts.onFailed?.(new DOMException("Failed to open serial port.", "NetworkError"));
+        opts.onFailed?.(err);
         return null;
       }
     );

@@ -2,7 +2,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
-import { openFailureMessage } from "../../util/serial-open-error.js";
+import { openFailureMessage, openSerialPort } from "../../util/serial-open-error.js";
 import { LOG_BAUD_RATE, LOG_BUFFER_SIZE } from "./serial-source.js";
 
 /** Per-board line handling for a logs open. */
@@ -24,7 +24,7 @@ export async function openPortForLogs(
   options: LogsOpenOptions = {}
 ): Promise<boolean> {
   try {
-    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
+    await openSerialPort(port, { baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
     // Chromium asserts DTR and RTS on open; on the RTL8720C kits those are
     // the download strap and the reset, so drop them before the board boots.
     if (options.releaseLines) await releaseControlLines(port);

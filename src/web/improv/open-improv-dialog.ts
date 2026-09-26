@@ -8,7 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
-import { portInUseMessage } from "../../util/serial-open-error.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 
@@ -165,8 +165,9 @@ async function acquirePort(
     onFailed: afterReset ? undefined : (err) => (failure = err),
   });
   if (!live) {
+    // A manual open says why it failed; after a reset keep the restart advice.
     toast.error(
-      portInUseMessage(failure, localize) ?? localize("web.improv.open_failed")
+      failure ? openFailureMessage(failure, localize) : localize("web.improv.open_failed")
     );
     return null;
   }
