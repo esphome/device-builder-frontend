@@ -208,11 +208,16 @@ export async function connectToPort(
  * the one to show.
  */
 async function releasePort(transport: Transport): Promise<void> {
+  // Once this attempt has given up, the port may belong to a later one; a
+  // disconnect that finally fails then must not close it out from under it.
+  let abandoned = false;
   const release = transport.disconnect().catch(async (err: unknown) => {
+    if (abandoned) return;
     console.warn("[esptool] Disconnect failed, closing the port directly:", err);
     await transport.device.close().catch(() => {});
   });
   if (!(await settledWithin(release, RELEASE_DEADLINE_MS))) {
+    abandoned = true;
     console.warn(
       `[esptool] Could not release the port in ${RELEASE_DEADLINE_MS} ms; it stays held until the device is unplugged`
     );

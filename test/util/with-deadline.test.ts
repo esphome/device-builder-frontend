@@ -59,4 +59,9 @@ describe("settledWithin", () => {
     await vi.advanceTimersByTimeAsync(1000);
     await expect(result).resolves.toBe(false);
   });
+
+  it("clears its timer once the work settles", async () => {
+    await settledWithin(Promise.resolve(), 1000);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

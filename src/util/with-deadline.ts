@@ -1,5 +1,3 @@
-import { sleep } from "./sleep.js";
-
 /**
  * ``work``, or ``timeout()``'s error once ``ms`` have passed without it
  * settling. The work itself keeps running, abandoned: its late rejection is
@@ -24,11 +22,13 @@ export function withDeadline<T>(
  * caller can only warn about; the work keeps running past the deadline.
  */
 export function settledWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
-  return Promise.race([
-    work.then(
-      () => true,
-      () => true
-    ),
-    sleep(ms).then(() => false),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  const settled = work.then(
+    () => true,
+    () => true
+  );
+  return Promise.race([settled, deadline]).finally(() => clearTimeout(timer));
 }

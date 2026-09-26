@@ -57,6 +57,7 @@ const LONG_ENOUGH_MS = 120_000;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(port.close).mockClear();
   state.main = () => new Promise(() => {});
   state.disconnect = () => Promise.resolve();
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -127,5 +128,24 @@ describe("disconnect", () => {
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("Could not release the port")
     );
+  });
+
+  it("never closes the port for a release that fails after it gave up", async () => {
+    // By then the port may be a later attempt's; the fallback close stays out.
+    let failLate: (err: Error) => void = () => {};
+    state.disconnect = () => new Promise((_, reject) => (failLate = reject));
+    const transport = { disconnect: () => state.disconnect(), device: port };
+    const done = disconnect(transport as never);
+    await vi.advanceTimersByTimeAsync(LONG_ENOUGH_MS);
+    await done;
+    failLate(new Error("stream gone, eventually"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(port.close).not.toHaveBeenCalled();
+  });
+
+  it("leaves no timer behind after a release that settles in time", async () => {
+    const transport = { disconnect: () => state.disconnect(), device: port };
+    await disconnect(transport as never);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
