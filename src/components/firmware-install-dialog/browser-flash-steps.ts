@@ -74,6 +74,8 @@ export interface TouchStep {
   showNext: () => void;
   /** The failure detail; a flasher may add a hint for a failed touch. */
   failureDetail?: (err: unknown) => string;
+  /** The port the touch went through (closed), for a flow that wants it back later. */
+  onTouched?: (port: SerialPort) => void;
 }
 
 /**
@@ -102,6 +104,7 @@ export async function touchIntoBootloaderStep(
     // an install that no longer exists.
     if (!stillCurrent()) return;
     await resetToBootloader(port, installLog(host, stillCurrent));
+    step.onTouched?.(port);
   } catch (err) {
     if (stillCurrent()) {
       host._fail(

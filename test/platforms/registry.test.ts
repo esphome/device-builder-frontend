@@ -74,25 +74,44 @@ describe("PLATFORMS", () => {
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release only on RTL8720C kits,
-  // the Pico's own reset, and Bluetooth only on nRF52.
+  // DTR held up and its own reset for the Pico, and Bluetooth only on nRF52.
   it.each([
     [
       "nrf52",
-      { pulseResets: false, releasesLinesAfterOpen: false, reset: false, ble: true },
+      {
+        pulseResets: false,
+        releasesLinesAfterOpen: false,
+        needsDtr: false,
+        reset: false,
+        ble: true,
+      },
     ],
     [
       "rp2",
-      { pulseResets: false, releasesLinesAfterOpen: false, reset: true, ble: false },
+      {
+        pulseResets: false,
+        releasesLinesAfterOpen: false,
+        needsDtr: true,
+        reset: true,
+        ble: false,
+      },
     ],
     [
       "rtl87xx",
-      { pulseResets: true, releasesLinesAfterOpen: true, reset: false, ble: false },
+      {
+        pulseResets: true,
+        releasesLinesAfterOpen: true,
+        needsDtr: false,
+        reset: false,
+        ble: false,
+      },
     ],
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
     expect({
       pulseResets: logs?.serial?.pulseResets,
       releasesLinesAfterOpen: logs?.serial?.releasesLinesAfterOpen,
+      needsDtr: logs?.serial?.needsDtr ?? false,
       reset: logs?.serial?.reset !== undefined,
       ble: logs?.ble !== undefined,
     }).toEqual(expected);

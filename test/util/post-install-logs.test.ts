@@ -484,6 +484,31 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
 });
 
 describe("attachSerialLogStream reopen", () => {
+  it.each([
+    ["rp2", false],
+    ["esp32", true],
+  ])(
+    "on a %s reopen, drops DTR and RTS: %s (a Pico's CDC needs DTR up to transmit)",
+    async (targetPlatform, released) => {
+      const live = openPort();
+      const restore = withGetPorts(async () => [live]);
+      try {
+        await attachSerialLogStream(
+          deadPort(),
+          stubDialog() as never,
+          defaultLocalize,
+          115200,
+          () => false,
+          targetPlatform
+        );
+        if (released) expect(live.setSignals).toHaveBeenCalled();
+        else expect(live.setSignals).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+    }
+  );
+
   it("opens a fresh getPorts() handle when the cached one is dead (Chrome re-enum)", async () => {
     // The cached esptool handle won't reopen, but getPorts() yields a live one
     // for the same device — the auto path must recover with no picker.

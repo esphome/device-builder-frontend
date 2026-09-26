@@ -263,7 +263,8 @@ export async function attachSerialLogStream(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
   baudRate: number,
-  cancelled: () => boolean = () => false
+  cancelled: () => boolean = () => false,
+  targetPlatform?: string | null
 ): Promise<void> {
   if (!port.readable) {
     const live = await openLiveSerialPort(port, {
@@ -276,7 +277,11 @@ export async function attachSerialLogStream(
       return;
     }
     port = live;
-    await releaseControlLines(port);
+    // Drop the lines the reopen asserted, unless the board's CDC needs DTR
+    // up to transmit at all (a Pico).
+    if (!platformFor(targetPlatform)?.logs?.serial?.needsDtr) {
+      await releaseControlLines(port);
+    }
   }
   if (cancelled()) {
     // The session moved on while the port was reopened; nothing will read it.
@@ -345,7 +350,14 @@ export async function handlePostInstallShowLogs(
     /* The install just left the port closed via ``resetAndDisconnect``;
        the attach reopens the still-granted port (retrying the native-USB
        re-enumeration window) and starts reading. */
-    await attachSerialLogStream(webSerialPort, logsDialog, localize, baudRate, cancelled);
+    await attachSerialLogStream(
+      webSerialPort,
+      logsDialog,
+      localize,
+      baudRate,
+      cancelled,
+      targetPlatform
+    );
   } else {
     logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }

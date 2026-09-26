@@ -1,25 +1,16 @@
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { isRp2CdcPort, RASPBERRY_PI_USB_VID } from "../../../platforms/rp2/index.js";
+import { RP2_SERIAL_PICK } from "../../../platforms/rp2/index.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { PortNotAcceptedError, requestSerialPort } from "../../../util/web-serial.js";
 
 /**
- * Web Serial port filters for a Raspberry Pi Pico running ESPHome: any
- * Raspberry Pi USB device, the same boards the site's Pico detection claims.
- * A filter can't exclude a product id, so the picker also lists Raspberry Pi
- * debug probes; pass ``isRp2CdcPort`` as the pick's ``accept`` to turn them away.
+ * The Pico's pick (``RP2_SERIAL_PICK``, shared with the Device Builder): any
+ * Raspberry Pi USB device in the picker, with a debug probe turned away after
+ * the pick. Spread into ``touchIntoBootloader``; ``pickPicoPort`` uses it too.
  */
-export const picoPortFilters: SerialPortRequestOptions["filters"] = [
-  { usbVendorId: RASPBERRY_PI_USB_VID },
-];
-
-/**
- * The Pico's pick: the filters above plus the check that turns a debug probe
- * away. Spread into ``touchIntoBootloader``; ``pickPicoPort`` uses it too.
- */
-export const PICO_PICK = { filters: picoPortFilters, accept: isRp2CdcPort };
+export const PICO_PICK = RP2_SERIAL_PICK;
 
 /** Toasted when the pick turned out to be a debug probe. */
 export const PROBE_PICKED_KEY = "web.pico.probe_picked";

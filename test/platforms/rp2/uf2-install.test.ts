@@ -10,10 +10,14 @@ const mocks = vi.hoisted(() => ({
   picobootOpen: vi.fn(),
   flashUf2: vi.fn<typeof FlashUf2>(),
   downloadSelectedBinary: vi.fn(),
+  finishWithLogsPort: vi.fn(),
+  notifyError: vi.fn(),
 }));
-vi.mock("../../../src/util/web-serial.js", () => ({
+vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
+vi.mock("../../../src/util/notify.js", () => ({ notifyError: mocks.notifyError }));
 vi.mock("../../../src/util/serial-bootloader-touch.js", () => ({
   resetToBootloader: mocks.resetToBootloader,
 }));
@@ -30,6 +34,7 @@ vi.mock(
   async (importOriginal) => ({
     ...(await importOriginal<object>()),
     downloadSelectedBinary: mocks.downloadSelectedBinary,
+    finishWithLogsPort: mocks.finishWithLogsPort,
   })
 );
 
@@ -44,11 +49,13 @@ import {
   rp2Uf2Install,
   startRp2Uf2Install,
 } from "../../../src/platforms/rp2/uf2-install.js";
+import { RP2_SERIAL_PICK } from "../../../src/platforms/rp2/web-usb.js";
 import {
   UF2_FAMILY_RP2040,
   UF2_FAMILY_RP2350_ARM_S,
   type Uf2Image,
 } from "../../../src/util/uf2.js";
+import { PortNotAcceptedError } from "../../../src/util/web-serial.js";
 import {
   asHost,
   bin,
@@ -82,7 +89,9 @@ type Host = ReturnType<typeof makeHost>;
 
 function readyHost(): Host {
   const host = makeHost();
-  rp2Image.set(asHost(host), image);
+  // A fresh image per install, as a real parse gives: the touched port is
+  // recorded against it.
+  rp2Image.set(asHost(host), { ...image });
   host._binaries = [bin("firmware.uf2", "uf2")];
   // As showBootselStep leaves it.
   host._step = "rp2-bootsel";
@@ -334,5 +343,70 @@ describe("retry and download", () => {
     const host = readyHost();
     rp2DoDownload(asHost(host));
     expect(mocks.downloadSelectedBinary).toHaveBeenCalledWith(host, "firmware.uf2");
+  });
+});
+
+describe("logs after a Pico install", () => {
+  const bootsel = { vendorId: 0x2e8a, productId: 0x0003 };
+  const flashOk = () => {
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel);
+    mocks.picobootOpen.mockResolvedValue({ device: bootsel, close: vi.fn() });
+    mocks.flashUf2.mockResolvedValue(undefined);
+  };
+
+  it("hands the port the BOOTSEL touch went through to the logs", async () => {
+    const host = readyHost();
+    const cdc = {} as SerialPort;
+    mocks.requestSerialPort.mockResolvedValue(cdc);
+    mocks.resetToBootloader.mockResolvedValue(undefined);
+    await rp2DoReset(asHost(host));
+    flashOk();
+    await rp2DoFlash(asHost(host));
+    expect(mocks.finishWithLogsPort).toHaveBeenCalledWith(host, cdc);
+  });
+
+  it("ends on done without a port when nothing was touched (BOOTSEL by hand)", async () => {
+    const host = readyHost();
+    flashOk();
+    await rp2DoFlash(asHost(host));
+    expect(host._step).toBe("done");
+    expect(mocks.finishWithLogsPort).not.toHaveBeenCalled();
+  });
+
+  it("holds a port only where the WebUSB write runs", () => {
+    const had = "usb" in navigator;
+    Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+    expect(rp2Uf2Install.holdsPort).toBe(true);
+    Reflect.deleteProperty(navigator, "usb");
+    expect(rp2Uf2Install.holdsPort).toBe(false);
+    if (had) Object.defineProperty(navigator, "usb", { configurable: true, value: {} });
+  });
+
+  describe("pickLogsPort", () => {
+    const localize = (key: string) => key;
+
+    it("picks the Pico's own port through the shared Pico pick", async () => {
+      const cdc = {} as SerialPort;
+      mocks.requestSerialPort.mockResolvedValue(cdc);
+      expect(await rp2Uf2Install.pickLogsPort!(localize)).toBe(cdc);
+      expect(mocks.requestSerialPort).toHaveBeenCalledWith(
+        { filters: RP2_SERIAL_PICK.filters },
+        RP2_SERIAL_PICK.accept
+      );
+    });
+
+    it("turns a debug probe away with a toast", async () => {
+      mocks.requestSerialPort.mockRejectedValue(
+        new PortNotAcceptedError({} as SerialPort)
+      );
+      expect(await rp2Uf2Install.pickLogsPort!(localize)).toBeNull();
+      expect(mocks.notifyError).toHaveBeenCalledWith("firmware.rp2_not_a_pico");
+    });
+
+    it("stays quiet when the picker is dismissed", async () => {
+      mocks.requestSerialPort.mockResolvedValue(null);
+      expect(await rp2Uf2Install.pickLogsPort!(localize)).toBeNull();
+      expect(mocks.notifyError).not.toHaveBeenCalled();
+    });
   });
 });
