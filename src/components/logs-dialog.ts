@@ -25,7 +25,6 @@ import {
   devicesContext,
   localizeContext,
 } from "../context/index.js";
-import type { SerialResetHook } from "../platforms/platform-support.js";
 import { platformFor } from "../platforms/registry.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
@@ -42,6 +41,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
+import type { SerialResetHook } from "./logs-dialog/session.js";
 import {
   abortSerialReconnect,
   beginClose,
@@ -254,6 +254,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
     if (changedProperties.has("configuration") || changedProperties.has("_devices")) {
       this._targetPlatform = resolveDevicePlatform(this._devices, this.configuration);
+      // ESP (no descriptor) keeps the RTS pulse.
       this._pulseResets =
         platformFor(this._targetPlatform)?.logs?.serial?.pulseResets ?? true;
     }

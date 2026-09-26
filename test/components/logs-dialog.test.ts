@@ -17,10 +17,12 @@ import {
 
 import { flush } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
-import { startOtaStream } from "../../src/components/logs-dialog/session.js";
+import {
+  type SerialResetHook,
+  startOtaStream,
+} from "../../src/components/logs-dialog/session.js";
 import { hasSerialPort } from "../../src/components/logs-session.js";
 import { crashCalloutStyles } from "../../src/components/process-terminal/crash-callout.js";
-import type { SerialResetHook } from "../../src/platforms/platform-support.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface DeferredStop {

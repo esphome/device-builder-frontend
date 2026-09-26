@@ -7,8 +7,8 @@ import { platformFor } from "../platforms/registry.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
 import {
+  attachBleLogs,
   attachSerialLogStream,
-  logsSessionContext,
   openNetworkLogsFallback,
   openPortForLogs,
   reconnectWebSerialLogs,
@@ -176,17 +176,17 @@ export async function launchLogsWithMethod(
     // The firmware advertises the node name; the friendly name is a guess.
     const bleDevice = await ble.pick(host.localize, [device.name, device.friendly_name]);
     if (!bleDevice) return;
-    const ctx = logsSessionContext(host.logsDialog, host.localize);
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
     const cancelled = host.logsDialog.openPassive({
       source: "ble",
-      onReconnect: (cancelled) => ble.attach(ctx, bleDevice, cancelled),
+      onReconnect: (cancelled) =>
+        attachBleLogs(host.logsDialog, host.localize, ble, bleDevice, cancelled),
     });
     // attach reports its own failures; cover any other rejection so it can't
     // escape this fire-and-forget call as an unhandled rejection.
     try {
-      await ble.attach(ctx, bleDevice, cancelled);
+      await attachBleLogs(host.logsDialog, host.localize, ble, bleDevice, cancelled);
     } catch (err) {
       console.warn("BLE NUS attach failed", err);
       notifyError(host.localize("dashboard.logs_ble_nus_open_failed"));

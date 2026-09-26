@@ -5,11 +5,8 @@ import {
   streamSerialToDialog,
 } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import type {
-  LogsSessionContext,
-  SerialLogsContext,
-  SerialResetHook,
-} from "../platforms/platform-support.js";
+import type { SerialResetHook } from "../components/logs-dialog/session.js";
+import type { BleLogsSupport } from "../platforms/platform-support.js";
 import { platformFor } from "../platforms/registry.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
@@ -144,24 +141,10 @@ export async function openPortForLogs(
   }
 }
 
-/** What a platform's Bluetooth logs code may do to ``dialog``'s session. */
-export function logsSessionContext(
-  dialog: ESPHomeLogsDialog,
-  localize: LocalizeFunc
-): LogsSessionContext {
-  return {
-    localize,
-    lineHooks: dialogLineHooks(dialog),
-    end: (message) => dialog.setSerialOpenFailed(message),
-    fail: (message, cancelled) => failSerialOpen(dialog, message, cancelled),
-    setBleStream: (cancel) => dialog.setBleStream(cancel),
-  };
-}
-
 /**
  * The platform's own Reset Device for a Web Serial logs session, or
- * undefined where the dialog's RTS pulse applies (or the platform's reset
- * can't run in this browser, which hides the button).
+ * undefined where the dialog's RTS pulse applies or the platform's reset
+ * can't run in this browser (which hides the button).
  */
 export function sessionResetHook(
   logsDialog: ESPHomeLogsDialog,
@@ -169,17 +152,66 @@ export function sessionResetHook(
   targetPlatform: string | null | undefined,
   baudRate: number
 ): SerialResetHook | undefined {
-  const resetHook = platformFor(targetPlatform)?.logs?.serial?.resetHook;
-  if (!resetHook) return undefined;
-  const ctx: SerialLogsContext = {
-    ...logsSessionContext(logsDialog, localize),
-    baudRate,
-    attach: (port, cancelled) =>
-      attachSerialLogStream(port, logsDialog, localize, baudRate, cancelled),
-    failReopen: (port, cancelled) =>
-      failPortReopen(logsDialog, localize, port, cancelled),
+  const support = platformFor(targetPlatform)?.logs?.serial?.reset;
+  if (!support?.available()) return undefined;
+  return {
+    supports: (port) => support.supports(port),
+    run: async (port, cancelled) => {
+      let live: SerialPort | null = null;
+      let failure: string | undefined;
+      try {
+        live = await support.reset(port, baudRate, cancelled);
+      } catch (err) {
+        console.warn("Reset Device failed", err);
+        failure = localize(support.failureKey(err));
+      }
+      if (failure) {
+        // A stranded device still gets its toast once the session moved on,
+        // but a newer session must not be flipped dead.
+        if (cancelled()) notifyError(failure);
+        else failSerialOpen(logsDialog, failure);
+      } else if (!live) {
+        failPortReopen(logsDialog, localize, port, cancelled);
+      } else {
+        await attachSerialLogStream(live, logsDialog, localize, baudRate, cancelled);
+      }
+    },
   };
-  return resetHook(ctx);
+}
+
+/**
+ * The Bluetooth twin of ``attachSerialLogStream``: a stream registered, or
+ * the session dead with the reason in the pane. A remote disconnect goes dead
+ * quietly (Start reconnects); a failed connect also toasts.
+ */
+export async function attachBleLogs(
+  dialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc,
+  ble: BleLogsSupport,
+  device: BluetoothDevice,
+  cancelled: () => boolean
+): Promise<void> {
+  let cancel: () => Promise<void>;
+  try {
+    cancel = await ble.connect(
+      device,
+      {
+        ...dialogLineHooks(dialog),
+        onDisconnect: () =>
+          dialog.setSerialOpenFailed(localize("dashboard.logs_ble_nus_disconnected")),
+      },
+      cancelled
+    );
+  } catch (err) {
+    console.warn("Bluetooth logs connect failed", err);
+    failSerialOpen(dialog, localize(ble.failureKey(err)), cancelled);
+    return;
+  }
+  if (cancelled()) {
+    void cancel();
+    return;
+  }
+  dialog.setBleStream(cancel);
 }
 
 /**

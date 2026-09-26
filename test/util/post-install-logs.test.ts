@@ -51,14 +51,14 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 
 import { defaultLocalize } from "../../src/common/localize.js";
 import { BleNusServiceNotFoundError } from "../../src/platforms/nrf52/ble-nus-stream.js";
-import { attachBleNusLogs } from "../../src/platforms/nrf52/dashboard-logs.js";
+import { nrf52Platform } from "../../src/platforms/nrf52/dashboard.js";
 import { PicoStrandedError } from "../../src/platforms/rp2/rp2-logs-reset.js";
 import type { PostInstallShowLogsDetail } from "../../src/util/post-install-dispatch.js";
 import {
+  attachBleLogs,
   attachSerialLogStream,
   formatSerialPortLabel,
   handlePostInstallShowLogs,
-  logsSessionContext,
   reconnectWebSerialLogs,
   sessionResetHook,
 } from "../../src/util/post-install-logs.js";
@@ -424,7 +424,8 @@ describe("the Pico's Reset Device hook, through sessionResetHook", () => {
   });
 });
 
-describe("attachBleNusLogs, through the logs session context", () => {
+describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
+  const nrfBle = nrf52Platform.logs!.ble!;
   const device = {} as BluetoothDevice;
   const bleDialog = () => ({ ...stubDialog(), setBleStream: vi.fn() });
 
@@ -432,11 +433,7 @@ describe("attachBleNusLogs, through the logs session context", () => {
     const dialog = bleDialog();
     const cancel = vi.fn(async () => {});
     bleStream.streamBleNus.mockResolvedValue(cancel);
-    await attachBleNusLogs(
-      logsSessionContext(dialog as never, defaultLocalize),
-      device,
-      () => false
-    );
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setBleStream).toHaveBeenCalledWith(cancel);
     expect(bleStream.streamBleNus).toHaveBeenCalledWith(
       device,
@@ -449,11 +446,7 @@ describe("attachBleNusLogs, through the logs session context", () => {
     const dialog = bleDialog();
     const cancel = vi.fn(async () => {});
     bleStream.streamBleNus.mockResolvedValue(cancel);
-    await attachBleNusLogs(
-      logsSessionContext(dialog as never, defaultLocalize),
-      device,
-      () => true
-    );
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => true);
     expect(cancel).toHaveBeenCalledOnce();
     expect(dialog.setBleStream).not.toHaveBeenCalled();
   });
@@ -461,11 +454,7 @@ describe("attachBleNusLogs, through the logs session context", () => {
   it("names the wrong device when the NUS service is missing", async () => {
     const dialog = bleDialog();
     bleStream.streamBleNus.mockRejectedValue(new BleNusServiceNotFoundError());
-    await attachBleNusLogs(
-      logsSessionContext(dialog as never, defaultLocalize),
-      device,
-      () => false
-    );
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     const message = defaultLocalize("dashboard.logs_ble_nus_service_not_found");
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(message);
     expect(toastError).toHaveBeenCalledWith(message, expect.anything());
@@ -474,11 +463,7 @@ describe("attachBleNusLogs, through the logs session context", () => {
   it("reports a failed connect", async () => {
     const dialog = bleDialog();
     bleStream.streamBleNus.mockRejectedValue(new DOMException("GATT", "NetworkError"));
-    await attachBleNusLogs(
-      logsSessionContext(dialog as never, defaultLocalize),
-      device,
-      () => false
-    );
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_ble_nus_open_failed")
     );
@@ -490,11 +475,7 @@ describe("attachBleNusLogs, through the logs session context", () => {
       hooks.onDisconnect?.();
       return async () => {};
     });
-    await attachBleNusLogs(
-      logsSessionContext(dialog as never, defaultLocalize),
-      device,
-      () => false
-    );
+    await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
     expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_ble_nus_disconnected")
     );

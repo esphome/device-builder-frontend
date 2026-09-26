@@ -176,13 +176,13 @@ export function renderPlatformFlashOption(
   hasWebSerial: boolean
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs" || !hasWebSerial) return nothing;
-  const flasher = platformFor(platform)?.install;
-  if (!flasher) return nothing;
+  const install = platformFor(platform)?.install;
+  if (!install) return nothing;
   return renderMethodRow({
     icon: "chip",
-    title: ctx.localize(`dashboard.install_method_${flasher.methodKey}`),
-    desc: ctx.localize(`dashboard.install_method_${flasher.methodKey}_desc`),
-    onClick: () => ctx.onSelect(flasher.id),
+    title: ctx.localize(`dashboard.install_method_${install.methodKey}`),
+    desc: ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
+    onClick: () => ctx.onSelect(install.id),
   });
 }
 

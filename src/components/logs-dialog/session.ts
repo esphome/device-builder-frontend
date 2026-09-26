@@ -5,10 +5,19 @@
  * owns nothing about how a stream is started, paused, or torn down.
  */
 import { OTA_PORT } from "../../api/types/streaming.js";
-import type { SerialResetHook } from "../../platforms/platform-support.js";
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
 import { hasPause, isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
+
+/** Replaces the RTS-pulse Reset Device for a session. */
+export interface SerialResetHook {
+  /** Whether the device behind this port can be reset this way. */
+  supports(port: SerialPort): boolean;
+  /** Gets the port closed and, like onReconnect, ends by attaching a fresh
+   *  stream or ``setSerialOpenFailed``; ``cancelled`` flips once the dialog
+   *  closed or the session moved on. */
+  run(port: SerialPort, cancelled: () => boolean): Promise<void>;
+}
 
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(

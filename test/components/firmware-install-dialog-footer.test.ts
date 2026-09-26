@@ -11,7 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 const { isWebUsbSupported } = vi.hoisted(() => ({
   isWebUsbSupported: vi.fn(() => true),
 }));
-vi.mock("../../src/platforms/rp2/web-usb.js", () => ({ isWebUsbSupported }));
+vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isWebUsbSupported,
+}));
 
 import { identityLocalize } from "../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";
@@ -19,7 +22,10 @@ import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
 } from "../../src/components/firmware-install-dialog.js";
-import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
+import {
+  flasherStepView,
+  renderFooter,
+} from "../../src/components/firmware-install-dialog/renderers.js";
 import {
   nrfDfuInstall,
   nrfDoFlash,
@@ -28,7 +34,6 @@ import {
 import {
   type AnyBrowserInstall,
   FLASH_ACTION_KEY,
-  type FlasherStepView,
   RESET_ACTION_KEY,
 } from "../../src/platforms/platform-support.js";
 import {
@@ -60,9 +65,9 @@ function footerHost(step: string) {
 
 // The platform functions a flasher step's buttons run, secondary first.
 function stepRuns(host: ReturnType<typeof footerHost>) {
-  const steps: Partial<Record<string, FlasherStepView>> | undefined =
-    host._flasher?.steps;
-  const footer = steps?.[host._step]?.footer?.();
+  const footer = flasherStepView(
+    host as unknown as ESPHomeFirmwareInstallDialog
+  )?.footer?.();
   return [footer?.secondary?.run, footer?.primary.run].filter(Boolean);
 }
 

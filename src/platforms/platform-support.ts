@@ -12,7 +12,9 @@
  *        interface BrowserFlasherSteps { "bk-uart": "bk-ready" | "bk-wait" } }``
  *  2. Keep the parsed image in a ``FlashImageSlot`` and export a
  *     ``BrowserInstall<"bk-uart">`` from the platform's install module.
- *  3. Export the ``PlatformSupport`` from ``dashboard.ts``, add it to
+ *  3. Describe its logs in ``logs`` (Web Serial and Bluetooth logs, the
+ *     line release on open, its own Reset Device), if it has any.
+ *  4. Export the ``PlatformSupport`` from ``dashboard.ts``, add it to
  *     ``PLATFORMS``, and its copy to ``en.json``.
  */
 import type { TemplateResult } from "lit";
@@ -82,37 +84,20 @@ export interface BrowserInstall<Id extends FlasherId> {
 
 export type AnyBrowserInstall = { [Id in FlasherId]: BrowserInstall<Id> }[FlasherId];
 
-/** Replaces the logs dialog's RTS-pulse Reset Device for a session. */
-export interface SerialResetHook {
+/** A platform's own Reset Device for a Web Serial logs session. */
+export interface SerialResetSupport {
+  /** The browser can send it (the button stays hidden otherwise). */
+  available(): boolean;
   /** Whether the device behind this port can be reset this way. */
   supports(port: SerialPort): boolean;
-  /** Gets the port closed and, like onReconnect, ends by attaching a fresh
-   *  stream or ``setSerialOpenFailed``; ``cancelled`` flips once the dialog
-   *  closed or the session moved on. */
-  run(port: SerialPort, cancelled: () => boolean): Promise<void>;
-}
-
-/**
- * What a platform's logs code may do to a logs session. The logs code builds
- * it, so a platform never imports the logs dialog or its helpers.
- */
-export interface LogsSessionContext {
-  readonly localize: LocalizeFunc;
-  /** Routes stream lines into the logs pane. */
-  readonly lineHooks: SerialLineHooks;
-  /** Ends the session with ``message`` in the pane (Start reconnects). */
-  end(message: string): void;
-  /** Ends the session and toasts ``message``, unless ``cancelled()``. */
-  fail(message: string, cancelled?: () => boolean): void;
-  setBleStream(cancel: () => Promise<void>): void;
-}
-
-export interface SerialLogsContext extends LogsSessionContext {
-  readonly baudRate: number;
-  /** Streams a port into the session, reopening it first when it is closed. */
-  attach(port: SerialPort, cancelled: () => boolean): Promise<void>;
-  /** Fails the session because ``port`` could not be reopened. */
-  failReopen(port: SerialPort, cancelled: () => boolean): void;
+  /** Resets the device and returns its port reopened, or null when it never came back. */
+  reset(
+    port: SerialPort,
+    baudRate: number,
+    cancelled: () => boolean
+  ): Promise<SerialPort | null>;
+  /** Localize key for a failed reset. */
+  failureKey(err: unknown): string;
 }
 
 /** Web Serial logs for the platform; its presence offers them in the logs picker. */
@@ -121,8 +106,8 @@ export interface SerialLogsPolicy {
   readonly pulseResets: boolean;
   /** Drop DTR and RTS right after opening, so the board boots its firmware. */
   readonly releasesLinesAfterOpen: boolean;
-  /** A Reset Device of the platform's own, or undefined where it can't run. */
-  resetHook?(ctx: SerialLogsContext): SerialResetHook | undefined;
+  /** Replaces the RTS pulse with the platform's own reset. */
+  readonly reset?: SerialResetSupport;
 }
 
 /** Logs over Web Bluetooth. */
@@ -130,12 +115,14 @@ export interface BleLogsSupport {
   /** The browser can do it; the platform already matched. */
   available(): boolean;
   pick(localize: LocalizeFunc, names: string[]): Promise<BluetoothDevice | null>;
-  /** Streams ``device`` into the session, or fails it with the reason. */
-  attach(
-    ctx: LogsSessionContext,
+  /** Streams ``device``'s logs into ``hooks``; resolves to the stream's cancel. */
+  connect(
     device: BluetoothDevice,
+    hooks: SerialLineHooks,
     cancelled: () => boolean
-  ): Promise<void>;
+  ): Promise<() => Promise<void>>;
+  /** Localize key for a failed connect. */
+  failureKey(err: unknown): string;
 }
 
 export interface PlatformLogs {

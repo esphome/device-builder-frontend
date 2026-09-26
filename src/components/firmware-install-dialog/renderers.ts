@@ -90,8 +90,8 @@ export function renderResetSuggestion(
 // download-ready screens have no status icon — their bespoke bodies render in
 // the status-extra slot below.
 
-// The active browser install flow's view of the current step, if the step is its own.
-function flasherStepView(
+/** The active browser install flow's view of the current step, if the step is its own. */
+export function flasherStepView(
   host: ESPHomeFirmwareInstallDialog
 ): FlasherStepView | undefined {
   const steps: Partial<Record<string, FlasherStepView>> | undefined =

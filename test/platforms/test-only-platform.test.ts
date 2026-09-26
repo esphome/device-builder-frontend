@@ -3,7 +3,7 @@
  *
  * A new platform's logs policy needs no edits in the shared logs code: with a
  * test-only platform added to the registry, the logs picker rows, the line
- * release on open, the Reset Device hook and the Bluetooth pick and attach
+ * release on open, its Reset Device and the Bluetooth pick and connect
  * all follow its descriptor.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,12 +37,7 @@ import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import type { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
-import type {
-  LogsSessionContext,
-  PlatformSupport,
-  SerialLogsContext,
-  SerialResetHook,
-} from "../../src/platforms/platform-support.js";
+import type { PlatformSupport } from "../../src/platforms/platform-support.js";
 import {
   launchLogs,
   launchLogsWithMethod,
@@ -54,8 +49,8 @@ import {
   setLocalhostWithWebSerial,
 } from "../components/_install-method-dialog-env.js";
 
-const hook: SerialResetHook = { supports: () => true, run: vi.fn(async () => {}) };
 const bleDevice = {} as BluetoothDevice;
+const bleCancel = async () => {};
 const platform = {
   id: "test-only",
   matches: (p: string | null | undefined) => p === "test-only",
@@ -63,14 +58,18 @@ const platform = {
     serial: {
       pulseResets: false,
       releasesLinesAfterOpen: true,
-      resetHook: vi.fn((_ctx: SerialLogsContext) => hook),
+      reset: {
+        available: () => true,
+        supports: () => true,
+        reset: vi.fn(async (_port: SerialPort, _baud: number, _c: () => boolean) => null),
+        failureKey: () => "dashboard.logs_reset_failed",
+      },
     },
     ble: {
       available: () => true,
       pick: vi.fn(async () => bleDevice),
-      attach: vi.fn(
-        async (_ctx: LogsSessionContext, _d: BluetoothDevice, _c: () => boolean) => {}
-      ),
+      connect: vi.fn(async () => bleCancel),
+      failureKey: () => "dashboard.logs_ble_nus_open_failed",
     },
   },
 } satisfies PlatformSupport;
@@ -133,12 +132,19 @@ describe("a platform added only to the registry", () => {
     });
   });
 
-  it("hands its Reset Device hook a context carrying the session's baud", () => {
+  it("runs its own Reset Device at the session's baud", async () => {
     const dialog = { setSerialOpenFailed: vi.fn() } as unknown as ESPHomeLogsDialog;
-    expect(sessionResetHook(dialog, defaultLocalize, "test-only", 9600)).toBe(hook);
-    expect(platform.logs.serial.resetHook).toHaveBeenCalledWith(
-      expect.objectContaining({ baudRate: 9600 })
+    const hook = sessionResetHook(dialog, defaultLocalize, "test-only", 9600)!;
+    const port = { getInfo: () => ({}) } as SerialPort;
+    expect(hook.supports(port)).toBe(true);
+    await hook.run(port, () => false);
+    expect(platform.logs.serial.reset.reset).toHaveBeenCalledWith(
+      port,
+      9600,
+      expect.any(Function)
     );
+    // It never came back: the session fails, naming the port.
+    expect(dialog.setSerialOpenFailed).toHaveBeenCalled();
   });
 
   it("offers the logs picker for its Bluetooth logs", async () => {
@@ -153,17 +159,18 @@ describe("a platform added only to the registry", () => {
     }
   });
 
-  it("picks and attaches its Bluetooth logs through the descriptor", async () => {
+  it("picks and connects its Bluetooth logs through the descriptor", async () => {
     const host = logsHost();
     await launchLogsWithMethod(host as unknown as LogsLaunchHost, device, "ble-nus");
     expect(platform.logs.ble.pick).toHaveBeenCalledWith(defaultLocalize, [
       "thing",
       "Thing",
     ]);
-    const [ctx, picked] = platform.logs.ble.attach.mock.calls[0];
-    expect(picked).toBe(bleDevice);
-    const cancel = async () => {};
-    ctx.setBleStream(cancel);
-    expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(cancel);
+    expect(platform.logs.ble.connect).toHaveBeenCalledWith(
+      bleDevice,
+      expect.objectContaining({ onLine: expect.any(Function) }),
+      expect.any(Function)
+    );
+    expect(host.logsDialog.setBleStream).toHaveBeenCalledWith(bleCancel);
   });
 });
