@@ -110,10 +110,10 @@ describe("PLATFORMS", () => {
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
     expect({
-      pulseResets: logs?.serial?.pulseResets,
-      releasesLinesAfterOpen: logs?.serial?.releasesLinesAfterOpen,
+      pulseResets: logs?.serial?.reset === "rts-pulse",
+      releasesLinesAfterOpen: logs?.serial?.releaseLinesAfterOpen ?? false,
       keepLinesOnReopen: logs?.serial?.keepLinesOnReopen ?? false,
-      reset: logs?.serial?.reset !== undefined,
+      reset: typeof logs?.serial?.reset === "object",
       ble: logs?.ble !== undefined,
     }).toEqual(expected);
   });

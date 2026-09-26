@@ -30,12 +30,10 @@ afterEach(() => {
 });
 
 describe("SerialLogSource reopen line policy", () => {
-  it("drops DTR and RTS on the reopened handle before streaming when asked to", async () => {
+  // A UART bridge's auto-reset circuit must not be left holding the lines.
+  it("drops DTR and RTS on the reopened handle before streaming by default", async () => {
     const { dead, live } = ports();
-    const source = new SerialLogSource(dead, {
-      reset: RTS_PULSE,
-      releaseLinesAfterOpen: true,
-    });
+    const source = new SerialLogSource(dead, { reset: RTS_PULSE });
     await source.resume(hooks, () => false);
     const setSignals = vi.mocked(live.setSignals);
     expect(setSignals).toHaveBeenCalledWith({
@@ -48,9 +46,13 @@ describe("SerialLogSource reopen line policy", () => {
     expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);
   });
 
-  it("leaves the lines as opened otherwise", async () => {
+  // arduino-pico's CDC only transmits while DTR is asserted.
+  it("leaves the lines as reopened when the policy keeps them (a Pico)", async () => {
     const { dead, live } = ports();
-    const source = new SerialLogSource(dead, { reset: RTS_PULSE });
+    const source = new SerialLogSource(dead, {
+      reset: RTS_PULSE,
+      keepLinesOnReopen: true,
+    });
     await source.resume(hooks, () => false);
     expect(live.setSignals).not.toHaveBeenCalled();
     expect(mocks.streamSerialLines).toHaveBeenCalledWith(live, hooks);

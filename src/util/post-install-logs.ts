@@ -7,7 +7,8 @@ import {
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { SerialResetHook } from "../components/logs-dialog/session.js";
 import type { BleLogsSupport } from "../platforms/platform-support.js";
-import { platformFor } from "../platforms/registry.js";
+import { serialLogsFor } from "../platforms/registry.js";
+import { platformReset } from "../platforms/serial-logs.js";
 import { formatUsbId } from "./flash-log.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { notifyError, notifyInfo } from "./notify.js";
@@ -140,7 +141,7 @@ export async function openPortForLogs(
   targetPlatform: string | null | undefined
 ): Promise<void> {
   await openSerialPort(port, { baudRate });
-  if (platformFor(targetPlatform)?.logs?.serial?.releasesLinesAfterOpen) {
+  if (serialLogsFor(targetPlatform).releaseLinesAfterOpen) {
     await releaseControlLines(port);
   }
 }
@@ -156,10 +157,10 @@ export function sessionResetHook(
   targetPlatform: string | null | undefined,
   baudRate: number
 ): SerialResetHook | undefined {
-  const support = platformFor(targetPlatform)?.logs?.serial?.reset;
+  const support = platformReset(serialLogsFor(targetPlatform));
   if (!support?.available()) return undefined;
   return {
-    supports: (port) => support.supports(port),
+    supports: (port) => support.supports?.(port) ?? true,
     run: async (port, cancelled) => {
       let live: SerialPort | null = null;
       let failure: string | undefined;
@@ -170,7 +171,7 @@ export function sessionResetHook(
         }
       } catch (err) {
         console.warn("Reset Device failed", err);
-        failure = localize(support.failureKey(err) ?? "dashboard.logs_reset_failed");
+        failure = localize(support.failureKey?.(err) ?? "dashboard.logs_reset_failed");
       }
       if (failure) {
         // A stranded device still gets its toast once the session moved on,
@@ -296,7 +297,7 @@ export async function attachSerialLogStream(
     port = live;
     // Drop the lines the reopen asserted, unless the board's CDC needs DTR
     // up to transmit at all (a Pico).
-    if (!platformFor(targetPlatform)?.logs?.serial?.keepLinesOnReopen) {
+    if (!serialLogsFor(targetPlatform).keepLinesOnReopen) {
       await releaseControlLines(port);
     }
   }

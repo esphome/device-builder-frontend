@@ -21,8 +21,11 @@ export const LOG_BUFFER_SIZE = 8192;
 export interface SerialLogSourceOptions {
   /** How Reset Device reaches the board; none without one. */
   reset?: WebSerialReset;
-  /** Drop DTR and RTS right after a reopen (the RTL8720C's strap lines). */
-  releaseLinesAfterOpen?: boolean;
+  /**
+   * Leave DTR and RTS as reopened instead of dropping them, which a UART
+   * bridge's auto-reset circuit needs (see ``SerialLogsPolicy``).
+   */
+  keepLinesOnReopen?: boolean;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
 }
@@ -86,7 +89,7 @@ export class SerialLogSource implements WebLogSource {
       return null;
     }
     if (!live) return null;
-    if (this.options.releaseLinesAfterOpen) await releaseControlLines(live);
+    if (!this.options.keepLinesOnReopen) await releaseControlLines(live);
     const cancel = this.stream(live, hooks);
     this.options.onPortReplaced?.(live);
     return cancel;

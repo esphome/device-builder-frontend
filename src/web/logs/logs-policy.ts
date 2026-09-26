@@ -1,35 +1,18 @@
+import { platformReset, type SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { sleep } from "../../util/sleep.js";
 
 /**
- * A family's Web Serial logs policy, which its card hands to both the port
- * open (``pickPortForLogs`` / ``openLogsPortForCard``) and the logs dialog
- * (``policy``). Each family states its own in ``platforms/<name>/logs-policy.ts``;
- * the dialog's default is no reset and no line release.
- */
-export interface WebLogsPolicy {
-  /** How Reset device reaches the board; without one there is no button. */
-  readonly reset?: WebSerialReset;
-  /** Drop DTR and RTS right after every (re)open (the RTL8720C's strap and reset lines). */
-  readonly releaseLines?: boolean;
-}
-
-/**
- * How Reset device reaches a board in the logs. ``undefined`` in a policy
- * means the port has no way to reset the board (an nRF52's CDC).
+ * How the web logs run a board's Reset device. Each card hands its family's
+ * shared ``SerialLogsPolicy`` (``src/platforms/<name>/``) to both the port
+ * open and the logs dialog; this maps its reset onto the dialog's two paths.
  */
 export interface WebSerialReset {
-  /** The browser can send it; the button stays hidden otherwise. */
-  available(): boolean;
-  /** Whether the board behind this port takes it (every port when omitted). */
-  supports?(port: SerialPort): boolean;
   /**
-   * The reset re-enumerates the port (a Pico rebooting through BOOTSEL), so
-   * the stream is dropped first and resumed after.
+   * The reset re-enumerates the port (a platform's own reboot), so the
+   * stream is dropped first and resumed after.
    */
   readonly dropsStream: boolean;
   run(port: SerialPort, cancelled: () => boolean): Promise<void>;
-  /** Localize key for a failed reset (``web.logs.reset_failed`` otherwise). */
-  failureKey?(err: unknown): string | undefined;
 }
 
 /**
@@ -39,7 +22,6 @@ export interface WebSerialReset {
  * don't wire the reset lines.
  */
 export const RTS_PULSE: WebSerialReset = {
-  available: () => true,
   dropsStream: false,
   run: async (port) => {
     await port.setSignals({ dataTerminalReady: false, requestToSend: true });
@@ -47,3 +29,24 @@ export const RTS_PULSE: WebSerialReset = {
     await sleep(1000);
   },
 };
+
+/**
+ * The reset the logs can run on *port* under *policy*: the RTS pulse, the
+ * platform's reboot (where this browser can send it and the board behind the
+ * port takes it), or undefined for no Reset device.
+ */
+export function webSerialReset(
+  policy: SerialLogsPolicy,
+  port: SerialPort | undefined
+): WebSerialReset | undefined {
+  if (policy.reset === "rts-pulse") return RTS_PULSE;
+  const reset = platformReset(policy);
+  if (!reset?.available()) return undefined;
+  if (port && reset.supports && !reset.supports(port)) return undefined;
+  return {
+    dropsStream: true,
+    run: async (live, cancelled) => {
+      await reset.reboot(live, cancelled);
+    },
+  };
+}

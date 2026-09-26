@@ -22,6 +22,7 @@ import type { TemplateResult } from "lit";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { SerialLineHooks } from "../util/serial-log-stream.js";
+import type { SerialLogsPolicy } from "./serial-logs.js";
 
 type Host = ESPHomeFirmwareInstallDialog;
 
@@ -90,38 +91,6 @@ export interface BrowserInstall<Id extends FlasherId> {
 
 export type AnyBrowserInstall = { [Id in FlasherId]: BrowserInstall<Id> }[FlasherId];
 
-/** A platform's own Reset Device for a Web Serial logs session. */
-export interface SerialResetSupport {
-  /** The browser can send it (the button stays hidden otherwise). */
-  available(): boolean;
-  /** Whether the device behind this port can be reset this way. */
-  supports(port: SerialPort): boolean;
-  /**
-   * Reboots the device behind *port* (closed by the caller); its CDC port
-   * re-enumerates and the session reopens it. False when ``cancelled``
-   * flipped before anything was sent.
-   */
-  reboot(port: SerialPort, cancelled: () => boolean): Promise<boolean>;
-  /** Localize key for a platform-specific failure; the logs' generic key otherwise. */
-  failureKey(err: unknown): string | undefined;
-}
-
-/** Web Serial logs for the platform; its presence offers them in the logs picker. */
-export interface SerialLogsPolicy {
-  /** Reset Device pulses RTS; false where the port has no reset line. */
-  readonly pulseResets: boolean;
-  /** Drop DTR and RTS right after opening, so the board boots its firmware. */
-  readonly releasesLinesAfterOpen: boolean;
-  /**
-   * A reopen leaves DTR and RTS as opened instead of dropping them (which it
-   * does by default for a UART bridge): the CDC only transmits while DTR is
-   * asserted (arduino-pico).
-   */
-  readonly keepLinesOnReopen?: boolean;
-  /** Replaces the RTS pulse with the platform's own reset. */
-  readonly reset?: SerialResetSupport;
-}
-
 /** Logs over Web Bluetooth. */
 export interface BleLogsSupport {
   /** The browser can do it; the platform already matched. */
@@ -138,6 +107,7 @@ export interface BleLogsSupport {
 }
 
 export interface PlatformLogs {
+  /** Web Serial logs; their presence offers them in the logs picker. */
   readonly serial?: SerialLogsPolicy;
   readonly ble?: BleLogsSupport;
 }

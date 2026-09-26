@@ -10,6 +10,7 @@ import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
 import { rp2Platform } from "./rp2/dashboard.js";
 import { rtl87xxPlatform } from "./rtl87xx/dashboard.js";
+import { DEFAULT_SERIAL_LOGS, type SerialLogsPolicy } from "./serial-logs.js";
 
 export const PLATFORMS: readonly PlatformSupport[] = [
   nrf52Platform,
@@ -22,6 +23,13 @@ export function platformFor(
   targetPlatform: string | null | undefined
 ): PlatformSupport | undefined {
   return PLATFORMS.find((p) => p.matches(targetPlatform));
+}
+
+/** A device's Web Serial logs policy; ESP (no descriptor) gets the RTS pulse. */
+export function serialLogsFor(
+  targetPlatform: string | null | undefined
+): SerialLogsPolicy {
+  return platformFor(targetPlatform)?.logs?.serial ?? DEFAULT_SERIAL_LOGS;
 }
 
 /** The install flow an install method string selects, if any. */

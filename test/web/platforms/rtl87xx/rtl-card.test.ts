@@ -25,9 +25,8 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import { identityLocalize, mount } from "../../../_dom.js";
 import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
-import { RTS_PULSE } from "../../../../src/web/logs/logs-policy.js";
+import { RTL87XX_SERIAL_LOGS } from "../../../../src/platforms/rtl87xx/serial-logs.js";
 import { ESPHomeWebRtlCard } from "../../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
-import { RTL_LOGS } from "../../../../src/web/platforms/rtl87xx/logs-policy.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -63,15 +62,18 @@ describe("esphome-web-rtl-card", () => {
     expect(mocks.openPortForLogs).toHaveBeenCalledWith(
       port,
       expect.any(Function),
-      RTL_LOGS
+      RTL87XX_SERIAL_LOGS
     );
     const dialog = logsDialog(el);
     expect(dialog.port).toBe(port);
     expect(dialog.hasAttribute("open")).toBe(true);
     // One policy for both the open and the dialog's reopens: release the
     // lines, reset over RTS.
-    expect(dialog.policy).toBe(RTL_LOGS);
-    expect(RTL_LOGS).toEqual({ reset: RTS_PULSE, releaseLines: true });
+    expect(dialog.policy).toBe(RTL87XX_SERIAL_LOGS);
+    expect(RTL87XX_SERIAL_LOGS).toEqual({
+      reset: "rts-pulse",
+      releaseLinesAfterOpen: true,
+    });
   });
 
   it("stays closed when the picker is dismissed or the port will not open", async () => {
