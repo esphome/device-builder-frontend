@@ -3,6 +3,7 @@
  * the USB ids, the errors callers check, and the plain types. The engine
  * itself is ``esptool.ts``, loaded on demand.
  */
+import { getErrorMessage } from "../../util/error-message.js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 export const ESPRESSIF_USB_VID = 0x303a;
@@ -24,6 +25,14 @@ export interface FlashProgress {
   written: number;
   total: number;
   percent: number;
+}
+
+/** The esptool chunk could not be fetched (offline, a deploy replaced it). */
+export class EngineLoadError extends Error {
+  constructor(readonly cause: unknown) {
+    super(getErrorMessage(cause));
+    this.name = "EngineLoadError";
+  }
 }
 
 /** The connected chip has no esptool-js target; flashing needs the esptool CLI. */

@@ -14,11 +14,11 @@ import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.j
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
-import { requestSerialPort } from "../../util/web-serial.js";
 import {
   type DetectedChip,
+  EngineLoadError,
   type Esptool,
-  loadEsptool,
+  pickPortAndLoadEsptool,
   UnsupportedChipError,
 } from "./index.js";
 
@@ -66,31 +66,25 @@ export async function startWebSerialInstall(
     host._log.enqueue(line);
   };
 
-  // 1. Pick the port in the click, then load the engine: the chunk fetch must
-  // not eat the click's user activation. A dismissed picker closes the dialog.
-  let port: SerialPort | null;
+  // 1. Pick the port in the click (the engine chunk fetches meanwhile), then
+  // connect and detect the chip. A dismissed picker closes the dialog.
+  let picked: Awaited<ReturnType<typeof pickPortAndLoadEsptool>>;
   try {
-    port = await requestSerialPort();
+    picked = await pickPortAndLoadEsptool();
   } catch (err) {
     host._fail(
-      openFailureMessage(err, host._localize, "serial.connect_failed"),
+      err instanceof EngineLoadError
+        ? host._localize("firmware.engine_load_failed")
+        : openFailureMessage(err, host._localize, "serial.connect_failed"),
       getErrorMessage(err)
     );
     return;
   }
-  if (!port) {
+  if (!picked) {
     host._close();
     return;
   }
-  let esptool: Esptool;
-  try {
-    esptool = await loadEsptool();
-  } catch (err) {
-    host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
-    return;
-  }
-
-  // 2. Connect and detect chip
+  const { port, esptool } = picked;
   let detected: DetectedChip;
   try {
     detected = await esptool.connectToPort(port, onLog);
@@ -109,7 +103,7 @@ export async function startWebSerialInstall(
   }
   host._detected = detected;
 
-  // 3. Verify chip matches platform. device.target_platform only carries the
+  // 2. Verify chip matches platform. device.target_platform only carries the
   // YAML's top-level platform — every ESP32 variant reports as plain "esp32"
   // until the first compile fills in specifics. Resolve the actual variant
   // via the board catalog and only strict-compare when we have authoritative info.
@@ -162,7 +156,7 @@ export async function startWebSerialInstall(
   // "Failed to enter compressed flash mode" (#1833). The external flasher and
   // the legacy dashboard both flash on one continuous session for this reason.
 
-  // 4. Compile
+  // 3. Compile
   host._step = "queued";
   host._statusMessage = host._localize("firmware.status_queued");
   if (!(await compileOrFail(host, device.configuration))) {
@@ -170,7 +164,7 @@ export async function startWebSerialInstall(
     return;
   }
 
-  // 5. Download binary
+  // 4. Download binary
   host._statusMessage = host._localize("firmware.status_downloading");
   let firmwareBytes: Uint8Array;
   let flashAddress: number;
@@ -192,7 +186,7 @@ export async function startWebSerialInstall(
     return;
   }
 
-  // 6. Flash on the still-open session.
+  // 5. Flash on the still-open session.
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
@@ -210,7 +204,7 @@ export async function startWebSerialInstall(
     }
   }
 
-  // 7. Reset
+  // 6. Reset
   host._statusMessage = host._localize("firmware.status_resetting");
   try {
     await esptool.resetAndDisconnect(detected.loader, detected.transport, detected.port);

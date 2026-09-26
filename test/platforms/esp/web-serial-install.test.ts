@@ -22,8 +22,7 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
   requestSerialPort: seams.requestSerialPort,
 }));
-vi.mock("../../../src/platforms/esp/index.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platforms/esp/index.js")>()),
+vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
 vi.mock("../../../src/util/download-text.js", () => ({ triggerDownload: vi.fn() }));
@@ -200,13 +199,20 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(esptool.connectToPort).not.toHaveBeenCalled();
   });
 
-  it("picks the port before loading the engine, so the click's activation is spent on the picker", async () => {
+  it("opens the picker in the click without waiting for the engine chunk", async () => {
     const { host } = makeHost();
     esptool.connectToPort.mockResolvedValue(CHIP);
+    // The chunk stays pending until the pick is in: the fetch overlaps the
+    // picker instead of delaying it.
+    let deliver: (engine: unknown) => void = () => {};
+    seams.loadEsptool.mockReturnValueOnce(new Promise((resolve) => (deliver = resolve)));
+    seams.requestSerialPort.mockImplementationOnce(async () => {
+      deliver(await import("../../../src/platforms/esp/esptool.js"));
+      return { getInfo: () => ({}) } as SerialPort;
+    });
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
-    expect(seams.requestSerialPort.mock.invocationCallOrder[0]).toBeLessThan(
-      seams.loadEsptool.mock.invocationCallOrder[0]
-    );
+    expect(seams.requestSerialPort).toHaveBeenCalledOnce();
+    expect(esptool.connectToPort).toHaveBeenCalledOnce();
   });
 
   it("surfaces a connect failure instead of closing the dialog (#1414)", async () => {

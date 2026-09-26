@@ -89,15 +89,13 @@ export async function runFlash(
 ): Promise<boolean> {
   hooks.onStep("connecting");
   // The port is already authorized (no picker), so the engine can load first.
-  let esptool: Esptool;
-  try {
-    esptool = await loadEsptool();
-  } catch (err) {
+  const esptool = await loadEsptool().catch((err: unknown) => {
     console.error(err);
     hooks.onStep("error");
     hooks.onError(plan.messages?.loadFailed ?? getErrorMessage(err));
-    return false;
-  }
+    return null;
+  });
+  if (!esptool) return false;
   let detected: DetectedChip;
   try {
     detected = await esptool.connectToPort(port, hooks.onLog);

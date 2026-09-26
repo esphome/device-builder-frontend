@@ -8,7 +8,12 @@ import type { SlimBoard } from "../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { loadEsptool } from "../../platforms/esp/index.js";
+import {
+  type DetectedBoard,
+  detectEspBoard,
+  EngineLoadError,
+  preloadEsptool,
+} from "../../platforms/esp/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
@@ -18,7 +23,7 @@ import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { portInUseMessage } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
-import { isWebSerialSupported, requestSerialPort } from "../../util/web-serial.js";
+import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
   chipNameToFilterLabel,
   WIZARD_BOARD_PLATFORMS,
@@ -96,7 +101,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     super.connectedCallback();
     // Warm the esptool chunk while the user reads the step; a miss only
     // costs the fetch at click time.
-    if (isWebSerialSupported()) void loadEsptool().catch(() => {});
+    if (isWebSerialSupported()) preloadEsptool();
     // Lit usually sets ``.presetFilterLabel`` before connectedCallback
     // fires (property bindings are applied during element upgrade), so
     // this path handles the common case. ``willUpdate`` below covers
@@ -292,67 +297,44 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private async _connectViaWebSerial() {
     this._detectError = "";
-    // The picker runs in the click, before the engine chunk is fetched.
-    let port: SerialPort | null;
+    let board: DetectedBoard | null;
     try {
-      port = await requestSerialPort();
+      board = await detectEspBoard(null);
     } catch (err) {
       this._detectError =
-        portInUseMessage(err, this._localize) ??
-        this._extractErrorDetail(
-          err,
-          this._localize("wizard.connect_your_board_detect_failed")
-        );
+        err instanceof EngineLoadError
+          ? this._localize("firmware.engine_load_failed")
+          : (portInUseMessage(err, this._localize) ??
+            this._extractErrorDetail(
+              err,
+              this._localize("wizard.connect_your_board_detect_failed")
+            ));
       return;
     }
-    if (!port) return;
-    let esptool: Awaited<ReturnType<typeof loadEsptool>>;
-    try {
-      esptool = await loadEsptool();
-    } catch {
-      this._detectError = this._localize("firmware.engine_load_failed");
-      return;
-    }
-    try {
-      const detected = await esptool.connectToPort(port);
-      // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
-      const chipName = detected.chipName;
+    if (!board) return; // picker dismissed
 
-      // Read the IDF app descriptor before disconnecting — when the
-      // chip is running a factory-flashed firmware that sets
-      // ``esphome.name`` to a catalog id, ``project_name`` points us
-      // straight at the right board. Same flow as
-      // ``detectAndOpenWizard`` so both entry points behave alike.
-      const manifest = await esptool.readDeviceManifest(detected.loader);
-
-      await esptool.disconnect(detected.transport);
-
-      if (manifest?.board_id) {
-        const knownBoard = await fetchBoard(this._api, manifest.board_id);
-        if (knownBoard) {
-          this._onAdd(knownBoard);
-          return;
-        }
-        // ``board_id`` set but the catalog doesn't know it — fall
-        // through to chip-family filtering rather than failing.
+    // A factory-flashed firmware that sets ``esphome.name`` to a catalog id
+    // names the board outright through the app descriptor; same flow as
+    // ``detectAndOpenWizard`` so both entry points behave alike.
+    if (board.manifest?.board_id) {
+      const knownBoard = await fetchBoard(this._api, board.manifest.board_id).catch(
+        () => null
+      );
+      if (knownBoard) {
+        this._onAdd(knownBoard);
+        return;
       }
-
-      // No specific board match — narrow the picker to the detected
-      // chip family and let the user pick. The generic-{family}
-      // auto-advance used to live here, but landing the user on a
-      // filtered picker is the better UX: they can still pick the
-      // generic board explicitly, or one of several boards for
-      // their chip.
-      this._applyDetectedFilter(chipNameToFilterLabel(chipName));
-      void this._fetchBoards();
-    } catch (err) {
-      this._detectError =
-        portInUseMessage(err, this._localize) ??
-        this._extractErrorDetail(
-          err,
-          this._localize("wizard.connect_your_board_detect_failed")
-        );
+      // ``board_id`` set but the catalog doesn't know it — fall through to
+      // chip-family filtering rather than failing.
     }
+
+    // No specific board match — narrow the picker to the detected chip
+    // family and let the user pick. The generic-{family} auto-advance used to
+    // live here, but landing the user on a filtered picker is the better UX:
+    // they can still pick the generic board explicitly, or one of several
+    // boards for their chip.
+    this._applyDetectedFilter(chipNameToFilterLabel(board.chipName));
+    void this._fetchBoards();
   }
 
   /**

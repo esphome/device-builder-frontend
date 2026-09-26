@@ -561,7 +561,7 @@
     "rtl_flash_failed": "UART flash failed",
     "rtl_done_manual_reset": "Installation complete. Release PA00 and reset the board to start the firmware.",
     "rtl_bad_uf2": "Invalid LibreTiny UF2 image",
-    "engine_load_failed": "Could not load the flashing tools. Check the connection and try again.",
+    "engine_load_failed": "Could not load the flashing tools. Reload the page and try again.",
     "rtl_wrong_family": "This firmware is not built for an RTL8720C (AmebaZ2), the only Realtek chip the browser can flash.",
     "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",
     "nrf_bad_package": "Invalid DFU package",

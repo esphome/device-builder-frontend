@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const seams = vi.hoisted(() => ({
-  requestSerialPort: vi.fn(),
-  loadEsptool: vi.fn(),
+const seams = vi.hoisted(() => ({ requestSerialPort: vi.fn(), loadEsptool: vi.fn() }));
+// The loaded engine is this object; the real module never runs.
+const engine = vi.hoisted(() => ({
   connectToPort: vi.fn(),
   readMacAddress: vi.fn(),
   readDeviceManifest: vi.fn(),
@@ -15,21 +15,15 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
   requestSerialPort: seams.requestSerialPort,
 }));
-vi.mock("../../../src/platforms/esp/index.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platforms/esp/index.js")>()),
+vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
+import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { detectAndOpenWizard } from "../../../src/components/dashboard/actions.js";
 
-const engine = {
-  connectToPort: seams.connectToPort,
-  readMacAddress: seams.readMacAddress,
-  readDeviceManifest: seams.readDeviceManifest,
-  disconnect: seams.disconnect,
-};
 const port = { getInfo: () => ({}) } as SerialPort;
 const localize = (k: string) => k;
 
@@ -41,39 +35,58 @@ beforeEach(() => {
   vi.clearAllMocks();
   seams.requestSerialPort.mockResolvedValue(port);
   seams.loadEsptool.mockResolvedValue(engine);
-  seams.connectToPort.mockResolvedValue({
+  engine.connectToPort.mockResolvedValue({
     chipName: "ESP32-S3",
     port,
     loader: {},
     transport: {},
   });
-  seams.readDeviceManifest.mockResolvedValue(null);
+  engine.readDeviceManifest.mockResolvedValue(null);
 });
 
 describe("detectAndOpenWizard", () => {
-  it("picks the port first, then loads the engine and opens the wizard at the board step", async () => {
+  it("opens the picker in the click without waiting for the engine chunk, then opens the wizard at the board step", async () => {
     const dialog = makeDialog();
+    // The chunk stays pending until the pick is in: the fetch overlaps the picker.
+    let deliver: (engine: unknown) => void = () => {};
+    seams.loadEsptool.mockReturnValueOnce(new Promise((resolve) => (deliver = resolve)));
+    seams.requestSerialPort.mockImplementationOnce(async () => {
+      deliver(engine);
+      return port;
+    });
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize });
-    expect(seams.requestSerialPort.mock.invocationCallOrder[0]).toBeLessThan(
-      seams.loadEsptool.mock.invocationCallOrder[0]
-    );
-    expect(seams.connectToPort).toHaveBeenCalledWith(port);
-    expect(seams.disconnect).toHaveBeenCalledOnce();
+    expect(engine.connectToPort).toHaveBeenCalledWith(port);
+    expect(engine.disconnect).toHaveBeenCalledOnce();
     expect(dialog.openAtBoardStep).toHaveBeenCalledWith("ESP32-S3");
+  });
+
+  it("recognises a configured device by its MAC and hands it to the caller", async () => {
+    const dialog = makeDialog();
+    engine.readMacAddress.mockResolvedValue("AA:BB:CC:DD:EE:FF");
+    const known = { name: "lamp", mac_address: "aa:bb:cc:dd:ee:ff" } as ConfiguredDevice;
+    const onRecognized = vi.fn();
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, {
+      localize,
+      devices: [known],
+      onRecognized,
+    });
+    expect(onRecognized).toHaveBeenCalledWith(known);
+    expect(dialog.open).not.toHaveBeenCalled();
+    expect(dialog.openAtBoardStep).not.toHaveBeenCalled();
   });
 
   it("skips the picker for a port handed in from a connect event", async () => {
     const dialog = makeDialog();
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { port, localize });
     expect(seams.requestSerialPort).not.toHaveBeenCalled();
-    expect(seams.connectToPort).toHaveBeenCalledWith(port);
+    expect(engine.connectToPort).toHaveBeenCalledWith(port);
   });
 
   it("opens the wizard for a manual pick when the picker is dismissed, quietly", async () => {
     const dialog = makeDialog();
     seams.requestSerialPort.mockResolvedValueOnce(null);
     await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize });
-    expect(seams.loadEsptool).not.toHaveBeenCalled();
+    expect(engine.connectToPort).not.toHaveBeenCalled();
     expect(dialog.open).toHaveBeenCalledWith("board");
     expect(toast.error).not.toHaveBeenCalled();
   });
@@ -87,6 +100,6 @@ describe("detectAndOpenWizard", () => {
       expect.anything()
     );
     expect(dialog.open).toHaveBeenCalledWith("board");
-    expect(seams.connectToPort).not.toHaveBeenCalled();
+    expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 });

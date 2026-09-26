@@ -46,13 +46,14 @@ export async function startRtlAmbz2Install(
   );
   if (!artifact) return;
   // The parser loads on demand, like the engine; a failed fetch is named.
-  let parser: Awaited<ReturnType<typeof loadLibreTinyParser>>;
-  try {
-    parser = await loadLibreTinyParser();
-  } catch (err) {
-    host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
-    return;
-  }
+  const parser = await loadLibreTinyParser().catch((err: unknown) => {
+    // Not for a dialog that moved to another device meanwhile.
+    if (host._device === device) {
+      host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
+    }
+    return null;
+  });
+  if (!parser) return;
   if (host._device !== device) return;
   try {
     rtlImage.set(host, parser.parseAmbz2Image(artifact.bytes));

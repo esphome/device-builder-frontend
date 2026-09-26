@@ -25,7 +25,7 @@ import type { FirmwareMessage, FlashState } from "./protocol.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
 import "../logs/esphome-web-logs-dialog.js";
-import { loadEsptool } from "../../platforms/esp/index.js";
+import { preloadEsptool } from "../../platforms/esp/index.js";
 
 const MAX_LOG_LINES = 10000;
 const LOG_BAUD_RATE = 115200;
@@ -83,7 +83,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     // The page exists to flash: warm the esptool chunk while the hand-off arrives.
-    void loadEsptool().catch(() => {});
+    preloadEsptool();
     const params = parseFlasherParams(window.location.hash);
     this._hasOpener = window.opener != null;
     if (params && window.opener) {

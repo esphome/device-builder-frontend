@@ -12,7 +12,6 @@ import "../../_mock-webawesome.js";
 vi.mock("../../../src/util/web-serial.js", () => ({}));
 vi.mock("../../../src/platforms/esp/esptool.js", () => ({
   connectToPort: vi.fn(),
-  detectChip: vi.fn(),
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
   resetAndDisconnect: vi.fn(),

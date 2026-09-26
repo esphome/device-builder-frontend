@@ -10,8 +10,7 @@ vi.mock("../../../../src/platforms/esp/esptool.js", () => ({
   disconnect: vi.fn(async () => {}),
 }));
 const seams = vi.hoisted(() => ({ loadEsptool: vi.fn() }));
-vi.mock("../../../../src/platforms/esp/index.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../src/platforms/esp/index.js")>()),
+vi.mock("../../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
 

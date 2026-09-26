@@ -79,8 +79,8 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
 /**
  * Open an already-authorized serial port and detect the connected chip.
  *
- * Used for both first-time detect (via ``detectChip`` after the
- * browser picker) and follow-on reconnects (install-flow's resume
+ * Used for both first-time detect (after the browser picker) and
+ * follow-on reconnects (install-flow's resume
  * after compile, the connect-event fast-path that skips the picker).
  *
  * Every caller passes a port it expects closed, so a handle still open here
@@ -183,16 +183,6 @@ export async function connectToPort(
 }
 
 /**
- * Prompt the user to select a serial port and detect the connected chip.
- * Returns chip info + the open connection for subsequent operations.
- */
-export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
-  markSerialActivity();
-  const port = await navigator.serial.requestPort();
-  return connectToPort(port, onLog);
-}
-
-/**
  * Read the base MAC address from the chip's eFuse, normalized to the
  * uppercase colon-separated form the backend stores in
  * ``ConfiguredDevice.mac_address``. esptool-js returns lowercase; the
@@ -243,7 +233,7 @@ export async function readDeviceManifest(
 
 /**
  * Flash firmware binary data to a connected ESP device.
- * Assumes detectChip() was already called and the loader is connected.
+ * Assumes connectToPort() was already called and the loader is connected.
  */
 export async function flashFirmware(
   loader: ESPLoader,

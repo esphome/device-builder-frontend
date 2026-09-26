@@ -21,13 +21,8 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   isWebSerialSupported: () => true,
   requestSerialPort: seams.requestSerialPort,
 }));
-vi.mock("../../../src/platforms/esp/index.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platforms/esp/index.js")>()),
+vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
-}));
-vi.mock("../../../src/platforms/esp/esptool.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platforms/esp/esptool.js")>()),
-  ...esptool,
 }));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
@@ -53,7 +48,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   seams.requestSerialPort.mockResolvedValue({ getInfo: () => ({}) } as SerialPort);
   // The loaded engine is the hoisted mock itself; the real module never runs.
-  seams.loadEsptool.mockResolvedValue(esptool as never);
+  seams.loadEsptool.mockResolvedValue(esptool);
 });
 
 afterEach(() => {
