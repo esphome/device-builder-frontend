@@ -1,4 +1,5 @@
 import { rebootPico } from "../../util/rp2-logs-reset.js";
+import { releaseControlLines } from "../../util/serial-control-lines.js";
 /**
  * Web Serial as a log source. The parent opened the port (``openPortForLogs``)
  * before the dialog showed; a drop mid-stream is ridden out the way the
@@ -28,6 +29,8 @@ export type SerialResetMode = "rts" | "pico" | "none";
 
 export interface SerialLogSourceOptions {
   reset: SerialResetMode;
+  /** Drop DTR and RTS right after a reopen (the RTL8720C's strap lines). */
+  releaseLinesAfterOpen?: boolean;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
 }
@@ -90,6 +93,7 @@ export class SerialLogSource implements WebLogSource {
       return null;
     }
     if (!live) return null;
+    if (this.options.releaseLinesAfterOpen) await releaseControlLines(live);
     const cancel = this.stream(live, hooks);
     this.options.onPortReplaced?.(live);
     return cancel;

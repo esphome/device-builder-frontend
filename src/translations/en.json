@@ -1878,6 +1878,7 @@
       "mode_esp": "ESP",
       "mode_pico": "Raspberry Pi",
       "mode_nrf": "nRF52",
+      "mode_rtl": "RTL8720C",
       "mode_picker_label": "Device family",
       "more_options": "More options",
       "report_issue": "Report an issue"
@@ -2012,7 +2013,8 @@
       "privacy": "ESPHome Web runs 100% in your browser. No data will leave your computer.",
       "lite": "This page is a lite variant of the ESPHome Device Builder. To create and edit ESPHome projects, install it on your computer or inside Home Assistant (it's free!).",
       "get_esphome": "Get ESPHome",
-      "body_nrf": "ESPHome Web lets you update the firmware on your nRF52 device using the Nordic DFU protocol, directly from your browser."
+      "body_nrf": "ESPHome Web lets you update the firmware on your nRF52 device using the Nordic DFU protocol, directly from your browser.",
+      "body_rtl": "ESPHome Web lets you install a LibreTiny build on your RTL8720C (AmebaZ2) board through its USB serial adapter and check the device logs, directly from your browser."
     },
     "install": {
       "preparing": "Preparing firmware…",
@@ -2033,6 +2035,18 @@
       "adoptable_erase_helper": "Wipes everything on the device, including saved Wi-Fi credentials. Use this if the device ran other firmware before; it takes a little longer.",
       "connect_failed_hint": "Failed to initialize. Try resetting your device or holding the BOOT button while selecting your serial port until it starts preparing the installation.",
       "no_firmware": "No firmware to flash."
+    },
+    "rtl": {
+      "title": "RTL8720C Device",
+      "connect_hint": "Install a LibreTiny UF2 on your RTL8720C (AmebaZ2) board through its USB serial adapter, or read its logs. The board is reset into download mode automatically where the adapter's DTR and RTS lines reach it.",
+      "logs": "Serial logs",
+      "install_title": "Install firmware on an RTL8720C",
+      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
+      "install_file_label": "LibreTiny UF2 (.uf2)",
+      "install_file_placeholder": "No file selected",
+      "install_howto_title": "To get the UF2 of your ESPHome project:",
+      "install_howto_3": "Choose the UF2 format and save the .uf2 file.",
+      "install_done": "Installation complete. The board is starting the firmware."
     },
     "nrf": {
       "title": "nRF52 Device",

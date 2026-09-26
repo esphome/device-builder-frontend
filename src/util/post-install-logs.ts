@@ -1,3 +1,5 @@
+import { releaseControlLines } from "./serial-control-lines.js";
+export { releaseControlLines };
 import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
@@ -151,15 +153,6 @@ export function releasesLinesAfterOpen(
   targetPlatform: string | null | undefined
 ): boolean {
   return isRtl87xxPlatform(targetPlatform);
-}
-
-/** Drop DTR and RTS, best effort: an adapter without the lines rejects. */
-export async function releaseControlLines(port: SerialPort): Promise<void> {
-  try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    // No control lines on this adapter.
-  }
 }
 
 /** Open ``port`` for a logs session and apply the platform's line policy; rejects as ``open`` does. */

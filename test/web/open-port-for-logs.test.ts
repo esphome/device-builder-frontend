@@ -30,6 +30,18 @@ describe("openPortForLogs", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("drops DTR and RTS after the open when asked to", async () => {
+    const setSignals = vi.fn(async () => {});
+    const port = { ...makePort(async () => {}), setSignals };
+    await expect(
+      openPortForLogs(port as unknown as SerialPort, localize, { releaseLines: true })
+    ).resolves.toBe(true);
+    expect(setSignals).toHaveBeenCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
+  });
+
   it("treats an already-open port with an unlocked reader as ready", async () => {
     const port = makePort(
       async () => {

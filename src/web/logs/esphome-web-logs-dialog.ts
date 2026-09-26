@@ -3,6 +3,7 @@ import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/
 import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { releaseControlLines } from "../../util/serial-control-lines.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
@@ -62,10 +63,14 @@ const MAX_SILENT_RECONNECTS = 3;
  */
 export async function openPortForLogs(
   port: SerialPort,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  options: { releaseLines?: boolean } = {}
 ): Promise<boolean> {
   try {
     await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
+    // Chromium asserts DTR and RTS on open; on the RTL8720C kits those are
+    // the download strap and the reset, so drop them before the board boots.
+    if (options.releaseLines) await releaseControlLines(port);
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader — streamSerialLines() calls getReader(), so
@@ -117,6 +122,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
    * reboot goes over WebUSB, so the button hides where that is missing.
    */
   @property() resetMode: SerialResetMode = "rts";
+
+  /** Drop DTR and RTS after every (re)open: the RTL8720C's strap and reset lines. */
+  @property({ type: Boolean, attribute: "release-lines" }) releaseLines = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -212,6 +220,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!this.port?.readable) return undefined;
     return new SerialLogSource(this.port, {
       reset: this.canReset ? this.resetMode : "none",
+      releaseLinesAfterOpen: this.releaseLines,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // registration matters for rendering the dashboard shell.
 vi.mock("../../src/web/dashboard/esphome-web-esp-connect-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-pico-connect-card.js", () => ({}));
+vi.mock("../../src/web/dashboard/esphome-web-nrf-card.js", () => ({}));
+vi.mock("../../src/web/dashboard/esphome-web-rtl-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-unsupported-card.js", () => ({}));
 vi.mock("../../src/util/web-serial.js", () => ({ isWebSerialSupported: () => true }));
 
@@ -16,7 +18,7 @@ function setSearch(query: string): void {
   window.history.replaceState({}, "", query ? `/?${query}` : "/");
 }
 
-async function mount(mode: "esp" | "pico" = "esp"): Promise<ESPHomeWebDashboard> {
+async function mount(mode: "esp" | "pico" | "rtl" = "esp"): Promise<ESPHomeWebDashboard> {
   const el = new ESPHomeWebDashboard();
   (el as any)._localize = (k: string) => k;
   el.mode = mode;
@@ -58,5 +60,13 @@ describe("esphome-web-dashboard deep-link hint", () => {
     setSearch("dashboard_logs");
     const el = await mount("pico");
     expect(el.shadowRoot!.querySelector(".hint")).toBeNull();
+  });
+});
+
+describe("esphome-web-dashboard RTL mode", () => {
+  it("renders the RTL card and its intro", async () => {
+    const el = await mount("rtl");
+    expect(el.shadowRoot!.querySelector("esphome-web-rtl-card")).not.toBeNull();
+    expect(el.shadowRoot!.textContent).toContain("web.intro.body_rtl");
   });
 });

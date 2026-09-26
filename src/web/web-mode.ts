@@ -1,13 +1,17 @@
 /**
- * ESP ⇄ Pico ⇄ nRF mode, encoded in the URL query so a link is shareable and
+ * ESP ⇄ Pico ⇄ nRF ⇄ RTL mode, encoded in the URL query so a link is shareable and
  * a reload keeps the chosen device family (matching the legacy site's ``/?pico``
  * convention). ``esp`` is the default and carries no query param; other modes
  * are a bare ``?<mode>`` flag.
  */
-export type WebMode = "esp" | "pico" | "nrf";
+export type WebMode = "esp" | "pico" | "nrf" | "rtl";
 
 const DEFAULT_MODE: WebMode = "esp";
-const FLAGGED_MODES: readonly Exclude<WebMode, typeof DEFAULT_MODE>[] = ["pico", "nrf"];
+const FLAGGED_MODES: readonly Exclude<WebMode, typeof DEFAULT_MODE>[] = [
+  "pico",
+  "nrf",
+  "rtl",
+];
 
 /** Read the current mode from a query string (defaults to the live URL). */
 export function readMode(search: string = window.location.search): WebMode {
