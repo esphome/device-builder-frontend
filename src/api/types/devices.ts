@@ -33,10 +33,10 @@ export interface DeviceRuntimeState {
    *  the device is seen online. ``ip_addresses[0]`` matches the flat
    *  ``ip`` when populated. */
   ip_addresses: string[];
-  /** Seconds the device has been unreachable, as of the moment the listing
-   *  was sent; ``null`` while online or never observed. Combine with
-   *  ``ageOf()`` to keep a rendered duration ticking between listings. */
-  offline_seconds: number | null;
+  /** Epoch seconds at which the device stopped being reachable; ``null``
+   *  while online or when nothing is known. Absolute, so a duration ticks
+   *  forward without a per-response anchor and every surface agrees. */
+  offline_since: number | null;
   deployed_version: string;
   /**
    * 8-char hex hash the running firmware reports via the

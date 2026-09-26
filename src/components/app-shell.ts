@@ -46,7 +46,6 @@ import {
   isHaIngressContext,
   labelsContext,
   localizeContext,
-  offlineDurationVisibleContext,
   offloaderIncludeLocalInPoolContext,
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
@@ -101,7 +100,6 @@ import {
   onSetExpertMode,
   onSetHideDeviceBuilder,
   onSetLanguage,
-  onSetOfflineDurationVisible,
   onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
@@ -189,9 +187,6 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: versionHistoryEnabledContext })
   @state()
   _versionHistoryEnabled = true;
-  @provide({ context: offlineDurationVisibleContext })
-  @state()
-  _offlineDurationVisible = false;
   // False until the subscribe snapshot delivers preferences; the dashboard
   // waits on it before honouring remote_compute_only so the accordion's
   // default section can't flip after first paint.
@@ -574,8 +569,6 @@ export class ESPHomeApp extends LitElement {
           onSetHideDeviceBuilder(this, e)}
         @set-version-history-enabled=${(e: CustomEvent<boolean>) =>
           onSetVersionHistoryEnabled(this, e)}
-        @set-offline-duration-visible=${(e: CustomEvent<boolean>) =>
-          onSetOfflineDurationVisible(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>

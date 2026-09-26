@@ -38,7 +38,6 @@ export {
   resolvedPlatformsContext,
   serverVersionContext,
   versionContext,
-  offlineDurationVisibleContext,
   versionHistoryEnabledContext,
 } from "./contexts.js";
 export type { RemoteBuildJobState } from "./contexts.js";

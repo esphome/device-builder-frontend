@@ -81,10 +81,11 @@ export function renderReachabilitySection(
 
   // Independent of the per-source rows: a device asleep since before the
   // dashboard started has no per-source ages at all, which is exactly when
-  // "how long has it been gone" is the only thing worth showing.
-  const offlineFor = deviceOffline
-    ? ageOf(host.device?.runtime_state.offline_seconds ?? null, anchor, now)
-    : null;
+  // "how long has it been gone" is the only thing worth showing. Measured
+  // off the same absolute stamp the card uses, so the two always agree.
+  const offlineSince = host.device?.runtime_state.offline_since ?? null;
+  const offlineFor =
+    deviceOffline && offlineSince !== null ? now / 1000 - offlineSince : null;
 
   return html`
     <div class="section">

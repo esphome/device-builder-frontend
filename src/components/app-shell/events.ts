@@ -157,10 +157,20 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.DEVICE_STATE_CHANGED: {
       // Narrow event stays flat on the wire; fold it into runtime_state.
       // New runtime_state object so Lit change detection sees the update.
-      const { configuration, state } = data as DeviceStateChangedEventData;
+      const { configuration, state, offline_since } = data as DeviceStateChangedEventData;
       host._devices = host._devices.map((d) =>
         d.configuration === configuration
-          ? { ...d, runtime_state: { ...d.runtime_state, state: state as DeviceState } }
+          ? {
+              ...d,
+              runtime_state: {
+                ...d.runtime_state,
+                state: state as DeviceState,
+                // Carried on the event: without it a fresh outage renders no
+                // duration until the next listing, and a re-flap renders the
+                // previous outage's.
+                offline_since: offline_since ?? null,
+              },
+            }
           : d
       );
       break;

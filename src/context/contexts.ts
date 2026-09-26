@@ -166,14 +166,6 @@ export const hideDeviceBuilderContext = createContext<boolean>(
  * snapshot and toggled via the expert-only Settings → Appearance switch;
  * when ``false`` the backend stops committing config edits.
  */
-export const offlineDurationVisibleContext = createContext<boolean>(
-  Symbol("esphome-offline-duration-visible")
-);
-
-/**
- * Context for whether an offline device's status pill shows how long it
- * has been unreachable. Default ``false``; toggled in Settings.
- */
 export const versionHistoryEnabledContext = createContext<boolean>(
   Symbol("esphome-version-history-enabled")
 );

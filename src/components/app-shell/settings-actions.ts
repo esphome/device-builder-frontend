@@ -135,25 +135,6 @@ export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void
 }
 
 // Turning version history off stops the backend's git auto-commit.
-export function onSetOfflineDurationVisible(
-  host: ESPHomeApp,
-  e: CustomEvent<boolean>
-): void {
-  void optimisticSetting(host, {
-    get: () => host._offlineDurationVisible,
-    set: (v) => {
-      host._offlineDurationVisible = v;
-    },
-    write: () => host._api.updatePreferences({ offline_duration_visible: e.detail }),
-    value: e.detail,
-    toastKey: "settings.experience_save_failed",
-    warn: "Failed to save offline-duration-visible:",
-    inFlight: (active) => {
-      host._prefsWritesInFlight += active ? 1 : -1;
-    },
-  });
-}
-
 export function onSetVersionHistoryEnabled(
   host: ESPHomeApp,
   e: CustomEvent<boolean>

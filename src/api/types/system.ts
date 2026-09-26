@@ -121,7 +121,6 @@ export interface UserPreferences {
   /** Auto-commit config edits to a Git history. Default ``true``; the
    *  off switch is an expert-only Appearance toggle. */
   version_history_enabled: boolean;
-  offline_duration_visible: boolean;
   /** Highest onboarding-flow version the user has acknowledged.
    *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
    *  the wizard whenever this is below the server's

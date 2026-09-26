@@ -1,11 +1,12 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
+import { activeLocale } from "../../common/localize.js";
 import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
-import { ageOf, formatDuration } from "../../util/relative-time.js";
+import { formatDuration } from "../../util/relative-time.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
 // Busy-badge copy per active job type; anything else (upload, install,
@@ -126,16 +127,13 @@ export function renderEncryptionIcon(
     <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
-/**
- * "Offline", or "Offline 2h" when the user has opted in and some channel
- * has seen the device. The backend's age is a snapshot, so advance it by
- * the wall-clock elapsed since the listing arrived before formatting.
- */
+/** "Offline", or "Offline 2h" once the backend knows when it went away. */
 function offlineLabel(card: ESPHomeDeviceCard): string {
-  const base = card._localize("dashboard.offline");
-  if (!card._offlineDurationVisible) return base;
-  const age = ageOf(card.offlineSeconds, card.offlineAnchor, card.nowMs || Date.now());
-  return age === null ? base : `${base} ${formatDuration(age)}`;
+  if (card.offlineSince === null) return card._localize("dashboard.offline");
+  const language = activeLocale();
+  return card._localize("dashboard.offline_for", {
+    duration: formatDuration(Date.now() / 1000 - card.offlineSince, { language }),
+  });
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {

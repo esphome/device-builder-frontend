@@ -15,7 +15,6 @@ import {
   expertModeContext,
   hideDeviceBuilderContext,
   localizeContext,
-  offlineDurationVisibleContext,
   remoteComputeOnlyContext,
   versionHistoryEnabledContext,
 } from "../../context/index.js";
@@ -89,9 +88,6 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @state()
   private _hideDeviceBuilder = false;
 
-  @consume({ context: offlineDurationVisibleContext, subscribe: true })
-  @state()
-  private _offlineDurationVisible = false;
   @consume({ context: versionHistoryEnabledContext, subscribe: true })
   @state()
   private _versionHistoryEnabled = true;
@@ -142,19 +138,8 @@ export class ESPHomeSettingsAppearance extends LitElement {
         </wa-select>
       </div>
       ${this._renderExpertMode()} ${this._renderRemoteCompute()}
-      ${this._renderOfflineDuration()}
       ${this._expertMode ? this._renderVersionHistory() : nothing}
     `;
-  }
-
-  private _renderOfflineDuration() {
-    return renderToggleRow(this._localize, {
-      titleId: "offline-duration-title",
-      titleKey: "settings.offline_duration",
-      descKey: "settings.offline_duration_desc",
-      checked: this._offlineDurationVisible,
-      onToggle: this._onToggleOfflineDuration,
-    });
   }
 
   // Expert-only: a beginner keeps version history on as a safety net, so the
@@ -259,10 +244,6 @@ export class ESPHomeSettingsAppearance extends LitElement {
 
   private _onToggleHideDeviceBuilder() {
     fireEvent(this, "set-hide-device-builder", !this._hideDeviceBuilder);
-  }
-
-  private _onToggleOfflineDuration() {
-    fireEvent(this, "set-offline-duration-visible", !this._offlineDurationVisible);
   }
 
   private _onToggleVersionHistory() {

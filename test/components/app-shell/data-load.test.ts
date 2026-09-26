@@ -102,7 +102,6 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     remote_compute_only: true,
     hide_device_builder: false,
     version_history_enabled: true,
-    offline_duration_visible: false,
     onboarding_completed_version: 2,
   };
 

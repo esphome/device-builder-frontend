@@ -12,10 +12,16 @@ import { handleEvent } from "../../../src/components/app-shell/events.js";
 
 type Host = Pick<ESPHomeApp, "_devices">;
 
-function dispatch(host: Host, configuration: string, state: DeviceState): void {
+function dispatch(
+  host: Host,
+  configuration: string,
+  state: DeviceState,
+  offline_since: number | null = null
+): void {
   handleEvent(host as ESPHomeApp, DeviceEventType.DEVICE_STATE_CHANGED, {
     configuration,
     state,
+    offline_since,
   });
 }
 
@@ -46,5 +52,26 @@ describe("handleEvent DEVICE_STATE_CHANGED", () => {
 
     expect(host._devices[0]).toBe(other);
     expect(host._devices[1].runtime_state.state).toBe(DeviceState.OFFLINE);
+  });
+
+  it("folds the offline anchor a fresh outage carries", () => {
+    const host: Host = { _devices: [makeConfiguredDevice()] };
+    const since = Date.now() / 1000 - 30;
+
+    dispatch(host, "kitchen.yaml", DeviceState.OFFLINE, since);
+
+    expect(host._devices[0].runtime_state.offline_since).toBe(since);
+  });
+
+  it("drops a previous outage's anchor when the device comes back", () => {
+    const device = makeConfiguredDevice({
+      runtime_state: { offline_since: Date.now() / 1000 - 7200 },
+    });
+    const host: Host = { _devices: [device] };
+
+    dispatch(host, "kitchen.yaml", DeviceState.ONLINE, null);
+
+    // Otherwise the next outage renders the previous one's duration.
+    expect(host._devices[0].runtime_state.offline_since).toBeNull();
   });
 });
