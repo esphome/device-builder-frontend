@@ -29,7 +29,7 @@
  *                    output afresh and clear it, so a quiet device (bursty
  *                    logging at INFO) never re-trips the banner, a Stop/Start
  *                    included.
- * - ``ble``          a BLE NUS GATT notify session is streaming. ``paused``
+ * - ``ble``          a Bluetooth logs session is streaming. ``paused``
  *                    gates the on-screen log; Stop pauses display without
  *                    disconnecting, Start resumes. No reset line or port handle.
  * - ``dead``         a Web Serial reopen or BLE GATT connect/reconnect failed;
