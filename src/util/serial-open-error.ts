@@ -1,6 +1,8 @@
 import type { LocalizeFunc } from "../common/localize.js";
 import { getErrorMessage } from "./error-message.js";
 
+// The copy for a failed serial open or connect, and the errors it names.
+//
 // Rejections that came from ``SerialPort.open()`` itself. A read or write
 // on a device that dropped mid-session throws ``NetworkError`` too, and that
 // one must not read as another program holding the port.
@@ -50,9 +52,13 @@ export function portInUseMessage(
 
 /** A device never answered the connect handshake before the deadline. */
 export class SerialConnectTimeoutError extends Error {
-  constructor(readonly deadlineMs: number) {
-    super(`No answer from the device in ${Math.round(deadlineMs / 1000)} s`);
+  readonly seconds: number;
+
+  constructor(deadlineMs: number) {
+    const seconds = Math.round(deadlineMs / 1000);
+    super(`No answer from the device in ${seconds} s`);
     this.name = "SerialConnectTimeoutError";
+    this.seconds = seconds;
   }
 }
 
@@ -65,9 +71,7 @@ export function namedConnectFailure(
   localize: LocalizeFunc
 ): string | undefined {
   if (err instanceof SerialConnectTimeoutError) {
-    return localize("serial.connect_timed_out", {
-      seconds: Math.round(err.deadlineMs / 1000),
-    });
+    return localize("serial.connect_timed_out", { seconds: err.seconds });
   }
   return portInUseMessage(err, localize);
 }

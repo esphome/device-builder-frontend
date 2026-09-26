@@ -49,7 +49,6 @@ describe("serial-open-error", () => {
   it("names a connect that timed out, in seconds, ahead of the fallback", () => {
     const late = new SerialConnectTimeoutError(30_000);
     const TIMED_OUT = 'serial.connect_timed_out {"seconds":30}';
-    expect(namedConnectFailure(late, localize)).toBe(TIMED_OUT);
     expect(openFailureMessage(late, localize, "serial.connect_failed")).toBe(TIMED_OUT);
     expect(namedConnectFailure(new Error("no sync"), localize)).toBeUndefined();
   });

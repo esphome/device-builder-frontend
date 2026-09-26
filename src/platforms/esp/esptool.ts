@@ -15,7 +15,7 @@ import {
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
-import { withDeadline } from "../../util/with-deadline.js";
+import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import {
   type DeviceManifest,
   type FlashProgress,
@@ -32,6 +32,12 @@ export interface DetectedChip {
 
 /** Bounded tail of esptool-js debug lines replayed into the log on a failed connect. */
 const DEBUG_TAIL_LINES = 80;
+
+/** How long the whole esptool handshake gets; its own retries take a few seconds. */
+const CONNECT_DEADLINE_MS = 30_000;
+
+/** How long releasing the port gets before the caller moves on without it. */
+const RELEASE_DEADLINE_MS = 5_000;
 
 /** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
 const ESP_GET_SECURITY_INFO = 0x14;
@@ -90,14 +96,14 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
  * Every caller passes a port it expects closed, so a handle still open here
  * is a leftover and is closed first.
  *
- * On ``loader.main()`` failure, tries ``transport.disconnect()`` first
- * and falls back to ``port.close()`` so we never leak an open port —
- * a still-open port silently breaks the next ``port.open()`` call.
+ * On ``loader.main()`` failure the port is released (``releasePort``) so we
+ * never leak an open port — a still-open port silently breaks the next
+ * ``port.open()`` call.
  *
- * Both the handshake and that release run against a deadline: esptool-js
- * bounds each of its reads, but a device that never answers (a UART bridge
- * with no ESP behind it, a dead board) can still hold a read or a stream
- * cancel open until it is unplugged (#1858).
+ * The handshake runs against a deadline: esptool-js bounds each of its
+ * reads, but a ``write``, ``setSignals`` or ``open`` on some device or
+ * driver can block until the device is unplugged, and the writer lock it
+ * holds then keeps ``disconnect()`` waiting too (#1858).
  */
 export async function connectToPort(
   port: SerialPort,
@@ -131,14 +137,17 @@ export async function connectToPort(
     }
   };
 
+  // The log sink is dropped on failure: a handshake abandoned at the
+  // deadline runs on, and its late lines would land after the error.
+  let sink = onLog;
   const loader = new ESPLoader({
     transport,
     baudrate: 115200,
     terminal: onLog
       ? {
           clean: () => {},
-          writeLine: (line: string) => onLog(line),
-          write: (text: string) => onLog(text),
+          writeLine: (line: string) => sink?.(line),
+          write: (text: string) => sink?.(text),
         }
       : undefined,
   });
@@ -165,12 +174,8 @@ export async function connectToPort(
       await guardMisdetectedP4(loader);
       return runStub();
     };
-    const main = loader.main();
-    // Past the deadline the handshake is abandoned, and the release below
-    // cancels its read; its late rejection has nobody left to hear it.
-    main.catch(() => {});
     const chipName = await withDeadline(
-      main,
+      loader.main(),
       CONNECT_DEADLINE_MS,
       () => new SerialConnectTimeoutError(CONNECT_DEADLINE_MS)
     );
@@ -184,36 +189,33 @@ export async function connectToPort(
       }
       onLog(`Error: ${getErrorMessage(error)}`);
     }
-    await withDeadline(
-      releaseAfterFailure(transport, port),
-      RELEASE_DEADLINE_MS,
-      () => new Error(`port not released in ${RELEASE_DEADLINE_MS} ms`)
-    ).catch((err: unknown) => {
-      // The port stays held until the device is unplugged; the connect error
-      // below is still the one to show.
-      console.warn("[esptool] Could not release the port after a failed connect:", err);
-    });
+    sink = undefined;
+    await releasePort(transport);
     throw error;
   } finally {
     if (onLog) loader.debug = originalDebug;
   }
 }
 
-/** How long the whole esptool handshake gets; its own retries take a few seconds. */
-export const CONNECT_DEADLINE_MS = 30_000;
-/** How long the release after a failed handshake gets before the caller moves on. */
-export const RELEASE_DEADLINE_MS = 5_000;
-
-// Best-effort: transport.disconnect(), else port.close(). Rejections are the
-// caller's to log; the original detection error is what it rethrows.
-async function releaseAfterFailure(
-  transport: Transport,
-  port: SerialPort
-): Promise<void> {
-  try {
-    await transport.disconnect();
-  } catch {
-    await port.close();
+/**
+ * Release the transport's port, never throwing and never waiting forever:
+ * ``transport.disconnect()``, falling back to closing the port directly when
+ * that rejects (a still-open port breaks the next ``open``), and giving up
+ * with a warning past ``RELEASE_DEADLINE_MS``. A release can hang when an
+ * earlier write or ``setSignals`` never returned, since the writer lock it
+ * holds keeps ``disconnect()`` waiting for the streams; the port then stays
+ * held until the device is unplugged, and the caller's own error is still
+ * the one to show.
+ */
+async function releasePort(transport: Transport): Promise<void> {
+  const release = transport.disconnect().catch(async (err: unknown) => {
+    console.warn("[esptool] Disconnect failed, closing the port directly:", err);
+    await transport.device.close().catch(() => {});
+  });
+  if (!(await settledWithin(release, RELEASE_DEADLINE_MS))) {
+    console.warn(
+      `[esptool] Could not release the port in ${RELEASE_DEADLINE_MS} ms; it stays held until the device is unplugged`
+    );
   }
 }
 
@@ -491,15 +493,15 @@ export async function resetAndDisconnect(
   try {
     await hardResetChip(loader, transport, port);
   } finally {
-    await transport.disconnect();
+    await releasePort(transport);
     // hard_reset triggers a USB re-enumeration on native-USB chips;
     // re-stamp so the resulting connect event lands inside the window.
     markSerialActivity();
   }
 }
 
-/** Disconnect without resetting. */
+/** Disconnect without resetting; bounded and never throwing (``releasePort``). */
 export async function disconnect(transport: Transport): Promise<void> {
   markSerialActivity();
-  await transport.disconnect();
+  await releasePort(transport);
 }

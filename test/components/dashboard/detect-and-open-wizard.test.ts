@@ -104,24 +104,14 @@ describe("detectAndOpenWizard", () => {
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 
-  it("keeps the detection and closes the port when the disconnect throws", async () => {
+  it("keeps the detection when the release fails", async () => {
     const dialog = makeDialog();
-    const closable = {
-      getInfo: () => ({}),
-      close: vi.fn(async () => {}),
-    } as unknown as SerialPort;
-    engine.connectToPort.mockResolvedValue({
-      chipName: "ESP32-S3",
-      port: closable,
-      loader: {},
-      transport: {},
-    });
     engine.disconnect.mockRejectedValueOnce(new Error("transport gone"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize, port: closable });
-    // A teardown failure neither replaces the result nor leaks the open port.
+    await detectAndOpenWizard({} as ESPHomeAPI, dialog, { localize, port });
+    // A teardown failure never replaces the result; the engine's own
+    // disconnect is what closes the port directly.
     expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "ESP32-S3" });
-    expect(closable.close).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
   });
