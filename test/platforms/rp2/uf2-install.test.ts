@@ -380,6 +380,16 @@ describe("logs after a Pico install", () => {
     expect((host as { _logsPort?: unknown })._logsPort ?? null).toBeNull();
   });
 
+  it("keeps a refusal quiet when the dialog moved on during the pick", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockImplementation(async () => {
+      host._device = { ...device, configuration: "other.yaml" };
+      throw new PortNotAcceptedError({} as SerialPort);
+    });
+    await rp2DoReset(asHost(host));
+    expect(mocks.notifyError).not.toHaveBeenCalled();
+  });
+
   it("keeps no port from a touch that finished after the dialog moved on", async () => {
     const host = readyHost();
     mocks.requestSerialPort.mockResolvedValue({} as SerialPort);

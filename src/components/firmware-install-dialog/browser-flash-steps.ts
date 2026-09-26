@@ -113,8 +113,12 @@ export async function touchIntoBootloaderStep(
         : await requestSerialPort();
     } catch (err) {
       if (!step.pick || !(err instanceof PortNotAcceptedError)) throw err;
-      if (stillCurrent()) host._statusMessage = status;
-      notifyError(host._localize(step.pick.refusedKey));
+      // Like the failure path below: a picker that outlived its install
+      // must not toast over the next one.
+      if (stillCurrent()) {
+        host._statusMessage = status;
+        notifyError(host._localize(step.pick.refusedKey));
+      }
       return;
     }
     if (!port) {
