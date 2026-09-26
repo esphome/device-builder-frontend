@@ -542,6 +542,7 @@
     "rp2_uf2_download_done_body": "Copy {filename} onto the RPI-RP2 drive. The Pico restarts with the new firmware as soon as the copy finishes.",
     "rp2_resetting": "Restarting the device into BOOTSEL mode…",
     "rp2_not_a_pico": "That is a Raspberry Pi debug probe, not a Pico. Pick the Pico's own USB port.",
+    "nrf_reset_needs_newer_esphome": "This device ignored the reset; update it to a newer ESPHome to reset it from the logs.",
     "rp2_flash_failed": "USB flash failed",
     "rp2_device_lost": "The device disconnected during the flash. Hold BOOTSEL while plugging it back in, then retry.",
     "rp2_not_bootsel": "The selected device is not in BOOTSEL mode. Click Reset Device, or hold BOOTSEL while plugging it in, then try again.",

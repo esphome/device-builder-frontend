@@ -8,6 +8,11 @@ import {
   streamBleNus,
 } from "./ble-nus-stream.js";
 import { nrfDfuInstall } from "./dfu-install.js";
+import {
+  isNrfAppCdcPort,
+  nrfResetFailureKey,
+  resetNrfForLogs,
+} from "./nrf-logs-reset.js";
 import { isNrfPlatform } from "./nrf-platform.js";
 
 export * from "./dfu-install.js";
@@ -17,8 +22,18 @@ export const nrf52Platform: PlatformSupport = {
   matches: isNrfPlatform,
   install: nrfDfuInstall,
   logs: {
-    // The DFU-capable CDC has no reset line to pulse.
-    serial: { pulseResets: false, releasesLinesAfterOpen: false },
+    serial: {
+      // The DFU-capable CDC has no reset line to pulse; Reset device reboots
+      // ESPHome through a 2001-baud touch instead, on its own CDC only.
+      pulseResets: false,
+      releasesLinesAfterOpen: false,
+      reset: {
+        available: () => true,
+        supports: isNrfAppCdcPort,
+        reset: resetNrfForLogs,
+        failureKey: (err) => nrfResetFailureKey(err, "dashboard.logs_reset_failed"),
+      },
+    },
     ble: {
       available: isWebBluetoothSupported,
       pick: pickBleNusDevice,
