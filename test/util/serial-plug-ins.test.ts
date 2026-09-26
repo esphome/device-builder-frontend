@@ -157,4 +157,19 @@ describe("watchSerialPlugIns", () => {
     plugIn(port(0xf00a));
     expect(onPlugIn).not.toHaveBeenCalled();
   });
+
+  it("reads an identical board swapped in within the blip as the bounce, by policy", () => {
+    const onPlugIn = vi.fn();
+    watchSerialPlugIns(onPlugIn);
+    // Web Serial gives no per-device serial, so the twin is indistinguishable
+    // from the board that just left; a hand swap never fits in a second.
+    unplug(port(0xf00a));
+    vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS / 2);
+    plugIn(port(0xf00a));
+    expect(onPlugIn).not.toHaveBeenCalled();
+    unplug(port(0xf00a));
+    vi.advanceTimersByTime(SERIAL_REENUMERATION_BLIP_MS);
+    plugIn(port(0xf00a));
+    expect(onPlugIn).toHaveBeenCalledTimes(1);
+  });
 });

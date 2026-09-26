@@ -24,7 +24,10 @@ export const SERIAL_REENUMERATION_BLIP_MS = 1000;
  * ``connect`` that follows: Chrome hands out a fresh ``SerialPort`` object
  * when a device re-enumerates, so the object is no key. Ports without USB
  * ids (Bluetooth RFCOMM, for one) get none, as in ``matchesDevice``: two of
- * them would otherwise read as the same device.
+ * them would otherwise read as the same device. Web Serial exposes no
+ * per-device serial, so two identical boards share a key: swapping one for
+ * the other inside the blip reads as a bounce and costs one toast, which a
+ * hand swap never manages in under a second.
  */
 function deviceKey(port: SerialPort): string | null {
   const { usbVendorId, usbProductId } = port.getInfo();
