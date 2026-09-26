@@ -8,7 +8,7 @@ import {
   streamBleNus,
 } from "./ble-nus-stream.js";
 import { nrfDfuInstall } from "./dfu-install.js";
-import { isNrf52Port, isNrfPlatform } from "./nrf-platform.js";
+import { isNrfPlatform } from "./nrf-platform.js";
 import { NRF52_SERIAL_LOGS } from "./serial-logs.js";
 
 export * from "./dfu-install.js";
@@ -16,7 +16,6 @@ export * from "./dfu-install.js";
 export const nrf52Platform: PlatformSupport = {
   id: "nrf52",
   matches: isNrfPlatform,
-  claimsPort: isNrf52Port,
   install: nrfDfuInstall,
   logs: {
     serial: NRF52_SERIAL_LOGS,

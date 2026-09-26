@@ -118,13 +118,6 @@ export interface PlatformSupport {
   /** The platform key, e.g. ``rp2``. */
   readonly id: string;
   matches(targetPlatform: string | null | undefined): boolean;
-  /**
-   * Whether a Web Serial port is one of this platform's own boards by its
-   * USB ids (a board's native CDC, never a UART bridge, which can carry
-   * anything). Claims use disjoint vendor ids, so at most one platform
-   * claims a port.
-   */
-  claimsPort?(port: SerialPort): boolean;
   readonly install?: AnyBrowserInstall;
   readonly logs?: PlatformLogs;
 }
