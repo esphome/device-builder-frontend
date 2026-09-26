@@ -2,19 +2,33 @@
  * The Device Builder's nRF52 install: Nordic legacy DFU over the bootloader's
  * CDC. The engine loads on demand so it stays out of the main chunk.
  */
-import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  resetForRetry,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import {
+  type BrowserFlasher,
+  FLASH_ACTION_KEY,
+  FlashImageSlot,
+  RESET_ACTION_KEY,
+} from "../../components/firmware-install-dialog/browser-flasher.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
-import { loadDfuEngine } from "./index.js";
+import { type DfuPackage, loadDfuEngine } from "./index.js";
 import { withManualBootloaderHint } from "./manual-bootloader-hint.js";
+import { isNrfPlatform } from "./nrf-platform.js";
+
+declare module "../../components/firmware-install-dialog/types.js" {
+  interface BrowserFlasherSteps {
+    "nrf-dfu": "nrf-reset" | "nrf-wait";
+  }
+}
+
+/** The parsed DFU package, kept for Retry. */
+export const nrfPackage = new FlashImageSlot<DfuPackage>();
 
 /**
  * Compile, download and parse the DFU package, then hand off to the two
@@ -47,7 +61,7 @@ export async function startNrfDfuInstall(
   }
   if (stale()) return;
   try {
-    host._nrfPkg = parseDfuPackage(bytes);
+    nrfPackage.set(host, parseDfuPackage(bytes));
   } catch (err) {
     host._fail(host._localize("firmware.nrf_bad_package"), getErrorMessage(err));
     return;
@@ -56,24 +70,8 @@ export async function startNrfDfuInstall(
   showResetStep(host);
 }
 
-/**
- * Retry after a failed reset or flash (device dropped mid-transfer, wrong
- * port picked). The package is still parsed, so skip the compile and go back
- * to the DFU steps: the port was released on failure and the device is in
- * the bootloader or back in the app, and step 1 handles either.
- */
-export function retryNrfDfu(
-  host: ESPHomeFirmwareInstallDialog,
-  device: ConfiguredDevice
-): void {
-  if (!host._nrfPkg) {
-    host.installNrfDfu(device);
-    return;
-  }
-  resetForRetry(host);
-  showResetStep(host);
-}
-
+// Also the Retry target: the port was released on failure and the device is
+// in the bootloader or back in the app, and step 1 handles either.
 function showResetStep(host: ESPHomeFirmwareInstallDialog): void {
   host._step = "nrf-reset";
   host._statusMessage = host._localize("firmware.nrf_step1_title");
@@ -82,7 +80,7 @@ function showResetStep(host: ESPHomeFirmwareInstallDialog): void {
 /** Step 1: 1200-baud touch into DFU mode. Runs from a button click (user gesture). */
 export function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   return touchIntoBootloaderStep(host, {
-    image: () => host._nrfPkg,
+    image: () => nrfPackage.get(host),
     resettingKey: "firmware.nrf_resetting",
     showNext: () => {
       host._step = "nrf-wait";
@@ -99,14 +97,14 @@ export function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
 
 /** Step 2: flash over the re-enumerated DFU port. Runs from a button click. */
 export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  const pkg = host._nrfPkg;
+  const pkg = nrfPackage.get(host);
   if (!pkg || host._flashBusy) return;
   // Teardown aborts the session, but the abort still lands here on a dialog
   // that may already show another install, so only report back to the same
   // one. A retry re-parses, so package identity covers a restart on the same
   // device.
   const device = host._device;
-  const stillCurrent = () => host._device === device && host._nrfPkg === pkg;
+  const stillCurrent = () => host._device === device && nrfPackage.get(host) === pkg;
   const port = await pickSerialPortOrFail(host, stillCurrent);
   if (!port) return;
   host._step = "flashing";
@@ -144,3 +142,29 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._statusMessage = host._localize("firmware.status_done");
   host._step = "done";
 }
+
+/**
+ * Two user-gesture steps. Step 1 offers Flash beside Reset: a device already
+ * in DFU mode (say after a double-press reset) skips the touch.
+ */
+export const nrfDfuFlasher: BrowserFlasher<"nrf-dfu"> = {
+  id: "nrf-dfu",
+  matches: isNrfPlatform,
+  methodKey: "nrf_dfu",
+  holdsPort: false,
+  start: startNrfDfuInstall,
+  showFirstStep: showResetStep,
+  steps: {
+    "nrf-reset": {
+      detailKey: "firmware.nrf_step1_desc",
+      footer: () => ({
+        secondary: { run: nrfDoFlash, labelKey: FLASH_ACTION_KEY },
+        primary: { run: nrfDoReset, labelKey: RESET_ACTION_KEY },
+      }),
+    },
+    "nrf-wait": {
+      detailKey: "firmware.nrf_step2_desc",
+      footer: () => ({ primary: { run: nrfDoFlash, labelKey: FLASH_ACTION_KEY } }),
+    },
+  },
+};

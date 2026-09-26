@@ -1,8 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
-import { FLASHER_HOST, LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
+import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
-import { isWebUsbSupported } from "../../platforms/rp2/index.js";
 import { devicePlatform } from "../../util/crash-report.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
@@ -18,7 +17,8 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
-import { PORT_HOLDING_INSTALLERS } from "./types.js";
+import { flasherStepView } from "./browser-flasher.js";
+import type { FlasherStep } from "./types.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -112,18 +112,12 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
     case "compiling":
     case "flashing":
     case "downloading":
-    case "nrf-reset":
-    case "nrf-wait":
-    case "rp2-bootsel":
-    case "rp2-wait":
-    case "rtl-ready":
-    case "rtl-connect":
-    case "rtl-wait":
       return "running";
     default:
-      // Exhaustive: adding an InstallStep without mapping it here is a
-      // compile error (host._step is no longer narrowed to never).
-      return host._step satisfies never;
+      // What's left is a browser flasher's own step, which always runs. A
+      // shared step added without a case above is a compile error here.
+      host._step satisfies FlasherStep;
+      return "running";
   }
 }
 
@@ -131,9 +125,8 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
     return host._localize("firmware.usb_built_title");
   }
-  if (host._installer === "rp2-uf2") {
-    return host._localize("firmware.rp2_uf2_download_done_title");
-  }
+  const flasherCopy = host._flasher?.downloadReady;
+  if (flasherCopy) return host._localize(flasherCopy.titleKey);
   // binary-download
   const isElf = host._downloadedFilename.endsWith(".elf");
   return host._localize(
@@ -149,9 +142,8 @@ function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
     return host._localize("firmware.usb_built_body", { host: FLASHER_HOST });
   }
   const filename = host._downloadedFilename;
-  if (host._installer === "rp2-uf2") {
-    return host._localize("firmware.rp2_uf2_download_done_body", { filename });
-  }
+  const flasherCopy = host._flasher?.downloadReady;
+  if (flasherCopy) return host._localize(flasherCopy.bodyKey, { filename });
   // binary-download
   const isElf = filename.endsWith(".elf");
   return host._localize(
@@ -173,19 +165,11 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
     return host._localize("firmware.choose_binary_desc");
   }
   if (host._step === "download-ready") return downloadReadyDetail(host);
-  if (host._step === "nrf-reset") return host._localize("firmware.nrf_step1_desc");
-  if (host._step === "nrf-wait") return host._localize("firmware.nrf_step2_desc");
-  if (host._step === "rp2-bootsel" || host._step === "rp2-wait") {
-    // Without WebUSB the write is a UF2 download the user copies to the drive.
-    const base =
-      host._step === "rp2-bootsel"
-        ? "firmware.rp2_bootsel_desc"
-        : "firmware.rp2_wait_desc";
-    return host._localize(isWebUsbSupported() ? base : `${base}_download`);
+  const view = flasherStepView(host);
+  if (view) {
+    const key = typeof view.detailKey === "string" ? view.detailKey : view.detailKey();
+    return host._localize(key);
   }
-  if (host._step === "rtl-ready") return host._localize("firmware.rtl_ready_desc");
-  if (host._step === "rtl-connect") return host._localize("firmware.rtl_connect_desc");
-  if (host._step === "rtl-wait") return host._localize("firmware.rtl_wait_desc");
   if (host._step === "error") return host._errorMessage;
   // Hidden tabs throttle timers, which can stall the Web Serial write and fail
   // the flash; there's no API to opt out, so warn the user to stay on the page.
@@ -262,17 +246,6 @@ function renderDownloadReadyExtra(
     : nothing;
 }
 
-// Where to read on when the strap step does not get the board into download mode.
-function renderRtlGuideLink(host: ESPHomeFirmwareInstallDialog): TemplateResult {
-  return html`<a
-    class="reset-suggestion-link"
-    href=${LIBRETINY_AMBZ2_GUIDE_URL}
-    target="_blank"
-    rel="noopener noreferrer"
-    >${host._localize("firmware.rtl_guide_link")}</a
-  >`;
-}
-
 // The body a step adds under its status text; the steps are exclusive.
 function stepExtra(host: ESPHomeFirmwareInstallDialog): TemplateResult | typeof nothing {
   switch (host._step) {
@@ -280,10 +253,8 @@ function stepExtra(host: ESPHomeFirmwareInstallDialog): TemplateResult | typeof 
       return renderBinaryList(host);
     case "download-ready":
       return renderDownloadReadyExtra(host);
-    case "rtl-wait":
-      return renderRtlGuideLink(host);
     default:
-      return nothing;
+      return flasherStepView(host)?.extra?.(host) ?? nothing;
   }
 }
 
@@ -326,46 +297,6 @@ export function renderLogs(
   `;
 }
 
-interface FooterAction {
-  onClick: () => void;
-  labelKey: string;
-}
-
-// The two-step bootloader hand-offs. nRF offers Flash beside Reset on step 1
-// (a device already in DFU mode, say after a double-press reset, skips the
-// touch), then Flash alone on step 2. The Pico keeps Reset beside the write on
-// both steps (a touch on the wrong serial port "succeeds" silently, and a
-// blank Pico skips it), and the write is a UF2 download where WebUSB is
-// missing.
-function bootloaderStepActions(
-  host: ESPHomeFirmwareInstallDialog
-): { primary: FooterAction; secondary?: FooterAction } | null {
-  const reset = "firmware.browser_flash_reset_action";
-  const flash = "firmware.browser_flash_action";
-  switch (host._step) {
-    case "nrf-reset":
-      return {
-        secondary: { onClick: host._nrfDoFlash, labelKey: flash },
-        primary: { onClick: host._nrfDoReset, labelKey: reset },
-      };
-    case "nrf-wait":
-      return { primary: { onClick: host._nrfDoFlash, labelKey: flash } };
-    case "rp2-bootsel":
-    case "rp2-wait":
-      return {
-        secondary: { onClick: host._rp2DoReset, labelKey: reset },
-        primary: isWebUsbSupported()
-          ? { onClick: host._rp2DoFlash, labelKey: flash }
-          : { onClick: host._rp2DoDownload, labelKey: "firmware.rp2_download_action" },
-      };
-    // One click: the engine resets the board itself, or shows the strap guide.
-    case "rtl-ready":
-      return { primary: { onClick: host._rtlDoFlash, labelKey: flash } };
-    default:
-      return null;
-  }
-}
-
 export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   if (host._step === "choose-binary" || host._step === "downloading") {
     // Compile is done and the byte fetch can't be cancelled, so offer Close
@@ -378,7 +309,8 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  const bootloader = bootloaderStepActions(host);
+  // A browser flasher's user-gesture step (reset into the bootloader, flash).
+  const bootloader = flasherStepView(host)?.footer?.(host);
   if (bootloader) {
     const { primary, secondary } = bootloader;
     return html`
@@ -391,7 +323,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
             ? html`<button
                 class="btn btn--ghost"
                 ?disabled=${host._flashBusy}
-                @click=${secondary.onClick}
+                @click=${host._flashAction(secondary.run)}
               >
                 ${host._localize(secondary.labelKey)}
               </button>`
@@ -400,7 +332,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         <button
           class="btn btn--primary"
           ?disabled=${host._flashBusy}
-          @click=${primary.onClick}
+          @click=${host._flashAction(primary.run)}
         >
           ${host._localize(primary.labelKey)}
         </button>
@@ -410,7 +342,9 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const isRunning =
     host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {
-    const showToggle = PORT_HOLDING_INSTALLERS.has(host._installer);
+    // Installers whose flash leaves a port the logs can reopen.
+    const showToggle =
+      host._installer === "web-serial" || host._flasher?.holdsPort === true;
     return html`
       <div class="footer">
         ${

@@ -28,8 +28,9 @@ import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.j
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import {
-  retryRtlAmbz2,
+  rtlAmbz2Flasher,
   rtlDoFlash,
+  rtlImage,
   startRtlAmbz2Install,
 } from "../../../src/platforms/rtl87xx/ambz2-install.js";
 import {
@@ -70,11 +71,9 @@ function makeHost(opts: { binaries?: FirmwareBinary[]; uf2?: ArrayBuffer } = {})
       downloadBytes: opts.uf2 ?? uf2(),
     },
     {
-      _rtlImage: null as LibreTinyImage | null,
       _logsPort: null as SerialPort | null,
       _open: true,
       _showLogsAfterInstall: false,
-      installRtlAmbz2: vi.fn(),
     }
   );
 }
@@ -82,7 +81,7 @@ type Host = ReturnType<typeof makeHost>;
 
 function readyHost(): Host {
   const host = makeHost();
-  host._rtlImage = image;
+  rtlImage.set(asHost(host), image);
   host._binaries = [bin("firmware.uf2", "uf2")];
   host._step = "rtl-ready";
   return host;
@@ -100,7 +99,7 @@ describe("startRtlAmbz2Install", () => {
       "bw15.yaml",
       "firmware.uf2"
     );
-    expect(host._rtlImage?.runs.map((r) => r.address)).toEqual([0x4000]);
+    expect(rtlImage.get(asHost(host))?.runs.map((r) => r.address)).toEqual([0x4000]);
     expect(host._binaries.map((b) => b.file)).toEqual(["firmware.uf2"]);
     expect(host._step).toBe("rtl-ready");
     expect(host._statusMessage).toBe("firmware.rtl_ready_title");
@@ -118,7 +117,7 @@ describe("startRtlAmbz2Install", () => {
     await startRtlAmbz2Install(asHost(host));
     expect(host._statusMessage).toBe("firmware.rtl_wrong_family");
     expect(host._errorMessage).toContain("0x22e0d6fc");
-    expect(host._rtlImage).toBeNull();
+    expect(rtlImage.get(asHost(host))).toBeNull();
   });
 
   it("treats a malformed file as a bad UF2", async () => {
@@ -134,7 +133,7 @@ describe("startRtlAmbz2Install", () => {
       return uf2();
     });
     await startRtlAmbz2Install(asHost(host));
-    expect(host._rtlImage).toBeNull();
+    expect(rtlImage.get(asHost(host))).toBeNull();
     expect(host._step).not.toBe("rtl-ready");
   });
 });
@@ -276,20 +275,12 @@ describe("rtlDoFlash", () => {
   });
 });
 
-describe("retryRtlAmbz2", () => {
-  it("goes back to the ready step without recompiling when the image is held", () => {
+describe("rtlAmbz2Flasher", () => {
+  it("goes back to the ready step as the Retry target", () => {
     const host = readyHost();
     host._step = "error";
-    host._errorMessage = "x";
-    retryRtlAmbz2(asHost(host), device);
+    rtlAmbz2Flasher.showFirstStep(asHost(host));
     expect(host._step).toBe("rtl-ready");
-    expect(host._errorMessage).toBe("");
-    expect(host.installRtlAmbz2).not.toHaveBeenCalled();
-  });
-
-  it("retries from scratch when no image is held", () => {
-    const host = makeHost();
-    retryRtlAmbz2(asHost(host), device);
-    expect(host.installRtlAmbz2).toHaveBeenCalledWith(device);
+    expect(host._statusMessage).toBe("firmware.rtl_ready_title");
   });
 });

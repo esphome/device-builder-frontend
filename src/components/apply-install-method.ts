@@ -1,5 +1,6 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
+import { browserFlasherForMethod } from "../platforms/browser-flashers.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 
 export interface InstallMethodHandlers {
@@ -34,6 +35,8 @@ export function applyInstallMethod(
     case "bootloader":
       h.openInstall(OTA_PORT, { bootloader: true });
       break;
+    // ESP's installers, still built into the dialog; they move to browser
+    // flasher descriptors in a later pass.
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);
       break;
@@ -45,14 +48,10 @@ export function applyInstallMethod(
     case "binary-download":
       h.firmwareDialog?.installBinaryDownload(h.device);
       break;
-    case "nrf-dfu":
-      h.firmwareDialog?.installNrfDfu(h.device);
-      break;
-    case "rp2-uf2":
-      h.firmwareDialog?.installRp2Uf2(h.device);
-      break;
-    case "rtl-ambz2":
-      h.firmwareDialog?.installRtlAmbz2(h.device);
-      break;
+    default: {
+      // A platform's browser flasher (nRF52 DFU, Pico UF2, RTL8720C ROM).
+      const flasher = browserFlasherForMethod(method);
+      if (flasher) h.firmwareDialog?.installBrowserFlasher(flasher, h.device);
+    }
   }
 }
