@@ -1,10 +1,9 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
-import type { ProcessTerminalState } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -16,7 +15,14 @@ import {
 } from "../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
-import { renderProgressCard } from "./install-progress.js";
+import { filePickerStyles, renderFilePicker } from "./file-picker.js";
+import {
+  installActionsStyles,
+  installTerminalState,
+  renderCloseButton,
+  renderProgressCard,
+  renderRetryButton,
+} from "./install-progress.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -83,10 +89,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     this._state = "error";
   }
 
-  private _onFileChange(e: Event): void {
-    const input = e.target as HTMLInputElement;
-    this._file = input.files?.[0] ?? null;
-  }
+  private _onFileChange = (e: Event): void => {
+    this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
+  };
 
   private async _startInstall(): Promise<void> {
     if (!this._file) {
@@ -186,30 +191,13 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   }
 
   private _renderSetup() {
-    return html`
-      <div class="file-row">
-        <label class="file-label">
-          <span>${this._localize("web.nrf.install_file_label")}</span>
-          <input type="file" accept=".zip" @change=${this._onFileChange} />
-        </label>
-        <span class="file-name">
-          ${this._file ? this._file.name : this._localize("web.nrf.install_file_placeholder")}
-        </span>
-      </div>
-    `;
-  }
-
-  private _terminalState(): ProcessTerminalState {
-    switch (this._state) {
-      case "success":
-        return "success";
-      case "error":
-        return "error";
-      case "waiting":
-        return null;
-      default:
-        return "running";
-    }
+    return renderFilePicker({
+      label: this._localize("web.nrf.install_file_label"),
+      accept: ".zip",
+      file: this._file,
+      placeholder: this._localize("web.nrf.install_file_placeholder"),
+      onChange: this._onFileChange,
+    });
   }
 
   private _statusMessage(): string {
@@ -233,7 +221,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     const errored = this._state === "error";
     const done = this._state === "success";
     return renderProgressCard({
-      state: this._terminalState(),
+      state: installTerminalState(this._state),
       message: this._statusMessage(),
       detail: errored
         ? this._errorMessage
@@ -268,17 +256,9 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
           </wa-button>
         `;
       case "error":
-        return html`
-          <wa-button variant="neutral" @click=${() => (this._state = "idle")}>
-            ${this._localize("command.retry")}
-          </wa-button>
-        `;
+        return renderRetryButton(this._localize, () => (this._state = "idle"));
       case "success":
-        return html`
-          <wa-button variant="brand" @click=${this._onAfterHide}>
-            ${this._localize("command.close")}
-          </wa-button>
-        `;
+        return renderCloseButton(this._localize, this._onAfterHide);
       default:
         return nothing;
     }
@@ -298,40 +278,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     `;
   }
 
-  static styles = [
-    espHomeStyles,
-    css`
-      .file-row {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-      .file-label {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-      .file-label input[type="file"] {
-        font-size: var(--wa-font-size-s);
-        font-family: inherit;
-      }
-      .file-name {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: var(--wa-space-m);
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, filePickerStyles, installActionsStyles];
 }
 
 declare global {

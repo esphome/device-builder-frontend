@@ -14,7 +14,7 @@ import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
 import { runFlash } from "../install/run-flash.js";
-import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
+import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import type { FlashPart } from "../util/esphome-web-firmware.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
 import { validateEspImage } from "./image-magic.js";

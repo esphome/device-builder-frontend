@@ -5,26 +5,29 @@ import { customElement, property, state } from "lit/decorators.js";
 import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
-import type { ProcessTerminalState } from "../../components/process-terminal/process-terminal.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import {
-  type LibreTinyImage,
-  parseLibreTinyImage,
-  UF2_FAMILY_AMBZ2,
-} from "../../util/libretiny-uf2.js";
-import { Uf2FamilyError } from "../../util/uf2.js";
+import { Ambz2ImageError, type LibreTinyImage } from "../../util/libretiny-uf2.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 
-import { renderProgressCard } from "./install-progress.js";
+import { filePickerStyles, renderFilePicker } from "./file-picker.js";
+import {
+  installActionsStyles,
+  installTerminalState,
+  renderCloseButton,
+  renderProgressCard,
+  renderRetryButton,
+} from "./install-progress.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
 
-// Loaded on demand so ESP / Pico / nRF visitors never download the engine.
+// Loaded on demand so ESP / Pico / nRF visitors never download the engine
+// or the UF2 parser.
 const loadEngine = () => import("../../util/ambz2-flasher.js");
+const loadParser = () => import("../../util/libretiny-uf2.js");
 
 /**
  * RTL8720C (AmebaZ2) install: a LibreTiny UF2 the user supplies (there is no
@@ -92,9 +95,9 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     this._state = "error";
   }
 
-  private _onFileChange(e: Event): void {
+  private _onFileChange = (e: Event): void => {
     this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
-  }
+  };
 
   private async _flash(): Promise<void> {
     const file = this._file;
@@ -105,17 +108,15 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     let port: SerialPort | null;
     try {
       try {
-        image = parseLibreTinyImage(new Uint8Array(await file.arrayBuffer()), [
-          UF2_FAMILY_AMBZ2,
+        const [{ parseAmbz2Image }, bytes] = await Promise.all([
+          loadParser(),
+          file.arrayBuffer(),
         ]);
+        image = parseAmbz2Image(new Uint8Array(bytes));
       } catch (err) {
-        // Another Realtek family (AmebaZ) is a real build for a chip this
-        // engine cannot flash; anything else is a bad file.
         this._fail(
           this._localize(
-            err instanceof Uf2FamilyError
-              ? "firmware.rtl_wrong_family"
-              : "firmware.rtl_bad_uf2"
+            err instanceof Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2"
           ),
           getErrorMessage(err)
         );
@@ -136,6 +137,8 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     this._progress = 0;
     const abort = new AbortController();
     this._abort = abort;
+    // Closing the dialog aborts the run; its late hooks must not repaint it.
+    const live = () => !abort.signal.aborted;
     let rebooted: boolean;
     try {
       const { flashAmbz2 } = await loadEngine();
@@ -143,18 +146,18 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
         signal: abort.signal,
         onLog: this._log,
         onWaitingForStrap: () => {
-          if (this._abort === abort) this._state = "waiting";
+          if (live()) this._state = "waiting";
         },
         onLinked: () => {
-          if (this._abort === abort) this._state = "flashing";
+          if (live()) this._state = "flashing";
         },
         onProgress: (percent) => {
-          if (this._abort === abort) this._progress = percent;
+          if (live()) this._progress = percent;
         },
       });
     } catch (err) {
       // The dialog closed and stopped the engine: nothing left to report to.
-      if (abort.signal.aborted) return;
+      if (!live()) return;
       this._fail(this._localize("firmware.rtl_flash_failed"), getErrorMessage(err));
       return;
     } finally {
@@ -166,19 +169,6 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
 
   private _onAfterHide(): void {
     this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true }));
-  }
-
-  private _terminalState(): ProcessTerminalState {
-    switch (this._state) {
-      case "success":
-        return "success";
-      case "error":
-        return "error";
-      case "waiting":
-        return null;
-      default:
-        return "running";
-    }
   }
 
   private _statusMessage(): string {
@@ -214,15 +204,13 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   private _renderSetup() {
     return html`
       <p>${this._localize("web.rtl.install_intro")}</p>
-      <div class="file-row">
-        <label class="file-label">
-          <span>${this._localize("web.rtl.install_file_label")}</span>
-          <input type="file" accept=".uf2" @change=${this._onFileChange} />
-        </label>
-        <span class="file-name">
-          ${this._file ? this._file.name : this._localize("web.rtl.install_file_placeholder")}
-        </span>
-      </div>
+      ${renderFilePicker({
+        label: this._localize("web.rtl.install_file_label"),
+        accept: ".uf2",
+        file: this._file,
+        placeholder: this._localize("web.rtl.install_file_placeholder"),
+        onChange: this._onFileChange,
+      })}
       <p>${this._localize("web.rtl.install_howto_title")}</p>
       <ol>
         <li>${this._localize("web.install.upload_howto_1")}</li>
@@ -235,7 +223,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   private _renderProgress() {
     return html`
       ${renderProgressCard({
-        state: this._terminalState(),
+        state: installTerminalState(this._state),
         message: this._statusMessage(),
         detail: this._statusDetail(),
         progress: this._state === "flashing" ? this._progress : null,
@@ -269,17 +257,9 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
           </wa-button>
         `;
       case "error":
-        return html`
-          <wa-button variant="neutral" @click=${() => (this._state = "idle")}>
-            ${this._localize("command.retry")}
-          </wa-button>
-        `;
+        return renderRetryButton(this._localize, () => (this._state = "idle"));
       case "success":
-        return html`
-          <wa-button variant="brand" @click=${this._onAfterHide}>
-            ${this._localize("command.close")}
-          </wa-button>
-        `;
+        return renderCloseButton(this._localize, this._onAfterHide);
       default:
         return nothing;
     }
@@ -301,31 +281,9 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    filePickerStyles,
+    installActionsStyles,
     css`
-      .file-row {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-      .file-label {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-      .file-label input[type="file"] {
-        font-size: var(--wa-font-size-s);
-        font-family: inherit;
-      }
-      .file-name {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       ol {
         padding-left: 1.5em;
         color: var(--wa-color-text-quiet);
@@ -333,11 +291,6 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
       .guide {
         margin: var(--wa-space-s) 0 0;
         font-size: var(--wa-font-size-s);
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: var(--wa-space-m);
       }
     `,
   ];

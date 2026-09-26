@@ -1,4 +1,4 @@
-import { html, nothing, type TemplateResult } from "lit";
+import { css, html, nothing, type TemplateResult } from "lit";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -84,3 +84,46 @@ export function renderProgressCard(card: ProgressCard): TemplateResult {
     </esphome-process-terminal>
   `;
 }
+
+/** The card's banner state for a self-driven dialog's step: a wait step shows no banner. */
+export function installTerminalState(step: string): ProcessTerminalState {
+  switch (step) {
+    case "success":
+      return "success";
+    case "error":
+      return "error";
+    case "waiting":
+      return null;
+    default:
+      return "running";
+  }
+}
+
+export function renderRetryButton(
+  localize: LocalizeFunc,
+  onClick: () => void
+): TemplateResult {
+  return html`
+    <wa-button variant="neutral" @click=${onClick}
+      >${localize("command.retry")}</wa-button
+    >
+  `;
+}
+
+export function renderCloseButton(
+  localize: LocalizeFunc,
+  onClick: () => void
+): TemplateResult {
+  return html`
+    <wa-button variant="brand" @click=${onClick}>${localize("command.close")}</wa-button>
+  `;
+}
+
+/** The right-aligned action row under a dialog's body. */
+export const installActionsStyles = css`
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--wa-space-m);
+  }
+`;

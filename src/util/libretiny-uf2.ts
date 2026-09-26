@@ -12,6 +12,7 @@ import {
   UF2_BLOCK_SIZE,
   UF2_FLAG_HAS_TAGS,
   UF2_FLAG_NOT_MAIN_FLASH,
+  Uf2FamilyError,
   type Uf2Range,
 } from "./uf2.js";
 import { XMODEM_BLOCK_SIZE } from "./xmodem.js";
@@ -227,4 +228,33 @@ export function parseLibreTinyImage(
     runs: ranges,
     totalBytes: ranges.reduce((n, r) => n + r.data.length, 0),
   };
+}
+
+/** Why an AmebaZ2 image was refused; ``key`` is the install dialogs' title copy. */
+export class Ambz2ImageError extends Error {
+  constructor(
+    readonly key: "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2",
+    readonly cause: unknown
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "Ambz2ImageError";
+  }
+}
+
+/**
+ * Parse a LibreTiny UF2 for the RTL8720C flasher. Another Realtek family
+ * (AmebaZ) is a real build for a chip the browser cannot flash; anything
+ * else is a bad file. Fails as ``Ambz2ImageError``.
+ */
+export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
+  try {
+    return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2]);
+  } catch (err) {
+    throw new Ambz2ImageError(
+      err instanceof Uf2FamilyError
+        ? "firmware.rtl_wrong_family"
+        : "firmware.rtl_bad_uf2",
+      err
+    );
+  }
 }

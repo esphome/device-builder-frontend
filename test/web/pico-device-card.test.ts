@@ -5,7 +5,8 @@ vi.mock("../../src/web/improv/open-improv-dialog.js", () => ({
   openImprovDialog: vi.fn(),
   IMPROV_OPEN_DELAY_MS: 0,
 }));
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: vi.fn(),
 }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
@@ -15,7 +16,7 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import { expectTooltipsAnchored } from "../_tooltip-anchors.js";
 import { ESPHomeWebPicoDeviceCard } from "../../src/web/dashboard/esphome-web-pico-device-card.js";
-import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { openPortForLogs } from "../../src/web/logs/open-port-for-logs.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

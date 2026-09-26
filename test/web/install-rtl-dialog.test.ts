@@ -8,7 +8,7 @@ vi.mock("../../src/components/install-details-log.js", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
-  parseLibreTinyImage: vi.fn(),
+  parseAmbz2Image: vi.fn(),
   flashAmbz2: vi.fn(),
 }));
 vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
@@ -17,12 +17,12 @@ vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
 }));
 vi.mock("../../src/util/libretiny-uf2.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  parseLibreTinyImage: mocks.parseLibreTinyImage,
+  parseAmbz2Image: mocks.parseAmbz2Image,
 }));
 vi.mock("../../src/util/ambz2-flasher.js", () => ({ flashAmbz2: mocks.flashAmbz2 }));
 
 import { identityLocalize, mount } from "../_dom.js";
-import { Uf2FamilyError } from "../../src/util/uf2.js";
+import { Ambz2ImageError } from "../../src/util/libretiny-uf2.js";
 import { ESPHomeWebInstallRtlDialog } from "../../src/web/install/esphome-web-install-rtl-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -40,17 +40,16 @@ async function mountDialog(): Promise<any> {
 }
 
 const card = (el: any) => el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-// The file read and the engine load take real turns; poll for the state.
-async function until(check: () => boolean): Promise<void> {
-  for (let i = 0; i < 50 && !check(); i++) await new Promise((r) => setTimeout(r, 0));
-  expect(check()).toBe(true);
-}
 const log = (el: any) =>
   el.shadowRoot!.querySelector("esphome-install-details-log") as any;
 const text = (el: any) => el.shadowRoot!.textContent ?? "";
+const button = (el: any, label: string): HTMLElement =>
+  [...el.shadowRoot!.querySelectorAll("wa-button")].find(
+    (b: Element) => b.textContent?.trim() === label
+  ) as HTMLElement;
 
 beforeEach(() => {
-  mocks.parseLibreTinyImage.mockReturnValue(IMAGE);
+  mocks.parseAmbz2Image.mockReturnValue(IMAGE);
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.flashAmbz2.mockResolvedValue(true);
 });
@@ -71,7 +70,7 @@ describe("esphome-web-install-rtl-dialog", () => {
     await el._flash();
     await el.updateComplete;
     expect(mocks.flashAmbz2).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
-    expect(el._state).toBe("success");
+    expect(card(el).state).toBe("success");
     expect(card(el).statusMessage).toBe("web.rtl.install_done");
     expect(log(el).lines).toEqual([
       "Resetting the board into download mode over DTR/RTS",
@@ -95,46 +94,57 @@ describe("esphome-web-install-rtl-dialog", () => {
     });
     const el = await mountDialog();
     const pending = el._flash();
-    await until(() => el._state === "waiting");
-    await el.updateComplete;
-    expect(card(el).statusMessage).toBe("firmware.rtl_wait_title");
+    await vi.waitFor(() =>
+      expect(card(el).statusMessage).toBe("firmware.rtl_wait_title")
+    );
+    expect(card(el).state).toBeNull();
     expect(text(el)).toContain("firmware.rtl_guide_link");
     strapped();
     await pending;
-    expect(el._state).toBe("success");
+    await el.updateComplete;
+    expect(card(el).state).toBe("success");
   });
 
   it("refuses an AmebaZ image with the wrong-family copy and a bad file with the bad-file copy", async () => {
-    mocks.parseLibreTinyImage.mockImplementation(() => {
-      throw new Uf2FamilyError(0x22e0d6fc);
+    mocks.parseAmbz2Image.mockImplementation(() => {
+      throw new Ambz2ImageError(
+        "firmware.rtl_wrong_family",
+        new Error("family 0x22e0d6fc")
+      );
     });
     const el = await mountDialog();
     await el._flash();
-    expect(el._state).toBe("error");
-    expect(el._errorTitle).toBe("firmware.rtl_wrong_family");
+    await el.updateComplete;
+    expect(card(el).state).toBe("error");
+    expect(card(el).statusMessage).toBe("firmware.rtl_wrong_family");
+    expect(card(el).statusDetail).toBe("family 0x22e0d6fc");
     expect(mocks.requestSerialPort).not.toHaveBeenCalled();
 
-    el._state = "idle";
-    mocks.parseLibreTinyImage.mockImplementation(() => {
-      throw new Error("not a UF2");
+    button(el, "command.retry").click();
+    await el.updateComplete;
+    mocks.parseAmbz2Image.mockImplementation(() => {
+      throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     await el._flash();
-    expect(el._errorTitle).toBe("firmware.rtl_bad_uf2");
-    expect(el._errorMessage).toBe("not a UF2");
+    await el.updateComplete;
+    expect(card(el).statusMessage).toBe("firmware.rtl_bad_uf2");
+    expect(card(el).statusDetail).toBe("not a UF2");
   });
 
   it("goes back to the setup step when the picker is dismissed, and reports a failed flash", async () => {
     const el = await mountDialog();
     mocks.requestSerialPort.mockResolvedValue(null);
     await el._flash();
-    expect(el._state).toBe("idle");
+    await el.updateComplete;
+    expect(card(el)).toBeNull();
 
     mocks.requestSerialPort.mockResolvedValue(PORT);
     mocks.flashAmbz2.mockRejectedValue(new Error("no answer from the ROM"));
     await el._flash();
-    expect(el._state).toBe("error");
-    expect(el._errorTitle).toBe("firmware.rtl_flash_failed");
-    expect(el._errorMessage).toBe("no answer from the ROM");
+    await el.updateComplete;
+    expect(card(el).state).toBe("error");
+    expect(card(el).statusMessage).toBe("firmware.rtl_flash_failed");
+    expect(card(el).statusDetail).toBe("no answer from the ROM");
   });
 
   it("stops the engine and stays quiet when the dialog closes mid-flash", async () => {
@@ -150,11 +160,12 @@ describe("esphome-web-install-rtl-dialog", () => {
     );
     const el = await mountDialog();
     const pending = el._flash();
-    await until(() => el._state === "connecting");
+    await vi.waitFor(() => expect(mocks.flashAmbz2).toHaveBeenCalled());
     el.open = false;
     await el.updateComplete;
     await pending;
     expect(signal.aborted).toBe(true);
-    expect(el._state).toBe("idle");
+    await el.updateComplete;
+    expect(card(el)).toBeNull();
   });
 });

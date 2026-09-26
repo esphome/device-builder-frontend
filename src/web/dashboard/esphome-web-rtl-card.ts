@@ -2,19 +2,14 @@ import { consume } from "@lit/context";
 import { mdiTextBoxOutline, mdiUpload } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { requestSerialPort } from "../../util/web-serial.js";
 import "../install/esphome-web-install-rtl-dialog.js";
-import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
-import { releaseOrphanedPort } from "../util/release-port.js";
+import { pickPortForLogs } from "../util/pick-port-for-logs.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -23,11 +18,14 @@ import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
 
+// The usual kits wire RTS to CEN and DTR to the PA00 download strap; every
+// logs open (the first one here, reopens in the dialog) drops both lines.
+const RTL_LOGS = { releaseLines: true };
+
 /**
  * RTL8720C (AmebaZ2) card: no connected state; each install picks its own
  * port and flashes through the ROM downloader, and each logs session picks
- * its own port. The usual kits wire RTS to CEN and DTR to the PA00 download
- * strap, so a logs open releases both lines right away.
+ * its own port.
  */
 @customElement("esphome-web-rtl-card")
 export class ESPHomeWebRtlCard extends LitElement {
@@ -44,26 +42,8 @@ export class ESPHomeWebRtlCard extends LitElement {
     if (this._picking || this._logsPort) return;
     this._picking = true;
     try {
-      let port: SerialPort | null;
-      try {
-        port = await requestSerialPort();
-      } catch (err) {
-        toast.error(
-          this._localize("web.connect.failed", { error: getErrorMessage(err) })
-        );
-        return;
-      }
-      if (!port) return;
-      // The shell may offer another board flow from the port's ids.
-      fireEvent(this, "port-picked", port);
-      if (!(await openPortForLogs(port, this._localize, { releaseLines: true }))) return;
-      // A flow switch accepted while the open was pending unmounted this
-      // card: nothing is left to own the port, so release it.
-      if (!this.isConnected) {
-        await releaseOrphanedPort(port);
-        return;
-      }
-      this._logsPort = port;
+      const port = await pickPortForLogs(this, this._localize, RTL_LOGS);
+      if (port) this._logsPort = port;
     } finally {
       this._picking = false;
     }
@@ -109,7 +89,7 @@ export class ESPHomeWebRtlCard extends LitElement {
         ?open=${this._logsPort !== undefined}
         .deviceLabel=${this._localize("web.rtl.title")}
         .resetMode=${"rts"}
-        release-lines
+        ?release-lines=${RTL_LOGS.releaseLines}
         @after-hide=${this._onLogsHidden}
       ></esphome-web-logs-dialog>
     `;

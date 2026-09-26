@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   openPortForLogs: vi.fn(),
 }));
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: mocks.openPortForLogs,
 }));
 vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
@@ -84,11 +85,11 @@ describe("esphome-web-rtl-card", () => {
     );
     const el = await mountCard();
     const pending = (el as any)._showLogs();
-    for (let i = 0; i < 4; i++) await Promise.resolve();
+    await vi.waitFor(() => expect(mocks.openPortForLogs).toHaveBeenCalled());
     el.remove();
     opened(true);
     await pending;
     expect(port.close).toHaveBeenCalledTimes(1);
-    expect((el as any)._logsPort).toBeUndefined();
+    expect(logsDialog(el).hasAttribute("open")).toBe(false);
   });
 });

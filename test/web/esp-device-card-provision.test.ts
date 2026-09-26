@@ -15,7 +15,8 @@ vi.mock("../../src/util/sleep.js", () => ({ sleep: () => Promise.resolve() }));
 vi.mock("../../src/web/install/esphome-web-install-adoptable-dialog.js", () => ({}));
 vi.mock("../../src/web/install/esphome-web-install-upload-dialog.js", () => ({}));
 const openPortForLogs = vi.fn();
-vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({
+vi.mock("../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: (...a: unknown[]) => openPortForLogs(...a),
 }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));

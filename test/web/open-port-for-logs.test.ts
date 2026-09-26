@@ -7,7 +7,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import toast from "sonner-js";
-import { openPortForLogs } from "../../src/web/logs/esphome-web-logs-dialog.js";
+import { openPortForLogs } from "../../src/web/logs/open-port-for-logs.js";
 
 const localize = (k: string) => k;
 
