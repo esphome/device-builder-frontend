@@ -193,6 +193,21 @@ describe("openImprovDialog", () => {
     expect(close).toHaveBeenCalledTimes(2);
   });
 
+  it("resolves at the deadline when the close is still pending (a wedged driver)", async () => {
+    const close = vi.fn(() => new Promise<void>(() => {}));
+    const port = { ...makePort(), close };
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    vi.useFakeTimers();
+    try {
+      dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(promise).resolves.toEqual({ improv: false, provisioned: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps retrying the close while only the SDK's writer still holds the port", async () => {
     const close = vi
       .fn<() => Promise<void>>()
