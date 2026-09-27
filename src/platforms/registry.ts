@@ -6,6 +6,7 @@
  * everything from it. A device with no entry (ESP) gets the built-in
  * behaviour. Never imported from ``src/web``.
  */
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
@@ -41,22 +42,32 @@ export function serialLogsFor(
   return serialLogsOf(platformFor(targetPlatform));
 }
 
-/** The flasher of ``platform`` that writes a device's chip, if one does. */
+const writesChip = (install: AnyBrowserInstall, mcu: string | null): boolean =>
+  !install.chips || (mcu !== null && install.chips.includes(mcu));
+
+/**
+ * The flasher of ``platform`` that writes a device's chip whatever firmware
+ * it runs, if one does.
+ */
 export function installOf(
   platform: PlatformSupport | undefined,
   mcu: string | null
 ): AnyBrowserInstall | undefined {
   return platform?.installs?.find(
-    (install) => !install.chips || (mcu !== null && install.chips.includes(mcu))
+    (install) => !install.component && writesChip(install, mcu)
   );
 }
 
-/** ``installOf`` for a device's target platform. */
-export function installFor(
-  targetPlatform: string | null | undefined,
-  mcu: string | null
-): AnyBrowserInstall | undefined {
-  return installOf(platformFor(targetPlatform), mcu);
+/** Every flasher a device can take: its chip's, and its firmware's own. */
+export function installsFor(
+  device: ConfiguredDevice | null | undefined
+): readonly AnyBrowserInstall[] {
+  if (!device) return [];
+  return (platformFor(device.target_platform)?.installs ?? []).filter(
+    (install) =>
+      writesChip(install, device.mcu) &&
+      (!install.component || device.loaded_platforms.includes(install.component))
+  );
 }
 
 /** The install flow an install method string selects, if any. */

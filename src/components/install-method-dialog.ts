@@ -22,7 +22,8 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { isEsptoolPlatform } from "../platforms/esp/index.js";
 import { BleProbeController } from "../platforms/nrf52/index.js";
-import { installFor, platformFor } from "../platforms/registry.js";
+import type { AnyBrowserInstall } from "../platforms/platform-support.js";
+import { platformFor } from "../platforms/registry.js";
 import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
@@ -100,9 +101,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @property()
   deviceTargetPlatform = "";
 
-  /** The device's ``mcu``. */
+  /** The platform flashers the device can take (``installsFor``). */
   @property({ attribute: false })
-  deviceMcu: string | null = null;
+  platformInstalls: readonly AnyBrowserInstall[] = [];
 
   @property()
   mode: "install" | "logs" = "install";
@@ -266,15 +267,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
-    // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial),
-    // or, on an insecure origin, the hand-off to web.esphome.io for the ones
-    // that can, with the same copy the ESP USB row shows there.
-    const platformRow = renderPlatformFlashOption(
-      ctx,
-      installFor(this.deviceTargetPlatform, this.deviceMcu),
-      hasWebSerial,
-      availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined
-    );
+    const flasherRows = this._renderPlatformFlashRows(ctx, (i) => !i.component);
+    const updaterRows = this._renderPlatformFlashRows(ctx, (i) => !!i.component);
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)
       : nothing;
@@ -286,11 +280,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // cable; the server-serial row is the cable path when neither renders (a
     // chip no browser flasher writes). The logs → ESPHome Web row only
     // appears in logs mode, so it's inert (``nothing``) in the usbFirst
-    // (install) ordering.
+    // (install) ordering. An updater needs firmware that already runs, as an
+    // OTA does, so it goes last with it; it stays offered, since a board
+    // flashed outside the dashboard reads as never flashed too.
     const usbFirst = !isLogs && this.neverFlashed;
     const rows = usbFirst
-      ? [usbRow, platformRow, logsWebRow, serverRow, otaRow]
-      : [otaRow, usbRow, platformRow, logsWebRow, bleNusRow, serverRow];
+      ? [usbRow, flasherRows, logsWebRow, serverRow, updaterRows, otaRow]
+      : [otaRow, usbRow, flasherRows, updaterRows, logsWebRow, bleNusRow, serverRow];
 
     return html`
       ${renderInstallNotice(ctx)}
@@ -454,13 +450,30 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     `;
   }
 
+  /** The rows of the device's platform flashers that ``wanted`` picks. */
+  private _renderPlatformFlashRows(
+    ctx: MethodRowContext,
+    wanted: (install: AnyBrowserInstall) => boolean,
+    advanced = false
+  ) {
+    const availability = this._webSerialAvailability;
+    const handoffDesc =
+      availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined;
+    return this.platformInstalls
+      .filter((install) => (install.advanced ?? false) === advanced && wanted(install))
+      .map((install) =>
+        renderPlatformFlashOption(ctx, install, availability === "available", handoffDesc)
+      );
+  }
+
   /**
    * "Advanced options" disclosure at the bottom of the method
    * list. Holds the OTA address-override card (target a specific
    * IP / hostname — useful when the device hasn't been resolved
    * yet, or when overriding the dashboard's auto-detected
-   * address) and, in install mode, the manual binary-download
-   * option (compile here, flash with an external tool).
+   * address), the platform flashers marked advanced and, in install
+   * mode, the manual binary-download option (compile here, flash with
+   * an external tool).
    */
   private _renderAdvancedSection(ctx: MethodRowContext) {
     return renderDisclosure({
@@ -483,6 +496,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             },
             onSubmit: this._submitOtaAddress,
           })}
+          ${this._renderPlatformFlashRows(ctx, () => true, true)}
           ${
             this.mode === "install" &&
             this.canFlashBootloader &&

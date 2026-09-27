@@ -2,20 +2,20 @@
  * Unit tests for the pure registry-list helpers extracted from
  * ``registry-list.ts``. The element-level renderer test exercises these
  * through the DOM; this file pins the context-free behaviour directly,
- * with particular attention to ``spliceEditable``'s foreign-entry
+ * with particular attention to foreign-entry
  * preservation (the load-bearing invariant: a click in the visual
  * editor must never drop data the form doesn't understand).
  */
 import { describe, expect, it } from "vitest";
 
 import {
+  appendEditable,
   asList,
   editableEntries,
   formatRegistryId,
   isEditableItem,
   itemId,
   REGISTRY_OPS,
-  spliceEditable,
   VALUE_TYPE_TO_CONFIG_TYPE,
 } from "../../../src/components/device/config-entry-renderers/registry-list-helpers.js";
 
@@ -96,39 +96,25 @@ describe("editableEntries", () => {
   });
 });
 
-describe("spliceEditable", () => {
-  it("replaces editable slots in place (edit)", () => {
-    const list = [{ a: 1 }, { b: 2 }];
-    expect(spliceEditable(list, [0, 1], [{ a: 9 }, { b: 2 }])).toEqual([
-      { a: 9 },
-      { b: 2 },
-    ]);
-  });
-
-  it("removes a trailing editable slot while preserving foreign entries (remove)", () => {
-    const list = [{ a: 1 }, "foreign", { b: 2 }];
-    expect(spliceEditable(list, [0, 2], [{ a: 1 }])).toEqual([{ a: 1 }, "foreign"]);
-  });
-
-  it("inserts a new entry after the last editable slot, before trailing foreign entries (add)", () => {
+describe("appendEditable", () => {
+  it("adds the row after the last editable entry, before trailing foreign entries", () => {
     const list = [{ a: 1 }, "foreign"];
-    expect(spliceEditable(list, [0], [{ a: 1 }, { c: 3 }])).toEqual([
-      { a: 1 },
-      { c: 3 },
-      "foreign",
-    ]);
+    expect(appendEditable(list, [0], { c: 3 })).toEqual([{ a: 1 }, { c: 3 }, "foreign"]);
   });
 
-  it("appends to the end when there are no editable slots yet", () => {
-    const list = ["foreign"];
-    expect(spliceEditable(list, [], [{ c: 3 }])).toEqual(["foreign", { c: 3 }]);
+  it("adds the row past a foreign entry that sits between editable ones", () => {
+    const list = [{ a: 1 }, "foreign", { b: 2 }];
+    expect(appendEditable(list, [0, 2], {})).toEqual([{ a: 1 }, "foreign", { b: 2 }, {}]);
+  });
+
+  it("appends to the end when there are no editable entries yet", () => {
+    expect(appendEditable(["foreign"], [], { c: 3 })).toEqual(["foreign", { c: 3 }]);
   });
 
   it("does not mutate the input list", () => {
     const list = [{ a: 1 }];
-    const copy = [...list];
-    spliceEditable(list, [0], [{ a: 1 }, { b: 2 }]);
-    expect(list).toEqual(copy);
+    appendEditable(list, [0], { b: 2 });
+    expect(list).toEqual([{ a: 1 }]);
   });
 });
 

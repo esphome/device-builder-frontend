@@ -20,6 +20,8 @@ import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderDialogs } from "../../../src/components/dashboard/render-dialogs.js";
+import type { AnyBrowserInstall } from "../../../src/platforms/platform-support.js";
+import { installsFor } from "../../../src/platforms/registry.js";
 import { makeDashboardHost } from "./_host.js";
 
 function renderInstallMethodDialog(device: ConfiguredDevice | null) {
@@ -40,7 +42,7 @@ function renderInstallMethodDialog(device: ConfiguredDevice | null) {
   return dialog as HTMLElement & {
     deviceState: DeviceState;
     deviceTargetPlatform: string;
-    deviceMcu: string | null;
+    platformInstalls: readonly AnyBrowserInstall[];
   };
 }
 
@@ -56,12 +58,12 @@ describe("renderDialogs install-method dialog", () => {
     expect(renderInstallMethodDialog(null).deviceState).toBe(DeviceState.UNKNOWN);
   });
 
-  it("binds the selected device's platform and chip, which pick the flash row", () => {
-    const dialog = renderInstallMethodDialog(
-      makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8720c" })
-    );
+  it("binds the selected device's platform and the flashers it can take", () => {
+    const device = makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8720c" });
+    const dialog = renderInstallMethodDialog(device);
     expect(dialog.deviceTargetPlatform).toBe("rtl87xx");
-    expect(dialog.deviceMcu).toBe("rtl8720c");
-    expect(renderInstallMethodDialog(null).deviceMcu).toBeNull();
+    expect(dialog.platformInstalls).toEqual(installsFor(device));
+    expect(dialog.platformInstalls).toHaveLength(1);
+    expect(renderInstallMethodDialog(null).platformInstalls).toEqual([]);
   });
 });

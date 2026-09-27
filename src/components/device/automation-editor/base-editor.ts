@@ -105,6 +105,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected _target = 0;
   private _retargeted = false;
 
+  /** "Show advanced settings" of the editor's own form; collapsed again
+   *  for each automation the editor is pointed at. */
+  @state() protected _showAdvanced = false;
+
   /** Focus target for the current caret; none while a stale tree is shown. */
   protected _currentFocus() {
     return this._resolveFocus(
@@ -237,7 +241,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       const m = this._parseError.resolve(parsed, this.location);
       if (m) {
         this.location = m.location;
-        if (this._retargeted) this._target++;
+        if (this._retargeted) {
+          this._target++;
+          this._showAdvanced = false;
+        }
         this._retargeted = false;
         this.value = m.tree;
         this._hydrating = false;
@@ -326,6 +333,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     if (this._engine.shouldSkipReload()) return;
     void this._hydrateFromBackend();
   }
+
+  protected _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._showAdvanced = e.detail.show;
+  };
 
   protected _onDelete = () => {
     void this._engine.delete();

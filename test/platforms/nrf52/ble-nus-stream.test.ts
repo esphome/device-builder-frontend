@@ -9,7 +9,7 @@ import {
 import {
   BLE_NUS_SERVICE_UUID,
   BleNusServiceNotFoundError,
-  requestBleNusDevice,
+  requestBleDevice,
   streamBleNus,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
 
@@ -280,7 +280,7 @@ describe("streamBleNus", () => {
   });
 });
 
-describe("requestBleNusDevice", () => {
+describe("requestBleDevice", () => {
   let restore = (): void => {};
   afterEach(() => restore());
 
@@ -289,7 +289,7 @@ describe("requestBleNusDevice", () => {
     const requestDevice = vi.fn(async () => picked);
     restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
     await expect(
-      requestBleNusDevice(["test3", "Living Room", "test3", ""])
+      requestBleDevice(["test3", "Living Room", "test3", ""], BLE_NUS_SERVICE_UUID)
     ).resolves.toBe(picked);
     expect(requestDevice).toHaveBeenCalledWith({
       filters: [{ name: "test3" }, { name: "Living Room" }],
@@ -300,7 +300,7 @@ describe("requestBleNusDevice", () => {
   it("lists every device when no name is known", async () => {
     const requestDevice = vi.fn(async () => ({}));
     restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
-    await requestBleNusDevice([]);
+    await requestBleDevice([], BLE_NUS_SERVICE_UUID);
     expect(requestDevice).toHaveBeenCalledWith({
       acceptAllDevices: true,
       optionalServices: [BLE_NUS_SERVICE_UUID],
@@ -318,7 +318,7 @@ describe("requestBleNusDevice", () => {
       activation();
       bluetooth();
     };
-    await expect(requestBleNusDevice(["x"])).rejects.toMatchObject({
+    await expect(requestBleDevice(["x"], BLE_NUS_SERVICE_UUID)).rejects.toMatchObject({
       name: "PickerActivationError",
     });
   });
@@ -331,7 +331,7 @@ describe("requestBleNusDevice", () => {
       getAvailability: vi.fn(async () => false),
     };
     restore = withWebBluetooth(bluetooth);
-    await expect(requestBleNusDevice(["x"])).rejects.toMatchObject({
+    await expect(requestBleDevice(["x"], BLE_NUS_SERVICE_UUID)).rejects.toMatchObject({
       name: "BleUnavailableError",
       reason: "off",
     });
@@ -341,8 +341,8 @@ describe("requestBleNusDevice", () => {
     );
     bluetooth.getAvailability.mockResolvedValue(true);
     const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    await expect(requestBleNusDevice(["x"])).resolves.toBeNull();
-    expect(debug).toHaveBeenCalledWith("BLE NUS chooser closed", expect.anything());
+    await expect(requestBleDevice(["x"], BLE_NUS_SERVICE_UUID)).resolves.toBeNull();
+    expect(debug).toHaveBeenCalledWith("BLE chooser closed", expect.anything());
     debug.mockRestore();
   });
 });

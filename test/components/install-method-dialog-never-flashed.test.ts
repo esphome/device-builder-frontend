@@ -11,10 +11,13 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import { installsFor } from "../../src/platforms/registry.js";
 import {
   restoreWebSerialEnv,
+  setBluetooth,
   setLocalhostWithWebSerial,
 } from "./_install-method-dialog-env.js";
 
@@ -24,6 +27,7 @@ async function mount(opts: {
   state?: DeviceState;
   platform?: string;
   mcu?: string;
+  loadedPlatforms?: string[];
   mode?: "install" | "logs";
 }): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
@@ -32,7 +36,13 @@ async function mount(opts: {
   dialog.neverFlashed = opts.neverFlashed ?? false;
   dialog.deviceState = opts.state ?? DeviceState.UNKNOWN;
   dialog.deviceTargetPlatform = opts.platform ?? "esp32";
-  dialog.deviceMcu = opts.mcu ?? null;
+  dialog.platformInstalls = installsFor(
+    makeConfiguredDevice({
+      target_platform: dialog.deviceTargetPlatform,
+      mcu: opts.mcu,
+      loaded_platforms: opts.loadedPlatforms ?? [],
+    })
+  );
   dialog.mode = opts.mode ?? "install";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
@@ -71,6 +81,23 @@ describe("install-method-dialog never-flashed ordering", () => {
     expect(callout(d)!.textContent).toContain(
       "dashboard.install_method_first_install_notice"
     );
+  });
+
+  it("keeps an updater offered, last with the OTA row", async () => {
+    setBluetooth(true);
+    const d = await mount({
+      neverFlashed: true,
+      platform: "nrf52",
+      loadedPlatforms: ["ota.zephyr_mcumgr"],
+    });
+    // The DFU flasher, server-serial, then what needs running firmware.
+    expect(rowIconOrder(d)).toEqual(["chip", "serial-port", "bluetooth", "wifi"]);
+  });
+
+  it("lists an updater with the flashers once the device has run firmware", async () => {
+    setBluetooth(true);
+    const d = await mount({ platform: "nrf52", loadedPlatforms: ["ota.zephyr_mcumgr"] });
+    expect(rowIconOrder(d)).toEqual(["wifi", "chip", "bluetooth", "serial-port"]);
   });
 
   it("promotes server-serial when the platform has no browser row", async () => {

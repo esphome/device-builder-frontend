@@ -18,6 +18,7 @@ import {
   renderSubstitutionHint,
   renderYamlOnlyField,
 } from "../config-entry-renderers-shared.js";
+import { rowRemoved } from "./row-memory.js";
 import { seedIdFor } from "./seed-identity.js";
 
 // Returns an empty array (not undefined) when nothing's there or the value
@@ -36,10 +37,7 @@ function arrayItemHandlers(
   makeNewItem: () => unknown
 ): { addItem: () => void; removeAt: (idx: number) => void } {
   const removeAt = (idx: number) => {
-    // Row edit buffers are keyed by index; a removal shifts the indices,
-    // so an un-blurred buffer would paint (and commit) over the row that
-    // slides into its slot.
-    ctx.clearEditingMagnitudesUnder(path);
+    ctx.rowsMoved(path, rowRemoved(idx));
     ctx.emitChange(
       path,
       readArrayAt(ctx, path).filter((_, i) => i !== idx)

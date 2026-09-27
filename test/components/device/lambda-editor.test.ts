@@ -8,6 +8,7 @@
  * echo a spurious change, dirty the form, and trigger a lossy
  * re-serialize of the whole section.
  */
+import { undo } from "@codemirror/commands";
 import { describe, expect, it, vi } from "vitest";
 
 import { mount } from "../../_dom.js";
@@ -107,5 +108,24 @@ describe("lambda-editor lambda-change emission", () => {
     expect(onChange).not.toHaveBeenCalled();
     view.dispatch({ changes: { from: 0, to: 0, insert: "// " } });
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps its undo history and selection after the element is moved", async () => {
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
+    const view = el["_view"]!;
+    view.dispatch({
+      changes: { from: 9, insert: " // abc" },
+      selection: { anchor: 7, head: 8 },
+    });
+    const elsewhere = document.createElement("div");
+    document.body.appendChild(elsewhere);
+
+    elsewhere.appendChild(el);
+    await el.updateComplete;
+
+    expect(el["_view"]).toBe(view);
+    expect(view.state.selection.main.toJSON()).toEqual({ anchor: 7, head: 8 });
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("return 1;");
   });
 });

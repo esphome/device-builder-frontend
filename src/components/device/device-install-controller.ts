@@ -2,6 +2,8 @@ import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { AnyBrowserInstall } from "../../platforms/platform-support.js";
+import { installsFor } from "../../platforms/registry.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import {
   launchLogs,
@@ -53,8 +55,8 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.target_platform ?? "";
   }
 
-  get deviceMcu(): string | null {
-    return this._host.device?.mcu ?? null;
+  get platformInstalls(): readonly AnyBrowserInstall[] {
+    return installsFor(this._host.device);
   }
 
   get deviceCurrentAddress(): string {

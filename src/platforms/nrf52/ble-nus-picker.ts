@@ -1,31 +1,40 @@
 /**
- * The NUS device chooser with its failures toasted: what both the dashboard
- * and ESPHome Web run from a "Bluetooth logs" click. Null when there is
- * nothing to open (dismissed, unsupported, or the failure already shown).
+ * The Bluetooth device chooser with its failures toasted: what both the
+ * dashboard and ESPHome Web run from a "Bluetooth logs" click, and the
+ * dashboard from a Bluetooth install. Null when there is nothing to open
+ * (dismissed, unsupported, or the failure already shown).
  */
 import type { LocalizeFunc } from "../../common/localize.js";
 import { copyAddressToClipboard } from "../../util/copy-address.js";
 import { LONG_TOAST_DURATION_MS, notifyError } from "../../util/notify.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
+  BLE_NUS_SERVICE_UUID,
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
   isWebBluetoothSupported,
-  requestBleNusDevice,
+  requestBleDevice,
 } from "./ble-nus-stream.js";
 
-export async function pickBleNusDevice(
+export const pickBleNusDevice = (
   localize: LocalizeFunc,
   names: string[]
+): Promise<BluetoothDevice | null> =>
+  pickBleDevice(localize, names, BLE_NUS_SERVICE_UUID);
+
+export async function pickBleDevice(
+  localize: LocalizeFunc,
+  names: string[],
+  service: string
 ): Promise<BluetoothDevice | null> {
   if (!isWebBluetoothSupported()) {
     notifyError(localize("dashboard.logs_ble_nus_unsupported"));
     return null;
   }
   try {
-    return await requestBleNusDevice(names);
+    return await requestBleDevice(names, service);
   } catch (err) {
-    console.warn("BLE NUS chooser failed", err);
+    console.warn("BLE chooser failed", err);
     if (!(err instanceof BleUnavailableError)) {
       notifyError(
         openFailureMessage(err, localize, "dashboard.logs_ble_nus_open_failed")

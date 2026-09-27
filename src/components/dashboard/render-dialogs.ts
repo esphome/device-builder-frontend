@@ -4,6 +4,7 @@ import { DeviceState } from "../../api/types/devices.js";
 import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { installsFor } from "../../platforms/registry.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
@@ -261,7 +262,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       ?open=${host._installMethodOpen}
       .deviceState=${host._installMethodDevice?.runtime_state.state ?? DeviceState.UNKNOWN}
       .deviceTargetPlatform=${host._installMethodDevice?.target_platform ?? ""}
-      .deviceMcu=${host._installMethodDevice?.mcu ?? null}
+      .platformInstalls=${installsFor(host._installMethodDevice)}
       .deviceCurrentAddress=${
         host._installMethodDevice?.ip || host._installMethodDevice?.address || ""
       }

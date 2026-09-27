@@ -91,6 +91,49 @@ describe("EscapeController", () => {
     expect(cb).not.toHaveBeenCalled();
   });
 
+  it("binds again when a host that is still active is reconnected", () => {
+    const target = new EventTarget();
+    const host = new FakeHost();
+    const cb = vi.fn();
+    const ctrl = new EscapeController(host, cb, { target });
+    ctrl.set(true);
+
+    ctrl.hostDisconnected();
+    ctrl.hostConnected();
+    target.dispatchEvent(makeEsc());
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays unbound on reconnect when the host closed meanwhile", () => {
+    const target = new EventTarget();
+    const host = new FakeHost();
+    const cb = vi.fn();
+    const ctrl = new EscapeController(host, cb, { target });
+    ctrl.set(true);
+
+    ctrl.hostDisconnected();
+    ctrl.set(false);
+    ctrl.hostConnected();
+    target.dispatchEvent(makeEsc());
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it("waits for the reconnect when activated while the host is detached", () => {
+    const target = new EventTarget();
+    const host = new FakeHost();
+    const cb = vi.fn();
+    const ctrl = new EscapeController(host, cb, { target });
+
+    ctrl.hostDisconnected();
+    ctrl.set(true);
+    target.dispatchEvent(makeEsc());
+    expect(cb).not.toHaveBeenCalled();
+
+    ctrl.hostConnected();
+    target.dispatchEvent(makeEsc());
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
   it("passes the event to the callback", () => {
     const target = new EventTarget();
     const host = new FakeHost();

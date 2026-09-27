@@ -78,6 +78,21 @@ export interface BrowserInstall<Id extends FlasherId> {
    * that is unknown. Absent: the platform is one chip.
    */
   readonly chips?: readonly string[];
+  /**
+   * The ``domain.platform`` the device's last compile must have loaded
+   * (``ota.zephyr_mcumgr``): an update over a service only that component
+   * puts on the device. Absent: the flasher needs nothing from the firmware.
+   */
+  readonly component?: string;
+  /**
+   * Whether this browser can run the flash, for one that does not go over
+   * Web Serial. Absent: it needs Web Serial.
+   */
+  readonly available?: () => boolean;
+  /** The method row's icon; a chip when absent. */
+  readonly icon?: string;
+  /** Offered under "Advanced options" rather than in the main list. */
+  readonly advanced?: boolean;
   /** The flash leaves a port the logs can reopen (the show-logs toggle). */
   readonly holdsPort: boolean;
   /** Where the flow keeps its parsed image; Retry skips the compile while it holds one. */
@@ -132,7 +147,7 @@ export interface PlatformSupport {
   /** The platform key, e.g. ``rp2``. */
   readonly id: string;
   matches(targetPlatform: string | null | undefined): boolean;
-  /** The platform's flashers; more than one where its chips need their own. */
+  /** The platform's flashers, in the order they are offered. */
   readonly installs?: readonly AnyBrowserInstall[];
   readonly logs?: PlatformLogs;
 }

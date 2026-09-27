@@ -17,8 +17,9 @@ import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import "../../../src/components/device/config-entry-renderers/registry-list.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { type ESPHomeRegistryList } from "../../../src/components/device/config-entry-renderers/registry-list.js";
+import { getIn, setIn } from "../../../src/util/nested-values.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
-import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
+import { makeEntry, makeRenderCtx, reportedRowMoves } from "./_renderer-fixtures.js";
 
 const STUB_CATALOG: LightEffect[] = [
   { id: "addressable_rainbow", name: "Rainbow", config_entries: [], applies_to: [] },
@@ -178,6 +179,7 @@ describe("renderRegistryListField — emitChange contract", () => {
     )[0] as HTMLButtonElement;
     firstRemove.click();
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
+    expect(reportedRowMoves(el.ctx, 2)).toEqual([["effects"], [null, 0]]);
   });
 
   it("Each row's wa-select has a per-row aria-label", async () => {
@@ -236,6 +238,8 @@ describe("renderRegistryListField — emitChange contract", () => {
     picker.value = "pulse";
     picker.dispatchEvent(new Event("change"));
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
+    // The row's values are gone, and what the form remembered for them too.
+    expect(reportedRowMoves(el.ctx, 2)).toEqual([["effects"], [null, 1]]);
   });
 
   it("Picker change with empty nextId never produces an empty-key item", async () => {
@@ -1005,6 +1009,86 @@ describe("renderRegistryListField — YAML-only fallback", () => {
 });
 
 describe("renderRegistryListField — foreign-entry preservation", () => {
+  // A multi-key mapping is an entry the picker cannot edit, as a string is.
+  const FOREIGN = { pulse: { speed: 3 }, strobe: null };
+  const SPEED_CATALOG: LightEffect[] = [
+    {
+      id: "pulse",
+      name: "Pulse",
+      applies_to: [],
+      config_entries: [makeEntry(ConfigEntryType.INTEGER, { key: "speed" })],
+    },
+    { id: "addressable_rainbow", name: "Rainbow", config_entries: [], applies_to: [] },
+  ];
+
+  it("addresses a row's fields by its place in the whole list (#1905)", async () => {
+    const renderEntry = vi.fn();
+    const values = { effects: [FOREIGN, { pulse: { speed: 2 } }] };
+    const { el } = mount(values, { catalog: SPEED_CATALOG, renderEntry });
+    await el.updateComplete;
+
+    const paths = renderEntry.mock.calls.map((c) => c[1] as string[]);
+    expect(paths).toEqual([["effects", "1", "pulse", "speed"]]);
+    // The path reads the row's own value, and a write lands in the row.
+    expect(getIn(values, paths[0])).toBe(2);
+    expect(setIn(values, paths[0], 7)).toEqual({
+      effects: [FOREIGN, { pulse: { speed: 7 } }],
+    });
+  });
+
+  it("still counts the rows the user sees from one", async () => {
+    const localize = vi.fn((key: string) => key);
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx(
+      { effects: [FOREIGN, { pulse: null }] },
+      { overrides: { localize } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: LightEffect[] })._catalog = SPEED_CATALOG;
+    el.requestUpdate();
+    await el.updateComplete;
+
+    // The row is second in the list and first among the rows shown.
+    expect(localize).toHaveBeenCalledWith("device.registry_list_row_label", {
+      index: "1",
+    });
+  });
+
+  it("Remove takes the row out where it is and keeps the order around it", async () => {
+    // Filters run in order, so a row must not jump over the entry that stays.
+    const { el, emit } = mount({
+      effects: [{ pulse: null }, FOREIGN, { addressable_rainbow: null }],
+    });
+    await el.updateComplete;
+    (
+      el.shadowRoot!.querySelectorAll(
+        ".registry-list-row .multi-btn"
+      )[0] as HTMLButtonElement
+    ).click();
+    expect(emit).toHaveBeenCalledWith(
+      ["effects"],
+      [FOREIGN, { addressable_rainbow: null }]
+    );
+    expect(reportedRowMoves(el.ctx, 3)).toEqual([["effects"], [null, 0, 1]]);
+  });
+
+  it("a kind change forgets the row at its place in the whole list", async () => {
+    const { el } = mount({ effects: [FOREIGN, { addressable_rainbow: null }] });
+    await el.updateComplete;
+    const picker = el.shadowRoot!.querySelector(
+      ".registry-list-row wa-select"
+    ) as HTMLSelectElement & { value: string };
+    picker.value = "pulse";
+    picker.dispatchEvent(new Event("change"));
+    expect(reportedRowMoves(el.ctx, 2)).toEqual([["effects"], [0, null]]);
+  });
+
   it("Remove keeps non-editable entries verbatim (silent-data-loss fix)", async () => {
     // The values dict can carry foreign entries — strings, scalars,
     // a YamlRawValue from a parser bail — that the picker shouldn't
@@ -1023,6 +1107,7 @@ describe("renderRegistryListField — foreign-entry preservation", () => {
       ["effects"],
       [foreign, { addressable_rainbow: null }]
     );
+    expect(reportedRowMoves(el.ctx, 3)).toEqual([["effects"], [0, null, 1]]);
   });
 
   it("Add preserves trailing foreign entries", async () => {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   copyAddressToClipboard: vi.fn(async () => {}),
   notifyError: vi.fn(),
-  requestBleNusDevice: vi.fn(),
+  requestBleDevice: vi.fn(),
   isWebBluetoothSupported: vi.fn(() => true),
 }));
 vi.mock("../../../src/util/copy-address.js", () => ({
@@ -16,12 +16,13 @@ vi.mock("../../../src/util/notify.js", () => ({
 vi.mock("../../../src/platforms/nrf52/ble-nus-stream.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   isWebBluetoothSupported: mocks.isWebBluetoothSupported,
-  requestBleNusDevice: mocks.requestBleNusDevice,
+  requestBleDevice: mocks.requestBleDevice,
 }));
 
 import { lapsedPick } from "../../_web-serial.js";
 import { pickBleNusDevice } from "../../../src/platforms/nrf52/ble-nus-picker.js";
 import {
+  BLE_NUS_SERVICE_UUID,
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
@@ -36,14 +37,14 @@ beforeEach(() => {
 describe("pickBleNusDevice", () => {
   it("hands the chosen device back, passing the names through", async () => {
     const device = {};
-    mocks.requestBleNusDevice.mockResolvedValue(device);
+    mocks.requestBleDevice.mockResolvedValue(device);
     await expect(pickBleNusDevice(localize, ["a", "b"])).resolves.toBe(device);
-    expect(mocks.requestBleNusDevice).toHaveBeenCalledWith(["a", "b"]);
+    expect(mocks.requestBleDevice).toHaveBeenCalledWith(["a", "b"], BLE_NUS_SERVICE_UUID);
     expect(mocks.notifyError).not.toHaveBeenCalled();
   });
 
   it("is quiet when the chooser is dismissed", async () => {
-    mocks.requestBleNusDevice.mockResolvedValue(null);
+    mocks.requestBleDevice.mockResolvedValue(null);
     await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
     expect(mocks.notifyError).not.toHaveBeenCalled();
   });
@@ -52,17 +53,17 @@ describe("pickBleNusDevice", () => {
     mocks.isWebBluetoothSupported.mockReturnValue(false);
     await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
     expect(mocks.notifyError).toHaveBeenCalledWith("dashboard.logs_ble_nus_unsupported");
-    expect(mocks.requestBleNusDevice).not.toHaveBeenCalled();
+    expect(mocks.requestBleDevice).not.toHaveBeenCalled();
   });
 
   it("tells an adapter that is off apart from Brave's switched-off API", async () => {
-    mocks.requestBleNusDevice.mockRejectedValue(new BleUnavailableError("off"));
+    mocks.requestBleDevice.mockRejectedValue(new BleUnavailableError("off"));
     await pickBleNusDevice(localize, []);
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_unavailable"
     );
 
-    mocks.requestBleNusDevice.mockRejectedValue(new BleUnavailableError("brave"));
+    mocks.requestBleDevice.mockRejectedValue(new BleUnavailableError("brave"));
     await pickBleNusDevice(localize, []);
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_unavailable",
@@ -84,7 +85,7 @@ describe("pickBleNusDevice", () => {
   });
 
   it("reports any other chooser failure as a failed open", async () => {
-    mocks.requestBleNusDevice.mockRejectedValue(new Error("boom"));
+    mocks.requestBleDevice.mockRejectedValue(new Error("boom"));
     await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_open_failed"
@@ -92,7 +93,7 @@ describe("pickBleNusDevice", () => {
   });
 
   it("says to click again for a chooser refused after the click ran out", async () => {
-    mocks.requestBleNusDevice.mockRejectedValue(lapsedPick());
+    mocks.requestBleDevice.mockRejectedValue(lapsedPick());
     await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
     expect(mocks.notifyError).toHaveBeenLastCalledWith("serial.picker_needs_click");
   });

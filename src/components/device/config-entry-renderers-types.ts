@@ -11,6 +11,7 @@ import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import type { RowMove } from "./config-entry-renderers/row-memory.js";
 
 export interface RenderCtx {
   localize: LocalizeFunc;
@@ -116,10 +117,10 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
-  /** Drop every edit buffer at or under *path*. List-row buffers embed the
-   *  row index, so removing a row must invalidate them — the indices shift
-   *  and an un-blurred buffer would paint (and commit) over the wrong row. */
-  clearEditingMagnitudesUnder: (path: string[]) => void;
+  /** The rows of the list at *path* are about to go where *move* says. What
+   *  the form remembers is keyed by paths that embed the row index, so it
+   *  follows each row to its new index, and a dropped row's is forgotten. */
+  rowsMoved: (path: string[], move: RowMove) => void;
   /**
    * Generic per-key off-config UI-choice store. Born for either/or
    * constraint clusters (radio chooser): ``ClusterChoice`` is the selected

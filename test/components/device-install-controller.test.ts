@@ -56,20 +56,19 @@ describe("DeviceInstallController.deviceState", () => {
   });
 });
 
-describe("DeviceInstallController.deviceMcu", () => {
-  it("returns the device's chip, which picks the flash row with its platform", () => {
+describe("DeviceInstallController.platformInstalls", () => {
+  it("returns the flashers the device's platform and chip take", () => {
     const ctrl = new DeviceInstallController(
-      makeHost(makeConfiguredDevice({ target_platform: "rp2", mcu: "rp2350" }))
+      makeHost(makeConfiguredDevice({ target_platform: "rp2", mcu: "rp2040" }))
     );
     expect(ctrl.deviceTargetPlatform).toBe("rp2");
-    expect(ctrl.deviceMcu).toBe("rp2350");
+    expect(ctrl.platformInstalls.map((i) => i.id)).toEqual(["rp2-uf2"]);
   });
 
-  it("is null for a device without one and with no device loaded", () => {
-    expect(
-      new DeviceInstallController(makeHost(makeConfiguredDevice())).deviceMcu
-    ).toBeNull();
-    expect(new DeviceInstallController(makeHost(null)).deviceMcu).toBeNull();
+  it("is empty for a chip no flasher writes and with no device loaded", () => {
+    const other = makeConfiguredDevice({ target_platform: "rp2", mcu: "rp2350" });
+    expect(new DeviceInstallController(makeHost(other)).platformInstalls).toEqual([]);
+    expect(new DeviceInstallController(makeHost(null)).platformInstalls).toEqual([]);
   });
 });
 

@@ -11,9 +11,10 @@ import { query } from "lit/decorators.js";
  * Subclasses keep their own styles, extensions, change events, and
  * theme/reconfigure strategy; the base never touches those.
  *
- * The view is torn down while the element is detached and mounted again
- * when it comes back, so an element that is moved (a keyed list
- * reordering its rows) keeps an editor.
+ * The view is torn down once the element is still detached at the next
+ * microtask checkpoint and mounted again when it comes back; a synchronous
+ * move (a keyed list reordering its rows) keeps its view, with its undo
+ * history, cursor and selection.
  */
 export abstract class CodeMirrorEditorElement extends LitElement {
   @query(".cm-wrap") protected _container!: HTMLDivElement;
@@ -48,11 +49,15 @@ export abstract class CodeMirrorEditorElement extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     // Before the first render there is no host yet; firstUpdated mounts then.
-    if (this.hasUpdated && !this._view) this._mountEditor();
+    if (!this.hasUpdated) return;
+    if (this._view) this._view.requestMeasure();
+    else this._mountEditor();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._destroyView();
+    queueMicrotask(() => {
+      if (!this.isConnected) this._destroyView();
+    });
   }
 }

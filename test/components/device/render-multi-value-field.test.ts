@@ -11,7 +11,12 @@ import { describe, expect, it } from "vitest";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderMultiValueField } from "../../../src/components/device/config-entry-renderers.js";
-import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
+import {
+  findElementBindings,
+  makeEntry,
+  makeRenderCtx,
+  reportedRowMoves,
+} from "./_renderer-fixtures.js";
 
 function fireInput(binding: Record<string, unknown>, value: string): void {
   (binding["@input"] as (e: Event) => void)({ target: { value } } as never);
@@ -74,13 +79,13 @@ describe("renderMultiValueField numeric coercion", () => {
     expect(inputs[0][".value"]).toBe("0042");
   });
 
-  it("invalidates row edit buffers when a row is removed", () => {
+  it("reports the removed row so what is remembered follows the rows", () => {
     const ctx = makeRenderCtx({ field: [1, 2] });
     const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
     const removeButtons = findElementBindings(tpl, "button");
 
     (removeButtons[0]["@click"] as () => void)();
-    expect(ctx.clearEditingMagnitudesUnder).toHaveBeenCalledWith(["field"]);
+    expect(reportedRowMoves(ctx, 2)).toEqual([["field"], [null, 0]]);
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], [2]);
   });
 

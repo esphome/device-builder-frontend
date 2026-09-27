@@ -74,22 +74,23 @@ export class BleUnavailableError extends Error {
 }
 
 /**
- * Chooser for a NUS peripheral. ESPHome advertises the node name, so the
- * chooser matches on the given names; with no name known at all it lists
- * every device. The service is listed as optional so GATT access to it is
- * granted after the user picks a device. Returns null when the chooser is
+ * Chooser for a peripheral with *service*. ESPHome advertises the node name,
+ * so the chooser matches on the given names; with no name known at all it
+ * lists every device. The service is listed as optional so GATT access to it
+ * is granted after the user picks a device. Returns null when the chooser is
  * dismissed.
  */
-export async function requestBleNusDevice(
-  names: string[]
+export async function requestBleDevice(
+  names: string[],
+  service: string
 ): Promise<BluetoothDevice | null> {
   const known = [...new Set(names.filter(Boolean))];
   const options: RequestDeviceOptions = known.length
     ? {
         filters: known.map((name) => ({ name })),
-        optionalServices: [BLE_NUS_SERVICE_UUID],
+        optionalServices: [service],
       }
-    : { acceptAllDevices: true, optionalServices: [BLE_NUS_SERVICE_UUID] };
+    : { acceptAllDevices: true, optionalServices: [service] };
   try {
     return await navigator.bluetooth.requestDevice(options);
   } catch (err) {
@@ -99,7 +100,7 @@ export async function requestBleNusDevice(
     if (reason) throw new BleUnavailableError(reason);
     // Also Chrome's answer when no device matched or policy blocked the
     // chooser, so leave a trace for "nothing happened" reports.
-    console.debug("BLE NUS chooser closed", err);
+    console.debug("BLE chooser closed", err);
     return null;
   }
 }

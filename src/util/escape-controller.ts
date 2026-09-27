@@ -1,4 +1,5 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
+import type { ReactiveControllerHost } from "lit";
+import { ActiveListenerController } from "./active-listener-controller.js";
 
 export interface EscapeControllerOptions {
   /** Where to bind the keydown listener. Defaults to ``window``. Use
@@ -28,10 +29,10 @@ export interface EscapeControllerOptions {
  *
  * Hooking up via Lit's ``addController`` means the listener is also
  * dropped automatically when the host disconnects, even if the host
- * never explicitly calls ``set(false)``.
+ * never explicitly calls ``set(false)``, and bound again when a host
+ * that is still active is reconnected.
  */
-export class EscapeController implements ReactiveController {
-  private _bound = false;
+export class EscapeController extends ActiveListenerController {
   private readonly _target: EventTarget;
   private readonly _capture: boolean;
 
@@ -40,23 +41,17 @@ export class EscapeController implements ReactiveController {
     private readonly onEscape: (e: KeyboardEvent) => void,
     options: EscapeControllerOptions = {}
   ) {
+    super(host);
     this._target = options.target ?? window;
     this._capture = options.capture ?? false;
-    host.addController(this);
   }
 
-  hostDisconnected() {
-    this.set(false);
+  protected bind(): void {
+    this._target.addEventListener("keydown", this._handler, this._capture);
   }
 
-  set(active: boolean) {
-    if (active === this._bound) return;
-    if (active) {
-      this._target.addEventListener("keydown", this._handler, this._capture);
-    } else {
-      this._target.removeEventListener("keydown", this._handler, this._capture);
-    }
-    this._bound = active;
+  protected unbind(): void {
+    this._target.removeEventListener("keydown", this._handler, this._capture);
   }
 
   /* Typed as EventListener so the union of Window | Document accepts

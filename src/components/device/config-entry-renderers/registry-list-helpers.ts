@@ -34,7 +34,7 @@ export function itemId(item: Record<string, unknown>): string {
 /** True when *item* looks like a registry-list item the renderer can
  *  edit: a plain object with zero or one key. Multi-key items or
  *  non-object entries are preserved verbatim through edits via
- *  ``editableEntries`` / ``spliceEditable`` so a click in the visual
+ *  ``editableEntries`` / ``appendEditable`` so a click in the visual
  *  editor never drops data the form doesn't understand. */
 export function isEditableItem(raw: unknown): raw is Record<string, unknown> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false;
@@ -115,15 +115,15 @@ export const REGISTRY_OPS: Record<string, RegistryOps> = {
  *  no value, a parser fallback to YamlRawValue) renders as an empty
  *  list — the user can click Add to start. The renderer treats
  *  non-object / multi-key entries as foreign and preserves them
- *  verbatim through edits via :func:`spliceEditable`. */
+ *  verbatim through edits, which address a row by its place in the list. */
 export function asList(raw: unknown): unknown[] {
   return Array.isArray(raw) ? raw : [];
 }
 
 /** Editable items + their positions in the original list. Foreign
  *  entries (non-object or multi-key) stay in the list but the
- *  picker doesn't render rows for them; ``spliceEditable`` glues
- *  the edited slice back into the original positions on save. */
+ *  picker doesn't render rows for them; ``positions`` gives each
+ *  row's place in the original list, which every edit addresses. */
 export function editableEntries(list: unknown[]): {
   items: Record<string, unknown>[];
   positions: number[];
@@ -139,32 +139,14 @@ export function editableEntries(list: unknown[]): {
   return { items, positions };
 }
 
-/** Re-emit *list* with the editable slice replaced by *next*. Foreign
- *  entries keep their original positions; new entries from Add land
- *  at the end of the editable slice (just before any trailing
- *  foreign entries). */
-export function spliceEditable(
+/** *list* with *item* added as a new row: after the last editable entry,
+ *  so ahead of any foreign entries that trail it, or at the end when no
+ *  entry is editable yet. */
+export function appendEditable(
   list: unknown[],
   positions: number[],
-  next: Record<string, unknown>[]
+  item: Record<string, unknown>
 ): unknown[] {
-  const out: unknown[] = [...list];
-  // Replace each tracked editable slot, drop the trailing tail when
-  // ``next`` is shorter (Remove), append when longer (Add).
-  positions.forEach((pos, i) => {
-    if (i < next.length) out[pos] = next[i];
-  });
-  if (next.length < positions.length) {
-    // Remove the surplus tracked slots in descending order so earlier
-    // indices stay valid as we splice.
-    const removeAt = positions.slice(next.length).reverse();
-    for (const pos of removeAt) out.splice(pos, 1);
-  } else if (next.length > positions.length) {
-    // Add: insert new entries immediately after the last editable
-    // slot, preserving any foreign entries that came after.
-    const insertAt =
-      positions.length > 0 ? positions[positions.length - 1] + 1 : out.length;
-    out.splice(insertAt, 0, ...next.slice(positions.length));
-  }
-  return out;
+  const at = positions.length > 0 ? positions[positions.length - 1] + 1 : list.length;
+  return [...list.slice(0, at), item, ...list.slice(at)];
 }
