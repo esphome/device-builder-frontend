@@ -107,4 +107,16 @@ describe("config-entry-form literal / lambda stash", () => {
     ctx().seedNestedOpen("other.pin:pin-advanced");
     expect(ctx().nestedOpenSections.has("other.pin:pin-advanced")).toBe(true);
   });
+
+  it("forgets a constraint cluster's choice and stash on a new read of the values", async () => {
+    const { form, ctx } = await mountForm(valueEntry("Delay"), { id: "1s" });
+    ctx().setClusterChoice("cluster", "b");
+    ctx().setClusterStash("cluster", "key", "typed for the side left");
+
+    form.valuesRead++;
+    await form.updateComplete;
+
+    expect(ctx().getClusterChoice("cluster")).toBeUndefined();
+    expect(ctx().getClusterStash("cluster", "key")).toBeUndefined();
+  });
 });

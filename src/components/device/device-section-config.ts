@@ -216,7 +216,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
-  /** Counts the times ``_values`` was read from the YAML, for the form. */
+  /** For the form: goes up when the YAML was edited outside it, which is
+   *  up to a second before the reload, and when ``_values`` was read. */
   _valuesRead = 0;
   /** A retargeting load is in flight while the outgoing section is still
    *  on screen. The pane is inert meanwhile; the write fences cover
@@ -316,6 +317,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
       this._fieldErrors.size
     ) {
       revalidateFields(this);
+    }
+    if (changedProperties.has("yaml") && this.yaml !== this._lastSelfWrittenYaml) {
+      this._valuesRead++;
     }
     // loadConfig synchronously flips _loading/_error; running it in
     // willUpdate folds those into the in-progress render rather than

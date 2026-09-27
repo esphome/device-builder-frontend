@@ -208,32 +208,47 @@ describe("section reload keeps the form mounted", () => {
       await c.updateComplete;
     }
 
-    it("tells the form the values were read again", async () => {
+    const reads = (c: ESPHomeDeviceSectionConfig): number => form(c).valuesRead;
+
+    it("tells the form at once, before the reload that follows a second later", async () => {
       const { c } = await firstLoad();
-      expect(form(c).valuesRead).toBe(1);
+      const before = reads(c);
+
+      c.yaml = EDITED;
+      await c.updateComplete;
+
+      expect(reads(c)).toBe(before + 1);
+    });
+
+    it("tells the form again once the values were read", async () => {
+      const { c } = await firstLoad();
+      const before = reads(c);
 
       await reloadWith(c, EDITED);
 
-      expect(form(c).valuesRead).toBe(2);
+      expect(reads(c)).toBe(before + 2);
     });
 
     it("does not for the YAML the section wrote itself", async () => {
       const { c, inner } = await firstLoad();
+      const before = reads(c);
+      expect(before).toBeGreaterThan(0);
 
       inner._lastSelfWrittenYaml = EDITED;
       await reloadWith(c, EDITED);
 
-      expect(form(c).valuesRead).toBe(1);
+      expect(reads(c)).toBe(before);
     });
 
     it("counts a read when the values are there, not when the load starts", async () => {
       const { c, settle } = await firstLoad();
+      const before = reads(c);
 
       await switchToSwitch(c);
-      expect(form(c).valuesRead).toBe(1);
+      expect(reads(c)).toBe(before);
 
       await settle("switch.template");
-      expect(form(c).valuesRead).toBe(2);
+      expect(reads(c)).toBe(before + 1);
     });
   });
 });

@@ -281,11 +281,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ attribute: false })
   presentComponents: ReadonlySet<string> = new Set();
 
-  /** Counts the times the owner read ``values`` from the YAML. The YAML may
-   *  have been edited outside the form, which is not told what moved, so
-   *  on a new read the form forgets what could write a value the user did
-   *  not just enter: it could sit on another field by now. What is only
-   *  shown, such as open groups, is kept. */
+  /** Goes up when the owner's YAML was edited outside the form, and when
+   *  the owner read ``values`` from it. The form is not told what moved,
+   *  so it then forgets what could write a value the user did not just
+   *  enter: it could sit on another field by now. What is only shown, such
+   *  as open groups, is kept. */
   @property({ attribute: false })
   valuesRead = 0;
 
@@ -645,13 +645,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearTemplatableStash(this);
       clearEnableStash(this);
     }
-    if (reread || retargeted) this._valueMemory.clear();
+    if (reread || retargeted) {
+      this._valueMemory.clear();
+      this._constraintClusters.reset();
+    }
     // A pin's open Advanced panel writes under the pin; on a pin that is
     // short form by now that write would drop the GPIO.
     if (reread) closePinAdvanced(this._nestedOpenSections, this._seededNestedOpen);
     if (retargeted) {
       this._openAdvancedPlacement.clear();
-      this._constraintClusters.reset();
       this._expandedOptionFields.clear();
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
