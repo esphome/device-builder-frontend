@@ -27,6 +27,10 @@ const STATEMENT =
 // Anchored so a `/*` inside a string ("image/*", a glob) cannot swallow the
 // imports after it.
 const COMMENTS = /^\s*\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
+// A comment trailing one name of a multi-line specifier list. Left in, it
+// would glue itself to the next name (a `type` list read as a runtime one)
+// or, with a quote in it, stop the statement from matching at all.
+const SPECIFIER_COMMENT = /^(\s*(?:type\s+)?[\w$]+(?:\s+as\s+[\w$]+)?\s*,?)\s*\/\/.*$/gm;
 
 /** Whether `{ type A, type B }` names types only. */
 function isTypeOnlyList(specifiers) {
@@ -39,10 +43,14 @@ function isTypeOnlyList(specifiers) {
   return names.length > 0 && names.every((name) => name.startsWith("type "));
 }
 
+function stripComments(source) {
+  return source.replace(COMMENTS, "").replace(SPECIFIER_COMMENT, "$1");
+}
+
 /** The relative sources a module imports at runtime. */
 function runtimeImports(source) {
   const specs = [];
-  for (const match of source.replace(COMMENTS, "").matchAll(STATEMENT)) {
+  for (const match of stripComments(source).matchAll(STATEMENT)) {
     const [, typeKeyword, specifiers, from, sideEffect] = match;
     if (sideEffect) specs.push(sideEffect);
     else if (!typeKeyword && !isTypeOnlyList(specifiers)) specs.push(from);

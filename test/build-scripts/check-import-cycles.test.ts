@@ -46,6 +46,24 @@ describe("runtimeImports", () => {
       )
     ).toEqual([]);
   });
+  it("reads a specifier list with a comment after a name", async () => {
+    const { runtimeImports } = await load();
+    expect(
+      runtimeImports(
+        [
+          "import {",
+          "  type A, // why A",
+          "  type B,",
+          '} from "./types.js";',
+          "import {",
+          "  c, // it's needed at runtime",
+          "  type C as D, // renamed",
+          '} from "./runtime.js";',
+        ].join("\n")
+      )
+    ).toEqual(["./runtime.js"]);
+  });
+
   it("keeps the imports after a string that looks like a comment opening", async () => {
     const { runtimeImports } = await load();
     expect(
