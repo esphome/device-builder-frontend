@@ -31,7 +31,7 @@ vi.mock("../../../src/util/post-install-dispatch.js", () => ({
 }));
 
 import { identityLocalize } from "../../_dom.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
+import { fakeBuildState, fakeLogBuffer } from "../../_fake-host.js";
 import { lapsedPick } from "../../_web-serial.js";
 import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
@@ -80,8 +80,7 @@ function makeHost() {
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
     _localize: identityLocalize,
-    _activeJobs: new Map<string, { job_id: string }>(),
-    _timer: { noteLine: vi.fn() },
+    ...fakeBuildState(),
     _fail: vi.fn(),
     _close: vi.fn(),
   };
@@ -325,6 +324,8 @@ describe("Web Serial install — HTTP byte download", () => {
 });
 
 describe("Web Serial install while someone else's build runs (#1893)", () => {
+  type Output = Follow & { onOutput: (line: string) => void };
+
   function busyHost() {
     const made = makeHost();
     made.host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
@@ -345,25 +346,33 @@ describe("Web Serial install while someone else's build runs (#1893)", () => {
     await install;
   });
 
-  it("waits the build out after the connect and before its own compile", async () => {
+  it("waits the build out after the connect, then compiles as if nothing ran", async () => {
     const { host, api } = busyHost();
-    const waiting: string[] = [];
+    const seen: string[] = [];
     api.firmwareFollowJob.mockImplementation((id: string, cbs: Follow) => {
-      if (id === "foreign-1") waiting.push(`${host._step}: ${host._statusMessage}`);
+      seen.push(`${id} ${host._step}: ${host._statusMessage}`);
+      // A followed build replays its lines, which move the step on.
+      (cbs as Output).onOutput("Compiling .pio/build/main.cpp.o");
+      if (id === "j1") seen.push(`${id} ${host._step}: ${host._statusMessage}`);
       cbs.onResult({ status: JobStatus.COMPLETED });
       return "s1";
     });
 
     await run(host);
 
-    expect(waiting).toEqual(["queued: firmware.status_waiting_build"]);
-    const connected = esptool.connectToPort.mock.invocationCallOrder[0];
-    const followed = api.firmwareFollowJob.mock.invocationCallOrder[0];
-    const compiled = api.firmwareCompile.mock.invocationCallOrder[0];
-    expect(connected).toBeLessThan(followed);
-    expect(followed).toBeLessThan(compiled);
-    expect(api.firmwareFollowJob.mock.calls[0][0]).toBe("foreign-1");
-    // The build is not this install's: a dismissal must not cancel it.
+    expect(seen).toEqual([
+      "foreign-1 queued: firmware.status_waiting_build",
+      "j1 queued: firmware.status_queued",
+      "j1 compiling: firmware.status_compiling",
+    ]);
+    // The clocks the other build's lines started are not this compile's.
+    expect(host._timer.reset).toHaveBeenCalledOnce();
+    expect(host._timer.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      api.firmwareCompile.mock.invocationCallOrder[0]
+    );
+    expect(esptool.connectToPort.mock.invocationCallOrder[0]).toBeLessThan(
+      api.firmwareFollowJob.mock.invocationCallOrder[0]
+    );
     expect(host._step).toBe("done");
   });
 
@@ -380,17 +389,5 @@ describe("Web Serial install while someone else's build runs (#1893)", () => {
     expect(api.firmwareCompile).not.toHaveBeenCalled();
     expect(esptool.disconnect).toHaveBeenCalled();
     expect(esptool.flashFirmware).not.toHaveBeenCalled();
-  });
-
-  it("does not wait when nothing is running", async () => {
-    const { host, api } = makeHost();
-    esptool.connectToPort.mockResolvedValue(CHIP);
-    esptool.flashFirmware.mockResolvedValue(undefined);
-    esptool.resetAndDisconnect.mockResolvedValue(undefined);
-
-    await run(host);
-
-    expect(api.firmwareFollowJob).toHaveBeenCalledOnce();
-    expect(api.firmwareFollowJob.mock.calls[0][0]).toBe("j1");
   });
 });

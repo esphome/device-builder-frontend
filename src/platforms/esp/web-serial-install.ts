@@ -8,7 +8,6 @@ import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-ins
 import {
   compileOrFail,
   finishWithLogsPort,
-  waitForRunningJob,
 } from "../../components/firmware-install-dialog/install-flow.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
@@ -159,18 +158,8 @@ export async function startWebSerialInstall(
   // "Failed to enter compressed flash mode" (#1833). The external flasher and
   // the legacy dashboard both flash on one continuous session for this reason.
 
-  // 3. Compile, once a build someone else started for this device is done:
-  // compiling now would supersede it (#1202). The wait sits here and not
-  // before the picker, which needs the click (#1893).
+  // 3. Compile
   host._step = "queued";
-  const running = host._activeJobs.get(device.configuration);
-  if (running) {
-    host._statusMessage = host._localize("firmware.status_waiting_build");
-    if (!(await waitForRunningJob(host, running.job_id, "firmware.install_failed"))) {
-      await releaseSerial(esptool, detected);
-      return;
-    }
-  }
   host._statusMessage = host._localize("firmware.status_queued");
   if (!(await compileOrFail(host, device.configuration))) {
     await releaseSerial(esptool, detected);

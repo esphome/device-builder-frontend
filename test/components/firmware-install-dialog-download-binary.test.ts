@@ -21,7 +21,7 @@ vi.mock("../../src/platforms/esp/esptool.js", () => ({
 }));
 
 import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
+import { fakeBuildState, fakeLogBuffer } from "../_fake-host.js";
 import {
   type FirmwareBinary,
   JobSource,
@@ -73,8 +73,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
-    _activeJobs: new Map<string, unknown>(),
-    _timer: { noteLine: vi.fn() },
+    ...fakeBuildState(),
     _localize: identityLocalize,
     _fail: vi.fn(),
   };

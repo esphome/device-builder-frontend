@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
+import { fakeBuildState, fakeLogBuffer } from "../_fake-host.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
@@ -40,6 +40,7 @@ function makeHost(opts: { compileOk: boolean; binaries?: FirmwareBinary[] }) {
     _statusMessage: "",
     _errorMessage: "",
     _log: fakeLogBuffer(),
+    ...fakeBuildState(),
     _jobId: "",
     _streamId: "",
     _compileReject: null,
@@ -131,5 +132,24 @@ describe("pickFactoryBinary", () => {
     expect(
       pickFactoryBinary("esp32", [bin("firmware.ota.bin"), bin("firmware.bin")])
     ).toBeUndefined();
+  });
+});
+
+describe("startUsbFlash while someone else's build runs (#1202)", () => {
+  it("waits the build out before its own compile, never claiming it", async () => {
+    const host = makeHost({ compileOk: true });
+    host._activeJobs.set("x.yaml", { job_id: "foreign-1" });
+
+    await startUsbFlash(asHost(host));
+
+    const follow = vi.mocked(host._api.firmwareFollowJob);
+    expect(follow.mock.calls.map(([id]) => id)).toEqual(["foreign-1", "j"]);
+    // Never claimed: a dismissal must not cancel someone else's build.
+    expect(host._jobId).toBe("");
+    expect(follow.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(host._api.firmwareCompile).mock.invocationCallOrder[0]
+    );
+    expect(host._timer.reset).toHaveBeenCalledOnce();
+    expect(host._step).toBe("download-ready");
   });
 });
