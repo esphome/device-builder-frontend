@@ -91,7 +91,9 @@ export async function compileOrFail(
   if (!(await runningBuildSettled(host, configuration, failKey))) return false;
   try {
     await compileAndWait(host, configuration);
-    return true;
+    // A build that ends between a close and its after-hide is nobody's to
+    // carry on with: the dialog is going, and the rejection has not come yet.
+    return stillCurrent();
   } catch (err) {
     // A dismissal settles the compile by rejecting it; the dialog it would
     // be reported on is gone, or on its next run already.
@@ -436,7 +438,8 @@ export function compileAndWait(
       follow(job.job_id);
     };
     start().catch((err: unknown) => {
-      host._compileReject = null;
+      // After a reopen the hook on the dialog is the next run's.
+      if (host._installRun === run) host._compileReject = null;
       // Raw rejection: compileFailureDetail normalizes downstream.
       reject(err);
     });

@@ -672,6 +672,41 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     expect(host._fail).not.toHaveBeenCalled();
   });
 
+  it("does not carry on with a build that ended after a dismissal", async () => {
+    const { host, api } = ready();
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+      // The close flipped the flag; its after-hide, and the rejection, come later.
+      dismiss(host);
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("leaves the next run's reject hook alone when the run before's submit fails", async () => {
+    const { host, api } = ready();
+    const nextHook = vi.fn();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      // The next run has reached its own compile meanwhile.
+      host._compileReject = nextHook;
+      throw new Error("submit refused");
+    });
+
+    await run(host);
+
+    expect(host._compileReject).toBe(nextHook);
+    expect(nextHook).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
   it("still records a compile submitted for a run that was only dismissed", async () => {
     const { host, api } = ready();
     api.firmwareCompile.mockImplementationOnce(async () => {
