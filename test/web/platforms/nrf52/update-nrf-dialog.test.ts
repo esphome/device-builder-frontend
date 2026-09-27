@@ -12,7 +12,14 @@ const mocks = vi.hoisted(() => ({
   isWebBluetoothSupported: vi.fn(() => true),
   flashMcubootOverBle: vi.fn(),
   flashMcubootOverSerial: vi.fn(),
+  loadSmpEngine: vi.fn(),
+  loadRealSmpEngine: (): Promise<unknown> => Promise.reject(new Error("not loaded")),
 }));
+vi.mock("../../../../src/platforms/nrf52/index.js", async (importOriginal) => {
+  const real = await importOriginal<{ loadSmpEngine(): Promise<unknown> }>();
+  mocks.loadRealSmpEngine = real.loadSmpEngine;
+  return { ...real, loadSmpEngine: mocks.loadSmpEngine };
+});
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
@@ -38,6 +45,7 @@ import {
   SmpBleServiceNotFoundError,
   SmpNoReplyError,
 } from "../../../../src/platforms/nrf52/smp-engine.js";
+import { SerialDeviceLostError } from "../../../../src/util/serial-open-error.js";
 import { ESPHomeWebUpdateNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-update-nrf-dialog.js";
 import { makeMcubootImage } from "../../../platforms/nrf52/_mcuboot-image.js";
 
@@ -67,6 +75,7 @@ const TRANSPORTS = [
 ] as const;
 
 beforeEach(() => {
+  mocks.loadSmpEngine.mockImplementation(() => mocks.loadRealSmpEngine());
   mocks.isWebBluetoothSupported.mockReturnValue(true);
   mocks.requestSerialPort.mockResolvedValue({ port: true });
   mocks.pickBleDevice.mockResolvedValue({ name: "itsy" });
@@ -133,6 +142,17 @@ describe.each(TRANSPORTS)(
 
       expect(el._state).toBe("error");
       expect(el._errorMessage).toBe("web.nrf.update_no_reply");
+    });
+
+    it("says so when the update tools cannot be loaded", async () => {
+      const el = await mountDialog();
+      mocks.loadSmpEngine.mockRejectedValue(new Error("chunk failed to load"));
+
+      await el[run]();
+
+      expect(flash).not.toHaveBeenCalled();
+      expect(el._state).toBe("error");
+      expect(el._errorMessage).toBe("web.install.tools_load_failed");
     });
 
     it("reports any other failure with the engine's reason, and retries afresh", async () => {
@@ -253,5 +273,21 @@ describe("esphome-web-update-nrf-dialog", () => {
     await el.updateComplete;
     expect(cleared).toHaveBeenCalledWith("");
     expect(el._file).toBeNull();
+  });
+});
+
+describe("esphome-web-update-nrf-dialog over serial", () => {
+  const lost = new SerialDeviceLostError();
+
+  it.each([
+    ["a write", lost],
+    ["the wait for a reply", new SmpNoReplyError(lost.message, lost)],
+  ])("says the device disconnected when %s finds it gone", async (_name, err) => {
+    const el = await mountDialog();
+    mocks.flashMcubootOverSerial.mockRejectedValue(err);
+
+    await el._updateOverSerial();
+
+    expect(el._errorMessage).toBe("serial.device_lost");
   });
 });
