@@ -470,9 +470,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _retry = () => {
     const device = this._device;
     if (!device) return;
-    if (this._installer === "web-flash") this.installUsbFlash(device);
-    else if (this._flasher) this._retryFlasher(this._flasher, device);
-    else this.installWebSerial(device);
+    if (this._flasher) this._retryFlasher(this._flasher, device);
+    else if (this._installer === "web-flash") this.installUsbFlash(device);
+    else if (this._installer === "web-serial") this.installWebSerial(device);
   };
 
   // A failed reset or flash (device dropped mid-transfer, wrong port picked)

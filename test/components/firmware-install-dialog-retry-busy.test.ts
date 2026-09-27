@@ -67,6 +67,13 @@ describe("install-dialog Retry while a foreign build runs", () => {
     expect(made.followJob).not.toHaveBeenCalled();
   });
 
+  it("opens no port picker for an install that is not the Web Serial one", () => {
+    const made = makeDialog("binary-download");
+    void made.dialog._retry();
+    expect(made.installWebSerial).not.toHaveBeenCalled();
+    expect(made.installUsbFlash).not.toHaveBeenCalled();
+  });
+
   it("does nothing without a device", () => {
     const made = makeDialog("web-serial");
     made.dialog._device = null;
