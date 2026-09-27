@@ -243,6 +243,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) {
+      // Nothing can read the tree: not with the one from before an edit.
+      if (this._stale) this.value = null;
       this._dropStaleTree();
       this._stale = false;
       return;
@@ -309,6 +311,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     super.connectedCallback();
     // Attached again after a detach that dropped its tree.
     if (this.hasUpdated && !this.addMode && this.value === null && !this._loading) {
+      // Held meanwhile: an edit would write an empty tree.
+      this._hydrating = true;
       void this._hydrateFromBackend();
     }
   }

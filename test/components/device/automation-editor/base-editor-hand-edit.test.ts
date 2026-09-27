@@ -153,7 +153,7 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(inner._parseError.active).toBe(true);
   });
 
-  it("is released when the reload has nothing to ask", async () => {
+  it("drops the tree when the reload has nothing to ask", async () => {
     const { editor, inner } = await mount();
     await editByHand(editor);
     inner._api = undefined;
@@ -162,6 +162,7 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     await settled(editor);
 
     expect(editor.inert).toBe(false);
+    expect(inner.value).toBeNull();
   });
 
   it("stays held for a reload that a newer one replaced", async () => {
@@ -224,8 +225,17 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
     expect(inner.value).toBeNull();
 
+    const d = deferred<ParsedAutomation[]>();
     api.parseDeviceAutomations.mockClear();
+    api.parseDeviceAutomations.mockReturnValue(d.promise);
     parent.appendChild(editor);
+    await editor.updateComplete;
+    expect(editor.inert).toBe(true);
+    inner._engine.withValue({ actions: [] });
+    await flushMicrotasks(3);
+    expect(api.upsertAutomation).not.toHaveBeenCalled();
+
+    d.resolve([parsedEdited()]);
     await settled(editor);
     expect(api.parseDeviceAutomations).toHaveBeenCalledWith("device.yaml", EDITED);
     expect(inner.value.actions).toHaveLength(1);
