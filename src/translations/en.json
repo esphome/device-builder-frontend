@@ -1934,6 +1934,7 @@
       "status": "USB flasher",
       "hint_opener": "Plug the board into this computer over USB, then press Connect & install.",
       "hint_direct": "Pick a factory .bin below, plug in the board, then press Connect & install.",
+      "preparing": "Getting the firmware ready…",
       "firmware_ready": "Firmware received from your dashboard tab. Press Connect & install.",
       "firmware_ready_named": "Firmware received from your dashboard tab: {name}. Press Connect & install.",
       "erasing": "Erasing device…",

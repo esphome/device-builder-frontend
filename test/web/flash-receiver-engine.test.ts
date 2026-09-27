@@ -88,11 +88,37 @@ async function handOff(frame: Record<string, unknown>, click = true) {
       source: opener as unknown as Window,
     })
   );
-  await (el as any)._prepared;
-  await el.updateComplete;
+  await settled(el);
   if (click) await (el as any)._onPrimary();
   return { el, opener };
 }
+
+// Waits out a preparation that is under way.
+async function settled(el: ESPHomeWebFlashReceiver) {
+  await vi.waitFor(() => expect((el as any)._preparation.pending).toBe(false));
+  await el.updateComplete;
+}
+
+// A receiver opened by hand, with ``file`` as the picked one.
+async function pickFile(file: { arrayBuffer: () => Promise<ArrayBuffer> }) {
+  Object.defineProperty(window, "opener", { value: null, configurable: true });
+  window.location.hash = "";
+  Object.defineProperty(navigator, "serial", {
+    configurable: true,
+    value: { requestPort, getPorts: async () => [] },
+  });
+  const el = new ESPHomeWebFlashReceiver();
+  (el as any)._localize = (k: string) => k;
+  document.body.appendChild(el);
+  await el.updateComplete;
+  Object.defineProperty(el, "_fileInput", { value: { files: [file] } });
+  await (el as any)._onFileChange();
+  await settled(el);
+  return el;
+}
+
+const primaryButton = (el: ESPHomeWebFlashReceiver) =>
+  el.shadowRoot!.querySelector(".action-btn--primary") as HTMLButtonElement;
 
 const states = (opener: { postMessage: ReturnType<typeof vi.fn> }) =>
   opener.postMessage.mock.calls
@@ -149,23 +175,73 @@ describe("esphome-web-flash-receiver engines", () => {
 
   it("prepares again on the click after a preparation that failed", async () => {
     engines.esp.prepare.mockRejectedValueOnce(new Error("chunk fetch failed"));
-    const { el } = await handOff({}, false);
+    const { el } = await handOff({ name: "fw.bin" }, false);
     expect((el as any)._state).toBe("error");
+    expect(primaryButton(el).disabled).toBe(false);
     // The click that prepares again does not open the picker: the fetch may
-    // have used up its user activation.
+    // use up its user activation.
     await (el as any)._onPrimary();
-    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect(requestPort).not.toHaveBeenCalled();
+    await settled(el);
+    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect((el as any)._state).toBe("connecting");
-    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready");
-    expect((el as any)._busy).toBe(false);
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
     await (el as any)._onPrimary();
     expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect(requestPort).toHaveBeenCalledOnce();
     expect(engines.esp.run).toHaveBeenCalledOnce();
     expect((el as any)._state).toBe("done");
-    // Prepared once for good: a later click reuses the run.
-    expect((el as any)._reprepare).toBeUndefined();
+  });
+
+  it("offers the install only once the preparation has settled", async () => {
+    let ready!: (plan: { run: typeof engines.esp.run }) => void;
+    engines.esp.prepare.mockReturnValueOnce(
+      new Promise((resolve) => {
+        ready = resolve;
+      })
+    );
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, "opener", { value: opener, configurable: true });
+    window.location.hash = "#nonce=n1";
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { requestPort, getPorts: async () => [] },
+    });
+    const el = new ESPHomeWebFlashReceiver();
+    (el as any)._localize = (k: string) => k;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: MSG_FIRMWARE,
+          nonce: "n1",
+          parts: [{ address: 0, data: new ArrayBuffer(4) }],
+        },
+        origin: "http://dashboard.local",
+        source: opener as unknown as Window,
+      })
+    );
+    await vi.waitFor(() => expect(engines.esp.prepare).toHaveBeenCalled());
+    await el.updateComplete;
+    // Still fetching and checking: no install, and a click starts nothing.
+    expect((el as any)._statusMessage).toBe("web.flash.preparing");
+    expect(primaryButton(el).disabled).toBe(true);
+    await (el as any)._onPrimary();
+    expect(requestPort).not.toHaveBeenCalled();
+
+    ready({ run: engines.esp.run });
+    await settled(el);
+    expect(primaryButton(el).disabled).toBe(false);
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready");
+  });
+
+  it("asks for the port in the click itself, with nothing awaited before it", async () => {
+    const { el } = await handOff({}, false);
+    // Not awaited: the picker has to be asked for before the click's turn ends.
+    const install = (el as any)._onPrimary();
+    expect(requestPort).toHaveBeenCalledOnce();
+    await install;
   });
 
   it("reports a frame naming a flasher it does not have as malformed", async () => {
@@ -182,22 +258,35 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.esp.run).toHaveBeenCalledOnce();
   });
 
-  it("frees the button when the picked file cannot be read", async () => {
-    Object.defineProperty(window, "opener", { value: null, configurable: true });
-    window.location.hash = "";
-    const el = new ESPHomeWebFlashReceiver();
-    (el as any)._localize = (k: string) => k;
-    document.body.appendChild(el);
-    await el.updateComplete;
-    Object.defineProperty(el, "_fileInput", {
-      value: {
-        files: [{ arrayBuffer: () => Promise.reject(new Error("NotReadableError")) }],
-      },
+  it("prepares a picked file when it is picked, so the click opens the picker", async () => {
+    const el = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect(engines.esp.prepare).toHaveBeenCalledOnce();
+    expect(engines.esp.prepare.mock.calls[0][1]).toBe(true); // a manual flash erases
+    expect((el as any)._state).toBe("idle");
+    expect(primaryButton(el).disabled).toBe(false);
+    const install = (el as any)._onPrimary();
+    expect(requestPort).toHaveBeenCalledOnce();
+    await install;
+    expect(engines.esp.run).toHaveBeenCalledOnce();
+  });
+
+  it("names a picked file that is not firmware when it is picked", async () => {
+    engines.esp.prepare.mockResolvedValueOnce({ error: "web.flash.invalid_image" });
+    const el = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toBe("web.flash.invalid_image");
+    expect(requestPort).not.toHaveBeenCalled();
+  });
+
+  it("says so when the picked file cannot be read, and offers no install", async () => {
+    const el = await pickFile({
+      arrayBuffer: () => Promise.reject(new Error("NotReadableError")),
     });
-    await (el as any)._onPrimary();
     expect((el as any)._busy).toBe(false);
     expect((el as any)._state).toBe("error");
-    expect(engines.esp.run).not.toHaveBeenCalled();
+    expect((el as any)._statusMessage).toBe("web.flash.choose_file");
+    expect(engines.esp.prepare).not.toHaveBeenCalled();
+    expect(primaryButton(el).disabled).toBe(true);
   });
 
   it("sends the manual reset as the done note and parks the port for Logs", async () => {
