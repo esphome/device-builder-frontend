@@ -176,7 +176,8 @@ export function getNumberFormatter(
 /**
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
- * (zero minutes dropped: ``1h``). The ``counter`` variant is for a live
+ * / ``2d 3h`` (zero minor unit dropped: ``1h``, ``2d``). The ``counter``
+ * variant is for a live
  * ticking readout: seconds kept in the minute range (``4m 32s``) and
  * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
  * Locale-aware digits via the shared number formatter; the unit letters
@@ -198,6 +199,13 @@ export function formatDuration(
     return counter
       ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
       : `${fmt.format(minutes)}m`;
+  }
+  if (!counter && total >= 86400) {
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    return hours > 0
+      ? `${fmt.format(days)}d ${fmt.format(hours)}h`
+      : `${fmt.format(days)}d`;
   }
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);

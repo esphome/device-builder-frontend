@@ -148,6 +148,14 @@ describe("formatDuration", () => {
     expect(formatDuration(8 * 60 + 30)).toBe("8m");
     expect(formatDuration(3600)).toBe("1h");
     expect(formatDuration(3600 + 14 * 60)).toBe("1h 14m");
+    expect(formatDuration(23 * 3600 + 59 * 60)).toBe("23h 59m");
+  });
+
+  it("switches the compact variant to days past 24h", () => {
+    expect(formatDuration(86400)).toBe("1d");
+    expect(formatDuration(7 * 86400 + 12 * 60)).toBe("7d");
+    expect(formatDuration(51 * 86400 + 5 * 3600)).toBe("51d 5h");
+    expect(formatDuration(86400 + 3600, { variant: "counter" })).toBe("25h 00m");
   });
 
   it("keeps the finer unit in the counter variant, padding hour-range minutes", () => {

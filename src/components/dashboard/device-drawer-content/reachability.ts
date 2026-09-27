@@ -1,6 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../../api/types/devices.js";
-import type { ReachabilitySource } from "../../../api/types/reachability.js";
+import type {
+  ReachabilitySource,
+  ReachabilityStateEvent,
+} from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
 import { offlineSeconds } from "../../../util/device-status.js";
 import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
@@ -32,10 +35,45 @@ export function renderReachabilitySection(
   host: ESPHomeDeviceDrawerContent
 ): TemplateResult | typeof nothing {
   const r = host._reachability;
-  if (r === null) return nothing;
-
   const lang = activeLocale();
   const now = Date.now();
+
+  // Not a per-source row, and not gated on the snapshot: those are all
+  // absent for a device unreachable since before the dashboard started.
+  const device = host.device;
+  const offlineFor = device
+    ? offlineSeconds(
+        device.runtime_state.state,
+        device.name_add_mac_suffix,
+        device.runtime_state.offline_since,
+        now
+      )
+    : null;
+  if (r === null && offlineFor === null) return nothing;
+
+  return html`
+    <div class="section">
+      <h4 class="section-title">${host._localize("dashboard.drawer_reachability")}</h4>
+      ${
+        offlineFor === null
+          ? nothing
+          : renderRow(
+              "clock-outline",
+              host._localize("dashboard.drawer_offline_for"),
+              formatDuration(offlineFor, { language: lang })
+            )
+      }
+      ${r === null ? nothing : renderSourceRows(host, r, now, lang)}
+    </div>
+  `;
+}
+
+function renderSourceRows(
+  host: ESPHomeDeviceDrawerContent,
+  r: ReachabilityStateEvent,
+  now: number,
+  lang: string | undefined
+): TemplateResult {
   const anchor = host._reachabilityAnchorMs;
 
   // The mDNS row's "Expires in N" countdown is the PTR record's full
@@ -81,41 +119,17 @@ export function renderReachabilitySection(
   ];
   const anySignal = rows.some((row) => row.age !== null);
 
-  // Not a per-source row: those are all absent for a device that has been
-  // unreachable since before the dashboard started.
-  const device = host.device;
-  const offlineFor = device
-    ? offlineSeconds(
-        device.runtime_state.state,
-        device.name_add_mac_suffix,
-        device.runtime_state.offline_since,
-        now
-      )
-    : null;
-
   return html`
-    <div class="section">
-      <h4 class="section-title">${host._localize("dashboard.drawer_reachability")}</h4>
-      ${
-        offlineFor === null
-          ? nothing
-          : renderRow(
-              "clock-outline",
-              host._localize("dashboard.drawer_offline_for"),
-              formatDuration(offlineFor, { language: lang })
-            )
-      }
-      ${
-        !anySignal
-          ? html`<div class="value muted">
-              ${host._localize("dashboard.drawer_waiting_for_signal")}
-            </div>`
-          : rows.map((row) =>
-              renderReachabilityRow(row, r.active_source, lang, host._localize)
-            )
-      }
-      ${renderMdnsStaleWarning(r, host._localize)}
-    </div>
+    ${
+      !anySignal
+        ? html`<div class="value muted">
+            ${host._localize("dashboard.drawer_waiting_for_signal")}
+          </div>`
+        : rows.map((row) =>
+            renderReachabilityRow(row, r.active_source, lang, host._localize)
+          )
+    }
+    ${renderMdnsStaleWarning(r, host._localize)}
   `;
 }
 
