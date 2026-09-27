@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  *
  * A row's element, and what it remembers, follows its action through a
- * delete or a reorder (esphome/device-builder#2848). The real list, node
+ * delete or a reorder (esphome/device-builder-frontend#1882). The real list, node
  * and form are mounted, since per-row state lives across all three: the
  * node's view flags, the form's pending unit and the literal / lambda
  * stash.
@@ -148,6 +148,34 @@ describe("automation-action-list row identity", () => {
 
     expect(nodes(list)[1].shadowRoot!.activeElement).toBe(button);
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves focus alone when the owner drops the move", async () => {
+    const list = new ESPHomeAutomationActionList();
+    list.actions = [delay("1s"), delay("2s"), delay("3s")];
+    list.catalog = [DELAY];
+    document.body.appendChild(list);
+    await settle(list);
+    const button = nodeButton(nodes(list)[0], MOVE_DOWN);
+    const focus = vi.spyOn(button, "focus");
+
+    button.click();
+    list.disabled = true;
+    await settle(list);
+
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("acts on the moved row, not on the one that took its place", async () => {
+    const list = await mountList([delay("1s"), delay("2s"), delay("3s")]);
+    const [first] = nodes(list);
+
+    nodeButton(first, MOVE_DOWN).click();
+    await settle(list);
+    nodeButton(first, ".ae-row-delete").click();
+    await settle(list);
+
+    expect(list.actions).toEqual([delay("2s"), delay("3s")]);
   });
 
   it("keeps a collapsed card collapsed when it is moved", async () => {

@@ -146,8 +146,8 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     if (changed.has("focusTarget")) this._focusScrolled = false;
   }
 
-  protected updated(): void {
-    this._refocus?.focus();
+  protected updated(changed: PropertyValues<this>): void {
+    if (changed.has("conditions")) this._refocus?.focus();
     this._refocus = null;
     this._maybeScrollRow();
   }

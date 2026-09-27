@@ -13,7 +13,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiPlus } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
@@ -94,11 +94,12 @@ export class ESPHomeAutomationActionList extends LitElement {
   private readonly _rows = new RowKeys<ActionNode>();
 
   /** The control that asked for a reorder. Its row is moved in the DOM,
-   *  which drops focus, so it is focused again once the rows have moved. */
+   *  which drops focus, so it is focused again once the rows have moved.
+   *  The owner can drop the reorder, and then nothing is focused. */
   private _refocus: HTMLElement | null = null;
 
-  protected updated(): void {
-    this._refocus?.focus();
+  protected updated(changed: PropertyValues<this>): void {
+    if (changed.has("actions")) this._refocus?.focus();
     this._refocus = null;
   }
 

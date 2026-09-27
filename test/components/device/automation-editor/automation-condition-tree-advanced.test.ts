@@ -155,6 +155,29 @@ describe("automation-condition-tree advanced section", () => {
     expect(focus).toHaveBeenCalledTimes(1);
   });
 
+  it("acts on the moved row, not on the one that took its place", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("binary_sensor.is_on"),
+    ]);
+    const row = el.shadowRoot!.querySelector(".ae-row")!;
+    const button = (label: string) =>
+      row.querySelector<HTMLButtonElement>(
+        `button[aria-label="device.automation_${label}"]`
+      )!;
+
+    button("move_down").click();
+    await el.updateComplete;
+    button("remove").click();
+    await el.updateComplete;
+
+    expect(el.conditions.map((c) => c.condition_id)).toEqual([
+      "number.in_range",
+      "binary_sensor.is_on",
+    ]);
+  });
+
   it("moves the flag with its row on a reorder", async () => {
     const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
     const opened = forms(el)[0];
