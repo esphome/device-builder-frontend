@@ -4,6 +4,7 @@
  * upload sequence (chunks, mark for test, reset).
  */
 import { getErrorMessage } from "../../util/error-message.js";
+import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 import { sleep } from "../../util/sleep.js";
 import { withDeadline } from "../../util/with-deadline.js";
 import { cborDecode, cborEncode } from "./smp-cbor.js";
@@ -45,7 +46,10 @@ export class SmpError extends Error {
   }
 }
 
-/** The request went out and no reply came back: the link dropped, or timed out. */
+/**
+ * The request went out and no reply came back: the link dropped, or timed
+ * out. ``cause`` is what ended the wait.
+ */
 export class SmpNoReplyError extends Error {
   constructor(
     message: string,
@@ -434,8 +438,12 @@ async function testAndReset(
     .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
     .catch((err: unknown) => {
       // The device resets before its reply arrives, so no reply is the
-      // expected outcome; a request that never went out is not.
-      if (!(err instanceof SmpNoReplyError)) throw err;
+      // expected outcome; a request that never went out is not. A serial
+      // device that left is no failure either, whenever it did: the test
+      // flag is stored, so its next boot is the new image.
+      if (!(err instanceof SmpNoReplyError || err instanceof SerialDeviceLostError)) {
+        throw err;
+      }
     });
   onLog?.("Done; the device is rebooting into the new firmware");
   onProgress(100);

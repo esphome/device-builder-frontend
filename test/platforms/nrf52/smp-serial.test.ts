@@ -127,10 +127,22 @@ function makePort({
   smp = new FakeSmpDevice(),
   silent = false,
   strayReply = false,
-}: { smp?: FakeSmpDevice; silent?: boolean; strayReply?: boolean } = {}) {
+  resetWriteLost = false,
+}: {
+  smp?: FakeSmpDevice;
+  silent?: boolean;
+  strayReply?: boolean;
+  resetWriteLost?: boolean;
+} = {}) {
   let rx!: ReadableStreamDefaultController<Uint8Array>;
+  let writeLost = false;
   const decoder = new SmpSerialDecoder((frame) => {
     if (silent) return;
+    // Group 0, command 5: the reset.
+    if (resetWriteLost && frame[5] === 0 && frame[7] === 5) {
+      writeLost = true;
+      return;
+    }
     void smp.exchange(frame).then((reply) => {
       if (strayReply) {
         // A late answer to an earlier request, numbered differently.
@@ -159,7 +171,11 @@ function makePort({
   };
   const readable = new ReadableStream<Uint8Array>({ start: (c) => (rx = c) });
   const writable = new WritableStream<Uint8Array>({
-    write: (bytes) => decoder.push(bytes),
+    write: (bytes) => {
+      decoder.push(bytes);
+      // The browser fails the write to a device that is gone.
+      if (writeLost) throw new DOMException("", "NetworkError");
+    },
   });
   return { port: port as unknown as SerialPort, mock: port, smp };
 }
@@ -229,20 +245,45 @@ describe("flashMcubootOverSerial", () => {
     expect(fake.mock.close).toHaveBeenCalled();
   });
 
-  it("takes the device leaving the bus as the reset it asked for", async () => {
+  it("takes the device leaving the bus before it answers as the reset it asked for", async () => {
     const smp = new FakeSmpDevice();
     const fake = makePort({ smp });
     const exchange = smp.exchange.bind(smp);
     smp.exchange = (frame) => {
-      // Group 0, command 5: the reset, which the device leaves the bus on.
-      if (frame[3] === 0 && frame[7] === 5) {
-        fake.mock.fire();
-        return new Promise(() => {});
-      }
-      return exchange(frame);
+      // Group 0, command 5: the reset.
+      if (frame[5] !== 0 || frame[7] !== 5) return exchange(frame);
+      // After the write, as the device takes the request in first.
+      setTimeout(() => fake.mock.fire(), 10);
+      return new Promise(() => {});
     };
     const { done } = await flashOverSerial(fake);
 
     await expect(done).resolves.toBeUndefined();
+  });
+
+  it("takes the device leaving the bus ahead of the reset the same", async () => {
+    const smp = new FakeSmpDevice();
+    const fake = makePort({ smp });
+    const exchange = smp.exchange.bind(smp);
+    smp.exchange = (frame) => {
+      // Op 2, group 1, command 0: the image marked for test, a second
+      // before the reset is asked for.
+      if (frame[0] === 2 && frame[5] === 1 && frame[7] === 0) {
+        setTimeout(() => fake.mock.fire(), 100);
+      }
+      return exchange(frame);
+    };
+    const { done, image } = await flashOverSerial(fake);
+
+    await expect(done).resolves.toBeUndefined();
+    expect(smp.received).toEqual(image.bytes);
+  });
+
+  it("takes the device leaving the bus under the reset's write the same", async () => {
+    const fake = makePort({ resetWriteLost: true });
+    const { done, image } = await flashOverSerial(fake);
+
+    await expect(done).resolves.toBeUndefined();
+    expect(fake.smp.received).toEqual(image.bytes);
   });
 });
