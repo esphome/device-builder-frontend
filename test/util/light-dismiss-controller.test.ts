@@ -10,18 +10,35 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EscapeController } from "../../src/util/escape-controller.js";
 import { LightDismissController } from "../../src/util/light-dismiss-controller.js";
 
-type Host = import("lit").ReactiveControllerHost & HTMLElement;
+type Controller = import("lit").ReactiveController;
+type Host = import("lit").ReactiveControllerHost &
+  HTMLElement & { controllers: Controller[] };
 
 function makeHost(): Host {
   const el = document.createElement("div");
+  const controllers: Controller[] = [];
   Object.assign(el, {
-    addController: () => {},
+    controllers,
+    addController: (c: Controller) => controllers.push(c),
     removeController: () => {},
     requestUpdate: () => {},
     updateComplete: Promise.resolve(true),
   });
   document.body.appendChild(el);
   return el as unknown as Host;
+}
+
+/* What Lit does when the host element leaves and rejoins the document. */
+function reconnect(host: Host, whileDetached: () => void = () => {}) {
+  for (const c of host.controllers) c.hostDisconnected?.();
+  whileDetached();
+  for (const c of host.controllers) c.hostConnected?.();
+}
+
+function pressEscape() {
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+  );
 }
 
 function clickOn(target: EventTarget) {
@@ -117,14 +134,14 @@ describe("LightDismissController outside-click", () => {
     const ctrl = track(new LightDismissController(host, onDismiss));
     ctrl.set(true);
 
-    ctrl.hostDisconnected();
-    ctrl.hostConnected();
+    reconnect(host, () => {
+      clickOn(document.body);
+      pressEscape();
+      expect(onDismiss).not.toHaveBeenCalled();
+    });
     clickOn(document.body);
     expect(onDismiss).toHaveBeenCalledTimes(1);
-
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
-    );
+    pressEscape();
     expect(onDismiss).toHaveBeenCalledTimes(2);
   });
 
@@ -134,10 +151,9 @@ describe("LightDismissController outside-click", () => {
     const ctrl = track(new LightDismissController(host, onDismiss));
     ctrl.set(true);
 
-    ctrl.hostDisconnected();
-    ctrl.set(false);
-    ctrl.hostConnected();
+    reconnect(host, () => ctrl.set(false));
     clickOn(document.body);
+    pressEscape();
     expect(onDismiss).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
+import type { ReactiveControllerHost } from "lit";
+import { ActiveListenerController } from "./active-listener-controller.js";
 import { EscapeController } from "./escape-controller.js";
 
 export interface LightDismissOptions {
@@ -31,9 +32,7 @@ export interface LightDismissOptions {
  * capture phase has already run by the time the host flips the flag)
  * can't self-dismiss it.
  */
-export class LightDismissController implements ReactiveController {
-  private _active = false;
-  private _bound = false;
+export class LightDismissController extends ActiveListenerController {
   private readonly _escape: EscapeController;
 
   constructor(
@@ -41,6 +40,7 @@ export class LightDismissController implements ReactiveController {
     private readonly _onDismiss: () => void,
     private readonly _options: LightDismissOptions = {}
   ) {
+    super(_host);
     this._escape = new EscapeController(
       _host,
       (e) => {
@@ -50,33 +50,19 @@ export class LightDismissController implements ReactiveController {
       },
       { target: _options.escapeTarget, capture: _options.escapeCapture }
     );
-    _host.addController(this);
   }
 
-  hostConnected(): void {
-    this._escape.hostConnected();
-    this._bind(this._active);
-  }
-
-  hostDisconnected(): void {
-    this._escape.hostDisconnected();
-    this._bind(false);
-  }
-
-  set(active: boolean): void {
-    this._active = active;
+  override set(active: boolean): void {
     this._escape.set(active);
-    this._bind(active);
+    super.set(active);
   }
 
-  private _bind(bound: boolean): void {
-    if (bound === this._bound) return;
-    if (bound) {
-      document.addEventListener("click", this._onDocumentClick, true);
-    } else {
-      document.removeEventListener("click", this._onDocumentClick, true);
-    }
-    this._bound = bound;
+  protected bind(): void {
+    document.addEventListener("click", this._onDocumentClick, true);
+  }
+
+  protected unbind(): void {
+    document.removeEventListener("click", this._onDocumentClick, true);
   }
 
   private _onDocumentClick = (e: MouseEvent): void => {
