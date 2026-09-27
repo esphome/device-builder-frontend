@@ -8,7 +8,13 @@ import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
 import { pulseRts } from "../../util/serial-control-lines.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { hasPause, isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
+import {
+  hasPause,
+  isPassive,
+  isStreaming,
+  type LogsSession,
+  type PassiveSource,
+} from "../logs-session.js";
 
 /** Replaces the RTS-pulse Reset Device for a session. */
 export interface SerialResetHook {
@@ -129,14 +135,16 @@ export function triggerBleReconnect(
   host: ESPHomeLogsDialog,
   disconnectMessage: string
 ): void {
-  if (!host._open || host._session.kind !== "ble") return;
+  const s = host._session;
+  if (!host._open || s.kind !== "ble") return;
   host._log.append([
     "",
     "",
     disconnectMessage,
     host._localize("dashboard.logs_ble_nus_reconnecting"),
   ]);
-  reconnectSerial(host, true);
+  // A Stop pressed before the drop still holds once the link is back.
+  reconnectSerial(host, { paused: s.paused, resume: true });
 }
 
 // An attach is async (a reopen retries for seconds). If the dialog closed or
@@ -430,6 +438,9 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   }
 }
 
+/** How a ``reconnecting`` phase starts out. */
+type ReconnectSeed = Omit<Extract<LogsSession, { kind: "reconnecting" }>, "kind">;
+
 // Run a session hook (reconnect or reset) as `reconnecting`. The hook reports
 // its own failures (setSerialOpenFailed -> `dead`, with its own toast); still
 // `reconnecting` afterwards means it neither attached nor failed, so only
@@ -438,10 +449,10 @@ async function runReconnecting(
   host: ESPHomeLogsDialog,
   task: (cancelled: () => boolean) => Promise<void>,
   failKey: string,
-  resume = false
+  seed: ReconnectSeed = { paused: false }
 ): Promise<void> {
   const cancelled = sessionMovedOn(host);
-  host._session = { kind: "reconnecting", paused: false, ...(resume && { resume }) };
+  host._session = { kind: "reconnecting", ...seed };
   let failure: unknown;
   try {
     await task(cancelled);
@@ -457,7 +468,7 @@ async function runReconnecting(
   notifyError(host._localize(failKey));
 }
 
-function reconnectSerial(host: ESPHomeLogsDialog, resume = false): void {
+function reconnectSerial(host: ESPHomeLogsDialog, seed?: ReconnectSeed): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
   void runReconnecting(
@@ -466,7 +477,7 @@ function reconnectSerial(host: ESPHomeLogsDialog, resume = false): void {
     host._passiveSource === "ble"
       ? "dashboard.logs_ble_nus_open_failed"
       : "dashboard.logs_web_serial_open_failed",
-    resume
+    seed
   );
 }
 

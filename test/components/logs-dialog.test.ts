@@ -326,6 +326,17 @@ describe("logs-dialog BLE auto-reconnect", () => {
     expect(logLines(el)).not.toContain("dashboard.logs_ble_nus_reconnected");
   });
 
+  it("keeps a Stop pressed before the disconnect across the reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    call(el, "_onStop");
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(session(el)).toMatchObject({ kind: "reconnecting", paused: true });
+    el.setBleStream(async () => {});
+    expect(session(el)).toMatchObject({ kind: "ble", paused: true });
+  });
+
   it("keeps a Stop pressed during the reconnect and still says Reconnected", () => {
     const el = mount();
     el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
