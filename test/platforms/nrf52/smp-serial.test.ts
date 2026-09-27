@@ -3,6 +3,7 @@ import { disconnectEvents } from "../../_web-serial.js";
 import {
   buildSmpFrame,
   parseMcubootImage,
+  SmpRestartNeededError,
 } from "../../../src/platforms/nrf52/smp-protocol.js";
 import {
   encodeSerialFrame,
@@ -261,7 +262,7 @@ describe("flashMcubootOverSerial", () => {
     await expect(done).resolves.toBeUndefined();
   });
 
-  it("takes the device leaving the bus ahead of the reset the same", async () => {
+  it("asks for a restart when the device left ahead of the reset", async () => {
     const smp = new FakeSmpDevice();
     const fake = makePort({ smp });
     const exchange = smp.exchange.bind(smp);
@@ -275,15 +276,16 @@ describe("flashMcubootOverSerial", () => {
     };
     const { done, image } = await flashOverSerial(fake);
 
-    await expect(done).resolves.toBeUndefined();
+    await expect(done).rejects.toBeInstanceOf(SmpRestartNeededError);
+    await expect(done).rejects.not.toSatisfy(isSerialDeviceLost);
     expect(smp.received).toEqual(image.bytes);
   });
 
-  it("takes the device leaving the bus under the reset's write the same", async () => {
+  it("asks for a restart when the device left under the reset's write", async () => {
     const fake = makePort({ resetWriteLost: true });
     const { done, image } = await flashOverSerial(fake);
 
-    await expect(done).resolves.toBeUndefined();
+    await expect(done).rejects.toBeInstanceOf(SmpRestartNeededError);
     expect(fake.smp.received).toEqual(image.bytes);
   });
 });

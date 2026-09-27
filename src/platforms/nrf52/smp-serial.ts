@@ -175,7 +175,10 @@ class SmpSerialSession extends SerialStreamSession implements SmpTransport {
   }
 }
 
-/** The device went away, whether a write or the wait for a reply found out. */
+/**
+ * The device went away, whether a write or the wait for a reply found out.
+ * Not at the reset, which has ``SmpRestartNeededError``.
+ */
 export function isSerialDeviceLost(err: unknown): boolean {
   const reason = err instanceof SmpNoReplyError ? err.cause : err;
   return reason instanceof SerialDeviceLostError;

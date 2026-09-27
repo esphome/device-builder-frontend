@@ -4,7 +4,6 @@
  * upload sequence (chunks, mark for test, reset).
  */
 import { getErrorMessage } from "../../util/error-message.js";
-import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 import { sleep } from "../../util/sleep.js";
 import { withDeadline } from "../../util/with-deadline.js";
 import { cborDecode, cborEncode } from "./smp-cbor.js";
@@ -58,6 +57,17 @@ export class SmpNoReplyError extends Error {
   ) {
     super(message);
     this.name = "SmpNoReplyError";
+  }
+}
+
+/**
+ * The image is on the device and marked for its next boot, but the reset
+ * did not go out: the device runs it once it is restarted.
+ */
+export class SmpRestartNeededError extends Error {
+  constructor(readonly cause: unknown) {
+    super(`SMP: the reset was not sent (${getErrorMessage(cause)})`);
+    this.name = "SmpRestartNeededError";
   }
 }
 
@@ -425,7 +435,7 @@ async function sendChunks(
 async function testAndReset(
   client: SmpClient,
   hash: Uint8Array,
-  { onProgress, onLog }: SmpUploadHooks
+  { onProgress, onLog, signal }: SmpUploadHooks
 ): Promise<void> {
   onProgress(96);
   onLog?.("Marking uploaded image for test boot");
@@ -438,12 +448,13 @@ async function testAndReset(
     .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
     .catch((err: unknown) => {
       // The device resets before its reply arrives, so no reply is the
-      // expected outcome; a request that never went out is not. A serial
-      // device that left is no failure either, whenever it did: the test
-      // flag is stored, so its next boot is the new image.
-      if (!(err instanceof SmpNoReplyError || err instanceof SerialDeviceLostError)) {
-        throw err;
-      }
+      // expected outcome.
+      if (err instanceof SmpNoReplyError) return;
+      if (signal?.aborted || err instanceof SmpError) throw err;
+      // A request that never went out restarted nothing: a board on a
+      // serial adapter keeps running the old image when the adapter goes.
+      onLog?.("The reset was not sent; restart the device to boot the new firmware");
+      throw new SmpRestartNeededError(err);
     });
   onLog?.("Done; the device is rebooting into the new firmware");
   onProgress(100);

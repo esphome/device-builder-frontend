@@ -13,6 +13,7 @@ import {
   parseSmpFrame,
   SmpNoReplyError,
   smpQueryDeviceParams,
+  SmpRestartNeededError,
   type SmpTransport,
   smpUploadImage,
 } from "../../../src/platforms/nrf52/smp-protocol.js";
@@ -193,13 +194,14 @@ describe("smpUploadImage", () => {
     expect(progress[progress.length - 1]).toBe(100);
   });
 
-  it("fails when the reset request never went out", async () => {
+  it("asks for a restart when the reset request never went out", async () => {
     const image = await parseMcubootImage(makeMcubootImage());
     const device = new FakeSmpDevice();
     device.resetWriteFails = true;
 
     const { done, progress } = await upload(device, image);
 
+    await expect(done).rejects.toBeInstanceOf(SmpRestartNeededError);
     await expect(done).rejects.toThrow("write failed");
     expect(progress).not.toContain(100);
   });
@@ -212,6 +214,7 @@ describe("smpUploadImage", () => {
     const { done, progress } = await upload(device, image);
 
     await expect(done).rejects.toThrow("resetting failed (rc=8)");
+    await expect(done).rejects.not.toBeInstanceOf(SmpRestartNeededError);
     expect(progress).not.toContain(100);
   });
 

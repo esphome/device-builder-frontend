@@ -74,6 +74,30 @@ async function startSmpInstall(
   showReady(host, flow);
 }
 
+/** The title and the detail of a failed upload. */
+function smpFailure(
+  host: ESPHomeFirmwareInstallDialog,
+  flow: SmpFlow,
+  engine: SmpEngine | undefined,
+  err: unknown
+): [title: string, detail: string] {
+  const detail = getErrorMessage(err);
+  if (!engine) return [host._localize("firmware.engine_load_failed"), detail];
+  if (err instanceof engine.SmpBleServiceNotFoundError) {
+    return [host._localize("firmware.nrf_smp_ble_service_not_found"), detail];
+  }
+  if (err instanceof engine.SmpRestartNeededError) {
+    return [
+      host._localize("firmware.nrf_smp_restart_needed_title"),
+      host._localize("firmware.nrf_smp_restart_needed"),
+    ];
+  }
+  return [
+    host._localize(flow.failedKey),
+    engine.isSerialDeviceLost(err) ? host._localize("serial.device_lost") : detail,
+  ];
+}
+
 /**
  * The upload, from a footer click: ``pick`` opens the chooser (null when
  * there is nothing to flash), ``flash`` runs the engine over what it picked.
@@ -116,15 +140,7 @@ async function runSmpFlash<Target>(
     });
   } catch (err) {
     if (stillCurrent()) {
-      const key = !engine
-        ? "firmware.engine_load_failed"
-        : err instanceof engine.SmpBleServiceNotFoundError
-          ? "firmware.nrf_smp_ble_service_not_found"
-          : flow.failedKey;
-      const detail = engine?.isSerialDeviceLost(err)
-        ? host._localize("serial.device_lost")
-        : getErrorMessage(err);
-      host._fail(host._localize(key), detail);
+      host._fail(...smpFailure(host, flow, engine, err));
     }
     return;
   } finally {
