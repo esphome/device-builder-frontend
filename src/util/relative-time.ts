@@ -180,15 +180,13 @@ export function getNumberFormatter(
  */
 function calendarYears(seconds: number, nowMs: number): { years: number; days: number } {
   const startMs = nowMs - seconds * 1000;
-  const anniversary = new Date(startMs);
-  let years = new Date(nowMs).getUTCFullYear() - anniversary.getUTCFullYear();
-  anniversary.setUTCFullYear(anniversary.getUTCFullYear() + years);
-  if (anniversary.getTime() > nowMs) {
-    years--;
-    anniversary.setTime(startMs);
-    anniversary.setUTCFullYear(anniversary.getUTCFullYear() + years);
-  }
-  return { years, days: Math.floor((nowMs - anniversary.getTime()) / 86_400_000) };
+  const anniversaryMs = (years: number): number => {
+    const date = new Date(startMs);
+    return date.setUTCFullYear(date.getUTCFullYear() + years);
+  };
+  let years = new Date(nowMs).getUTCFullYear() - new Date(startMs).getUTCFullYear();
+  if (anniversaryMs(years) > nowMs) years--;
+  return { years, days: Math.floor((nowMs - anniversaryMs(years)) / 86_400_000) };
 }
 
 /**
@@ -210,51 +208,27 @@ export function formatDuration(
     nowMs = Date.now(),
   }: { variant?: "counter" | "compact"; language?: string; nowMs?: number } = {}
 ): string {
-  const counter = variant === "counter";
   const total = Math.max(0, Math.floor(seconds));
   const fmt = getNumberFormatter(language, 0);
   if (total < 60) return `${fmt.format(total)}s`;
-  if (total < 3600) {
-    const minutes = Math.floor(total / 60);
-    return counter
-      ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
-      : `${fmt.format(minutes)}m`;
-  }
-  // No calendar year is shorter than 365 days, so skip the date math below it.
-  const { years, days: yearDays } =
-    counter || total < 365 * 86400 ? { years: 0, days: 0 } : calendarYears(total, nowMs);
-  if (years > 0) {
-    return yearDays > 0
-      ? `${fmt.format(years)}y ${fmt.format(yearDays)}d`
-      : `${fmt.format(years)}y`;
-  }
-  if (!counter && total >= 86400) {
-    const days = Math.floor(total / 86400);
-    const hours = Math.floor((total % 86400) / 3600);
-    return hours > 0
-      ? `${fmt.format(days)}d ${fmt.format(hours)}h`
-      : `${fmt.format(days)}d`;
-  }
-  const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  if (counter) {
-    return `${fmt.format(hours)}h ${getNumberFormatter(language, 0, 2).format(minutes)}m`;
+  if (variant === "counter") {
+    if (total < 3600) return `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`;
+    const padded = getNumberFormatter(language, 0, 2).format(minutes);
+    return `${fmt.format(Math.floor(total / 3600))}h ${padded}m`;
   }
-  return minutes > 0
-    ? `${fmt.format(hours)}h ${fmt.format(minutes)}m`
-    : `${fmt.format(hours)}h`;
-}
-
-/**
- * *seconds* rounded down to the step :func:`formatDuration`'s compact
- * variant renders at, so two durations in one step share a label. Hourly
- * until 366 days: a year spanning a leap day is that long, and the label
- * still shows hours until the calendar year is up.
- */
-export function compactDurationStep(seconds: number): number {
-  const whole = Math.max(0, Math.floor(seconds));
-  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 366 * 86400 ? 3600 : 86400;
-  return whole - (whole % unit);
+  const pair = (major: number, unit: string, minor: number, minorUnit: string) =>
+    minor > 0
+      ? `${fmt.format(major)}${unit} ${fmt.format(minor)}${minorUnit}`
+      : `${fmt.format(major)}${unit}`;
+  if (total < 3600) return `${fmt.format(minutes)}m`;
+  if (total < 86400) return pair(Math.floor(total / 3600), "h", minutes, "m");
+  // No calendar year is shorter than 365 days, so skip the date math below it.
+  if (total >= 365 * 86400) {
+    const { years, days } = calendarYears(total, nowMs);
+    if (years > 0) return pair(years, "y", days, "d");
+  }
+  return pair(Math.floor(total / 86400), "d", Math.floor((total % 86400) / 3600), "h");
 }
 
 /**

@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { activeLocale } from "../../common/localize.js";
-import { isStatusUntracked } from "../../util/device-status.js";
+import { isStatusUntracked, offlineSeconds } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
@@ -127,9 +127,10 @@ export function renderEncryptionIcon(
     <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
-function offlineLabel(card: ESPHomeDeviceCard): string {
-  const seconds = card._offlineSeconds;
-  if (seconds === null) return card._localize("dashboard.offline");
+/** The pill's "Offline 2h" label, ``null`` when it shows no duration. */
+export function offlineDurationLabel(card: ESPHomeDeviceCard): string | null {
+  const seconds = offlineSeconds(card.state, card.nameAddMacSuffix, card.offlineSince);
+  if (seconds === null || jobBadgeShown(card)) return null;
   return card._localize("dashboard.offline_for", {
     duration: formatDuration(seconds, { language: activeLocale() }),
   });
@@ -216,7 +217,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     card.state === DeviceState.ONLINE
       ? card._localize("dashboard.online")
       : card.state === DeviceState.OFFLINE
-        ? offlineLabel(card)
+        ? (offlineDurationLabel(card) ?? card._localize("dashboard.offline"))
         : card._localize("dashboard.unknown");
   if (card.state !== DeviceState.ONLINE && !card.selectMode) {
     // Non-online badges open the troubleshooting dialog. Passive while

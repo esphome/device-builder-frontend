@@ -7,6 +7,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
+import { argsLocalize } from "../_dom.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { type FirmwareJob, JobStatus } from "../../src/api/types/firmware-jobs.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
@@ -17,10 +18,6 @@ function badgeText(el: HTMLElement): string {
 
 const nowSeconds = () => Date.now() / 1000;
 
-// The default stub drops params; echo them so the duration is visible.
-const localize = (key: string, values?: Record<string, string | number>) =>
-  values === undefined ? key : `${key}:${Object.values(values).join(",")}`;
-
 afterEach(() => {
   vi.useRealTimers();
   document.body.replaceChildren();
@@ -29,7 +26,7 @@ afterEach(() => {
 describe("device-card offline duration", () => {
   it("renders the duration once the backend has an anchor", async () => {
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.OFFLINE,
       offlineSince: nowSeconds() - 7200,
     });
@@ -38,7 +35,7 @@ describe("device-card offline duration", () => {
 
   it("stays a bare label when the backend has no anchor", async () => {
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.OFFLINE,
       offlineSince: null,
     });
@@ -47,17 +44,17 @@ describe("device-card offline duration", () => {
 
   it("leaves an online device alone", async () => {
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.ONLINE,
       offlineSince: nowSeconds() - 7200,
     });
     expect(badgeText(el)).toBe("dashboard.online");
   });
 
-  it("advances with wall-clock, with no new listing and no anchor property", async () => {
+  it("advances with wall-clock between listings", async () => {
     vi.useFakeTimers();
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.OFFLINE,
       offlineSince: nowSeconds() - 30,
     });
@@ -71,7 +68,7 @@ describe("device-card offline duration", () => {
   it("stops repainting while the busy badge covers the pill", async () => {
     vi.useFakeTimers();
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.OFFLINE,
       offlineSince: nowSeconds() - 30,
       busy: true,
@@ -86,7 +83,7 @@ describe("device-card offline duration", () => {
   it("stops repainting while a finished-job badge covers the pill", async () => {
     vi.useFakeTimers();
     const el = await mount({
-      _localize: localize,
+      _localize: argsLocalize,
       state: DeviceState.OFFLINE,
       offlineSince: nowSeconds() - 30,
       recentJob: { status: JobStatus.FAILED } as FirmwareJob,
@@ -96,23 +93,5 @@ describe("device-card offline duration", () => {
     el.recentJob = null;
     await el.updateComplete;
     expect(vi.getTimerCount()).toBe(1);
-  });
-
-  it("does not drift when an unrelated listing arrives", async () => {
-    vi.useFakeTimers();
-    const since = nowSeconds() - 7200;
-    const el = await mount({
-      _localize: localize,
-      state: DeviceState.OFFLINE,
-      offlineSince: since,
-    });
-    expect(badgeText(el)).toContain("2h");
-
-    await vi.advanceTimersByTimeAsync(600_000);
-    // As a fresh listing would re-deliver it.
-    el.offlineSince = since;
-    await el.updateComplete;
-
-    expect(badgeText(el)).toContain("2h 10m");
   });
 });

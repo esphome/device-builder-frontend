@@ -15,7 +15,6 @@
 import { describe, expect, it } from "vitest";
 import {
   ageOf,
-  compactDurationStep,
   formatCountdown,
   formatDuration,
   formatMinSec,
@@ -193,24 +192,6 @@ describe("formatDuration", () => {
   it("clamps negative input to zero", () => {
     expect(formatDuration(-5)).toBe("0s");
     expect(formatDuration(-5, { variant: "counter" })).toBe("0s");
-  });
-});
-
-describe("compactDurationStep", () => {
-  it.each([
-    [59.9, 59],
-    [60, 60],
-    [119, 60],
-    [86399, 86340],
-    [86400 + 3599, 86400],
-    [365 * 86400 + 3600 + 5, 365 * 86400 + 3600],
-    [366 * 86400 + 3600, 366 * 86400],
-  ])("rounds %d down to %d", (seconds, step) => {
-    expect(compactDurationStep(seconds)).toBe(step);
-  });
-
-  it("clamps negative input to zero", () => {
-    expect(compactDurationStep(-5)).toBe(0);
   });
 });
 

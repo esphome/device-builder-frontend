@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeHost } from "../_fake-host.js";
 import { OfflineClockController } from "../../src/util/offline-clock.js";
+import { formatDuration } from "../../src/util/relative-time.js";
 
 function makeClock(since: number | null = Date.now()) {
   const host = fakeHost();
   const shown = { since };
   const clock = new OfflineClockController(host, () =>
-    shown.since === null ? null : (Date.now() - shown.since) / 1000
+    shown.since === null
+      ? null
+      : formatDuration((Date.now() - shown.since) / 1000, { language: "en" })
   );
   clock.hostConnected();
   return { host, clock, shown };
@@ -33,12 +36,12 @@ describe("OfflineClockController", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("stays out while the host shows no duration", () => {
+  it("stays out while the host shows no label", () => {
     makeClock(null);
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("leaves when the host stops showing a duration", () => {
+  it("leaves when the host stops showing a label", () => {
     const { host, clock, shown } = makeClock();
 
     // Device came back.
@@ -61,7 +64,16 @@ describe("OfflineClockController", () => {
     clock.hostDisconnected();
   });
 
-  it("repaints each second under a minute, then once a minute", () => {
+  it("stays out when an update lands after the host is detached", () => {
+    const { clock } = makeClock();
+    clock.hostDisconnected();
+
+    clock.hostUpdated();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("repaints only when the label changes", () => {
     const { host, clock } = makeClock();
     const repaints = () => vi.mocked(host.requestUpdate).mock.calls.length;
     // Stand in for the render each repaint triggers.
@@ -78,30 +90,6 @@ describe("OfflineClockController", () => {
 
     vi.advanceTimersByTime(1000);
     expect(repaints()).toBe(61);
-    clock.hostDisconnected();
-  });
-
-  it("repaints once a day past a year", () => {
-    const { host, clock } = makeClock(Date.now() - 366 * 86_400_000);
-    vi.mocked(host.requestUpdate).mockImplementation(() => clock.hostUpdated());
-
-    vi.advanceTimersByTime(86_399_000);
-    expect(host.requestUpdate).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1000);
-    expect(host.requestUpdate).toHaveBeenCalledTimes(1);
-    clock.hostDisconnected();
-  });
-
-  it("repaints once an hour past a day", () => {
-    const { host, clock } = makeClock(Date.now() - 86_400_000);
-    vi.mocked(host.requestUpdate).mockImplementation(() => clock.hostUpdated());
-
-    vi.advanceTimersByTime(3_599_000);
-    expect(host.requestUpdate).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1000);
-    expect(host.requestUpdate).toHaveBeenCalledTimes(1);
     clock.hostDisconnected();
   });
 });

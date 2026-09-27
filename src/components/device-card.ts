@@ -28,7 +28,6 @@ import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { offlineSeconds } from "../util/device-status.js";
 import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { OfflineClockController } from "../util/offline-clock.js";
@@ -37,7 +36,7 @@ import { busyActionLabel, updateActionTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
-  jobBadgeShown,
+  offlineDurationLabel,
   renderEncryptionIcon,
   renderLabels,
   renderMigrationDot,
@@ -80,13 +79,8 @@ export class ESPHomeDeviceCard extends LitElement {
     [];
   @property({ attribute: false }) offlineSince: number | null = null;
 
-  get _offlineSeconds(): number | null {
-    return offlineSeconds(this.state, this.nameAddMacSuffix, this.offlineSince);
-  }
-
-  // A job badge covers the status pill, so there is nothing to repaint.
   protected readonly _offlineClock = new OfflineClockController(this, () =>
-    jobBadgeShown(this) ? null : this._offlineSeconds
+    offlineDurationLabel(this)
   );
 
   // Resolved against the catalog at render time so a recolor / rename in

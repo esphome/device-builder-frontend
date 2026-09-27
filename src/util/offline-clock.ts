@@ -1,11 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import { compactDurationStep } from "./relative-time.js";
 
-/**
- * Repaints hosts showing an offline duration; an offline device sends no
- * events to do it. One shared interval, not ``NowTickController``'s one
- * per instance, since a card grid can hold dozens.
- */
+// One shared interval, not ``NowTickController``'s one per instance, since
+// a card grid can hold dozens.
 const clocks = new Set<OfflineClockController>();
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -13,19 +9,25 @@ function tick(): void {
   for (const clock of clocks) clock.tick();
 }
 
+/**
+ * Repaints a host when its offline label changes; an offline device sends
+ * no events to do it.
+ */
 export class OfflineClockController implements ReactiveController {
   private readonly host: ReactiveControllerHost;
-  private readonly seconds: () => number | null;
-  private shown = 0;
+  private readonly label: () => string | null;
+  private shown: string | null = null;
+  private connected = false;
 
-  /** *seconds* returns the shown duration, ``null`` when none. */
-  constructor(host: ReactiveControllerHost, seconds: () => number | null) {
+  /** *label* returns the label the host shows, ``null`` when it shows none. */
+  constructor(host: ReactiveControllerHost, label: () => string | null) {
     this.host = host;
-    this.seconds = seconds;
+    this.label = label;
     host.addController(this);
   }
 
   hostConnected(): void {
+    this.connected = true;
     this.reconcile();
   }
 
@@ -34,22 +36,23 @@ export class OfflineClockController implements ReactiveController {
   }
 
   hostDisconnected(): void {
+    this.connected = false;
     this.leave();
   }
 
   tick(): void {
-    const seconds = this.seconds();
-    if (seconds !== null && compactDurationStep(seconds) !== this.shown)
-      this.host.requestUpdate();
+    const label = this.label();
+    if (label !== null && label !== this.shown) this.host.requestUpdate();
   }
 
   private reconcile(): void {
-    const seconds = this.seconds();
-    if (seconds === null) {
+    // An update pending at disconnect still runs; it must not rejoin.
+    const label = this.connected ? this.label() : null;
+    if (label === null) {
       this.leave();
       return;
     }
-    this.shown = compactDurationStep(seconds);
+    this.shown = label;
     clocks.add(this);
     timer ??= setInterval(tick, 1000);
   }
