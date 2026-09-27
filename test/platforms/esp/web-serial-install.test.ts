@@ -688,6 +688,22 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     expect(host._fail).not.toHaveBeenCalled();
   });
 
+  it("does not compile after a build it waited for ended past a dismissal", async () => {
+    const { host, api } = ready();
+    host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+      dismiss(host);
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
   it("leaves the next run's reject hook alone when the run before's submit fails", async () => {
     const { host, api } = ready();
     const nextHook = vi.fn();

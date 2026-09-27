@@ -88,11 +88,13 @@ export async function compileOrFail(
       ? "firmware.download_failed"
       : "firmware.install_failed";
   const stillCurrent = runGuard(host);
-  if (!(await runningBuildSettled(host, configuration, failKey))) return false;
+  // A build that ends between a close and its after-hide is nobody's to carry
+  // on with: the dialog is going, and the rejection has not come yet.
+  if (!(await runningBuildSettled(host, configuration, failKey)) || !stillCurrent()) {
+    return false;
+  }
   try {
     await compileAndWait(host, configuration);
-    // A build that ends between a close and its after-hide is nobody's to
-    // carry on with: the dialog is going, and the rejection has not come yet.
     return stillCurrent();
   } catch (err) {
     // A dismissal settles the compile by rejecting it; the dialog it would
