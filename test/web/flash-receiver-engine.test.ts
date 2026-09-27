@@ -570,6 +570,15 @@ describe("esphome-web-flash-receiver engines", () => {
     });
   });
 
+  it("shows the engine's last lines without waiting for a frame", async () => {
+    engines.esp.run.mockImplementationOnce(async (_port, hooks) => {
+      (hooks as unknown as { onLog: (line: string) => void }).onLog("Hard resetting");
+      return { rebooted: true };
+    });
+    const { el } = await handOff({});
+    expect((el as any)._logLines).toEqual(["Hard resetting"]);
+  });
+
   it("drops the handed-over bytes from the card's state once the run holds them", async () => {
     const { el } = await handOff({ name: "fw.uf2" }, false);
     expect((el as any)._firmware).toMatchObject({ name: "fw.uf2", parts: [] });

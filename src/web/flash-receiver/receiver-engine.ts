@@ -33,7 +33,7 @@ export interface ReceiverResult {
 /** The serial port a write went over, for the board's logs afterwards. */
 export interface ReceiverLogs {
   port: SerialPort;
-  /** The ports authorized before the write, to tell the rebooted board's apart. */
+  /** The ports authorized before the write, to tell the rebooted board's port apart. */
   knownPorts: SerialPort[];
   /** Whether the board is booting; if not, the logs wait for a reset by hand. */
   rebooted: boolean;

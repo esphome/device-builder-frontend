@@ -321,6 +321,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       return null;
     } finally {
       this._busy = false;
+      // The last lines are not left to a frame that may never come.
+      this._log.flush();
     }
     if (outcome !== "dismissed") return outcome;
     this._resetForRetry();
