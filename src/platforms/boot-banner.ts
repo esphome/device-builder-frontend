@@ -72,26 +72,52 @@ const isSettled = (hit: BootBannerMatch | null): boolean =>
  * up to ``BOOT_BANNER_MS``, stopping early once the text is conclusive. The
  * port is opened here and closed after. Resolves what the text named, or
  * null; rejects only when the port cannot be opened (marked, so the copy can
- * say it is held elsewhere) or the whole thing outlives its deadline.
+ * say it is held elsewhere) or the whole thing outlives its deadline, after
+ * which the abandoned read touches the port no further: esptool may have it
+ * by then.
  */
 export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch | null> {
   await openSerialPort(port, { baudRate: BOOT_BANNER_BAUD });
+  const session: BannerSession = { abandoned: false };
   try {
     return await withDeadline(
-      readAfterReset(port),
+      readAfterReset(port, session),
       BOOT_BANNER_DEADLINE_MS,
-      () => new Error(`Boot banner not read in ${BOOT_BANNER_DEADLINE_MS} ms`)
+      () => {
+        session.abandoned = true;
+        return new Error(`Boot banner not read in ${BOOT_BANNER_DEADLINE_MS} ms`);
+      }
     );
   } finally {
-    await port.close().catch(() => {});
+    // A reader the abandoned read still holds would keep the port from
+    // closing, and the close failing is worth knowing about: esptool's open
+    // fails next and its copy would blame another program.
+    await session.reader?.cancel().catch(() => {});
+    await port.close().catch((err: unknown) => {
+      console.warn("[detect] Could not close the port after the boot banner read:", err);
+    });
   }
 }
 
-async function readAfterReset(port: SerialPort): Promise<BootBannerMatch | null> {
+interface BannerSession {
+  /** The deadline passed; the port is no longer ours to touch. */
+  abandoned: boolean;
+  reader?: ReadableStreamDefaultReader<Uint8Array>;
+}
+
+async function readAfterReset(
+  port: SerialPort,
+  session: BannerSession
+): Promise<BootBannerMatch | null> {
   // An adapter without control lines cannot reset the board; whatever it
-  // prints on its own is still worth a look.
-  await pulseRts(port).catch(() => {});
+  // prints on its own is still worth a look, so a refused pulse is logged,
+  // not fatal.
+  await pulseRts(port).catch((err: unknown) => {
+    console.debug("[detect] Could not pulse reset for the boot banner:", err);
+  });
+  if (session.abandoned) return null;
   const reader = port.readable!.getReader();
+  session.reader = reader;
   const decoder = new TextDecoder("utf-8", { fatal: false });
   // The window closes by cancelling the reader, which ends a pending read.
   const window = setTimeout(() => void reader.cancel().catch(() => {}), BOOT_BANNER_MS);
@@ -109,6 +135,7 @@ async function readAfterReset(port: SerialPort): Promise<BootBannerMatch | null>
     clearTimeout(window);
     await reader.cancel().catch(() => {});
     reader.releaseLock();
+    session.reader = undefined;
   }
   return hit;
 }

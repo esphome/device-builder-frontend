@@ -24,6 +24,13 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../src/platforms/esp/esptool-loader.js", () => ({
   loadEsptool: seams.loadEsptool,
 }));
+const banner = vi.hoisted(() => ({
+  readBootBanner: vi.fn(async (): Promise<unknown> => null),
+}));
+vi.mock("../../../src/platforms/boot-banner.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  readBootBanner: banner.readBootBanner,
+}));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";
@@ -120,6 +127,25 @@ describe("wizard-step-board WebSerial detect errors", () => {
 
     await (el as any)._connectViaWebSerial();
     await el.updateComplete;
+
+    expect(detectError(el)?.textContent).toContain("Could not tell which board this is");
+    expect(esptool.connectToPort).not.toHaveBeenCalled();
+  });
+
+  it("says so when the banner named a board the catalog lacks", async () => {
+    banner.readBootBanner.mockResolvedValueOnce({ board: "some-new-kit" });
+    seams.requestSerialPort.mockResolvedValueOnce({
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+    } as SerialPort);
+    const el = await mount();
+    (el as any)._api.getBoard = async () => {
+      throw new Error("no such board");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await (el as any)._connectViaWebSerial();
+    await el.updateComplete;
+    warn.mockRestore();
 
     expect(detectError(el)?.textContent).toContain("Could not tell which board this is");
     expect(esptool.connectToPort).not.toHaveBeenCalled();

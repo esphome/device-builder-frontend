@@ -316,7 +316,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return;
     }
     this._applyDetection(landing.preset);
-    if (detection.kind === "unknown") {
+    // Nothing to narrow to (an unknown device, or a board the banner named
+    // that the catalog lacks): say so rather than look like nothing happened.
+    if (!landing.preset) {
       this._detectError = this._localize("wizard.connect_your_board_unrecognized");
     }
     void this._fetchBoards();

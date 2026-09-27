@@ -153,6 +153,26 @@ describe("readBootBanner", () => {
     expect(await p2).toBeNull();
   });
 
+  it("leaves the port alone once the deadline has passed, even when the pulse settles late", async () => {
+    const { port, raw } = fakePort([RTL_PLAIN]);
+    let releasePulse: () => void = () => {};
+    raw.setSignals.mockImplementationOnce(
+      () => new Promise<void>((r) => (releasePulse = r))
+    );
+    const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toThrow("Boot banner not read");
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+    expect(raw.close).toHaveBeenCalledOnce();
+    // esptool may own the port now; the late pulse must not take its reader.
+    raw.readable = { getReader: vi.fn() } as unknown as ReadableStream<Uint8Array>;
+    releasePulse();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(
+      (raw.readable as unknown as { getReader: ReturnType<typeof vi.fn> }).getReader
+    ).not.toHaveBeenCalled();
+  });
+
   it("rejects when the port will not open", async () => {
     const { port, raw } = fakePort([]);
     raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));
