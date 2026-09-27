@@ -157,6 +157,21 @@ describe("LightDismissController outside-click", () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
+  it("waits for the reconnect when opened or reasserted while detached", () => {
+    const host = makeHost();
+    const onDismiss = vi.fn();
+    const ctrl = track(new LightDismissController(host, onDismiss));
+
+    reconnect(host, () => {
+      ctrl.set(true);
+      clickOn(document.body);
+      pressEscape();
+      expect(onDismiss).not.toHaveBeenCalled();
+    });
+    clickOn(document.body);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
   it("binds one listener across repeated set(true) calls", () => {
     const host = makeHost();
     const onDismiss = vi.fn();
