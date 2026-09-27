@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PickerActivationError } from "../../src/util/picker-activation.js";
+import { lapsedPick } from "../_web-serial.js";
 import {
   connectFailureDetail,
   markOpenFailure,
@@ -67,7 +67,7 @@ describe("serial-open-error", () => {
   });
 
   it("names a picker refused after the click ran out, with no browser sentence", () => {
-    const err = new PickerActivationError(new Error("Must be handling a user gesture"));
+    const err = lapsedPick();
     expect(namedConnectFailure(err, localize)).toBe("serial.picker_needs_click");
     expect(openFailureMessage(err, localize, "web.connect.failed")).toBe(
       "serial.picker_needs_click"
@@ -75,7 +75,7 @@ describe("serial-open-error", () => {
   });
 
   it("gives the detail under a title: the name, else what the fallback makes of it", () => {
-    const refused = new PickerActivationError(new Error("no gesture"));
+    const refused = lapsedPick();
     expect(connectFailureDetail(refused, localize)).toBe("serial.picker_needs_click");
     expect(connectFailureDetail(new Error("boom"), localize)).toBe("boom");
     expect(connectFailureDetail(new Error("boom"), localize, () => "hinted")).toBe(

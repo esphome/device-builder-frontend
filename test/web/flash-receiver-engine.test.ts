@@ -63,7 +63,11 @@ import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.j
 
 const port = { getInfo: () => ({}), close: async () => {} } as unknown as SerialPort;
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   document.body.innerHTML = "";
   vi.clearAllMocks();
   delete (window as any).opener;
@@ -281,15 +285,13 @@ describe("esphome-web-flash-receiver engines", () => {
   });
 
   it("says to click again for a picker refused after the click ran out", async () => {
-    const restore = withUserActivation(false);
+    restoreActivation = withUserActivation(false);
     requestPort.mockRejectedValueOnce(pickerRefused());
     const { el } = await handOff({});
-    restore();
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toBe("serial.picker_needs_click");
 
     requestPort.mockRejectedValueOnce(new Error("no serial"));
-    (el as any)._busy = false;
     await (el as any)._onPrimary();
     expect((el as any)._statusMessage).toBe("web.flash.no_port");
   });

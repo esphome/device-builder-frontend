@@ -77,7 +77,8 @@ export async function touchPort(
  * where the board's ids are known, and checked by ``accept`` where the ids
  * alone can't tell), then reset. False when the picker was dismissed; a
  * failed touch throws ``BootloaderTouchError``, a refused pick
- * ``PortNotAcceptedError`` (untouched), a failed pick the browser's own error.
+ * ``PortNotAcceptedError`` (untouched), a failed pick what ``requestSerialPort``
+ * throws.
  */
 export async function touchIntoBootloader({
   onLog,

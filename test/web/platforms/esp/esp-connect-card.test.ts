@@ -28,7 +28,11 @@ import { ESPHomeWebEspConnectCard } from "../../../../src/web/platforms/esp/esph
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   document.body.innerHTML = "";
   vi.clearAllMocks();
 });
@@ -68,7 +72,7 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
   });
 
   it("says to click again for a picker refused after the click ran out", async () => {
-    const restore = withUserActivation(false);
+    restoreActivation = withUserActivation(false);
     const el = new ESPHomeWebEspConnectCard();
     (el as any)._localize = (k: string) => k;
     (navigator as any).serial = {
@@ -78,7 +82,6 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
     };
 
     await (el as any)._connect();
-    restore();
 
     expect(openNoPortPickedDialog).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledExactlyOnceWith("serial.picker_needs_click");

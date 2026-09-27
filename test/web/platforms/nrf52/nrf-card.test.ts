@@ -28,8 +28,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
+import { lapsedPick } from "../../../_web-serial.js";
 import { NRF52_SERIAL_LOGS } from "../../../../src/platforms/nrf52/serial-logs.js";
-import { PickerActivationError } from "../../../../src/util/picker-activation.js";
 import { ESPHomeWebNrfCard } from "../../../../src/web/platforms/nrf52/esphome-web-nrf-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -85,9 +85,7 @@ describe("esphome-web-nrf-card", () => {
     expect(mocks.toastError).toHaveBeenLastCalledWith("web.connect.failed");
     expect((el as any)._logs).toBeUndefined();
 
-    mocks.requestSerialPort.mockRejectedValue(
-      new PickerActivationError(new Error("no gesture"))
-    );
+    mocks.requestSerialPort.mockRejectedValue(lapsedPick());
     await (el as any)._showSerialLogs();
     expect(mocks.toastError).toHaveBeenLastCalledWith("serial.picker_needs_click");
 

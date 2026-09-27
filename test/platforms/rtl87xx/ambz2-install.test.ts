@@ -31,6 +31,7 @@ vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => {
 });
 
 import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { lapsedPick } from "../../_web-serial.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import {
@@ -44,7 +45,6 @@ import {
   LT_TAG,
   UF2_FAMILY_AMBZ,
 } from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
-import { PickerActivationError } from "../../../src/util/picker-activation.js";
 import {
   asHost,
   bin,
@@ -195,9 +195,7 @@ describe("rtlDoFlash", () => {
     expect(host._statusMessage).toBe("firmware.browser_flash_connect_failed");
     expect(host._errorMessage).toBe("no serial");
 
-    mocks.requestSerialPort.mockRejectedValue(
-      new PickerActivationError(new Error("no gesture"))
-    );
+    mocks.requestSerialPort.mockRejectedValue(lapsedPick());
     await rtlDoFlash(asHost(host));
     expect(host._errorMessage).toBe("serial.picker_needs_click");
   });

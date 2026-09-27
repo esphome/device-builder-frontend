@@ -10,7 +10,7 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { namedConnectFailure } from "../../util/serial-open-error.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { requestSerialPort, webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
@@ -317,17 +317,19 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._logPort = undefined;
     this._resetLog();
 
-    let port: SerialPort | null = null;
+    let port: SerialPort | null;
     try {
       port = await requestSerialPort();
-      if (!port) this._resetForRetry();
     } catch (err) {
       this._setState(
         "error",
-        namedConnectFailure(err, this._localize) ?? this._localize("web.flash.no_port")
+        openFailureMessage(err, this._localize, "web.flash.no_port")
       );
+      this._busy = false;
+      return;
     }
     if (!port) {
+      this._resetForRetry();
       this._busy = false;
       return;
     }

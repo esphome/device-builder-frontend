@@ -28,7 +28,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
 
 import { pickFile } from "../../_pick-file.js";
 import { argsLocalize } from "../../../_dom.js";
-import { PickerActivationError } from "../../../../src/util/picker-activation.js";
+import { lapsedPick } from "../../../_web-serial.js";
 import { BootloaderTouchError } from "../../../../src/util/serial-bootloader-touch.js";
 import { ESPHomeWebInstallNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js";
 
@@ -99,9 +99,7 @@ describe("web nRF52 install dialog failure hints", () => {
 
   it("says to click again for a picker refused after the click ran out", async () => {
     const el = await dialog();
-    mocks.touchIntoBootloader.mockRejectedValue(
-      new PickerActivationError(new Error("no gesture"))
-    );
+    mocks.touchIntoBootloader.mockRejectedValue(lapsedPick());
     await el._startInstall();
     expect(el._state).toBe("error");
     expect(el._errorMessage).toBe("serial.picker_needs_click");

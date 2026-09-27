@@ -10,12 +10,12 @@ vi.mock("../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   loadPicoboot: mocks.loadPicoboot,
 }));
 
+import { lapsedPick } from "../../_web-serial.js";
 import {
   flashPico,
   PicoFlashError,
   picoFlashFailureCopy,
 } from "../../../src/platforms/rp2/rp2-flash.js";
-import { PickerActivationError } from "../../../src/util/picker-activation.js";
 import { UF2_FAMILY_RP2040 } from "../../../src/util/uf2.js";
 
 const image = { familyId: UF2_FAMILY_RP2040, ranges: [], totalBytes: 0 };
@@ -175,7 +175,7 @@ describe("picoFlashFailureCopy", () => {
   });
 
   it("says to click again for a chooser refused after the click ran out", () => {
-    const refused = new PickerActivationError(new Error("no gesture"));
+    const refused = lapsedPick();
     expect(
       picoFlashFailureCopy(new PicoFlashError("connect", refused), localize)
     ).toEqual({

@@ -31,7 +31,7 @@ vi.mock("../../src/util/post-install-logs.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
-import { withWebBluetooth, withWebSerial } from "../_web-serial.js";
+import { lapsedPick, withWebBluetooth, withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
@@ -225,6 +225,29 @@ describe("launchLogsWithMethod", () => {
 });
 
 describe("launchLogsWithMethod web-serial", () => {
+  it("says why the picker failed: to click again when the click ran out", async () => {
+    const restore = withWebSerial(true);
+    const host = makeHost(async () => []);
+    try {
+      launch.requestSerialPort.mockRejectedValue(new Error("no serial"));
+      await launchLogsWithMethod(host, makeDevice(), "web-serial");
+      expect(toast.error).toHaveBeenLastCalledWith(
+        "dashboard.logs_web_serial_open_failed",
+        expect.anything()
+      );
+
+      launch.requestSerialPort.mockRejectedValue(lapsedPick());
+      await launchLogsWithMethod(host, makeDevice(), "web-serial");
+      expect(toast.error).toHaveBeenLastCalledWith(
+        "serial.picker_needs_click",
+        expect.anything()
+      );
+      expect(host.logsDialog.openPassive).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   // Chromium asserts DTR and RTS on open; an RTL8720C kit needs them released
   // (see releaseLinesAfterOpen), an ESP board must keep the open's state.
   it.each([

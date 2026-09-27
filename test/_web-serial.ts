@@ -1,3 +1,5 @@
+import { PickerActivationError } from "../src/util/picker-activation.js";
+
 /** Fake SerialPort whose disconnect listeners tests can fire directly. */
 export function makeDisconnectPort(): SerialPort & {
   fire: () => void;
@@ -70,3 +72,6 @@ export const pickerRefused = () =>
     "Must be handling a user gesture to show a permission request.",
     "SecurityError"
   );
+
+/** The error a picker helper throws for a click that ran out. */
+export const lapsedPick = () => new PickerActivationError(pickerRefused());

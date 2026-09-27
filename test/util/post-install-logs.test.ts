@@ -59,6 +59,7 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   isWebUsbSupported: () => picoReset.webUsb,
 }));
 
+import { pickerRefused, withUserActivation } from "../_web-serial.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { BleNusServiceNotFoundError } from "../../src/platforms/nrf52/ble-nus-stream.js";
 import { nrf52Platform } from "../../src/platforms/nrf52/dashboard.js";
@@ -193,6 +194,23 @@ describe("reconnectWebSerialLogs", () => {
       expect(dialog.setSerialStream).not.toHaveBeenCalled();
     } finally {
       restore();
+    }
+  });
+
+  it("says to click again when the picker is refused after the click ran out", async () => {
+    const activation = withUserActivation(false);
+    const restore = withRequestPort(async () => {
+      throw pickerRefused();
+    });
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(dialog as never, (k) => k, 115200, null);
+      expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+        "serial.picker_needs_click"
+      );
+    } finally {
+      restore();
+      activation();
     }
   });
 

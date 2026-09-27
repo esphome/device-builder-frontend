@@ -1,9 +1,9 @@
-import { pickerFailure } from "../../util/picker-activation.js";
 /**
  * Log streaming over the BLE Nordic UART Service (Web Bluetooth, Chromium
  * only). Lines go through the same assembler as Web Serial so both surfaces
  * render identically.
  */
+import { pickerFailure } from "../../util/picker-activation.js";
 import {
   createLogLineAssembler,
   safeFlush,

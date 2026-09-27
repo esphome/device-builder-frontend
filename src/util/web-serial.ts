@@ -57,7 +57,8 @@ export class PortNotAcceptedError extends Error {
 
 /**
  * Prompt for a Web Serial port without opening it. Returns ``null`` if the
- * user dismissed the picker; throws on a real requestPort failure. Callers
+ * user dismissed the picker; throws on a real requestPort failure, named
+ * ``PickerActivationError`` when the click ran out before the picker. Callers
  * that only need the USB identity can decide before ever opening (no DTR/RTS
  * pulse on a port that won't be used). When ``accept`` rejects the picked
  * port, this throws ``PortNotAcceptedError`` before the port is opened.

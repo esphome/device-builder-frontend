@@ -109,10 +109,12 @@ export async function launchLogsWithMethod(
     let serialPort: SerialPort | null;
     try {
       serialPort = await requestSerialPort();
-    } catch {
+    } catch (err) {
       // A real requestPort failure; unlike a picker dismissal this needs
       // feedback.
-      notifyError(host.localize("dashboard.logs_web_serial_open_failed"));
+      notifyError(
+        openFailureMessage(err, host.localize, "dashboard.logs_web_serial_open_failed")
+      );
       return;
     }
     if (!serialPort) return; // User dismissed the port picker.

@@ -22,7 +22,11 @@ function setUsb(usb: object | null, secure = true) {
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: secure });
 }
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   if (origUsb) Object.defineProperty(navigator, "usb", origUsb);
   else if ("usb" in navigator) delete (navigator as any).usb;
   if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);
@@ -61,7 +65,7 @@ describe("requestPicobootDevice", () => {
   });
 
   it("names a chooser refused after the click ran out", async () => {
-    const restore = withUserActivation(false);
+    restoreActivation = withUserActivation(false);
     setUsb({
       requestDevice: vi.fn(async () => {
         throw pickerRefused();
@@ -70,7 +74,6 @@ describe("requestPicobootDevice", () => {
     await expect(requestPicobootDevice()).rejects.toMatchObject({
       name: "PickerActivationError",
     });
-    restore();
   });
 
   it("rethrows other failures", async () => {

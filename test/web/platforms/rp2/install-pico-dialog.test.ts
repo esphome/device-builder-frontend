@@ -36,6 +36,7 @@ vi.mock("../../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 }));
 
 import toast from "sonner-js";
+import { lapsedPick } from "../../../_web-serial.js";
 
 import { makeUsbPort } from "../../_make-web-serial-port.js";
 import { RP2_SERIAL_PICK } from "../../../../src/platforms/rp2/index.js";
@@ -326,5 +327,14 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     await settle(el);
     expect(card(el).statusMessage).toBe("firmware.browser_flash_connect_failed");
     expect(card(el).statusDetail).toBe("no port");
+  });
+
+  it("says to click again under the title for a picker refused after the click ran out", async () => {
+    mocks.touchIntoBootloader.mockRejectedValue(lapsedPick());
+    const el = await mount();
+    button(el, "web.pico.install_reset_action").click();
+    await settle(el);
+    expect(card(el).statusMessage).toBe("firmware.browser_flash_connect_failed");
+    expect(card(el).statusDetail).toBe("serial.picker_needs_click");
   });
 });
