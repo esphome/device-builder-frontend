@@ -28,9 +28,11 @@ export interface EscapeControllerOptions {
  *
  * Hooking up via Lit's ``addController`` means the listener is also
  * dropped automatically when the host disconnects, even if the host
- * never explicitly calls ``set(false)``.
+ * never explicitly calls ``set(false)``, and bound again when a host
+ * that is still active is reconnected.
  */
 export class EscapeController implements ReactiveController {
+  private _active = false;
   private _bound = false;
   private readonly _target: EventTarget;
   private readonly _capture: boolean;
@@ -45,18 +47,27 @@ export class EscapeController implements ReactiveController {
     host.addController(this);
   }
 
+  hostConnected() {
+    this._bind(this._active);
+  }
+
   hostDisconnected() {
-    this.set(false);
+    this._bind(false);
   }
 
   set(active: boolean) {
-    if (active === this._bound) return;
-    if (active) {
+    this._active = active;
+    this._bind(active);
+  }
+
+  private _bind(bound: boolean) {
+    if (bound === this._bound) return;
+    if (bound) {
       this._target.addEventListener("keydown", this._handler, this._capture);
     } else {
       this._target.removeEventListener("keydown", this._handler, this._capture);
     }
-    this._bound = active;
+    this._bound = bound;
   }
 
   /* Typed as EventListener so the union of Window | Document accepts

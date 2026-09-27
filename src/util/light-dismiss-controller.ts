@@ -32,6 +32,7 @@ export interface LightDismissOptions {
  * can't self-dismiss it.
  */
 export class LightDismissController implements ReactiveController {
+  private _active = false;
   private _bound = false;
   private readonly _escape: EscapeController;
 
@@ -52,19 +53,30 @@ export class LightDismissController implements ReactiveController {
     _host.addController(this);
   }
 
+  hostConnected(): void {
+    this._escape.hostConnected();
+    this._bind(this._active);
+  }
+
   hostDisconnected(): void {
-    this.set(false);
+    this._escape.hostDisconnected();
+    this._bind(false);
   }
 
   set(active: boolean): void {
+    this._active = active;
     this._escape.set(active);
-    if (active === this._bound) return;
-    if (active) {
+    this._bind(active);
+  }
+
+  private _bind(bound: boolean): void {
+    if (bound === this._bound) return;
+    if (bound) {
       document.addEventListener("click", this._onDocumentClick, true);
     } else {
       document.removeEventListener("click", this._onDocumentClick, true);
     }
-    this._bound = active;
+    this._bound = bound;
   }
 
   private _onDocumentClick = (e: MouseEvent): void => {

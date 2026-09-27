@@ -111,6 +111,36 @@ describe("LightDismissController outside-click", () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
+  it("binds click and Escape again when a host that is still open is reconnected", () => {
+    const host = makeHost();
+    const onDismiss = vi.fn();
+    const ctrl = track(new LightDismissController(host, onDismiss));
+    ctrl.set(true);
+
+    ctrl.hostDisconnected();
+    ctrl.hostConnected();
+    clickOn(document.body);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
+    expect(onDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("stays inert on reconnect when the host closed meanwhile", () => {
+    const host = makeHost();
+    const onDismiss = vi.fn();
+    const ctrl = track(new LightDismissController(host, onDismiss));
+    ctrl.set(true);
+
+    ctrl.hostDisconnected();
+    ctrl.set(false);
+    ctrl.hostConnected();
+    clickOn(document.body);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
   it("binds one listener across repeated set(true) calls", () => {
     const host = makeHost();
     const onDismiss = vi.fn();
