@@ -17,10 +17,12 @@ import {
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
 import {
+  acceptsDurationMapping,
+  parseDurationMapping,
   parseTimePeriodScalar,
   serializeTimePeriod,
-  TIME_PERIOD_UNITS,
   type TimePeriodUnit,
+  timePeriodUnitsFor,
 } from "../../../util/time-period.js";
 import {
   effectiveDisabled,
@@ -178,13 +180,22 @@ function hexDisplayOrFallback(rawValue: unknown): string {
  * to a single "<value><unit>" string on every change so the
  * backend's parser handles it the same as if the user had typed
  * it raw into YAML.
+ *
+ * The picker offers only the units the entry's ``duration_min_unit``
+ * allows: ESPHome rejects a finer one ("Maximum precision is
+ * milliseconds").
  */
 export function renderTimePeriodField(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx
 ) {
-  const raw = ctx.getAt(path);
+  const stored = ctx.getAt(path);
+  // A whole-body duration may arrive in its mapping form (``{seconds: 2}``).
+  // A single unit reads as the scalar it is equivalent to, and an edit
+  // writes that scalar; a multi-unit mapping falls to the bail below.
+  const mapping = acceptsDurationMapping(entry) ? parseDurationMapping(stored) : null;
+  const raw = mapping ? serializeTimePeriod(mapping.value, mapping.unit) : stored;
   // Bail above parseTimePeriodScalar — its ``String(raw).trim()`` would
   // turn a single-element list ``["5s"]`` into the parseable string
   // ``"5s"`` and a save would clobber the original list.
@@ -235,13 +246,14 @@ export function renderTimePeriodField(
         />
         <wa-select
           data-no-value-sync
+          aria-label=${ctx.localize("device.automation_action_delay_unit")}
           ?disabled=${disabled}
           @change=${(e: Event) => {
             const nextUnit = (e.target as HTMLSelectElement).value as TimePeriodUnit;
             ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
           }}
         >
-          ${TIME_PERIOD_UNITS.map(
+          ${timePeriodUnitsFor(entry.duration_min_unit, displayUnit).map(
             (u) =>
               html`<wa-option value=${u} ?selected=${u === displayUnit}
                 >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option

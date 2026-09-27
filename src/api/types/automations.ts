@@ -71,6 +71,13 @@ export interface AutomationAction {
    *  (``homeassistant.service`` requires exactly one of ``service`` /
    *  ``action``). Members are never advanced. */
   required_groups?: RequiredGroup[] | null;
+  /** Set when the whole body is one value (``delay: 2s``) rather than a
+   *  mapping of fields; ``config_entries`` is then empty. The value lives
+   *  under ``SCALAR_BODY_PARAM_KEY``. See ``RegistryCatalogEntry``. */
+  value_type?: RegistryValueType | null;
+  templatable?: boolean;
+  /** See ``ConfigEntry.duration_min_unit``; for a ``time_period`` value. */
+  duration_min_unit?: string | null;
 }
 
 /** A condition usable inside an automation's ``if`` / ``while`` /
@@ -89,6 +96,10 @@ export interface AutomationCondition {
   /** See ``AutomationAction.required_groups`` — e.g. ``sensor.in_range``
    *  requires at least one of ``above`` / ``below``. */
   required_groups?: RequiredGroup[] | null;
+  /** See ``AutomationAction.value_type``. */
+  value_type?: RegistryValueType | null;
+  templatable?: boolean;
+  duration_min_unit?: string | null;
 }
 
 /** Scalar primitives a polymorphic registry entry can take at the
@@ -96,6 +107,10 @@ export interface AutomationCondition {
  *  rather than plain string so a misspelled tag is a compile-time
  *  error against the renderer's dispatch table. */
 export type RegistryValueType = "time_period" | "float" | "integer" | "string" | "lambda";
+
+/** Param key a scalar-bodied action / condition stores its value under:
+ *  the backend's fallback slot for a body with no named field. */
+export const SCALAR_BODY_PARAM_KEY = "id";
 
 /** Common shape for the polymorphic-list registry catalogs
  *  (`light_effects`, `filter`, future additions). One entry per
@@ -118,6 +133,8 @@ export interface RegistryCatalogEntry {
   /** The scalar value accepts a lambda (``multiply: !lambda``); the
    *  renderer offers a literal/lambda toggle on the inline input. */
   templatable?: boolean;
+  /** See ``ConfigEntry.duration_min_unit``; for a ``time_period`` value. */
+  duration_min_unit?: string | null;
 }
 
 /** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).

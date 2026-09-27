@@ -40,6 +40,7 @@ import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { intervalUnits, type TimePeriodUnit } from "../../util/time-period.js";
 import { bareTriggerKey } from "../../util/trigger-scopes.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
@@ -104,7 +105,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
    *  "<value><unit>" on submit (mirrors the inline TIME_PERIOD
    *  renderer's storage shape). */
   @state() private _intervalValue = "";
-  @state() private _intervalUnit: "us" | "ms" | "s" | "min" | "h" | "d" = "s";
+  @state() private _intervalUnit: TimePeriodUnit = "s";
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
   @state() private _saving = false;
@@ -318,7 +319,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
    * user doesn't land in the editor with an empty interval block.
    */
   private _renderIntervalRow() {
-    const units = ["us", "ms", "s", "min", "h", "d"] as const;
     return html`<div class="field">
       <label class="field-label" id="interval-label">
         ${this._localize("device.automation_interval_label")}
@@ -343,7 +343,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
               .value as typeof this._intervalUnit;
           }}
         >
-          ${units.map(
+          ${intervalUnits(this._intervalUnit).map(
             (u) =>
               html`<wa-option value=${u} ?selected=${u === this._intervalUnit}
                 >${this._localize(`device.automation_action_delay_unit_${u}`)}</wa-option

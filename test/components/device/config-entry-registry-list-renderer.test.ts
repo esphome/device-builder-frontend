@@ -602,6 +602,104 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     });
   });
 
+  it("passes a duration filter's precision to the row's value entry", async () => {
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "throttle",
+        name: "Throttle",
+        config_entries: [],
+        applies_to: [],
+        value_type: "time_period",
+        duration_min_unit: "ms",
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ throttle: "10s" }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry.mock.calls.map((c) => c[0])).toContainEqual(
+      expect.objectContaining({
+        type: ConfigEntryType.TIME_PERIOD,
+        duration_min_unit: "ms",
+        accepts_duration_mapping: true,
+      })
+    );
+  });
+
+  it("renders a scalar row whose catalog body has not hydrated yet", async () => {
+    // The slim index row carries ``value_type`` but no ``config_entries``
+    // until its body arrives.
+    const renderEntry = vi.fn();
+    const catalog = [{ id: "throttle", name: "Throttle", value_type: "time_period" }];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ throttle: "10s" }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry.mock.calls.map((c) => c[1])).toEqual([
+      ["filters", "0", "throttle"],
+    ]);
+  });
+
+  it("renders the value entry for a mapping on a filter that has no fields", async () => {
+    // ``throttle: {seconds: 5}`` is the duration's own mapping form; with no
+    // catalog fields there is no sub-form it could be mistaken for.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "throttle",
+        name: "Throttle",
+        config_entries: [],
+        applies_to: [],
+        value_type: "time_period",
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ throttle: { seconds: 5 } }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    const calls = renderEntry.mock.calls.map((c) => ({
+      type: (c[0] as { type: string }).type,
+      path: c[1],
+    }));
+    expect(calls).toEqual([
+      { type: ConfigEntryType.TIME_PERIOD, path: ["filters", "0", "throttle"] },
+    ]);
+  });
+
   it("marks a templatable scalar filter so the row gets a lambda toggle", async () => {
     // multiply takes a float OR a lambda; the synthetic scalar entry must carry
     // templatable so renderEntry wraps it with the literal/lambda toggle.

@@ -23,7 +23,6 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { apiContext } from "../../../context/index.js";
 import { subscribeAutomationCatalogCache } from "../../../util/automation-catalog-cache.js";
-import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
 import { looksLikeTimePeriodScalar } from "../../../util/time-period.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
@@ -47,8 +46,8 @@ import {
   REGISTRY_OPS,
   type RegistryOps,
   spliceEditable,
-  VALUE_TYPE_TO_CONFIG_TYPE,
 } from "./registry-list-helpers.js";
+import { makeScalarValueEntry, scalarValueType } from "./scalar-value-entry.js";
 
 @customElement("esphome-registry-list")
 export class ESPHomeRegistryList extends LitElement {
@@ -348,10 +347,15 @@ export class ESPHomeRegistryList extends LitElement {
     // (``delayed_on_off: 50ms`` shorthand for the mapping form) the
     // catalog doesn't classify. Suppressed when params is already a
     // mapping so a hypothetical catalog miscategorisation can't
-    // clobber an existing nested config.
-    const scalarConfigType = paramsIsMapping
-      ? null
-      : this._scalarDispatchType(catalogEntry, params);
+    // clobber an existing nested config; an entry with no fields has no
+    // nested config, so its mapping is the value's own dict form
+    // (``throttle: {seconds: 5}``).
+    // ``config_entries`` is absent on a row whose body hasn't hydrated yet.
+    const hasFields = (catalogEntry?.config_entries?.length ?? 0) > 0;
+    const scalarConfigType =
+      paramsIsMapping && hasFields
+        ? null
+        : this._scalarDispatchType(catalogEntry, params);
     // Render every child unconditionally — the user opted into this
     // filter/effect by picking it from the dropdown, so the outer
     // form's advanced / requiredOnly gates don't apply (many filters
@@ -402,7 +406,7 @@ export class ESPHomeRegistryList extends LitElement {
           currentId,
           scalarConfigType,
           childEntries,
-          catalogEntry?.templatable ?? false
+          catalogEntry
         )}
       </div>
     `;
@@ -431,16 +435,8 @@ export class ESPHomeRegistryList extends LitElement {
     catalogEntry: RegistryCatalogEntry | undefined,
     params: unknown
   ): ConfigEntryType | null {
-    const tagged = catalogEntry?.value_type;
-    // hasOwnProperty rather than ``in`` so prototype-chain keys
-    // (``toString`` etc.) coming through a non-typed payload don't
-    // accidentally resolve to a non-ConfigEntryType value.
-    if (
-      tagged &&
-      Object.prototype.hasOwnProperty.call(VALUE_TYPE_TO_CONFIG_TYPE, tagged)
-    ) {
-      return VALUE_TYPE_TO_CONFIG_TYPE[tagged];
-    }
+    const tagged = scalarValueType(catalogEntry);
+    if (tagged !== null) return tagged;
     if (looksLikeTimePeriodScalar(params)) {
       return ConfigEntryType.TIME_PERIOD;
     }
@@ -456,12 +452,12 @@ export class ESPHomeRegistryList extends LitElement {
     currentId: string,
     scalarConfigType: ConfigEntryType | null,
     childEntries: ConfigEntry[],
-    templatable: boolean
+    catalogEntry: RegistryCatalogEntry | undefined
   ) {
     if (scalarConfigType !== null) {
       // templatable adds the literal/lambda toggle on the value (multiply: !lambda).
       return html`<div class="registry-list-sub-form">
-        ${this.ctx.renderEntry(makeConfigEntry({ type: scalarConfigType, templatable }), [
+        ${this.ctx.renderEntry(makeScalarValueEntry(scalarConfigType, catalogEntry), [
           ...this.path,
           String(index),
           currentId,

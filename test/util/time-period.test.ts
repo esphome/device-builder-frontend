@@ -6,9 +6,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  intervalUnits,
   looksLikeTimePeriodScalar,
+  parseDurationMapping,
   parseTimePeriodScalar,
   serializeTimePeriod,
+  TIME_PERIOD_UNITS,
+  timePeriodUnitsFor,
 } from "../../src/util/time-period.js";
 
 describe("parseTimePeriodScalar", () => {
@@ -61,5 +65,65 @@ describe("serializeTimePeriod", () => {
 
   it("drops an empty value", () => {
     expect(serializeTimePeriod("", "s")).toBe("");
+  });
+});
+
+describe("timePeriodUnitsFor", () => {
+  it.each([undefined, null, "", "ns", "us", "fortnight"])(
+    "offers every unit for min unit %j",
+    (minUnit) => {
+      expect(timePeriodUnitsFor(minUnit)).toEqual(TIME_PERIOD_UNITS);
+    }
+  );
+
+  it.each([
+    ["ms", ["ms", "s", "min", "h", "d"]],
+    ["s", ["s", "min", "h", "d"]],
+    ["min", ["min", "h", "d"]],
+  ])("offers %s and coarser", (minUnit, expected) => {
+    expect(timePeriodUnitsFor(minUnit)).toEqual(expected);
+  });
+
+  it("keeps a finer unit the value already uses, in picker order", () => {
+    expect(timePeriodUnitsFor("s", "us")).toEqual(["us", "s", "min", "h", "d"]);
+  });
+
+  it("adds nothing when the in-use unit is already offered", () => {
+    expect(timePeriodUnitsFor("ms", "h")).toEqual(["ms", "s", "min", "h", "d"]);
+  });
+});
+
+describe("intervalUnits", () => {
+  it("is millisecond precision, as ESPHome validates interval", () => {
+    expect(intervalUnits()).toEqual(["ms", "s", "min", "h", "d"]);
+    expect(intervalUnits("s")).not.toContain("us");
+  });
+});
+
+describe("parseDurationMapping", () => {
+  it.each([
+    [{ seconds: 2 }, { value: "2", unit: "s" }],
+    [{ milliseconds: "250" }, { value: "250", unit: "ms" }],
+    [{ minutes: 1.5 }, { value: "1.5", unit: "min" }],
+    [{ microseconds: 4 }, { value: "4", unit: "us" }],
+    [{ hours: 1 }, { value: "1", unit: "h" }],
+    [{ days: 7 }, { value: "7", unit: "d" }],
+  ])("reads %j", (raw, expected) => {
+    expect(parseDurationMapping(raw)).toEqual(expected);
+  });
+
+  it.each([
+    ["a multi-unit mapping", { minutes: 1, seconds: 30 }],
+    ["an empty mapping", {}],
+    ["a non-unit key", { entity_state: "room_temp" }],
+    ["a unit alias, which the mapping form does not accept", { sec: 2 }],
+    ["an inherited key", { toString: 2 }],
+    ["a non-numeric amount", { seconds: "soon" }],
+    ["a nested amount", { seconds: { value: 2 } }],
+    ["a list", [{ seconds: 2 }]],
+    ["a scalar", "2s"],
+    ["null", null],
+  ])("is null for %s", (_label, raw) => {
+    expect(parseDurationMapping(raw)).toBeNull();
   });
 });

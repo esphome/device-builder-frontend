@@ -8,12 +8,78 @@
  * accepted suffix onto its canonical unit so an aliased value still
  * splits into the picker instead of blanking out. `ns` / `nanoseconds`
  * have no canonical picker unit and fall through to the raw-text editor.
+ *
+ * A field's precision (`duration_min_unit`) narrows the picker to the
+ * units ESPHome accepts for it.
  */
 
 /** Canonical units the time-period / delay pickers offer, least to
  *  most coarse. */
 export const TIME_PERIOD_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
 export type TimePeriodUnit = (typeof TIME_PERIOD_UNITS)[number];
+
+/** Units the picker offers for a field: *minUnit* (the catalog's
+ *  `duration_min_unit`) and coarser; `ns` is finer than any of them. The unit
+ *  a stored value already uses stays listed, so an existing `4us` still
+ *  shows its unit instead of a blank picker. An absent or unknown
+ *  *minUnit* offers every unit. */
+export function timePeriodUnitsFor(
+  minUnit: string | null | undefined,
+  inUse?: TimePeriodUnit
+): readonly TimePeriodUnit[] {
+  const first = TIME_PERIOD_UNITS.indexOf(minUnit as TimePeriodUnit);
+  if (first <= 0) return TIME_PERIOD_UNITS;
+  return TIME_PERIOD_UNITS.filter((u, i) => i >= first || u === inUse);
+}
+
+/** UI-only marker on a synthetic entry for a whole-body duration
+ *  (`delay: 2s`, `throttle: 10s`): the value may arrive in its mapping form
+ *  (`{seconds: 2}`). A regular field never carries it and keeps the
+ *  YAML-only notice for a mapping. */
+export interface DurationMappingCarrier {
+  accepts_duration_mapping?: boolean;
+}
+
+export const acceptsDurationMapping = (entry: object): boolean =>
+  (entry as DurationMappingCarrier).accepts_duration_mapping === true;
+
+/** Units the interval automation's picker offers. ESPHome validates
+ *  `interval:` with `cv.positive_time_period_milliseconds`. */
+export const intervalUnits = (inUse?: TimePeriodUnit): readonly TimePeriodUnit[] =>
+  timePeriodUnitsFor("ms", inUse);
+
+/** Keys of a time period's mapping form (`cv.time_period_dict`). */
+const DURATION_MAPPING_KEYS: Record<string, TimePeriodUnit> = {
+  microseconds: "us",
+  milliseconds: "ms",
+  seconds: "s",
+  minutes: "min",
+  hours: "h",
+  days: "d",
+};
+
+const NUMERIC_RE = /^\d+(?:\.\d+)?$/;
+
+/** Read a time period's mapping form (`{seconds: 2}`) as a value + unit.
+ *  Only a single-unit mapping fits one picker; a multi-unit one
+ *  (`{minutes: 1, seconds: 30}`) or any other shape is `null`. */
+export function parseDurationMapping(
+  raw: unknown
+): { value: string; unit: TimePeriodUnit } | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const keys = Object.keys(raw);
+  if (
+    keys.length !== 1 ||
+    !Object.prototype.hasOwnProperty.call(DURATION_MAPPING_KEYS, keys[0])
+  ) {
+    return null;
+  }
+  const amount = (raw as Record<string, unknown>)[keys[0]];
+  if (typeof amount !== "number" && typeof amount !== "string") return null;
+  const value = String(amount).trim();
+  if (!NUMERIC_RE.test(value)) return null;
+  return { value, unit: DURATION_MAPPING_KEYS[keys[0]] };
+}
 
 /** Every time-unit suffix ESPHome accepts, mapped to its canonical
  *  picker unit. Mirrors `cv.time_period_str_unit`'s `unit_to_kwarg`. */

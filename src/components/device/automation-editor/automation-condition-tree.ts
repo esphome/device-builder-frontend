@@ -38,6 +38,7 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
+import { paramEntriesOf } from "../config-entry-renderers/scalar-value-entry.js";
 import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -230,9 +231,12 @@ export class ESPHomeAutomationConditionTree extends LitElement {
               : nothing
           }
           ${
-            def && def.config_entries.length > 0
+            def && (def.value_type || def.config_entries.length > 0)
               ? html`<esphome-config-entry-form
-                  .entries=${def.config_entries}
+                  .entries=${paramEntriesOf(
+                    def,
+                    this._localize("device.automation_action_delay_value")
+                  )}
                   .values=${node.params}
                   .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
                   .board=${this.board}

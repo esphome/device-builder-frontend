@@ -44,20 +44,10 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
-import "../config-entry-renderers/lambda-editor.js";
-import { lambdaBodyOf } from "../config-entry-renderers/lambda.js";
-import { literalLambdaToggleStyles } from "../config-entry-renderers/literal-lambda-toggle.js";
+import { paramEntriesOf } from "../config-entry-renderers/scalar-value-entry.js";
 import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import "./automation-condition-tree.js";
-import {
-  delayLambdaOf,
-  type DelayUnit,
-  readDelay,
-  renderDelayParams,
-  writeDelayLambdaParams,
-  writeDelayParams,
-} from "./automation-delay-params.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   type AutomationFocus,
@@ -92,11 +82,10 @@ function hasConditionGate(def: AutomationAction | undefined): boolean {
   return !!def?.has_condition_gate;
 }
 
-/** Whether the action's params render as a catalog-driven
- *  ``<esphome-config-entry-form>`` (vs the bespoke delay widget or
- *  nothing). */
+/** Whether the action has params to render: catalog fields, or the one
+ *  value of a scalar-bodied action (``delay: 2s``). */
 function rendersParamsForm(def: AutomationAction | undefined): def is AutomationAction {
-  return !!def && def.id !== "delay" && def.config_entries.length > 0;
+  return !!def && (!!def.value_type || def.config_entries.length > 0);
 }
 
 @customElement("esphome-automation-action-node")
@@ -160,18 +149,10 @@ export class ESPHomeAutomationActionNode extends LitElement {
   /** "Show advanced settings" gate for the action params form. */
   @state() private _showAdvanced = false;
 
-  /** Stashed other-side values for the Delay literal/lambda toggle, so
-   *  flipping back and forth doesn't discard the user's work before they
-   *  return to it: the C++ body for the lambda side, the value + unit for
-   *  the literal side. Both reset when the action kind changes. */
-  @state() private _delayLambdaStash = "";
-  @state() private _delayLiteralStash: { value: string; unit: DelayUnit } | null = null;
-
   static styles = [
     espHomeStyles,
     inputStyles,
     automationEditorStyles,
-    literalLambdaToggleStyles,
     fieldHighlightStyles,
   ];
 
@@ -193,8 +174,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
       if (previous && previous.action_id !== this.value.action_id) {
         this._collapsed = false;
         this._showAdvanced = false;
-        this._delayLambdaStash = "";
-        this._delayLiteralStash = null;
       }
     }
     if (changed.has("focusTarget")) {
@@ -443,22 +422,18 @@ export class ESPHomeAutomationActionNode extends LitElement {
   }
 
   /**
-   * Render the action's parameter form. Most actions go through
-   * the catalog-driven ``<esphome-config-entry-form>``; specific
-   * "shortcut" actions (currently: ``delay``) need a bespoke
-   * surface because their catalog shape doesn't match the
-   * one-knob user-facing UX. See ``_renderDelayParams`` for the
-   * exact substitution.
+   * Render the action's parameter form through the catalog-driven
+   * ``<esphome-config-entry-form>``. A scalar-bodied action (``delay: 2s``)
+   * renders its one value as a field, labelled "Value".
    */
   private _renderActionParams(def: AutomationAction | undefined) {
-    if (def?.id === "delay") return this._renderDelayParams();
     if (!rendersParamsForm(def)) return nothing;
     // The form owns the advanced section; an all-advanced action (no basic
     // fields) renders everything with no control, matching the old
     // force-open-no-toggle behaviour.
     const t = this.focusTarget;
     return html`<esphome-config-entry-form
-      .entries=${def.config_entries}
+      .entries=${paramEntriesOf(def, this._localize("device.automation_action_delay_value"))}
       .values=${this.value.params}
       .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
       .board=${this.board}
@@ -477,57 +452,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
   private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
     this._showAdvanced = e.detail.show;
   };
-
-  /** The bespoke value+unit / lambda Delay widget. The renderer and
-   *  its params read/write helpers live in ``automation-delay-params``;
-   *  the host owns only the toggle stashes and the emit plumbing. */
-  private _renderDelayParams() {
-    return renderDelayParams({
-      params: this.value.params ?? {},
-      disabled: this.disabled,
-      localize: this._localize,
-      onWrite: (value, unit) => this._writeDelay(value, unit),
-      onWriteLambda: (body) => this._writeDelayLambda(body),
-      onToggle: (toLambda) => this._toggleDelayLambda(toLambda),
-    });
-  }
-
-  /** Flip the Delay action between its literal (value + unit) and
-   *  ``!lambda`` forms, stashing the side being left so an accidental
-   *  toggle doesn't discard the user's work before they flip back. */
-  private _toggleDelayLambda(toLambda: boolean) {
-    const params = this.value.params ?? {};
-    const lambda = delayLambdaOf(params);
-    if (toLambda === (lambda !== null)) return;
-    if (toLambda) {
-      this._delayLiteralStash = readDelay(params);
-      this._writeDelayLambda(this._delayLambdaStash);
-    } else {
-      this._delayLambdaStash = lambdaBodyOf(lambda);
-      const { value, unit } = this._delayLiteralStash ?? { value: "", unit: "s" };
-      this._writeDelay(value, unit);
-    }
-  }
-
-  /** Write a (numeric value, unit) pair into the delay action's params,
-   *  using the canonical ``<unit>: <value>`` form. */
-  private _writeDelay(value: string, unit: DelayUnit) {
-    this._emit({
-      ...this.value,
-      params: writeDelayParams(this.value.params ?? {}, value, unit),
-    });
-  }
-
-  /** Write a ``!lambda`` body into the delay action's scalar ``id``
-   *  slot. The explicit ``!lambda`` tag is what makes the backend
-   *  re-emit a lambda rather than a string literal. */
-  private _writeDelayLambda(body: string) {
-    this._delayLambdaStash = body;
-    this._emit({
-      ...this.value,
-      params: writeDelayLambdaParams(this.value.params ?? {}, body),
-    });
-  }
 
   private _openPicker = () => {
     requestCatalogPick(this, {

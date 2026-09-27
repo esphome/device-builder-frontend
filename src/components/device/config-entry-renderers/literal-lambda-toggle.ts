@@ -1,10 +1,9 @@
 /**
  * Literal/lambda toggle — the two-button tab strip that swaps a field
- * between its literal value and a ``!lambda`` body. Shared by the
- * templatable config-entry wrapper and the bespoke Delay action
- * renderer so the markup and styling live in one place. The toggle is
- * a pair of buttons rather than a wa-tab-group to keep the markup
- * leaf-cheap and the keyboard story explicit.
+ * between its literal value and a ``!lambda`` body, for the templatable
+ * config-entry wrapper. The toggle is a pair of buttons rather than a
+ * wa-tab-group to keep the markup leaf-cheap and the keyboard story
+ * explicit.
  */
 import { css, html } from "lit";
 

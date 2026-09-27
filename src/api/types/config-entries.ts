@@ -135,6 +135,12 @@ export interface ConfigEntry {
    * entries.
    */
   unit_options?: string[] | null;
+  /**
+   * Finest unit a `TIME_PERIOD` entry accepts (`ns` / `us` / `ms` / `s` /
+   * `min`); the unit picker hides anything finer. Absent means every
+   * unit is valid.
+   */
+  duration_min_unit?: string | null;
   /** When True the field accepts a list of values. */
   multi_value?: boolean;
   /**
