@@ -38,14 +38,31 @@ function wholeBody(minUnit?: string): ConfigEntry {
   );
 }
 
-function mount(entry: ConfigEntry, value: unknown) {
-  const { ctx, emitChange } = makeEmitCtx({ id: value });
+/** The form's pending-unit store, shared across renders of one field. */
+function pendingUnits() {
+  const units = new Map<string, string>();
+  return {
+    getPendingUnit: (path: string[]) => units.get(path.join(".")),
+    setPendingUnit: vi.fn((path: string[], unit: string) => {
+      units.set(path.join("."), unit);
+    }),
+  };
+}
+
+function mount(entry: ConfigEntry, value: unknown, pending = pendingUnits()) {
+  const { ctx, emitChange } = makeEmitCtx({ id: value }, pending);
   const host = document.createElement("div");
   render(renderTimePeriodField(entry, PATH, ctx), host);
   const options = [...host.querySelectorAll("wa-option")];
   return {
     host,
     emitChange,
+    pending,
+    pickUnit: (unit: string) => {
+      const select = host.querySelector("wa-select") as HTMLElement & { value: string };
+      select.value = unit;
+      select.dispatchEvent(new Event("change"));
+    },
     input: host.querySelector<HTMLInputElement>(".time-period-inputs input"),
     units: options.map((o) => o.getAttribute("value")),
     selected:
@@ -105,11 +122,36 @@ describe("renderTimePeriodField unit picker", () => {
   });
 
   it("gives a bare number the unit the user picks", () => {
-    const { host, emitChange } = mount(field({ duration_min_unit: "ms" }), "5");
-    const select = host.querySelector("wa-select") as HTMLElement & { value: string };
-    select.value = "min";
-    select.dispatchEvent(new Event("change"));
+    const { pickUnit, emitChange } = mount(field({ duration_min_unit: "ms" }), "5");
+    pickUnit("min");
     expect(emitChange).toHaveBeenCalledWith(PATH, "5min");
+  });
+
+  it("keeps a unit picked on an empty field for the number typed next", () => {
+    const entry = field({ duration_min_unit: "ms" });
+    const empty = mount(entry, "");
+    empty.pickUnit("min");
+    expect(empty.pending.setPendingUnit).toHaveBeenCalledWith(PATH, "min");
+    expect(empty.emitChange).not.toHaveBeenCalled();
+
+    const next = mount(entry, "", empty.pending);
+    expect(next.selected).toBe("min");
+    next.input!.value = "5";
+    next.input!.dispatchEvent(new Event("input"));
+    expect(next.emitChange).toHaveBeenCalledWith(PATH, "5min");
+  });
+
+  it("lets a stored unit win over a unit picked earlier", () => {
+    const pending = pendingUnits();
+    pending.setPendingUnit(PATH, "h");
+    expect(mount(field(), "5s", pending).selected).toBe("s");
+  });
+
+  it("ignores a pending unit the entry does not accept", () => {
+    const pending = pendingUnits();
+    pending.setPendingUnit(PATH, "us");
+    const { selected } = mount(field({ duration_min_unit: "ms" }), "", pending);
+    expect(selected).toBe("s");
   });
 
   it("gives a bare number a valid unit once it is edited", () => {

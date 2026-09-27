@@ -224,15 +224,20 @@ export function renderTimePeriodField(
   // matches what they'd see if they typed the catalog default. Only a
   // stored unit is kept when it is finer than the entry accepts. A stored
   // bare number has none, and ESPHome rejects it, so the picker shows no
-  // selection until the user picks one or edits the number.
+  // selection until the user picks one or edits the number. A unit picked
+  // while the field is empty has no value to live in, so it is held as the
+  // form's pending unit until a number is typed.
   const hasValue = raw !== undefined && raw !== null && raw !== "";
   const hasUnit = hasValue && !parsed.unitless;
+  const offered = timePeriodUnitsFor(entry.duration_min_unit);
+  const pendingUnit = offered.find((u) => u === ctx.getPendingUnit(path));
   const displayUnit = hasUnit
     ? parsed.unit
-    : clampTimePeriodUnit(
+    : (pendingUnit ??
+      clampTimePeriodUnit(
         defaultParsed?.parseable ? defaultParsed.unit : parsed.unit,
         entry.duration_min_unit
-      );
+      ));
   const selectedUnit = hasValue && !hasUnit ? null : displayUnit;
   return html`
     <div class="field time-period" data-field-key=${fieldKeyAttr(path)}>
@@ -257,12 +262,15 @@ export function renderTimePeriodField(
           ?disabled=${disabled}
           @change=${(e: Event) => {
             const nextUnit = (e.target as HTMLSelectElement).value as TimePeriodUnit;
-            ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
+            ctx.setPendingUnit(path, nextUnit);
+            if (hasValue) {
+              ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
+            }
           }}
         >
-          ${timePeriodUnitsFor(
-            entry.duration_min_unit,
-            hasUnit ? displayUnit : undefined
+          ${(hasUnit
+            ? timePeriodUnitsFor(entry.duration_min_unit, displayUnit)
+            : offered
           ).map(
             (u) =>
               html`<wa-option value=${u} ?selected=${u === selectedUnit}
