@@ -28,6 +28,7 @@ import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { offlineSeconds } from "../util/device-status.js";
 import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { OfflineClockController } from "../util/offline-clock.js";
@@ -76,11 +77,17 @@ export class ESPHomeDeviceCard extends LitElement {
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] =
     [];
-  // Epoch seconds the device went unreachable; ``null`` while online or
-  // when nothing is known.
+  // Mirrors ``runtime_state.offline_since``.
   @property({ attribute: false }) offlineSince: number | null = null;
 
-  private readonly _offlineClock = new OfflineClockController(this);
+  get _offlineSeconds(): number | null {
+    return offlineSeconds(this.state, this.nameAddMacSuffix, this.offlineSince);
+  }
+
+  protected readonly _offlineClock = new OfflineClockController(
+    this,
+    () => this._offlineSeconds
+  );
 
   // Resolved against the catalog at render time so a recolor / rename in
   // another client repaints every card without per-card state.
@@ -155,12 +162,6 @@ export class ESPHomeDeviceCard extends LitElement {
     // + actions row already stopPropagation so this only fires on body.
     this.addEventListener("click", this._onClick);
     this.addEventListener("contextmenu", this._onHostContextMenu);
-  }
-
-  protected updated() {
-    this._offlineClock.sync(
-      this.state === DeviceState.OFFLINE && this.offlineSince !== null
-    );
   }
 
   disconnectedCallback() {

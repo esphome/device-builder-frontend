@@ -13,6 +13,21 @@ export const isStatusUntracked = (
   nameAddMacSuffix: boolean
 ): boolean => nameAddMacSuffix && state !== DeviceState.ONLINE;
 
+/** Seconds the device has been offline, or `null` when no duration
+ *  applies: it isn't OFFLINE, the verdict is untracked, or the backend
+ *  has no `offline_since` for it. */
+export const offlineSeconds = (
+  state: DeviceState,
+  nameAddMacSuffix: boolean,
+  offlineSince: number | null,
+  nowMs = Date.now()
+): number | null =>
+  state === DeviceState.OFFLINE &&
+  !isStatusUntracked(state, nameAddMacSuffix) &&
+  offlineSince !== null
+    ? nowMs / 1000 - offlineSince
+    : null;
+
 /** Facet bucket id for untracked devices (beside the `DeviceState` values). */
 export const UNTRACKED_STATE = "untracked";
 

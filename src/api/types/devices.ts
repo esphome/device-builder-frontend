@@ -35,7 +35,9 @@ export interface DeviceRuntimeState {
   ip_addresses: string[];
   /** Epoch seconds at which the device stopped being reachable; ``null``
    *  while online or when nothing is known. Absolute, so a duration ticks
-   *  forward without a per-response anchor and every surface agrees. */
+   *  forward without a per-response anchor and every surface agrees.
+   *  It is the server's clock measured against the browser's, so any skew
+   *  between the two shifts the displayed duration by that much. */
   offline_since: number | null;
   deployed_version: string;
   /**

@@ -1,4 +1,3 @@
-import { DeviceState } from "../../api/types/devices.js";
 import type {
   DeviceEventData,
   DeviceStateChangedEventData,
@@ -160,17 +159,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       const { configuration, state, offline_since } = data as DeviceStateChangedEventData;
       host._devices = host._devices.map((d) =>
         d.configuration === configuration
-          ? {
-              ...d,
-              runtime_state: {
-                ...d.runtime_state,
-                state: state as DeviceState,
-                // Carried on the event: without it a fresh outage renders no
-                // duration until the next listing, and a re-flap renders the
-                // previous outage's.
-                offline_since: offline_since ?? null,
-              },
-            }
+          ? { ...d, runtime_state: { ...d.runtime_state, state, offline_since } }
           : d
       );
       break;

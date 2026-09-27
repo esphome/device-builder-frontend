@@ -1,43 +1,71 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
 /**
- * A one-second repaint shared by every surface showing an offline duration.
+ * Repaints device cards as their offline duration advances.
  *
- * The duration advances with wall-clock rather than with any incoming event
- * — an offline device sends nothing — so the surfaces showing one have to
- * repaint themselves. A timer per card would be dozens of intervals doing
- * identical work, and ticking the dashboard would re-render the whole page
- * each second, so hosts share one module-level interval that exists only
- * while at least one of them is actually displaying a duration.
+ * An offline device sends nothing, so a card showing a duration has to
+ * repaint itself. ``NowTickController`` owns an interval per instance, which
+ * across a card grid is dozens of timers doing identical work, so the cards
+ * share one module-level interval that exists only while at least one of
+ * them is showing a duration.
  */
-const hosts = new Set<ReactiveControllerHost>();
+const clocks = new Set<OfflineClockController>();
 let timer: ReturnType<typeof setInterval> | null = null;
 
 function tick(): void {
-  for (const host of hosts) host.requestUpdate();
+  for (const clock of clocks) clock.tick();
+}
+
+// The granularity ``formatDuration`` renders at: seconds under a minute,
+// minutes after. A repaint inside the same step would draw the same label.
+function shownStep(seconds: number): number {
+  const whole = Math.max(0, Math.floor(seconds));
+  return whole < 60 ? whole : whole - (whole % 60);
 }
 
 export class OfflineClockController implements ReactiveController {
   private readonly host: ReactiveControllerHost;
+  private readonly seconds: () => number | null;
+  private shown = 0;
 
-  constructor(host: ReactiveControllerHost) {
+  /** *seconds* is the duration the host is showing, ``null`` when it shows none. */
+  constructor(host: ReactiveControllerHost, seconds: () => number | null) {
     this.host = host;
+    this.seconds = seconds;
     host.addController(this);
   }
 
-  hostDisconnected(): void {
-    this.sync(false);
+  hostConnected(): void {
+    this.reconcile();
   }
 
-  /** Join or leave the shared tick; *showing* is whether a duration is on screen. */
-  sync(showing: boolean): void {
-    if (showing) {
-      hosts.add(this.host);
-      timer ??= setInterval(tick, 1000);
+  hostUpdated(): void {
+    this.reconcile();
+  }
+
+  hostDisconnected(): void {
+    this.leave();
+  }
+
+  tick(): void {
+    const seconds = this.seconds();
+    if (seconds !== null && shownStep(seconds) !== this.shown) this.host.requestUpdate();
+  }
+
+  private reconcile(): void {
+    const seconds = this.seconds();
+    if (seconds === null) {
+      this.leave();
       return;
     }
-    hosts.delete(this.host);
-    if (hosts.size === 0 && timer !== null) {
+    this.shown = shownStep(seconds);
+    clocks.add(this);
+    timer ??= setInterval(tick, 1000);
+  }
+
+  private leave(): void {
+    clocks.delete(this);
+    if (clocks.size === 0 && timer !== null) {
       clearInterval(timer);
       timer = null;
     }

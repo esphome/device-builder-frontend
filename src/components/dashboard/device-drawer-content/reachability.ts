@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../../api/types/devices.js";
 import type { ReachabilitySource } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
+import { offlineSeconds } from "../../../util/device-status.js";
 import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
@@ -15,6 +16,7 @@ import {
   renderMdnsStaleWarning,
   renderMdnsTxtRecords,
 } from "../device-drawer-render.js";
+import { renderRow } from "./render-sections.js";
 
 interface ReachabilityRowSpec {
   source: "mdns" | "ping" | "mqtt";
@@ -81,11 +83,16 @@ export function renderReachabilitySection(
 
   // Independent of the per-source rows: a device asleep since before the
   // dashboard started has no per-source ages at all, which is exactly when
-  // "how long has it been gone" is the only thing worth showing. Measured
-  // off the same absolute stamp the card uses, so the two always agree.
-  const offlineSince = host.device?.runtime_state.offline_since ?? null;
-  const offlineFor =
-    deviceOffline && offlineSince !== null ? now / 1000 - offlineSince : null;
+  // "how long has it been gone" is the only thing worth showing.
+  const device = host.device;
+  const offlineFor = device
+    ? offlineSeconds(
+        device.runtime_state.state,
+        device.name_add_mac_suffix,
+        device.runtime_state.offline_since,
+        now
+      )
+    : null;
 
   return html`
     <div class="section">
@@ -93,15 +100,11 @@ export function renderReachabilitySection(
       ${
         offlineFor === null
           ? nothing
-          : html`<div class="row">
-              <div class="icon">
-                <wa-icon library="mdi" name="clock-outline"></wa-icon>
-              </div>
-              <div class="content">
-                <div class="label">${host._localize("dashboard.drawer_offline_for")}</div>
-                <div class="value">${formatDuration(offlineFor, { language: lang })}</div>
-              </div>
-            </div>`
+          : renderRow(
+              "clock-outline",
+              host._localize("dashboard.drawer_offline_for"),
+              formatDuration(offlineFor, { language: lang })
+            )
       }
       ${
         !anySignal
