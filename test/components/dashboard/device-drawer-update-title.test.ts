@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 // Stub the drawer body; see _device-drawer.ts.
 vi.mock("../../../src/components/dashboard/device-drawer-content.js", () => ({}));
 

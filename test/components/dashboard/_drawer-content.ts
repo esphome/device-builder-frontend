@@ -10,7 +10,7 @@ import { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/de
  * Drawer-content test harness (stubbed api + identity localize).
  *
  * Callers still need their own ``vi.mock`` lines for the webawesome
- * icon module and the labels editor — vi.mock is hoisted per test
+ * icon and tooltip modules and the labels editor — vi.mock is hoisted per test
  * module.
  */
 export async function mountDrawerContent(

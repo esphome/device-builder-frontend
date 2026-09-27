@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 vi.mock("../../../src/components/labels/device-labels-editor.js", () => ({}));
 
 import { flush } from "../../_dom.js";
