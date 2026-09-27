@@ -430,7 +430,11 @@
     "compile_selected_aria": "Compile {count} selected without installing",
     "builder_stack_heading": "Device builder",
     "builder_stack_tagline": "create and manage your devices",
-    "logs_serial_probe_failed": "Could not check for serial ports; showing logs over the network."
+    "logs_serial_probe_failed": "Could not check for serial ports; showing logs over the network.",
+    "install_method_nrf_smp_ble": "OTA via Bluetooth",
+    "install_method_nrf_smp_ble_desc": "Install firmware over Bluetooth to a device with MCUmgr BLE transport enabled.",
+    "install_method_nrf_smp_serial": "OTA via Serial",
+    "install_method_nrf_smp_serial_desc": "Install firmware over serial to a device with MCUmgr serial transport enabled."
   },
   "command": {
     "install_title": "Install — {name}",
@@ -604,7 +608,17 @@
     "elf_download_done_body": "Saved as {filename}. Use it with the ESP stack trace decoder to decode crash backtraces.",
     "choose_binary_title": "Choose what to download",
     "choose_binary_desc": "Each option explains what it's for.",
-    "choose_binary_again": "Download another format"
+    "choose_binary_again": "Download another format",
+    "nrf_no_mcuboot_bin": "This build did not produce a MCUboot update image (zephyr/app_update.bin).",
+    "nrf_bad_mcuboot_image": "Invalid MCUboot firmware image",
+    "nrf_smp_ble_ready_title": "Ready to flash via Bluetooth",
+    "nrf_smp_ble_ready_desc": "Click Flash to open the Bluetooth device picker. Make sure the device is powered on and within range.",
+    "nrf_smp_serial_ready_title": "Ready to flash via serial",
+    "nrf_smp_serial_ready_desc": "Click Flash and pick the serial port for the device.",
+    "nrf_smp_connecting": "Connecting…",
+    "nrf_smp_ble_failed": "Bluetooth OTA failed",
+    "nrf_smp_serial_failed": "Serial OTA failed",
+    "nrf_smp_ble_service_not_found": "The selected device does not have the MCUmgr SMP service. Make sure it has the MCUmgr BLE transport enabled."
   },
   "serial": {
     "title": "USB Device",
@@ -2147,7 +2161,7 @@
     "open": "Troubleshoot",
     "open_tooltip": "Click to troubleshoot connectivity",
     "check_again": "Check again",
-    "checking": "Checking connectivity\u2026",
+    "checking": "Checking connectivity…",
     "check_failed": "The connectivity check did not complete. Try again in a moment.",
     "learn_more": "Learn more",
     "result_dns_ok": "{address} resolves to {ips}",

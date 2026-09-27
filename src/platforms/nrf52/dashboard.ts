@@ -1,4 +1,7 @@
-/** The Device Builder's nRF52 support: Nordic legacy DFU over the bootloader's CDC, and logs. */
+/**
+ * The Device Builder's nRF52 support: Nordic legacy DFU over the bootloader's
+ * CDC, MCUboot OTA via BLE and serial, and logs.
+ */
 import type { PlatformSupport } from "../platform-support.js";
 import { pickBleNusDevice } from "./ble-nus-picker.js";
 import {
@@ -10,13 +13,15 @@ import {
 import { nrfDfuInstall } from "./dfu-install.js";
 import { isNrfPlatform } from "./nrf-platform.js";
 import { NRF52_SERIAL_LOGS } from "./serial-logs.js";
+import { nrfSmpBleInstall } from "./smp-ble.js";
+import { nrfSmpSerialInstall } from "./smp-serial.js";
 
 export * from "./dfu-install.js";
 
 export const nrf52Platform: PlatformSupport = {
   id: "nrf52",
   matches: isNrfPlatform,
-  installs: [nrfDfuInstall],
+  installs: [nrfDfuInstall, nrfSmpBleInstall, nrfSmpSerialInstall],
   logs: {
     serial: NRF52_SERIAL_LOGS,
     ble: {

@@ -13,3 +13,5 @@ export * from "./nrf-platform.js";
 export * from "./serial-logs.js";
 
 export const loadDfuEngine = () => import("./nrf-dfu.js");
+export const loadSmpBleEngine = () => import("./smp-ble.js");
+export const loadSmpSerialEngine = () => import("./smp-serial.js");

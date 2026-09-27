@@ -59,6 +59,29 @@ export function installFor(
   return installOf(platformFor(targetPlatform), mcu);
 }
 
+/**
+ * Every flasher of ``platform`` that writes a device's chip (or is
+ * chip-agnostic). Unlike ``installOf``, this keeps all matches — a platform can
+ * offer several methods for the same chip (e.g. nRF52 DFU plus MCUboot OTA over
+ * BLE and serial), and the dialog renders a row for each.
+ */
+export function installsOf(
+  platform: PlatformSupport | undefined,
+  mcu: string | null
+): AnyBrowserInstall[] {
+  return (platform?.installs ?? []).filter(
+    (install) => !install.chips || (mcu !== null && install.chips.includes(mcu))
+  );
+}
+
+/** ``installsOf`` for a device's target platform. */
+export function installsFor(
+  targetPlatform: string | null | undefined,
+  mcu: string | null
+): AnyBrowserInstall[] {
+  return installsOf(platformFor(targetPlatform), mcu);
+}
+
 /** The install flow an install method string selects, if any. */
 export function installForMethod(method: string): AnyBrowserInstall | undefined {
   return PLATFORMS.flatMap((p) => p.installs ?? []).find((i) => i.id === method);

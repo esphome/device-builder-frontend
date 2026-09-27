@@ -80,6 +80,16 @@ export interface BrowserInstall<Id extends FlasherId> {
   readonly chips?: readonly string[];
   /** The flash leaves a port the logs can reopen (the show-logs toggle). */
   readonly holdsPort: boolean;
+  /**
+   * When false the install method works without Web Serial (e.g. BLE OTA).
+   * Defaults to true if absent.
+   */
+  readonly requiresWebSerial?: boolean;
+  /**
+   * When true the method row is rendered under "Advanced options" instead of in
+   * the primary list (e.g. serial OTA, which most users won't reach for).
+   */
+  readonly advanced?: boolean;
   /** Where the flow keeps its parsed image; Retry skips the compile while it holds one. */
   readonly image: FlashImageSlot<object>;
   /** Compile, download and parse, then show the first user-gesture step. */
@@ -132,7 +142,11 @@ export interface PlatformSupport {
   /** The platform key, e.g. ``rp2``. */
   readonly id: string;
   matches(targetPlatform: string | null | undefined): boolean;
-  /** The platform's flashers; more than one where its chips need their own. */
+  /**
+   * All in-browser install methods this platform offers, in display order —
+   * more than one where its chips need their own flasher, or where it offers
+   * several methods (e.g. nRF52 DFU plus MCUboot OTA over BLE / serial).
+   */
   readonly installs?: readonly AnyBrowserInstall[];
   readonly logs?: PlatformLogs;
 }

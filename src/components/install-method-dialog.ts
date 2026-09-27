@@ -12,7 +12,7 @@ import {
   mdiUsb,
   mdiWifi,
 } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -22,7 +22,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { isEsptoolPlatform } from "../platforms/esp/index.js";
 import { BleProbeController } from "../platforms/nrf52/index.js";
-import { installFor, platformFor } from "../platforms/registry.js";
+import { installsFor, platformFor } from "../platforms/registry.js";
 import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
@@ -268,13 +268,15 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
     // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial),
     // or, on an insecure origin, the hand-off to web.esphome.io for the ones
-    // that can, with the same copy the ESP USB row shows there.
-    const platformRow = renderPlatformFlashOption(
-      ctx,
-      installFor(this.deviceTargetPlatform, this.deviceMcu),
-      hasWebSerial,
-      availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined
-    );
+    // that can, with the same copy the ESP USB row shows there. A platform can
+    // offer several methods (nRF52 DFU + MCUboot OTA); the primary list shows
+    // the non-advanced ones, the Advanced section holds the rest.
+    const advancedHandoff =
+      availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined;
+    const platformInstalls = installsFor(this.deviceTargetPlatform, this.deviceMcu);
+    const platformRow = platformInstalls
+      .filter((i) => i.advanced !== true)
+      .map((i) => renderPlatformFlashOption(ctx, i, hasWebSerial, advancedHandoff));
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)
       : nothing;
@@ -295,7 +297,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return html`
       ${renderInstallNotice(ctx)}
       <div class="list">${rows}</div>
-      ${this._renderAdvancedSection(ctx)}
+      ${this._renderAdvancedSection(ctx, hasWebSerial, advancedHandoff)}
     `;
   }
 
@@ -462,7 +464,16 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * address) and, in install mode, the manual binary-download
    * option (compile here, flash with an external tool).
    */
-  private _renderAdvancedSection(ctx: MethodRowContext) {
+  private _renderAdvancedSection(
+    ctx: MethodRowContext,
+    hasWebSerial: boolean,
+    handoffDesc?: TemplateResult | string
+  ) {
+    // Platform installs flagged `advanced` (e.g. nRF52 serial OTA) live here
+    // rather than in the primary list.
+    const advancedPlatformRow = installsFor(this.deviceTargetPlatform, this.deviceMcu)
+      .filter((i) => i.advanced === true)
+      .map((i) => renderPlatformFlashOption(ctx, i, hasWebSerial, handoffDesc));
     return renderDisclosure({
       open: this._advancedExpanded,
       onToggle: () => this._onToggleAdvanced(),
@@ -483,6 +494,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             },
             onSubmit: this._submitOtaAddress,
           })}
+          ${advancedPlatformRow}
           ${
             this.mode === "install" &&
             this.canFlashBootloader &&
