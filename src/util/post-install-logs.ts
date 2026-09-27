@@ -197,8 +197,8 @@ export function sessionResetHook(
 
 /**
  * The Bluetooth twin of ``attachSerialLogStream``: a stream registered, or
- * the session dead with the reason in the pane. A remote disconnect goes dead
- * quietly (Start reconnects); a failed connect also toasts.
+ * the session dead with the reason in the pane. A remote disconnect starts an
+ * automatic reconnect; a failed connect also toasts.
  */
 export async function attachBleLogs(
   dialog: ESPHomeLogsDialog,
@@ -213,7 +213,7 @@ export async function attachBleLogs(
       device,
       {
         ...dialogLineHooks(dialog),
-        onDisconnect: () => dialog.setSerialOpenFailed(localize(ble.disconnectedKey)),
+        onDisconnect: () => dialog.triggerBleReconnect(localize(ble.disconnectedKey)),
       },
       cancelled
     );

@@ -455,7 +455,11 @@ describe("the Pico's Reset Device hook, through sessionResetHook", () => {
 describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
   const nrfBle = nrf52Platform.logs!.ble!;
   const device = {} as BluetoothDevice;
-  const bleDialog = () => ({ ...stubDialog(), setBleStream: vi.fn() });
+  const bleDialog = () => ({
+    ...stubDialog(),
+    setBleStream: vi.fn(),
+    triggerBleReconnect: vi.fn(),
+  });
 
   it("registers the stream once notifications flow", async () => {
     const dialog = bleDialog();
@@ -497,16 +501,17 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
     );
   });
 
-  it("ends the session quietly on a remote disconnect, leaving Start to reconnect", async () => {
+  it("triggers auto-reconnect on a remote disconnect", async () => {
     const dialog = bleDialog();
     bleStream.streamBleNus.mockImplementation(async (_d, hooks) => {
       hooks.onDisconnect?.();
       return async () => {};
     });
     await attachBleLogs(dialog as never, defaultLocalize, nrfBle, device, () => false);
-    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+    expect(dialog.triggerBleReconnect).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_ble_nus_disconnected")
     );
+    expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -520,7 +525,7 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
     // would fail this.
     const other = { ...nrfBle, disconnectedKey: "dashboard.logs_reset_failed" };
     await attachBleLogs(dialog as never, defaultLocalize, other, device, () => false);
-    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+    expect(dialog.triggerBleReconnect).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_reset_failed")
     );
   });

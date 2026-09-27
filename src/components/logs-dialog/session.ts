@@ -8,7 +8,13 @@ import { OTA_PORT } from "../../api/types/streaming.js";
 import { notifyError } from "../../util/notify.js";
 import { pulseRts } from "../../util/serial-control-lines.js";
 import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { hasPause, isPassive, isStreaming, type PassiveSource } from "../logs-session.js";
+import {
+  hasPause,
+  isPassive,
+  isStreaming,
+  type LogsSession,
+  type PassiveSource,
+} from "../logs-session.js";
 
 /** Replaces the RTS-pulse Reset Device for a session. */
 export interface SerialResetHook {
@@ -60,6 +66,10 @@ export function openPassive(
   host._session = { kind: "reconnecting", paused: false };
   host._open = true;
   host._resetAnsiLogScroll();
+  // The BLE connect can take seconds with nothing to show yet.
+  if (host._passiveSource === "ble") {
+    host._log.append([host._localize("dashboard.logs_ble_nus_connecting")]);
+  }
   // For that attach: it may still be settling when this session is gone.
   return sessionMovedOn(host);
 }
@@ -108,7 +118,33 @@ export function setSerialStream(
 /** Register a streaming Bluetooth logs link (its cancel). */
 export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void>): void {
   const pending = pendingPassiveAttach(host, cancel);
-  if (pending) host._session = { kind: "ble", cancel, paused: pending.paused };
+  if (!pending) return;
+  host._session = { kind: "ble", cancel, paused: pending.paused };
+  if (pending.resume) {
+    host._log.append([host._localize("dashboard.logs_ble_nus_reconnected"), ""]);
+  }
+}
+
+/**
+ * Called when the BLE device disconnects mid-session. Appends the disconnect
+ * and reconnecting messages to the log pane, then auto-triggers the reconnect
+ * hook — matching ESPHome Web's behaviour of printing status in the log window
+ * rather than only showing it in the toolbar bar.
+ */
+export function triggerBleReconnect(
+  host: ESPHomeLogsDialog,
+  disconnectMessage: string
+): void {
+  const s = host._session;
+  if (!host._open || s.kind !== "ble") return;
+  host._log.append([
+    "",
+    "",
+    disconnectMessage,
+    host._localize("dashboard.logs_ble_nus_reconnecting"),
+  ]);
+  // A Stop pressed before the drop still holds once the link is back.
+  reconnectSerial(host, { paused: s.paused, resume: true });
 }
 
 // An attach is async (a reopen retries for seconds). If the dialog closed or
@@ -118,12 +154,14 @@ export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void
 function pendingPassiveAttach(
   host: ESPHomeLogsDialog,
   cancel: () => Promise<void>
-): { paused: boolean } | null {
+): { paused: boolean; resume: boolean } | null {
   if (!host._open || !isPassive(host._session)) {
     void cancel();
     return null;
   }
-  return { paused: host._session.kind === "reconnecting" && host._session.paused };
+  const s = host._session;
+  if (s.kind !== "reconnecting") return { paused: false, resume: false };
+  return { paused: s.paused, resume: s.resume === true };
 }
 
 /**
@@ -400,6 +438,9 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
   }
 }
 
+/** How a ``reconnecting`` phase starts out. */
+type ReconnectSeed = Omit<Extract<LogsSession, { kind: "reconnecting" }>, "kind">;
+
 // Run a session hook (reconnect or reset) as `reconnecting`. The hook reports
 // its own failures (setSerialOpenFailed -> `dead`, with its own toast); still
 // `reconnecting` afterwards means it neither attached nor failed, so only
@@ -407,10 +448,11 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
 async function runReconnecting(
   host: ESPHomeLogsDialog,
   task: (cancelled: () => boolean) => Promise<void>,
-  failKey: string
+  failKey: string,
+  seed: ReconnectSeed = { paused: false }
 ): Promise<void> {
   const cancelled = sessionMovedOn(host);
-  host._session = { kind: "reconnecting", paused: false };
+  host._session = { kind: "reconnecting", ...seed };
   let failure: unknown;
   try {
     await task(cancelled);
@@ -426,7 +468,7 @@ async function runReconnecting(
   notifyError(host._localize(failKey));
 }
 
-function reconnectSerial(host: ESPHomeLogsDialog): void {
+function reconnectSerial(host: ESPHomeLogsDialog, seed?: ReconnectSeed): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
   void runReconnecting(
@@ -434,7 +476,8 @@ function reconnectSerial(host: ESPHomeLogsDialog): void {
     reconnect,
     host._passiveSource === "ble"
       ? "dashboard.logs_ble_nus_open_failed"
-      : "dashboard.logs_web_serial_open_failed"
+      : "dashboard.logs_web_serial_open_failed",
+    seed
   );
 }
 

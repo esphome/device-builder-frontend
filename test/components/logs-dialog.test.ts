@@ -170,17 +170,18 @@ describe("logs-dialog header source chip", () => {
   });
 
   it.each([
-    ["ble", true],
-    ["serial", false],
+    ["ble", ["dashboard.logs_ble_nus_connecting"]],
+    ["serial", []],
   ] as const)(
-    "shows the connecting banner while a %s session connects: %s",
-    async (source, shown) => {
+    "says in the pane that a %s session is connecting: %s",
+    async (source, lines) => {
       const el = mount();
       el.openPassive({ onReconnect: () => Promise.resolve(), source });
       await el.updateComplete;
+      expect((el as any)._log.lines).toEqual(lines);
       const term = el.shadowRoot!.querySelector("esphome-process-terminal") as LitElement;
       await term.updateComplete;
-      expect(term.shadowRoot!.querySelector(".status-banner--info") !== null).toBe(shown);
+      expect(term.shadowRoot!.querySelector(".status-banner--info")).toBeNull();
     }
   );
 
@@ -281,6 +282,81 @@ describe("logs-dialog States toggle gate (#539)", () => {
     el.openPassive({ onReconnect: () => Promise.resolve() });
     await el.updateComplete;
     expect(hasStatesToggle(el)).toBe(false);
+  });
+});
+
+describe("logs-dialog BLE auto-reconnect", () => {
+  const mount = (): ESPHomeLogsDialog => makeLogsDialog();
+  const logLines = (el: ESPHomeLogsDialog): string[] => (el as any)._log.lines;
+
+  it("triggerBleReconnect appends status lines and starts a reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_reconnecting");
+    expect(session(el).kind).toBe("reconnecting");
+  });
+
+  it("triggerBleReconnect is a no-op when the session is not ble", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    // Still in the pending state (no setBleStream yet) — kind is "reconnecting".
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(logLines(el)).toEqual(["dashboard.logs_ble_nus_connecting"]);
+    expect(session(el).kind).toBe("reconnecting");
+  });
+
+  it("setBleStream does not say Reconnected on the first connect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    expect(logLines(el)).not.toContain("dashboard.logs_ble_nus_reconnected");
+    expect(session(el).kind).toBe("ble");
+  });
+
+  it("setBleStream does not say Reconnected after a Start from dead", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setSerialOpenFailed("dashboard.logs_ble_nus_open_failed");
+    call(el, "_onStart");
+    expect(session(el).kind).toBe("reconnecting");
+    el.setBleStream(async () => {});
+    expect(logLines(el)).not.toContain("dashboard.logs_ble_nus_reconnected");
+  });
+
+  it("keeps a Stop pressed before the disconnect across the reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    call(el, "_onStop");
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(session(el)).toMatchObject({ kind: "reconnecting", paused: true });
+    el.setBleStream(async () => {});
+    expect(session(el)).toMatchObject({ kind: "ble", paused: true });
+  });
+
+  it("keeps a Stop pressed during the reconnect and still says Reconnected", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    call(el, "_onStop");
+    el.setBleStream(async () => {});
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_reconnected");
+    expect(session(el)).toMatchObject({ kind: "ble", paused: true });
+  });
+
+  it("setBleStream appends Reconnected when called during a reconnect", () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => new Promise(() => {}), source: "ble" });
+    el.setBleStream(async () => {});
+    el.triggerBleReconnect("dashboard.logs_ble_nus_disconnected");
+    expect(session(el).kind).toBe("reconnecting");
+    el.setBleStream(async () => {}); // reconnect lands
+    expect(logLines(el)).toContain("dashboard.logs_ble_nus_reconnected");
+    expect(session(el).kind).toBe("ble");
   });
 });
 

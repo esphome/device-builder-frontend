@@ -62,9 +62,30 @@ export class SerialConnectTimeoutError extends Error {
   }
 }
 
+/** ``SerialPort.open()`` had not returned by a deadline; the port is still opening. */
+export class SerialOpenTimeoutError extends Error {
+  readonly seconds: number;
+
+  constructor(deadlineMs: number) {
+    const seconds = Math.round(deadlineMs / 1000);
+    super(`The serial port did not open in ${seconds} s`);
+    this.name = "SerialOpenTimeoutError";
+    this.seconds = seconds;
+  }
+}
+
+/** The port could not be closed or released; it stays held until the board is replugged. */
+export class SerialPortHeldError extends Error {
+  constructor() {
+    super("The serial port could not be released; unplug and replug the board");
+    this.name = "SerialPortHeldError";
+  }
+}
+
 /**
  * The copy for a failed connect that can be named: the port held elsewhere,
- * or the device never answering; undefined for anything else.
+ * the device never answering, the port never opening, or the port not
+ * releasing; undefined for anything else.
  */
 export function namedConnectFailure(
   err: unknown,
@@ -73,6 +94,10 @@ export function namedConnectFailure(
   if (err instanceof SerialConnectTimeoutError) {
     return localize("serial.connect_timed_out", { seconds: err.seconds });
   }
+  if (err instanceof SerialOpenTimeoutError) {
+    return localize("serial.open_timed_out", { seconds: err.seconds });
+  }
+  if (err instanceof SerialPortHeldError) return localize("serial.port_held");
   return portInUseMessage(err, localize);
 }
 

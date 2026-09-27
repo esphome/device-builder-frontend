@@ -7,6 +7,8 @@ import {
   openSerialPort,
   portInUseMessage,
   SerialConnectTimeoutError,
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
 } from "../../src/util/serial-open-error.js";
 
 const localize = (k: string, v?: Record<string, string | number>) =>
@@ -51,5 +53,14 @@ describe("serial-open-error", () => {
     const TIMED_OUT = 'serial.connect_timed_out {"seconds":30}';
     expect(openFailureMessage(late, localize, "serial.connect_failed")).toBe(TIMED_OUT);
     expect(namedConnectFailure(new Error("no sync"), localize)).toBeUndefined();
+  });
+
+  it("names a port that never opened, and one that would not release", () => {
+    expect(namedConnectFailure(new SerialOpenTimeoutError(3000), localize)).toBe(
+      'serial.open_timed_out {"seconds":3}'
+    );
+    expect(namedConnectFailure(new SerialPortHeldError(), localize)).toBe(
+      "serial.port_held"
+    );
   });
 });
