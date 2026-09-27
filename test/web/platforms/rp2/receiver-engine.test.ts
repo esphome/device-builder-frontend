@@ -184,5 +184,15 @@ describe("rp2PicobootReceiverEngine", () => {
       );
       expect(mocks.flashPico).not.toHaveBeenCalled();
     });
+
+    it("names a save that failed, and claims nothing done", async () => {
+      const { run } = await prepared();
+      mocks.downloadBlob.mockImplementationOnce(() => {
+        throw new Error("blocked");
+      });
+      const h = hooks();
+      expect(await run(h)).toBeNull();
+      expect(last(h.states)).toBe("error:firmware.download_failed blocked");
+    });
   });
 });

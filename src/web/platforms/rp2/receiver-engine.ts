@@ -20,6 +20,7 @@ import {
 } from "../../../platforms/rp2/index.js";
 import { parsePicoUf2 } from "../../../platforms/rp2/pico-uf2.js";
 import { downloadBlob } from "../../../util/download-text.js";
+import { getErrorMessage } from "../../../util/error-message.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import type { Uf2Image } from "../../../util/uf2.js";
@@ -93,12 +94,20 @@ function picobootRun(image: Uf2Image, localize: LocalizeFunc): ReceiverRun {
 }
 
 function downloadRun(uf2: Uint8Array, localize: LocalizeFunc): ReceiverRun {
-  return async () => {
-    downloadBlob(
-      uf2 as Uint8Array<ArrayBuffer>,
-      UF2_FILENAME,
-      "application/octet-stream"
-    );
+  return async (hooks) => {
+    try {
+      downloadBlob(
+        uf2 as Uint8Array<ArrayBuffer>,
+        UF2_FILENAME,
+        "application/octet-stream"
+      );
+    } catch (err) {
+      hooks.onState(
+        "error",
+        `${localize("firmware.download_failed")} ${getErrorMessage(err)}`
+      );
+      return null;
+    }
     return {
       message: localize("firmware.rp2_uf2_download_done_title"),
       note: {

@@ -297,22 +297,31 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   ): Promise<T | null> {
     this._busy = true;
     this._waiting = null;
-    const outcome = await step({
-      onState: (state, message) => {
-        this._waiting = null;
-        this._setState(state, message);
-      },
-      onProgress: (pct) => this._setProgress(pct),
-      onLog: (line) => this._log.enqueue(line),
-      onWaiting: (note) => {
-        this._waiting = note;
-        // The dashboard shows the instruction too, on the state it mirrors.
-        if (this._state !== "idle") {
-          this._handshake?.postState(this._state, this._statusMessage, note.message);
-        }
-      },
-    });
-    this._busy = false;
+    let outcome: T | "dismissed" | null;
+    try {
+      outcome = await step({
+        onState: (state, message) => {
+          this._waiting = null;
+          this._setState(state, message);
+        },
+        onProgress: (pct) => this._setProgress(pct),
+        onLog: (line) => this._log.enqueue(line),
+        onWaiting: (note) => {
+          this._waiting = note;
+          // The dashboard shows the instruction too, on the state it mirrors.
+          if (this._state !== "idle") {
+            this._handshake?.postState(this._state, this._statusMessage, note.message);
+          }
+        },
+      });
+    } catch (err) {
+      // An engine broke its never-throws contract; the card must not stay busy.
+      console.error("[flash receiver] The engine threw:", err);
+      this._setState("error", getErrorMessage(err));
+      return null;
+    } finally {
+      this._busy = false;
+    }
     if (outcome !== "dismissed") return outcome;
     this._resetForRetry();
     return null;

@@ -547,6 +547,21 @@ describe("esphome-web-flash-receiver engines", () => {
       });
     });
 
+    it.each([
+      ["install", "run", "_onPrimary"],
+      ["step", "before", "_onBefore"],
+    ] as const)(
+      "frees the card and says why when the %s throws",
+      async (_n, part, click) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        engines.pico[part].mockRejectedValueOnce(new Error("boom"));
+        const { el, opener } = await handOff(pico, false);
+        await (el as any)[click]();
+        expect((el as any)._busy).toBe(false);
+        expect(last(states(opener))).toMatchObject({ state: "error", detail: "boom" });
+      }
+    );
+
     it("goes back to the ready line when the install's chooser is dismissed", async () => {
       engines.pico.run.mockResolvedValueOnce("dismissed");
       const { el } = await handOff(pico);
