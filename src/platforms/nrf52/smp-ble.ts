@@ -2,6 +2,9 @@
  * MCUboot updates over the mcumgr SMP GATT service: the Bluetooth transport
  * for ``smp-protocol``.
  */
+import { concat } from "../../util/bytes.js";
+import { sleep } from "../../util/sleep.js";
+import { withDeadline } from "../../util/with-deadline.js";
 import { SMP_BLE_CHARACTERISTIC_UUID, SMP_BLE_SERVICE_UUID } from "./smp-ble-service.js";
 import {
   chunkSizeFromParams,
@@ -27,125 +30,79 @@ const BLE_EXCHANGE_TIMEOUT_MS = 10_000;
 const BLE_WRITE_FRAGMENT = 244;
 
 class SmpBleTransport implements SmpTransport {
-  private readonly pending = new Map<number, (frame: Uint8Array) => void>();
-  private readonly pendingReject = new Map<number, (err: Error) => void>();
-  private rxBuf = new Uint8Array(0);
-  private readonly onValueChanged: (e: Event) => void;
-  private readonly onDisconnected: () => void;
+  // One exchange at a time, so one reply is ever awaited.
+  private pending: { seq: number; settle(frame: Uint8Array | Error): void } | null = null;
+  private rxBuf: Uint8Array = new Uint8Array(0);
+  private readonly onValueChanged = () => this.handleNotification();
+  private readonly onDisconnected = () =>
+    this.pending?.settle(new Error("SMP: the device disconnected"));
 
   constructor(
     private readonly characteristic: BluetoothRemoteGATTCharacteristic,
     private readonly device: BluetoothDevice
   ) {
-    this.onValueChanged = () => this.handleNotification();
-    this.onDisconnected = () => this.rejectAll(new Error("SMP: the device disconnected"));
     characteristic.addEventListener("characteristicvaluechanged", this.onValueChanged);
     device.addEventListener("gattserverdisconnected", this.onDisconnected);
-  }
-
-  private rejectAll(err: Error): void {
-    // Snapshot first: each reject's cleanup mutates the map.
-    const rejects = [...this.pendingReject.values()];
-    this.pending.clear();
-    this.pendingReject.clear();
-    for (const reject of rejects) reject(err);
   }
 
   private handleNotification(): void {
     const val = this.characteristic.value;
     if (!val) return;
     // val.buffer may be a larger shared ArrayBuffer; stay inside the window.
-    const chunk = new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
-    const merged = new Uint8Array(this.rxBuf.length + chunk.length);
-    merged.set(this.rxBuf);
-    merged.set(chunk, this.rxBuf.length);
-    this.rxBuf = merged;
-
+    this.rxBuf = concat(
+      this.rxBuf,
+      new Uint8Array(val.buffer, val.byteOffset, val.byteLength)
+    );
     while (this.rxBuf.length >= 8) {
-      const payloadLen = (this.rxBuf[2] << 8) | this.rxBuf[3];
-      const frameLen = 8 + payloadLen;
+      const frameLen = 8 + ((this.rxBuf[2] << 8) | this.rxBuf[3]);
       if (this.rxBuf.length < frameLen) break;
-
       const frame = this.rxBuf.slice(0, frameLen);
       this.rxBuf = this.rxBuf.slice(frameLen);
-
-      const seq = frame[6];
-      this.pending.get(seq)?.(frame);
+      if (this.pending?.seq === frame[6]) this.pending.settle(frame);
     }
   }
 
   async exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array> {
-    const seq = frame[6];
-
+    const onAbort = () => this.pending?.settle(signal?.reason as Error);
     const response = new Promise<Uint8Array>((resolve, reject) => {
-      // Cleaned up synchronously, so close() never finds a settled entry
-      // and raises an unhandled rejection for it.
-      const cleanup = () => {
-        clearTimeout(timer);
-        this.pending.delete(seq);
-        this.pendingReject.delete(seq);
-      };
-
-      let timer: ReturnType<typeof setTimeout>;
-
-      this.pending.set(seq, (f) => {
-        cleanup();
-        resolve(f);
-      });
-      this.pendingReject.set(seq, (e) => {
-        cleanup();
-        reject(e);
-      });
-
-      timer = setTimeout(() => {
-        if (this.pending.has(seq)) {
-          cleanup();
-          reject(new Error("SMP: no response from the device"));
-        }
-      }, BLE_EXCHANGE_TIMEOUT_MS);
-
-      signal?.addEventListener(
-        "abort",
-        () => {
-          if (this.pending.has(seq)) {
-            cleanup();
-            reject(signal.reason);
-          }
+      this.pending = {
+        seq: frame[6],
+        settle: (result) => {
+          this.pending = null;
+          if (result instanceof Uint8Array) resolve(result);
+          else reject(result);
         },
-        { once: true }
-      );
+      };
     });
-
-    // An SMP frame can exceed the ATT MTU; mcumgr reassembles one frame
-    // across writes by its length field.
-    for (let start = 0; start < frame.length; start += BLE_WRITE_FRAGMENT) {
-      const piece = frame.subarray(start, start + BLE_WRITE_FRAGMENT);
-      const buf = piece.buffer.slice(
-        piece.byteOffset,
-        piece.byteOffset + piece.byteLength
-      ) as ArrayBuffer;
-      await this.writeFragment(buf, seq);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      if (signal?.aborted) throw signal.reason;
+      // An SMP frame can exceed the ATT MTU; mcumgr reassembles one frame
+      // across writes by its length field.
+      for (let start = 0; start < frame.length; start += BLE_WRITE_FRAGMENT) {
+        await this.writeFragment(frame.slice(start, start + BLE_WRITE_FRAGMENT));
+      }
+      return await withDeadline(
+        response,
+        BLE_EXCHANGE_TIMEOUT_MS,
+        () => new Error("SMP: no response from the device")
+      );
+    } finally {
+      this.pending = null;
+      signal?.removeEventListener("abort", onAbort);
     }
-    return response;
   }
 
-  /** Write one MTU-sized fragment, retrying on transient GATT-busy errors. */
-  private async writeFragment(buf: ArrayBuffer, seq: number): Promise<void> {
+  /** Write one MTU-sized fragment, retrying while the GATT stack is busy. */
+  private async writeFragment(fragment: Uint8Array<ArrayBuffer>): Promise<void> {
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.characteristic.writeValueWithoutResponse(buf);
+        await this.characteristic.writeValueWithoutResponse(fragment);
         return;
       } catch (err) {
-        if (
-          attempt >= 2 ||
-          (err instanceof DOMException && err.name !== "NetworkError")
-        ) {
-          this.pendingReject.get(seq)?.(
-            err instanceof Error ? err : new Error(String(err))
-          );
-          throw err;
-        }
-        await new Promise<void>((r) => setTimeout(r, 100 * (attempt + 1)));
+        const busy = err instanceof DOMException && err.name === "NetworkError";
+        if (attempt >= 2 || !busy) throw err;
+        await sleep(100 * (attempt + 1));
       }
     }
   }
@@ -156,7 +113,7 @@ class SmpBleTransport implements SmpTransport {
       this.onValueChanged
     );
     this.device.removeEventListener("gattserverdisconnected", this.onDisconnected);
-    this.rejectAll(new Error("SMP: transport closed"));
+    this.pending?.settle(new Error("SMP: transport closed"));
     this.device.gatt?.disconnect();
   }
 }

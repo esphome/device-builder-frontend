@@ -81,10 +81,6 @@ describe.each(INSTALLS)("MCUboot install over %s", (_name, install, readyStep, k
   const engineFlash =
     kind === "ble" ? mocks.flashMcubootOverBle : mocks.flashMcubootOverSerial;
 
-  it("is offered only to firmware with the mcumgr OTA platform", () => {
-    expect(install.component).toBe("ota.zephyr_mcumgr");
-  });
-
   it("downloads the update image and shows the ready step", async () => {
     const host = makeHost();
     await install.start(asHost(host));

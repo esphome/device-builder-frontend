@@ -6,11 +6,13 @@
  * base64-encoded and split into lines, the first starting 0x06 0x09 and the
  * rest 0x04 0x14, each ending 0x0a.
  *
- * CRC16: polynomial 0x1021, init 0 (Zephyr's crc16_itu_t with seed 0).
+ * The CRC is Zephyr's crc16_itu_t with seed 0, which is CRC-16/XMODEM.
  */
+import { arrayBufferToBase64 } from "../../util/base64.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { withDeadline } from "../../util/with-deadline.js";
+import { crc16Xmodem } from "../../util/xmodem.js";
 import {
   type McubootImage,
   SMP_CHUNK_SIZE_DEFAULT,
@@ -30,12 +32,6 @@ const SMP_PKT_DELIM = 0x0a;
 // line buffer.
 const SMP_SERIAL_MAX_B64_PER_LINE = 124;
 
-function toBase64(bytes: Uint8Array): string {
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
-}
-
 function fromBase64(b64: string): Uint8Array | null {
   try {
     const bin = atob(b64);
@@ -45,17 +41,6 @@ function fromBase64(b64: string): Uint8Array | null {
   } catch {
     return null;
   }
-}
-
-function crc16CcittItu(data: Uint8Array): number {
-  let crc = 0;
-  for (const byte of data) {
-    crc ^= byte << 8;
-    for (let i = 0; i < 8; i++) {
-      crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-    }
-  }
-  return crc & 0xffff;
 }
 
 /**
@@ -68,7 +53,7 @@ function crc16CcittItu(data: Uint8Array): number {
  * terminated by 0x0a. The length prefix lives *inside* the base64 payload.
  */
 export function encodeSerialFrame(smpFrame: Uint8Array): Uint8Array {
-  const crc = crc16CcittItu(smpFrame);
+  const crc = crc16Xmodem(smpFrame);
   const pktLen = smpFrame.length + 2; // SMP frame + 2-byte CRC
 
   const raw = new Uint8Array(2 + smpFrame.length + 2);
@@ -78,7 +63,7 @@ export function encodeSerialFrame(smpFrame: Uint8Array): Uint8Array {
   raw[2 + smpFrame.length] = (crc >>> 8) & 0xff;
   raw[2 + smpFrame.length + 1] = crc & 0xff;
 
-  const b64 = toBase64(raw);
+  const b64 = arrayBufferToBase64(raw.buffer);
   const lines: number[] = [];
 
   for (let start = 0; start < b64.length; start += SMP_SERIAL_MAX_B64_PER_LINE) {
@@ -101,10 +86,8 @@ export function encodeSerialFrame(smpFrame: Uint8Array): Uint8Array {
  */
 export class SmpSerialDecoder {
   private rxLine: number[] = [];
-  private b64Accum = "";
-  // Decoded packet length (SMP data + CRC), from the prefix.
-  private pktLen = -1;
-  private expectedB64 = -1;
+  // The base64 of the frame in progress; null between frames.
+  private b64: string | null = null;
 
   constructor(private readonly onFrame: (frame: Uint8Array) => void) {}
 
@@ -119,49 +102,31 @@ export class SmpSerialDecoder {
     }
   }
 
-  private resetAccum(): void {
-    this.b64Accum = "";
-    this.pktLen = -1;
-    this.expectedB64 = -1;
-  }
-
   private processLine(line: number[]): void {
     if (line.length < 2) return;
-
+    const body = String.fromCharCode(...line.slice(2));
     if (line[0] === SMP_PKT_START_1 && line[1] === SMP_PKT_START_2) {
-      this.resetAccum();
-      this.b64Accum = String.fromCharCode(...line.slice(2));
+      this.b64 = body;
     } else if (line[0] === SMP_PKT_CONT_1 && line[1] === SMP_PKT_CONT_2) {
-      if (this.b64Accum === "" && this.pktLen < 0) return; // stray continuation
-      this.b64Accum += String.fromCharCode(...line.slice(2));
+      if (this.b64 === null) return;
+      this.b64 += body;
     } else {
       return;
     }
 
-    // The first 4 base64 chars hold the 2-byte length prefix.
-    if (this.pktLen < 0 && this.b64Accum.length >= 4) {
-      const head = fromBase64(this.b64Accum.slice(0, 4));
-      if (!head || head.length < 2) return;
-      this.pktLen = (head[0] << 8) | head[1];
-      const totalDecoded = 2 + this.pktLen; // length prefix + (data + CRC)
-      this.expectedB64 = 4 * Math.ceil(totalDecoded / 3);
-    }
+    // The first 4 base64 chars hold the 2-byte length of the data and CRC.
+    const head = this.b64.length >= 4 ? fromBase64(this.b64.slice(0, 4)) : null;
+    if (!head) return;
+    const length = (head[0] << 8) | head[1];
+    const expected = 4 * Math.ceil((2 + length) / 3);
+    if (this.b64.length < expected) return;
 
-    if (this.expectedB64 < 0 || this.b64Accum.length < this.expectedB64) return;
-
-    const decoded = fromBase64(this.b64Accum.slice(0, this.expectedB64));
-    const declaredLen = this.pktLen;
-    this.resetAccum();
-    if (!decoded || decoded.length < 2 + declaredLen) return;
-
-    // decoded = [len16] [smp data] [crc16]; CRC covers the SMP data only.
-    const body = decoded.slice(2, 2 + declaredLen); // data + CRC
-    if (body.length < 2) return;
-    const data = body.slice(0, body.length - 2);
-    const receivedCrc = (body[body.length - 2] << 8) | body[body.length - 1];
-    if (crc16CcittItu(data) !== receivedCrc) return;
-
-    this.onFrame(data);
+    const decoded = fromBase64(this.b64.slice(0, expected));
+    this.b64 = null;
+    if (!decoded || length < 2 || decoded.length < 2 + length) return;
+    const data = decoded.slice(2, length);
+    const crc = (decoded[length] << 8) | decoded[length + 1];
+    if (crc16Xmodem(data) === crc) this.onFrame(data);
   }
 }
 
@@ -211,11 +176,17 @@ export async function flashMcubootOverSerial(
   hooks.onLog?.(`Opening serial port at ${SMP_SERIAL_BAUD} baud`);
   await port.open({ baudRate: SMP_SERIAL_BAUD });
   const session = new SmpSerialSession(port, hooks.signal);
+  let failure: unknown;
   try {
+    // Not negotiated like Bluetooth's: larger frames are untested against
+    // the device's UART receive buffers.
     await smpUploadImage(session, image, SMP_CHUNK_SIZE_DEFAULT, hooks);
+  } catch (err) {
+    failure = err;
+    throw err;
   } finally {
     // The locks have to be released before the port closes.
-    await session.close(undefined).catch(() => {});
+    await session.close(failure).catch(() => {});
     markSerialActivity();
     await port.close().catch(() => {});
   }

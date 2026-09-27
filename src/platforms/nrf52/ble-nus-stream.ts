@@ -105,9 +105,6 @@ export async function requestBleDevice(
   }
 }
 
-export const requestBleNusDevice = (names: string[]): Promise<BluetoothDevice | null> =>
-  requestBleDevice(names, BLE_NUS_SERVICE_UUID);
-
 /**
  * Connect attempts a logs session gives a NUS link: GATT connects fail
  * transiently while the device is still advertising or the OS stack settles

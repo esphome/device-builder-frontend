@@ -3,6 +3,7 @@
  * the Bluetooth and serial transports: frames, image validation, and the
  * upload sequence (chunks, mark for test, reset).
  */
+import { sleep } from "../../util/sleep.js";
 import { cborDecode, cborEncode } from "./smp-cbor.js";
 
 export const MGMT_OP_READ = 0;
@@ -238,216 +239,208 @@ export interface SmpUploadHooks {
   signal?: AbortSignal;
 }
 
+/** One upload's requests: numbers them and turns an error reply into a throw. */
+class SmpClient {
+  private seq = 0;
+
+  constructor(
+    private readonly transport: SmpTransport,
+    private readonly signal?: AbortSignal
+  ) {}
+
+  /** *failed* names the step in the error for a reply with a non-zero ``rc``. */
+  async request(
+    op: number,
+    group: number,
+    id: number,
+    payload: unknown,
+    failed: string
+  ): Promise<SmpFrameInfo> {
+    const frame = buildSmpFrame(op, group, id, this.seq++, payload);
+    const reply = parseSmpFrame(await this.transport.exchange(frame, this.signal));
+    if (reply.group !== group || reply.id !== id) {
+      throw new Error(`SMP: unexpected reply while ${failed}`);
+    }
+    const rc = reply.payload.rc;
+    if (typeof rc === "number" && rc !== 0) {
+      throw new Error(`SMP: ${failed} failed (rc=${rc})`);
+    }
+    return reply;
+  }
+}
+
+interface ImageState {
+  /** The running image. */
+  active?: { hash: Uint8Array; confirmed: boolean };
+  /** The image in the update slot. */
+  update?: Uint8Array;
+}
+
+async function readImageState(client: SmpClient): Promise<ImageState> {
+  const reply = await client.request(
+    MGMT_OP_READ,
+    MGMT_GROUP_IMAGE,
+    IMG_MGMT_STATE,
+    undefined,
+    "reading the image list"
+  );
+  const images = Array.isArray(reply.payload.images) ? reply.payload.images : [];
+  const hashed = images.filter(
+    (image): image is Record<string, unknown> & { hash: Uint8Array } =>
+      typeof image === "object" && image !== null && image.hash instanceof Uint8Array
+  );
+  const active = hashed.find((image) => image.active === true);
+  return {
+    active: active && { hash: active.hash, confirmed: active.confirmed === true },
+    update: hashed.find((image) => image.slot === 1)?.hash,
+  };
+}
+
+const setImageState = (
+  client: SmpClient,
+  hash: Uint8Array,
+  confirm: boolean,
+  failed: string
+): Promise<SmpFrameInfo> =>
+  client.request(
+    MGMT_OP_WRITE,
+    MGMT_GROUP_IMAGE,
+    IMG_MGMT_STATE,
+    { hash, confirm },
+    failed
+  );
+
+const bytesEqual = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
+  a !== undefined &&
+  b !== undefined &&
+  a.length === b.length &&
+  a.every((v, i) => v === b[i]);
+
+const kb = (bytes: number): string => (bytes / 1024).toFixed(1);
+
+/** Send the image in chunks, from the offset the device asks for each time. */
+async function sendChunks(
+  client: SmpClient,
+  { bytes: image, info }: McubootImage,
+  chunkSize: number,
+  { onProgress, onLog, signal }: SmpUploadHooks
+): Promise<void> {
+  const packets = Math.ceil(image.length / chunkSize);
+  onLog?.(`Transferring in ${packets} packets of up to ${chunkSize} bytes`);
+  const startedAt = Date.now();
+  let offset = 0;
+  let stalled = 0;
+  let loggedDecile = -1;
+  while (offset < image.length) {
+    if (signal?.aborted) throw signal.reason;
+    const data = image.subarray(offset, Math.min(offset + chunkSize, image.length));
+    const reply = await client.request(
+      MGMT_OP_WRITE,
+      MGMT_GROUP_IMAGE,
+      IMG_MGMT_UPLOAD,
+      offset === 0
+        ? { data, off: offset, sha: info.hash, len: image.length }
+        : { data, off: offset },
+      "uploading"
+    );
+    const next = reply.payload.off;
+    if (typeof next !== "number") {
+      throw new Error("SMP: missing offset in upload response");
+    }
+    // The device dictates the next offset: it re-requests a partial write.
+    stalled = next > offset ? 0 : stalled + 1;
+    if (stalled >= MAX_STALLED_CHUNKS) {
+      throw new Error(`SMP: the device stopped accepting data at offset ${offset}`);
+    }
+    offset = next;
+    onProgress(Math.floor((offset / image.length) * 95));
+
+    const decile = Math.floor((offset / image.length) * 10) * 10;
+    if (decile > loggedDecile) {
+      loggedDecile = decile;
+      const seconds = (Date.now() - startedAt) / 1000;
+      const rate = seconds > 0 ? offset / seconds / 1024 : 0;
+      onLog?.(
+        `${decile}%: ${kb(offset)} / ${kb(image.length)} KB (${rate.toFixed(1)} KB/s)`
+      );
+    }
+  }
+}
+
+/** Mark the image with *hash* for a test boot, then reset the device. */
+async function testAndReset(
+  client: SmpClient,
+  hash: Uint8Array,
+  { onProgress, onLog }: SmpUploadHooks
+): Promise<void> {
+  onProgress(96);
+  onLog?.("Marking uploaded image for test boot");
+  await setImageState(client, hash, false, "marking the image for test");
+  onProgress(98);
+  // The test flag has to be stored before the device reboots.
+  await sleep(1000);
+  onLog?.("Resetting device to boot the new image");
+  await client
+    .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
+    // The device resets before its reply arrives.
+    .catch(() => {});
+  onLog?.("Done; the device is rebooting into the new firmware");
+  onProgress(100);
+}
+
 /**
  * Upload an MCUboot image over *transport*, mark it for test and reset the
  * device. Throws on error or abort.
  */
 export async function smpUploadImage(
   transport: SmpTransport,
-  { bytes: image, info }: McubootImage,
+  image: McubootImage,
   chunkSize: number,
   hooks: SmpUploadHooks
 ): Promise<void> {
-  const { onProgress, onLog, signal } = hooks;
-  const log = onLog ?? (() => {});
-  let seq = 0;
+  const { onProgress, onLog } = hooks;
+  const { info } = image;
+  const client = new SmpClient(transport, hooks.signal);
+  const alreadyRunning = (state: ImageState, hash?: Uint8Array): boolean => {
+    if (!bytesEqual(state.active?.hash, hash)) return false;
+    onLog?.("Device is already running this exact firmware; nothing to do.");
+    onProgress(100);
+    return true;
+  };
 
-  async function exchange(frame: Uint8Array): Promise<SmpFrameInfo> {
-    const resp = await transport.exchange(frame, signal);
-    return parseSmpFrame(resp);
-  }
-
-  const kb = (n: number) => (n / 1024).toFixed(1);
-  const bytesEqual = (a: Uint8Array, b: Uint8Array) =>
-    a.length === b.length && a.every((v, i) => v === b[i]);
-
-  interface ImageState {
-    activeHash?: Uint8Array; // the running image (slot 0 / active)
-    activeConfirmed?: boolean; // whether the running image is confirmed
-    slot1Hash?: Uint8Array; // the secondary/update slot
-  }
-
-  /** Read the image-state list and pick out the hashes we need. */
-  async function readImageState(): Promise<ImageState> {
-    const listFrame = buildSmpFrame(
-      MGMT_OP_READ,
-      MGMT_GROUP_IMAGE,
-      IMG_MGMT_STATE,
-      seq++
-    );
-    const listResp = await exchange(listFrame);
-    const images = listResp.payload.images;
-    const state: ImageState = {};
-    if (Array.isArray(images)) {
-      for (const img of images) {
-        if (img && typeof img === "object") {
-          const entry = img as Record<string, unknown>;
-          if (
-            state.slot1Hash === undefined &&
-            entry.slot === 1 &&
-            entry.hash instanceof Uint8Array
-          ) {
-            state.slot1Hash = entry.hash;
-          }
-          if (
-            state.activeHash === undefined &&
-            entry.active === true &&
-            entry.hash instanceof Uint8Array
-          ) {
-            state.activeHash = entry.hash;
-            state.activeConfirmed = entry.confirmed === true;
-          }
-        }
-      }
-    }
-    return state;
-  }
-
-  /** Confirm (make permanent) the currently-running image. */
-  async function confirmActiveImage(hash: Uint8Array): Promise<void> {
-    const frame = buildSmpFrame(MGMT_OP_WRITE, MGMT_GROUP_IMAGE, IMG_MGMT_STATE, seq++, {
-      hash,
-      confirm: true,
-    });
-    const resp = await exchange(frame);
-    const rc = typeof resp.payload.rc === "number" ? resp.payload.rc : 0;
-    if (rc !== 0) throw new Error(`SMP: confirming the running image failed (rc=${rc})`);
-  }
-
-  log(`Firmware version ${info.version}, ${kb(image.length)} KB`);
-
+  onLog?.(`Firmware version ${info.version}, ${kb(image.bytes.length)} KB`);
   // The image list reports MCUboot's image hash (the SHA256 TLV), so a device
   // that already holds this image skips the transfer.
-  log("Checking device image status");
-  let before = await readImageState();
-
+  onLog?.("Checking device image status");
+  let before = await readImageState(client);
   // While an unconfirmed test image runs, the update slot holds the confirmed
   // fallback and MCUboot rejects an upload (EBADSTATE).
-  if (before.activeHash && before.activeConfirmed === false) {
-    log("Running image is not confirmed; confirming it to free the update slot");
-    await confirmActiveImage(before.activeHash);
-    before = await readImageState();
+  if (before.active && !before.active.confirmed) {
+    onLog?.("Running image is not confirmed; confirming it to free the update slot");
+    await setImageState(client, before.active.hash, true, "confirming the running image");
+    before = await readImageState(client);
   }
-  if (info.imageHash) {
-    if (before.activeHash && bytesEqual(before.activeHash, info.imageHash)) {
-      log("Device is already running this exact firmware; nothing to do.");
-      onProgress(100);
-      return;
-    }
-    if (before.slot1Hash && bytesEqual(before.slot1Hash, info.imageHash)) {
-      log("This image is already in the update slot; skipping upload.");
-      await testAndReset(before.slot1Hash);
-      return;
-    }
-  } else {
-    log("Could not read this image's hash TLV; uploading unconditionally.");
-  }
-
-  const totalChunks = Math.ceil(image.length / chunkSize);
-  log(`Transferring in ${totalChunks} packets of up to ${chunkSize} bytes`);
-
-  const startedAt = Date.now();
-  let offset = 0;
-  let stalled = 0;
-  let lastLoggedPct = -1;
-  while (offset < image.length) {
-    if (signal?.aborted) throw signal.reason;
-
-    const end = Math.min(offset + chunkSize, image.length);
-    const chunk = image.subarray(offset, end);
-    const payload: Record<string, unknown> = { data: chunk, off: offset };
-    if (offset === 0) {
-      payload.sha = info.hash;
-      payload.len = image.length;
-    }
-
-    const frame = buildSmpFrame(
-      MGMT_OP_WRITE,
-      MGMT_GROUP_IMAGE,
-      IMG_MGMT_UPLOAD,
-      seq++,
-      payload
-    );
-    const resp = await exchange(frame);
-
-    if (resp.group !== MGMT_GROUP_IMAGE || resp.id !== IMG_MGMT_UPLOAD) {
-      throw new Error("SMP: unexpected response group/id during upload");
-    }
-    const rc = typeof resp.payload.rc === "number" ? resp.payload.rc : 0;
-    if (rc !== 0) throw new Error(`SMP: device returned error ${rc} during upload`);
-
-    const deviceOff = resp.payload.off;
-    if (typeof deviceOff !== "number")
-      throw new Error("SMP: missing offset in upload response");
-
-    // The device dictates the next offset: it re-requests a partial write.
-    stalled = deviceOff > offset ? 0 : stalled + 1;
-    if (stalled >= MAX_STALLED_CHUNKS) {
-      throw new Error(`SMP: the device stopped accepting data at offset ${offset}`);
-    }
-    offset = deviceOff;
-    const pct = Math.floor((offset / image.length) * 95);
-    onProgress(pct);
-
-    const decile = Math.floor((offset / image.length) * 10) * 10;
-    if (decile > lastLoggedPct) {
-      lastLoggedPct = decile;
-      const elapsed = (Date.now() - startedAt) / 1000;
-      const rate = elapsed > 0 ? offset / elapsed / 1024 : 0;
-      log(`${decile}%: ${kb(offset)} / ${kb(image.length)} KB (${rate.toFixed(1)} KB/s)`);
-    }
-  }
-  const elapsed = (Date.now() - startedAt) / 1000;
-  log(
-    `Upload finished: ${kb(image.length)} KB in ${elapsed.toFixed(1)} s (${(image.length / elapsed / 1024).toFixed(1)} KB/s)`
-  );
-
-  log("Fetching image list");
-  const after = await readImageState();
-  const slotHash = after.slot1Hash;
-  if (!slotHash) throw new Error("SMP: secondary slot image not found after upload");
-
-  // Marking the running image for test would fail.
-  if (after.activeHash && bytesEqual(after.activeHash, slotHash)) {
-    log("Device is already running this exact firmware; nothing to do.");
-    onProgress(100);
+  if (!info.imageHash) {
+    onLog?.("Could not read this image's hash TLV; uploading unconditionally.");
+  } else if (alreadyRunning(before, info.imageHash)) {
+    return;
+  } else if (bytesEqual(before.update, info.imageHash)) {
+    onLog?.("This image is already in the update slot; skipping upload.");
+    await testAndReset(client, info.imageHash, hooks);
     return;
   }
 
-  await testAndReset(slotHash);
+  const startedAt = Date.now();
+  await sendChunks(client, image, chunkSize, hooks);
+  const seconds = (Date.now() - startedAt) / 1000;
+  const size = kb(image.bytes.length);
+  const rate = (image.bytes.length / seconds / 1024).toFixed(1);
+  onLog?.(`Upload finished: ${size} KB in ${seconds.toFixed(1)} s (${rate} KB/s)`);
 
-  /** Mark the given image hash for test boot, then reset the device. */
-  async function testAndReset(hash: Uint8Array): Promise<void> {
-    onProgress(96);
-    log("Marking uploaded image for test boot");
-    const testFrame = buildSmpFrame(
-      MGMT_OP_WRITE,
-      MGMT_GROUP_IMAGE,
-      IMG_MGMT_STATE,
-      seq++,
-      { hash, confirm: false }
-    );
-    const testResp = await exchange(testFrame);
-    const testRc = typeof testResp.payload.rc === "number" ? testResp.payload.rc : 0;
-    if (testRc !== 0) throw new Error(`SMP: image test failed (rc=${testRc})`);
-
-    onProgress(98);
-    // The test flag has to be stored before the device reboots.
-    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-    log("Resetting device to boot the new image");
-    const resetFrame = buildSmpFrame(
-      MGMT_OP_WRITE,
-      MGMT_GROUP_OS,
-      OS_MGMT_RESET,
-      seq++,
-      {}
-    );
-    try {
-      await exchange(resetFrame);
-    } catch {
-      // The device resets before its reply arrives.
-    }
-    log("Done; the device is rebooting into the new firmware");
-    onProgress(100);
-  }
+  onLog?.("Fetching image list");
+  const after = await readImageState(client);
+  if (!after.update) throw new Error("SMP: secondary slot image not found after upload");
+  // Marking the running image for test would fail.
+  if (alreadyRunning(after, after.update)) return;
+  await testAndReset(client, after.update, hooks);
 }

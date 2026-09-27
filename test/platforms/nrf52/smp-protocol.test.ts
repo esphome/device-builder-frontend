@@ -248,7 +248,7 @@ describe("smpUploadImage", () => {
   });
 
   it.each([
-    ["an error code", { rc: 5 }, "device returned error 5"],
+    ["an error code", { rc: 5 }, "uploading failed (rc=5)"],
     ["no offset", { rc: 0 }, "missing offset"],
   ])("fails when a chunk is answered with %s", async (_name, reply, message) => {
     const image = await parseMcubootImage(makeMcubootImage());

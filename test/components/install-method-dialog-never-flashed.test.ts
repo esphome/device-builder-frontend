@@ -11,8 +11,10 @@ import "../_mock-webawesome.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import { installsFor } from "../../src/platforms/registry.js";
 import {
   restoreWebSerialEnv,
   setLocalhostWithWebSerial,
@@ -32,7 +34,9 @@ async function mount(opts: {
   dialog.neverFlashed = opts.neverFlashed ?? false;
   dialog.deviceState = opts.state ?? DeviceState.UNKNOWN;
   dialog.deviceTargetPlatform = opts.platform ?? "esp32";
-  dialog.deviceMcu = opts.mcu ?? null;
+  dialog.platformInstalls = installsFor(
+    makeConfiguredDevice({ target_platform: dialog.deviceTargetPlatform, mcu: opts.mcu })
+  );
   dialog.mode = opts.mode ?? "install";
   document.body.appendChild(dialog);
   await dialog.updateComplete;

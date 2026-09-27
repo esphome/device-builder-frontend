@@ -106,13 +106,16 @@ describe("flashMcubootOverBle", () => {
     vi.useRealTimers();
   });
 
-  it("uploads the image and closes the link", async () => {
+  it("uploads the image in small chunks and closes the link", async () => {
+    // The fake reports no buffer size, as older firmware does.
     const peripheral = makePeripheral();
     const { done, image } = await flash(peripheral);
     await vi.runAllTimersAsync();
     await done;
 
     expect(peripheral.smp.received).toEqual(image.bytes);
+    const chunks = peripheral.smp.requests.filter((r) => r.id === IMG_MGMT_UPLOAD);
+    expect(chunks).toHaveLength(Math.ceil(image.bytes.length / 128));
     expect(peripheral.disconnect).toHaveBeenCalled();
   });
 
@@ -130,14 +133,21 @@ describe("flashMcubootOverBle", () => {
     expect(Math.max(...peripheral.writes)).toBe(244);
   });
 
-  it("falls back to small chunks for a device that reports no buffer", async () => {
-    const peripheral = makePeripheral();
-    const { done, image } = await flash(peripheral);
+  it("stops at a cancel after the sequence number has wrapped", async () => {
+    const smp = new FakeSmpDevice();
+    const abort = new AbortController();
+    smp.onUpload = (payload) => {
+      // Past 256 exchanges, where a request reuses an earlier one's number.
+      if ((payload.off as number) >= 300 * 128) abort.abort(new Error("cancelled"));
+      return undefined;
+    };
+    const peripheral = makePeripheral({ smp });
+    const { done, image } = await flash(peripheral, 60_000, abort.signal);
     await vi.runAllTimersAsync();
-    await done;
 
-    const chunks = peripheral.smp.requests.filter((r) => r.id === IMG_MGMT_UPLOAD);
-    expect(chunks).toHaveLength(Math.ceil(image.bytes.length / 128));
+    await expect(done).rejects.toThrow("cancelled");
+    expect(smp.received.length).toBeLessThan(image.bytes.length);
+    expect(peripheral.disconnect).toHaveBeenCalled();
   });
 
   it("names a device without the SMP service", async () => {

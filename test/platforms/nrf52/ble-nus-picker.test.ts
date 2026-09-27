@@ -1,5 +1,3 @@
-const BLE_NUS_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -24,6 +22,7 @@ vi.mock("../../../src/platforms/nrf52/ble-nus-stream.js", async (importOriginal)
 import { lapsedPick } from "../../_web-serial.js";
 import { pickBleNusDevice } from "../../../src/platforms/nrf52/ble-nus-picker.js";
 import {
+  BLE_NUS_SERVICE_UUID,
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
@@ -40,7 +39,7 @@ describe("pickBleNusDevice", () => {
     const device = {};
     mocks.requestBleDevice.mockResolvedValue(device);
     await expect(pickBleNusDevice(localize, ["a", "b"])).resolves.toBe(device);
-    expect(mocks.requestBleDevice).toHaveBeenCalledWith(["a", "b"], BLE_NUS_UUID);
+    expect(mocks.requestBleDevice).toHaveBeenCalledWith(["a", "b"], BLE_NUS_SERVICE_UUID);
     expect(mocks.notifyError).not.toHaveBeenCalled();
   });
 

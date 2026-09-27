@@ -16,7 +16,13 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { pickBleDevice } from "./ble-nus-picker.js";
-import { loadSmpEngine, type McubootImage, type SmpUploadHooks } from "./index.js";
+import { isWebBluetoothSupported } from "./ble-nus-stream.js";
+import {
+  loadMcubootImage,
+  loadSmpEngine,
+  type McubootImage,
+  type SmpUploadHooks,
+} from "./index.js";
 import { SMP_BLE_SERVICE_UUID } from "./smp-ble-service.js";
 
 declare module "../platform-support.js" {
@@ -30,12 +36,18 @@ declare module "../platform-support.js" {
 const MCUMGR_OTA = "ota.zephyr_mcumgr";
 
 type SmpEngine = Awaited<ReturnType<typeof loadSmpEngine>>;
+type SmpStep = "nrf-smp-ble-ready" | "nrf-smp-serial-ready";
 
 interface SmpFlow {
   readonly image: FlashImageSlot<McubootImage>;
+  readonly readyStep: SmpStep;
   readonly readyTitleKey: string;
   readonly failedKey: string;
-  showReady(host: ESPHomeFirmwareInstallDialog): void;
+}
+
+function showReady(host: ESPHomeFirmwareInstallDialog, flow: SmpFlow): void {
+  host._step = flow.readyStep;
+  host._statusMessage = host._localize(flow.readyTitleKey);
 }
 
 /** Compile, download and validate the update image, then show the ready step. */
@@ -52,28 +64,14 @@ async function startSmpInstall(
     "firmware.nrf_no_mcuboot_bin"
   );
   if (!artifact) return;
-  const stale = () => host._device !== device;
-
-  let engine: SmpEngine;
-  try {
-    engine = await loadSmpEngine();
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
+  const loaded = await loadMcubootImage(artifact.bytes);
+  if (host._device !== device) return;
+  if ("key" in loaded) {
+    host._fail(host._localize(loaded.key), loaded.detail);
     return;
   }
-  if (stale()) return;
-  let image: McubootImage;
-  try {
-    image = await engine.parseMcubootImage(artifact.bytes);
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.nrf_bad_mcuboot_image"), getErrorMessage(err));
-    return;
-  }
-  if (stale()) return;
-  flow.image.set(host, image);
-  flow.showReady(host);
+  flow.image.set(host, loaded.image);
+  showReady(host, flow);
 }
 
 /**
@@ -89,8 +87,7 @@ async function runSmpFlash<Target>(
     target: Target,
     image: McubootImage,
     hooks: SmpUploadHooks
-  ) => Promise<void>,
-  failureKey: (engine: SmpEngine, err: unknown) => string = () => flow.failedKey
+  ) => Promise<void>
 ): Promise<void> {
   const image = flow.image.get(host);
   if (!image || host._flashBusy) return;
@@ -118,7 +115,11 @@ async function runSmpFlash<Target>(
     });
   } catch (err) {
     if (stillCurrent()) {
-      host._fail(host._localize(failureKey(engine, err)), getErrorMessage(err));
+      const key =
+        err instanceof engine.SmpBleServiceNotFoundError
+          ? "firmware.nrf_smp_ble_service_not_found"
+          : flow.failedKey;
+      host._fail(host._localize(key), getErrorMessage(err));
     }
     return;
   } finally {
@@ -131,22 +132,16 @@ async function runSmpFlash<Target>(
 
 const bleFlow: SmpFlow = {
   image: new FlashImageSlot<McubootImage>(),
+  readyStep: "nrf-smp-ble-ready",
   readyTitleKey: "firmware.nrf_smp_ble_ready_title",
   failedKey: "firmware.nrf_smp_ble_failed",
-  showReady(host) {
-    host._step = "nrf-smp-ble-ready";
-    host._statusMessage = host._localize(this.readyTitleKey);
-  },
 };
 
 const serialFlow: SmpFlow = {
   image: new FlashImageSlot<McubootImage>(),
+  readyStep: "nrf-smp-serial-ready",
   readyTitleKey: "firmware.nrf_smp_serial_ready_title",
   failedKey: "firmware.nrf_smp_serial_failed",
-  showReady(host) {
-    host._step = "nrf-smp-serial-ready";
-    host._statusMessage = host._localize(this.readyTitleKey);
-  },
 };
 
 const flashOverBle = (host: ESPHomeFirmwareInstallDialog): Promise<void> =>
@@ -159,11 +154,7 @@ const flashOverBle = (host: ESPHomeFirmwareInstallDialog): Promise<void> =>
         host._device ? [host._device.name] : [],
         SMP_BLE_SERVICE_UUID
       ),
-    (engine, device, image, hooks) => engine.flashMcubootOverBle(device, image, hooks),
-    (engine, err) =>
-      err instanceof engine.SmpBleServiceNotFoundError
-        ? "firmware.nrf_smp_ble_service_not_found"
-        : bleFlow.failedKey
+    (engine, device, image, hooks) => engine.flashMcubootOverBle(device, image, hooks)
   );
 
 const flashOverSerial = (host: ESPHomeFirmwareInstallDialog): Promise<void> =>
@@ -178,11 +169,12 @@ export const nrfSmpBleInstall: BrowserInstall<"nrf-smp-ble"> = {
   id: "nrf-smp-ble",
   methodKey: "nrf_smp_ble",
   component: MCUMGR_OTA,
-  transport: "bluetooth",
+  available: isWebBluetoothSupported,
+  icon: "bluetooth",
   holdsPort: false,
   image: bleFlow.image,
   start: (host) => startSmpInstall(host, bleFlow),
-  showFirstStep: (host) => bleFlow.showReady(host),
+  showFirstStep: (host) => showReady(host, bleFlow),
   steps: {
     "nrf-smp-ble-ready": {
       detailKey: "firmware.nrf_smp_ble_ready_desc",
@@ -199,7 +191,7 @@ export const nrfSmpSerialInstall: BrowserInstall<"nrf-smp-serial"> = {
   holdsPort: false,
   image: serialFlow.image,
   start: (host) => startSmpInstall(host, serialFlow),
-  showFirstStep: (host) => serialFlow.showReady(host),
+  showFirstStep: (host) => showReady(host, serialFlow),
   steps: {
     "nrf-smp-serial-ready": {
       detailKey: "firmware.nrf_smp_serial_ready_desc",

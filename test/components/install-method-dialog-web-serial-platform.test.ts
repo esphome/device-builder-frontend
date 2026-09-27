@@ -26,11 +26,12 @@ vi.mock("../../src/util/notify.js", () => ({
 }));
 
 import { flush } from "../_dom.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/platforms/nrf52/ble-nus-stream.js";
-import { platformFor } from "../../src/platforms/registry.js";
+import { installsFor, platformFor } from "../../src/platforms/registry.js";
 import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
@@ -53,12 +54,17 @@ async function mount(
   loadedPlatforms: string[] = []
 ): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
-  dialog.deviceLoadedPlatforms = loadedPlatforms;
+  dialog.platformInstalls = installsFor(
+    makeConfiguredDevice({
+      target_platform: platform,
+      mcu,
+      loaded_platforms: loadedPlatforms,
+    })
+  );
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {};
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = platform;
-  dialog.deviceMcu = mcu;
   dialog.mode = mode;
   dialog.open = true;
   document.body.appendChild(dialog);

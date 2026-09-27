@@ -172,22 +172,20 @@ export function renderBleNusOption(
  * A platform flasher's row (nRF52 DFU, Pico, RTL8720C). With Web Serial it
  * flashes here; on an insecure origin a flasher that can hand off sends its
  * firmware to web.esphome.io instead, with ``handoffDesc`` in place of the
- * in-app copy. A Bluetooth flasher needs Web Bluetooth instead.
+ * in-app copy. A flasher that says when it is ``available`` goes by that.
  */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,
   install: AnyBrowserInstall,
-  browser: { webSerial: boolean; webBluetooth: boolean },
+  hasWebSerial: boolean,
   handoffDesc?: TemplateResult | string
 ): TemplateResult | typeof nothing {
   if (ctx.mode === "logs") return nothing;
-  const bluetooth = install.transport === "bluetooth";
-  const viaHandoff =
-    !bluetooth && handoffDesc !== undefined && install.handoff !== undefined;
-  const usable = bluetooth ? browser.webBluetooth : browser.webSerial;
+  const viaHandoff = handoffDesc !== undefined && install.handoff !== undefined;
+  const usable = install.available ? install.available() : hasWebSerial;
   if (!usable && !viaHandoff) return nothing;
   return renderMethodRow({
-    icon: bluetooth ? "bluetooth" : "chip",
+    icon: install.icon ?? "chip",
     title: ctx.localize(`dashboard.install_method_${install.methodKey}`),
     desc: viaHandoff
       ? handoffDesc

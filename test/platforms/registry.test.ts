@@ -9,6 +9,7 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 }));
 
 import { english } from "../_en-json.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
 import type {
@@ -17,7 +18,6 @@ import type {
   PlatformSupport,
 } from "../../src/platforms/platform-support.js";
 import {
-  installFor,
   installForMethod,
   installOf,
   installsFor,
@@ -78,14 +78,15 @@ describe("PLATFORMS", () => {
       expect(each.chips !== undefined).toBe(chips !== undefined);
     }
     if (!chips) {
-      expect(installFor(sample, null)).toBe(install);
-      expect(installFor(sample, "anything")).toBe(install);
+      expect(installOf(platform, null)).toBe(install);
+      expect(installOf(platform, "anything")).toBe(install);
       return;
     }
-    expect(installFor(sample, chips.takes)).toBe(install);
-    expect(installFor(sample, chips.refuses)).toBeUndefined();
+    expect(installOf(platform, chips.takes)).toBe(install);
+    expect(installOf(platform, chips.refuses)).toBeUndefined();
     // Unknown is not offered: the chip has to be one a flasher writes.
-    expect(installFor(sample, null)).toBeUndefined();
+    expect(installOf(platform, null)).toBeUndefined();
+    expect(sample).toBeTruthy();
   });
 
   it("picks the flasher that writes the chip where a platform has several", () => {
@@ -103,25 +104,48 @@ describe("PLATFORMS", () => {
   });
 
   it("offers a flasher its firmware has to support only once it is loaded", () => {
-    const dfu = installFor("nrf52", null);
-    expect(installsFor("nrf52", null, [])).toEqual([dfu]);
-    expect(installsFor("nrf52", null, ["ota.esphome"])).toEqual([dfu]);
-    const offered = installsFor("nrf52", null, ["ota.zephyr_mcumgr"]);
-    expect(offered.map((i) => i.id)).toEqual([
+    const nrf = (loaded_platforms: string[]) =>
+      installsFor(makeConfiguredDevice({ target_platform: "nrf52", loaded_platforms }));
+    const dfu = installOf(platformFor("nrf52"), null);
+    expect(nrf([])).toEqual([dfu]);
+    expect(nrf(["ota.esphome"])).toEqual([dfu]);
+    expect(nrf(["ota.zephyr_mcumgr"]).map((i) => i.id)).toEqual([
       "nrf-dfu",
       "nrf-smp-ble",
       "nrf-smp-serial",
     ]);
-    // The hand-off and the one-flasher callers never get one that needs firmware.
-    expect(installFor("nrf52", null)).toBe(dfu);
   });
 
-  it("offers no flasher to a platform without a descriptor", () => {
-    expect(installsFor("esp32", null, ["ota.zephyr_mcumgr"])).toEqual([]);
+  it("hands off only a flasher that needs nothing from the firmware", () => {
+    const updater = { id: "updater", component: "ota.x" } as unknown as AnyBrowserInstall;
+    const flasher = { id: "flasher" } as unknown as AnyBrowserInstall;
+    const platform: PlatformSupport = {
+      id: "p",
+      matches: () => true,
+      installs: [updater, flasher],
+    };
+    expect(installOf(platform, null)).toBe(flasher);
   });
 
-  it("has no install for a platform without a descriptor", () => {
-    expect(installFor("esp32", null)).toBeUndefined();
+  it("offers a chip only the flashers that write it", () => {
+    const rp2 = (mcu: string | null) =>
+      installsFor(makeConfiguredDevice({ target_platform: "rp2", mcu }));
+    expect(rp2("rp2040").map((i) => i.id)).toEqual(["rp2-uf2"]);
+    expect(rp2("rp2350")).toEqual([]);
+    expect(rp2(null)).toEqual([]);
+  });
+
+  it("offers no flasher to a platform without a descriptor or with no device", () => {
+    expect(
+      installsFor(
+        makeConfiguredDevice({
+          target_platform: "esp32",
+          loaded_platforms: ["ota.zephyr_mcumgr"],
+        })
+      )
+    ).toEqual([]);
+    expect(installsFor(null)).toEqual([]);
+    expect(installOf(platformFor("esp32"), null)).toBeUndefined();
   });
 
   it.each(byId)(

@@ -1,5 +1,3 @@
-const BLE_NUS_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
@@ -37,7 +35,10 @@ import { lapsedPick, withWebBluetooth, withWebSerial } from "../_web-serial.js";
 import { CommandTimeoutError } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { SerialResetHook } from "../../src/components/logs-dialog/session.js";
-import { BleUnavailableError } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import {
+  BLE_NUS_SERVICE_UUID,
+  BleUnavailableError,
+} from "../../src/platforms/nrf52/ble-nus-stream.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -358,7 +359,7 @@ describe("launchLogsWithMethod ble-nus", () => {
     await launchLogsWithMethod(host, nrfDevice(), "ble-nus");
     expect(ble.requestBleDevice).toHaveBeenCalledWith(
       ["kitchen", "Kitchen"],
-      BLE_NUS_UUID
+      BLE_NUS_SERVICE_UUID
     );
     expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
       expect.objectContaining({ source: "ble", onReconnect: expect.any(Function) })

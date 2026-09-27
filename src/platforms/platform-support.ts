@@ -84,8 +84,13 @@ export interface BrowserInstall<Id extends FlasherId> {
    * puts on the device. Absent: the flasher needs nothing from the firmware.
    */
   readonly component?: string;
-  /** The browser API the flash runs over; Web Serial when absent. */
-  readonly transport?: "bluetooth";
+  /**
+   * Whether this browser can run the flash, for one that does not go over
+   * Web Serial. Absent: it needs Web Serial.
+   */
+  readonly available?: () => boolean;
+  /** The method row's icon; a chip when absent. */
+  readonly icon?: string;
   /** Offered under "Advanced options" rather than in the main list. */
   readonly advanced?: boolean;
   /** The flash leaves a port the logs can reopen (the show-logs toggle). */

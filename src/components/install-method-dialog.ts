@@ -21,8 +21,9 @@ import { esphomeWebUrl } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { isEsptoolPlatform } from "../platforms/esp/index.js";
-import { BleProbeController, isWebBluetoothSupported } from "../platforms/nrf52/index.js";
-import { installsFor, platformFor } from "../platforms/registry.js";
+import { BleProbeController } from "../platforms/nrf52/index.js";
+import type { AnyBrowserInstall } from "../platforms/platform-support.js";
+import { platformFor } from "../platforms/registry.js";
 import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
@@ -100,13 +101,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @property()
   deviceTargetPlatform = "";
 
-  /** The device's ``mcu``. */
+  /** The platform flashers the device can take (``installsFor``). */
   @property({ attribute: false })
-  deviceMcu: string | null = null;
-
-  /** The device's ``loaded_platforms``. */
-  @property({ attribute: false })
-  deviceLoadedPlatforms: readonly string[] = [];
+  platformInstalls: readonly AnyBrowserInstall[] = [];
 
   @property()
   mode: "install" | "logs" = "install";
@@ -270,9 +267,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
-    // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial),
-    // or, on an insecure origin, the hand-off to web.esphome.io for the ones
-    // that can, with the same copy the ESP USB row shows there.
     const platformRows = this._renderPlatformFlashRows(ctx, false);
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)
@@ -458,17 +452,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const availability = this._webSerialAvailability;
     const handoffDesc =
       availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined;
-    const browser = {
-      webSerial: availability === "available",
-      webBluetooth: isWebBluetoothSupported(),
-    };
-    return installsFor(
-      this.deviceTargetPlatform,
-      this.deviceMcu,
-      this.deviceLoadedPlatforms
-    )
+    return this.platformInstalls
       .filter((install) => (install.advanced ?? false) === advanced)
-      .map((install) => renderPlatformFlashOption(ctx, install, browser, handoffDesc));
+      .map((install) =>
+        renderPlatformFlashOption(ctx, install, availability === "available", handoffDesc)
+      );
   }
 
   /**

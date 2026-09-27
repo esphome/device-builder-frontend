@@ -6,6 +6,7 @@
  * everything from it. A device with no entry (ESP) gets the built-in
  * behaviour. Never imported from ``src/web``.
  */
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
@@ -59,23 +60,14 @@ export function installOf(
 
 /** Every flasher a device can take: its chip's, and its firmware's own. */
 export function installsFor(
-  targetPlatform: string | null | undefined,
-  mcu: string | null,
-  loadedPlatforms: readonly string[]
+  device: ConfiguredDevice | null | undefined
 ): readonly AnyBrowserInstall[] {
-  return (platformFor(targetPlatform)?.installs ?? []).filter(
+  if (!device) return [];
+  return (platformFor(device.target_platform)?.installs ?? []).filter(
     (install) =>
-      writesChip(install, mcu) &&
-      (!install.component || loadedPlatforms.includes(install.component))
+      writesChip(install, device.mcu) &&
+      (!install.component || device.loaded_platforms.includes(install.component))
   );
-}
-
-/** ``installOf`` for a device's target platform. */
-export function installFor(
-  targetPlatform: string | null | undefined,
-  mcu: string | null
-): AnyBrowserInstall | undefined {
-  return installOf(platformFor(targetPlatform), mcu);
 }
 
 /** The install flow an install method string selects, if any. */
