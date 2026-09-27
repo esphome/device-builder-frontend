@@ -34,7 +34,7 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
   return { ...real, loadAmbz2Image: seams.loadAmbz2Image };
 });
 
-import { pickerText, pickFile, slowFile } from "../../_pick-file.js";
+import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/libretiny-uf2.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
@@ -169,15 +169,20 @@ describe("esphome-web-install-rtl-dialog", () => {
       throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     const el = await mountBare();
-    const input = el.shadowRoot!.querySelector("input[type=file]") as HTMLInputElement;
-    const cleared = vi.fn();
-    Object.defineProperty(input, "value", {
-      configurable: true,
-      set: cleared,
-      get: () => "",
-    });
+    const cleared = watchFileInput(el);
     await pickFile(el, "_image", uf2());
     expect(cleared).toHaveBeenCalledWith("");
+  });
+
+  it("unpicks the file when the dialog closes, so it can be picked again", async () => {
+    const slow = slowFile("firmware.uf2");
+    const el = await mountBare();
+    const cleared = watchFileInput(el);
+    el._onFileChange({ target: { files: [slow.file] } });
+    el.open = false;
+    await el.updateComplete;
+    expect(cleared).toHaveBeenCalledWith("");
+    expect(el._file).toBeNull();
   });
 
   it("offers the install only once the picked file is read and checked", async () => {

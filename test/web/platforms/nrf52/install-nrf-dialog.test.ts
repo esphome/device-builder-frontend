@@ -25,7 +25,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
-import { pickerText, pickFile, slowFile } from "../../_pick-file.js";
+import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { ESPHomeWebInstallNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js";
 
@@ -120,6 +120,15 @@ describe("esphome-web-install-nrf-dialog details log", () => {
     });
     await el._startInstall();
     expect(mocks.touchIntoBootloader).not.toHaveBeenCalled();
+  });
+
+  it("unpicks the package when the dialog closes, so it can be picked again", async () => {
+    const el = await mountDialog();
+    const cleared = watchFileInput(el);
+    el.open = false;
+    await el.updateComplete;
+    expect(cleared).toHaveBeenCalledWith("");
+    expect(el._file).toBeNull();
   });
 
   it("offers the install only once the picked package is read and parsed", async () => {

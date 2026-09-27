@@ -38,3 +38,11 @@ export const pickerText = (el: any) => ({
       ?.textContent?.trim() ?? "",
   error: el.shadowRoot!.querySelector(".file-status--error")?.textContent?.trim() ?? "",
 });
+
+/** Records what the dialog's file input is set to; a real one only takes "". */
+export function watchFileInput(el: any) {
+  const input = el.shadowRoot!.querySelector("input[type=file]") as HTMLInputElement;
+  const set = vi.fn();
+  Object.defineProperty(input, "value", { configurable: true, set, get: () => "" });
+  return set;
+}

@@ -91,9 +91,12 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
 
   private _onPrepared(failure: FilePickerError | null): void {
     this._fileError = failure;
-    if (this._image.state.kind !== "idle") return;
-    // A refused file is unpicked: the input fires no change for the same
-    // file again, so it could not be picked a second time.
+    if (this._image.state.kind === "idle") this._unpick();
+  }
+
+  // The input is emptied with the file: it fires no change for the file it
+  // still holds, so that file could not be picked a second time.
+  private _unpick(): void {
     this._file = null;
     if (this._fileInput) this._fileInput.value = "";
   }
@@ -117,7 +120,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     this._abort?.abort();
     this._abort = null;
     this._state = "idle";
-    this._file = null;
+    this._unpick();
     this._fileError = null;
     this._image.clear();
     this._progress = 0;
