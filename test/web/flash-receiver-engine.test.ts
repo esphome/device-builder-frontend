@@ -128,7 +128,9 @@ describe("esphome-web-flash-receiver engines", () => {
   });
 
   it("names a bad image when the firmware arrives, before any port is asked for", async () => {
-    engines.rtl.prepare.mockResolvedValueOnce({ error: "firmware.rtl_bad_uf2 (family)" });
+    // The click prepares once more; a bad image is still a bad image.
+    const bad = { error: "firmware.rtl_bad_uf2 (family)" };
+    engines.rtl.prepare.mockResolvedValueOnce(bad).mockResolvedValueOnce(bad);
     const { el } = await handOff({ flasher: "rtl-ambz2" }, false);
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toContain("firmware.rtl_bad_uf2");
@@ -143,6 +145,19 @@ describe("esphome-web-flash-receiver engines", () => {
     const { el } = await handOff({}, false);
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toBe("web.flash.invalid_image (boom)");
+  });
+
+  it("prepares again on the click after a preparation that failed", async () => {
+    engines.esp.prepare.mockRejectedValueOnce(new Error("chunk fetch failed"));
+    const { el } = await handOff({}, false);
+    expect((el as any)._state).toBe("error");
+    await (el as any)._onPrimary();
+    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
+    expect(requestPort).toHaveBeenCalledOnce();
+    expect(engines.esp.run).toHaveBeenCalledOnce();
+    expect((el as any)._state).toBe("done");
+    // Prepared once for good: a later click reuses the run.
+    expect((el as any)._reprepare).toBeUndefined();
   });
 
   it("reports a frame naming a flasher it does not have as malformed", async () => {

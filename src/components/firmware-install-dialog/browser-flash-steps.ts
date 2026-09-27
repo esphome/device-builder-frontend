@@ -44,7 +44,11 @@ export async function downloadBuildArtifact(
   const binaries = await fetchBinaries(host, device.configuration);
   if (!binaries || stale()) return null;
   if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
+    // The hand-off to web.esphome.io names what that flasher takes.
+    failNoBinaries(host, {
+      isWebFlasher: host._installer === "web-flash",
+      isEmpty: true,
+    });
     return null;
   }
   const binary = pick(binaries);

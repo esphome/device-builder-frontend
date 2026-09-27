@@ -75,6 +75,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
   // The handed-over image's run, settled before the click (see _prepare).
   private _prepared: Promise<ReceiverRun | null> = Promise.resolve(null);
+  // Prepares the handed-over image again, kept until it has succeeded once:
+  // a chunk that failed to load must not leave the tab unable to retry.
+  private _reprepare?: () => Promise<ReceiverRun | null>;
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
   @state() private _hasFile = false;
@@ -155,11 +158,13 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       );
       return;
     }
-    this._prepared = this._prepare(
-      msg.parts.map((p) => ({ data: new Uint8Array(p.data), address: p.address })),
-      msg.erase !== false,
-      msg.flasher ?? DEFAULT_HANDOFF_FLASHER
-    );
+    const parts = msg.parts.map((p) => ({
+      data: new Uint8Array(p.data),
+      address: p.address,
+    }));
+    this._reprepare = () =>
+      this._prepare(parts, msg.erase !== false, msg.flasher ?? DEFAULT_HANDOFF_FLASHER);
+    this._startPrepare();
     // The prepared run owns the bytes from here; the card only needs the names.
     this._firmware = { ...msg, parts: [] };
     // Name the tab + card after the device so several concurrent flash tabs are
@@ -263,7 +268,20 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       );
       return;
     }
+    // Held from here, so a second click cannot start a second preparation.
+    this._busy = true;
+    if (!(await this._prepared)) this._startPrepare();
     await this._runInstall(this._prepared);
+  }
+
+  private _startPrepare(): void {
+    const prepare = this._reprepare;
+    if (!prepare) return;
+    this._prepared = prepare().then((run) => {
+      // The run holds what it needs; let the handed-over bytes go.
+      if (run) this._reprepare = undefined;
+      return run;
+    });
   }
 
   /**

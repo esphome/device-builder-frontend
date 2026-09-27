@@ -125,6 +125,18 @@ describe("startRtlAmbz2Install", () => {
     ).toBeLessThan(seams.loadAmbz2Image.mock.invocationCallOrder[0]);
   });
 
+  it("names an empty build by the flow that asked for it", async () => {
+    const inApp = makeHost({ binaries: [] });
+    await startRtlAmbz2Install(asHost(inApp));
+    expect(inApp._statusMessage).toBe("firmware.no_binaries");
+
+    // The hand-off to web.esphome.io reads through the same download.
+    const handoff = makeHost({ binaries: [] });
+    Object.assign(handoff, { _installer: "web-flash" });
+    await startRtlAmbz2Install(asHost(handoff));
+    expect(handoff._statusMessage).toBe("firmware.no_flashable_binary");
+  });
+
   it("fails when the build produced no UF2", async () => {
     const host = makeHost({ binaries: [bin("image_firmware_is.0x00C000.bin")] });
     await startRtlAmbz2Install(asHost(host));
