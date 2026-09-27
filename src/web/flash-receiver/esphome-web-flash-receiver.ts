@@ -312,8 +312,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     });
 
     this._busy = false;
-    if (result === "dismissed") this._resetForRetry();
-    if (result === "dismissed" || !result) return;
+    if (result === "dismissed") {
+      this._resetForRetry();
+      return;
+    }
+    if (!result) return;
 
     this._flashDone = true;
     this._progress = null;
