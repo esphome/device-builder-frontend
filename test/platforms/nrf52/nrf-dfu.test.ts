@@ -1,6 +1,8 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
+import { disconnectEvents } from "../../_web-serial.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import { makeWebSerialPort } from "../../web/_make-web-serial-port.js";
 
 import {
@@ -167,6 +169,7 @@ describe("flashDfuPackage", () => {
     const port = {
       open: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
+      ...disconnectEvents(),
       readable: new ReadableStream<Uint8Array>(),
       writable: new WritableStream<Uint8Array>(),
     } as unknown as SerialPort;
@@ -191,6 +194,7 @@ describe("flashDfuPackage", () => {
       open: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
       // The device vanishes: reads end immediately, writes still succeed.
+      ...disconnectEvents(),
       readable: new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
       writable: new WritableStream<Uint8Array>(),
     } as unknown as SerialPort;
@@ -201,7 +205,7 @@ describe("flashDfuPackage", () => {
     };
 
     await expect(flashDfuPackage(port, pkg, { onProgress: () => {} })).rejects.toThrow(
-      /Serial port closed/
+      SerialDeviceLostError
     );
     expect(port.close).toHaveBeenCalled();
   });
@@ -210,6 +214,7 @@ describe("flashDfuPackage", () => {
     const port = {
       open: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
+      ...disconnectEvents(),
       readable: new ReadableStream<Uint8Array>(),
       // A write that only settles when the stream is aborted, as Chromium's
       // serial sink does when the device is unplugged mid-flash.
@@ -251,6 +256,7 @@ function ackingPort() {
   const written: Uint8Array[] = [];
   const port = makeWebSerialPort({
     close: vi.fn(async () => rx.close()),
+    ...disconnectEvents(),
     readable: new ReadableStream<Uint8Array>({ start: (c) => (rx = c) }),
     writable: new WritableStream<Uint8Array>({
       write: (chunk) => {
@@ -305,6 +311,7 @@ describe("flashDfuPackageWithReconnect", () => {
       getInfo: () => ({ usbVendorId: 0x239a, usbProductId: 0x0029 }),
       open: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
+      ...disconnectEvents(),
       readable: new ReadableStream<Uint8Array>({ start: (c) => c.close() }),
       writable: new WritableStream<Uint8Array>(),
     }) as unknown as SerialPort;
@@ -328,7 +335,7 @@ describe("flashDfuPackageWithReconnect", () => {
           onReconnecting,
           onLog: (l) => log.push(l),
         })
-      ).rejects.toThrow(/Serial port closed/);
+      ).rejects.toThrow(SerialDeviceLostError);
       expect(onReconnecting).toHaveBeenCalledTimes(1);
       expect(log).toContain(
         "The device dropped off the bus mid-flash; waiting for it to re-enumerate"
@@ -353,7 +360,7 @@ describe("flashDfuPackageWithReconnect", () => {
         onProgress: () => {},
         onLog: (l) => log.push(l),
       })
-    ).rejects.toThrow(/Serial port closed/);
+    ).rejects.toThrow(SerialDeviceLostError);
     expect(log[log.length - 1]).toBe("The device did not come back");
     expect(port.close).toHaveBeenCalledTimes(1);
   });

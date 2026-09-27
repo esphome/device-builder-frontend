@@ -13,7 +13,10 @@ import {
 } from "../../../platforms/rtl87xx/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
-import { openFailureMessage } from "../../../util/serial-open-error.js";
+import {
+  connectFailureDetail,
+  openFailureMessage,
+} from "../../../util/serial-open-error.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
 import {
@@ -198,7 +201,10 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     // The dialog closed and stopped the engine: nothing left to report to.
     if (!live()) return;
     if ("detail" in result) {
-      this._fail(this._localize("firmware.rtl_flash_failed"), result.detail);
+      this._fail(
+        this._localize("firmware.rtl_flash_failed"),
+        connectFailureDetail(result.error, this._localize, () => result.detail)
+      );
       return;
     }
     this._manualReset = !result.rebooted;

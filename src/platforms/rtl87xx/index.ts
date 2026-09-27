@@ -52,17 +52,18 @@ export async function loadAmbz2Image(
  * Flash a parsed image through the on-demand ROM downloader engine, for the
  * same three flows. ``rebooted`` is false when the adapter has no control
  * lines and the user resets the board by hand; a failure (the engine chunk,
- * the link, the write) comes back as its detail. Never throws.
+ * the link, the write) comes back as its detail, with the error for a flow
+ * that has a line of its own for it. Never throws.
  */
 export async function runAmbz2(
   port: SerialPort,
   image: LibreTinyImage,
   hooks: Ambz2FlashHooks
-): Promise<{ rebooted: boolean } | { detail: string }> {
+): Promise<{ rebooted: boolean } | { detail: string; error: unknown }> {
   try {
     const { flashAmbz2 } = await loadAmbz2Engine();
     return { rebooted: await flashAmbz2(port, image, hooks) };
   } catch (err) {
-    return { detail: getErrorMessage(err) };
+    return { detail: getErrorMessage(err), error: err };
   }
 }

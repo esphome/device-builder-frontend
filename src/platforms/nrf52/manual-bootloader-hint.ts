@@ -1,12 +1,16 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 
 /**
  * ``err``'s message joined with the nRF52 way out when the 1200-baud touch
  * or the DFU handshake fails: enter the bootloader by hand. An abort is the
- * dialog's own teardown and stays bare.
+ * dialog's own teardown and stays bare, and a device that went away has a
+ * line of its own.
  */
 export function withManualBootloaderHint(err: unknown, localize: LocalizeFunc): string {
+  // A board that was unplugged is not one to put into its bootloader.
+  if (err instanceof SerialDeviceLostError) return localize("serial.device_lost");
   const message = getErrorMessage(err);
   if (err instanceof DOMException && err.name === "AbortError") return message;
   // The joined sentence is one translatable string; a browser message that

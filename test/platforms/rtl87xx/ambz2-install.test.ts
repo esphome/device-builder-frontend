@@ -45,6 +45,7 @@ import {
   LT_TAG,
   UF2_FAMILY_AMBZ,
 } from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
   asHost,
   bin,
@@ -296,6 +297,15 @@ describe("rtlDoFlash", () => {
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.rtl_flash_failed");
     expect(host._errorMessage).toContain("0xc000");
+  });
+
+  it("names a board that was unplugged during the flash", async () => {
+    const host = readyHost();
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashAmbz2.mockRejectedValue(new SerialDeviceLostError());
+    await rtlDoFlash(asHost(host));
+    expect(host._statusMessage).toBe("firmware.rtl_flash_failed");
+    expect(host._errorMessage).toBe("serial.device_lost");
   });
 
   it("stays silent when the dialog was torn down during the flash", async () => {

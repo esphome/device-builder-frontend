@@ -8,6 +8,7 @@
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { sleep } from "../../util/sleep.js";
+import { settledWithin } from "../../util/with-deadline.js";
 import { type XmodemIo, xmodemSend } from "../../util/xmodem.js";
 import type { LibreTinyImage } from "./libretiny-uf2.js";
 
@@ -30,6 +31,8 @@ const RESET_HOLD_MS = 100;
 const ROM_SETTLE_MS = 400;
 const LINE_MS = 1000;
 const XMODEM_TIMEOUT_MS = 3000;
+/** How long the reboot and the close after a flash each get. */
+const TEARDOWN_MS = 2000;
 const HASH_LENGTH = 32;
 // SYSCFG: bits 5..6 hold the flash pinout, which the ROM wants named back in
 // every flash command; the second write unlocks the flash controller.
@@ -203,14 +206,15 @@ async function autoLink(
  * user has to reset it.
  */
 async function bootFirmware(port: SerialPort): Promise<boolean> {
-  try {
+  const pulse = async (): Promise<boolean> => {
     await port.setSignals({ dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
     await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     return true;
-  } catch {
-    return false;
-  }
+  };
+  // A line change on a board that was unplugged can stay pending; the flash
+  // error that led here must still be reported.
+  return Promise.race([pulse().catch(() => false), sleep(TEARDOWN_MS).then(() => false)]);
 }
 
 /** One ping; true when the ROM downloader answered. */
@@ -386,7 +390,7 @@ export async function flashAmbz2(
           : "No control lines to reboot the board; release PA00 and reset it by hand"
       );
     }
-    await port.close().catch(() => {});
+    await settledWithin(port.close(), TEARDOWN_MS);
   }
   return rebooted;
 }

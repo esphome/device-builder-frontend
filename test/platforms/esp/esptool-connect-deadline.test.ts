@@ -7,6 +7,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./_mock-transport-guard.js";
+
 const state = vi.hoisted(() => ({
   main: (): Promise<string> => new Promise(() => {}),
   disconnect: (): Promise<void> => Promise.resolve(),
@@ -53,6 +55,7 @@ import {
   disconnect,
   resetAndDisconnect,
 } from "../../../src/platforms/esp/esptool.js";
+import { guardTransport } from "../../../src/platforms/esp/transport-guard.js";
 import { SerialConnectTimeoutError } from "../../../src/util/serial-open-error.js";
 
 const port = { close: vi.fn(async () => {}) } as unknown as SerialPort;
@@ -111,7 +114,10 @@ describe("connectToPort deadline", () => {
 
   it("leaves a handshake that answers in time alone", async () => {
     state.main = async () => "ESP32";
-    await expect(connectToPort(port)).resolves.toMatchObject({ chipName: "ESP32" });
+    const detected = await connectToPort(port);
+    expect(detected).toMatchObject({ chipName: "ESP32" });
+    // The session is the caller's from here, so it is guarded from here.
+    expect(guardTransport).toHaveBeenCalledExactlyOnceWith(detected.transport);
   });
 });
 

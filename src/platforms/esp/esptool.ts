@@ -22,6 +22,7 @@ import {
   isEspressifUsbJtagPort,
   UnsupportedChipError,
 } from "./esp-usb.js";
+import { guardTransport, releaseTransportGuard } from "./transport-guard.js";
 
 export interface DetectedChip {
   chipName: string;
@@ -38,6 +39,9 @@ const CONNECT_DEADLINE_MS = 30_000;
 
 /** How long releasing the port gets before the caller moves on without it. */
 const RELEASE_DEADLINE_MS = 5_000;
+
+/** How long the reset after a flash gets; it takes well under a second. */
+const RESET_DEADLINE_MS = 10_000;
 
 /** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
 const ESP_GET_SECURITY_INFO = 0x14;
@@ -179,6 +183,9 @@ export async function connectToPort(
       CONNECT_DEADLINE_MS,
       () => new SerialConnectTimeoutError(CONNECT_DEADLINE_MS)
     );
+    // From here on the session is the caller's: through a compile, a flash
+    // or an erase, with nothing else to end a write the device never takes.
+    guardTransport(transport);
     return { chipName, port, transport, loader };
   } catch (error) {
     if (onLog) {
@@ -208,6 +215,7 @@ export async function connectToPort(
  * the one to show.
  */
 async function releasePort(transport: Transport): Promise<void> {
+  releaseTransportGuard(transport);
   // Once this attempt has given up, the port may belong to a later one; a
   // disconnect that finally fails then must not close it out from under it.
   let abandoned = false;
@@ -279,6 +287,9 @@ export async function readDeviceManifest(
 /**
  * Flash firmware binary data to a connected ESP device.
  * Assumes connectToPort() was already called and the loader is connected.
+ * Throws ``SerialDeviceLostError`` when the device goes away meanwhile and
+ * ``SerialWriteStalledError`` when it stops taking data (see
+ * ``guardTransport``).
  */
 export async function flashFirmware(
   loader: ESPLoader,
@@ -498,8 +509,16 @@ export async function resetAndDisconnect(
   port: SerialPort
 ): Promise<void> {
   markSerialActivity();
+  // A chip on its own USB drops off the bus as it resets, which is the
+  // reset working and no lost device. The reset is bounded as a whole: a
+  // line change on a board unplugged just now can stay pending.
+  releaseTransportGuard(transport);
   try {
-    await hardResetChip(loader, transport, port);
+    await withDeadline(
+      hardResetChip(loader, transport, port),
+      RESET_DEADLINE_MS,
+      () => new Error("The reset did not finish in time")
+    );
   } finally {
     await releasePort(transport);
     // hard_reset triggers a USB re-enumeration on native-USB chips;

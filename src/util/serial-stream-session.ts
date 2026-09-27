@@ -4,7 +4,13 @@
  * against every wait (an in-flight stream read or write cannot be
  * interrupted, so the abort has to win the race instead), and a bounded
  * teardown. Engines extend it with their framing.
+ *
+ * A write is also raced against the device going away: written to a device
+ * that was unplugged it can stay pending, and the engine would wait on it
+ * without end (#1896).
  */
+import { deviceLostFrom, SerialDeviceLostError } from "./serial-open-error.js";
+import { type PortLost, watchPortLost } from "./serial-port-lost.js";
 import { sleep } from "./sleep.js";
 
 // Upper bound on stream teardown so a dead device can't hold the port open.
@@ -15,8 +21,12 @@ export abstract class SerialStreamSession {
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
   // Rejects on abort, never settles otherwise.
   private readonly aborted: Promise<never>;
+  // Rejects with ``readEnded`` once the session ended, never settles otherwise.
+  private readonly gone: Promise<never>;
+  private markGone: (err: Error) => void = () => {};
+  private readonly watch: PortLost;
   private active = true;
-  /** Why the read loop stopped (device gone, port error); set before ``onEnded``. */
+  /** Why the session ended (device gone, port error); set before ``onEnded``. */
   protected readEnded: Error | null = null;
 
   constructor(
@@ -34,6 +44,12 @@ export abstract class SerialStreamSession {
       signal.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
     this.aborted.catch(() => {});
+    this.gone = new Promise<never>((_, reject) => (this.markGone = reject));
+    this.gone.catch(() => {});
+    // The read loop ends by itself when the device goes; the port's own
+    // report is for a read that stays pending too.
+    this.watch = watchPortLost(port);
+    this.watch.gone.catch((err: Error) => this.end(err));
     void this.readLoop();
   }
 
@@ -49,7 +65,15 @@ export abstract class SerialStreamSession {
   }
 
   protected async writeBytes(bytes: Uint8Array): Promise<void> {
-    await this.race(this.writer.write(bytes));
+    try {
+      await this.race(Promise.race([this.writer.write(bytes), this.gone]));
+    } catch (err) {
+      // The browser can fail the write before the read, or the port, says so.
+      const lost = deviceLostFrom(err);
+      if (!lost) throw err;
+      this.end(lost);
+      throw this.readEnded ?? lost;
+    }
   }
 
   private async readLoop(): Promise<void> {
@@ -62,7 +86,10 @@ export abstract class SerialStreamSession {
         return;
       }
       if (result.done || !result.value) {
-        this.end(new Error("Serial port closed"));
+        // A stream that ends under a session in use is the device going away
+        // as well; one that ends with the session is its own close.
+        const closed = new Error("Serial port closed");
+        this.end(this.active ? new SerialDeviceLostError(closed) : closed);
         return;
       }
       this.onBytes(result.value);
@@ -70,8 +97,13 @@ export abstract class SerialStreamSession {
   }
 
   private end(err: Error): void {
-    this.readEnded = err;
-    this.onEnded(err);
+    // The first reason stands: a read that fails after the event adds nothing.
+    if (this.readEnded) return;
+    // One error for a lost device, however it was noticed.
+    const reason = deviceLostFrom(err) ?? err;
+    this.readEnded = reason;
+    this.markGone(reason);
+    this.onEnded(reason);
   }
 
   /**
@@ -83,6 +115,7 @@ export abstract class SerialStreamSession {
    */
   async close(failure?: unknown): Promise<void> {
     this.active = false;
+    this.watch.dispose();
     const writer =
       failure !== undefined ? this.writer.abort(failure) : this.writer.close();
     // Best effort: a dead port rejects these or never settles them.

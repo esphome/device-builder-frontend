@@ -23,6 +23,7 @@ import {
 import {
   markOpenFailure,
   SerialConnectTimeoutError,
+  SerialDeviceLostError,
 } from "../../../../src/util/serial-open-error.js";
 import { isPortPickerCancel } from "../../../../src/util/web-serial.js";
 import {
@@ -111,6 +112,26 @@ describe("runFlash", () => {
 
     expect(chip.loader.eraseFlash).toHaveBeenCalledOnce();
     expect(hooks.steps).toContain("erasing");
+  });
+
+  it("names a board unplugged during the flash, and releases the port", async () => {
+    vi.mocked(connectToPort).mockResolvedValue(detected() as never);
+    vi.mocked(flashFirmware).mockRejectedValue(new SerialDeviceLostError());
+    const hooks = makeHooks();
+
+    const ok = await runFlash(
+      port,
+      {
+        filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
+        messages: webFlashMessages((key) => key),
+      },
+      hooks
+    );
+
+    expect(ok).toBe(false);
+    expect(hooks.errors).toEqual(["serial.device_lost"]);
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(resetAndDisconnect).not.toHaveBeenCalled();
   });
 
   it("aggregates progress across multiple parts by byte size", async () => {

@@ -634,7 +634,9 @@
     "port_in_use": "Could not open the serial port; it may be open in another tab or program. Close it there and try again. ({error})",
     "open_timed_out": "The serial port did not open within {seconds} seconds. Unplug and replug the board, then try again.",
     "port_held": "The serial port could not be released. Unplug and replug the board, then try again.",
-    "picker_needs_click": "The browser did not open the device chooser because too much time passed since your click. Click again."
+    "picker_needs_click": "The browser did not open the device chooser because too much time passed since your click. Click again.",
+    "device_lost": "The device disconnected during the install. Plug it back in, then retry.",
+    "write_stalled": "The device stopped taking data for {seconds} seconds. Unplug and replug it, then retry."
   },
   "wizard": {
     "title_create": "Create configuration",

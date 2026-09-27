@@ -6,6 +6,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./_mock-transport-guard.js";
+
 interface TerminalLike {
   clean: () => void;
   writeLine: (line: string) => void;

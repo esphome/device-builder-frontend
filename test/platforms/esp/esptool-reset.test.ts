@@ -114,3 +114,29 @@ describe("resetAndDisconnect — chip's own USB-Serial/JTAG peripheral", () => {
     expect(transport.disconnect).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("resetAndDisconnect — a board unplugged as the reset starts", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("gives the reset ten seconds, then releases the port", async () => {
+    vi.useFakeTimers();
+    const transport = fakeTransport();
+    // A line change on a device that is gone can stay pending.
+    transport.setDTR.mockReturnValue(new Promise(() => {}));
+    let failed: unknown;
+    const reset = resetAndDisconnect(
+      esp8266Loader,
+      transport as unknown as Transport,
+      cp210xPort
+    ).catch((err: unknown) => (failed = err));
+
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(transport.disconnect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await reset;
+    expect(failed).toBeInstanceOf(Error);
+    expect(transport.disconnect).toHaveBeenCalledOnce();
+  });
+});

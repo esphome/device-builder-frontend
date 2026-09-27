@@ -10,6 +10,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./_mock-transport-guard.js";
+
 const state: {
   chip: { CHIP_NAME: string } | null;
   securityInfo: () => Promise<[number, Uint8Array]>;

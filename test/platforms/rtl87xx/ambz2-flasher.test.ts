@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
+import { disconnectEvents } from "../../_web-serial.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
 import {
   Ambz2ConsoleError,
@@ -103,6 +105,7 @@ function fakeRom(opts: RomOptions = {}) {
 
   // Like a freshly picked port: no streams until open().
   const port = {
+    ...disconnectEvents(),
     readable: null as ReadableStream<Uint8Array> | null,
     writable: null as WritableStream<Uint8Array> | null,
     open: vi.fn(async () => {
@@ -293,7 +296,19 @@ describe("flashAmbz2", () => {
     p.catch(() => {});
     await vi.advanceTimersByTimeAsync(1000);
     rom.dropLink();
-    await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
+    await expect(driveFakeTimers(p)).rejects.toThrow(SerialDeviceLostError);
     expect(rom.raw.close).toHaveBeenCalledOnce();
+  });
+
+  it("reports the failure when the reboot and the close never return", async () => {
+    const rom = fakeRom({ linkAfterPings: 1000 });
+    const p = flashAmbz2(rom.port, image, { onProgress: () => {} });
+    p.catch(() => {});
+    await vi.advanceTimersByTimeAsync(1000);
+    // The board is unplugged: from here a line change stays pending.
+    rom.raw.setSignals.mockReturnValue(new Promise(() => {}));
+    rom.raw.close.mockReturnValue(new Promise(() => {}));
+    rom.dropLink();
+    await expect(driveFakeTimers(p)).rejects.toThrow(SerialDeviceLostError);
   });
 });

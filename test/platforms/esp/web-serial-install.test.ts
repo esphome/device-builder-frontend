@@ -37,7 +37,10 @@ import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../../src/platforms/esp/web-serial-install.js";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
-import { markOpenFailure } from "../../../src/util/serial-open-error.js";
+import {
+  markOpenFailure,
+  SerialDeviceLostError,
+} from "../../../src/util/serial-open-error.js";
 
 type Follow = { onResult: (d: unknown) => void; onError: (e: string) => void };
 
@@ -389,5 +392,51 @@ describe("Web Serial install while someone else's build runs (#1893)", () => {
     expect(api.firmwareCompile).not.toHaveBeenCalled();
     expect(esptool.disconnect).toHaveBeenCalled();
     expect(esptool.flashFirmware).not.toHaveBeenCalled();
+  });
+});
+
+describe("Web Serial install when the board is unplugged during the flash (#1896)", () => {
+  function lostAt(percent: number, err: Error = new SerialDeviceLostError()) {
+    const { host } = makeHost();
+    esptool.connectToPort.mockResolvedValue(CHIP);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockImplementation(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent });
+      throw err;
+    });
+    // The release takes its whole deadline when the hung write holds the port.
+    const shown: string[] = [];
+    esptool.disconnect.mockImplementation(async () => {
+      shown.push(host._statusMessage);
+    });
+    const run = startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+    return { host, shown, run };
+  }
+
+  it("fails with the device lost line before it releases the port, and leaves Retry", async () => {
+    const { host, shown, run } = lostAt(60);
+    await run;
+
+    expect(host._fail).toHaveBeenCalledWith("serial.device_lost");
+    expect(shown).toEqual(["serial.device_lost"]);
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+    // Retry is only offered for a failure with no kind of its own.
+    expect(host._failureKind).toBeNull();
+  });
+
+  it("does not call a board that went away at the end done: the tail may be unwritten", async () => {
+    const { host, run } = lostAt(100);
+    await run;
+
+    expect(host._fail).toHaveBeenCalledWith("serial.device_lost");
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("still counts any other failure at the end as done", async () => {
+    const { host, run } = lostAt(100, new Error("Invalid head of packet"));
+    await run;
+
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._step).toBe("done");
   });
 });

@@ -14,7 +14,12 @@ import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.j
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { PickerActivationError } from "../../util/picker-activation.js";
-import { openFailureMessage } from "../../util/serial-open-error.js";
+import {
+  namedConnectFailure,
+  openFailureMessage,
+  SerialDeviceLostError,
+  SerialWriteStalledError,
+} from "../../util/serial-open-error.js";
 import {
   type DetectedChip,
   EngineLoadError,
@@ -198,10 +203,19 @@ export async function startWebSerialInstall(
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
-    // 100% reached: treat as success — device may have reset during verification.
-    if (host._flashPercent < 100) {
+    // 100% reached: treat as success — device may have reset during
+    // verification. Not a device that went away or stopped taking data: the
+    // last blocks may not be written.
+    const gone =
+      err instanceof SerialDeviceLostError || err instanceof SerialWriteStalledError;
+    if (gone || host._flashPercent < 100) {
+      // The failure first: the release can take its whole deadline when the
+      // write that hung still holds the port.
+      host._fail(
+        namedConnectFailure(err, host._localize) ??
+          formatApiError(err, host._localize, "firmware.flash_failed")
+      );
       await releaseSerial(esptool, detected);
-      host._fail(formatApiError(err, host._localize, "firmware.flash_failed"));
       return;
     }
   }

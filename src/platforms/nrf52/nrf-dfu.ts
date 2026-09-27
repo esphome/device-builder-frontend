@@ -1,4 +1,5 @@
 import { unzipSync } from "fflate";
+import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 
 import { concat, int32LE } from "../../util/bytes.js";
 import { tenthLogger } from "../../util/flash-log.js";
@@ -395,6 +396,7 @@ export async function flashDfuPackage(
 /** The device dropped off the bus (unplug, bootloader reset) rather than a protocol failure. */
 export function isDeviceLost(err: unknown): boolean {
   return (
+    err instanceof SerialDeviceLostError ||
     (err instanceof DOMException && err.name === "NetworkError") ||
     (err instanceof Error && err.message === "Serial port closed")
   );
