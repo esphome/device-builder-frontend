@@ -282,6 +282,21 @@ describe("base editor relocation hydrate", () => {
       expect(focus()).toEqual({ node: [], field: ["max_runs"] });
     });
 
+    it("follows the caret again after a detach before the reload", async () => {
+      const { editor, before } = await mounted();
+      await outsideEdit(editor, EDITED);
+
+      const parent = editor.parentNode!;
+      editor.remove();
+      parent.appendChild(editor);
+      await editor.updateComplete;
+
+      expect((editor as any)._stale).toBe(false);
+      // And the next outside edit counts again.
+      await outsideEdit(editor, `${EDITED}# more\n`);
+      expect(reads(editor)).toBeGreaterThan(before + 1);
+    });
+
     it("follows the caret again when the reload has nothing to read", async () => {
       const { editor } = await mounted();
       const focus = () => (editor as any)._currentFocus();

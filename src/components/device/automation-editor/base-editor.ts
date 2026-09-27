@@ -291,6 +291,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // and a re-attached one must not come back read-only or show the
     // previous section's tree under the new location.
     this._hydrateId++;
+    this._stale = false;
     this._dropStaleTree();
     setHeld(this, false);
   }
