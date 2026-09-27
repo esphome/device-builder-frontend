@@ -56,9 +56,10 @@ export interface HandoffSpec {
   ) => FirmwareBinary | undefined;
   noArtifactKey: string;
   /**
-   * Why the downloaded artifact is not this flasher's image, when a platform
-   * covers chips its flasher cannot write (``rtl87xx`` is also the RTL8710B);
-   * null when it is. Checked before the flasher tab is offered.
+   * Why the downloaded artifact is not this flasher's image; null when it
+   * is. The device's chip already picked the flasher, so this is the
+   * backstop for a build that disagrees with it. Checked before the flasher
+   * tab is offered.
    */
   check?: (bytes: Uint8Array) => Promise<{ key: string; detail: string } | null>;
 }

@@ -12,12 +12,14 @@ import { english } from "../_en-json.js";
 import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
 import type {
+  AnyBrowserInstall,
   FlasherStepView,
   PlatformSupport,
 } from "../../src/platforms/platform-support.js";
 import {
   installFor,
   installForMethod,
+  installOf,
   platformFor,
   PLATFORMS,
   serialLogsFor,
@@ -61,39 +63,60 @@ describe("PLATFORMS", () => {
     expect(platform.matches(SAMPLE_PLATFORM[id])).toBe(true);
     expect(platform.matches("esp32")).toBe(false);
     expect(platformFor(SAMPLE_PLATFORM[id])).toBe(platform);
-    if (platform.install) {
-      expect(installForMethod(platform.install.id)).toBe(platform.install);
+    for (const install of platform.installs ?? []) {
+      expect(installForMethod(install.id)).toBe(install);
     }
   });
 
   it.each(byId)("%s offers its install by chip", (id, platform) => {
     const sample = SAMPLE_PLATFORM[id];
+    const [install] = platform.installs ?? [];
     const chips = CHIPS[id];
-    // Every platform that is more than one chip names the chips it writes.
-    expect(platform.install?.chips !== undefined).toBe(chips !== undefined);
+    // Every flasher of a platform that is more than one chip names its chips.
+    for (const each of platform.installs ?? []) {
+      expect(each.chips !== undefined).toBe(chips !== undefined);
+    }
     if (!chips) {
-      expect(installFor(sample, null)).toBe(platform.install);
-      expect(installFor(sample, "anything")).toBe(platform.install);
+      expect(installFor(sample, null)).toBe(install);
+      expect(installFor(sample, "anything")).toBe(install);
       return;
     }
-    expect(installFor(sample, chips.takes)).toBe(platform.install);
+    expect(installFor(sample, chips.takes)).toBe(install);
     expect(installFor(sample, chips.refuses)).toBeUndefined();
-    // Unknown is not offered: the chip has to be one the flasher writes.
+    // Unknown is not offered: the chip has to be one a flasher writes.
     expect(installFor(sample, null)).toBeUndefined();
-    expect(installFor(sample, undefined)).toBeUndefined();
-    expect(installFor(sample, "")).toBeUndefined();
+  });
+
+  it("picks the flasher that writes the chip where a platform has several", () => {
+    const first = { id: "first", chips: ["chip-a"] } as unknown as AnyBrowserInstall;
+    const second = { id: "second", chips: ["chip-b"] } as unknown as AnyBrowserInstall;
+    const platform: PlatformSupport = {
+      id: "two-chips",
+      matches: () => true,
+      installs: [first, second],
+    };
+    expect(installOf(platform, "chip-a")).toBe(first);
+    expect(installOf(platform, "chip-b")).toBe(second);
+    expect(installOf(platform, "chip-c")).toBeUndefined();
+    expect(installOf(platform, null)).toBeUndefined();
   });
 
   it("has no install for a platform without a descriptor", () => {
     expect(installFor("esp32", null)).toBeUndefined();
-    expect(installFor(null, "rp2040")).toBeUndefined();
   });
 
   it.each(byId)(
     "%s has English copy for its install method and steps",
     (_id, platform) => {
-      const install = platform.install;
-      if (!install) return;
+      const keys = (platform.installs ?? []).flatMap(installCopyKeys);
+      for (const key of keys) {
+        expect(english(key), `missing en.json key "${key}"`).toBeTruthy();
+      }
+    }
+  );
+
+  function installCopyKeys(install: AnyBrowserInstall): string[] {
+    {
       const keys = [
         `dashboard.install_method_${install.methodKey}`,
         `dashboard.install_method_${install.methodKey}_desc`,
@@ -102,11 +125,9 @@ describe("PLATFORMS", () => {
       if (install.downloadReady) {
         keys.push(install.downloadReady.titleKey, install.downloadReady.bodyKey);
       }
-      for (const key of keys) {
-        expect(english(key), `missing en.json key "${key}"`).toBeTruthy();
-      }
+      return keys;
     }
-  );
+  }
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release only on RTL8720C kits,

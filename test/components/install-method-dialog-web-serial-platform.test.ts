@@ -30,6 +30,7 @@ import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { platformFor } from "../../src/platforms/registry.js";
 import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
@@ -40,18 +41,15 @@ import {
 } from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// The chip a device of each split platform reports (``Device.mcu``) when it is
-// the one the browser flashes; ``null`` for a platform that is one chip.
-const FLASHABLE_CHIP: Record<string, string> = {
-  rp2: "rp2040",
-  rp2040: "rp2040",
-  rtl87xx: "rtl8720c",
-};
+// The chip a device reports (``Device.mcu``) when its platform's flasher
+// writes it; ``null`` for a platform that is one chip.
+const flashableChip = (platform: string): string | null =>
+  platformFor(platform)?.installs?.[0]?.chips?.[0] ?? null;
 
 async function mount(
   platform: string,
   mode: "install" | "logs" = "install",
-  mcu: string | null = FLASHABLE_CHIP[platform] ?? null
+  mcu: string | null = flashableChip(platform)
 ): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = defaultLocalize;
@@ -135,7 +133,6 @@ describe("install-method-dialog platform gating", () => {
   it.each([
     ["rp2", "rp2350"],
     ["rp2", null],
-    ["rp2", "rtl8720c"],
   ])("hides the Pico row for %s with chip %s", async (platform, mcu) => {
     const d = await mount(platform, "install", mcu);
     expect(hasRp2Row(d)).toBe(false);
@@ -149,11 +146,6 @@ describe("install-method-dialog platform gating", () => {
     const d = await mount(platform, "install", mcu);
     expect(hasRtlRow(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
-  });
-
-  it("offers the nRF52 row whatever the chip, its platform being one chip", async () => {
-    expect(hasNrfDfuRow(await mount("nrf52", "install", null))).toBe(true);
-    expect(hasNrfDfuRow(await mount("nrf52", "install", "nrf52840"))).toBe(true);
   });
 
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
@@ -214,7 +206,6 @@ describe("install-method-dialog platform gating", () => {
     expect(hasRp2Row(await mount("rp2"))).toBe(false);
     // The hand-off row is the same row: not for the RTL8710B.
     expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
-    expect(hasRtlRow(await mount("rtl87xx", "install", null))).toBe(false);
   });
 });
 

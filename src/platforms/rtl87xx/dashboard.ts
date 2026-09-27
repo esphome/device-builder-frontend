@@ -9,6 +9,6 @@ export * from "./ambz2-install.js";
 export const rtl87xxPlatform: PlatformSupport = {
   id: "rtl87xx",
   matches: isRtl87xxPlatform,
-  install: rtlAmbz2Install,
+  installs: [rtlAmbz2Install],
   logs: { serial: RTL87XX_SERIAL_LOGS },
 };

@@ -11,7 +11,7 @@ import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
-import { installFor } from "../platforms/registry.js";
+import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -169,21 +169,18 @@ export function renderBleNusOption(
 }
 
 /**
- * The platform's own in-app flasher row (nRF52 DFU, Pico, RTL8720C). With Web
- * Serial it flashes here; on an insecure origin a flasher that can hand off
- * sends its firmware to web.esphome.io instead, with ``handoffDesc`` in place
- * of the in-app copy. No row for a chip the flasher does not write.
+ * A platform flasher's row (nRF52 DFU, Pico, RTL8720C). With Web Serial it
+ * flashes here; on an insecure origin a flasher that can hand off sends its
+ * firmware to web.esphome.io instead, with ``handoffDesc`` in place of the
+ * in-app copy.
  */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,
-  platform: string | null | undefined,
-  mcu: string | null,
+  install: AnyBrowserInstall | undefined,
   hasWebSerial: boolean,
   handoffDesc?: TemplateResult | string
 ): TemplateResult | typeof nothing {
-  if (ctx.mode === "logs") return nothing;
-  const install = installFor(platform, mcu);
-  if (!install) return nothing;
+  if (ctx.mode === "logs" || !install) return nothing;
   const viaHandoff = handoffDesc !== undefined && install.handoff !== undefined;
   if (!hasWebSerial && !viaHandoff) return nothing;
   return renderMethodRow({
@@ -251,6 +248,12 @@ function serverSerialCopyKeys(env: DeploymentEnvironment): {
   }
 }
 
+/** The address typed into the OTA override card, null while it names none. */
+export function otaAddressOf(value: string): string | null {
+  const address = value.trim();
+  return address.length > 0 && address !== OTA_PORT ? address : null;
+}
+
 /**
  * OTA address-override card. Header row mirrors the other .option cards
  * (icon + title + description) and the chevron toggles an inline form INSIDE
@@ -266,8 +269,7 @@ export function renderOtaAddressCard(card: {
   onInput: (value: string) => void;
   onSubmit: () => void;
 }): TemplateResult {
-  const trimmed = card.value.trim();
-  const canSubmit = trimmed.length > 0 && trimmed !== OTA_PORT;
+  const canSubmit = otaAddressOf(card.value) !== null;
   return html`
     <div class="option-collapsible">
       <button

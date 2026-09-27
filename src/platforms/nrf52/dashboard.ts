@@ -16,7 +16,7 @@ export * from "./dfu-install.js";
 export const nrf52Platform: PlatformSupport = {
   id: "nrf52",
   matches: isNrfPlatform,
-  install: nrfDfuInstall,
+  installs: [nrfDfuInstall],
   logs: {
     serial: NRF52_SERIAL_LOGS,
     ble: {
