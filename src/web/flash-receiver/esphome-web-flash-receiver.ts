@@ -242,6 +242,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._resetForRetry();
     this._preparation.clear();
     if (!file) return;
+    // Said before the read, which takes a moment for a large file.
+    this._setState("connecting", this._localize("web.install.preparing"));
     let data: Uint8Array;
     try {
       data = new Uint8Array(await file.arrayBuffer());
@@ -254,7 +256,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     // A newer pick overtook this read.
     if (this._fileInput?.files?.[0] !== file) return;
-    this._setState("connecting", this._localize("web.install.preparing"));
     this._preparation.start({
       parts: [{ data, address: 0 }],
       erase: true,
@@ -391,6 +392,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       return this._hasOpener
         ? this._localize("web.flash.close_tab")
         : this._localize("command.done");
+    }
+    // A click then loads the chunk that did not load, and installs nothing.
+    if (this._preparation.state.kind === "retryable") {
+      return this._localize("command.retry");
     }
     return this._localize("web.flash.connect_install");
   }

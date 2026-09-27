@@ -233,6 +233,8 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._statusMessage).toBe("firmware.engine_load_failed");
     expect(preparation(el)).toBe("retryable");
     expect(primaryButton(el).disabled).toBe(false);
+    // The button says what the click does: it loads again, it does not install.
+    expect(primaryButton(el).textContent?.trim()).toBe("command.retry");
     // The click that loads again does not open the picker: the fetch may
     // use up its user activation.
     await (el as any)._onPrimary();
@@ -241,6 +243,7 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.load.esp).toHaveBeenCalledTimes(3);
     expect((el as any)._state).toBe("connecting");
     expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+    expect(primaryButton(el).textContent?.trim()).toBe("web.flash.connect_install");
     await (el as any)._onPrimary();
     expect(requestPort).toHaveBeenCalledOnce();
     expect(engines.esp.run).toHaveBeenCalledOnce();
@@ -334,6 +337,27 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(preparation(el)).toBe("idle");
     expect((el as any)._statusMessage).toBe("web.flash.invalid_image");
     expect(primaryButton(el).disabled).toBe(true);
+  });
+
+  it("says it is preparing while a picked file is still being read", async () => {
+    let read!: (bytes: ArrayBuffer) => void;
+    const el = await mountReceiver(null);
+    const file = {
+      arrayBuffer: () =>
+        new Promise<ArrayBuffer>((resolve) => {
+          read = resolve;
+        }),
+    };
+    Object.defineProperty(el, "_fileInput", { value: { files: [file] } });
+    const picked = (el as any)._onFileChange();
+    await el.updateComplete;
+    expect((el as any)._statusMessage).toBe("web.install.preparing");
+    expect(primaryButton(el).disabled).toBe(true);
+    expect(engines.esp.prepare).not.toHaveBeenCalled();
+    read(new ArrayBuffer(4));
+    await picked;
+    await settled(el);
+    expect(primaryButton(el).disabled).toBe(false);
   });
 
   it("names a picked file that is not firmware when it is picked", async () => {
