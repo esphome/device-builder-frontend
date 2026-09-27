@@ -52,7 +52,10 @@ describe("rtlAmbz2ReceiverEngine", () => {
         false,
         localize
       )
-    ).toEqual({ error: "firmware.rtl_bad_uf2 (not a single UF2 part)" });
+    ).toEqual({
+      error: "firmware.rtl_bad_uf2 (not a single UF2 part)",
+      retryable: false,
+    });
     expect(rtl.loadAmbz2Image).not.toHaveBeenCalled();
   });
 
@@ -63,6 +66,16 @@ describe("rtlAmbz2ReceiverEngine", () => {
     });
     expect(await rtlAmbz2ReceiverEngine.prepare(uf2, false, localize)).toEqual({
       error: "firmware.rtl_wrong_family (family 0x22e0d6fc)",
+      retryable: false,
+    });
+    // The parser chunk did not load: the same bytes can be checked again.
+    rtl.loadAmbz2Image.mockResolvedValue({
+      key: "firmware.engine_load_failed",
+      detail: "Failed to fetch",
+    });
+    expect(await rtlAmbz2ReceiverEngine.prepare(uf2, false, localize)).toEqual({
+      error: "firmware.engine_load_failed (Failed to fetch)",
+      retryable: true,
     });
   });
 

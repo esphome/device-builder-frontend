@@ -248,6 +248,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     } catch (err) {
       // The file changed or went away after it was picked.
       console.error("[flash receiver] Could not read the picked file:", err);
+      if (this._fileInput?.files?.[0] !== file) return;
       this._setState("error", this._localize("web.flash.choose_file"));
       return;
     }
@@ -272,7 +273,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       await this._runInstall(preparation.run);
       return;
     }
-    // The engine did not load earlier; load it again. The install is offered
+    if (preparation.kind !== "retryable") return;
+    // A chunk did not load earlier; load it again. The install is offered
     // once that is done, on a click of its own.
     this._setState("connecting", this._localize("web.install.preparing"));
     this._preparation.retry();

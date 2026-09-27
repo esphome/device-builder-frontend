@@ -36,7 +36,9 @@ const engines = vi.hoisted(() => {
         async (
           _parts: unknown,
           _erase: boolean
-        ): Promise<{ run: typeof run } | { error: string }> => ({ run })
+        ): Promise<{ run: typeof run } | { error: string; retryable?: boolean }> => ({
+          run,
+        })
       ),
     };
   };
@@ -173,6 +175,46 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.rtl.prepare).toHaveBeenCalledOnce();
     expect(requestPort).not.toHaveBeenCalled();
     expect((el as any)._busy).toBe(false);
+    // The click changed nothing: the card still names the bad image.
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toContain("firmware.rtl_bad_uf2");
+  });
+
+  it("checks the image again after a chunk its check needs did not load", async () => {
+    engines.rtl.prepare.mockResolvedValueOnce({
+      error: "firmware.engine_load_failed (Failed to fetch)",
+      retryable: true,
+    });
+    const { el } = await handOff({ flasher: "rtl-ambz2" }, false);
+    expect((el as any)._state).toBe("error");
+    expect(preparation(el)).toBe("retryable");
+    expect(primaryButton(el).disabled).toBe(false);
+    await (el as any)._onPrimary();
+    await settled(el);
+    expect(engines.rtl.prepare).toHaveBeenCalledTimes(2);
+    expect(preparation(el)).toBe("ready");
+  });
+
+  it("leaves a newer pick's status alone when an overtaken file fails to read", async () => {
+    let failFirst!: (err: Error) => void;
+    const el = await mountReceiver(null);
+    const files = [
+      {
+        arrayBuffer: () =>
+          new Promise<ArrayBuffer>((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      },
+    ];
+    Object.defineProperty(el, "_fileInput", { value: { files } });
+    const firstPick = (el as any)._onFileChange();
+    files[0] = { arrayBuffer: async () => new ArrayBuffer(8) };
+    await (el as any)._onFileChange();
+    await settled(el);
+    failFirst(new Error("NotReadableError"));
+    await firstPick;
+    expect(preparation(el)).toBe("ready");
+    expect((el as any)._state).toBe("idle");
   });
 
   it("names the image, not the network, when an engine throws while checking it", async () => {

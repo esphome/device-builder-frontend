@@ -24,7 +24,7 @@ export type PreparationState =
   | { kind: "pending" }
   /** Checked and ready: the run holds what it writes. */
   | { kind: "ready"; run: ReceiverRun }
-  /** The engine did not load; the input is kept to try again. */
+  /** A chunk did not load; the input is kept to try again. */
   | { kind: "retryable"; input: PreparationInput };
 
 type Outcome =
@@ -72,7 +72,7 @@ export class ReceiverPreparation {
     });
   }
 
-  /** Run a preparation whose engine did not load again. */
+  /** Run a preparation that a chunk failed to load for again. */
   retry(): void {
     if (this.state.kind === "retryable") this.start(this.state.input);
   }
@@ -99,7 +99,8 @@ export class ReceiverPreparation {
     }
     try {
       const plan = await engine.prepare(input.parts, input.erase, localize);
-      if ("error" in plan) return { error: plan.error, retryable: false };
+      if ("error" in plan)
+        return { error: plan.error, retryable: plan.retryable === true };
       return { run: plan.run, logs: engine.logs };
     } catch (err) {
       // An engine broke its never-throws contract: name the image, not the network.
