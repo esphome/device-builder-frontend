@@ -208,6 +208,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     try {
       // A cache hit: the engine loaded when the image was parsed.
       engine = await loadSmpEngine();
+      // Closed while the engine loaded: the device is not to be touched.
+      if (abort.signal.aborted) return;
       await flash(engine, target, prepared.value, {
         signal: abort.signal,
         onProgress: (percent) => {

@@ -154,6 +154,25 @@ describe.each(TRANSPORTS)(
       expect(el._state).toBe("idle");
     });
 
+    it("does not start once the dialog closed while the tools loaded", async () => {
+      const el = await mountDialog();
+      let loaded!: () => void;
+      mocks.loadSmpEngine.mockImplementation(async () => {
+        await new Promise<void>((resolve) => (loaded = resolve));
+        return mocks.loadRealSmpEngine();
+      });
+
+      const update = el[run]();
+      await vi.waitFor(() => expect(el._state).toBe("flashing"));
+      el.open = false;
+      await el.updateComplete;
+      loaded();
+      await update;
+
+      expect(flash).not.toHaveBeenCalled();
+      expect(el._state).toBe("idle");
+    });
+
     it("names a device that never answers as one without the serial transport", async () => {
       const el = await mountDialog();
       flash.mockRejectedValue(
