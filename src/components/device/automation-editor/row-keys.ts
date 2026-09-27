@@ -19,13 +19,14 @@ export class RowKeys<T extends object> {
    * the key its index had. Anything else is a new row.
    */
   keysFor(items: readonly T[]): readonly number[] {
-    const previous = new Map<T, number>();
-    this._items.forEach((item, i) => previous.set(item, this._keys[i]));
-    const kept = items.map((item) => {
-      const key = previous.get(item);
-      previous.delete(item);
-      return key;
+    // One object can be listed more than once, so each holds a queue.
+    const previous = new Map<T, number[]>();
+    this._items.forEach((item, i) => {
+      const held = previous.get(item);
+      if (held) held.push(this._keys[i]);
+      else previous.set(item, [this._keys[i]]);
     });
+    const kept = items.map((item) => previous.get(item)?.shift());
     const taken = new Set(kept);
     this._keys = kept.map((key, i) => {
       if (key !== undefined) return key;

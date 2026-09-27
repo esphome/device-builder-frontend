@@ -83,6 +83,13 @@ describe("RowKeys", () => {
     expect(keysOf(keys, rows)).toEqual([a, b, c]);
   });
 
+  it("keeps both keys of an object listed twice when asked again", () => {
+    const keys = new RowKeys<Row>();
+    const twin = row("twin");
+    const first = keysOf(keys, [twin, twin]);
+    expect(keysOf(keys, [twin, twin])).toEqual(first);
+  });
+
   it("keys the same object listed twice as two rows", () => {
     const keys = new RowKeys<Row>();
     const twin = row("twin");
