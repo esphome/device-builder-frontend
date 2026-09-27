@@ -250,6 +250,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       return;
     }
     const id = ++this._hydrateId;
+    // Held while there is no tree yet: an edit would write an empty one.
+    if (this.value === null && !this.addMode) this._hydrating = true;
     const { configuration, yaml } = this;
     // A newer parse replaced this one, or the YAML was edited since and this
     // is a reload: the tree on screen waits for the reload of that edit, or
@@ -311,8 +313,6 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     super.connectedCallback();
     // Attached again after a detach that dropped its tree.
     if (this.hasUpdated && !this.addMode && this.value === null && !this._loading) {
-      // Held meanwhile: an edit would write an empty tree.
-      this._hydrating = true;
       void this._hydrateFromBackend();
     }
   }
