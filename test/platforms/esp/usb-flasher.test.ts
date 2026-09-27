@@ -290,6 +290,39 @@ describe("openFlasher", () => {
     teardown();
   });
 
+  it("hands a Pico UF2 to a receiver that lists its flasher, and to no other", () => {
+    const pico = { flasher: "rp2-picoboot", erase: false } as const;
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const declined = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.uf2", "pico", pico, declined);
+    // web.esphome.io before the Pico engine.
+    emit(fakeWin, {
+      type: "esphome-web-flash:ready",
+      version: 1,
+      flashers: ["esp", "rtl-ambz2"],
+    });
+    expect(declined.reasons).toEqual(["flasher"]);
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+
+    const teardown = openFlasher(
+      new ArrayBuffer(8),
+      "f.uf2",
+      "pico",
+      pico,
+      makeCallbacks()
+    )!;
+    emit(fakeWin, {
+      type: "esphome-web-flash:ready",
+      version: 1,
+      flashers: ["esp", "rtl-ambz2", "rp2-picoboot"],
+    });
+    const [msg] = fakeWin.postMessage.mock.calls[0];
+    expect(msg.flasher).toBe("rp2-picoboot");
+    expect(msg.erase).toBe(false);
+    teardown();
+  });
+
   it("declines an RTL8720C hand-off to an older receiver that lists no flashers", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);

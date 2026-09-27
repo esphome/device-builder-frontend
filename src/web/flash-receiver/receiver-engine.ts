@@ -24,6 +24,8 @@ export interface ReceiverNote {
 /** A finished write: what is left to do by hand, and where its logs are. */
 export interface ReceiverResult {
   note?: ReceiverNote;
+  /** The line for a finish that is not an install, in place of the receiver's. */
+  message?: string;
   /** Absent: no logs follow. */
   logs?: ReceiverLogs;
 }
@@ -47,6 +49,35 @@ export type ReceiverRun = (
 ) => Promise<ReceiverResult | "dismissed" | null>;
 
 /**
+ * A step ahead of the install on a click of its own, for a board that has to
+ * be put into its bootloader first. Opens its own chooser like the run, and
+ * ends like it: ``"dismissed"``, or null with what happened on the hooks.
+ * Never throws.
+ */
+export interface ReceiverStep {
+  label: string;
+  run: (hooks: ReceiverRunHooks) => Promise<"dismissed" | null>;
+}
+
+/** A checked image, ready to install from a click. */
+export interface ReceiverPlan {
+  run: ReceiverRun;
+  before?: ReceiverStep;
+  /** What to do with the board, in place of the receiver's own hint. */
+  hint?: string;
+  /** The install button's label, in place of the receiver's own. */
+  primaryLabel?: string;
+}
+
+/**
+ * The bytes of a hand-off that is one UF2 whole, as one part at address 0;
+ * undefined for anything else.
+ */
+export function singleUf2Part(parts: FlashPart[]): Uint8Array | undefined {
+  return parts.length === 1 && parts[0].address === 0 ? parts[0].data : undefined;
+}
+
+/**
  * What the flash receiver needs from a flasher: check the hand-off's bytes
  * are its kind of image and plan the write, before the user picks a device,
  * so the click goes straight to the chooser. One per hand-off flasher id,
@@ -65,7 +96,7 @@ export interface ReceiverEngine {
     parts: FlashPart[],
     erase: boolean,
     localize: LocalizeFunc
-  ): Promise<{ run: ReceiverRun } | { error: string; retryable?: boolean }>;
+  ): Promise<ReceiverPlan | { error: string; retryable?: boolean }>;
 }
 
 /**
@@ -77,4 +108,6 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/esp/receiver-engine.js")).espReceiverEngine,
   "rtl-ambz2": async () =>
     (await import("../platforms/rtl87xx/receiver-engine.js")).rtlAmbz2ReceiverEngine,
+  "rp2-picoboot": async () =>
+    (await import("../platforms/rp2/receiver-engine.js")).rp2PicobootReceiverEngine,
 };

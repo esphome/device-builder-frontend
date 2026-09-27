@@ -268,7 +268,7 @@ describe("install-method-dialog platform gating", () => {
 
   // The HA add-on over plain http: Web Serial exists but is blocked here, so
   // the RTL8720C row hands the UF2 to web.esphome.io, as the ESP USB row does.
-  it("offers the RTL8720C hand-off on an insecure origin, and nothing for a Pico there", async () => {
+  it("offers the RTL8720C and the Pico hand-off on an insecure origin", async () => {
     // The browser hides navigator.serial on an insecure origin.
     setWebSerialEnv({
       serial: false,
@@ -288,9 +288,10 @@ describe("install-method-dialog platform gating", () => {
     ) as HTMLElement;
     row.click();
     expect(selected).toEqual(["web-flash"]);
-    expect(hasRp2Row(await mount("rp2"))).toBe(false);
-    // The hand-off row is the same row: not for the RTL8710B.
+    expect(hasRp2Row(await mount("rp2"))).toBe(true);
+    // The hand-off row is the same row: not for the RTL8710B or the RP2350.
     expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
+    expect(hasRp2Row(await mount("rp2", "install", "rp2350"))).toBe(false);
   });
 });
 
