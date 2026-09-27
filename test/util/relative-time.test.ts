@@ -162,6 +162,14 @@ describe("formatDuration", () => {
     expect(formatDuration(86400 + 3600, { variant: "counter" })).toBe("25h 00m");
   });
 
+  it("keeps only the leading unit with units: 1", () => {
+    expect(formatDuration(45, { units: 1 })).toBe("45s");
+    expect(formatDuration(8 * 60 + 30, { units: 1 })).toBe("8m");
+    expect(formatDuration(5 * 3600 + 15 * 60, { units: 1 })).toBe("5h");
+    expect(formatDuration(9 * 86400 + 3 * 3600, { units: 1 })).toBe("9d");
+    expect(formatDuration(400 * 86400, { units: 1, nowMs: MID_2027 })).toBe("1y");
+  });
+
   it("switches the compact variant to calendar years", () => {
     // 2026-06-15 to 2027-06-15 crosses no leap day: 365 days.
     expect(formatDuration(365 * 86400, { nowMs: MID_2027 })).toBe("1y");

@@ -193,7 +193,8 @@ function calendarYears(seconds: number, nowMs: number): { years: number; days: n
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
  * / ``2d 3h`` / ``1y 35d`` (zero minor unit dropped: ``1h``, ``2d``,
- * ``1y``; years are calendar years back from *nowMs*). The ``counter``
+ * ``1y``; years are calendar years back from *nowMs*), or the leading
+ * unit alone with ``units: 1`` (``1h`` / ``2d`` / ``1y``). The ``counter``
  * variant is for a live ticking readout: seconds kept in the minute range
  * (``4m 32s``) and hour-range minutes zero-padded (``1h 05m``, stable width
  * per minute tick).
@@ -206,7 +207,13 @@ export function formatDuration(
     variant = "compact",
     language,
     nowMs = Date.now(),
-  }: { variant?: "counter" | "compact"; language?: string; nowMs?: number } = {}
+    units = 2,
+  }: {
+    variant?: "counter" | "compact";
+    language?: string;
+    nowMs?: number;
+    units?: 1 | 2;
+  } = {}
 ): string {
   const total = Math.max(0, Math.floor(seconds));
   const fmt = getNumberFormatter(language, 0);
@@ -218,7 +225,7 @@ export function formatDuration(
     return `${fmt.format(Math.floor(total / 3600))}h ${padded}m`;
   }
   const pair = (major: number, unit: string, minor: number, minorUnit: string) =>
-    minor > 0
+    units === 2 && minor > 0
       ? `${fmt.format(major)}${unit} ${fmt.format(minor)}${minorUnit}`
       : `${fmt.format(major)}${unit}`;
   if (total < 3600) return `${fmt.format(minutes)}m`;

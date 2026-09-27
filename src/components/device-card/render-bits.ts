@@ -132,7 +132,7 @@ export function offlineDurationLabel(card: ESPHomeDeviceCard): string | null {
   const seconds = offlineSeconds(card.state, card.nameAddMacSuffix, card.offlineSince);
   if (seconds === null || jobBadgeShown(card)) return null;
   return card._localize("dashboard.offline_for", {
-    duration: formatDuration(seconds, { language: activeLocale() }),
+    duration: formatDuration(seconds, { language: activeLocale(), units: 1 }),
   });
 }
 

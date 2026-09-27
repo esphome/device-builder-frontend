@@ -33,6 +33,15 @@ describe("device-card offline duration", () => {
     expect(badgeText(el)).toContain("2h");
   });
 
+  it("shows only the leading unit", async () => {
+    const el = await mount({
+      _localize: argsLocalize,
+      state: DeviceState.OFFLINE,
+      offlineSince: nowSeconds() - (5 * 3600 + 15 * 60),
+    });
+    expect(badgeText(el)).toBe("dashboard.offline_for | 5h");
+  });
+
   it("stays a bare label when the backend has no anchor", async () => {
     const el = await mount({
       _localize: argsLocalize,
