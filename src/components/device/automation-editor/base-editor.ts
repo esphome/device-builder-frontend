@@ -297,7 +297,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       if (outdated()) return;
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-      // The hold stays: the tree is still from before the edit.
+      // The hold stays: the tree is still from before the edit. A YAML
+      // broken mid edit fails here, and the next edit reads again.
       return;
     }
     // Not for a YAML edited again since: its own reload is still to come.

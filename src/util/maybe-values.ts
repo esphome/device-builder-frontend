@@ -15,7 +15,7 @@
  */
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
-import { isPlainObject } from "./nested-values.js";
+import { isMappingValue } from "./nested-values.js";
 
 /**
  * Expand maybe_simple_value shorthands in *values* against *entries*.
@@ -38,15 +38,6 @@ export function normalizeMaybeValues(
 function isScalarValue(value: unknown): boolean {
   const t = typeof value;
   return t === "string" || t === "number" || t === "boolean" || t === "bigint";
-}
-
-/** A parsed YAML mapping. Stricter than isPlainObject: class instances
- *  (YamlRawValue and friends) must pass through untouched, or the
- *  renderers' raw-block bail-outs stop seeing them. */
-function isMappingValue(value: unknown): value is Record<string, unknown> {
-  if (!isPlainObject(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
 }
 
 function cloneContainer(source: Record<string, unknown>): Record<string, unknown> {
