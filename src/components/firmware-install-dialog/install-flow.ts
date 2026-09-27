@@ -305,6 +305,7 @@ export function waitForRunningJob(
   jobId: string,
   failKey = "firmware.download_failed"
 ): Promise<boolean> {
+  const stillCurrent = runGuard(host);
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
     const follow = (): void => {
@@ -323,7 +324,7 @@ export function waitForRunningJob(
         onError: () => {
           host._streamId = "";
           host._compileReject = null;
-          host._fail(host._localize(failKey));
+          if (stillCurrent()) host._fail(host._localize(failKey));
           resolve(false);
         },
         onConnectionLost: () => {
@@ -337,7 +338,7 @@ export function waitForRunningJob(
             },
             giveUp: () => {
               host._compileReject = null;
-              host._fail(host._localize(failKey));
+              if (stillCurrent()) host._fail(host._localize(failKey));
               resolve(false);
             },
           });

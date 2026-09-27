@@ -513,12 +513,33 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
       released: true,
     },
     {
+      name: "the image listing",
+      arm: ({ host, api }: Made) =>
+        api.firmwareGetBinaries.mockImplementationOnce(async () => {
+          dismiss(host);
+          return [{ title: "Factory", file: "firmware.factory.bin" }];
+        }),
+      released: true,
+    },
+    {
       name: "the image listing, which then finds none",
       arm: ({ host, api }: Made) =>
         api.firmwareGetBinaries.mockImplementationOnce(async () => {
           dismiss(host);
           return [];
         }),
+      released: true,
+    },
+    {
+      name: "the wait for a build someone else started",
+      arm: ({ host, api }: Made) => {
+        host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
+        api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+          dismiss(host);
+          cbs.onError("stream lost");
+          return "s1";
+        });
+      },
       released: true,
     },
     {
@@ -529,6 +550,7 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
           return new Uint8Array([1]).buffer;
         }),
       released: true,
+      downloads: true,
     },
     {
       name: "a download that then fails",
@@ -538,19 +560,25 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
           throw new Error("boom");
         }),
       released: true,
+      downloads: true,
     },
-  ])("stands down quietly when dismissed during $name", async ({ arm, released }) => {
-    const made = ready();
-    arm(made);
+  ])(
+    "stands down quietly when dismissed during $name",
+    async ({ arm, released, downloads }) => {
+      const made = ready();
+      arm(made);
 
-    await run(made.host);
+      await run(made.host);
 
-    expect(esptool.flashFirmware).not.toHaveBeenCalled();
-    expect(made.host._fail).not.toHaveBeenCalled();
-    expect(made.host._close).not.toHaveBeenCalled();
-    if (released) expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
-    else expect(esptool.disconnect).not.toHaveBeenCalled();
-  });
+      expect(esptool.flashFirmware).not.toHaveBeenCalled();
+      expect(made.host._fail).not.toHaveBeenCalled();
+      expect(made.host._close).not.toHaveBeenCalled();
+      // A dismissal before the download never starts one.
+      if (!downloads) expect(made.api.firmwareDownloadBytes).not.toHaveBeenCalled();
+      if (released) expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+      else expect(esptool.disconnect).not.toHaveBeenCalled();
+    }
+  );
 
   it("does not mark a reopened dialog with a chip mismatch found for the run before", async () => {
     const { host, api } = ready();
