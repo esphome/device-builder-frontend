@@ -9,6 +9,6 @@ export * from "./uf2-install.js";
 export const rp2Platform: PlatformSupport = {
   id: "rp2",
   matches: isRp2Platform,
-  install: rp2Uf2Install,
+  installs: [rp2Uf2Install],
   logs: { serial: RP2_SERIAL_LOGS },
 };

@@ -53,6 +53,10 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.target_platform ?? "";
   }
 
+  get deviceMcu(): string | null {
+    return this._host.device?.mcu ?? null;
+  }
+
   get deviceCurrentAddress(): string {
     return this._host.device?.ip || this._host.device?.address || "";
   }

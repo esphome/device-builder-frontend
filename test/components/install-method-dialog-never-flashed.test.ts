@@ -23,6 +23,7 @@ async function mount(opts: {
   neverFlashed?: boolean;
   state?: DeviceState;
   platform?: string;
+  mcu?: string;
   mode?: "install" | "logs";
 }): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
@@ -31,6 +32,7 @@ async function mount(opts: {
   dialog.neverFlashed = opts.neverFlashed ?? false;
   dialog.deviceState = opts.state ?? DeviceState.UNKNOWN;
   dialog.deviceTargetPlatform = opts.platform ?? "esp32";
+  dialog.deviceMcu = opts.mcu ?? null;
   dialog.mode = opts.mode ?? "install";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
@@ -79,14 +81,14 @@ describe("install-method-dialog never-flashed ordering", () => {
   });
 
   it("promotes the RTL8720C row for a never-flashed rtl87xx", async () => {
-    const d = await mount({ neverFlashed: true, platform: "rtl87xx" });
+    const d = await mount({ neverFlashed: true, platform: "rtl87xx", mcu: "rtl8720c" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("chip");
     expect(order[order.length - 1]).toBe("wifi");
   });
 
   it("promotes the Pico row for a never-flashed rp2", async () => {
-    const d = await mount({ neverFlashed: true, platform: "rp2" });
+    const d = await mount({ neverFlashed: true, platform: "rp2", mcu: "rp2040" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("chip");
     expect(order[order.length - 1]).toBe("wifi");

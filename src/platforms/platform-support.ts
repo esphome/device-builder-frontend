@@ -71,6 +71,13 @@ export interface BrowserInstall<Id extends FlasherId> {
   readonly id: Id;
   /** Method row copy: ``dashboard.install_method_<key>`` and its ``_desc``. */
   readonly methodKey: string;
+  /**
+   * The chips this flasher writes, as the device's ``mcu``, on a platform
+   * that is more than one chip (``rtl87xx`` is also the RTL8710B). It is
+   * offered only to a device whose chip is one of them, so not to a chip
+   * that is unknown. Absent: the platform is one chip.
+   */
+  readonly chips?: readonly string[];
   /** The flash leaves a port the logs can reopen (the show-logs toggle). */
   readonly holdsPort: boolean;
   /** Where the flow keeps its parsed image; Retry skips the compile while it holds one. */
@@ -125,7 +132,8 @@ export interface PlatformSupport {
   /** The platform key, e.g. ``rp2``. */
   readonly id: string;
   matches(targetPlatform: string | null | undefined): boolean;
-  readonly install?: AnyBrowserInstall;
+  /** The platform's flashers; more than one where its chips need their own. */
+  readonly installs?: readonly AnyBrowserInstall[];
   readonly logs?: PlatformLogs;
 }
 

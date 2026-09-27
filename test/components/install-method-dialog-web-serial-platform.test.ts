@@ -30,6 +30,7 @@ import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { BRAVE_WEB_BLUETOOTH_FLAG } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { platformFor } from "../../src/platforms/registry.js";
 import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
 import {
   restoreWebSerialEnv,
@@ -40,15 +41,22 @@ import {
 } from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// The chip a device reports (``Device.mcu``) when its platform's flasher
+// writes it; ``null`` for a platform that is one chip.
+const flashableChip = (platform: string): string | null =>
+  platformFor(platform)?.installs?.[0]?.chips?.[0] ?? null;
+
 async function mount(
   platform: string,
-  mode: "install" | "logs" = "install"
+  mode: "install" | "logs" = "install",
+  mcu: string | null = flashableChip(platform)
 ): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {};
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = platform;
+  dialog.deviceMcu = mcu;
   dialog.mode = mode;
   dialog.open = true;
   document.body.appendChild(dialog);
@@ -114,10 +122,30 @@ describe("install-method-dialog platform gating", () => {
 
   // The Pico row needs only Web Serial (for the 1200-baud reset); WebUSB
   // decides the write button inside the dialog, not the row.
-  it.each(["rp2", "rp2040", "rp2350"])("shows the Pico row for %s", async (platform) => {
+  it.each(["rp2", "rp2040"])("shows the Pico row for %s", async (platform) => {
     const d = await mount(platform);
     expect(hasRp2Row(d)).toBe(true);
     expect(hasNrfDfuRow(d)).toBe(false);
+  });
+
+  // One platform, two chips: the row is for the chip the flasher writes, and
+  // a chip the backend could not name is not offered it.
+  it.each([
+    ["rp2", "rp2350"],
+    ["rp2", null],
+  ])("hides the Pico row for %s with chip %s", async (platform, mcu) => {
+    const d = await mount(platform, "install", mcu);
+    expect(hasRp2Row(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  it.each([
+    ["rtl87xx", "rtl8710b"],
+    ["rtl87xx", null],
+  ])("hides the RTL8720C row for %s with chip %s", async (platform, mcu) => {
+    const d = await mount(platform, "install", mcu);
+    expect(hasRtlRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
   });
 
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
@@ -176,6 +204,8 @@ describe("install-method-dialog platform gating", () => {
     row.click();
     expect(selected).toEqual(["web-flash"]);
     expect(hasRp2Row(await mount("rp2"))).toBe(false);
+    // The hand-off row is the same row: not for the RTL8710B.
+    expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
   });
 });
 

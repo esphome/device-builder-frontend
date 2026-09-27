@@ -132,6 +132,8 @@ const RTL_AMBZ2_HANDOFF: HandoffSpec = {
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   id: "rtl-ambz2",
   methodKey: "rtl_ambz2",
+  // The RTL8710B (AmebaZ) is the same platform and another ROM protocol.
+  chips: ["rtl8720c"],
   // The logs reopen the flash's port (Show logs on Done, the after-install toggle).
   holdsPort: true,
   image: rtlImage,

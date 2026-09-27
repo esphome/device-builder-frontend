@@ -30,6 +30,12 @@ import { nextIdFor } from "./seed-identity.js";
 // back recovers it (mirrors the templatable literal/lambda stash).
 const _enableStashes = new WeakMap<object, Map<string, Record<string, unknown>>>();
 
+/** Forget every stashed sub-reading of *owner*'s fields; see
+ *  ``clearTemplatableStash``. */
+export function clearEnableStash(owner: object): void {
+  _enableStashes.delete(owner);
+}
+
 function _enableStash(ctx: RenderCtx): Map<string, Record<string, unknown>> {
   let m = _enableStashes.get(ctx.stashOwner);
   if (!m) {

@@ -5,12 +5,13 @@
  */
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../api/types/devices.js";
+import { OTA_PORT } from "../api/types/streaming.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
-import { platformFor } from "../platforms/registry.js";
+import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -168,20 +169,18 @@ export function renderBleNusOption(
 }
 
 /**
- * The platform's own in-app flasher row (nRF52 DFU, Pico, RTL8720C). With Web
- * Serial it flashes here; on an insecure origin a flasher that can hand off
- * sends its firmware to web.esphome.io instead (``web-flash:<id>``), with
- * ``handoffDesc`` in place of the in-app copy.
+ * A platform flasher's row (nRF52 DFU, Pico, RTL8720C). With Web Serial it
+ * flashes here; on an insecure origin a flasher that can hand off sends its
+ * firmware to web.esphome.io instead, with ``handoffDesc`` in place of the
+ * in-app copy.
  */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,
-  platform: string | null | undefined,
+  install: AnyBrowserInstall | undefined,
   hasWebSerial: boolean,
   handoffDesc?: TemplateResult | string
 ): TemplateResult | typeof nothing {
-  if (ctx.mode === "logs") return nothing;
-  const install = platformFor(platform)?.install;
-  if (!install) return nothing;
+  if (ctx.mode === "logs" || !install) return nothing;
   const viaHandoff = handoffDesc !== undefined && install.handoff !== undefined;
   if (!hasWebSerial && !viaHandoff) return nothing;
   return renderMethodRow({
@@ -247,4 +246,88 @@ function serverSerialCopyKeys(env: DeploymentEnvironment): {
         desc: "dashboard.install_method_usb_server_desc",
       };
   }
+}
+
+/** The address typed into the OTA override card, null while it names none. */
+export function otaAddressOf(value: string): string | null {
+  const address = value.trim();
+  return address.length > 0 && address !== OTA_PORT ? address : null;
+}
+
+/**
+ * OTA address-override card. Header row mirrors the other .option cards
+ * (icon + title + description) and the chevron toggles an inline form INSIDE
+ * the same card, so the address input lives within the card's outline rather
+ * than dangling below as a separate panel.
+ */
+export function renderOtaAddressCard(card: {
+  localize: LocalizeFunc;
+  mode: "install" | "logs";
+  expanded: boolean;
+  value: string;
+  onToggle: () => void;
+  onInput: (value: string) => void;
+  onSubmit: () => void;
+}): TemplateResult {
+  const canSubmit = otaAddressOf(card.value) !== null;
+  return html`
+    <div class="option-collapsible">
+      <button
+        type="button"
+        class="option-collapsible__header"
+        aria-expanded=${card.expanded ? "true" : "false"}
+        aria-controls=${card.expanded ? "ota-address-form" : nothing}
+        @click=${card.onToggle}
+      >
+        <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+        <div class="info">
+          <span class="title" id="ota-address-title"
+            >${card.localize("dashboard.install_method_network_address_label")}</span
+          >
+          <span class="desc"
+            >${card.localize("dashboard.install_method_network_address_desc")}</span
+          >
+        </div>
+        <wa-icon
+          class="option-chevron"
+          library="mdi"
+          name=${card.expanded ? "chevron-up" : "chevron-down"}
+        ></wa-icon>
+      </button>
+      ${
+        card.expanded
+          ? html`
+              <div id="ota-address-form" class="option-collapsible__body">
+                <input
+                  class="ota-form-input"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="192.168.1.42"
+                  aria-labelledby="ota-address-title"
+                  .value=${card.value}
+                  @input=${(e: Event) => card.onInput((e.target as HTMLInputElement).value)}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" && canSubmit) card.onSubmit();
+                  }}
+                />
+                <div class="ota-form-actions">
+                  <button
+                    class="btn btn--primary"
+                    ?disabled=${!canSubmit}
+                    @click=${card.onSubmit}
+                  >
+                    ${card.localize(
+                      card.mode === "logs"
+                        ? "dashboard.logs_method_network_address_submit"
+                        : "dashboard.install_method_network_address_submit"
+                    )}
+                  </button>
+                </div>
+              </div>
+            `
+          : nothing
+      }
+    </div>
+  `;
 }

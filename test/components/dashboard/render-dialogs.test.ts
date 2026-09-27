@@ -3,7 +3,8 @@
  *
  * Pins renderDialogs' install-method dialog bindings: deviceState
  * comes from the selected device's runtime_state, falling back to
- * UNKNOWN when no device is set.
+ * UNKNOWN when no device is set, and the platform and the chip come
+ * from the device too.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -36,7 +37,11 @@ function renderInstallMethodDialog(device: ConfiguredDevice | null) {
   const container = renderInto(renderDialogs(host));
   const dialog = container.querySelector("esphome-install-method-dialog");
   expect(dialog).not.toBeNull();
-  return dialog as HTMLElement & { deviceState: DeviceState };
+  return dialog as HTMLElement & {
+    deviceState: DeviceState;
+    deviceTargetPlatform: string;
+    deviceMcu: string | null;
+  };
 }
 
 describe("renderDialogs install-method dialog", () => {
@@ -49,5 +54,14 @@ describe("renderDialogs install-method dialog", () => {
 
   it("falls back to UNKNOWN when no device is selected", () => {
     expect(renderInstallMethodDialog(null).deviceState).toBe(DeviceState.UNKNOWN);
+  });
+
+  it("binds the selected device's platform and chip, which pick the flash row", () => {
+    const dialog = renderInstallMethodDialog(
+      makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8720c" })
+    );
+    expect(dialog.deviceTargetPlatform).toBe("rtl87xx");
+    expect(dialog.deviceMcu).toBe("rtl8720c");
+    expect(renderInstallMethodDialog(null).deviceMcu).toBeNull();
   });
 });

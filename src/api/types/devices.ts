@@ -94,6 +94,12 @@ export interface ConfiguredDevice {
   area: string;
   board_id: string;
   target_platform: string;
+  /**
+   * Chip series on the platforms that lump several chips under one key
+   * (`rp2040` / `rp2350` on `rp2`, `rtl8710b` / `rtl8720c` on `rtl87xx`).
+   * `null` where the platform needs no split or the chip is unknown.
+   */
+  mcu: string | null;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */
   address: string;
   /** Primary resolved IP from mDNS — empty until the device is seen online.

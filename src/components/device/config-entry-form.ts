@@ -32,6 +32,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
+import { sameEntryTarget } from "../../util/config-entry-target.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
@@ -90,6 +91,7 @@ import {
   unitHasMaterialValue,
 } from "./config-entry-form-plan.js";
 import {
+  clearEnableStash,
   fieldRendererStyles,
   labelFor,
   renderBooleanField,
@@ -114,7 +116,10 @@ import {
 } from "./config-entry-renderers.js";
 import { renderConstraintBanners } from "./config-entry-renderers/constraint-banner-view.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
-import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
+import {
+  clearTemplatableStash,
+  renderTemplatableField,
+} from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
 import "./secret-picker.js";
 
@@ -167,7 +172,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   );
 
   /** Schema entries to render (recursive — NESTED entries contain
-   *  their own `config_entries`). */
+   *  their own `config_entries`). The form tells its target by these
+   *  objects (``sameEntryTarget``): pass the catalog's own entries, or
+   *  cache any built ones per target, since a copy made on each render
+   *  reads as a new target and drops what the user stashed. */
   @property({ attribute: false })
   entries: ConfigEntry[] = [];
 
@@ -640,7 +648,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // different component (e.g. the dep-flow detour swapping
     // ES7210 for i2c). Drop transient unit picks from the previous
     // shape so they don't bleed into unrelated paths.
-    if (changed.has("entries") && changed.get("entries") !== undefined) {
+    const previous = changed.get("entries") as ConfigEntry[] | undefined;
+    if (changed.has("entries") && previous !== undefined) {
+      // A stash holds what the user typed on the side they left, so it is
+      // dropped only for another target, not for the same one rebuilt.
+      if (!sameEntryTarget(previous, this.entries)) {
+        clearTemplatableStash(this);
+        clearEnableStash(this);
+      }
       this._pendingUnits.clear();
       this._editingMagnitudes.clear();
       this._openAdvancedPlacement.clear();

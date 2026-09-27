@@ -17,7 +17,10 @@ import {
 } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
-import { onEnableToggle } from "../../../src/components/device/config-entry-renderers/nested.js";
+import {
+  clearEnableStash,
+  onEnableToggle,
+} from "../../../src/components/device/config-entry-renderers/nested.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { getIn, setIn } from "../../../src/util/nested-values.js";
 import { findElementBindings, makeRenderCtx } from "./_renderer-fixtures.js";
@@ -225,6 +228,37 @@ describe("onEnableToggle", () => {
       ctx,
     });
     expect(ctx.emitChange).toHaveBeenLastCalledWith(["min_free"], configured);
+  });
+
+  it("seeds afresh once the owner's stash is cleared on a re-target", () => {
+    let values: Record<string, unknown> = { min_free: { name: "Custom" } };
+    const ctx = makeRenderCtx(
+      {},
+      {
+        overrides: {
+          emitChange: vi.fn((path: string[], value: unknown) => {
+            values = setIn(values, path, value);
+          }),
+          getAt: (path: string[]) => getIn(values, path),
+        },
+      }
+    );
+    const toggle = (checked: boolean) =>
+      onEnableToggle({
+        entry: makeSensorEntry(),
+        path: ["min_free"],
+        key: "min_free",
+        isOpen: true,
+        checked,
+        label: "Min Free",
+        ctx,
+      });
+
+    toggle(false);
+    clearEnableStash(ctx.stashOwner);
+    toggle(true);
+
+    expect(getIn(values, ["min_free"])).toEqual({ name: "Min Free" });
   });
 
   it("seeds a unique id when the group has no name field (#2459)", () => {

@@ -261,6 +261,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       ?open=${host._installMethodOpen}
       .deviceState=${host._installMethodDevice?.runtime_state.state ?? DeviceState.UNKNOWN}
       .deviceTargetPlatform=${host._installMethodDevice?.target_platform ?? ""}
+      .deviceMcu=${host._installMethodDevice?.mcu ?? null}
       .deviceCurrentAddress=${
         host._installMethodDevice?.ip || host._installMethodDevice?.address || ""
       }
