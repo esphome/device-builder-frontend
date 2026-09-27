@@ -67,7 +67,7 @@ describe("CodeMirrorEditorElement", () => {
     expect(el.container.querySelectorAll(".cm-editor").length).toBe(1);
   });
 
-  it("tears the view down once a disconnect has lasted past the task", async () => {
+  it("tears the view down once a disconnect outlasts the microtask checkpoint", async () => {
     const el = await mount(new TestCmEditor());
     el.remove();
     expect(el.view).not.toBeNull();
@@ -75,7 +75,7 @@ describe("CodeMirrorEditorElement", () => {
     expect(el.view).toBeNull();
   });
 
-  it("keeps the view, and what it holds, when the element is moved", async () => {
+  it("keeps the view, and what it holds, when the element is moved synchronously", async () => {
     const el = await mount(new TestCmEditor());
     const first = el.view!;
     first.dispatch({ changes: { from: 0, insert: "typed " } });

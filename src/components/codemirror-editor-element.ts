@@ -11,9 +11,9 @@ import { query } from "lit/decorators.js";
  * Subclasses keep their own styles, extensions, change events, and
  * theme/reconfigure strategy; the base never touches those.
  *
- * The view is torn down once the element has stayed detached past the
- * current task and mounted again when it comes back; an element that is
- * moved (a keyed list reordering its rows) keeps its view, with its undo
+ * The view is torn down once the element is still detached at the next
+ * microtask checkpoint and mounted again when it comes back; a synchronous
+ * move (a keyed list reordering its rows) keeps its view, with its undo
  * history, cursor and selection.
  */
 export abstract class CodeMirrorEditorElement extends LitElement {
