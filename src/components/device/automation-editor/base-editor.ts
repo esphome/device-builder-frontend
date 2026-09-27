@@ -101,16 +101,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   /** Counts the automations the parent has pointed this editor at. The
    *  editor is reused, so each one keys its body on this to start the
    *  next automation with fresh rows and forms. It advances when the new
-   *  tree lands, and not for a rename the editor wrote itself. */
+   *  tree lands. */
   protected _target = 0;
   private _retargeted = false;
-  private _ownLocation: L | null = null;
-
-  /** Rename what the editor edits, without counting as a new target. */
-  protected _relocate(location: L): void {
-    this._ownLocation = location;
-    this.location = location;
-  }
 
   /** Focus target for the current caret; none while a stale tree is shown. */
   protected _currentFocus() {
@@ -293,7 +286,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
         this._hydrating = true;
-        if (this.location !== this._ownLocation) this._retargeted = true;
+        this._retargeted = true;
       }
     }
     setHeld(this, this._hydrating);

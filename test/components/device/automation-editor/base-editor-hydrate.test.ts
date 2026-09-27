@@ -162,22 +162,6 @@ describe("base editor relocation hydrate", () => {
     expect(actionList(editor)).not.toBe(before);
   });
 
-  it("keeps its body through a rename the editor made itself", async () => {
-    const parse = vi.fn().mockResolvedValue([parsedScript("renamed")]);
-    const { editor } = await mountAt("a", parse);
-    const before = actionList(editor);
-
-    (editor as any)._onConfigFormValueChange(
-      new CustomEvent("value-change", { detail: { path: ["id"], value: "renamed" } })
-    );
-    await editor.updateComplete;
-    await flushMicrotasks(5);
-    await editor.updateComplete;
-
-    expect(editor.location).toEqual({ kind: "script", id: "renamed" });
-    expect(actionList(editor)).toBe(before);
-  });
-
   it("keeps its body through a re-parse of the same automation", async () => {
     const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
     const { editor } = await mountAt("a", parse);

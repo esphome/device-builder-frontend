@@ -35,7 +35,6 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -46,7 +45,7 @@ import {
   focusKey,
   paramFocus,
 } from "./automation-focus.js";
-import { CallableAutomationEditor } from "./callable-editor.js";
+import { CallableAutomationEditor, type CallableNameField } from "./callable-editor.js";
 import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
@@ -95,6 +94,16 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
    *  isn't drowned out by the rarely-used options. */
   @state() private _showAdvanced = false;
 
+  protected override _nameField(): CallableNameField {
+    return {
+      inputId: "script-id",
+      yamlKeys: ["id"],
+      label: this._localize("device.script_id_label"),
+      description: this._localize("device.script_id_description"),
+      value: this.location?.id ?? "",
+    };
+  }
+
   // Can't upsert a script with no id.
   protected override _canApply(location: AutomationLocation): boolean {
     return location.kind === "script" && !!location.id;
@@ -140,7 +149,8 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     return keyed(
       this._target,
       html`
-        ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
+        ${this._renderHeader()} ${this._renderNameField(disabled)}
+        ${this._renderConfigForm(automation, disabled, focus)}
         ${
           this._showAdvanced
             ? this._renderParametersField(automation, disabled, focus)
@@ -222,8 +232,9 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   ) {
     const comp = this._scriptComponent;
     if (!comp) return nothing;
+    // ``id`` is the locked name field above the form.
     const entries = comp.config_entries.filter(
-      (e) => e.key !== "parameters" && e.key !== "then"
+      (e) => e.key !== "id" && e.key !== "parameters" && e.key !== "then"
     );
     const hasParameters = this._hasParametersEntry();
     if (entries.length === 0 && !hasParameters) return nothing;
@@ -265,35 +276,14 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   }
 
   /** Bridge ``<esphome-config-entry-form>`` patch events into the
-   *  AutomationTree shape. Special-cases the ``id`` field: changing
-   *  it has to also mutate ``this.location`` because the YAML splice
-   *  destination is keyed by location.id — without the mirror the
-   *  next upsert would target the OLD slot. */
+   *  AutomationTree shape. */
   private _onConfigFormValueChange = (
     e: CustomEvent<{ path: string[]; value: unknown }>
   ) => {
     e.stopPropagation();
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
-    // ``id`` runs through the shared normalizer so a stray space or
-    // dash the user typed lands as a valid YAML key
-    // (``"my script"`` → ``"my_script"``) — without this the input
-    // would round-trip a value that breaks compilation on save.
-    const normalizedValue =
-      path.length === 1 && path[0] === "id"
-        ? normalizeEspHomeId(String(value ?? ""))
-        : value;
-    const next = applyParamChange(automation.trigger_params, path, normalizedValue);
-    if (path.length === 1 && path[0] === "id") {
-      // Match wire shape: ``trigger_params.id`` round-trips with
-      // ``location.id``, so keep both pinned to the normalized id.
-      // Empty id falls back to the previous location so we don't
-      // dispatch a write with no destination.
-      const newId = String(normalizedValue ?? "");
-      if (newId) {
-        this._relocate({ kind: "script", id: newId });
-      }
-    }
+    const next = applyParamChange(automation.trigger_params, path, value);
     this._engine.withValue({ trigger_params: next });
   };
 
