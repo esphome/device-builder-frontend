@@ -183,9 +183,10 @@ export async function flashMcubootOverSerial(
   if (port.readable || port.writable) await port.close().catch(() => {});
   hooks.onLog?.(`Opening serial port at ${SMP_SERIAL_BAUD} baud`);
   await port.open({ baudRate: SMP_SERIAL_BAUD });
-  const session = new SmpSerialSession(port, hooks.signal);
+  let session: SmpSerialSession | undefined;
   let failure: unknown;
   try {
+    session = new SmpSerialSession(port, hooks.signal);
     // Not negotiated like Bluetooth's: larger frames are untested against
     // the device's UART receive buffers.
     await smpUploadImage(session, image, SMP_CHUNK_SIZE_DEFAULT, hooks);
@@ -194,7 +195,7 @@ export async function flashMcubootOverSerial(
     throw err;
   } finally {
     // The locks have to be released before the port closes.
-    await session.close(failure).catch(() => {});
+    await session?.close(failure).catch(() => {});
     markSerialActivity();
     await port.close().catch(() => {});
   }

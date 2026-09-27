@@ -195,6 +195,16 @@ describe("flashMcubootOverSerial", () => {
     expect(fake.smp.received).toEqual(image.bytes);
   });
 
+  it("closes the port when its streams cannot be taken", async () => {
+    const fake = makePort();
+    // As a port whose reader is still locked by an earlier session.
+    fake.mock.open.mockImplementation(async () => {});
+    const { done } = await flashOverSerial(fake);
+
+    await expect(done).rejects.toThrow();
+    expect(fake.mock.close).toHaveBeenCalled();
+  });
+
   it("fails when the device never answers, and closes the port", async () => {
     const fake = makePort({ silent: true });
     const { done } = await flashOverSerial(fake);
