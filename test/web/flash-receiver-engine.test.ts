@@ -138,6 +138,13 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._busy).toBe(false);
   });
 
+  it("names the image, not the network, when an engine throws while checking it", async () => {
+    engines.esp.prepare.mockRejectedValueOnce(new Error("boom"));
+    const { el } = await handOff({}, false);
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toBe("web.flash.invalid_image (boom)");
+  });
+
   it("reports a frame naming a flasher it does not have as malformed", async () => {
     const { el } = await handOff({ flasher: "toString" }, false);
     expect((el as any)._state).toBe("error");

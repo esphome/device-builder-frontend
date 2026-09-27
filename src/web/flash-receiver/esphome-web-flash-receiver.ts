@@ -9,6 +9,7 @@ import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
@@ -27,6 +28,7 @@ import {
 } from "./protocol.js";
 import {
   RECEIVER_ENGINES,
+  type ReceiverEngine,
   type ReceiverNote,
   type ReceiverRun,
 } from "./receiver-engine.js";
@@ -275,8 +277,15 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     erase: boolean,
     flasher: HandoffFlasher
   ): Promise<ReceiverRun | null> {
+    let engine: ReceiverEngine;
     try {
-      const engine = await RECEIVER_ENGINES[flasher]();
+      engine = await RECEIVER_ENGINES[flasher]();
+    } catch (err) {
+      console.error("[flash receiver] Could not load the engine chunk:", err);
+      this._setState("error", this._localize("firmware.engine_load_failed"));
+      return null;
+    }
+    try {
       const plan = await engine.prepare(parts, erase, this._localize);
       if ("error" in plan) {
         this._setState("error", plan.error);
@@ -285,8 +294,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       this._logsPolicy = engine.logs;
       return plan.run;
     } catch (err) {
-      console.error("[flash receiver] Could not load the engine chunk:", err);
-      this._setState("error", this._localize("firmware.engine_load_failed"));
+      // An engine broke its never-throws contract: name the image, not the network.
+      console.error("[flash receiver] The engine could not check the image:", err);
+      this._setState(
+        "error",
+        `${this._localize("web.flash.invalid_image")} (${getErrorMessage(err)})`
+      );
       return null;
     }
   }

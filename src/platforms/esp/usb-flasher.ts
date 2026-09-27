@@ -115,7 +115,11 @@ export function openFlasher(
       // Likewise for the flasher: an older receiver omits the list, which
       // means esptool only, so anything else is declined rather than handed
       // to a page that would fail it as a bad ESP image.
-      if (!(data.flashers ?? [DEFAULT_HANDOFF_FLASHER]).includes(flasher)) {
+      // Anything but a list (absent, or a malformed frame) is esptool only.
+      const flashers: unknown[] = Array.isArray(data.flashers)
+        ? data.flashers
+        : [DEFAULT_HANDOFF_FLASHER];
+      if (!flashers.includes(flasher)) {
         finish();
         cb.onUnsupported("flasher");
         return;

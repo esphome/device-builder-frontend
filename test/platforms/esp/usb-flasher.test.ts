@@ -329,6 +329,16 @@ describe("openFlasher", () => {
     expect(cb.states).toEqual([{ state: "done", detail: "reset the board" }]);
   });
 
+  it("reads a flashers field that is not a list as esptool only", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.uf2", "bw15", RTL, cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1, flashers: "rtl-ambz2" });
+    expect(cb.reasons).toEqual(["flasher"]);
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+  });
+
   it("names the browser, not the flasher, when Web Serial is what is missing", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);

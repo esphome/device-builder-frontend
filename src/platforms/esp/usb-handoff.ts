@@ -79,7 +79,9 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
 // flasher" button (a user gesture, so the pop-up isn't blocked).
 export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   const firmware = host._usbFirmware;
-  if (!firmware) return;
+  // startUsbFlash only stages firmware for a platform that can hand off.
+  const handoff = handoffFor(host._device?.target_platform);
+  if (!firmware || !handoff) return;
   host._step = "flashing";
   host._flashPercent = 0;
   host._statusMessage = host._localize("firmware.usb_flashing");
@@ -94,7 +96,6 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._errorMessage = "";
     host._statusMessage = host._localize("firmware.usb_flashing");
   };
-  const handoff = handoffFor(host._device?.target_platform) ?? ESP_HANDOFF;
   const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, handoff, {
     onProgress: (pct) => {
       resumeFromError();

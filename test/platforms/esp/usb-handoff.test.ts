@@ -53,6 +53,14 @@ afterEach(() => vi.clearAllMocks());
 const callbacks = () => openFlasher.mock.calls[0][4] as FlasherCallbacks;
 
 describe("handOffToFlasher", () => {
+  it("opens nothing for a device whose platform cannot hand off", () => {
+    const host = makeHost();
+    host._device.target_platform = "rp2040";
+    handOffToFlasher(asHost(host));
+    expect(openFlasher).not.toHaveBeenCalled();
+    expect(host._step).toBe("download-ready");
+  });
+
   it("shows the receiver's done note, and the plain done line without one", () => {
     const host = makeHost();
     handOffToFlasher(asHost(host));
