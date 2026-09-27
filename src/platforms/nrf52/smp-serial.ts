@@ -163,13 +163,7 @@ class SmpSerialSession extends SerialStreamSession implements SmpTransport {
     // A write that fails after the read loop ended leaves this unawaited.
     response.catch(() => {});
     try {
-      await this.writeBytes(encodeSerialFrame(frame)).catch((err: unknown) => {
-        // The frame may have reached a device that left during the write.
-        if (err instanceof SerialDeviceLostError) {
-          throw new SmpNoReplyError(err.message, err);
-        }
-        throw err;
-      });
+      await this.writeBytes(encodeSerialFrame(frame));
       // A frame that fails its CRC is dropped, so a garbled reply would
       // otherwise wait forever.
       return await this.race(

@@ -261,6 +261,24 @@ describe("flashMcubootOverSerial", () => {
     await expect(done).resolves.toBeUndefined();
   });
 
+  it("takes the device leaving the bus ahead of the reset the same", async () => {
+    const smp = new FakeSmpDevice();
+    const fake = makePort({ smp });
+    const exchange = smp.exchange.bind(smp);
+    smp.exchange = (frame) => {
+      // Op 2, group 1, command 0: the image marked for test, a second
+      // before the reset is asked for.
+      if (frame[0] === 2 && frame[5] === 1 && frame[7] === 0) {
+        setTimeout(() => fake.mock.fire(), 100);
+      }
+      return exchange(frame);
+    };
+    const { done, image } = await flashOverSerial(fake);
+
+    await expect(done).resolves.toBeUndefined();
+    expect(smp.received).toEqual(image.bytes);
+  });
+
   it("takes the device leaving the bus under the reset's write the same", async () => {
     const fake = makePort({ resetWriteLost: true });
     const { done, image } = await flashOverSerial(fake);
