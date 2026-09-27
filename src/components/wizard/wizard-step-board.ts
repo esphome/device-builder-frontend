@@ -419,6 +419,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
   private _exitDetectionMode() {
     this._selectedFilter = "";
     this._detection = null;
+    // The detection's own message (a board not found, a device not told)
+    // goes with it; the user asked for the full list.
+    this._detectError = "";
     void this._fetchBoards();
   }
 }

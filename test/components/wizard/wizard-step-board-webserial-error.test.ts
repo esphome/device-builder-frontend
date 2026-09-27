@@ -174,6 +174,11 @@ describe("wizard-step-board WebSerial detect errors", () => {
     expect(el.shadowRoot!.querySelector(".detection-banner")?.textContent).toContain(
       "RTL8720C"
     );
+
+    // Show all boards takes the detection's message with it.
+    (el as any)._exitDetectionMode();
+    await el.updateComplete;
+    expect(detectError(el)).toBeNull();
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

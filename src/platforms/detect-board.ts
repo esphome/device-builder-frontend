@@ -1,13 +1,13 @@
-import {
-  SerialOpenTimeoutError,
-  SerialPortHeldError,
-} from "../util/serial-open-error.js";
 /**
  * The Device Builder's board detection behind "Set it up" and the wizard's
  * "Connect your board": pick a port when none is in hand, say what the port
  * is from its USB ids, read the boot banner where the ids say nothing, and
  * run the ESP detect only where an ESP can be.
  */
+import {
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
+} from "../util/serial-open-error.js";
 import { requestSerialPort } from "../util/web-serial.js";
 import { type BootBannerMatch, readBootBanner } from "./boot-banner.js";
 import { type DetectedBoard, detectEspBoard, preloadEsptool } from "./esp/index.js";
