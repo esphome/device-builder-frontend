@@ -12,7 +12,6 @@ import {
   SCALAR_BODY_PARAM_KEY,
 } from "../../../api/types/automations.js";
 import { type ConfigEntry, ConfigEntryType } from "../../../api/types/config-entries.js";
-import type { LocalizeFunc } from "../../../common/localize.js";
 import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
 import { VALUE_TYPE_TO_CONFIG_TYPE } from "./registry-list-helpers.js";
 
@@ -54,31 +53,27 @@ export function makeScalarValueEntry(
 
 type ScalarBodied = AutomationAction | AutomationCondition;
 
-const VALUE_LABEL_KEY = "device.automation_action_delay_value";
-
-// One entries array per (def, label): a fresh array per render would defeat
-// Lit's change detection on the form mount.
-const _bodyEntries = new WeakMap<
-  ScalarBodied,
-  { label: string; entries: ConfigEntry[] }
->();
+// One entries array per definition: the form tells its target by its
+// entries, so they must outlive a render and a change of language alike.
+const _bodyEntries = new WeakMap<ScalarBodied, ConfigEntry[]>();
 
 /** The entries an action / condition's params form renders: its catalog
  *  fields, or for a scalar-bodied one (``delay: 2s``) the single value
  *  entry. Empty when it has neither. */
-export function paramEntriesOf(def: ScalarBodied, localize: LocalizeFunc): ConfigEntry[] {
+export function paramEntriesOf(def: ScalarBodied): ConfigEntry[] {
   const type = def.config_entries.length > 0 ? null : scalarValueType(def);
   if (type === null) return def.config_entries;
-  const label = localize(VALUE_LABEL_KEY);
-  const cached = _bodyEntries.get(def);
-  if (cached?.label === label) return cached.entries;
-  const entries = [
-    makeScalarValueEntry(type, def, {
-      key: SCALAR_BODY_PARAM_KEY,
-      label,
-      required: true,
-    }),
-  ];
-  _bodyEntries.set(def, { label, entries });
+  let entries = _bodyEntries.get(def);
+  if (!entries) {
+    entries = [
+      makeScalarValueEntry(type, def, {
+        key: SCALAR_BODY_PARAM_KEY,
+        label: "Value",
+        translation_key: "device.automation_action_delay_value",
+        required: true,
+      }),
+    ];
+    _bodyEntries.set(def, entries);
+  }
   return entries;
 }

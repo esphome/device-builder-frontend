@@ -54,22 +54,19 @@ describe("makeScalarValueEntry", () => {
 });
 
 describe("paramEntriesOf", () => {
-  const localize = (key: string) =>
-    key === "device.automation_action_delay_value" ? "Value" : key;
-
   it("has nothing to render for a value_type this build doesn't know", () => {
     const action = makeAutomationAction({ id: "x", value_type: "toString" as never });
-    expect(paramEntriesOf(action, localize)).toEqual([]);
+    expect(paramEntriesOf(action)).toEqual([]);
   });
 
   it("returns the catalog fields of a field-based action", () => {
     const fields = [makeConfigEntry({ key: "format", label: "Format" })];
     const action = makeAutomationAction({ id: "logger.log", config_entries: fields });
-    expect(paramEntriesOf(action, localize)).toBe(fields);
+    expect(paramEntriesOf(action)).toBe(fields);
   });
 
   it("returns the one value entry of a scalar-bodied action", () => {
-    expect(paramEntriesOf(DELAY, localize)).toEqual([
+    expect(paramEntriesOf(DELAY)).toEqual([
       expect.objectContaining({
         key: "id",
         label: "Value",
@@ -83,17 +80,18 @@ describe("paramEntriesOf", () => {
   });
 
   it("keeps one array per action so the form mount sees a stable property", () => {
-    expect(paramEntriesOf(DELAY, localize)).toBe(paramEntriesOf(DELAY, localize));
+    expect(paramEntriesOf(DELAY)).toBe(paramEntriesOf(DELAY));
   });
 
-  it("rebuilds when the label changes with the locale", () => {
-    const english = paramEntriesOf(DELAY, localize);
-    expect(paramEntriesOf(DELAY, () => "Waarde")[0].label).toBe("Waarde");
-    expect(english[0].label).toBe("Value");
+  it("labels the value through a translation key, so a change of language keeps the entries", () => {
+    expect(paramEntriesOf(DELAY)[0]).toMatchObject({
+      label: "Value",
+      translation_key: "device.automation_action_delay_value",
+    });
   });
 
   it("has nothing to render for an action with no fields and no value", () => {
     const action = makeAutomationAction({ id: "ethernet.disable" });
-    expect(paramEntriesOf(action, localize)).toEqual([]);
+    expect(paramEntriesOf(action)).toEqual([]);
   });
 });

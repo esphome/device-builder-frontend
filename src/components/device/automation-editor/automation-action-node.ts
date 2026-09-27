@@ -203,7 +203,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     }
     if (t.field.length === 0) return true;
     // Field target with no catalog form to arm — degrade to the row flash.
-    return !def || paramEntriesOf(def, this._localize).length === 0;
+    return !def || paramEntriesOf(def).length === 0;
   }
 
   protected render() {
@@ -421,7 +421,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * renders its one value as a field, labelled "Value".
    */
   private _renderActionParams(def: AutomationAction | undefined) {
-    const entries = def ? paramEntriesOf(def, this._localize) : [];
+    const entries = def ? paramEntriesOf(def) : [];
     if (!def || entries.length === 0) return nothing;
     // The form owns the advanced section; an all-advanced action (no basic
     // fields) renders everything with no control, matching the old

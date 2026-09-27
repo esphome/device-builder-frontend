@@ -172,7 +172,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   );
 
   /** Schema entries to render (recursive — NESTED entries contain
-   *  their own `config_entries`). */
+   *  their own `config_entries`). The form tells its target by these
+   *  objects (``sameEntryTarget``): pass the catalog's own entries, or
+   *  cache any built ones per target, since a copy made on each render
+   *  reads as a new target and drops what the user stashed. */
   @property({ attribute: false })
   entries: ConfigEntry[] = [];
 

@@ -95,7 +95,8 @@ describe("automation-action-node scalar-bodied action", () => {
       expect.objectContaining({
         key: "id",
         type: ConfigEntryType.TIME_PERIOD,
-        label: "device.automation_action_delay_value",
+        label: "Value",
+        translation_key: "device.automation_action_delay_value",
         required: true,
         templatable: true,
         duration_min_unit: "ms",
