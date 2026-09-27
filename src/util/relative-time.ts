@@ -196,9 +196,9 @@ function calendarYears(seconds: number, nowMs: number): { years: number; days: n
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
  * / ``2d 3h`` / ``1y 35d`` (zero minor unit dropped: ``1h``, ``2d``,
  * ``1y``; years are calendar years back from *nowMs*). The ``counter``
- * variant is for a live
- * ticking readout: seconds kept in the minute range (``4m 32s``) and
- * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
+ * variant is for a live ticking readout: seconds kept in the minute range
+ * (``4m 32s``) and hour-range minutes zero-padded (``1h 05m``, stable width
+ * per minute tick).
  * Locale-aware digits via the shared number formatter; the unit letters
  * aren't localized. Negative input clamps to ``0s``.
  */
@@ -243,6 +243,18 @@ export function formatDuration(
   return minutes > 0
     ? `${fmt.format(hours)}h ${fmt.format(minutes)}m`
     : `${fmt.format(hours)}h`;
+}
+
+/**
+ * *seconds* rounded down to the step :func:`formatDuration`'s compact
+ * variant renders at, so two durations in one step share a label. Hourly
+ * until 366 days: a year spanning a leap day is that long, and the label
+ * still shows hours until the calendar year is up.
+ */
+export function compactDurationStep(seconds: number): number {
+  const whole = Math.max(0, Math.floor(seconds));
+  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 366 * 86400 ? 3600 : 86400;
+  return whole - (whole % unit);
 }
 
 /**

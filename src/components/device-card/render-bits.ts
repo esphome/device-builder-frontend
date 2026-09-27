@@ -135,11 +135,15 @@ function offlineLabel(card: ESPHomeDeviceCard): string {
   });
 }
 
+/** The finished job's status while its badge shows, else ``null``. */
+function finishedBadgeStatus(card: ESPHomeDeviceCard): JobStatus | null {
+  const status = card.recentJob?.status;
+  return status !== undefined && RECENT_JOB_ICON[status] ? status : null;
+}
+
 /** True while a busy or finished-job badge stands in for the status pill. */
 export function jobBadgeShown(card: ESPHomeDeviceCard): boolean {
-  return (
-    card.busy || (card.recentJob !== null && !!RECENT_JOB_ICON[card.recentJob.status])
-  );
+  return card.busy || finishedBadgeStatus(card) !== null;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
@@ -158,15 +162,12 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       ${card._localize(labelKey)}
     </div>`;
   }
-  if (card.recentJob) {
-    const status = card.recentJob.status;
-    const icon = RECENT_JOB_ICON[status];
-    if (icon) {
-      return html`<div class="device-status ${RECENT_JOB_VARIANT[status]}">
-        <wa-icon library="mdi" name=${icon}></wa-icon>
-        ${card._localize(RECENT_JOB_LABEL[status])}
-      </div>`;
-    }
+  const finished = finishedBadgeStatus(card);
+  if (finished !== null) {
+    return html`<div class="device-status ${RECENT_JOB_VARIANT[finished]}">
+      <wa-icon library="mdi" name=${RECENT_JOB_ICON[finished]}></wa-icon>
+      ${card._localize(RECENT_JOB_LABEL[finished])}
+    </div>`;
   }
   // "No status" is the least self-explanatory state; clicking it opens
   // the dialog in explainer-only mode (the probe stays suppressed

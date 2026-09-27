@@ -1,4 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
+import { compactDurationStep } from "./relative-time.js";
 
 /**
  * Repaints hosts showing an offline duration; an offline device sends no
@@ -10,14 +11,6 @@ let timer: ReturnType<typeof setInterval> | null = null;
 
 function tick(): void {
   for (const clock of clocks) clock.tick();
-}
-
-// ``formatDuration``'s granularity; the label is the same within a step.
-// Hourly until 366 days, since a year spanning a leap day is that long.
-function shownStep(seconds: number): number {
-  const whole = Math.max(0, Math.floor(seconds));
-  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 366 * 86400 ? 3600 : 86400;
-  return whole - (whole % unit);
 }
 
 export class OfflineClockController implements ReactiveController {
@@ -46,7 +39,8 @@ export class OfflineClockController implements ReactiveController {
 
   tick(): void {
     const seconds = this.seconds();
-    if (seconds !== null && shownStep(seconds) !== this.shown) this.host.requestUpdate();
+    if (seconds !== null && compactDurationStep(seconds) !== this.shown)
+      this.host.requestUpdate();
   }
 
   private reconcile(): void {
@@ -55,7 +49,7 @@ export class OfflineClockController implements ReactiveController {
       this.leave();
       return;
     }
-    this.shown = shownStep(seconds);
+    this.shown = compactDurationStep(seconds);
     clocks.add(this);
     timer ??= setInterval(tick, 1000);
   }
