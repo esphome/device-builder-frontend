@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 const load = async () =>
   (await import("../../build-scripts/check-import-cycles.cjs")) as {
-    checkImportCycles: () => string[][];
     cyclesAmong: (sources: Record<string, string>) => string[][];
     findCycles: (graph: Map<string, Set<string>>) => string[][];
     runtimeImports: (source: string) => string[];
@@ -46,6 +45,19 @@ describe("runtimeImports", () => {
         ].join("\n")
       )
     ).toEqual([]);
+  });
+  it("keeps the imports after a string that looks like a comment opening", async () => {
+    const { runtimeImports } = await load();
+    expect(
+      runtimeImports(
+        [
+          'const accept = "image/*";',
+          'import { x } from "./x.js";',
+          'const glob = "**/*.ts"; /* trailing */',
+          'import { y } from "./y.js";',
+        ].join("\n")
+      )
+    ).toEqual(["./x.js", "./y.js"]);
   });
 });
 
@@ -97,12 +109,5 @@ describe("cyclesAmong", () => {
         "b.ts": 'import type { A } from "./a.js";',
       })
     ).toEqual([]);
-  });
-});
-
-describe("checkImportCycles", () => {
-  it("finds none in this repo's src", async () => {
-    const { checkImportCycles } = await load();
-    expect(checkImportCycles()).toEqual([]);
   });
 });

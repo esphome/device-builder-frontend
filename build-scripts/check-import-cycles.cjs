@@ -23,7 +23,10 @@ const SRC_DIR = path.join(__dirname, "..", "src");
 // source.
 const STATEMENT =
   /^(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*["'](\.[^"']+)["']|^import\s+["'](\.[^"']+)["']/gm;
-const COMMENTS = /\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
+// Comments that start a line, which is where a commented-out import sits.
+// Anchored so a `/*` inside a string ("image/*", a glob) cannot swallow the
+// imports after it.
+const COMMENTS = /^\s*\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
 
 /** Whether `{ type A, type B }` names types only. */
 function isTypeOnlyList(specifiers) {
