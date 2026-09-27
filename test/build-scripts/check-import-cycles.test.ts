@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const load = async () =>
   (await import("../../build-scripts/check-import-cycles.cjs")) as {
+    checkImportCycles: (srcDir: string) => string[][];
     cyclesAmong: (sources: Record<string, string>) => string[][];
     findCycles: (graph: Map<string, Set<string>>) => string[][];
     runtimeImports: (source: string) => string[];
@@ -157,5 +158,43 @@ describe("cyclesAmong", () => {
         "b.ts": 'import type { A } from "./a.js";',
       })
     ).toEqual([]);
+  });
+});
+
+describe("checkImportCycles", () => {
+  it("walks a source tree on disk, nested directories included, and reads only .ts files", async () => {
+    // tsconfig restricts `types` to @types/w3c-web-serial, so node
+    // module specifiers don't type-check; vitest resolves them fine.
+    // @ts-expect-error — node-only module
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module
+    const os = await import("node:os");
+    // @ts-expect-error — node-only module
+    const path = await import("node:path");
+    const { checkImportCycles } = await load();
+
+    const src = fs.mkdtempSync(path.join(os.tmpdir(), "check-import-cycles-"));
+    const write = (name: string, source: string) => {
+      fs.mkdirSync(path.dirname(path.join(src, name)), { recursive: true });
+      fs.writeFileSync(path.join(src, name), source);
+    };
+    try {
+      write("components/deep/dialog.ts", 'import { p } from "../../platforms/index.js";');
+      write("platforms/index.ts", 'export * from "./rtl.js";');
+      write("platforms/rtl.ts", 'import { d } from "../components/deep/dialog.js";');
+      write("util/alone.ts", 'import { p } from "../platforms/index.js";');
+      // Not a module of the graph: never parsed, never resolved to.
+      write("platforms/notes.md", 'import { d } from "./rtl.js";');
+      write("translations/en.json", "{}");
+
+      expect(checkImportCycles(src)).toEqual([
+        ["components/deep/dialog.ts", "platforms/index.ts", "platforms/rtl.ts"],
+      ]);
+
+      write("platforms/rtl.ts", 'import type { D } from "../components/deep/dialog.js";');
+      expect(checkImportCycles(src)).toEqual([]);
+    } finally {
+      fs.rmSync(src, { recursive: true, force: true });
+    }
   });
 });
