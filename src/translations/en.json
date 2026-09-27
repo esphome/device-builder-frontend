@@ -1011,7 +1011,7 @@
     "api_action_header_title_static": "API action",
     "api_action_header_description": "A named action your Home Assistant can invoke. Declare typed `variables:` to accept arguments from the caller, then list the actions that run when it's called.",
     "api_action_id_label": "Action name",
-    "api_action_id_description": "The name Home Assistant uses to call this action. Renaming it requires updating any callers that reference the old name.",
+    "api_action_id_description": "The name Home Assistant uses to call this action. To rename the action, edit the name in the YAML and update any callers that reference the old name.",
     "api_action_variables": "Variables",
     "api_action_variables_description": "Typed values the caller can pass when invoking this action. Reference them inside actions via `id(name)`.",
     "api_action_add_variable": "Add variable",

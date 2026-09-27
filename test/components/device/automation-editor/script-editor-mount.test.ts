@@ -7,7 +7,7 @@
  * CodeMirror, the action list) are no-op mocked so the editor itself
  * can construct in a happy-dom window.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./_editor-harness.js";
 
@@ -114,6 +114,10 @@ describe("script-editor action-catalog hydration (#1286)", () => {
   });
 
   describe("script id (#1883)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     const SCRIPT = {
       location: { kind: "script", id: "my_script" },
       value: {
@@ -174,7 +178,6 @@ describe("script-editor action-catalog hydration (#1286)", () => {
         editor.shadowRoot!.querySelector<HTMLInputElement>("#script-id")!.value
       ).toBe("other_script");
       expect(scrolled).toHaveBeenCalledTimes(2);
-      vi.restoreAllMocks();
     });
 
     it("flashes the id field when the cursor is on the id line", async () => {
@@ -190,7 +193,6 @@ describe("script-editor action-catalog hydration (#1286)", () => {
       expect(scrolled).toHaveBeenCalledTimes(1);
       const field = editor.shadowRoot!.querySelector("#script-id")!.closest(".field");
       expect(scrolled.mock.instances[0]).toBe(field);
-      vi.restoreAllMocks();
     });
   });
 
