@@ -110,7 +110,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
-        targetKey: this._targetKey(),
+        target: this._target,
         descriptionKey: "device.api_action_actions_description",
         onActionsChange: this._onActionsChange,
       })}
@@ -196,7 +196,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     // YAML key the upsert produces is always valid.
     const normalized = normalizeEspHomeId(name);
     if (!normalized) return;
-    this.location = { kind: "api_action", action_name: normalized };
+    this._relocate({ kind: "api_action", action_name: normalized });
     this._engine.scheduleAutoApply();
   }
 

@@ -126,8 +126,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
    *  follows its row through a move or a delete. */
   @state() private _advancedRows: ReadonlySet<number> = new Set();
 
-  private readonly _rowKeys = new RowKeys<ConditionNode>();
-  private _keys: readonly number[] = [];
+  private readonly _rows = new RowKeys<ConditionNode>();
 
   static styles = [
     espHomeStyles,
@@ -141,9 +140,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   private _focusScrolled = false;
 
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("conditions")) {
-      this._keys = this._rowKeys.reconcile(this.conditions);
-    }
+    if (changed.has("conditions")) this._rows.reconcile(this.conditions);
     if (changed.has("focusTarget")) this._focusScrolled = false;
   }
 
@@ -166,7 +163,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             ? html`<p class="ae-empty">${this._localize("device.add_condition")}</p>`
             : repeat(
                 this.conditions,
-                (_node, idx) => this._keys[idx],
+                (_node, idx) => this._rows.keys[idx],
                 (node, idx) => this._renderNode(node, idx)
               )
         }
@@ -252,7 +249,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                   .focusFieldPath=${fieldFocus}
                   ?disabled=${this.disabled}
                   advanced-section
-                  ?show-advanced=${this._advancedRows.has(this._keys[idx])}
+                  ?show-advanced=${this._advancedRows.has(this._rows.keys[idx])}
                   @value-change=${(e: CustomEvent<ConfigEntryValueChange>) =>
                     this._onParamChange(idx, e)}
                   @advanced-toggle=${(e: CustomEvent<{ show: boolean }>) =>
@@ -333,9 +330,9 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   private _setRowAdvanced(idx: number, show: boolean) {
     const next = new Set(this._advancedRows);
     if (show) {
-      next.add(this._keys[idx]);
+      next.add(this._rows.keys[idx]);
     } else {
-      next.delete(this._keys[idx]);
+      next.delete(this._rows.keys[idx]);
     }
     this._advancedRows = next;
   }

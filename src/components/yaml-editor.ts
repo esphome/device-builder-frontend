@@ -606,7 +606,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     return extensions;
   }
 
-  private _mountEditor() {
+  protected _mountEditor() {
     this._mountView(this.value, this._buildExtensions());
 
     // Remount paths in updated() return before the highlightRange

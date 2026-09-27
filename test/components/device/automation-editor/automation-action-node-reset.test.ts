@@ -3,14 +3,12 @@
  *
  * Behavioral mount tests for ``automation-action-node.ts``.
  *
- * The action list renders rows with a plain ``actions.map(...)`` (no
- * keyed ``repeat()``), so Lit reuses each ``<esphome-automation-action-node>``
- * element by DOM position. Reordering / deleting only rebinds the
- * element's ``.value``; the per-row ``@state`` (``_collapsed`` /
- * ``_showAdvanced``) must NOT leak from the previous action onto the
- * one that lands at that slot. These tests pin that contract through
- * the observable DOM (``aria-expanded``, the body block, the
- * ``show-advanced`` attribute on the params form).
+ * The action list keys its rows, and a change of kind keeps the row,
+ * so the same ``<esphome-automation-action-node>`` is rebound to another
+ * action. The per-row ``@state`` (``_collapsed`` / ``_showAdvanced``)
+ * must NOT carry over from the previous kind. These tests pin that
+ * contract through the observable DOM (``aria-expanded``, the body
+ * block, the ``show-advanced`` attribute on the params form).
  *
  * The node drags CodeMirror in transitively through
  * ``config-entry-form`` → ``lambda-editor`` and its picker / condition

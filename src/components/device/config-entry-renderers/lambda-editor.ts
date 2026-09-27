@@ -128,7 +128,7 @@ export class ESPHomeLambdaEditor extends CodeMirrorEditorElement {
     }
   }
 
-  private _mountEditor() {
+  protected _mountEditor() {
     this._mountView(this.value, [
       basicSetup,
       editorSearchPhrases(this._localize),

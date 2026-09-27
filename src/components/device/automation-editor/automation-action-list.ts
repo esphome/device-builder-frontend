@@ -5,8 +5,8 @@
  * ``wait_until``) embed nested action lists for each of their
  * ``accepts_action_list`` keys. Each action row is an
  * ``<esphome-automation-action-node>``; this component owns the
- * outer list ergonomics (add / reorder / remove). Rows are keyed, so a
- * row's element and what it remembers follow its action through them.
+ * outer list ergonomics (add / reorder / remove). Rows are keyed, so
+ * per-row state follows its action.
  *
  * Pure-presentational: parent owns ``actions`` and listens for
  * ``actions-change`` to update its own state.
@@ -91,11 +91,10 @@ export class ESPHomeAutomationActionList extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
-  private readonly _rowKeys = new RowKeys<ActionNode>();
-  private _keys: readonly number[] = [];
+  private readonly _rows = new RowKeys<ActionNode>();
 
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("actions")) this._keys = this._rowKeys.reconcile(this.actions);
+    if (changed.has("actions")) this._rows.reconcile(this.actions);
   }
 
   protected render() {
@@ -115,7 +114,7 @@ export class ESPHomeAutomationActionList extends LitElement {
               </p>`
             : repeat(
                 this.actions,
-                (_node, idx) => this._keys[idx],
+                (_node, idx) => this._rows.keys[idx],
                 (node, idx) => this._renderRow(node, idx, idx === this.actions.length - 1)
               )
         }

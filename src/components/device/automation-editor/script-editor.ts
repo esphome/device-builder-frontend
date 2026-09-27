@@ -154,7 +154,7 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
-        targetKey: this._targetKey(),
+        target: this._target,
         descriptionKey: "device.script_actions_description",
         onActionsChange: this._onActionsChange,
       })}
@@ -288,7 +288,7 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
       // dispatch a write with no destination.
       const newId = String(normalizedValue ?? "");
       if (newId) {
-        this.location = { kind: "script", id: newId };
+        this._relocate({ kind: "script", id: newId });
       }
     }
     this._engine.withValue({ trigger_params: next });

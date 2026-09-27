@@ -3,9 +3,9 @@
  *
  * A row's element, and what it remembers, follows its action through a
  * delete or a reorder (esphome/device-builder#2848). The real list, node
- * and form are mounted, since the state that used to leak lives across all
- * three: the node's view flags, the form's pending unit and the literal /
- * lambda stash.
+ * and form are mounted, since per-row state lives across all three: the
+ * node's view flags, the form's pending unit and the literal / lambda
+ * stash.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -86,6 +86,14 @@ function toggle(node: ESPHomeAutomationActionNode, side: "literal" | "lambda"): 
     [side === "literal" ? 0 : 1].click();
 }
 
+function typeDuration(node: ESPHomeAutomationActionNode, amount: string): void {
+  const input = form(node)!.shadowRoot!.querySelector<HTMLInputElement>(
+    ".time-period-inputs input"
+  )!;
+  input.value = amount;
+  input.dispatchEvent(new Event("input"));
+}
+
 const MOVE_DOWN = 'button[aria-label="device.automation_move_down"]';
 
 describe("automation-action-list row identity", () => {
@@ -156,11 +164,7 @@ describe("automation-action-list row identity", () => {
     nodeButton(empty, MOVE_DOWN).click();
     await settle(list);
 
-    const input = form(nodes(list)[1])!.shadowRoot!.querySelector<HTMLInputElement>(
-      ".time-period-inputs input"
-    )!;
-    input.value = "5";
-    input.dispatchEvent(new Event("input"));
+    typeDuration(nodes(list)[1], "5");
     await settle(list);
 
     expect(list.actions).toEqual([delay("2s"), delay("5min")]);
@@ -170,11 +174,7 @@ describe("automation-action-list row identity", () => {
     const list = await mountList([delay("1s"), delay("2s")]);
     const before = nodes(list);
 
-    const input = form(before[1])!.shadowRoot!.querySelector<HTMLInputElement>(
-      ".time-period-inputs input"
-    )!;
-    input.value = "9";
-    input.dispatchEvent(new Event("input"));
+    typeDuration(before[1], "9");
     await settle(list);
 
     expect(list.actions).toEqual([delay("1s"), delay("9s")]);

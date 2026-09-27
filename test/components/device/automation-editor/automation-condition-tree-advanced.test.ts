@@ -57,16 +57,22 @@ function node(condition_id: string): ConditionNode {
 const CATALOG = [condition("sensor.in_range"), condition("number.in_range")];
 
 async function mountTree(
-  conditions: ConditionNode[]
+  conditions: ConditionNode[],
+  { readOnly = false } = {}
 ): Promise<ESPHomeAutomationConditionTree> {
   const el = new ESPHomeAutomationConditionTree();
   el.conditions = conditions;
   el.catalog = CATALOG;
   // Mirror the owner contract: mutations come back through
-  // conditions-change and the parent rebinds the list.
-  el.addEventListener("conditions-change", (e) => {
-    el.conditions = (e as CustomEvent<{ conditions: ConditionNode[] }>).detail.conditions;
-  });
+  // conditions-change and the parent rebinds the list, unless it is
+  // read only and drops them.
+  if (!readOnly) {
+    el.addEventListener("conditions-change", (e) => {
+      el.conditions = (
+        e as CustomEvent<{ conditions: ConditionNode[] }>
+      ).detail.conditions;
+    });
+  }
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -152,12 +158,9 @@ describe("automation-condition-tree advanced section", () => {
   });
 
   it("leaves the flags alone when the parent drops a delete", async () => {
-    const el = new ESPHomeAutomationConditionTree();
-    el.conditions = [node("sensor.in_range"), node("number.in_range")];
-    el.catalog = CATALOG;
-    // A read only owner ignores conditions-change.
-    document.body.appendChild(el);
-    await el.updateComplete;
+    const el = await mountTree([node("sensor.in_range"), node("number.in_range")], {
+      readOnly: true,
+    });
 
     toggleAdvanced(forms(el)[1], true);
     await el.updateComplete;

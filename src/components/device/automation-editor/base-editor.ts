@@ -98,9 +98,17 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected _resolveFocus = createFocusResolver();
 
-  /** Names the automation being edited, for ``renderActionsSection``. */
-  protected _targetKey(): string {
-    return this.location ? sectionKeyFromLocation(this.location) : "";
+  /** Counts the automations the parent has pointed this editor at; see
+   *  ``renderActionsSection``. It advances when the new tree lands, and
+   *  not for a location the editor wrote itself (a rename). */
+  protected _target = 0;
+  private _retargeted = false;
+  private _ownLocation: L | null = null;
+
+  /** Move the editor's own location, as a rename of what it edits does. */
+  protected _relocate(location: L | null): void {
+    this._ownLocation = location;
+    this.location = location;
   }
 
   /** Focus target for the current caret; none while a stale tree is shown. */
@@ -234,7 +242,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       // controller withholds a read-only section's empty tree.
       const m = this._parseError.resolve(parsed, this.location);
       if (m) {
-        this.location = m.location;
+        this._relocate(m.location as L);
+        if (this._retargeted) this._target++;
+        this._retargeted = false;
         this.value = m.tree;
         this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
@@ -282,6 +292,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
         this._hydrating = true;
+        if (this.location !== this._ownLocation) this._retargeted = true;
       }
     }
     setHeld(this, this._hydrating);

@@ -227,7 +227,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
-        targetKey: this._targetKey(),
+        target: this._target,
         descriptionKey: "device.automation_actions_description",
         onActionsChange: this._onActionsChange,
       })}
@@ -261,7 +261,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
 
   private _onTargetChange = (e: CustomEvent<{ target: AutomationLocation | null }>) => {
     e.stopPropagation();
-    this.location = e.detail.target;
+    this._relocate(e.detail.target);
     // Reset trigger when switching target kinds — the previous
     // trigger id wouldn't apply to the new target's domain.
     this._engine.withValue({ trigger_id: null, trigger_params: {} });
@@ -283,10 +283,10 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     // ``trigger`` field. The catalog-qualified vs bare-YAML-key id
     // forms are documented in ``trigger-identity.ts``.
     if (this.location?.kind === "device_on") {
-      this.location = { ...this.location, trigger: e.detail.triggerId };
+      this._relocate({ ...this.location, trigger: e.detail.triggerId });
     } else if (this.location?.kind === "component_on") {
       const bare = bareTriggerKey(e.detail.triggerId);
-      this.location = { ...this.location, trigger: bare };
+      this._relocate({ ...this.location, trigger: bare });
     }
   };
 

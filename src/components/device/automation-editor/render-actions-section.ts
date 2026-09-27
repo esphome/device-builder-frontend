@@ -31,11 +31,10 @@ export function renderActionsSection(opts: {
   disabled: boolean;
   localize: LocalizeFunc;
   focusTarget?: AutomationFocus | null;
-  /** Names the automation being edited. The editor element is reused from
-   *  one automation to the next, and every node of the new tree is a new
-   *  object, so the list is remounted rather than left to carry each row's
-   *  state over by position. */
-  targetKey: string;
+  /** Changes when the editor, which is reused, shows another automation:
+   *  the list is remounted, since the new tree's rows would otherwise take
+   *  over the old rows' state by position. */
+  target: number;
   /** Required so each editor names its own copy — a fallback would
    *  silently render the automation flavour under a script. */
   descriptionKey: string;
@@ -49,7 +48,7 @@ export function renderActionsSection(opts: {
       </p>
       <esphome-catalog-picker-host>
         ${keyed(
-          opts.targetKey,
+          opts.target,
           html`<esphome-automation-action-list
             no-header
             .focusTarget=${opts.focusTarget ?? null}

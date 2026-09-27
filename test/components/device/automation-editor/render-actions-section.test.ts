@@ -17,12 +17,12 @@ vi.mock(
   () => ({})
 );
 
-import { identityLocalize } from "../../../_dom.js";
+import { identityLocalize, renderInto } from "../../../_dom.js";
 import type { AutomationTree } from "../../../../src/api/types/automations.js";
 import type { LocalizeFunc } from "../../../../src/common/localize.js";
 import { renderActionsSection } from "../../../../src/components/device/automation-editor/render-actions-section.js";
 
-function section(targetKey: string) {
+function section(target: number) {
   return renderActionsSection({
     automation: { actions: [] } as unknown as AutomationTree,
     catalog: [],
@@ -34,7 +34,7 @@ function section(targetKey: string) {
     disabled: false,
     localize: identityLocalize as LocalizeFunc,
     descriptionKey: "device.automation_action_description",
-    targetKey,
+    target,
     onActionsChange: () => {},
   });
 }
@@ -43,24 +43,21 @@ const list = (host: HTMLElement) => host.querySelector("esphome-automation-actio
 
 describe("renderActionsSection", () => {
   it("wraps the root action list in the catalog picker host", () => {
-    const host = document.createElement("div");
-    render(section("automation:script:a"), host);
+    const host = renderInto(section(1));
     expect(list(host)!.parentElement!.localName).toBe("esphome-catalog-picker-host");
   });
 
   it("keeps the list across renders of the same automation", () => {
-    const host = document.createElement("div");
-    render(section("automation:script:a"), host);
+    const host = renderInto(section(1));
     const first = list(host);
-    render(section("automation:script:a"), host);
+    render(section(1), host);
     expect(list(host)).toBe(first);
   });
 
   it("remounts the list when the editor moves to another automation", () => {
-    const host = document.createElement("div");
-    render(section("automation:script:a"), host);
+    const host = renderInto(section(1));
     const first = list(host);
-    render(section("automation:script:b"), host);
+    render(section(2), host);
     expect(list(host)).not.toBe(first);
   });
 });
