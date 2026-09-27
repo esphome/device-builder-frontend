@@ -14,14 +14,8 @@ import {
   downloadSelectedBinary,
   finishWithLogsPort,
 } from "../../components/firmware-install-dialog/install-flow.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import {
-  parseUf2Image,
-  UF2_FAMILY_RP2040,
-  UF2_FAMILY_RP2350_ARM_S,
-  Uf2FamilyError,
-  type Uf2Image,
-} from "../../util/uf2.js";
+import type { Uf2Image } from "../../util/uf2.js";
+import type { HandoffSpec } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
@@ -30,7 +24,8 @@ import {
   RESET_ACTION_KEY,
 } from "../platform-support.js";
 import { pickRp2CdcPort } from "./pick-cdc-port.js";
-import { flashPico, PicoFlashError, picoFlashFailureCopy } from "./rp2-flash.js";
+import { parsePicoUf2 } from "./pico-uf2.js";
+import { flashPico, picoFlashFailureCopy } from "./rp2-flash.js";
 import { isWebUsbSupported, RP2_SERIAL_PICK } from "./web-usb.js";
 
 declare module "../platform-support.js" {
@@ -38,6 +33,8 @@ declare module "../platform-support.js" {
     "rp2-uf2": "rp2-bootsel" | "rp2-wait";
   }
 }
+
+const NO_UF2_KEY = "firmware.no_uf2";
 
 /** The parsed UF2, kept for Retry. */
 export const rp2Image = new FlashImageSlot<Uf2Image>();
@@ -51,21 +48,14 @@ export async function startRp2Uf2Install(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(host, device, pickUf2, "firmware.no_uf2");
+  const artifact = await downloadBuildArtifact(host, device, pickUf2, NO_UF2_KEY);
   if (!artifact) return;
-  try {
-    rp2Image.set(host, parseUf2Image(artifact.bytes, [UF2_FAMILY_RP2040]));
-  } catch (err) {
-    // Only a real RP2350 image gets the copy-to-drive advice; a missing or
-    // unknown family is just a bad file.
-    const rp2350 =
-      err instanceof Uf2FamilyError && err.familyId === UF2_FAMILY_RP2350_ARM_S;
-    host._fail(
-      host._localize(rp2350 ? "firmware.rp2_rp2350_unsupported" : "firmware.rp2_bad_uf2"),
-      getErrorMessage(err)
-    );
+  const parsed = parsePicoUf2(artifact.bytes);
+  if ("key" in parsed) {
+    host._fail(host._localize(parsed.key), parsed.detail);
     return;
   }
+  rp2Image.set(host, parsed.image);
   // The only artifact this flow hands out; the download step reads it from here.
   host._binaries = [artifact.binary];
   showBootselStep(host);
@@ -124,12 +114,8 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
     });
   } catch (err) {
     if (!stillCurrent()) return;
-    if (err instanceof PicoFlashError) {
-      const { title, detail } = picoFlashFailureCopy(err, host._localize);
-      host._fail(title, detail);
-    } else {
-      host._fail(host._localize("firmware.rp2_flash_failed"), getErrorMessage(err));
-    }
+    const { title, detail } = picoFlashFailureCopy(err, host._localize);
+    host._fail(title, detail);
     return;
   } finally {
     if (stillCurrent()) host._flashBusy = false;
@@ -166,6 +152,19 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
+// Handed whole to web.esphome.io's rp2-picoboot engine; parsed first so an
+// RP2350 image is refused before a tab opens. PICOBOOT erases what it writes.
+const RP2_PICOBOOT_HANDOFF: HandoffSpec = {
+  flasher: "rp2-picoboot",
+  erase: false,
+  pick: pickUf2,
+  noArtifactKey: NO_UF2_KEY,
+  check: async (bytes) => {
+    const parsed = parsePicoUf2(bytes);
+    return "key" in parsed ? parsed : null;
+  },
+};
+
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",
   methodKey: "rp2_uf2",
@@ -177,6 +176,7 @@ export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   },
   image: rp2Image,
   start: startRp2Uf2Install,
+  handoff: RP2_PICOBOOT_HANDOFF,
   showFirstStep: showBootselStep,
   pickLogsPort: (localize) =>
     pickRp2CdcPort(localize, "dashboard.logs_web_serial_open_failed"),

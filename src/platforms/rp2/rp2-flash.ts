@@ -102,11 +102,17 @@ export async function flashPico(
   return true;
 }
 
-/** The title and detail an install dialog shows for a failed write. */
+/**
+ * The title and detail an install dialog shows for a failed write; anything
+ * ``flashPico`` did not name reads as a failed flash.
+ */
 export function picoFlashFailureCopy(
-  err: PicoFlashError,
+  err: unknown,
   localize: LocalizeFunc
 ): { title: string; detail: string } {
+  if (!(err instanceof PicoFlashError)) {
+    return { title: localize("firmware.rp2_flash_failed"), detail: getErrorMessage(err) };
+  }
   switch (err.kind) {
     case "rp2350":
       return { title: localize("firmware.rp2_rp2350_device"), detail: "" };

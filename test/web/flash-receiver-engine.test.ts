@@ -20,7 +20,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 }));
 const engines = vi.hoisted(() => {
   type Hooks = {
-    onState: (s: string, m: string) => void;
+    onState: (s: "connecting" | "installing" | "done" | "error", m: string) => void;
     onWaiting: (note: { message: string }) => void;
   };
   type Result = { rebooted: boolean; note?: { message: string } };
@@ -44,20 +44,62 @@ const engines = vi.hoisted(() => {
   };
   const esp = make("esp");
   const rtl = make("rtl-ambz2");
+  // An engine that picks its own device, with a step ahead of the install.
+  const pico = {
+    logs: { reset: "none" },
+    before: vi.fn(async (hooks: Hooks): Promise<"dismissed" | null> => {
+      hooks.onState("connecting", "resetting");
+      hooks.onWaiting({ message: "now in BOOTSEL" });
+      return null;
+    }),
+    run: vi.fn(
+      async (
+        hooks: Hooks
+      ): Promise<{ message?: string; note?: Result["note"] } | "dismissed" | null> => {
+        hooks.onState("installing", "pico writing");
+        return {};
+      }
+    ),
+  };
   // The lazy chunk loads; a test makes one reject to stand for a failed fetch.
   const load = { esp: vi.fn(async () => esp), rtl: vi.fn(async () => rtl) };
-  return { esp, rtl, load };
+  return { esp, rtl, pico, load };
 });
-vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
-  RECEIVER_ENGINES: {
-    esp: () => engines.load.esp(),
-    "rtl-ambz2": () => engines.load.rtl(),
-  },
-}));
+vi.mock("../../src/web/flash-receiver/receiver-engine.js", async () => {
+  // Both write over one serial port, picked by the helper as the real ones do.
+  const { serialRun } = await import("../../src/web/flash-receiver/serial-run.js");
+  type Engine = typeof engines.esp;
+  const picking = async (engine: Promise<Engine>) => {
+    const { prepare, logs } = await engine;
+    return {
+      logs,
+      prepare: async (parts: unknown, erase: boolean) => {
+        const plan = await prepare(parts, erase);
+        return "run" in plan ? { run: serialRun((k) => k, plan.run) } : plan;
+      },
+    };
+  };
+  return {
+    RECEIVER_ENGINES: {
+      esp: () => picking(engines.load.esp()),
+      "rtl-ambz2": () => picking(engines.load.rtl()),
+      "rp2-picoboot": async () => ({
+        logs: engines.pico.logs,
+        prepare: async () => ({
+          run: engines.pico.run,
+          before: { label: "Reset Device", run: engines.pico.before },
+          hint: "put the Pico into BOOTSEL",
+          primaryLabel: "Flash",
+        }),
+      }),
+    },
+  };
+});
 
 import { pickerRefused, withUserActivation } from "../_web-serial.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
 import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.js";
+import { last } from "./_receiver-hooks.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -147,7 +189,7 @@ describe("esphome-web-flash-receiver engines", () => {
     const ready = opener.postMessage.mock.calls
       .map((c) => c[0] as { type: string; flashers?: string[] })
       .find((m) => m.type === MSG_READY);
-    expect(ready?.flashers).toEqual(["esp", "rtl-ambz2"]);
+    expect(ready?.flashers).toEqual(["esp", "rtl-ambz2", "rp2-picoboot"]);
   });
 
   it("runs esptool for a frame without a flasher, as an older dashboard sends", async () => {
@@ -438,6 +480,115 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(states(opener)).toContainEqual(
       expect.objectContaining({ state: "connecting", note: "firmware.rtl_wait_desc" })
     );
+  });
+
+  describe("an engine that picks its own device", () => {
+    const beforeButton = (el: ESPHomeWebFlashReceiver) =>
+      el.shadowRoot!.querySelector("#btn-before") as HTMLButtonElement | null;
+    const pico = { flasher: "rp2-picoboot", erase: false };
+
+    it("shows the engine's hint, label and step, and none of them for the others", async () => {
+      const { el } = await handOff(pico, false);
+      expect(el.shadowRoot!.querySelector(".hint")!.textContent).toBe(
+        "put the Pico into BOOTSEL"
+      );
+      expect(primaryButton(el).textContent!.trim()).toBe("Flash");
+      expect(beforeButton(el)!.textContent!.trim()).toBe("Reset Device");
+
+      document.body.innerHTML = "";
+      const esp = (await handOff({}, false)).el;
+      expect(beforeButton(esp)).toBeNull();
+      expect(primaryButton(esp).textContent!.trim()).toBe("web.flash.connect_install");
+    });
+
+    it("runs the step from its own click and relays what the board needs next", async () => {
+      const { el, opener } = await handOff(pico, false);
+      beforeButton(el)!.click();
+      await vi.waitFor(() => expect((el as any)._busy).toBe(false));
+
+      expect(engines.pico.before).toHaveBeenCalledOnce();
+      expect(engines.pico.run).not.toHaveBeenCalled();
+      expect(states(opener)).toContainEqual(
+        expect.objectContaining({ state: "connecting", note: "now in BOOTSEL" })
+      );
+      // The install is still offered, on a click of its own.
+      await el.updateComplete;
+      expect(primaryButton(el).disabled).toBe(false);
+    });
+
+    it("goes back to the ready line when the step's chooser is dismissed", async () => {
+      engines.pico.before.mockImplementationOnce(async (hooks) => {
+        hooks.onState("connecting", "resetting");
+        return "dismissed";
+      });
+      const { el, opener } = await handOff({ ...pico, name: "fw.uf2" }, false);
+      await (el as any)._onBefore();
+      expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+      // The opener mirrors the receiver, so it is told as well.
+      expect(last(states(opener))).toMatchObject({
+        state: "connecting",
+        detail: "web.flash.firmware_ready_named",
+      });
+    });
+
+    it("asks no serial port for the install, and follows no logs without one", async () => {
+      const { el, opener } = await handOff(pico);
+      expect(engines.pico.run).toHaveBeenCalledOnce();
+      expect(requestPort).not.toHaveBeenCalled();
+      expect(last(states(opener))).toMatchObject({ state: "done" });
+      expect((el as any)._logPort).toBeUndefined();
+      expect((el as any)._logsOpen).toBe(false);
+      await el.updateComplete;
+      expect(beforeButton(el)).toBeNull();
+    });
+
+    it("finishes on the engine's own line when the finish is not an install", async () => {
+      engines.pico.run.mockResolvedValueOnce({
+        message: "UF2 downloaded",
+        note: { message: "copy it to the drive" },
+      });
+      const { opener } = await handOff(pico);
+      expect(last(states(opener))).toMatchObject({
+        state: "done",
+        detail: "UF2 downloaded",
+        note: "copy it to the drive",
+      });
+    });
+
+    it.each([
+      ["install", "run", "_onPrimary"],
+      ["step", "before", "_onBefore"],
+    ] as const)(
+      "frees the card and says why when the %s throws",
+      async (_n, part, click) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        engines.pico[part].mockImplementationOnce(async (hooks) => {
+          hooks.onWaiting({ message: "now in BOOTSEL" });
+          throw new Error("boom");
+        });
+        const { el, opener } = await handOff(pico, false);
+        await (el as any)[click]();
+        expect((el as any)._busy).toBe(false);
+        expect((el as any)._waiting).toBeNull();
+        expect(last(states(opener))).toMatchObject({ state: "error", detail: "boom" });
+      }
+    );
+
+    it("goes back to the ready line when the install's chooser is dismissed", async () => {
+      engines.pico.run.mockResolvedValueOnce("dismissed");
+      const { el } = await handOff(pico);
+      expect((el as any)._state).toBe("connecting");
+      expect((el as any)._flashDone).toBe(false);
+    });
+  });
+
+  it("shows the engine's last lines without waiting for a frame", async () => {
+    engines.esp.run.mockImplementationOnce(async (_port, hooks) => {
+      (hooks as unknown as { onLog: (line: string) => void }).onLog("Hard resetting");
+      return { rebooted: true };
+    });
+    const { el } = await handOff({});
+    expect((el as any)._logLines).toEqual(["Hard resetting"]);
   });
 
   it("drops the handed-over bytes from the card's state once the run holds them", async () => {

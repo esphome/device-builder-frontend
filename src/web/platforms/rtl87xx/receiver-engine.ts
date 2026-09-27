@@ -12,17 +12,20 @@ import {
   runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
-import type { ReceiverEngine } from "../../flash-receiver/receiver-engine.js";
+import {
+  type ReceiverEngine,
+  singleUf2Part,
+} from "../../flash-receiver/receiver-engine.js";
+import { serialRun } from "../../flash-receiver/serial-run.js";
 import { parseFailureCopy } from "../../install/preparation.js";
 
 export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
   logs: RTL87XX_SERIAL_LOGS,
   async prepare(parts, _erase, localize) {
-    // One part, the whole UF2, at address 0; anything else is not this hand-off.
-    const parsed =
-      parts.length === 1 && parts[0].address === 0
-        ? await loadAmbz2Image(parts[0].data)
-        : { key: "firmware.rtl_bad_uf2", detail: "not a single UF2 part" };
+    const uf2 = singleUf2Part(parts);
+    const parsed = uf2
+      ? await loadAmbz2Image(uf2)
+      : { key: "firmware.rtl_bad_uf2", detail: "not a single UF2 part" };
     if ("key" in parsed) {
       // The parser is a chunk of its own; the same bytes can parse next time.
       const { key, retryable } = parseFailureCopy(parsed.key);
@@ -37,7 +40,7 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
       label: localize("firmware.rtl_guide_link"),
     };
     return {
-      async run(port, hooks) {
+      run: serialRun(localize, async (port, hooks) => {
         hooks.onState("connecting", localize("firmware.rtl_connecting"));
         const result = await runAmbz2(port, image, {
           onLog: hooks.onLog,
@@ -61,7 +64,7 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
               rebooted: false,
               note: { message: localize("firmware.rtl_done_manual_reset") },
             };
-      },
+      }),
     };
   },
 };

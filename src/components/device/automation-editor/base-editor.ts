@@ -5,7 +5,7 @@
  * error + confirm-gated delete footer. Subclasses own their body
  * render and lifecycle (hydrate, catalog lists, headers).
  */
-import { consume } from "@lit/context";
+import { consume, provide } from "@lit/context";
 import { type CSSResultGroup, html, LitElement, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 
@@ -18,7 +18,11 @@ import type {
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  valuesReadContext,
+} from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles, heldStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
@@ -90,16 +94,6 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   @state() protected _hydrating = false;
   private _hydrateId = 0;
 
-  /** The YAML was edited outside the editor and the tree is still from
-   *  before. Written from it, the section would undo that edit (#1920),
-   *  so the editor is held until the reload that follows has settled. */
-  @state() private _stale = false;
-
-  /** Inert and read-only: the tree on screen is about to be replaced. */
-  private get _held(): boolean {
-    return this._hydrating || this._stale;
-  }
-
   /** One ``automations/parse`` per buffer while it is in flight, so a burst
    *  of relocations and reloads shares the round trip. */
   private readonly _parses = new KeyedPromiseCache<ParsedAutomation[]>({
@@ -115,18 +109,39 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected _target = 0;
   private _retargeted = false;
 
+  /** Provided as ``valuesReadContext``. */
+  @provide({ context: valuesReadContext }) private _valuesRead = 0;
+
+  /** The YAML was edited outside the editor and the tree shown is from
+   *  before that edit; the read follows up to a second later. Written from
+   *  it, the section would undo the edit (#1920), so the editor is held
+   *  until that read has settled. */
+  @state() private _stale = false;
+
+  /** Inert and read-only: the tree on screen is about to be replaced. */
+  private get _held(): boolean {
+    return this._hydrating || this._stale;
+  }
+
   /** "Show advanced settings" of the editor's own form; collapsed again
    *  for each automation the editor is pointed at. */
   @state() protected _showAdvanced = false;
 
-  /** Focus target for the current caret; none while a stale tree is shown. */
+  /** Focus target for the current caret; none while the tree of another
+   *  automation is shown. While the tree is from before an outside edit it
+   *  stays the target it was: the caret would land on the row that had its
+   *  place before the edit. */
   protected _currentFocus() {
-    return this._resolveFocus(
+    if (this._stale) return this._focus;
+    this._focus = this._resolveFocus(
       this._hydrating ? null : this.value,
       this.location,
       this.focusYamlPath
     );
+    return this._focus;
   }
+
+  private _focus: ReturnType<typeof this._resolveFocus> = null;
 
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  section so its empty tree can't overwrite the real YAML. */
@@ -239,6 +254,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // is the one of the YAML the editor wrote when the edit was taken back.
     const outdated = () =>
       id !== this._hydrateId || (yaml !== this.yaml && !this._hydrating);
+    // Read before the wait: a write the editor makes meanwhile must not
+    // turn a read that follows an outside edit into one of its own.
+    const counts = this._stale || !this._engine.shouldSkipReload();
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
       // draft buffer — without it the post-add hydrate would read
@@ -262,6 +280,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
           this._showAdvanced = false;
         }
         this._retargeted = false;
+        if (counts) this._valuesRead++;
         this.value = m.tree;
         this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
@@ -285,14 +304,25 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     if (yaml === this.yaml) this._stale = false;
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    // Attached again after a detach that dropped its tree.
+    if (this.hasUpdated && !this.addMode && this.value === null && !this._loading) {
+      void this._hydrateFromBackend();
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     // A parse resolving after unmount must not write into the element,
     // and a re-attached one must not come back read-only or show the
     // previous section's tree under the new location.
     this._hydrateId++;
-    this._dropStaleTree();
+    // Nor with the tree from before an outside edit, which nothing would
+    // read again.
+    if (this._stale) this.value = null;
     this._stale = false;
+    this._dropStaleTree();
     setHeld(this, false);
   }
 
@@ -323,13 +353,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // As ``reload()``: an edit of the form on its way out keeps its tree.
     // An edit taken back leaves the YAML the editor wrote, which no reload
     // reads, so the hold ends here.
-    if (changed.has("yaml") && this.hasUpdated) {
+    if (changed.get("yaml") !== undefined && !this.addMode) {
+      const outside = !this._engine.shouldSkipReload();
+      // Once for a burst of edits: each count renders every form below.
+      if (outside && !this._stale) this._valuesRead++;
       this._stale =
-        !this.addMode &&
-        this.location !== null &&
-        this.value !== null &&
-        !this._engine.dirty &&
-        !this._engine.shouldSkipReload();
+        outside && this.location !== null && this.value !== null && !this._engine.dirty;
     }
     setHeld(this, this._held);
   }
@@ -364,12 +393,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
    * pattern so editing YAML in the pane updates the visual editor.
    */
   public reload(): void {
-    if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) {
-      this._stale = false;
-      return;
-    }
-    void this._hydrateFromBackend();
+    this._stale =
+      !this.addMode && this.location !== null && !this._engine.shouldSkipReload();
+    if (this._stale) void this._hydrateFromBackend();
   }
 
   protected _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {

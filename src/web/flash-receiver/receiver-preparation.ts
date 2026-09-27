@@ -7,7 +7,7 @@ import type { HandoffFlasher } from "./protocol.js";
 import {
   RECEIVER_ENGINES,
   type ReceiverEngine,
-  type ReceiverRun,
+  type ReceiverPlan,
 } from "./receiver-engine.js";
 
 /** What is to be flashed, as it was handed over or picked. */
@@ -17,9 +17,8 @@ export interface ReceiverInput {
   flasher: HandoffFlasher;
 }
 
-/** A checked image: its run, and the logs policy of the flasher that runs it. */
-export interface ReceiverPrepared {
-  run: ReceiverRun;
+/** A checked image: its plan, and the logs policy of the flasher that runs it. */
+export interface ReceiverPrepared extends ReceiverPlan {
   logs: SerialLogsPolicy;
 }
 
@@ -46,7 +45,7 @@ export async function prepareForReceiver(
     if ("error" in plan) {
       return { failure: plan.error, retryable: plan.retryable === true };
     }
-    return { value: { run: plan.run, logs: engine.logs } };
+    return { value: { ...plan, logs: engine.logs } };
   } catch (err) {
     // An engine broke its never-throws contract: name the image, not the network.
     console.error("[flash receiver] The engine could not check the image:", err);

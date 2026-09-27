@@ -18,6 +18,7 @@ vi.mock(
 );
 
 import { identityLocalize } from "../../_dom.js";
+import { makeUf2Block } from "../../_make-uf2-block.js";
 import { FLASHER_HOST } from "../../../src/common/docs.js";
 import { defaultLocalize } from "../../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
@@ -27,6 +28,7 @@ import {
   handOffToFlasher,
   startUsbFlash,
 } from "../../../src/platforms/esp/usb-handoff.js";
+import { UF2_FAMILY_RP2350_ARM_S } from "../../../src/util/uf2.js";
 
 function makeHost() {
   const host = {
@@ -68,7 +70,7 @@ const callbacks = () => openFlasher.mock.calls[0][4] as FlasherCallbacks;
 describe("handOffToFlasher", () => {
   it("opens nothing for a device whose platform cannot hand off", () => {
     const host = makeHost();
-    host._device.target_platform = "rp2040";
+    host._device.target_platform = "nrf52";
     handOffToFlasher(asHost(host));
     expect(openFlasher).not.toHaveBeenCalled();
     expect(host._step).toBe("download-ready");
@@ -108,6 +110,17 @@ describe("handOffToFlasher", () => {
     expect(host._errorMessage).toBe("");
     expect(host._statusMessage).toBe("firmware.usb_flashing");
     expect(host._flashPercent).toBe(10);
+  });
+
+  it("hands a Pico's UF2 to the PICOBOOT flasher, without erase", () => {
+    const host = makeHost();
+    host._device.target_platform = "rp2040";
+    host._device.mcu = "rp2040";
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3]).toMatchObject({
+      flasher: "rp2-picoboot",
+      erase: false,
+    });
   });
 
   it("reads the flasher from the device's platform, and names an outdated receiver", () => {
@@ -212,6 +225,33 @@ describe("startUsbFlash artifact", () => {
     expect(host._usbFirmware).toBeNull();
   });
 
+  it("sends the UF2 for a Pico through the shared download", async () => {
+    const host = flowHost("rp2040", "rp2040");
+    const bytes = makeUf2Block({ addr: 0x10000000 });
+    steps.downloadBuildArtifact.mockResolvedValue({
+      binary: { file: "firmware.uf2", title: "UF2" },
+      bytes,
+    });
+    await startUsbFlash(asHost(host));
+    const [, , pick, noArtifactKey] = steps.downloadBuildArtifact.mock.calls[0];
+    expect(pick(binaries)?.file).toBe("firmware.uf2");
+    expect(noArtifactKey).toBe("firmware.no_uf2");
+    expect(host._usbFirmware).toBe(bytes.buffer);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("refuses an RP2350 image in the dashboard, before any flasher tab is offered", async () => {
+    const host = flowHost("rp2040", "rp2040");
+    steps.downloadBuildArtifact.mockResolvedValue({
+      binary: { file: "firmware.uf2", title: "UF2" },
+      bytes: makeUf2Block({ addr: 0x10000000, family: UF2_FAMILY_RP2350_ARM_S }),
+    });
+    await startUsbFlash(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.rp2_rp2350_unsupported");
+    expect(host._usbFirmware).toBeNull();
+  });
+
   it("sends the factory image for an ESP through the same download", async () => {
     const host = flowHost("esp32");
     steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.factory.bin"));
@@ -225,6 +265,8 @@ describe("startUsbFlash artifact", () => {
   it.each([
     ["rtl87xx", "rtl8710b"],
     ["rtl87xx", null],
+    ["rp2040", "rp2350"],
+    ["rp2040", null],
   ])("refuses %s with chip %s before the build", async (platform, mcu) => {
     const host = flowHost(platform, mcu);
     await startUsbFlash(asHost(host));
@@ -233,7 +275,7 @@ describe("startUsbFlash artifact", () => {
   });
 
   it("refuses a platform that has no hand-off instead of sending an ESP image", async () => {
-    const host = flowHost("rp2040", "rp2040");
+    const host = flowHost("nrf52", "nrf52840");
     await startUsbFlash(asHost(host));
     expect(steps.downloadBuildArtifact).not.toHaveBeenCalled();
     expect(host._statusMessage).toBe("firmware.no_flashable_binary");

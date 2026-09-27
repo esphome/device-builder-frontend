@@ -21,25 +21,66 @@ export interface ReceiverNote {
   guide?: { url: string; label: string };
 }
 
-/** A finished write: whether the board is booting, and what is left to do by hand. */
+/** A finished write: what is left to do by hand, and where its logs are. */
 export interface ReceiverResult {
-  rebooted: boolean;
   note?: ReceiverNote;
+  /** The line for a finish that is not an install, in place of the receiver's. */
+  message?: string;
+  /** Absent: no logs follow. */
+  logs?: ReceiverLogs;
+}
+
+/** The serial port a write went over, for the board's logs afterwards. */
+export interface ReceiverLogs {
+  port: SerialPort;
+  /** The ports authorized before the write, to tell the rebooted board's port apart. */
+  knownPorts: SerialPort[];
+  /** Whether the board is booting; if not, the logs wait for a reset by hand. */
+  rebooted: boolean;
 }
 
 /**
- * Flash the prepared image over ``port`` (closed, authorized). Null when it
- * failed; the hooks carried the detail. Never throws.
+ * Flash the prepared image, from the click: the engine opens its own chooser
+ * first, with nothing awaited before it. ``"dismissed"`` when the chooser was
+ * closed, null when it failed; the hooks carried the detail. Never throws.
  */
 export type ReceiverRun = (
-  port: SerialPort,
   hooks: ReceiverRunHooks
-) => Promise<ReceiverResult | null>;
+) => Promise<ReceiverResult | "dismissed" | null>;
+
+/**
+ * A step ahead of the install on a click of its own, for a board that has to
+ * be put into its bootloader first. Opens its own chooser like the run, and
+ * ends like it: ``"dismissed"``, or null with what happened on the hooks.
+ * Never throws.
+ */
+export interface ReceiverStep {
+  label: string;
+  run: (hooks: ReceiverRunHooks) => Promise<"dismissed" | null>;
+}
+
+/** A checked image, ready to install from a click. */
+export interface ReceiverPlan {
+  run: ReceiverRun;
+  before?: ReceiverStep;
+  /** What to do with the board, in place of the receiver's own hint. */
+  hint?: string;
+  /** The install button's label, in place of the receiver's own. */
+  primaryLabel?: string;
+}
+
+/**
+ * The bytes of a hand-off that is one UF2 whole, as one part at address 0;
+ * undefined for anything else.
+ */
+export function singleUf2Part(parts: FlashPart[]): Uint8Array | undefined {
+  return parts.length === 1 && parts[0].address === 0 ? parts[0].data : undefined;
+}
 
 /**
  * What the flash receiver needs from a flasher: check the hand-off's bytes
- * are its kind of image and plan the write, before the user picks a port,
- * so the click goes straight to the picker. One per hand-off flasher id,
+ * are its kind of image and plan the write, before the user picks a device,
+ * so the click goes straight to the chooser. One per hand-off flasher id,
  * registered in ``RECEIVER_ENGINES``, which holds every id the ``ready`` frame
  * advertises (``HANDOFF_FLASHERS``).
  */
@@ -55,7 +96,7 @@ export interface ReceiverEngine {
     parts: FlashPart[],
     erase: boolean,
     localize: LocalizeFunc
-  ): Promise<{ run: ReceiverRun } | { error: string; retryable?: boolean }>;
+  ): Promise<ReceiverPlan | { error: string; retryable?: boolean }>;
 }
 
 /**
@@ -67,4 +108,6 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/esp/receiver-engine.js")).espReceiverEngine,
   "rtl-ambz2": async () =>
     (await import("../platforms/rtl87xx/receiver-engine.js")).rtlAmbz2ReceiverEngine,
+  "rp2-picoboot": async () =>
+    (await import("../platforms/rp2/receiver-engine.js")).rp2PicobootReceiverEngine,
 };

@@ -30,7 +30,12 @@ import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  devicesContext,
+  localizeContext,
+  valuesReadContext,
+} from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import { sameEntryTarget } from "../../util/config-entry-target.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
@@ -279,12 +284,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ attribute: false })
   presentComponents: ReadonlySet<string> = new Set();
 
-  /** Goes up when the owner's YAML was edited outside the form, and when
-   *  the owner read ``values`` from it. The form is not told what moved,
-   *  so it then forgets what could write a value the user did not just
-   *  enter: it could sit on another field by now. What is only shown, such
-   *  as open groups, is kept. */
-  @property({ attribute: false })
+  /** See ``valuesReadContext``: on a new count the form forgets what could
+   *  write a value. What is only shown, such as open groups, is kept. */
+  @consume({ context: valuesReadContext, subscribe: true })
+  @state()
   valuesRead = 0;
 
   /** Instance-relative field path to scroll into view, from the YAML cursor. */

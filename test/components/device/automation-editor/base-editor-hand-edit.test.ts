@@ -213,10 +213,22 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
   });
 
-  it("is released when it leaves the page", async () => {
-    const { editor } = await mount();
+  it("leaves the page without the tree from before the edit, and reads it when it is back", async () => {
+    const { editor, inner, api } = await mount({
+      parseDeviceAutomations: vi.fn().mockResolvedValue([parsedEdited()]),
+    });
     await editByHand(editor);
+    const parent = editor.parentNode!;
+
     editor.remove();
+    expect(editor.inert).toBe(false);
+    expect(inner.value).toBeNull();
+
+    api.parseDeviceAutomations.mockClear();
+    parent.appendChild(editor);
+    await settled(editor);
+    expect(api.parseDeviceAutomations).toHaveBeenCalledWith("device.yaml", EDITED);
+    expect(inner.value.actions).toHaveLength(1);
     expect(editor.inert).toBe(false);
   });
 

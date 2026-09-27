@@ -7,12 +7,14 @@
  * previous ones at a path they share. Nor must one whose values were read
  * again from a YAML edited outside it.
  */
+import { ContextProvider } from "@lit/context";
 import { describe, expect, it } from "vitest";
 
 import { mountControlledForm as mountForm } from "./_config-entry-form-host.js";
 
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import { valuesReadContext } from "../../../src/context/index.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const valueEntry = (label: string): ConfigEntry[] => [
@@ -118,5 +120,33 @@ describe("config-entry-form literal / lambda stash", () => {
 
     expect(ctx().getClusterChoice("cluster")).toBeUndefined();
     expect(ctx().getClusterStash("cluster", "key")).toBeUndefined();
+  });
+
+  describe("under an editor that provides the count", () => {
+    async function mountUnderProvider() {
+      const mounted = await mountForm(valueEntry("Delay"), {
+        id: { _lambda: "return 1000;", _tag: "!lambda" },
+      });
+      const editor = document.createElement("div");
+      const provider = new ContextProvider(editor, {
+        context: valuesReadContext,
+        initialValue: 0,
+      });
+      document.body.appendChild(editor);
+      editor.appendChild(mounted.form);
+      await mounted.form.updateComplete;
+      return { ...mounted, provider };
+    }
+
+    it("forgets the stash on a new count", async () => {
+      const { form, changes, toggle, provider } = await mountUnderProvider();
+      await toggle("literal");
+
+      provider.setValue(1);
+      await form.updateComplete;
+      await toggle("lambda");
+
+      expect(changes[changes.length - 1].value).toEqual({ _lambda: "", _tag: "!lambda" });
+    });
   });
 });

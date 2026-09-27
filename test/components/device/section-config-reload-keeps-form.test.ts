@@ -208,9 +208,10 @@ describe("section reload keeps the form mounted", () => {
       await c.updateComplete;
     }
 
-    const reads = (c: ESPHomeDeviceSectionConfig): number => form(c).valuesRead;
+    // What the section provides to the form, which is a stub here.
+    const reads = (c: ESPHomeDeviceSectionConfig): number => (c as any)._valuesRead;
 
-    it("tells the form at once, before the reload that follows a second later", async () => {
+    it("counts the edit at once, before the reload that follows a second later", async () => {
       const { c } = await firstLoad();
       const before = reads(c);
 
@@ -220,7 +221,7 @@ describe("section reload keeps the form mounted", () => {
       expect(reads(c)).toBe(before + 1);
     });
 
-    it("tells the form again once the values were read", async () => {
+    it("counts again once the values were read", async () => {
       const { c } = await firstLoad();
       const before = reads(c);
 
@@ -229,7 +230,7 @@ describe("section reload keeps the form mounted", () => {
       expect(reads(c)).toBe(before + 2);
     });
 
-    it("does not for the YAML the section wrote itself", async () => {
+    it("does not count the YAML the section wrote itself", async () => {
       const { c, inner } = await firstLoad();
       const before = reads(c);
       expect(before).toBeGreaterThan(0);

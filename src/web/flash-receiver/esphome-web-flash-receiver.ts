@@ -10,8 +10,8 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { openFailureMessage } from "../../util/serial-open-error.js";
-import { requestSerialPort, webSerialAvailability } from "../../util/web-serial.js";
+import { LineBatcher } from "../../util/line-batcher.js";
+import { webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
@@ -30,6 +30,7 @@ import {
   RECEIVER_ENGINES,
   type ReceiverNote,
   type ReceiverRun,
+  type ReceiverRunHooks,
 } from "./receiver-engine.js";
 import {
   prepareForReceiver,
@@ -50,7 +51,8 @@ const MAX_LOG_LINES = 10000;
  * — the hand-off the dashboard uses when it can't flash itself (HA add-on over
  * plain http, where Web Serial is blocked). It authenticates the opener, takes
  * the firmware over postMessage, flashes it with the engine the frame names
- * (esptool by default, the RTL8720C ROM downloader; see ``receiver-engine.ts``),
+ * (esptool by default, the RTL8720C ROM downloader, PICOBOOT for a Pico; see
+ * ``receiver-engine.ts``),
  * and relays state/progress back so the dashboard mirrors it. A manual file
  * picker is the fallback if no firmware arrives; it flashes ESP images.
  */
@@ -103,10 +105,15 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   // Supersedes a pending boot-log acquisition (a second manual flash during
   // the re-enumeration wait, or an unmount mid-await).
   _bootLogsGen = 0;
-  // Batched log buffer flushed on the next animation frame (mirrors the logs
-  // dialog): an esptool output flood would otherwise trigger a render per line.
-  private _pendingLog: string[] = [];
-  private _flushScheduled = 0;
+  // An esptool output flood would otherwise trigger a render per line.
+  private _log = new LineBatcher(
+    (batch) => {
+      const merged = [...this._logLines, ...batch];
+      this._logLines =
+        merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    },
+    { maxLines: MAX_LOG_LINES }
+  );
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -150,7 +157,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     // A parked (or handed-over-but-not-yet-streamed) handle has no dialog
     // left to release it; a closed or dialog-owned one rejects harmlessly.
     void this._logPort?.close().catch(() => {});
-    if (this._flushScheduled) cancelAnimationFrame(this._flushScheduled);
+    this._log.reset();
   }
 
   private _onFirmware(msg: FirmwareMessage): void {
@@ -197,8 +204,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._fileInput && this._preparation.state.kind === "idle") {
       this._fileInput.value = "";
     }
-    const prepared = this._preparation.state;
-    if (prepared.kind === "ready") this._logsPolicy = prepared.value.logs;
+    if (this._plan) this._logsPolicy = this._plan.logs;
     if (error !== null) this._setState("error", error);
     else if (this._firmware) this._setState("connecting", this._readyMessage());
     else this._resetForRetry();
@@ -225,34 +231,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._handshake?.postProgress(pct);
   }
 
-  // Buffer a log line; flush on the next animation frame so a flood renders
-  // once per frame instead of per line.
-  private _enqueueLog(line: string): void {
-    this._pendingLog.push(line);
-    if (this._pendingLog.length > 2 * MAX_LOG_LINES) {
-      this._pendingLog = this._pendingLog.slice(-MAX_LOG_LINES);
-    }
-    if (this._flushScheduled) return;
-    this._flushScheduled = requestAnimationFrame(() => {
-      this._flushScheduled = 0;
-      this._flushLog();
-    });
-  }
-
-  private _flushLog(): void {
-    if (this._pendingLog.length === 0) return;
-    const merged = [...this._logLines, ...this._pendingLog];
-    this._logLines =
-      merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
-    this._pendingLog = [];
-  }
-
   private _resetLog(): void {
-    this._pendingLog = [];
-    if (this._flushScheduled) {
-      cancelAnimationFrame(this._flushScheduled);
-      this._flushScheduled = 0;
-    }
+    this._log.reset();
     this._logLines = [];
   }
 
@@ -290,24 +270,79 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       return;
     }
     if (this._working) return;
-    const preparation = this._preparation.state;
-    if (preparation.kind === "ready") {
-      await this._runInstall(preparation.value.run);
+    const plan = this._plan;
+    if (plan) {
+      await this._runInstall(plan.run);
       return;
     }
-    if (preparation.kind !== "retryable") return;
+    if (this._preparation.state.kind !== "retryable") return;
     // A chunk did not load earlier; load it again. The install is offered
     // once that is done, on a click of its own.
     this._setState("connecting", this._localize("web.install.preparing"));
     this._preparation.retry();
   }
 
-  // Nothing is awaited before the port picker: it needs the click's activation.
-  private async _runInstall(run: ReceiverRun): Promise<void> {
+  /** The ready plan, which the install and the engine's own copy come from. */
+  private get _plan(): ReceiverPrepared | undefined {
+    const preparation = this._preparation.state;
+    return preparation.kind === "ready" ? preparation.value : undefined;
+  }
+
+  /**
+   * Runs an engine's step from the click: nothing is awaited before it, as
+   * it opens the chooser. Null when it failed or the chooser was dismissed.
+   */
+  private async _engine<T>(
+    step: (hooks: ReceiverRunHooks) => Promise<T | "dismissed" | null>
+  ): Promise<T | null> {
     this._busy = true;
+    this._waiting = null;
+    let outcome: T | "dismissed" | null;
+    try {
+      outcome = await step({
+        onState: (state, message) => {
+          this._waiting = null;
+          this._setState(state, message);
+        },
+        onProgress: (pct) => this._setProgress(pct),
+        onLog: (line) => this._log.enqueue(line),
+        onWaiting: (note) => {
+          this._waiting = note;
+          // The dashboard shows the instruction too, on the state it mirrors.
+          if (this._state !== "idle") {
+            this._handshake?.postState(this._state, this._statusMessage, note.message);
+          }
+        },
+      });
+    } catch (err) {
+      // An engine broke its never-throws contract; the card must not stay busy.
+      console.error("[flash receiver] The engine threw:", err);
+      this._waiting = null;
+      this._setState("error", getErrorMessage(err));
+      return null;
+    } finally {
+      this._busy = false;
+      // The last lines are not left to a frame that may never come.
+      this._log.flush();
+    }
+    if (outcome !== "dismissed") return outcome;
+    this._resetForRetry();
+    // The opener saw what the engine said ahead of its chooser; take it back.
+    if (this._state !== "idle") {
+      this._handshake?.postState(this._state, this._statusMessage);
+    }
+    return null;
+  }
+
+  private async _onBefore(): Promise<void> {
+    const before = this._plan?.before;
+    if (!before || this._working || this._flashDone) return;
+    await this._engine(before.run);
+  }
+
+  private async _runInstall(run: ReceiverRun): Promise<void> {
     this._flashDone = false;
     this._progress = null;
-    this._waiting = null;
     // End any prior flash's log session outright: the generation bump only
     // supersedes a still-pending acquisition; closing the dialog releases a
     // streaming one (after-hide → _stop), and the stale handle must not
@@ -317,49 +352,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._logPort = undefined;
     this._resetLog();
 
-    let port: SerialPort | null;
-    try {
-      port = await requestSerialPort();
-    } catch (err) {
-      this._setState(
-        "error",
-        openFailureMessage(err, this._localize, "web.flash.no_port")
-      );
-      this._busy = false;
-      return;
-    }
-    if (!port) {
-      this._resetForRetry();
-      this._busy = false;
-      return;
-    }
-
-    // Snapshot authorized ports before the flash/reset so the live-log
-    // re-acquire can tell the re-enumerated handle from an existing board.
-    let before: SerialPort[] = [];
-    try {
-      before = await navigator.serial.getPorts();
-    } catch {
-      // tolerate; openLiveLogPort falls back to VID/PID matching
-    }
-
-    const result = await run(port, {
-      onState: (state, message) => {
-        this._waiting = null;
-        this._setState(state, message);
-      },
-      onProgress: (pct) => this._setProgress(pct),
-      onLog: (line) => this._enqueueLog(line),
-      onWaiting: (note) => {
-        this._waiting = note;
-        // The dashboard shows the instruction too, on the state it mirrors.
-        if (this._state !== "idle") {
-          this._handshake?.postState(this._state, this._statusMessage, note.message);
-        }
-      },
-    });
-
-    this._busy = false;
+    const result = await this._engine(run);
     if (!result) return;
 
     this._flashDone = true;
@@ -367,20 +360,21 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._waiting = result.note ?? null;
     this._setState(
       "done",
-      this._hasOpener
-        ? this._localize("web.flash.done_opener")
-        : this._localize("web.flash.done"),
+      result.message ??
+        this._localize(this._hasOpener ? "web.flash.done_opener" : "web.flash.done"),
       result.note?.message
     );
-    if (!result.rebooted) {
+    const { logs } = result;
+    if (!logs) return;
+    if (!logs.rebooted) {
       // No reboot to follow: park the port so Logs opens it once the user
       // has reset the board.
-      this._logPort = port;
+      this._logPort = logs.port;
       return;
     }
     // The engine already reset + disconnected the device; show its boot logs
     // in the shared logs dialog (reset / download / stop-start / reconnect).
-    await acquireBootLogs(this, port, before);
+    await acquireBootLogs(this, logs.port, logs.knownPorts);
   }
 
   // Reopen the boot-log dialog after the user closed it (the dialog closed
@@ -422,7 +416,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._preparation.state.kind === "retryable") {
       return this._localize("command.retry");
     }
-    return this._localize("web.flash.connect_install");
+    return this._plan?.primaryLabel ?? this._localize("web.flash.connect_install");
   }
 
   // Flashing, or getting the firmware ready to.
@@ -436,6 +430,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   private get _hint(): string {
+    if (this._plan?.hint) return this._plan.hint;
     return this._hasOpener
       ? this._localize("web.flash.hint_opener")
       : this._localize("web.flash.hint_direct");
@@ -521,6 +516,18 @@ export class ESPHomeWebFlashReceiver extends LitElement {
                     @click=${this._onViewLogs}
                   >
                     ${this._localize("dashboard.logs")}
+                  </button>`
+                : nothing
+            }
+            ${
+              this._plan?.before && !this._flashDone
+                ? html`<button
+                    id="btn-before"
+                    class="action-btn action-btn--ghost"
+                    ?disabled=${this._working}
+                    @click=${this._onBefore}
+                  >
+                    ${this._plan.before.label}
                   </button>`
                 : nothing
             }

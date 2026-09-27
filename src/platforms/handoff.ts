@@ -27,11 +27,12 @@ export const MSG_PROGRESS = "esphome-web-flash:progress";
 
 /**
  * The flasher a hand-off is for: ``"esp"`` is esptool (ESP32 / ESP8266),
- * ``"rtl-ambz2"`` the RTL8720C ROM downloader. Named after the flasher, not
- * the platform: ``rtl87xx`` covers the RTL8710B too, whose ROM speaks another
- * protocol and gets its own id when it lands.
+ * ``"rtl-ambz2"`` the RTL8720C ROM downloader, ``"rp2-picoboot"`` PICOBOOT
+ * for the RP2040. Named after the flasher, not the platform: ``rtl87xx``
+ * covers the RTL8710B too, whose ROM speaks another protocol and gets its own
+ * id when it lands.
  */
-export const HANDOFF_FLASHERS = ["esp", "rtl-ambz2"] as const;
+export const HANDOFF_FLASHERS = ["esp", "rtl-ambz2", "rp2-picoboot"] as const;
 export type HandoffFlasher = (typeof HANDOFF_FLASHERS)[number];
 /** What an absent ``flasher`` or ``flashers`` means: esptool, as in v1. */
 export const DEFAULT_HANDOFF_FLASHER: HandoffFlasher = "esp";
@@ -97,9 +98,9 @@ export interface FirmwareMessage {
    * Which flasher writes ``parts``; absent means esptool. An older receiver
    * ignores the field and would write anything as ESP parts, so a sender
    * puts a non-esp id only to a receiver whose ``flashers`` lists it, and a
-   * receiver refuses an id it does not have. For ``rtl-ambz2`` the parts are
-   * the LibreTiny UF2 as one part at address 0, which the receiver parses
-   * into flash runs itself.
+   * receiver refuses an id it does not have. For ``rtl-ambz2`` and
+   * ``rp2-picoboot`` the parts are the UF2 as one part at address 0, which
+   * the receiver parses into flash runs itself.
    */
   flasher?: HandoffFlasher;
   parts: FlashPartMessage[];

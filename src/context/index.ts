@@ -37,6 +37,7 @@ export {
   resolvedComponentsContext,
   resolvedPlatformsContext,
   serverVersionContext,
+  valuesReadContext,
   versionContext,
   versionHistoryEnabledContext,
 } from "./contexts.js";
