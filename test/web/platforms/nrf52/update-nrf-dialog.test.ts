@@ -176,9 +176,16 @@ describe.each(TRANSPORTS)(
       flash.mockRejectedValue(new SmpRestartNeededError(new Error("write failed")));
 
       await el[run]();
+      await el.updateComplete;
 
-      expect(el._state).toBe("error");
-      expect(el._errorMessage).toBe("firmware.nrf_smp_restart_needed");
+      // Not a failure to retry: the image is on the device.
+      expect(el._state).toBe("restart");
+      const card = el.shadowRoot!.querySelector("esphome-process-terminal") as any;
+      expect(card.statusMessage).toBe("firmware.nrf_smp_restart_needed_title");
+      expect(card.statusDetail).toBe("firmware.nrf_smp_restart_needed");
+      expect(el.shadowRoot!.querySelector(".actions")!.textContent).toContain(
+        "command.close"
+      );
     });
 
     it("says so when the update tools cannot be loaded", async () => {

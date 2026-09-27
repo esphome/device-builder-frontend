@@ -39,7 +39,8 @@ import {
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
-type UpdateState = "idle" | "flashing" | "success" | "error";
+// "restart": the image is on the device, which could not be restarted.
+type UpdateState = "idle" | "flashing" | "success" | "error" | "restart";
 type SmpEngine = Awaited<ReturnType<typeof loadSmpEngine>>;
 
 /**
@@ -218,7 +219,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     } catch (err) {
       if (abort.signal.aborted) return;
       console.error("[nrf52] The MCUboot update failed:", err);
-      this._fail(this._failureOf(engine, err, silentKey));
+      if (engine && err instanceof engine.SmpRestartNeededError) this._state = "restart";
+      else this._fail(this._failureOf(engine, err, silentKey));
     } finally {
       if (this._abort === abort) this._abort = null;
     }
@@ -234,9 +236,6 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     if (!engine) return this._localize("web.install.tools_load_failed");
     if (err instanceof engine.SmpBleServiceNotFoundError) {
       return this._localize("firmware.nrf_smp_ble_service_not_found");
-    }
-    if (err instanceof engine.SmpRestartNeededError) {
-      return this._localize("firmware.nrf_smp_restart_needed");
     }
     if (engine.isSerialDeviceLost(err)) return this._localize("serial.device_lost");
     // Only a device that never answered: one that stopped part way has the
@@ -282,6 +281,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
         return this._localize("web.nrf.install_flashing");
       case "success":
         return this._localize("web.nrf.install_done");
+      case "restart":
+        return this._localize("firmware.nrf_smp_restart_needed_title");
       default:
         return this._localize("firmware.status_failed");
     }
@@ -290,14 +291,17 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
   private _renderProgress() {
     return renderProgressCard(
       {
-        state: installTerminalState(this._state),
+        // The card has no banner for it; the error one says it needs attention.
+        state: installTerminalState(this._state === "restart" ? "error" : this._state),
         message: this._statusMessage(),
         detail:
           this._state === "error"
             ? this._errorMessage
             : this._state === "success"
               ? this._localize("web.nrf.install_done_hint")
-              : "",
+              : this._state === "restart"
+                ? this._localize("firmware.nrf_smp_restart_needed")
+                : "",
         progress: this._state === "flashing" ? this._progress : null,
         log: this._logLines,
       },
@@ -338,6 +342,7 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
       case "error":
         return renderRetryButton(this._localize, () => (this._state = "idle"));
       case "success":
+      case "restart":
         return renderCloseButton(this._localize, this._onAfterHide);
       default:
         return nothing;
