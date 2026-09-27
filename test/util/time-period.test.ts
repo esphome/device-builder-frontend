@@ -17,25 +17,29 @@ import {
 
 describe("parseTimePeriodScalar", () => {
   it.each([
-    ["1sec", { value: "1", unit: "s", parseable: true }],
-    ["34.1sec", { value: "34.1", unit: "s", parseable: true }],
-    ["1.0sec", { value: "1.0", unit: "s", parseable: true }],
-    ["5seconds", { value: "5", unit: "s", parseable: true }],
-    ["200ms", { value: "200", unit: "ms", parseable: true }],
-    ["10milliseconds", { value: "10", unit: "ms", parseable: true }],
-    ["1min", { value: "1", unit: "min", parseable: true }],
-    ["2minutes", { value: "2", unit: "min", parseable: true }],
-    ["3hours", { value: "3", unit: "h", parseable: true }],
-    ["4days", { value: "4", unit: "d", parseable: true }],
-    ["500microseconds", { value: "500", unit: "us", parseable: true }],
-    ["1 sec", { value: "1", unit: "s", parseable: true }],
-    ["100", { value: "100", unit: "s", parseable: true }],
+    ["1sec", { value: "1", unit: "s", parseable: true, unitless: false }],
+    ["34.1sec", { value: "34.1", unit: "s", parseable: true, unitless: false }],
+    ["1.0sec", { value: "1.0", unit: "s", parseable: true, unitless: false }],
+    ["5seconds", { value: "5", unit: "s", parseable: true, unitless: false }],
+    ["200ms", { value: "200", unit: "ms", parseable: true, unitless: false }],
+    ["10milliseconds", { value: "10", unit: "ms", parseable: true, unitless: false }],
+    ["1min", { value: "1", unit: "min", parseable: true, unitless: false }],
+    ["2minutes", { value: "2", unit: "min", parseable: true, unitless: false }],
+    ["3hours", { value: "3", unit: "h", parseable: true, unitless: false }],
+    ["4days", { value: "4", unit: "d", parseable: true, unitless: false }],
+    ["500microseconds", { value: "500", unit: "us", parseable: true, unitless: false }],
+    ["1 sec", { value: "1", unit: "s", parseable: true, unitless: false }],
   ])("parses %s", (input, expected) => {
     expect(parseTimePeriodScalar(input)).toEqual(expected);
   });
 
   it("treats an empty value as parseable seconds", () => {
-    expect(parseTimePeriodScalar("")).toEqual({ value: "", unit: "s", parseable: true });
+    expect(parseTimePeriodScalar("")).toEqual({
+      value: "",
+      unit: "s",
+      parseable: true,
+      unitless: false,
+    });
   });
 
   it("surfaces a compound form as unparseable raw text", () => {
@@ -43,6 +47,15 @@ describe("parseTimePeriodScalar", () => {
       value: "1h30s",
       unit: "s",
       parseable: false,
+      unitless: false,
+    });
+  });
+
+  it.each(["100", 100, "0", "2.5"])("reads a bare %j as a number with no unit", (raw) => {
+    expect(parseTimePeriodScalar(raw)).toMatchObject({
+      value: String(raw),
+      parseable: true,
+      unitless: true,
     });
   });
 });

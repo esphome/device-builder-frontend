@@ -171,9 +171,9 @@ function hexDisplayOrFallback(rawValue: unknown): string {
 
 /**
  * Time-period field: ESPHome accepts "<value><unit>" strings like
- * "5s" / "100ms" / "30min" / "1h" (and "5" = 5 seconds, "1h30s" =
- * compound — the latter is rare enough that we render it as a
- * plain text fallback when parsing fails).
+ * "5s" / "100ms" / "30min" / "1h" ("1h30s" is a compound, rare enough
+ * that we render it as a plain text fallback when parsing fails). A
+ * number with no unit is rejected, so it shows with no unit picked.
  *
  * Splits the value into a numeric input + a unit picker so the
  * user never has to remember the suffix grammar. Serializes back
@@ -222,14 +222,18 @@ export function renderTimePeriodField(
   // When the user hasn't touched the field yet, seed the unit
   // picker with the default's unit so the round-tripped widget
   // matches what they'd see if they typed the catalog default. Only a
-  // stored value keeps a unit finer than the entry accepts.
+  // stored unit is kept when it is finer than the entry accepts. A stored
+  // bare number has none, and ESPHome rejects it, so the picker shows no
+  // selection until the user picks one or edits the number.
   const hasValue = raw !== undefined && raw !== null && raw !== "";
-  const displayUnit = hasValue
+  const hasUnit = hasValue && !parsed.unitless;
+  const displayUnit = hasUnit
     ? parsed.unit
     : clampTimePeriodUnit(
         defaultParsed?.parseable ? defaultParsed.unit : parsed.unit,
         entry.duration_min_unit
       );
+  const selectedUnit = hasValue && !hasUnit ? null : displayUnit;
   return html`
     <div class="field time-period" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
@@ -249,6 +253,7 @@ export function renderTimePeriodField(
         <wa-select
           data-no-value-sync
           aria-label=${ctx.localize("device.automation_action_delay_unit")}
+          placeholder=${ctx.localize("device.automation_action_delay_unit")}
           ?disabled=${disabled}
           @change=${(e: Event) => {
             const nextUnit = (e.target as HTMLSelectElement).value as TimePeriodUnit;
@@ -257,10 +262,10 @@ export function renderTimePeriodField(
         >
           ${timePeriodUnitsFor(
             entry.duration_min_unit,
-            hasValue ? displayUnit : undefined
+            hasUnit ? displayUnit : undefined
           ).map(
             (u) =>
-              html`<wa-option value=${u} ?selected=${u === displayUnit}
+              html`<wa-option value=${u} ?selected=${u === selectedUnit}
                 >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option
               >`
           )}

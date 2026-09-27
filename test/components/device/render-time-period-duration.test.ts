@@ -96,6 +96,29 @@ describe("renderTimePeriodField unit picker", () => {
     expect(selected).toBe("s");
   });
 
+  it.each(["5", 5])("shows a bare %j with no unit picked", (stored) => {
+    // ESPHome rejects a number with no unit, so it must not read as seconds.
+    const { input, selected, units } = mount(field({ duration_min_unit: "ms" }), stored);
+    expect(input!.value).toBe("5");
+    expect(selected).toBeNull();
+    expect(units).toEqual(["ms", "s", "min", "h", "d"]);
+  });
+
+  it("gives a bare number the unit the user picks", () => {
+    const { host, emitChange } = mount(field({ duration_min_unit: "ms" }), "5");
+    const select = host.querySelector("wa-select") as HTMLElement & { value: string };
+    select.value = "min";
+    select.dispatchEvent(new Event("change"));
+    expect(emitChange).toHaveBeenCalledWith(PATH, "5min");
+  });
+
+  it("gives a bare number a valid unit once it is edited", () => {
+    const { input, emitChange } = mount(field({ duration_min_unit: "min" }), "5");
+    input!.value = "7";
+    input!.dispatchEvent(new Event("input"));
+    expect(emitChange).toHaveBeenCalledWith(PATH, "7min");
+  });
+
   it("labels the unit picker for assistive tech", () => {
     const { host } = mount(field(), "5s");
     expect(host.querySelector("wa-select")!.getAttribute("aria-label")).toBe(

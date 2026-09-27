@@ -80,15 +80,18 @@ export function looksLikeTimePeriodScalar(raw: unknown): boolean {
 }
 
 /** Split a time-period scalar into its numeric value and canonical unit.
- *  A bare number is seconds (ESPHome's default); a compound (`1h30s`) or
- *  unrecognised form surfaces verbatim with `parseable: false`. */
+ *  ESPHome rejects a number with no unit ("Did you mean '5s'?"), so a bare
+ *  number is `unitless`: its `unit` is only the seconds a picker may start
+ *  from, not what the value means. A compound (`1h30s`) or unrecognised
+ *  form surfaces verbatim with `parseable: false`. */
 export function parseTimePeriodScalar(raw: unknown): {
   value: string;
   unit: TimePeriodUnit;
   parseable: boolean;
+  unitless: boolean;
 } {
   if (raw === undefined || raw === null || raw === "") {
-    return { value: "", unit: "s", parseable: true };
+    return { value: "", unit: "s", parseable: true, unitless: false };
   }
   const text = String(raw).trim();
   const m = text.match(TIME_PERIOD_PARSE_RE);
@@ -98,9 +101,10 @@ export function parseTimePeriodScalar(raw: unknown): {
       value: num,
       unit: suf ? TIME_PERIOD_UNIT_ALIASES[suf] : "s",
       parseable: true,
+      unitless: !suf,
     };
   }
-  return { value: text, unit: "s", parseable: false };
+  return { value: text, unit: "s", parseable: false, unitless: false };
 }
 
 /** Combine a value and canonical unit into the YAML string form; empty
