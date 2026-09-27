@@ -152,4 +152,22 @@ describe("startUsbFlash while someone else's build runs (#1202)", () => {
     expect(host._timer.reset).toHaveBeenCalledOnce();
     expect(host._step).toBe("download-ready");
   });
+
+  it("waits for a build that took the slot while the first one ended", async () => {
+    const host = makeHost({ compileOk: true });
+    host._activeJobs.set("x.yaml", { job_id: "foreign-1" });
+    const follow = vi.mocked(host._api.firmwareFollowJob);
+    const followed = follow.getMockImplementation()!;
+    follow.mockImplementation((id, cbs) => {
+      // The map follows the backend: a successor, then nothing.
+      if (id === "foreign-1") host._activeJobs.set("x.yaml", { job_id: "foreign-2" });
+      if (id === "foreign-2") host._activeJobs.delete("x.yaml");
+      return followed(id, cbs);
+    });
+
+    await startUsbFlash(asHost(host));
+
+    expect(follow.mock.calls.map(([id]) => id)).toEqual(["foreign-1", "foreign-2", "j"]);
+    expect(host._step).toBe("download-ready");
+  });
 });

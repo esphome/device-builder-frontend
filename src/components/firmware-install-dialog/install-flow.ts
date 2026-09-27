@@ -253,11 +253,19 @@ async function runningBuildSettled(
   configuration: string,
   failKey: string
 ): Promise<boolean> {
-  const running = host._activeJobs.get(configuration);
-  if (!running) return true;
-  host._step = "queued";
-  host._statusMessage = host._localize("firmware.status_waiting_build");
-  if (!(await waitForRunningJob(host, running.job_id, failKey))) return false;
+  let waited = "";
+  // A build queued behind the one waited for takes the slot when that one
+  // ends, so the slot is read again. The same job still listed is the map
+  // not having caught up, not another build.
+  for (;;) {
+    const running = host._activeJobs.get(configuration);
+    if (!running || running.job_id === waited) break;
+    waited = running.job_id;
+    host._step = "queued";
+    host._statusMessage = host._localize("firmware.status_waiting_build");
+    if (!(await waitForRunningJob(host, waited, failKey))) return false;
+  }
+  if (!waited) return true;
   host._step = "queued";
   host._timer.reset();
   host._statusMessage = host._localize("firmware.status_queued");
