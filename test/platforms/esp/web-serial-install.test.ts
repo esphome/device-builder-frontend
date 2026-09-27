@@ -74,6 +74,7 @@ function makeHost() {
     _flashPercent: 0,
     _log: fakeLogBuffer(),
     _open: true,
+    _installRun: 1,
     _showLogsAfterInstall: false,
     _detected: null as unknown,
     _failureKind: null,
@@ -456,6 +457,11 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
   const dismiss = (host: { _open: boolean }) => {
     host._open = false;
   };
+  // A reopen for the same device is a new install run on an open dialog.
+  const reopen = (host: { _open: boolean; _installRun: number }) => {
+    host._installRun++;
+    host._open = true;
+  };
 
   it("does not connect when the dialog was dismissed during the port pick", async () => {
     const { host, api } = ready();
@@ -468,6 +474,62 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
 
     expect(esptool.connectToPort).not.toHaveBeenCalled();
     expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stands down when the same device was reopened during the connect", async () => {
+    const { host, api } = ready();
+    esptool.connectToPort.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      return CHIP;
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._detected).toBeNull();
+    expect(host._step).toBe("connecting");
+  });
+
+  it("does not close a reopened dialog when its own picker was dismissed", async () => {
+    const { host } = ready();
+    seams.requestSerialPort.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      return null;
+    });
+
+    await run(host);
+
+    expect(host._close).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the picker fails after a dismissal", async () => {
+    const { host } = ready();
+    seams.requestSerialPort.mockImplementationOnce(async () => {
+      dismiss(host);
+      throw lapsedPick();
+    });
+
+    await run(host);
+
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when there is no image to flash after a dismissal", async () => {
+    const { host, api } = ready();
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      dismiss(host);
+      return [];
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
     expect(host._fail).not.toHaveBeenCalled();
   });
 

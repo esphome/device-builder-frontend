@@ -85,6 +85,17 @@ describe("install-dialog dismissal", () => {
     expect(notifyInfo).not.toHaveBeenCalled();
   });
 
+  it("a reopen for the same device is a new install run", () => {
+    const { dialog } = makeDialog();
+    const device = { configuration: "d.yaml", name: "d", friendly_name: "D" };
+    dialog["_init"](device as never);
+    const run = dialog._installRun;
+    dialog._onClose();
+    dialog["_init"](device as never);
+    expect(dialog._installRun).toBe(run + 1);
+    expect(dialog._open).toBe(true);
+  });
+
   it("_close never cancels", () => {
     const { dialog, api } = makeDialog();
     dialog._close();

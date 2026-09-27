@@ -63,10 +63,12 @@ export async function startWebSerialInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // A dismissal (X, Escape) only closes the dialog; the device stays. The
-  // compile is the one await a dismissal settles, so after every other one
-  // the flow checks that the dialog is still open on this install.
-  const stillCurrent = () => host._device === device && host._open;
+  // A dismissal (X, Escape) only closes the dialog, and a reopen for the same
+  // device restores it. The compile is the one await a dismissal settles, so
+  // after every other one the flow checks that the dialog is still open on
+  // this very install.
+  const run = host._installRun;
+  const stillCurrent = () => host._installRun === run && host._open;
 
   // Surface esptool-js chip-detect / flash-session output in the shared log,
   // the same buffer the compile phase streams to. Without this the WebSerial
@@ -82,6 +84,7 @@ export async function startWebSerialInstall(
   try {
     picked = await pickPortAndLoadEsptool();
   } catch (err) {
+    if (!stillCurrent()) return;
     host._fail(
       err instanceof EngineLoadError
         ? host._localize("firmware.engine_load_failed")
@@ -91,11 +94,11 @@ export async function startWebSerialInstall(
     );
     return;
   }
+  if (!stillCurrent()) return;
   if (!picked) {
     host._close();
     return;
   }
-  if (!stillCurrent()) return;
   const { port, esptool } = picked;
   let detected: DetectedChip;
   try {
@@ -194,7 +197,7 @@ export async function startWebSerialInstall(
     const target = pickFlashTarget(detected.chipName, binaries);
     if (!target) {
       await releaseSerial(esptool, detected);
-      host._fail(host._localize("serial.no_firmware"));
+      if (stillCurrent()) host._fail(host._localize("serial.no_firmware"));
       return;
     }
     flashAddress = target.address;

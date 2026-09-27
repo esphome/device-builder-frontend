@@ -160,6 +160,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _installer: Installer = null;
 
   _device: ConfiguredDevice | null = null;
+  // Counts the installs this dialog has run. A flow captures it at its start
+  // and stands down when a reopen, for the same device or another, moved on.
+  _installRun = 0;
   _jobId = "";
   _streamId = "";
 
@@ -289,6 +292,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // run (which only flips _open) — without this teardown, a still-attached
     // followJob from the prior compile would push lines into the buffer.
     this._detachStream();
+    this._installRun++;
     this._device = device;
     this._open = true;
     this._step = "installing";
