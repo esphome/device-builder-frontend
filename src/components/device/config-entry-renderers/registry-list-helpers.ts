@@ -19,6 +19,7 @@ import {
   getCachedFilters,
   getCachedLightEffects,
 } from "../../../util/automation-catalog-cache.js";
+import type { RowMove } from "../config-entry-renderers-types.js";
 
 /** Extract the single key from a polymorphic-list item. Items
  *  arriving from a freshly-pressed Add button can be ``{}`` until
@@ -137,6 +138,17 @@ export function editableEntries(list: unknown[]): {
     }
   });
   return { items, positions };
+}
+
+/** Where ``spliceEditable`` puts each row when editable row *removed*
+ *  leaves: the editable rows after it each take the slot of the one before,
+ *  passing over the foreign entries, which stay where they are. */
+export function editableRowMove(positions: number[], removed: number): RowMove {
+  const moves = new Map<number, number | null>([[positions[removed], null]]);
+  for (let i = removed + 1; i < positions.length; i++) {
+    moves.set(positions[i], positions[i - 1]);
+  }
+  return (row) => (moves.has(row) ? moves.get(row)! : row);
 }
 
 /** Re-emit *list* with the editable slice replaced by *next*. Foreign

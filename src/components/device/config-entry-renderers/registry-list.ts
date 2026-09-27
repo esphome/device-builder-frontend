@@ -41,12 +41,14 @@ import {
 import {
   asList,
   editableEntries,
+  editableRowMove,
   formatRegistryId,
   itemId,
   REGISTRY_OPS,
   type RegistryOps,
   spliceEditable,
 } from "./registry-list-helpers.js";
+import { rowForgotten } from "./row-memory.js";
 import { makeScalarValueEntry, scalarValueType } from "./scalar-value-entry.js";
 
 @customElement("esphome-registry-list")
@@ -226,7 +228,7 @@ export class ESPHomeRegistryList extends LitElement {
       `;
     }
     const rawList = asList(raw);
-    const { items } = editableEntries(rawList);
+    const { items, positions } = editableEntries(rawList);
     const disabled = effectiveDisabled(this.entry, this.ctx);
     // Scope the catalog to entries valid for the parent section's
     // domain — sensor's picker should not offer binary_sensor's
@@ -288,7 +290,15 @@ export class ESPHomeRegistryList extends LitElement {
         ${renderLabel(this.entry, this.ctx, { path: this.path })}
         ${renderListEmptyHint(items, this.ctx)} ${statusHint}
         ${items.map((item, i) =>
-          this._renderRow(item, i, catalog, items, disabled, ops.dedupByTypeId)
+          this._renderRow(
+            item,
+            i,
+            positions[i],
+            catalog,
+            items,
+            disabled,
+            ops.dedupByTypeId
+          )
         )}
         ${renderListAddButton(this.ctx, addDisabled, () => this._addItem())}
         ${renderFieldError(this.path, this.ctx)}
@@ -299,6 +309,7 @@ export class ESPHomeRegistryList extends LitElement {
   private _renderRow(
     item: Record<string, unknown>,
     index: number,
+    position: number,
     catalog: RegistryCatalogEntry[],
     allItems: Record<string, unknown>[],
     disabled: boolean,
@@ -404,7 +415,7 @@ export class ESPHomeRegistryList extends LitElement {
           ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
         </div>
         ${this._renderSubForm(
-          index,
+          position,
           currentId,
           scalarConfigType,
           childEntries,
@@ -450,7 +461,7 @@ export class ESPHomeRegistryList extends LitElement {
    *  ``- lambda: |- ...``), the mapping sub-form when it carries
    *  config_entries, or nothing for ids with no params. */
   private _renderSubForm(
-    index: number,
+    position: number,
     currentId: string,
     scalarConfigType: ConfigEntryType | null,
     childEntries: ConfigEntry[],
@@ -461,7 +472,7 @@ export class ESPHomeRegistryList extends LitElement {
       return html`<div class="registry-list-sub-form">
         ${this.ctx.renderEntry(makeScalarValueEntry(scalarConfigType, catalogEntry), [
           ...this.path,
-          String(index),
+          String(position),
           currentId,
         ])}
       </div>`;
@@ -469,7 +480,12 @@ export class ESPHomeRegistryList extends LitElement {
     if (childEntries.length > 0) {
       return html`<div class="registry-list-sub-form">
         ${childEntries.map((child) =>
-          this.ctx.renderEntry(child, [...this.path, String(index), currentId, child.key])
+          this.ctx.renderEntry(child, [
+            ...this.path,
+            String(position),
+            currentId,
+            child.key,
+          ])
         )}
       </div>`;
     }
@@ -487,7 +503,8 @@ export class ESPHomeRegistryList extends LitElement {
   }
 
   private _removeAt(index: number) {
-    this.ctx.rowRemoved(this.path, index);
+    const { positions } = editableEntries(asList(this.ctx.getAt(this.path)));
+    this.ctx.rowsMoved(this.path, editableRowMove(positions, index));
     this._mutateEditable((items) => items.filter((_, i) => i !== index));
   }
 
@@ -495,14 +512,15 @@ export class ESPHomeRegistryList extends LitElement {
     // Reject empty: an empty id would synthesize ``{ "": null }``
     // and collide with itemId()'s unselected-placeholder sentinel.
     if (!nextId) return;
-    const target = editableEntries(asList(this.ctx.getAt(this.path))).items[index];
+    const { items, positions } = editableEntries(asList(this.ctx.getAt(this.path)));
+    const target = items[index];
     if (!target || itemId(target) === nextId) return;
     // Discard non-null params on type change: each entry type has
     // its own schema and carrying ``{delta: 0.5}`` over to ``throttle``
     // would silently produce a scalar where the new type expects a
     // time string. V1 has no sub-form to surface the mismatch, so
     // emit ``{nextId: null}`` and let the user reconfigure.
-    this.ctx.rowKindChanged(this.path, index);
+    this.ctx.rowsMoved(this.path, rowForgotten(positions[index]));
     this._mutateEditable((items) =>
       items.map((it, i) => (i === index ? { [nextId]: null } : it))
     );

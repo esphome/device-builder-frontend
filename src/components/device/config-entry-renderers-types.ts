@@ -12,6 +12,10 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
 
+/** Where a list row goes, by its index: its new index, or ``null`` when
+ *  what was remembered for it is dropped. */
+export type RowMove = (row: number) => number | null;
+
 export interface RenderCtx {
   localize: LocalizeFunc;
   disabled: boolean;
@@ -116,13 +120,10 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
-  /** Row *index* is leaving the list at *path*. What the form remembers is
-   *  keyed by paths that embed the row index, so the removed row's is
-   *  dropped and that of the rows below follows them up one index. */
-  rowRemoved: (path: string[], index: number) => void;
-  /** Row *index* of the list at *path* became another kind and lost its
-   *  values; what the form remembered for it goes with them. */
-  rowKindChanged: (path: string[], index: number) => void;
+  /** The rows of the list at *path* are about to go where *move* says. What
+   *  the form remembers is keyed by paths that embed the row index, so it
+   *  follows each row to its new index, and a dropped row's is forgotten. */
+  rowsMoved: (path: string[], move: RowMove) => void;
   /**
    * Generic per-key off-config UI-choice store. Born for either/or
    * constraint clusters (radio chooser): ``ClusterChoice`` is the selected

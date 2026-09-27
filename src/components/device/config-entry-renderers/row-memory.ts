@@ -2,17 +2,30 @@
  * What a form remembers about a field (the other side of a Value / Lambda
  * toggle, a unit picked on an empty field, an open group) is keyed by the
  * field's dotted path, and a list row's path holds the row's index. When a
- * row leaves the list the rows below it move up one index, so their keys
- * are renumbered to follow them and the removed row's are dropped.
+ * row leaves the list the rows below it move up, so their keys are
+ * renumbered to follow them and the removed row's are dropped.
  */
 import { isIndexSegment } from "../../../util/nested-values.js";
 import { fieldKeyAttr, parseFieldKey } from "../config-entry-renderers-shared.js";
+import type { RowMove } from "../config-entry-renderers-types.js";
 
 /** New key for a remembered entry; ``null`` drops the entry. */
 export type Rekey = (key: string) => string | null;
 
-/** The rekeyer for row *index* leaving the list at *path*. */
-export function rowRekeyer(path: string[], index: number): Rekey {
+/** Row *index* leaves a list: the rows below it move up one. */
+export const rowRemoved =
+  (index: number): RowMove =>
+  (row) =>
+    row === index ? null : row > index ? row - 1 : row;
+
+/** Row *index* stays where it is and loses what was remembered for it. */
+export const rowForgotten =
+  (index: number): RowMove =>
+  (row) =>
+    row === index ? null : row;
+
+/** The rekeyer for the rows of the list at *path* going where *move* says. */
+export function rowRekeyer(path: string[], move: RowMove): Rekey {
   const prefix = `${path.join(".")}.`;
   return (key) => {
     if (!key.startsWith(prefix)) return key;
@@ -20,25 +33,22 @@ export function rowRekeyer(path: string[], index: number): Rekey {
     // The row's segment ends at the next one or at a ``:suffix``.
     const segment = rest.split(/[.:]/, 1)[0];
     if (!isIndexSegment(segment)) return key;
-    const row = Number(segment);
-    if (row === index) return null;
-    if (row < index) return key;
-    return `${prefix}${row - 1}${rest.slice(segment.length)}`;
+    const row = move(Number(segment));
+    return row === null ? null : `${prefix}${row}${rest.slice(segment.length)}`;
   };
 }
 
 /** ``rowRekeyer`` for keys in the ``fieldKeyAttr`` form, which keeps a
  *  path's segments apart where a dotted key cannot. */
-export function fieldKeyRowRekeyer(path: string[], index: number): Rekey {
+export function fieldKeyRowRekeyer(path: string[], move: RowMove): Rekey {
   return (key) => {
     const segments = parseFieldKey(key);
     const segment = segments?.[path.length];
     if (!segments || segment === undefined || !isIndexSegment(segment)) return key;
     if (!path.every((part, i) => segments[i] === part)) return key;
-    const row = Number(segment);
-    if (row === index) return null;
-    if (row < index) return key;
-    return fieldKeyAttr([...path, String(row - 1), ...segments.slice(path.length + 1)]);
+    const row = move(Number(segment));
+    if (row === null) return null;
+    return fieldKeyAttr([...path, String(row), ...segments.slice(path.length + 1)]);
   };
 }
 

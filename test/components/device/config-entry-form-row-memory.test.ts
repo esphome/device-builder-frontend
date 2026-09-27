@@ -11,6 +11,7 @@ import { mountControlledForm } from "./_config-entry-form-host.js";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { rowRemoved } from "../../../src/components/device/config-entry-renderers/row-memory.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const STEPS = makeConfigEntry({
@@ -72,7 +73,7 @@ describe("config-entry-form list rows", () => {
     const ctx = () => (form as unknown as { _buildCtx(): RenderCtx })._buildCtx();
 
     ctx().expandOptions(["steps", "2", "value"]);
-    ctx().rowRemoved(["steps"], 0);
+    ctx().rowsMoved(["steps"], rowRemoved(0));
 
     expect(ctx().isOptionsExpanded(["steps", "1", "value"])).toBe(true);
     expect(ctx().isOptionsExpanded(["steps", "2", "value"])).toBe(false);

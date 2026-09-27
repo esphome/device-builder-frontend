@@ -28,7 +28,7 @@ import { renderNestedListField } from "../../../src/components/device/config-ent
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { normalizeMaybeValues } from "../../../src/util/maybe-values.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
-import { makeRenderCtx } from "./_renderer-fixtures.js";
+import { makeRenderCtx, reportedRowMoves } from "./_renderer-fixtures.js";
 
 function makeListEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -227,7 +227,7 @@ describe("renderNestedListField", () => {
     expect(handlers).toHaveLength(4);
     handlers[1]();
     expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "a" }, { id: "c" }]);
-    expect(ctx.rowRemoved).toHaveBeenCalledWith(["devices"], 1);
+    expect(reportedRowMoves(ctx, 3)).toEqual([["devices"], [0, null, 1]]);
     // Untouched siblings preserve identity.
     const next = emitChange.mock.calls[0][1] as Array<Record<string, unknown>>;
     expect(next[0]).toBe(before.devices[0]);

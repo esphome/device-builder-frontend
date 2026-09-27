@@ -4,11 +4,13 @@ import { rowMemoryCtx } from "../../../src/components/device/config-entry-render
 import {
   fieldKeyRowRekeyer,
   rekeyStore,
+  rowForgotten,
   rowRekeyer,
+  rowRemoved,
 } from "../../../src/components/device/config-entry-renderers/row-memory.js";
 import type { ConstraintClusterController } from "../../../src/components/device/constraint-cluster-controller.js";
 
-const removed = (index: number) => rowRekeyer(["filters"], index);
+const removed = (index: number) => rowRekeyer(["filters"], rowRemoved(index));
 
 describe("rowRekeyer", () => {
   it.each([
@@ -33,15 +35,46 @@ describe("rowRekeyer", () => {
   });
 
   it("renumbers a list inside a row by its own path", () => {
-    const rekey = rowRekeyer(["filters", "1", "steps"], 0);
+    const rekey = rowRekeyer(["filters", "1", "steps"], rowRemoved(0));
     expect(rekey("filters.1.steps.1.value")).toBe("filters.1.steps.0.value");
     expect(rekey("filters.2.steps.1.value")).toBe("filters.2.steps.1.value");
   });
 });
 
+describe("a move of more than one index", () => {
+  // Rows 0 and 2 can be edited, 1 cannot: removing row 0 brings row 2 to 0.
+  const move = (row: number) => (row === 0 ? null : row === 2 ? 0 : row);
+
+  it("sends a dotted key where its row goes", () => {
+    const rekey = rowRekeyer(["filters"], move);
+    expect(rekey("filters.0.multiply")).toBeNull();
+    expect(rekey("filters.2.multiply")).toBe("filters.0.multiply");
+    expect(rekey("filters.1.x")).toBe("filters.1.x");
+  });
+
+  it("sends a field key where its row goes", () => {
+    const rekey = fieldKeyRowRekeyer(["filters"], move);
+    expect(rekey(fieldKeyAttr(["filters", "2", "x"]))).toBe(
+      fieldKeyAttr(["filters", "0", "x"])
+    );
+  });
+
+  it("keeps both rows when two swap places in one store", () => {
+    const store = new Map([
+      ["l.0.x", "a"],
+      ["l.1.x", "b"],
+    ]);
+    rekeyStore(
+      store,
+      rowRekeyer(["l"], (row) => 1 - row)
+    );
+    expect(Object.fromEntries(store)).toEqual({ "l.0.x": "b", "l.1.x": "a" });
+  });
+});
+
 describe("fieldKeyRowRekeyer", () => {
   const key = (...path: string[]) => fieldKeyAttr(path);
-  const rekey = fieldKeyRowRekeyer(["filters"], 1);
+  const rekey = fieldKeyRowRekeyer(["filters"], rowRemoved(1));
 
   it.each([
     ["the removed row's key", key("filters", "1", "x"), null],
@@ -55,7 +88,7 @@ describe("fieldKeyRowRekeyer", () => {
 
   it("keeps a map key that holds a dot apart from a row", () => {
     // ``logs["i2c.2"]`` reads like row 2 of ``logs.i2c`` in a dotted key.
-    const dotted = fieldKeyRowRekeyer(["logs", "i2c"], 0);
+    const dotted = fieldKeyRowRekeyer(["logs", "i2c"], rowRemoved(0));
     expect(dotted(key("logs", "i2c.2"))).toBe(key("logs", "i2c.2"));
     expect(dotted(key("logs", "i2c", "2"))).toBe(key("logs", "i2c", "1"));
   });
@@ -103,7 +136,7 @@ describe("rowMemoryCtx", () => {
 
   it("drops a removed row and moves the rows below it up", () => {
     const { store, clusters, ctx } = setup();
-    ctx.rowRemoved(["filters"], 1);
+    ctx.rowsMoved(["filters"], rowRemoved(1));
     expect([...store]).toEqual([
       ["filters.0.x", "a"],
       ["filters.1.x", "c"],
@@ -113,7 +146,7 @@ describe("rowMemoryCtx", () => {
 
   it("forgets a row whose kind changed and leaves the others where they are", () => {
     const { store, ctx } = setup();
-    ctx.rowKindChanged(["filters"], 1);
+    ctx.rowsMoved(["filters"], rowForgotten(1));
     expect([...store]).toEqual([
       ["filters.0.x", "a"],
       ["filters.2.x", "c"],
