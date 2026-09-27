@@ -267,7 +267,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
-    const platformRows = this._renderPlatformFlashRows(ctx, false);
+    const flasherRows = this._renderPlatformFlashRows(ctx, (i) => !i.component);
+    const updaterRows = this._renderPlatformFlashRows(ctx, (i) => !!i.component);
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)
       : nothing;
@@ -279,11 +280,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // cable; the server-serial row is the cable path when neither renders (a
     // chip no browser flasher writes). The logs → ESPHome Web row only
     // appears in logs mode, so it's inert (``nothing``) in the usbFirst
-    // (install) ordering.
+    // (install) ordering. An updater needs firmware that already runs, as an
+    // OTA does, so it goes last with it; it stays offered, since a board
+    // flashed outside the dashboard reads as never flashed too.
     const usbFirst = !isLogs && this.neverFlashed;
     const rows = usbFirst
-      ? [usbRow, platformRows, logsWebRow, serverRow, otaRow]
-      : [otaRow, usbRow, platformRows, logsWebRow, bleNusRow, serverRow];
+      ? [usbRow, flasherRows, logsWebRow, serverRow, updaterRows, otaRow]
+      : [otaRow, usbRow, flasherRows, updaterRows, logsWebRow, bleNusRow, serverRow];
 
     return html`
       ${renderInstallNotice(ctx)}
@@ -447,13 +450,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     `;
   }
 
-  /** The device's platform flashers, the main list's or the advanced ones. */
-  private _renderPlatformFlashRows(ctx: MethodRowContext, advanced: boolean) {
+  /** The rows of the device's platform flashers that ``wanted`` picks. */
+  private _renderPlatformFlashRows(
+    ctx: MethodRowContext,
+    wanted: (install: AnyBrowserInstall) => boolean,
+    advanced = false
+  ) {
     const availability = this._webSerialAvailability;
     const handoffDesc =
       availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined;
     return this.platformInstalls
-      .filter((install) => (install.advanced ?? false) === advanced)
+      .filter((install) => (install.advanced ?? false) === advanced && wanted(install))
       .map((install) =>
         renderPlatformFlashOption(ctx, install, availability === "available", handoffDesc)
       );
@@ -489,7 +496,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             },
             onSubmit: this._submitOtaAddress,
           })}
-          ${this._renderPlatformFlashRows(ctx, true)}
+          ${this._renderPlatformFlashRows(ctx, () => true, true)}
           ${
             this.mode === "install" &&
             this.canFlashBootloader &&
