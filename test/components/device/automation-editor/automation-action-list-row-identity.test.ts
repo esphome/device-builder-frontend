@@ -178,6 +178,25 @@ describe("automation-action-list row identity", () => {
     expect(list.actions).toEqual([delay("2s"), delay("3s")]);
   });
 
+  it("does not hand the caret's target to a row moved onto its index", async () => {
+    const list = await mountList([delay("1s"), delay("2s"), delay("3s")]);
+    list.focusTarget = { node: [1], field: [] };
+    await settle(list);
+    const [first, second] = nodes(list);
+    expect(second.focusTarget).toEqual({ node: [], field: [] });
+
+    nodeButton(first, "button[aria-expanded]").click();
+    await settle(list);
+    nodeButton(first, MOVE_DOWN).click();
+    await settle(list);
+
+    expect(nodes(list)[1]).toBe(first);
+    expect(first.focusTarget).toBeNull();
+    expect(nodeButton(first, "button[aria-expanded]").getAttribute("aria-expanded")).toBe(
+      "false"
+    );
+  });
+
   it("keeps a collapsed card collapsed when it is moved", async () => {
     const list = await mountList([delay("1s"), delay("2s")]);
 

@@ -142,8 +142,15 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   /** The control that asked for a reorder; see the action list. */
   private _refocus: HTMLElement | null = null;
 
+  /** Key of the row the caret's target was handed to; see the action list. */
+  private _focusRow: number | undefined;
+
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("focusTarget")) this._focusScrolled = false;
+    if (!changed.has("focusTarget")) return;
+    this._focusScrolled = false;
+    const at = this.focusTarget?.node[0];
+    this._focusRow =
+      typeof at === "number" ? this._rows.keysFor(this.conditions)[at] : undefined;
   }
 
   protected updated(changed: PropertyValues<this>): void {
@@ -188,7 +195,10 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   private _renderNode(node: ConditionNode, idx: number, key: number) {
     const def = this.catalog.find((c) => c.id === node.condition_id);
     const lastIdx = this.conditions.length - 1;
-    const rowFocus = this.focusTarget?.node[0] === idx ? this.focusTarget : null;
+    const rowFocus =
+      this.focusTarget?.node[0] === idx && key === this._focusRow
+        ? this.focusTarget
+        : null;
     const nestedFocus =
       rowFocus && rowFocus.node.length > 1 ? childFocus(rowFocus) : null;
     const fieldFocus =

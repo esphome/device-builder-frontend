@@ -178,6 +178,28 @@ describe("automation-condition-tree advanced section", () => {
     ]);
   });
 
+  it("does not hand the caret's target to a row moved onto its index", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("sensor.in_range"),
+    ]);
+    el.focusTarget = { node: [1], field: ["basic"] };
+    await el.updateComplete;
+    const fieldFocus = () =>
+      forms(el).map(
+        (form) => (form as unknown as { focusFieldPath?: string[] }).focusFieldPath
+      );
+    expect(fieldFocus()).toEqual([undefined, ["basic"], undefined]);
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!.click();
+    await el.updateComplete;
+
+    expect(fieldFocus()).toEqual([undefined, undefined, undefined]);
+  });
+
   it("moves the flag with its row on a reorder", async () => {
     const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
     const opened = forms(el)[0];

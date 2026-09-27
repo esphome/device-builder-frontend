@@ -98,6 +98,19 @@ export class ESPHomeAutomationActionList extends LitElement {
    *  The owner can drop the reorder, and then nothing is focused. */
   private _refocus: HTMLElement | null = null;
 
+  /** Key of the row the caret's target was handed to. A target names its
+   *  row by index, so a row that a reorder or a delete brings to that
+   *  index would otherwise take it over, and flash and expand as if the
+   *  caret had moved there. */
+  private _focusRow: number | undefined;
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (!changed.has("focusTarget")) return;
+    const at = this.focusTarget?.node[0];
+    this._focusRow =
+      typeof at === "number" ? this._rows.keysFor(this.actions)[at] : undefined;
+  }
+
   protected updated(changed: PropertyValues<this>): void {
     if (changed.has("actions")) this._refocus?.focus();
     this._refocus = null;
@@ -122,7 +135,7 @@ export class ESPHomeAutomationActionList extends LitElement {
             : repeat(
                 this.actions,
                 (_node, idx) => keys[idx],
-                (node, idx) => this._renderRow(node, idx, idx === this.actions.length - 1)
+                (node, idx) => this._renderRow(node, idx, keys[idx])
               )
         }
         <button
@@ -148,11 +161,13 @@ export class ESPHomeAutomationActionList extends LitElement {
     });
   };
 
-  private _renderRow(node: ActionNode, idx: number, isLast: boolean) {
+  private _renderRow(node: ActionNode, idx: number, key: number) {
+    const focus = this.focusTarget;
+    const isLast = idx === this.actions.length - 1;
     return html`<esphome-automation-action-node
       .value=${node}
       .focusTarget=${
-        this.focusTarget?.node[0] === idx ? childFocus(this.focusTarget) : null
+        focus?.node[0] === idx && key === this._focusRow ? childFocus(focus) : null
       }
       .catalog=${this.catalog}
       .conditionCatalog=${this.conditionCatalog}
