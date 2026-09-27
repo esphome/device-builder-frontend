@@ -370,11 +370,6 @@ export class ESPHomeLogsDialog extends LitElement {
     const offerOtaFallback = !isBle && (this._quietSerial.quiet || s.kind === "dead");
     const title = this._localize("dashboard.logs_title", { name: this.name });
     const source = this._sourceLabel();
-    // The BLE connect can take seconds with nothing to show yet.
-    const connectingMessage =
-      s.kind === "reconnecting" && this._passiveSource === "ble"
-        ? this._localize("dashboard.logs_ble_nus_connecting")
-        : "";
     // Only the ota source rides the dashboard WS; a Web Serial stream
     // is healthy regardless, so no false error banner there.
     const wsDown = s.kind === "ota" && this._connectionLost;
@@ -394,8 +389,6 @@ export class ESPHomeLogsDialog extends LitElement {
           .targetPlatform=${this._targetPlatform}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
-          .state=${connectingMessage ? "running" : null}
-          .statusMessage=${connectingMessage}
           .connectionLost=${wsDown}
           .connectionLostMessage=${this._localize("dashboard.logs_connection_lost")}
         >
