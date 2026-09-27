@@ -240,6 +240,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       return;
     }
     const id = ++this._hydrateId;
+    // Read before the wait: a write the editor makes meanwhile must not
+    // turn a read that follows an outside edit into one of its own.
+    const counts = this._stale || !this._engine.shouldSkipReload();
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
       // draft buffer — without it the post-add hydrate would read
@@ -264,8 +267,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
           this._showAdvanced = false;
         }
         this._retargeted = false;
-        // Not for the editor's own write, read back while this waited.
-        if (!this._engine.shouldSkipReload()) this._valuesRead++;
+        if (counts) this._valuesRead++;
         this._stale = false;
         this.value = m.tree;
         this._hydrating = false;

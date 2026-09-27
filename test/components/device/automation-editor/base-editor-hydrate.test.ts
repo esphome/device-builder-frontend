@@ -252,6 +252,25 @@ describe("base editor relocation hydrate", () => {
       expect(reads(editor)).toBe(before + 3);
     });
 
+    it("counts the read after an outside edit although the editor wrote while it waited", async () => {
+      const d = deferred<ParsedAutomation[]>();
+      const parse = vi.fn().mockResolvedValueOnce([parsedScript("a")]);
+      const { editor } = await mountAt("a", parse);
+      parse.mockReturnValue(d.promise);
+      const before = reads(editor);
+      await outsideEdit(editor, EDITED);
+      editor.reload();
+      await flushMicrotasks(3);
+
+      // A change in the form while the parse is out makes the YAML its own.
+      (editor as any)._engine._lastSelfWrittenYaml = EDITED;
+      d.resolve([parsedScript("a")]);
+      await flushMicrotasks(5);
+      await editor.updateComplete;
+
+      expect(reads(editor)).toBe(before + 2);
+    });
+
     it("does not count the YAML the editor wrote itself", async () => {
       const { editor, before } = await mounted();
 
