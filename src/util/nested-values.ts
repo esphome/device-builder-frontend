@@ -196,7 +196,11 @@ export function isUnderScalar(obj: Record<string, unknown>, path: string[]): boo
   for (const segment of path.slice(0, -1)) {
     node = (node as Record<string, unknown>)[segment];
     if (node === undefined || node === null) return false;
-    if (typeof node !== "object") return true;
+    if (Array.isArray(node)) continue;
+    // An object of a class (a preserved block of raw YAML) is one value
+    // as well: a write under it would leave a mapping in its place.
+    const proto: unknown = Object.getPrototypeOf(node);
+    if (proto !== Object.prototype && proto !== null) return true;
   }
   return false;
 }

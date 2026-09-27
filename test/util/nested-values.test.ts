@@ -6,6 +6,7 @@ import {
   isUnderScalar,
   setIn,
 } from "../../src/util/nested-values.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 describe("setIn", () => {
   it("returns a fresh object with the leaf written", () => {
@@ -215,6 +216,8 @@ describe("isUnderScalar", () => {
     [{ filters: ["x"] }, ["filters", "0", "multiply"], true],
     [{}, ["pin", "inverted"], false],
     [{ pin: null }, ["pin", "inverted"], false],
+    [{ on_press: new YamlRawValue(["- logger.log: hi"]) }, ["on_press", "then"], true],
+    [{ pin: Object.create(null) }, ["pin", "inverted"], false],
     [{ pin: "GPIO5" }, ["pin"], false],
     [{ pin: "GPIO5" }, [], false],
   ])("%j at %j is %s", (obj, path, expected) => {
