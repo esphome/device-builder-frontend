@@ -3,8 +3,8 @@
  * bridge the USB ids name nothing, but every ROM and firmware announces
  * itself on reset, so one reset and one short read at 115200 name the
  * family, the chip, or the exact board, for as many families as there are
- * lines in the table (#1866). Shared by both apps; nothing here touches the
- * DOM or an engine.
+ * lines in the table (#1866). The Device Builder's detect reads it; nothing
+ * here touches the DOM or an engine, so ESPHome Web can share it.
  */
 import { openSerialPort } from "../util/serial-open-error.js";
 import { settledWithin, withDeadline } from "../util/with-deadline.js";
@@ -182,6 +182,6 @@ async function pulseReset(port: SerialPort, session: BannerSession): Promise<voi
       "[detect] Could not release reset after the boot banner pulse; trying once more:",
       err
     );
-    await release().catch(() => {});
+    if (!session.abandoned) await release().catch(() => {});
   });
 }
