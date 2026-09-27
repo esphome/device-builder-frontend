@@ -121,7 +121,10 @@ async function runSmpFlash<Target>(
         : err instanceof engine.SmpBleServiceNotFoundError
           ? "firmware.nrf_smp_ble_service_not_found"
           : flow.failedKey;
-      host._fail(host._localize(key), getErrorMessage(err));
+      const detail = engine?.isSerialDeviceLost(err)
+        ? host._localize("serial.device_lost")
+        : getErrorMessage(err);
+      host._fail(host._localize(key), detail);
     }
     return;
   } finally {

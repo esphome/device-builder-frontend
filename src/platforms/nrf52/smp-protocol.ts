@@ -47,7 +47,11 @@ export class SmpError extends Error {
 
 /** The request went out and no reply came back: the link dropped, or timed out. */
 export class SmpNoReplyError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    // Error.cause needs lib ES2022; the field is declared here instead.
+    readonly cause?: unknown
+  ) {
     super(message);
     this.name = "SmpNoReplyError";
   }
@@ -225,7 +229,7 @@ export async function awaitReply(
     );
   } catch (err) {
     if (signal?.aborted) throw err;
-    throw new SmpNoReplyError(getErrorMessage(err));
+    throw new SmpNoReplyError(getErrorMessage(err), err);
   }
 }
 
