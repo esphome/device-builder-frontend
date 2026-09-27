@@ -9,6 +9,11 @@ const flow = vi.hoisted(() => ({
   failNoBinaries: vi.fn(),
 }));
 vi.mock("../../../src/components/firmware-install-dialog/install-flow.js", () => flow);
+const steps = vi.hoisted(() => ({ downloadBuildArtifact: vi.fn() }));
+vi.mock(
+  "../../../src/components/firmware-install-dialog/browser-flash-steps.js",
+  () => steps
+);
 
 import { identityLocalize } from "../../_dom.js";
 import { FLASHER_HOST } from "../../../src/common/docs.js";
@@ -49,7 +54,21 @@ const asHost = (h: ReturnType<typeof makeHost>) =>
 
 afterEach(() => vi.clearAllMocks());
 
+// The callbacks the dialog gave the (mocked) flasher session.
+const callbacks = () => openFlasher.mock.calls[0][4] as FlasherCallbacks;
+
 describe("handOffToFlasher", () => {
+  it("shows the receiver's done note, and the plain done line without one", () => {
+    const host = makeHost();
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3]).toBe("esp");
+    callbacks().onState("done", "");
+    expect(host._statusMessage).toBe("firmware.usb_done");
+    callbacks().onState("done", "reset the board");
+    expect(host._step).toBe("done");
+    expect(host._statusMessage).toBe("reset the board");
+  });
+
   it("parks on download-ready and keeps the firmware when the pop-up is blocked", () => {
     openFlasher.mockReturnValue(null);
     const host = makeHost();
@@ -61,21 +80,14 @@ describe("handOffToFlasher", () => {
   });
 
   it("clears the failure banner when an in-tab retry resumes flashing", () => {
-    let cbs: FlasherCallbacks | undefined;
-    openFlasher.mockImplementation(
-      (_fw: ArrayBuffer, _n: string, _d: string, callbacks: FlasherCallbacks) => {
-        cbs = callbacks;
-        return () => {};
-      }
-    );
     const host = makeHost();
     handOffToFlasher(asHost(host));
     // The flasher reports a non-terminal error, then the user retries in-tab and
     // the first frame back is progress (no status detail).
-    cbs!.onState("error", "boom");
+    callbacks().onState("error", "boom");
     expect(host._step).toBe("error");
     expect(host._errorMessage).toBe("boom");
-    cbs!.onProgress(10);
+    callbacks().onProgress(10);
     expect(host._step).toBe("flashing");
     expect(host._errorMessage).toBe("");
     expect(host._statusMessage).toBe("firmware.usb_flashing");
@@ -83,33 +95,19 @@ describe("handOffToFlasher", () => {
   });
 
   it("passes the platform flasher's id through, and names an outdated receiver", () => {
-    let cbs: FlasherCallbacks | undefined;
-    openFlasher.mockImplementation(
-      (_fw: ArrayBuffer, _n: string, _d: string, callbacks: FlasherCallbacks) => {
-        cbs = callbacks;
-        return () => {};
-      }
-    );
     const host = makeHost();
     host._usbHandoff = rtlAmbz2Install;
     handOffToFlasher(asHost(host));
-    expect(openFlasher.mock.calls[0][4]).toBe("rtl-ambz2");
-    cbs!.onUnsupported("flasher");
+    expect(openFlasher.mock.calls[0][3]).toBe("rtl-ambz2");
+    callbacks().onUnsupported("flasher");
     expect(host._errorMessage).toBe("firmware.usb_flasher_outdated");
     expect(host._failureKind).toBe("unsupported-browser");
   });
 
   it("fails with the unsupported-browser message when the hand-off is declined", () => {
-    let cbs: FlasherCallbacks | undefined;
-    openFlasher.mockImplementation(
-      (_fw: ArrayBuffer, _n: string, _d: string, callbacks: FlasherCallbacks) => {
-        cbs = callbacks;
-        return () => {};
-      }
-    );
     const host = makeHost();
     handOffToFlasher(asHost(host));
-    cbs!.onUnsupported("web-serial");
+    callbacks().onUnsupported("web-serial");
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.usb_failed");
     expect(host._errorMessage).toBe("firmware.usb_unsupported_browser");
@@ -160,26 +158,33 @@ describe("startUsbFlash artifact", () => {
     return host;
   }
 
-  it("sends the platform flasher's own artifact, the UF2 for the RTL8720C", async () => {
-    const host = flowHost([
-      { file: "firmware.factory.bin", title: "Factory" },
-      { file: "firmware.uf2", type: "uf2", title: "UF2" },
-    ]);
+  it("sends the platform flasher's own artifact through the shared download, the UF2 for the RTL8720C", async () => {
+    const host = flowHost([]);
     host._usbHandoff = rtlAmbz2Install;
+    const bytes = new Uint8Array(new ArrayBuffer(4));
+    steps.downloadBuildArtifact.mockResolvedValue({
+      binary: { file: "firmware.uf2", type: "uf2", title: "UF2" },
+      bytes,
+    });
     await startUsbFlash(asHost(host));
-    expect(host._api.firmwareDownloadBytes).toHaveBeenCalledWith(
-      "d.yaml",
-      "firmware.uf2"
-    );
+    const [, , pick, noArtifactKey] = steps.downloadBuildArtifact.mock.calls[0];
+    expect(pick({ file: "firmware.uf2", type: "uf2" })).toBe(true);
+    expect(pick({ file: "firmware.factory.bin" })).toBe(false);
+    expect(noArtifactKey).toBe("firmware.no_uf2");
+    expect(host._usbFirmware).toBe(bytes.buffer);
+    expect(host._usbFirmwareName).toBe("firmware.uf2");
     expect(host._step).toBe("download-ready");
+    expect(flow.compileOrFail).not.toHaveBeenCalled();
   });
 
-  it("names the missing artifact in the flasher's own words", async () => {
-    const host = flowHost([{ file: "firmware.factory.bin", title: "Factory" }]);
+  it("stays where the shared download left the dialog when it failed", async () => {
+    const host = flowHost([]);
     host._usbHandoff = rtlAmbz2Install;
+    steps.downloadBuildArtifact.mockResolvedValue(null);
+    host._step = "error";
     await startUsbFlash(asHost(host));
-    expect(host._statusMessage).toBe("firmware.no_uf2");
-    expect(flow.failNoBinaries).not.toHaveBeenCalled();
+    expect(host._usbFirmware).toBeNull();
+    expect(host._step).toBe("error");
   });
 
   it("still picks the ESP factory image without a platform flasher", async () => {

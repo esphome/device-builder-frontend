@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { handoffFlasherOf, isFlashParts } from "../../src/web/flash-receiver/protocol.js";
+import {
+  handoffFlasherOf,
+  isFlashParts,
+  isHandoffFlasher,
+} from "../../src/web/flash-receiver/protocol.js";
 
 const part = (address = 0, bytes = 8) => ({ address, data: new ArrayBuffer(bytes) });
 
@@ -45,5 +49,15 @@ describe("handoffFlasherOf", () => {
   it("reads an absent flasher as esptool, so an older dashboard's frame is unchanged", () => {
     expect(handoffFlasherOf({})).toBe("esp");
     expect(handoffFlasherOf({ flasher: "rtl-ambz2" })).toBe("rtl-ambz2");
+  });
+});
+
+describe("isHandoffFlasher", () => {
+  it("takes the ids this build knows and nothing inherited or foreign", () => {
+    expect(isHandoffFlasher("esp")).toBe(true);
+    expect(isHandoffFlasher("rtl-ambz2")).toBe(true);
+    expect(isHandoffFlasher("rtl-ambz1")).toBe(false);
+    expect(isHandoffFlasher("toString")).toBe(false);
+    expect(isHandoffFlasher(undefined)).toBe(false);
   });
 });

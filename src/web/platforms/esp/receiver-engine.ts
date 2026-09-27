@@ -6,31 +6,29 @@ import { runFlash, webFlashMessages } from "./run-flash.js";
 
 export const espReceiverEngine: ReceiverEngine = {
   logs: ESP_SERIAL_LOGS,
-  async validate(parts, localize) {
-    return validateEspImage(parts) ? null : localize("web.flash.invalid_image");
-  },
-  async run(port, parts, erase, hooks) {
-    return runFlash(
-      port,
-      {
-        erase,
-        filesCallback: async () => parts,
-        messages: webFlashMessages(hooks.localize),
-      },
-      {
-        onStep: (step) => {
-          if (step === "connecting") {
-            hooks.onState("connecting", hooks.localize("firmware.status_connecting"));
-          } else if (step === "erasing") {
-            hooks.onState("installing", hooks.localize("web.flash.erasing"));
-          } else if (step === "flashing") {
-            hooks.onState("installing", hooks.localize("dashboard.status_installing"));
-          }
-        },
-        onProgress: hooks.onProgress,
-        onLog: hooks.onLog,
-        onError: (message) => hooks.onState("error", message),
-      }
-    );
+  async prepare(parts, erase, localize) {
+    if (!validateEspImage(parts)) return { error: localize("web.flash.invalid_image") };
+    const plan = {
+      erase,
+      filesCallback: async () => parts,
+      messages: webFlashMessages(localize),
+    };
+    return {
+      run: (port, hooks) =>
+        runFlash(port, plan, {
+          onStep: (step) => {
+            if (step === "connecting") {
+              hooks.onState("connecting", localize("firmware.status_connecting"));
+            } else if (step === "erasing") {
+              hooks.onState("installing", localize("web.flash.erasing"));
+            } else if (step === "flashing") {
+              hooks.onState("installing", localize("dashboard.status_installing"));
+            }
+          },
+          onProgress: hooks.onProgress,
+          onLog: hooks.onLog,
+          onError: (message) => hooks.onState("error", message),
+        }),
+    };
   },
 };

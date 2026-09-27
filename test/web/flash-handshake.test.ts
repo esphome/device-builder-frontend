@@ -125,6 +125,26 @@ describe("FlashHandshake", () => {
     expect(onFirmware).toHaveBeenCalledOnce();
   });
 
+  it("reports a frame naming an unknown flasher as malformed, and relays a done note", () => {
+    const { opener, target, env } = makeEnv();
+    const onFirmware = vi.fn();
+    const onMalformed = vi.fn();
+    const handshake = new FlashHandshake(env, { onFirmware, onMalformed });
+    handshake.start();
+    fireMessage(target, {
+      source: opener,
+      data: { ...firmware(), flasher: "toString" },
+    });
+    expect(onMalformed).toHaveBeenCalledOnce();
+    expect(onFirmware).not.toHaveBeenCalled();
+
+    handshake.postState("done", "close this tab", "reset the board");
+    handshake.postState("done", "close this tab");
+    const frames = opener.postMessage.mock.calls.map((c) => c[0] as object).slice(-2);
+    expect(frames[0]).toMatchObject({ state: "done", note: "reset the board" });
+    expect("note" in frames[1]).toBe(false);
+  });
+
   it("fires onTimeout when no firmware arrives within the ready window", () => {
     const { env } = makeEnv();
     const onTimeout = vi.fn();

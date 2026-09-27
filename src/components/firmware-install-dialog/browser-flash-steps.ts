@@ -15,7 +15,7 @@ import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js"
 
 export interface BuildArtifact {
   binary: FirmwareBinary;
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -46,7 +46,7 @@ export async function downloadBuildArtifact(
     return null;
   }
 
-  let bytes: Uint8Array;
+  let bytes: Uint8Array<ArrayBuffer>;
   try {
     bytes = new Uint8Array(
       await host._api.firmwareDownloadBytes(device.configuration, binary.file)

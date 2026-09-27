@@ -25,7 +25,11 @@ import {
   type HandoffFlasher,
   handoffFlasherOf,
 } from "./protocol.js";
-import { RECEIVER_ENGINES, RECEIVER_FLASHERS } from "./receiver-engine.js";
+import {
+  RECEIVER_ENGINES,
+  RECEIVER_FLASHERS,
+  type ReceiverRun,
+} from "./receiver-engine.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
@@ -67,6 +71,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   @state() private _waiting: { message: string; guideUrl?: string } | null = null;
   // The logs policy of the flasher that last ran, for the boot logs after.
   private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
+  // The checked image's run, settled before the click (see _prepare).
+  private _prepared: Promise<ReceiverRun | null> = Promise.resolve(null);
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
   @state() private _hasFile = false;
@@ -145,6 +151,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       return;
     }
     this._firmware = msg;
+    this._prepared = this._prepare(
+      msg.parts.map((p) => ({ data: new Uint8Array(p.data), address: p.address })),
+      msg.erase !== false,
+      handoffFlasherOf(msg)
+    );
     // Name the tab + card after the device so several concurrent flash tabs are
     // distinguishable (legacy did the same with the transmitted device name).
     if (msg.deviceName) {
@@ -220,51 +231,62 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       window.close();
       return;
     }
-    if (this._firmware) {
-      const parts = this._firmware.parts.map((p) => ({
-        data: new Uint8Array(p.data),
-        address: p.address,
-      }));
-      await this._runInstall(
-        parts,
-        this._firmware.erase !== false,
-        handoffFlasherOf(this._firmware)
+    if (this._busy) return;
+    if (!this._firmware) {
+      const file = this._fileInput?.files?.[0];
+      if (!file) {
+        this._setState("error", this._localize("web.flash.choose_file"));
+        return;
+      }
+      // Held from here: the read and the check must not let a second click in.
+      this._busy = true;
+      const data = new Uint8Array(await file.arrayBuffer());
+      this._prepared = this._prepare(
+        [{ data, address: 0 }],
+        true,
+        DEFAULT_HANDOFF_FLASHER
       );
-      return;
     }
-    const file = this._fileInput?.files?.[0];
-    if (!file) {
-      this._setState("error", this._localize("web.flash.choose_file"));
-      return;
-    }
-    const data = new Uint8Array(await file.arrayBuffer());
-    await this._runInstall([{ data, address: 0 }], true, DEFAULT_HANDOFF_FLASHER);
+    await this._runInstall();
   }
 
-  private async _runInstall(
+  /**
+   * Load the flasher's engine and check the image, ahead of the click: the
+   * click then goes straight to the port picker, inside its user activation,
+   * and a bad image is named before the user is asked for a port. Resolves
+   * null once the failure is on the card.
+   */
+  private async _prepare(
     parts: FlashPart[],
     erase: boolean,
     flasher: HandoffFlasher
-  ): Promise<void> {
-    if (this._busy) return;
-    const engine = await RECEIVER_ENGINES[flasher]().catch((err: unknown) => {
+  ): Promise<ReceiverRun | null> {
+    try {
+      const engine = await RECEIVER_ENGINES[flasher]();
+      const plan = await engine.prepare(parts, erase, this._localize);
+      if ("error" in plan) {
+        this._setState("error", plan.error);
+        return null;
+      }
+      this._logsPolicy = engine.logs;
+      return plan.run;
+    } catch (err) {
       console.error("[flash receiver] Could not load the engine chunk:", err);
-      return null;
-    });
-    if (!engine) {
       this._setState("error", this._localize("firmware.engine_load_failed"));
-      return;
+      return null;
     }
-    const invalid = await engine.validate(parts, this._localize);
-    if (invalid) {
-      this._setState("error", invalid);
-      return;
-    }
+  }
+
+  private async _runInstall(): Promise<void> {
     this._busy = true;
+    const run = await this._prepared;
+    if (!run) {
+      this._busy = false;
+      return;
+    }
     this._flashDone = false;
     this._progress = null;
     this._waiting = null;
-    this._logsPolicy = engine.logs;
     // End any prior flash's log session outright: the generation bump only
     // supersedes a still-pending acquisition; closing the dialog releases a
     // streaming one (after-hide → _stop), and the stale handle must not
@@ -296,15 +318,18 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       // tolerate; openLiveLogPort falls back to VID/PID matching
     }
 
-    const ok = await engine.run(port, parts, erase, {
-      localize: this._localize,
+    // What is left for the user's hands once the engine returns, if anything.
+    let note: string | undefined;
+    const ok = await run(port, {
       onState: (state, message) => {
+        note = undefined;
         this._waiting = null;
         this._setState(state, message);
       },
       onProgress: (pct) => this._setProgress(pct),
       onLog: (line) => this._enqueueLog(line),
       onWaiting: (message, guideUrl) => {
+        note = message;
         this._waiting = { message, guideUrl };
       },
     });
@@ -314,16 +339,22 @@ export class ESPHomeWebFlashReceiver extends LitElement {
 
     this._flashDone = true;
     this._progress = null;
-    this._setState(
-      "done",
-      this._hasOpener
-        ? this._localize("web.flash.done_opener")
-        : this._localize("web.flash.done")
-    );
+    // Still waiting after a finished write: the board needs a reset by hand.
+    // The opener gets that as the done note, so the dashboard says it too.
+    this._state = "done";
+    this._statusMessage = this._hasOpener
+      ? this._localize("web.flash.done_opener")
+      : this._localize("web.flash.done");
+    this._handshake?.postState("done", this._statusMessage, note);
+    if (note) {
+      // No reboot to follow: park the port so Logs opens it once the user
+      // has reset the board.
+      this._logPort = port;
+      return;
+    }
     // The engine already reset + disconnected the device; show its boot logs
-    // in the shared logs dialog (reset / download / stop-start / reconnect),
-    // unless the board is still waiting on the user's hands.
-    if (!this._waiting) await this._openBootLogs(port, before);
+    // in the shared logs dialog (reset / download / stop-start / reconnect).
+    await this._openBootLogs(port, before);
   }
 
   /** See ``acquireBootLogs``; kept as a method so a newer install or an unmount can supersede it. */

@@ -22,11 +22,13 @@ vi.mock("../../../src/util/post-install-dispatch.js", () => ({
 vi.mock("../../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
 }));
-const seams = vi.hoisted(() => ({ loadLibreTinyParser: vi.fn() }));
-vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../src/platforms/rtl87xx/index.js")>()),
-  loadLibreTinyParser: seams.loadLibreTinyParser,
-}));
+const seams = vi.hoisted(() => ({ loadAmbz2Image: vi.fn() }));
+vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import("../../../src/platforms/rtl87xx/index.js")>();
+  seams.loadAmbz2Image.mockImplementation(real.loadAmbz2Image);
+  return { ...real, loadAmbz2Image: seams.loadAmbz2Image };
+});
 
 import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
@@ -92,9 +94,6 @@ function readyHost(): Host {
 }
 
 beforeEach(() => {
-  seams.loadLibreTinyParser.mockImplementation(
-    () => import("../../../src/platforms/rtl87xx/libretiny-uf2.js")
-  );
   vi.clearAllMocks();
 });
 
@@ -114,13 +113,16 @@ describe("startRtlAmbz2Install", () => {
 
   it("loads the parser after the download and names a failed chunk fetch", async () => {
     const host = makeHost();
-    seams.loadLibreTinyParser.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    seams.loadAmbz2Image.mockResolvedValueOnce({
+      key: "firmware.engine_load_failed",
+      detail: "Failed to fetch",
+    });
     await startRtlAmbz2Install(asHost(host));
     expect(host._statusMessage).toBe("firmware.engine_load_failed");
     expect(rtlImage.get(asHost(host))).toBeNull();
     expect(
       vi.mocked(host._api.firmwareDownloadBytes).mock.invocationCallOrder[0]
-    ).toBeLessThan(seams.loadLibreTinyParser.mock.invocationCallOrder[0]);
+    ).toBeLessThan(seams.loadAmbz2Image.mock.invocationCallOrder[0]);
   });
 
   it("fails when the build produced no UF2", async () => {

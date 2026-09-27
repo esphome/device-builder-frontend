@@ -8,3 +8,9 @@
  */
 export type HandoffFlasher = "esp" | "rtl-ambz2";
 export const DEFAULT_HANDOFF_FLASHER: HandoffFlasher = "esp";
+export const HANDOFF_FLASHERS: readonly HandoffFlasher[] = ["esp", "rtl-ambz2"];
+
+/** Whether an untrusted frame's ``flasher`` names one this build knows. */
+export function isHandoffFlasher(value: unknown): value is HandoffFlasher {
+  return (HANDOFF_FLASHERS as readonly unknown[]).includes(value);
+}

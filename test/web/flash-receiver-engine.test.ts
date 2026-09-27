@@ -19,22 +19,26 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
   openLiveLogPort: vi.fn(async () => ({ port: null, error: "none" })),
 }));
 const engines = vi.hoisted(() => {
-  const make = (name: string) => ({
-    name,
-    logs: { reset: "rts-pulse" },
-    validate: vi.fn(async (): Promise<string | null> => null),
-    run: vi.fn(
-      async (
-        _port: unknown,
-        _parts: unknown,
-        _erase: boolean,
-        hooks: { onState: (s: string, m: string) => void }
-      ) => {
-        hooks.onState("installing", `${name} writing`);
-        return true;
-      }
-    ),
-  });
+  type Hooks = {
+    onState: (s: string, m: string) => void;
+    onWaiting: (m: string) => void;
+  };
+  const make = (name: string) => {
+    const run = vi.fn(async (_port: unknown, hooks: Hooks) => {
+      hooks.onState("installing", `${name} writing`);
+      return true;
+    });
+    return {
+      logs: { reset: "rts-pulse" },
+      run,
+      prepare: vi.fn(
+        async (
+          _parts: unknown,
+          _erase: boolean
+        ): Promise<{ run: typeof run } | { error: string }> => ({ run })
+      ),
+    };
+  };
   return { esp: make("esp"), rtl: make("rtl-ambz2") };
 });
 vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
@@ -50,7 +54,7 @@ import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.j
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const port = { getInfo: () => ({}) } as SerialPort;
+const port = { getInfo: () => ({}), close: async () => {} } as unknown as SerialPort;
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -58,13 +62,15 @@ afterEach(() => {
   delete (window as any).opener;
 });
 
-async function handOff(frame: Record<string, unknown>) {
+const requestPort = vi.fn(async () => port);
+
+async function handOff(frame: Record<string, unknown>, click = true) {
   const opener = { postMessage: vi.fn() };
   Object.defineProperty(window, "opener", { value: opener, configurable: true });
   window.location.hash = "#nonce=n1";
   Object.defineProperty(navigator, "serial", {
     configurable: true,
-    value: { requestPort: async () => port, getPorts: async () => [] },
+    value: { requestPort, getPorts: async () => [] },
   });
   const el = new ESPHomeWebFlashReceiver();
   (el as any)._localize = (k: string) => k;
@@ -82,10 +88,16 @@ async function handOff(frame: Record<string, unknown>) {
       source: opener as unknown as Window,
     })
   );
+  await (el as any)._prepared;
   await el.updateComplete;
-  await (el as any)._onPrimary();
+  if (click) await (el as any)._onPrimary();
   return { el, opener };
 }
+
+const states = (opener: { postMessage: ReturnType<typeof vi.fn> }) =>
+  opener.postMessage.mock.calls
+    .map((c) => c[0] as { type: string; state?: string; detail?: string; note?: string })
+    .filter((m) => m.type === "esphome-web-flash:state");
 
 describe("esphome-web-flash-receiver engines", () => {
   it("advertises its engines on ready", async () => {
@@ -99,27 +111,60 @@ describe("esphome-web-flash-receiver engines", () => {
   it("runs esptool for a frame without a flasher, as an older dashboard sends", async () => {
     await handOff({});
     expect(engines.esp.run).toHaveBeenCalledOnce();
-    expect(engines.rtl.run).not.toHaveBeenCalled();
-    expect(engines.esp.run.mock.calls[0][2]).toBe(true); // erase defaults on
+    expect(engines.rtl.prepare).not.toHaveBeenCalled();
+    expect(engines.esp.prepare.mock.calls[0][1]).toBe(true); // erase defaults on
   });
 
   it("runs the named engine and relays its states to the opener", async () => {
     const { opener } = await handOff({ flasher: "rtl-ambz2", erase: false });
     expect(engines.rtl.run).toHaveBeenCalledOnce();
-    expect(engines.rtl.run.mock.calls[0][2]).toBe(false);
-    const states = opener.postMessage.mock.calls
-      .map((c) => c[0] as { type: string; state?: string; detail?: string })
-      .filter((m) => m.type === "esphome-web-flash:state")
-      .map((m) => `${m.state}:${m.detail}`);
-    expect(states).toContain("installing:rtl-ambz2 writing");
-    expect(states[states.length - 1]).toMatch(/^done:/);
+    expect(engines.rtl.prepare.mock.calls[0][1]).toBe(false);
+    const seen = states(opener);
+    expect(seen.map((m) => `${m.state}:${m.detail}`)).toContain(
+      "installing:rtl-ambz2 writing"
+    );
+    expect(seen[seen.length - 1]).toMatchObject({ state: "done" });
+    expect("note" in seen[seen.length - 1]).toBe(false);
   });
 
-  it("shows the engine's reason when the image is not its kind", async () => {
-    engines.rtl.validate.mockResolvedValueOnce("firmware.rtl_bad_uf2 (family)");
-    const { el } = await handOff({ flasher: "rtl-ambz2" });
+  it("names a bad image when the firmware arrives, before any port is asked for", async () => {
+    engines.rtl.prepare.mockResolvedValueOnce({ error: "firmware.rtl_bad_uf2 (family)" });
+    const { el } = await handOff({ flasher: "rtl-ambz2" }, false);
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toContain("firmware.rtl_bad_uf2");
+    await (el as any)._onPrimary();
+    expect(requestPort).not.toHaveBeenCalled();
     expect(engines.rtl.run).not.toHaveBeenCalled();
+    expect((el as any)._busy).toBe(false);
+  });
+
+  it("reports a frame naming a flasher it does not have as malformed", async () => {
+    const { el } = await handOff({ flasher: "toString" }, false);
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toBe("web.flash.malformed");
+    expect(engines.esp.prepare).not.toHaveBeenCalled();
+  });
+
+  it("takes one install for a double click", async () => {
+    const { el } = await handOff({}, false);
+    await Promise.all([(el as any)._onPrimary(), (el as any)._onPrimary()]);
+    expect(requestPort).toHaveBeenCalledOnce();
+    expect(engines.esp.run).toHaveBeenCalledOnce();
+  });
+
+  it("sends the manual reset as the done note and parks the port for Logs", async () => {
+    engines.rtl.run.mockImplementationOnce(async (_port, hooks) => {
+      hooks.onState("installing", "writing");
+      hooks.onWaiting("firmware.rtl_done_manual_reset");
+      return true;
+    });
+    const { el, opener } = await handOff({ flasher: "rtl-ambz2" });
+    const seen = states(opener);
+    expect(seen[seen.length - 1]).toMatchObject({
+      state: "done",
+      note: "firmware.rtl_done_manual_reset",
+    });
+    expect((el as any)._logPort).toBe(port);
+    expect((el as any)._logsOpen).toBe(false);
   });
 });

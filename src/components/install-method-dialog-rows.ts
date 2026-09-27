@@ -10,7 +10,7 @@ import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
-import { platformFor } from "../platforms/registry.js";
+import { handoffMethodFor, platformFor } from "../platforms/registry.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -168,10 +168,6 @@ export function renderBleNusOption(
 }
 
 /**
- * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
- * ROM), install mode only and only with Web Serial; nothing for the rest.
- */
-/**
  * The platform's own in-app flasher row (nRF52 DFU, Pico, RTL8720C). With Web
  * Serial it flashes here; on an insecure origin a flasher that can hand off
  * sends its firmware to web.esphome.io instead (``web-flash:<id>``), with
@@ -195,7 +191,7 @@ export function renderPlatformFlashOption(
     desc: viaHandoff
       ? handoffDesc
       : ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
-    onClick: () => ctx.onSelect(viaHandoff ? `web-flash:${install.id}` : install.id),
+    onClick: () => ctx.onSelect(viaHandoff ? handoffMethodFor(install) : install.id),
   });
 }
 

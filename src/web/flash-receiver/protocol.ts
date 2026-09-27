@@ -18,9 +18,13 @@ export const MSG_FIRMWARE = "esphome-web-flash:firmware";
 export const MSG_STATE = "esphome-web-flash:state";
 export const MSG_PROGRESS = "esphome-web-flash:progress";
 
-import { DEFAULT_HANDOFF_FLASHER, type HandoffFlasher } from "../../platforms/handoff.js";
+import {
+  DEFAULT_HANDOFF_FLASHER,
+  type HandoffFlasher,
+  isHandoffFlasher,
+} from "../../platforms/handoff.js";
 
-export { DEFAULT_HANDOFF_FLASHER };
+export { DEFAULT_HANDOFF_FLASHER, isHandoffFlasher };
 export type { HandoffFlasher };
 
 /**
@@ -60,9 +64,11 @@ export interface FirmwareMessage {
   erase?: boolean;
   /**
    * Which flasher writes ``parts``; absent means esptool, so older dashboards
-   * are unchanged and older receivers ignore it. For ``rtl-ambz2`` the parts
-   * are the LibreTiny UF2 as one part at address 0, which the receiver parses
-   * into flash runs itself.
+   * are unchanged. An older receiver ignores the field and would write
+   * anything as ESP parts, so a sender puts a non-esp id only to a receiver
+   * whose ``flashers`` lists it. For ``rtl-ambz2`` the parts are the
+   * LibreTiny UF2 as one part at address 0, which the receiver parses into
+   * flash runs itself.
    */
   flasher?: HandoffFlasher;
   parts: FlashPartMessage[];
@@ -74,6 +80,19 @@ export function handoffFlasherOf(msg: Pick<FirmwareMessage, "flasher">): Handoff
 }
 
 export type FlashState = "connecting" | "installing" | "done" | "error";
+
+/**
+ * Receiver → opener: the state the dashboard mirrors. ``note`` rides with
+ * ``done`` only: what the user still has to do by hand for the firmware to
+ * start (an RTL8720C on an adapter without control lines needs a reset).
+ * Additive in v1: older receivers omit it and older dashboards ignore it.
+ */
+export interface StateMessage {
+  type: typeof MSG_STATE;
+  state: FlashState;
+  detail?: string;
+  note?: string;
+}
 
 // Sanity caps for the untrusted postMessage payload. A merged ESP factory image
 // is a handful of parts totalling a few MB; these ceilings reject absurd frames

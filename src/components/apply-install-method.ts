@@ -1,6 +1,6 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { OTA_PORT } from "../api/types/streaming.js";
-import { installForMethod } from "../platforms/registry.js";
+import { installForHandoffMethod, installForMethod } from "../platforms/registry.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 
 export interface InstallMethodHandlers {
@@ -50,16 +50,13 @@ export function applyInstallMethod(
       // A platform's in-browser install (nRF52 DFU, Pico UF2, RTL8720C ROM),
       // or its hand-off to web.esphome.io (``web-flash:<id>``) where this
       // origin cannot flash.
-      const handoff = method.startsWith("web-flash:");
-      const install = installForMethod(
-        handoff ? method.slice("web-flash:".length) : method
-      );
-      if (!install) return;
-      if (handoff) {
-        if (install.handoff) h.firmwareDialog?.installUsbFlash(h.device, install);
-      } else {
+      const install = installForMethod(method);
+      if (install) {
         h.firmwareDialog?.installBrowserFlasher(install, h.device);
+        break;
       }
+      const handoff = installForHandoffMethod(method);
+      if (handoff) h.firmwareDialog?.installUsbFlash(h.device, handoff);
     }
   }
 }

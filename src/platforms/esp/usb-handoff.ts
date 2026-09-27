@@ -1,10 +1,12 @@
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
+import { downloadBuildArtifact } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import {
   compileOrFail,
   failNoBinaries,
   fetchBinaries,
 } from "../../components/firmware-install-dialog/install-flow.js";
+import { DEFAULT_HANDOFF_FLASHER } from "../handoff.js";
 import { openFlasher } from "./usb-flasher.js";
 
 /**
@@ -37,30 +39,45 @@ export function pickFactoryBinary(
 export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
+  // A platform flasher's hand-off sends the artifact its in-app flow builds.
+  const handoff = host._usbHandoff?.handoff;
+  if (handoff) {
+    const artifact = await downloadBuildArtifact(
+      host,
+      device,
+      handoff.artifact,
+      handoff.noArtifactKey
+    );
+    if (artifact) showDownloadReady(host, artifact.bytes.buffer, artifact.binary.file);
+    return;
+  }
   if (!(await compileOrFail(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
   host._step = "downloading";
   const binaries = await fetchBinaries(host, device.configuration);
   if (!binaries) return;
-  const handoff = host._usbHandoff?.handoff;
-  const factory = handoff
-    ? binaries.find(handoff.artifact)
-    : pickFactoryBinary(device.target_platform, binaries);
+  const factory = pickFactoryBinary(device.target_platform, binaries);
   if (!factory) {
-    if (handoff && binaries.length > 0) host._fail(host._localize(handoff.noArtifactKey));
-    else failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
+    failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
     return;
   }
+  let firmware: ArrayBuffer;
   try {
-    host._usbFirmware = await host._api.firmwareDownloadBytes(
-      device.configuration,
-      factory.file
-    );
-    host._usbFirmwareName = factory.file;
+    firmware = await host._api.firmwareDownloadBytes(device.configuration, factory.file);
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;
   }
+  showDownloadReady(host, firmware, factory.file);
+}
+
+function showDownloadReady(
+  host: ESPHomeFirmwareInstallDialog,
+  firmware: ArrayBuffer,
+  name: string
+): void {
+  host._usbFirmware = firmware;
+  host._usbFirmwareName = name;
   host._step = "download-ready";
   host._statusMessage = "";
 }
@@ -85,55 +102,50 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._errorMessage = "";
     host._statusMessage = host._localize("firmware.usb_flashing");
   };
-  const flasher = host._usbHandoff?.handoff?.flasher ?? "esp";
-  const teardown = openFlasher(
-    firmware,
-    host._usbFirmwareName,
-    deviceName,
-    {
-      onProgress: (pct) => {
-        resumeFromError();
-        host._flashPercent = pct;
-      },
-      onStatus: (detail) => {
-        resumeFromError();
-        host._statusMessage = detail;
-      },
-      onState: (state, detail) => {
-        if (state === "done") {
-          host._usbFlashTeardown = null;
-          host._step = "done";
-          host._statusMessage = host._localize("firmware.usb_done");
-        } else {
-          // Non-terminal: the flasher tab can retry in place, so keep the
-          // teardown live for a later success or close.
-          host._fail(host._localize("firmware.usb_failed"), detail);
-        }
-      },
-      onLost: () => {
-        host._usbFlashTeardown = null;
-        host._fail(
-          host._localize("firmware.usb_failed"),
-          host._localize("firmware.usb_window_closed")
-        );
-      },
-      onUnsupported: (reason) => {
-        host._usbFlashTeardown = null;
-        // Retrying would recompile and re-open a tab that declines again for the
-        // same reason; suppress the Retry footer (mirrors chip-mismatch).
-        host._failureKind = "unsupported-browser";
-        host._fail(
-          host._localize("firmware.usb_failed"),
-          host._localize(
-            reason === "flasher"
-              ? "firmware.usb_flasher_outdated"
-              : "firmware.usb_unsupported_browser"
-          )
-        );
-      },
+  const flasher = host._usbHandoff?.handoff?.flasher ?? DEFAULT_HANDOFF_FLASHER;
+  const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, flasher, {
+    onProgress: (pct) => {
+      resumeFromError();
+      host._flashPercent = pct;
     },
-    flasher
-  );
+    onStatus: (detail) => {
+      resumeFromError();
+      host._statusMessage = detail;
+    },
+    onState: (state, detail) => {
+      if (state === "done") {
+        host._usbFlashTeardown = null;
+        host._step = "done";
+        // The receiver's note: what is left for the user's hands, if anything.
+        host._statusMessage = detail || host._localize("firmware.usb_done");
+      } else {
+        // Non-terminal: the flasher tab can retry in place, so keep the
+        // teardown live for a later success or close.
+        host._fail(host._localize("firmware.usb_failed"), detail);
+      }
+    },
+    onLost: () => {
+      host._usbFlashTeardown = null;
+      host._fail(
+        host._localize("firmware.usb_failed"),
+        host._localize("firmware.usb_window_closed")
+      );
+    },
+    onUnsupported: (reason) => {
+      host._usbFlashTeardown = null;
+      // Retrying would recompile and re-open a tab that declines again for the
+      // same reason; suppress the Retry footer (mirrors chip-mismatch).
+      host._failureKind = "unsupported-browser";
+      host._fail(
+        host._localize("firmware.usb_failed"),
+        host._localize(
+          reason === "flasher"
+            ? "firmware.usb_flasher_outdated"
+            : "firmware.usb_unsupported_browser"
+        )
+      );
+    },
+  });
   if (!teardown) {
     // Pop-up blocked: stay on download-ready with the firmware still in hand so
     // the user can allow pop-ups and click Open again, rather than being forced

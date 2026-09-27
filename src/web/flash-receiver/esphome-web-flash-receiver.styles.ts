@@ -14,6 +14,14 @@ export const flashReceiverStyles = css`
   .warning-banner {
     margin: 0 0 var(--wa-space-s);
   }
+  /* What the board needs from the user's hands: the strap, a reset. */
+  .waiting {
+    margin: 0 0 var(--wa-space-s);
+    padding: var(--wa-space-s);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-lowered);
+    font-size: var(--wa-font-size-s);
+  }
   .status {
     display: flex;
     align-items: center;

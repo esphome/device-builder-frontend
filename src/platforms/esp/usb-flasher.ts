@@ -50,8 +50,8 @@ export function openFlasher(
   firmware: ArrayBuffer,
   name: string,
   deviceName: string,
-  cb: FlasherCallbacks,
-  flasher: HandoffFlasher = "esp"
+  flasher: HandoffFlasher,
+  cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = randomNonce();
   const win = window.open(
@@ -100,6 +100,7 @@ export function openFlasher(
       version?: number;
       webSerial?: boolean;
       flashers?: string[];
+      note?: string;
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
@@ -180,7 +181,9 @@ export function openFlasher(
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
         finish();
-        cb.onState("done", "");
+        // The note is what the user still has to do by hand (see protocol.ts);
+        // the receiver's own done line is for its tab, not the dashboard.
+        cb.onState("done", typeof data.note === "string" ? data.note : "");
       } else if (data.state === "error") {
         errored = true;
         // Not terminal: the flasher tab stays open and the user can retry in
