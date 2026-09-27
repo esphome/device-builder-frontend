@@ -15,24 +15,30 @@ import {
   isWebBluetoothSupported,
   requestBleDevice,
 } from "./ble-nus-stream.js";
+import { SMP_BLE_SERVICE_UUID } from "./smp-ble-service.js";
 
+// The NUS service is not advertised, but a build with the mcumgr OTA
+// advertises that one, which finds the device under a name the OS has not
+// caught up with.
 export const pickBleNusDevice = (
   localize: LocalizeFunc,
   names: string[]
 ): Promise<BluetoothDevice | null> =>
-  pickBleDevice(localize, names, BLE_NUS_SERVICE_UUID);
+  pickBleDevice(localize, names, BLE_NUS_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]);
 
+/** *advertised*: the services the device may advertise (``requestBleDevice``). */
 export async function pickBleDevice(
   localize: LocalizeFunc,
   names: string[],
-  service: string
+  service: string,
+  advertised: readonly string[] = []
 ): Promise<BluetoothDevice | null> {
   if (!isWebBluetoothSupported()) {
     notifyError(localize("dashboard.logs_ble_nus_unsupported"));
     return null;
   }
   try {
-    return await requestBleDevice(names, service);
+    return await requestBleDevice(names, service, advertised);
   } catch (err) {
     console.warn("BLE chooser failed", err);
     if (!(err instanceof BleUnavailableError)) {

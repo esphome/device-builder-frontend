@@ -178,15 +178,17 @@ describe.each(INSTALLS)("MCUboot install over %s", (_name, install, readyStep, k
 });
 
 describe("MCUboot install over Bluetooth", () => {
-  it("asks the chooser for the device by name and the SMP service", async () => {
+  it("asks the chooser for the devices that advertise the SMP service", async () => {
     const host = makeHost();
     await nrfSmpBleInstall.start(asHost(host));
     await flash(nrfSmpBleInstall, host);
 
+    // Not by name: the OS remembers a renamed device by its old one.
     expect(mocks.pickBleDevice).toHaveBeenCalledWith(
       host._localize,
-      ["itsy"],
-      SMP_BLE_SERVICE_UUID
+      [],
+      SMP_BLE_SERVICE_UUID,
+      [SMP_BLE_SERVICE_UUID]
     );
   });
 

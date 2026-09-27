@@ -39,6 +39,7 @@ import {
   BLE_NUS_SERVICE_UUID,
   BleUnavailableError,
 } from "../../src/platforms/nrf52/ble-nus-stream.js";
+import { SMP_BLE_SERVICE_UUID } from "../../src/platforms/nrf52/smp-ble-service.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
 import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 
@@ -359,7 +360,8 @@ describe("launchLogsWithMethod ble-nus", () => {
     await launchLogsWithMethod(host, nrfDevice(), "ble-nus");
     expect(ble.requestBleDevice).toHaveBeenCalledWith(
       ["kitchen", "Kitchen"],
-      BLE_NUS_SERVICE_UUID
+      BLE_NUS_SERVICE_UUID,
+      [SMP_BLE_SERVICE_UUID]
     );
     expect(host.logsDialog.openPassive).toHaveBeenCalledWith(
       expect.objectContaining({ source: "ble", onReconnect: expect.any(Function) })

@@ -12,6 +12,7 @@ import {
   requestBleDevice,
   streamBleNus,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
+import { SMP_BLE_SERVICE_UUID } from "../../../src/platforms/nrf52/smp-ble-service.js";
 
 const enc = (s: string) => new DataView(new TextEncoder().encode(s).buffer);
 
@@ -304,6 +305,36 @@ describe("requestBleDevice", () => {
     expect(requestDevice).toHaveBeenCalledWith({
       acceptAllDevices: true,
       optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
+  it("also matches a service the device advertises, under any name", async () => {
+    const requestDevice = vi.fn(async () => ({}));
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
+    await requestBleDevice(["test3"], BLE_NUS_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]);
+    expect(requestDevice).toHaveBeenCalledWith({
+      filters: [{ name: "test3" }, { services: [SMP_BLE_SERVICE_UUID] }],
+      optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
+  it("still lists every device when only another service is advertised", async () => {
+    const requestDevice = vi.fn(async () => ({}));
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
+    await requestBleDevice([], BLE_NUS_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]);
+    expect(requestDevice).toHaveBeenCalledWith({
+      acceptAllDevices: true,
+      optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
+  it("finds the devices by the service itself where they advertise it", async () => {
+    const requestDevice = vi.fn(async () => ({}));
+    restore = withWebBluetooth({ requestDevice, getAvailability: async () => true });
+    await requestBleDevice([], SMP_BLE_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]);
+    expect(requestDevice).toHaveBeenCalledWith({
+      filters: [{ services: [SMP_BLE_SERVICE_UUID] }],
+      optionalServices: [SMP_BLE_SERVICE_UUID],
     });
   });
 
