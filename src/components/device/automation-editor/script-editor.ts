@@ -12,9 +12,8 @@
  *
  * Same public-surface conventions as the automation editor:
  *
- * - ``addMode`` distinguishes the wizard mount (id input + save into
- *   a new section) from the navigator-routed edit mount (id locked,
- *   value hydrated from the backend).
+ * - The id is locked and the value is hydrated from the backend; a
+ *   script is renamed in the YAML.
  * - Save / delete are optimistic + revert-on-failure (toast.error on
  *   failure); the editor's ``inFlightWrite`` guard signals to the
  *   parent's reconnect handler to skip clobbering an in-flight
@@ -23,6 +22,7 @@
 import { mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 
 import type {
   AutomationLocation,
@@ -34,7 +34,6 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -83,8 +82,8 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
 
   /** Component catalog entry for the ``script`` component, lazily
    *  fetched on mount. Drives the header (name / description /
-   *  docs / image) and the inline config-entry form (``id``,
-   *  ``mode``, ``max_runs`` — ``parameters`` and ``then`` stay
+   *  docs / image) and the inline config-entry form (``mode``,
+   *  ``max_runs`` — ``parameters`` and ``then`` stay
    *  under bespoke surfaces because the form's generic ``map``
    *  type wouldn't validate the typed-parameter shape). */
   @state() private _scriptComponent: ComponentCatalogEntry | null = null;
@@ -93,6 +92,9 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
    *  in the form behind a toggle so the casual "id only" case
    *  isn't drowned out by the rarely-used options. */
   @state() private _showAdvanced = false;
+
+  protected override readonly _nameInputId = "script-id";
+  protected override readonly _nameYamlKeys = ["id"];
 
   // Can't upsert a script with no id.
   protected override _canApply(location: AutomationLocation): boolean {
@@ -136,33 +138,45 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const focus = this._currentFocus();
-    return html`
-      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
-      ${
-        this._showAdvanced
-          ? this._renderParametersField(automation, disabled, focus)
-          : nothing
-      }
-      ${renderActionsSection({
-        automation,
-        catalog: actions,
-        conditionCatalog: conditions,
-        scripts,
-        devices,
-        board: this.board,
-        yaml: this.yaml,
-        disabled,
-        localize: this._localize,
-        focusTarget: actionsFocus(focus),
-        descriptionKey: "device.script_actions_description",
-        onActionsChange: this._onActionsChange,
-      })}
-      ${this.renderFooter({
-        label: this._localize("device.delete_script"),
-        message: (location) =>
-          this._localize("device.confirm_delete_script", { name: location.id }),
-      })}
-    `;
+    return keyed(
+      this._target,
+      html`
+        ${this._renderHeader()}
+        ${this._renderNameField(
+          {
+            label: this._localize("device.script_id_label"),
+            description: this._localize("device.script_id_description"),
+            value: this.location?.id ?? "",
+          },
+          disabled
+        )}
+        ${this._renderConfigForm(automation, disabled, focus)}
+        ${
+          this._showAdvanced
+            ? this._renderParametersField(automation, disabled, focus)
+            : nothing
+        }
+        ${renderActionsSection({
+          automation,
+          catalog: actions,
+          conditionCatalog: conditions,
+          scripts,
+          devices,
+          board: this.board,
+          yaml: this.yaml,
+          disabled,
+          localize: this._localize,
+          focusTarget: actionsFocus(focus),
+          descriptionKey: "device.script_actions_description",
+          onActionsChange: this._onActionsChange,
+        })}
+        ${this.renderFooter({
+          label: this._localize("device.delete_script"),
+          message: (location) =>
+            this._localize("device.confirm_delete_script", { name: location.id }),
+        })}
+      `
+    );
   }
 
   /**
@@ -201,11 +215,11 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   /**
    * Inline ``<esphome-config-entry-form>`` driven by the script
    * component's catalog config_entries — gives us the same form
-   * surface a regular component gets (catalog descriptions, id /
-   * mode / max_runs renderers, advanced-toggle, validation) for
-   * free.
+   * surface a regular component gets (catalog descriptions, mode /
+   * max_runs renderers, advanced-toggle, validation) for free.
    *
-   * ``parameters`` and ``then`` are filtered out: ``parameters``
+   * ``id`` is the locked name field above the form. ``parameters``
+   * and ``then`` are filtered out too: ``parameters``
    * has a typed-declaration UI that's still bespoke (the generic
    * map renderer can't validate the ``{name: type}`` constraint),
    * and ``then`` is the actions block, rendered by the action-list
@@ -219,7 +233,7 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     const comp = this._scriptComponent;
     if (!comp) return nothing;
     const entries = comp.config_entries.filter(
-      (e) => e.key !== "parameters" && e.key !== "then"
+      (e) => e.key !== "id" && e.key !== "parameters" && e.key !== "then"
     );
     const hasParameters = this._hasParametersEntry();
     if (entries.length === 0 && !hasParameters) return nothing;
@@ -261,35 +275,14 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   }
 
   /** Bridge ``<esphome-config-entry-form>`` patch events into the
-   *  AutomationTree shape. Special-cases the ``id`` field: changing
-   *  it has to also mutate ``this.location`` because the YAML splice
-   *  destination is keyed by location.id — without the mirror the
-   *  next upsert would target the OLD slot. */
+   *  AutomationTree shape. */
   private _onConfigFormValueChange = (
     e: CustomEvent<{ path: string[]; value: unknown }>
   ) => {
     e.stopPropagation();
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
-    // ``id`` runs through the shared normalizer so a stray space or
-    // dash the user typed lands as a valid YAML key
-    // (``"my script"`` → ``"my_script"``) — without this the input
-    // would round-trip a value that breaks compilation on save.
-    const normalizedValue =
-      path.length === 1 && path[0] === "id"
-        ? normalizeEspHomeId(String(value ?? ""))
-        : value;
-    const next = applyParamChange(automation.trigger_params, path, normalizedValue);
-    if (path.length === 1 && path[0] === "id") {
-      // Match wire shape: ``trigger_params.id`` round-trips with
-      // ``location.id``, so keep both pinned to the normalized id.
-      // Empty id falls back to the previous location so we don't
-      // dispatch a write with no destination.
-      const newId = String(normalizedValue ?? "");
-      if (newId) {
-        this.location = { kind: "script", id: newId };
-      }
-    }
+    const next = applyParamChange(automation.trigger_params, path, value);
     this._engine.withValue({ trigger_params: next });
   };
 

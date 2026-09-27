@@ -74,7 +74,7 @@ describe("rtlAmbz2ReceiverEngine", () => {
       detail: "Failed to fetch",
     });
     expect(await rtlAmbz2ReceiverEngine.prepare(uf2, false, localize)).toEqual({
-      error: "firmware.engine_load_failed (Failed to fetch)",
+      error: "web.install.tools_load_failed (Failed to fetch)",
       retryable: true,
     });
   });

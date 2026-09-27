@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  *
  * Pins the shared CodeMirror host lifecycle: `_mountView` builds a live
- * EditorView into `.cm-wrap`, and `_destroyView` / `disconnectedCallback`
- * tear it down.
+ * EditorView into `.cm-wrap`, `_destroyView` / `disconnectedCallback`
+ * tear it down, and a reconnect mounts it again.
  */
 import type { EditorView } from "@codemirror/view";
 import { html } from "lit";
@@ -19,8 +19,10 @@ class TestCmEditor extends CodeMirrorEditorElement {
     return html`<div class="cm-wrap"></div>`;
   }
 
-  protected firstUpdated() {
-    this._mountView("hello\nworld\n", []);
+  doc = "hello\nworld\n";
+
+  protected _mountEditor() {
+    this._mountView(this.doc, []);
   }
 
   get view(): EditorView | null {
@@ -68,6 +70,34 @@ describe("CodeMirrorEditorElement", () => {
   it("tears the view down when disconnected", async () => {
     const el = await mount(new TestCmEditor());
     el.remove();
+    expect(el.view).toBeNull();
+  });
+
+  it("mounts the view again when the element is moved", async () => {
+    const el = await mount(new TestCmEditor());
+    const first = el.view!;
+    const elsewhere = document.createElement("div");
+    document.body.appendChild(elsewhere);
+
+    elsewhere.appendChild(el);
+
+    expect(el.view).not.toBeNull();
+    expect(el.view).not.toBe(first);
+    expect(el.container.querySelectorAll(".cm-editor").length).toBe(1);
+  });
+
+  it("mounts from the current properties on a reconnect", async () => {
+    const el = await mount(new TestCmEditor());
+    el.remove();
+    el.doc = "changed while detached";
+    document.body.appendChild(el);
+    expect(el.view!.state.doc.toString()).toBe("changed while detached");
+  });
+
+  it("does not mount before the first render", () => {
+    const el = new TestCmEditor();
+    document.body.appendChild(el);
+    // firstUpdated has not run yet, so there is no host to mount into.
     expect(el.view).toBeNull();
   });
 });

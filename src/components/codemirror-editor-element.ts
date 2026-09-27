@@ -10,11 +10,23 @@ import { query } from "lit/decorators.js";
  * lookup, the single ``EditorView`` handle, and its mount/teardown.
  * Subclasses keep their own styles, extensions, change events, and
  * theme/reconfigure strategy; the base never touches those.
+ *
+ * The view is torn down while the element is detached and mounted again
+ * when it comes back, so an element that is moved (a keyed list
+ * reordering its rows) keeps an editor.
  */
 export abstract class CodeMirrorEditorElement extends LitElement {
   @query(".cm-wrap") protected _container!: HTMLDivElement;
 
   protected _view: EditorView | null = null;
+
+  /** Mount the view from the element's current properties, resetting
+   *  anything the subclass tracked about the previous view. */
+  protected abstract _mountEditor(): void;
+
+  protected firstUpdated(): void {
+    this._mountEditor();
+  }
 
   /** Build the view into ``.cm-wrap`` with the subclass's extensions;
    *  tears down any existing view first so the single-handle contract
@@ -31,6 +43,12 @@ export abstract class CodeMirrorEditorElement extends LitElement {
   protected _destroyView(): void {
     this._view?.destroy();
     this._view = null;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Before the first render there is no host yet; firstUpdated mounts then.
+    if (this.hasUpdated && !this._view) this._mountEditor();
   }
 
   override disconnectedCallback(): void {

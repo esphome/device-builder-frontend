@@ -12,7 +12,7 @@
  * Public surface mirrors the automation/script editors:
  *
  * - ``configuration``, ``board``, ``platform``, ``value``,
- *   ``location``, ``yaml``, ``addMode`` props.
+ *   ``location``, ``yaml`` props.
  * - Events: ``automation-change``, ``yaml-draft`` / ``yaml-updated``
  *   (auto-apply + delete), ``section-select`` after delete,
  *   ``dirty-change``, ``section-mount`` / ``section-unmount``.
@@ -24,20 +24,13 @@
 import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { scrollFlashRow } from "../field-highlight.js";
-import { fieldHighlightStyles } from "../field-highlight.styles.js";
-import {
-  actionsFocus,
-  entryFieldFocus,
-  focusKey,
-  paramFocus,
-} from "./automation-focus.js";
+import { actionsFocus, paramFocus } from "./automation-focus.js";
 import { CallableAutomationEditor } from "./callable-editor.js";
 import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
@@ -67,15 +60,10 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     return location.kind === "api_action" && !!location.action_name;
   }
 
-  static styles = [CallableAutomationEditor.styles, fieldHighlightStyles];
+  protected override readonly _nameInputId = "api-action-name";
 
-  /** ``focusKey`` already name-flashed — one-shot per target. */
-  private _nameFlashKey?: string;
-
-  protected override updated(changed: Map<string, unknown>) {
-    this._maybeFlashName();
-    super.updated(changed);
-  }
+  /** ``service`` is the legacy spelling of ``action``. */
+  protected override readonly _nameYamlKeys = ["action", "service"];
 
   protected render() {
     const gate = this.renderStateGate();
@@ -87,40 +75,51 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const focus = this._currentFocus();
-    return html`
-      ${this._renderHeader()} ${this._renderActionNameField(disabled)}
-      <esphome-callable-params-editor
-        .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
-        .focusParam=${paramFocus(focus, "variables")}
-        ?disabled=${disabled}
-        .fieldLabel=${this._localize("device.api_action_variables")}
-        .description=${this._localize("device.api_action_variables_description")}
-        .addLabel=${this._localize("device.api_action_add_variable")}
-        .namePlaceholder=${this._localize("device.api_action_variable_name_placeholder")}
-        @value-change=${this._onVariablesChange}
-      ></esphome-callable-params-editor>
-      ${renderActionsSection({
-        automation,
-        catalog: actions,
-        conditionCatalog: conditions,
-        scripts,
-        devices,
-        board: this.board,
-        yaml: this.yaml,
-        disabled,
-        localize: this._localize,
-        focusTarget: actionsFocus(focus),
-        descriptionKey: "device.api_action_actions_description",
-        onActionsChange: this._onActionsChange,
-      })}
-      ${this.renderFooter({
-        label: this._localize("device.delete_api_action"),
-        message: (location) =>
-          this._localize("device.confirm_delete_api_action", {
-            name: location.action_name,
-          }),
-      })}
-    `;
+    return keyed(
+      this._target,
+      html`
+        ${this._renderHeader()}
+        ${this._renderNameField(
+          {
+            label: this._localize("device.api_action_id_label"),
+            description: this._localize("device.api_action_id_description"),
+            value: this.location?.action_name ?? "",
+          },
+          disabled
+        )}
+        <esphome-callable-params-editor
+          .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
+          .focusParam=${paramFocus(focus, "variables")}
+          ?disabled=${disabled}
+          .fieldLabel=${this._localize("device.api_action_variables")}
+          .description=${this._localize("device.api_action_variables_description")}
+          .addLabel=${this._localize("device.api_action_add_variable")}
+          .namePlaceholder=${this._localize("device.api_action_variable_name_placeholder")}
+          @value-change=${this._onVariablesChange}
+        ></esphome-callable-params-editor>
+        ${renderActionsSection({
+          automation,
+          catalog: actions,
+          conditionCatalog: conditions,
+          scripts,
+          devices,
+          board: this.board,
+          yaml: this.yaml,
+          disabled,
+          localize: this._localize,
+          focusTarget: actionsFocus(focus),
+          descriptionKey: "device.api_action_actions_description",
+          onActionsChange: this._onActionsChange,
+        })}
+        ${this.renderFooter({
+          label: this._localize("device.delete_api_action"),
+          message: (location) =>
+            this._localize("device.confirm_delete_api_action", {
+              name: location.action_name,
+            }),
+        })}
+      `
+    );
   }
 
   private _renderHeader() {
@@ -141,62 +140,6 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
         <wa-icon library="mdi" name="webhook"></wa-icon>
       </div>
     </div>`;
-  }
-
-  /** Action-name input. Locked in edit mode so the YAML splice
-   *  destination stays pinned (renaming would move the entry to a
-   *  different slot and require a delete + insert; we don't support
-   *  that inline). ``readonly`` rather than ``disabled`` for the
-   *  lock so the value stays focusable / selectable for copy and
-   *  screen readers; ``disabled`` is reserved for the during-delete
-   *  state where the whole editor is inert. */
-  private _renderActionNameField(disabled: boolean) {
-    const name = this.location?.action_name ?? "";
-    return html`<div class="field">
-      <label class="field-label" for="api-action-name">
-        ${this._localize("device.api_action_id_label")}
-      </label>
-      <p class="field-description">
-        ${renderMarkdown(this._localize("device.api_action_id_description"))}
-      </p>
-      <input
-        id="api-action-name"
-        type="text"
-        .value=${name}
-        ?disabled=${disabled}
-        ?readonly=${!this.addMode}
-        @input=${(e: Event) =>
-          this._onActionNameChange((e.target as HTMLInputElement).value)}
-      />
-    </div>`;
-  }
-
-  /** The action name lives in a bespoke input, outside any form — flash
-   *  its field when the cursor targets ``action:`` (or legacy
-   *  ``service:``). */
-  private _maybeFlashName(): void {
-    const focus = this._currentFocus();
-    const head = entryFieldFocus(focus)?.[0];
-    if (head !== "action" && head !== "service") return;
-    const key = focusKey(focus);
-    if (key === this._nameFlashKey) return;
-    const field = this.shadowRoot
-      ?.querySelector("#api-action-name")
-      ?.closest<HTMLElement>(".field");
-    // Hold the shot while the loading spinner still owns the render.
-    if (!field) return;
-    this._nameFlashKey = key;
-    scrollFlashRow(field);
-  }
-
-  private _onActionNameChange(name: string) {
-    // Normalize so the field reshapes invalid characters
-    // (``"my action"`` → ``"my_action"``) as the user types and the
-    // YAML key the upsert produces is always valid.
-    const normalized = normalizeEspHomeId(name);
-    if (!normalized) return;
-    this.location = { kind: "api_action", action_name: normalized };
-    this._engine.scheduleAutoApply();
   }
 
   private _onVariablesChange = (e: CustomEvent<{ value: Record<string, string> }>) => {

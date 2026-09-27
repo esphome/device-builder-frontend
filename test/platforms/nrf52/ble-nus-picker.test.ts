@@ -19,6 +19,7 @@ vi.mock("../../../src/platforms/nrf52/ble-nus-stream.js", async (importOriginal)
   requestBleNusDevice: mocks.requestBleNusDevice,
 }));
 
+import { lapsedPick } from "../../_web-serial.js";
 import { pickBleNusDevice } from "../../../src/platforms/nrf52/ble-nus-picker.js";
 import {
   BleUnavailableError,
@@ -88,5 +89,11 @@ describe("pickBleNusDevice", () => {
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_open_failed"
     );
+  });
+
+  it("says to click again for a chooser refused after the click ran out", async () => {
+    mocks.requestBleNusDevice.mockRejectedValue(lapsedPick());
+    await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
+    expect(mocks.notifyError).toHaveBeenLastCalledWith("serial.picker_needs_click");
   });
 });

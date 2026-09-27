@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { lapsedPick } from "../_web-serial.js";
 import {
+  connectFailureDetail,
   markOpenFailure,
   namedConnectFailure,
   openFailureMessage,
@@ -61,6 +63,26 @@ describe("serial-open-error", () => {
     );
     expect(namedConnectFailure(new SerialPortHeldError(), localize)).toBe(
       "serial.port_held"
+    );
+  });
+
+  it("names a picker refused after the click ran out, with no browser sentence", () => {
+    const err = lapsedPick();
+    expect(namedConnectFailure(err, localize)).toBe("serial.picker_needs_click");
+    expect(openFailureMessage(err, localize, "web.connect.failed")).toBe(
+      "serial.picker_needs_click"
+    );
+  });
+
+  it("gives the detail under a title: the name, else what the fallback makes of it", () => {
+    const refused = lapsedPick();
+    expect(connectFailureDetail(refused, localize)).toBe("serial.picker_needs_click");
+    expect(connectFailureDetail(new Error("boom"), localize)).toBe("boom");
+    expect(connectFailureDetail(new Error("boom"), localize, () => "hinted")).toBe(
+      "hinted"
+    );
+    expect(connectFailureDetail(refused, localize, () => "hinted")).toBe(
+      "serial.picker_needs_click"
     );
   });
 });

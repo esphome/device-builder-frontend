@@ -7,7 +7,7 @@
  * CodeMirror, the action list) are no-op mocked so the editor itself
  * can construct in a happy-dom window.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./_editor-harness.js";
 
@@ -17,14 +17,17 @@ import type { AvailableAutomations } from "../../../../src/api/types/automations
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 
+import { flushMicrotasks } from "../../../_dom.js";
 import {
   loggerBodies,
+  makeEditorApi,
   mountEditor as mountHarness,
+  parsedAutomation,
   slimWithLoggerAction,
 } from "./_editor-harness.js";
 
 async function mountEditor(
-  api: ESPHomeAPI,
+  api: Parameters<typeof mountHarness>[1],
   configuration?: string,
   props: object = {}
 ): Promise<ESPHomeScriptEditor> {
@@ -108,6 +111,89 @@ describe("script-editor action-catalog hydration (#1286)", () => {
     const form = editor.shadowRoot!.querySelector("esphome-config-entry-form");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((form as any).focusFieldPath).toEqual(["mode"]);
+  });
+
+  describe("script id (#1883)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const SCRIPT = {
+      location: { kind: "script", id: "my_script" },
+      value: {
+        trigger_id: null,
+        trigger_params: { id: "my_script" },
+        actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+      },
+      _scriptComponent: {
+        config_entries: [
+          { key: "id", type: "string", label: "ID" },
+          { key: "mode", type: "enum", label: "Mode" },
+        ],
+      },
+    };
+
+    const slimApi = () => makeEditorApi({}, slimWithLoggerAction());
+
+    it("shows the id in a read only field, outside the form", async () => {
+      const editor = await mountEditor(slimApi(), "device.yaml", SCRIPT);
+
+      const input = editor.shadowRoot!.querySelector<HTMLInputElement>("#script-id")!;
+      expect(input.value).toBe("my_script");
+      expect(input.readOnly).toBe(true);
+      const form = editor.shadowRoot!.querySelector("esphome-config-entry-form");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((form as any).entries.map((e: { key: string }) => e.key)).toEqual(["mode"]);
+    });
+
+    it("flashes the id field again for the next script the editor shows", async () => {
+      const scrolled = vi
+        .spyOn(HTMLElement.prototype, "scrollIntoView")
+        .mockImplementation(() => {});
+      const api = makeEditorApi(
+        {
+          parseDeviceAutomations: vi.fn().mockResolvedValue([
+            parsedAutomation({
+              location: { kind: "script", id: "other_script" },
+              label: "other_script",
+              automation: { ...SCRIPT.value, trigger_params: { id: "other_script" } },
+            }),
+          ]),
+        },
+        slimWithLoggerAction()
+      );
+      const editor = await mountEditor(api, "device.yaml", {
+        ...SCRIPT,
+        focusYamlPath: ["script", 0, "id"],
+      });
+      expect(scrolled).toHaveBeenCalledTimes(1);
+
+      editor.location = { kind: "script", id: "other_script" };
+      editor.focusYamlPath = ["script", 1, "id"];
+      await editor.updateComplete;
+      await flushMicrotasks(10);
+      await editor.updateComplete;
+
+      expect(
+        editor.shadowRoot!.querySelector<HTMLInputElement>("#script-id")!.value
+      ).toBe("other_script");
+      expect(scrolled).toHaveBeenCalledTimes(2);
+    });
+
+    it("flashes the id field when the cursor is on the id line", async () => {
+      const scrolled = vi
+        .spyOn(HTMLElement.prototype, "scrollIntoView")
+        .mockImplementation(() => {});
+
+      const editor = await mountEditor(slimApi(), "device.yaml", {
+        ...SCRIPT,
+        focusYamlPath: ["script", 0, "id"],
+      });
+
+      expect(scrolled).toHaveBeenCalledTimes(1);
+      const field = editor.shadowRoot!.querySelector("#script-id")!.closest(".field");
+      expect(scrolled.mock.instances[0]).toBe(field);
+    });
   });
 
   it("reveals the advanced-gated parameters block for a parameter target", async () => {

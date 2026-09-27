@@ -6,6 +6,7 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatUsbId } from "../../util/flash-log.js";
+import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { Uf2Image } from "../../util/uf2.js";
 import {
   classifyUsbDevice,
@@ -124,7 +125,7 @@ export function picoFlashFailureCopy(
     case "connect":
       return {
         title: localize("firmware.browser_flash_connect_failed"),
-        detail: getErrorMessage(err.cause),
+        detail: connectFailureDetail(err.cause, localize),
       };
     case "device-lost":
       return {

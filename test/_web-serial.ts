@@ -1,3 +1,5 @@
+import { PickerActivationError } from "../src/util/picker-activation.js";
+
 /** Fake SerialPort whose disconnect listeners tests can fire directly. */
 export function makeDisconnectPort(): SerialPort & {
   fire: () => void;
@@ -43,3 +45,33 @@ export function withWebSerial(present: boolean, value: object = {}): () => void 
     }
   };
 }
+
+/**
+ * Set whether the click still counts (``navigator.userActivation``), or
+ * remove it with null as a browser that does not report it. Returns the restore.
+ */
+export function withUserActivation(active: boolean | null): () => void {
+  const orig = Object.getOwnPropertyDescriptor(navigator, "userActivation");
+  if (active === null) {
+    delete (navigator as unknown as { userActivation?: unknown }).userActivation;
+  } else {
+    Object.defineProperty(navigator, "userActivation", {
+      configurable: true,
+      value: { isActive: active },
+    });
+  }
+  return () => {
+    if (orig) Object.defineProperty(navigator, "userActivation", orig);
+    else delete (navigator as unknown as { userActivation?: unknown }).userActivation;
+  };
+}
+
+/** What a browser throws from a picker asked for without a live click. */
+export const pickerRefused = () =>
+  new DOMException(
+    "Must be handling a user gesture to show a permission request.",
+    "SecurityError"
+  );
+
+/** The error a picker helper throws for a click that ran out. */
+export const lapsedPick = () => new PickerActivationError(pickerRefused());

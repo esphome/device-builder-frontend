@@ -3,6 +3,8 @@
  * picker. Re-enumeration lives in ``serial-reacquire.ts`` and the esptool
  * engine in ``src/platforms/esp/esptool.ts``.
  */
+import { pickerFailure } from "./picker-activation.js";
+
 export type LogCallback = (line: string) => void;
 
 /** Why Web Serial can or can't be used here. */
@@ -55,7 +57,8 @@ export class PortNotAcceptedError extends Error {
 
 /**
  * Prompt for a Web Serial port without opening it. Returns ``null`` if the
- * user dismissed the picker; throws on a real requestPort failure. Callers
+ * user dismissed the picker; throws on a real requestPort failure, named
+ * ``PickerActivationError`` when the click ran out before the picker. Callers
  * that only need the USB identity can decide before ever opening (no DTR/RTS
  * pulse on a port that won't be used). When ``accept`` rejects the picked
  * port, this throws ``PortNotAcceptedError`` before the port is opened.
@@ -71,7 +74,7 @@ export async function requestSerialPort(
     if (isPortPickerCancel(err)) {
       return null; // User dismissed the port picker.
     }
-    throw err; // A real requestPort failure — let the caller surface it.
+    throw pickerFailure(err); // A real requestPort failure — let the caller surface it.
   }
   if (accept && !accept(port)) throw new PortNotAcceptedError(port);
   return port;

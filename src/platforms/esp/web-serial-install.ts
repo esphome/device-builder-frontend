@@ -13,6 +13,7 @@ import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { PickerActivationError } from "../../util/picker-activation.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
   type DetectedChip,
@@ -76,7 +77,8 @@ export async function startWebSerialInstall(
       err instanceof EngineLoadError
         ? host._localize("firmware.engine_load_failed")
         : openFailureMessage(err, host._localize, "serial.connect_failed"),
-      getErrorMessage(err)
+      // The title of a refused picker says it all; its own message is not copy.
+      err instanceof PickerActivationError ? "" : getErrorMessage(err)
     );
     return;
   }

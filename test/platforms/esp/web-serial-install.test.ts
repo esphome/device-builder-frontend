@@ -32,6 +32,7 @@ vi.mock("../../../src/util/post-install-dispatch.js", () => ({
 
 import { identityLocalize } from "../../_dom.js";
 import { fakeLogBuffer } from "../../_fake-host.js";
+import { lapsedPick } from "../../_web-serial.js";
 import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../../src/platforms/esp/web-serial-install.js";
@@ -183,6 +184,16 @@ describe("Web Serial install — HTTP byte download", () => {
 
     expect(host._close).toHaveBeenCalledTimes(1);
     expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("says to click again, once, for a picker refused after the click ran out", async () => {
+    const { host } = makeHost();
+    seams.requestSerialPort.mockRejectedValueOnce(lapsedPick());
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith("serial.picker_needs_click", "");
+    expect(esptool.connectToPort).not.toHaveBeenCalled();
   });
 
   it("names a failed engine chunk fetch and touches no port", async () => {

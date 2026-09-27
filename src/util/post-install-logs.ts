@@ -96,10 +96,10 @@ export async function reconnectWebSerialLogs(
   let port: SerialPort | null;
   try {
     port = await requestSerialPort();
-  } catch {
+  } catch (err) {
     failSerialOpen(
       logsDialog,
-      localize("dashboard.logs_web_serial_open_failed"),
+      openFailureMessage(err, localize, "dashboard.logs_web_serial_open_failed"),
       cancelled
     );
     return;

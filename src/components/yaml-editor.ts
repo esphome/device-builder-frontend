@@ -206,10 +206,6 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     return html`<div class="cm-wrap"></div>`;
   }
 
-  protected firstUpdated() {
-    this._mountEditor();
-  }
-
   private _buildExtensions() {
     const extensions = [
       basicSetup,
@@ -606,7 +602,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     return extensions;
   }
 
-  private _mountEditor() {
+  private _buildView() {
     this._mountView(this.value, this._buildExtensions());
 
     // Remount paths in updated() return before the highlightRange
@@ -734,7 +730,8 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
 
   /**
    * Tear down the current view and mount a fresh one against
-   * `this.value`. Both rebuild branches in `updated()` (theme/API
+   * `this.value`; also the first mount and the one after a reconnect.
+   * Both rebuild branches in `updated()` (theme/API
    * change, configuration change) end with the same destroy +
    * clear + reset-throttle + remount sequence; without this
    * helper the throttle reset in particular tends to drift
@@ -743,7 +740,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * what regressed cross-device cursor dispatch — a host-side
    * field outliving the destroyed view).
    */
-  private _remountEditor() {
+  protected _mountEditor() {
     this._destroyView();
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
@@ -755,7 +752,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       this._lastCompletionOpen = false;
       fireEvent(this, "yaml-completion-open", { open: false });
     }
-    this._mountEditor();
+    this._buildView();
   }
 
   updated(changed: Map<string, unknown>) {
@@ -786,7 +783,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       this._view
     ) {
       this.value = this._view.state.doc.toString();
-      this._remountEditor();
+      this._mountEditor();
       return;
     }
 
@@ -801,7 +798,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     // owned by `_mountEditor` (offset 0, scroll top via
     // `EditorState.create`'s default selection), not this branch.
     if (changed.has("configuration") && this._view) {
-      this._remountEditor();
+      this._mountEditor();
       return;
     }
 
@@ -812,7 +809,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       // The undoDepth gate keeps later external repopulates (after the
       // user edits/clears) undoable.
       if (current === "" && this.value !== "" && undoDepth(this._view.state) === 0) {
-        this._remountEditor();
+        this._mountEditor();
         return;
       }
       if (current !== this.value) {

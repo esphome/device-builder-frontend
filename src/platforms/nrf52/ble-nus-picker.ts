@@ -6,6 +6,7 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { copyAddressToClipboard } from "../../util/copy-address.js";
 import { LONG_TOAST_DURATION_MS, notifyError } from "../../util/notify.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import {
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
@@ -26,7 +27,9 @@ export async function pickBleNusDevice(
   } catch (err) {
     console.warn("BLE NUS chooser failed", err);
     if (!(err instanceof BleUnavailableError)) {
-      notifyError(localize("dashboard.logs_ble_nus_open_failed"));
+      notifyError(
+        openFailureMessage(err, localize, "dashboard.logs_ble_nus_open_failed")
+      );
     } else if (err.reason === "brave") {
       // Brave ships with the API switched off; name the flag page too, with
       // a copy action since no page can link to it.

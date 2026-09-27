@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import "../../../components/base-dialog.js";
@@ -8,6 +8,7 @@ import { localizeContext } from "../../../context/index.js";
 import {
   type DfuPackage,
   loadDfuEngine,
+  loadDfuPackage,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
@@ -16,9 +17,14 @@ import {
   BootloaderTouchError,
   touchIntoBootloader,
 } from "../../../util/serial-bootloader-touch.js";
+import { openFailureMessage } from "../../../util/serial-open-error.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
-import { filePickerStyles, renderFilePicker } from "../../install/file-picker.js";
+import {
+  type FilePickerError,
+  filePickerStyles,
+  renderFilePicker,
+} from "../../install/file-picker.js";
 import {
   installActionsStyles,
   installTerminalState,
@@ -26,6 +32,12 @@ import {
   renderProgressCard,
   renderRetryButton,
 } from "../../install/install-progress.js";
+
+import {
+  parseFailureCopy,
+  Preparation,
+  type Prepared,
+} from "../../install/preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -49,13 +61,47 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   // Rounded so per-packet callbacks re-render only on a visible change.
   @state() private _progress = 0;
   @state() private _errorMessage = "";
-  // Blocks a second click while a step's file read, engine load or port
-  // picker is in flight.
+  // Blocks a second click while the flash step's port picker is open.
   @state() private _pending = false;
+  // Why the picked file cannot be installed, shown under the picker.
+  @state() private _fileError: FilePickerError | null = null;
+
+  @query("input[type=file]") private _fileInput?: HTMLInputElement;
   @state() private _reconnecting = false;
   @state() private _logLines: string[] = [];
 
-  private _pkg: DfuPackage | null = null;
+  // The package is read and parsed when it is picked, so the click that
+  // starts the install goes straight to the port picker.
+  private _package = new Preparation<File, DfuPackage, FilePickerError>(
+    this,
+    (file) => this._parse(file),
+    (failure) => this._onPrepared(failure),
+    // A revoked file handle rejects the read.
+    (err) => ({
+      title: this._localize("firmware.nrf_bad_package"),
+      detail: getErrorMessage(err),
+    })
+  );
+
+  private async _parse(file: File): Promise<Prepared<DfuPackage, FilePickerError>> {
+    const bytes = await file.arrayBuffer();
+    const parsed = await loadDfuPackage(new Uint8Array(bytes));
+    if ("pkg" in parsed) return { value: parsed.pkg };
+    const { key, retryable } = parseFailureCopy(parsed.key);
+    return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
+  }
+
+  private _onPrepared(failure: FilePickerError | null): void {
+    this._fileError = failure;
+    if (this._package.state.kind === "idle") this._unpick();
+  }
+
+  // The input is emptied with the file: it fires no change for the file it
+  // still holds, so that file could not be picked a second time.
+  private _unpick(): void {
+    this._file = null;
+    if (this._fileInput) this._fileInput.value = "";
+  }
 
   private _log = (line: string) => {
     this._logLines = [...this._logLines, line];
@@ -67,21 +113,22 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
   }
 
-  // Also while a step's file read, engine load or picker is pending: a close
-  // then would reset the dialog under a step that keeps running.
+  // Also while a step's picker is open: a close then would reset the dialog
+  // under a step that keeps running.
   private get _busy(): boolean {
     return this._pending || this._state === "resetting" || this._state === "flashing";
   }
 
   private _reset(): void {
     this._state = "idle";
-    this._file = null;
+    this._unpick();
+    this._fileError = null;
+    this._package.clear();
     this._progress = 0;
     this._errorMessage = "";
     this._pending = false;
     this._reconnecting = false;
     this._logLines = [];
-    this._pkg = null;
   }
 
   private _fail(message: string): void {
@@ -91,72 +138,50 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
 
   private _onFileChange = (e: Event): void => {
     this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
+    this._fileError = null;
+    if (this._file) this._package.start(this._file);
+    else this._package.clear();
+  };
+
+  // The engine did not load for the picked file: load it again.
+  private _retryFile = (): void => {
+    this._fileError = null;
+    this._package.retry();
   };
 
   private async _startInstall(): Promise<void> {
-    if (!this._file) {
-      this._fail(this._localize("web.nrf.install_error_no_file"));
-      return;
-    }
-    if (this._pending) return;
-    this._pending = true;
+    if (this._package.state.kind !== "ready" || this._state !== "idle") return;
     this._logLines = [];
-    try {
-      await this._prepareAndReset(this._file);
-    } finally {
-      this._pending = false;
-    }
-  }
-
-  private async _prepareAndReset(file: File): Promise<void> {
-    try {
-      // A revoked file handle or a stale chunk after a deploy rejects here.
-      const [zipBytes, { parseDfuPackage }] = await Promise.all([
-        file.arrayBuffer(),
-        loadDfuEngine(),
-      ]);
-      this._pkg = parseDfuPackage(new Uint8Array(zipBytes));
-    } catch (err) {
-      this._fail(
-        this._localize("web.nrf.install_error_bad_package", {
-          error: getErrorMessage(err),
-        })
-      );
-      return;
-    }
-
     this._state = "resetting";
     try {
-      if (!(await touchIntoBootloader({ onLog: this._log }))) {
-        this._state = "idle";
-        return;
-      }
+      // Nothing is awaited before the touch's port picker: it needs the
+      // click's activation.
+      const touched = await touchIntoBootloader({ onLog: this._log });
+      this._state = touched ? "waiting" : "idle";
     } catch (err) {
       // A failed pick has nothing to do with the board; only the touch earns
       // the manual-bootloader hint.
       this._fail(
-        this._localize("web.connect.failed", {
-          error:
-            err instanceof BootloaderTouchError
-              ? withManualBootloaderHint(err, this._localize)
-              : getErrorMessage(err),
-        })
+        err instanceof BootloaderTouchError
+          ? this._localize("web.connect.failed", {
+              error: withManualBootloaderHint(err, this._localize),
+            })
+          : openFailureMessage(err, this._localize, "web.connect.failed")
       );
-      return;
     }
-    this._state = "waiting";
   }
 
   private async _continueFlash(): Promise<void> {
-    const pkg = this._pkg;
-    if (!pkg || this._pending) return;
+    const prepared = this._package.state;
+    if (prepared.kind !== "ready" || this._pending) return;
+    const pkg = prepared.value;
 
     let port: SerialPort | null;
     this._pending = true;
     try {
       port = await requestSerialPort();
     } catch (err) {
-      this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+      this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
       return;
     } finally {
       this._pending = false;
@@ -197,6 +222,11 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       file: this._file,
       placeholder: this._localize("web.nrf.install_file_placeholder"),
       onChange: this._onFileChange,
+      preparing:
+        this._package.state.kind === "pending"
+          ? this._localize("web.install.preparing")
+          : undefined,
+      error: this._fileError,
     });
   }
 
@@ -239,10 +269,13 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   private _renderAction() {
     switch (this._state) {
       case "idle":
+        if (this._package.state.kind === "retryable") {
+          return renderRetryButton(this._localize, this._retryFile);
+        }
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${!this._file || this._pending}
+            ?disabled=${this._package.state.kind !== "ready"}
             @click=${this._startInstall}
           >
             ${this._localize("dashboard.install")}

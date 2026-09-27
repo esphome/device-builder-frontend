@@ -6,8 +6,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/util/web-serial.js", () => ({
-  isPortPickerCancel: vi.fn(() => false),
+vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
   webSerialAvailability: vi.fn(() => "available"),
 }));
 vi.mock("../../src/web/dashboard/esphome-web-card.js", () => ({}));
@@ -55,7 +55,7 @@ vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
   },
 }));
 
-import { isPortPickerCancel } from "../../src/util/web-serial.js";
+import { pickerRefused, withUserActivation } from "../_web-serial.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
 import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.js";
 
@@ -63,7 +63,11 @@ import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.j
 
 const port = { getInfo: () => ({}), close: async () => {} } as unknown as SerialPort;
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   document.body.innerHTML = "";
   vi.clearAllMocks();
   delete (window as any).opener;
@@ -232,7 +236,7 @@ describe("esphome-web-flash-receiver engines", () => {
     engines.load.esp.mockRejectedValueOnce(offline).mockRejectedValueOnce(offline);
     const { el } = await handOff({ name: "fw.bin" }, false);
     expect((el as any)._state).toBe("error");
-    expect((el as any)._statusMessage).toBe("firmware.engine_load_failed");
+    expect((el as any)._statusMessage).toBe("web.install.tools_load_failed");
     expect(preparation(el)).toBe("retryable");
     expect(primaryButton(el).disabled).toBe(false);
     // The button says what the click does: it loads again, it does not install.
@@ -276,9 +280,20 @@ describe("esphome-web-flash-receiver engines", () => {
 
   it("keeps the firmware's name on the ready line after a dismissed picker", async () => {
     requestPort.mockRejectedValueOnce(new DOMException("dismissed", "NotFoundError"));
-    vi.mocked(isPortPickerCancel).mockReturnValueOnce(true);
     const { el } = await handOff({ name: "fw.bin" });
     expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+  });
+
+  it("says to click again for a picker refused after the click ran out", async () => {
+    restoreActivation = withUserActivation(false);
+    requestPort.mockRejectedValueOnce(pickerRefused());
+    const { el } = await handOff({});
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toBe("serial.picker_needs_click");
+
+    requestPort.mockRejectedValueOnce(new Error("no serial"));
+    await (el as any)._onPrimary();
+    expect((el as any)._statusMessage).toBe("web.flash.no_port");
   });
 
   it("asks for the port in the click itself, with nothing awaited before it", async () => {

@@ -634,7 +634,8 @@
     "open_failed": "Could not open the serial port: {error}",
     "port_in_use": "Could not open the serial port; it may be open in another tab or program. Close it there and try again. ({error})",
     "open_timed_out": "The serial port did not open within {seconds} seconds. Unplug and replug the board, then try again.",
-    "port_held": "The serial port could not be released. Unplug and replug the board, then try again."
+    "port_held": "The serial port could not be released. Unplug and replug the board, then try again.",
+    "picker_needs_click": "The browser did not open the device chooser because too much time passed since your click. Click again."
   },
   "wizard": {
     "title_create": "Create configuration",
@@ -1025,7 +1026,7 @@
     "api_action_header_title_static": "API action",
     "api_action_header_description": "A named action your Home Assistant can invoke. Declare typed `variables:` to accept arguments from the caller, then list the actions that run when it's called.",
     "api_action_id_label": "Action name",
-    "api_action_id_description": "The name Home Assistant uses to call this action. Renaming it requires updating any callers that reference the old name.",
+    "api_action_id_description": "The name Home Assistant uses to call this action. To rename the action, edit the name in the YAML and update any callers that reference the old name.",
     "api_action_variables": "Variables",
     "api_action_variables_description": "Typed values the caller can pass when invoking this action. Reference them inside actions via `id(name)`.",
     "api_action_add_variable": "Add variable",
@@ -1036,7 +1037,7 @@
     "script_header_description": "A reusable list of actions. Once declared, call it from any automation with `script.execute`.",
     "automation_target_interval_n": "Interval #{index}",
     "script_id_label": "Script ID",
-    "script_id_description": "The unique id used to invoke this script via `script.execute`. Renaming requires updating any callers that reference the old id.",
+    "script_id_description": "The unique id used to invoke this script via `script.execute`. To rename the script, edit the id in the YAML and update any callers that reference the old id.",
     "script_mode_description": "How concurrent invocations behave. `single` ignores new calls while the script is running; `restart` cancels and restarts; `queued` lines them up; `parallel` runs them concurrently.",
     "script_parameters_description": "Typed parameters callers can pass to the script. Reference them inside actions via `id(name)`.",
     "script_add_parameter": "Add parameter",
@@ -2046,6 +2047,7 @@
     },
     "install": {
       "preparing": "Preparing firmware…",
+      "tools_load_failed": "Could not load the flashing tools. Check your connection and retry.",
       "erasing": "Erasing device…",
       "done": "Installation complete",
       "unsupported_chip": "There's no ready-made ESPHome Web firmware for the {chip} (for example, chips without built-in Wi-Fi). Create a device in your ESPHome Device Builder and install it from there instead.",
@@ -2090,8 +2092,6 @@
       "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready. If no new port appears, the firmware on the board did not act on the reset: double-press the board's reset button to enter the bootloader by hand, then click Continue.",
       "install_flashing": "Installing firmware…",
       "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
-      "install_error_no_file": "Select a DFU package first.",
-      "install_error_bad_package": "Invalid DFU package: {error}",
       "install_error_flash": "Firmware update failed: {error}"
     }
   },

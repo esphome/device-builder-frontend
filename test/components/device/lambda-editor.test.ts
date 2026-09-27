@@ -90,4 +90,22 @@ describe("lambda-editor lambda-change emission", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(view.state.doc.toString()).toBe("return 99;");
   });
+
+  it("keeps its body and still reports edits after the element is moved", async () => {
+    // A keyed list moves a row's elements on a reorder.
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
+    const onChange = vi.fn();
+    el.addEventListener("lambda-change", onChange);
+    const elsewhere = document.createElement("div");
+    document.body.appendChild(elsewhere);
+
+    elsewhere.appendChild(el);
+    await el.updateComplete;
+
+    const view = el["_view"]!;
+    expect(view.state.doc.toString()).toBe("return 1;");
+    expect(onChange).not.toHaveBeenCalled();
+    view.dispatch({ changes: { from: 0, to: 0, insert: "// " } });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
 });

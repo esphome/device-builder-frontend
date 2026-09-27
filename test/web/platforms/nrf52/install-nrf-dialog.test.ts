@@ -25,6 +25,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
+import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { ESPHomeWebInstallNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js";
 
@@ -35,7 +36,7 @@ async function mountDialog(): Promise<any> {
     _localize: identityLocalize,
     open: true,
   } as Partial<ESPHomeWebInstallNrfDialog>);
-  (el as any)._file = new File([new Uint8Array(4)], "firmware.zip");
+  await pickFile(el, "_package", new File([new Uint8Array(4)], "firmware.zip"));
   return el;
 }
 
@@ -92,9 +93,59 @@ describe("esphome-web-install-nrf-dialog details log", () => {
     el.open = false;
     await el.updateComplete;
     el.open = true;
-    el._file = new File([new Uint8Array(4)], "firmware.zip");
+    await pickFile(el, "_package", new File([new Uint8Array(4)], "firmware.zip"));
     await el._startInstall();
     await el.updateComplete;
     expect(logLines(el)).toEqual(["Touching the port at 1200 baud"]);
+  });
+
+  it("asks for the touch's port in the click itself, with nothing awaited before it", async () => {
+    const el = await mountDialog();
+    // Not awaited: the picker has to be asked for before the click's turn ends.
+    const install = el._startInstall();
+    expect(mocks.touchIntoBootloader).toHaveBeenCalledOnce();
+    await install;
+  });
+
+  it("names a package that does not parse under the picker, when it is picked", async () => {
+    mocks.parseDfuPackage.mockImplementation(() => {
+      throw new Error("no manifest.json");
+    });
+    const el = await mountDialog();
+    expect(el._state).toBe("idle");
+    expect(pickerText(el)).toEqual({
+      name: "web.nrf.install_file_placeholder",
+      status: "",
+      error: "firmware.nrf_bad_package: no manifest.json",
+    });
+    await el._startInstall();
+    expect(mocks.touchIntoBootloader).not.toHaveBeenCalled();
+  });
+
+  it("unpicks the package when the dialog closes, so it can be picked again", async () => {
+    const el = await mountDialog();
+    const cleared = watchFileInput(el);
+    el.open = false;
+    await el.updateComplete;
+    expect(cleared).toHaveBeenCalledWith("");
+    expect(el._file).toBeNull();
+  });
+
+  it("offers the install only once the picked package is read and parsed", async () => {
+    const slow = slowFile("firmware.zip");
+    const el = (await mount(new ESPHomeWebInstallNrfDialog(), {
+      _localize: identityLocalize,
+      open: true,
+    } as Partial<ESPHomeWebInstallNrfDialog>)) as any;
+    const installDisabled = () =>
+      el.shadowRoot!.querySelector(".actions wa-button").hasAttribute("disabled");
+    el._onFileChange({ target: { files: [slow.file] } });
+    await el.updateComplete;
+    expect(pickerText(el).status).toBe("web.install.preparing");
+    expect(installDisabled()).toBe(true);
+    await el._startInstall();
+    expect(mocks.touchIntoBootloader).not.toHaveBeenCalled();
+    slow.read(new ArrayBuffer(4));
+    await vi.waitFor(() => expect(installDisabled()).toBe(false));
   });
 });

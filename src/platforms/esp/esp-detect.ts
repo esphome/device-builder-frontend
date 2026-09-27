@@ -37,7 +37,8 @@ export async function loadEsptoolOrThrow(): Promise<Esptool> {
  * Pick the port in the click while the engine chunk fetches: ``import()``
  * doesn't spend the user activation, and the chunk lands while the picker
  * is open. ``null`` when the picker was dismissed; a failed fetch throws
- * ``EngineLoadError``, a failed pick the browser's own error.
+ * ``EngineLoadError``, and a failed pick throws whatever
+ * ``requestSerialPort`` throws.
  */
 export async function pickPortAndLoadEsptool(): Promise<{
   port: SerialPort;

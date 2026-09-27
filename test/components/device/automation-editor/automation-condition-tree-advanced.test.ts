@@ -4,9 +4,8 @@
  * Advanced-section wiring tests for ``automation-condition-tree.ts``
  * (issue #1905: sensor.in_range's above/below were unreachable).
  *
- * The tree renders rows with a plain ``conditions.map(...)`` (no keyed
- * ``repeat()``), so the per-row "Show advanced settings" flag is keyed
- * by index and must follow its row across kind changes and removals.
+ * The tree keys its rows, so the per-row "Show advanced settings" flag
+ * follows its row across moves and removals, and is reset by a kind change.
  * ``config-entry-form`` drags CodeMirror in transitively, so ``vi.mock``
  * no-ops it; picks are delivered by answering the tree's pick request.
  */
@@ -58,16 +57,22 @@ function node(condition_id: string): ConditionNode {
 const CATALOG = [condition("sensor.in_range"), condition("number.in_range")];
 
 async function mountTree(
-  conditions: ConditionNode[]
+  conditions: ConditionNode[],
+  { readOnly = false } = {}
 ): Promise<ESPHomeAutomationConditionTree> {
   const el = new ESPHomeAutomationConditionTree();
   el.conditions = conditions;
   el.catalog = CATALOG;
   // Mirror the owner contract: mutations come back through
-  // conditions-change and the parent rebinds the list.
-  el.addEventListener("conditions-change", (e) => {
-    el.conditions = (e as CustomEvent<{ conditions: ConditionNode[] }>).detail.conditions;
-  });
+  // conditions-change and the parent rebinds the list, unless it is
+  // read only and drops them.
+  if (!readOnly) {
+    el.addEventListener("conditions-change", (e) => {
+      el.conditions = (
+        e as CustomEvent<{ conditions: ConditionNode[] }>
+      ).detail.conditions;
+    });
+  }
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -129,6 +134,106 @@ describe("automation-condition-tree advanced section", () => {
 
     expect(forms(el)).toHaveLength(1);
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(true);
+  });
+
+  it("puts focus back on the move button once its row has moved", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("sensor.in_range"),
+    ]);
+    const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!;
+    button.focus();
+    const focus = vi.spyOn(button, "focus");
+
+    button.click();
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.activeElement).toBe(button);
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("acts on the moved row, not on the one that took its place", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("binary_sensor.is_on"),
+    ]);
+    const row = el.shadowRoot!.querySelector(".ae-row")!;
+    const button = (label: string) =>
+      row.querySelector<HTMLButtonElement>(
+        `button[aria-label="device.automation_${label}"]`
+      )!;
+
+    button("move_down").click();
+    await el.updateComplete;
+    button("remove").click();
+    await el.updateComplete;
+
+    expect(el.conditions.map((c) => c.condition_id)).toEqual([
+      "number.in_range",
+      "binary_sensor.is_on",
+    ]);
+  });
+
+  it("does not hand the caret's target to a row moved onto its index", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("sensor.in_range"),
+    ]);
+    el.focusTarget = { node: [1], field: ["basic"] };
+    await el.updateComplete;
+    const fieldFocus = () =>
+      forms(el).map(
+        (form) => (form as unknown as { focusFieldPath?: string[] }).focusFieldPath
+      );
+    expect(fieldFocus()).toEqual([undefined, ["basic"], undefined]);
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!.click();
+    await el.updateComplete;
+
+    expect(fieldFocus()).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("moves the flag with its row on a reorder", async () => {
+    const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
+    const opened = forms(el)[0];
+
+    toggleAdvanced(opened, true);
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!.click();
+    await el.updateComplete;
+
+    expect(el.conditions.map((c) => c.condition_id)).toEqual([
+      "number.in_range",
+      "sensor.in_range",
+    ]);
+    expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);
+    expect(forms(el)[1].hasAttribute("show-advanced")).toBe(true);
+    // The row's own form moved with it, carrying whatever it remembers.
+    expect(forms(el)[1]).toBe(opened);
+  });
+
+  it("leaves the flags alone when the parent drops a delete", async () => {
+    const el = await mountTree([node("sensor.in_range"), node("number.in_range")], {
+      readOnly: true,
+    });
+
+    toggleAdvanced(forms(el)[1], true);
+    await el.updateComplete;
+    el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".ae-row-delete")[0].click();
+    await el.updateComplete;
+
+    expect(forms(el)).toHaveLength(2);
+    expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);
+    expect(forms(el)[1].hasAttribute("show-advanced")).toBe(true);
   });
 
   it("resets the flag when the row's condition kind changes", async () => {

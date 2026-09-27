@@ -76,8 +76,9 @@ export async function touchPort(
  * The touch from a button click: pick the CDC port (narrowed by ``filters``
  * where the board's ids are known, and checked by ``accept`` where the ids
  * alone can't tell), then reset. False when the picker was dismissed; a
- * failed touch throws ``BootloaderTouchError``, a refused pick
- * ``PortNotAcceptedError`` (untouched), a failed pick the browser's own error.
+ * failed touch throws ``BootloaderTouchError``, a refused pick throws
+ * ``PortNotAcceptedError`` (untouched), and a failed pick throws whatever
+ * ``requestSerialPort`` throws.
  */
 export async function touchIntoBootloader({
   onLog,

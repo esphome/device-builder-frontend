@@ -3,6 +3,7 @@
  * only). Lines go through the same assembler as Web Serial so both surfaces
  * render identically.
  */
+import { pickerFailure } from "../../util/picker-activation.js";
 import {
   createLogLineAssembler,
   safeFlush,
@@ -92,7 +93,7 @@ export async function requestBleNusDevice(
   try {
     return await navigator.bluetooth.requestDevice(options);
   } catch (err) {
-    if (!isPortPickerCancel(err)) throw err;
+    if (!isPortPickerCancel(err)) throw pickerFailure(err);
     // Chrome rejects with the same NotFoundError when the adapter is off.
     const reason = await bleUnavailableReason();
     if (reason) throw new BleUnavailableError(reason);

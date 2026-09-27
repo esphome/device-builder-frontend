@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -13,9 +13,14 @@ import {
 } from "../../../platforms/rtl87xx/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { openFailureMessage } from "../../../util/serial-open-error.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
-import { filePickerStyles, renderFilePicker } from "../../install/file-picker.js";
+import {
+  type FilePickerError,
+  filePickerStyles,
+  renderFilePicker,
+} from "../../install/file-picker.js";
 import {
   installActionsStyles,
   installTerminalState,
@@ -23,6 +28,12 @@ import {
   renderProgressCard,
   renderRetryButton,
 } from "../../install/install-progress.js";
+
+import {
+  parseFailureCopy,
+  Preparation,
+  type Prepared,
+} from "../../install/preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -51,11 +62,47 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   @state() private _logLines: string[] = [];
   // The adapter had no control lines: the user resets the board by hand.
   @state() private _manualReset = false;
-  // Blocks a second click while the file read, the engine load or the port
-  // picker is in flight.
+  // Blocks a second click while the port picker is open.
   @state() private _pending = false;
+  // Why the picked file cannot be installed, shown under the picker.
+  @state() private _fileError: FilePickerError | null = null;
+
+  @query("input[type=file]") private _fileInput?: HTMLInputElement;
 
   private _abort: AbortController | null = null;
+
+  // The UF2 is read and parsed when it is picked, so the click that installs
+  // it goes straight to the port picker.
+  private _image = new Preparation<File, LibreTinyImage, FilePickerError>(
+    this,
+    (file) => this._parse(file),
+    (failure) => this._onPrepared(failure),
+    // A revoked file handle rejects the read.
+    (err) => ({
+      title: this._localize("firmware.rtl_bad_uf2"),
+      detail: getErrorMessage(err),
+    })
+  );
+
+  private async _parse(file: File): Promise<Prepared<LibreTinyImage, FilePickerError>> {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const parsed = await loadAmbz2Image(bytes);
+    if ("image" in parsed) return { value: parsed.image };
+    const { key, retryable } = parseFailureCopy(parsed.key);
+    return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
+  }
+
+  private _onPrepared(failure: FilePickerError | null): void {
+    this._fileError = failure;
+    if (this._image.state.kind === "idle") this._unpick();
+  }
+
+  // The input is emptied with the file: it fires no change for the file it
+  // still holds, so that file could not be picked a second time.
+  private _unpick(): void {
+    this._file = null;
+    if (this._fileInput) this._fileInput.value = "";
+  }
 
   private _log = (line: string) => {
     this._logLines = [...this._logLines, line];
@@ -76,7 +123,9 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     this._abort?.abort();
     this._abort = null;
     this._state = "idle";
-    this._file = null;
+    this._unpick();
+    this._fileError = null;
+    this._image.clear();
     this._progress = 0;
     this._errorTitle = "";
     this._errorMessage = "";
@@ -93,33 +142,30 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
 
   private _onFileChange = (e: Event): void => {
     this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
+    this._fileError = null;
+    if (this._file) this._image.start(this._file);
+    else this._image.clear();
+  };
+
+  // The parser did not load for the picked file: load it again.
+  private _retryFile = (): void => {
+    this._fileError = null;
+    this._image.retry();
   };
 
   private async _flash(): Promise<void> {
-    const file = this._file;
-    if (!file || this._pending) return;
+    const prepared = this._image.state;
+    if (prepared.kind !== "ready" || this._pending) return;
+    const image = prepared.value;
     this._pending = true;
     this._logLines = [];
-    let image: LibreTinyImage;
     let port: SerialPort | null;
     try {
-      let bytes: Uint8Array;
-      try {
-        bytes = new Uint8Array(await file.arrayBuffer());
-      } catch (err) {
-        this._fail(this._localize("firmware.rtl_bad_uf2"), getErrorMessage(err));
-        return;
-      }
-      const parsed = await loadAmbz2Image(bytes);
-      if ("key" in parsed) {
-        this._fail(this._localize(parsed.key), parsed.detail);
-        return;
-      }
-      image = parsed.image;
+      // Nothing is awaited before the picker: it needs the click's activation.
       try {
         port = await requestSerialPort();
       } catch (err) {
-        this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+        this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
         return;
       }
       if (!port) return;
@@ -202,6 +248,11 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
         file: this._file,
         placeholder: this._localize("web.rtl.install_file_placeholder"),
         onChange: this._onFileChange,
+        preparing:
+          this._image.state.kind === "pending"
+            ? this._localize("web.install.preparing")
+            : undefined,
+        error: this._fileError,
       })}
       <p>${this._localize("web.rtl.install_howto_title")}</p>
       <ol>
@@ -242,10 +293,13 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   private _renderAction() {
     switch (this._state) {
       case "idle":
+        if (this._image.state.kind === "retryable") {
+          return renderRetryButton(this._localize, this._retryFile);
+        }
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${!this._file || this._pending}
+            ?disabled=${this._image.state.kind !== "ready" || this._pending}
             @click=${this._flash}
           >
             ${this._localize("firmware.browser_flash_action")}

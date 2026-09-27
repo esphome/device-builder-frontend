@@ -19,6 +19,7 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { notifyError } from "../../../util/notify.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
+import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import type { Uf2Image } from "../../../util/uf2.js";
 import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
@@ -140,7 +141,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       }
       this._fail(
         this._localize("firmware.browser_flash_connect_failed"),
-        getErrorMessage(err)
+        connectFailureDetail(err, this._localize)
       );
     }
   }

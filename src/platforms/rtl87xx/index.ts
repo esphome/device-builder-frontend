@@ -35,6 +35,7 @@ export async function loadAmbz2Image(
   try {
     parser = await loadLibreTinyParser();
   } catch (err) {
+    console.error("[rtl87xx] Could not load the parser chunk:", err);
     return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
   }
   try {

@@ -98,6 +98,13 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected _resolveFocus = createFocusResolver();
 
+  /** Counts the automations the parent has pointed this editor at. The
+   *  editor is reused, so each one keys its body on this to start the
+   *  next automation with fresh rows and forms. It advances when the new
+   *  tree lands. */
+  protected _target = 0;
+  private _retargeted = false;
+
   /** Focus target for the current caret; none while a stale tree is shown. */
   protected _currentFocus() {
     return this._resolveFocus(
@@ -230,6 +237,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       const m = this._parseError.resolve(parsed, this.location);
       if (m) {
         this.location = m.location;
+        if (this._retargeted) this._target++;
+        this._retargeted = false;
         this.value = m.tree;
         this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
@@ -277,6 +286,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
         this._hydrating = true;
+        this._retargeted = true;
       }
     }
     setHeld(this, this._hydrating);

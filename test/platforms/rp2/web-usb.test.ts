@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { pickerRefused, withUserActivation } from "../../_web-serial.js";
 import {
   getPicobootDevices,
   isRp2CdcPort,
@@ -21,7 +22,11 @@ function setUsb(usb: object | null, secure = true) {
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: secure });
 }
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   if (origUsb) Object.defineProperty(navigator, "usb", origUsb);
   else if ("usb" in navigator) delete (navigator as any).usb;
   if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);
@@ -57,6 +62,18 @@ describe("requestPicobootDevice", () => {
       }),
     });
     await expect(requestPicobootDevice()).resolves.toBeNull();
+  });
+
+  it("names a chooser refused after the click ran out", async () => {
+    restoreActivation = withUserActivation(false);
+    setUsb({
+      requestDevice: vi.fn(async () => {
+        throw pickerRefused();
+      }),
+    });
+    await expect(requestPicobootDevice()).rejects.toMatchObject({
+      name: "PickerActivationError",
+    });
   });
 
   it("rethrows other failures", async () => {

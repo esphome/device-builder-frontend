@@ -3,6 +3,7 @@
  * lazy PICOBOOT engine because ``requestDevice()`` must run inside the
  * click's user activation, before any engine chunk is awaited.
  */
+import { pickerFailure } from "../../util/picker-activation.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
 
 /** Chromium only; Firefox has no WebUSB. */
@@ -94,6 +95,6 @@ export async function requestPicobootDevice(): Promise<USBDevice | null> {
     });
   } catch (err) {
     if (isPortPickerCancel(err)) return null;
-    throw err;
+    throw pickerFailure(err);
   }
 }

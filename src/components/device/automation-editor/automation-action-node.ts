@@ -155,12 +155,10 @@ export class ESPHomeAutomationActionNode extends LitElement {
   private _focusScrolled = false;
 
   /**
-   * The list reuses nodes by DOM position (plain actions.map, no keyed
-   * repeat), so a reorder/delete only rebinds .value and the @state
-   * view-flags would otherwise leak onto whichever action lands here.
-   * Key the reset off action_id, not object identity: a same-action
-   * param edit re-emits a fresh ActionNode every keystroke and resetting
-   * on that would snap the card shut mid-edit.
+   * A change of kind keeps this row, so reset the view flags on a new
+   * ``action_id``. Not on object identity: a same-action param edit
+   * re-emits a fresh ActionNode every keystroke and resetting on that
+   * would snap the card shut mid-edit.
    */
   protected willUpdate(changed: PropertyValues<this>): void {
     if (changed.has("value")) {

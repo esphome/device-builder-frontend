@@ -10,7 +10,8 @@ import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { isPortPickerCancel } from "../../../util/web-serial.js";
+import { openFailureMessage } from "../../../util/serial-open-error.js";
+import { requestSerialPort } from "../../../util/web-serial.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import { PortDisconnectWatcher } from "../../util/port-disconnect-watcher.js";
 import "../../dashboard/esphome-web-card.js";
@@ -76,21 +77,17 @@ export class ESPHomeWebEspConnectCard extends LitElement {
   }
 
   private async _connect(): Promise<void> {
-    let port: SerialPort;
+    let port: SerialPort | null;
     try {
-      port = await navigator.serial.requestPort();
+      port = await requestSerialPort();
     } catch (err) {
-      if (isPortPickerCancel(err)) {
-        // Cancelled / no device listed: offer driver help + a retry, matching
-        // the legacy site rather than silently doing nothing.
-        openNoPortPickedDialog(this._localize, () => void this._connect());
-      } else {
-        toast.error(
-          this._localize("web.connect.failed", {
-            error: err instanceof Error ? err.message : String(err),
-          })
-        );
-      }
+      toast.error(openFailureMessage(err, this._localize, "web.connect.failed"));
+      return;
+    }
+    if (!port) {
+      // Cancelled / no device listed: offer driver help + a retry, matching
+      // the legacy site rather than silently doing nothing.
+      openNoPortPickedDialog(this._localize, () => void this._connect());
       return;
     }
     this._port = port;

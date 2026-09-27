@@ -140,4 +140,39 @@ describe("base editor relocation hydrate", () => {
     await flushMicrotasks(5);
     expect((editor as any).value.actions).toHaveLength(0);
   });
+
+  const actionList = (editor: ESPHomeScriptEditor) =>
+    editor.shadowRoot!.querySelector("esphome-automation-action-list");
+
+  it("remounts its body once the parent's other automation has landed", async () => {
+    const d = deferred<ParsedAutomation[]>();
+    const { editor } = await mountAt("a", vi.fn().mockReturnValue(d.promise));
+    const before = actionList(editor);
+    expect(before).not.toBeNull();
+
+    (editor as any).location = { kind: "script", id: "b" };
+    await editor.updateComplete;
+    await flushMicrotasks(3);
+    // The previous tree is still on screen, so its rows stay mounted.
+    expect(actionList(editor)).toBe(before);
+
+    d.resolve([parsedScript("b")]);
+    await flushMicrotasks(5);
+    await editor.updateComplete;
+    expect(actionList(editor)).not.toBe(before);
+  });
+
+  it("keeps its body through a re-parse of the same automation", async () => {
+    const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
+    const { editor } = await mountAt("a", parse);
+    const before = actionList(editor);
+
+    (editor as any).yaml = "script:\n  - id: a\n";
+    editor.reload();
+    await flushMicrotasks(5);
+    await editor.updateComplete;
+
+    expect(parse).toHaveBeenCalled();
+    expect(actionList(editor)).toBe(before);
+  });
 });

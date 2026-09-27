@@ -26,17 +26,19 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
+import { pickFile } from "../../_pick-file.js";
 import { argsLocalize } from "../../../_dom.js";
+import { lapsedPick } from "../../../_web-serial.js";
 import { BootloaderTouchError } from "../../../../src/util/serial-bootloader-touch.js";
 import { ESPHomeWebInstallNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Driven directly: nothing here reads the rendered output.
-function dialog(): any {
+async function dialog(): Promise<any> {
   const el = new ESPHomeWebInstallNrfDialog() as any;
   el._localize = argsLocalize;
-  el._file = new File([new Uint8Array(4)], "firmware.zip");
+  await pickFile(el, "_package", new File([new Uint8Array(4)], "firmware.zip"));
   return el;
 }
 
@@ -53,7 +55,7 @@ afterEach(() => {
 
 describe("web nRF52 install dialog failure hints", () => {
   it("tells the user to enter the bootloader by hand when the bootloader never answers", async () => {
-    const el = dialog();
+    const el = await dialog();
     await el._startInstall();
     expect(el._state).toBe("waiting");
     mocks.flashDfuPackageWithReconnect.mockRejectedValue(
@@ -67,7 +69,7 @@ describe("web nRF52 install dialog failure hints", () => {
   });
 
   it("adds the same hint when the touch itself fails", async () => {
-    const el = dialog();
+    const el = await dialog();
     mocks.touchIntoBootloader.mockRejectedValue(
       new BootloaderTouchError(new DOMException("refused", "NetworkError"))
     );
@@ -79,19 +81,27 @@ describe("web nRF52 install dialog failure hints", () => {
   });
 
   it("goes back to the setup step when the picker is dismissed", async () => {
-    const el = dialog();
+    const el = await dialog();
     mocks.touchIntoBootloader.mockResolvedValue(false);
     await el._startInstall();
     expect(el._state).toBe("idle");
   });
 
   it("keeps a picker or permission failure bare, since the board is not the problem", async () => {
-    const el = dialog();
+    const el = await dialog();
     mocks.touchIntoBootloader.mockRejectedValue(
       new DOMException("denied", "SecurityError")
     );
     await el._startInstall();
     expect(el._state).toBe("error");
     expect(el._errorMessage).toBe("web.connect.failed | denied");
+  });
+
+  it("says to click again for a picker refused after the click ran out", async () => {
+    const el = await dialog();
+    mocks.touchIntoBootloader.mockRejectedValue(lapsedPick());
+    await el._startInstall();
+    expect(el._state).toBe("error");
+    expect(el._errorMessage).toBe("serial.picker_needs_click");
   });
 });

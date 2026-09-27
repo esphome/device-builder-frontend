@@ -5,11 +5,7 @@ const openNoPortPickedDialog = vi.fn();
 vi.mock("../../../../src/web/platforms/esp/esphome-web-no-port-picked-dialog.js", () => ({
   openNoPortPickedDialog: (...a: unknown[]) => openNoPortPickedDialog(...a),
 }));
-const isPortPickerCancel = vi.fn((..._a: unknown[]) => true);
 const reacquirePort = vi.fn();
-vi.mock("../../../../src/util/web-serial.js", () => ({
-  isPortPickerCancel: (...a: unknown[]) => isPortPickerCancel(...a),
-}));
 vi.mock("../../../../src/util/serial-reacquire.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   reacquirePort: (...a: unknown[]) => reacquirePort(...a),
@@ -23,15 +19,22 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import toast from "sonner-js";
 import { flush } from "../../../_dom.js";
-import { makeDisconnectPort } from "../../../_web-serial.js";
+import {
+  makeDisconnectPort,
+  pickerRefused,
+  withUserActivation,
+} from "../../../_web-serial.js";
 import { ESPHomeWebEspConnectCard } from "../../../../src/web/platforms/esp/esphome-web-esp-connect-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+let restoreActivation = (): void => {};
+
 afterEach(() => {
+  restoreActivation();
+  restoreActivation = () => {};
   document.body.innerHTML = "";
   vi.clearAllMocks();
-  isPortPickerCancel.mockReturnValue(true);
 });
 
 describe("esphome-web-esp-connect-card connect cancel", () => {
@@ -54,7 +57,6 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
   });
 
   it("toasts (no driver dialog) on a real connect error", async () => {
-    isPortPickerCancel.mockReturnValue(false);
     const el = new ESPHomeWebEspConnectCard();
     (el as any)._localize = (k: string) => k;
     (navigator as any).serial = {
@@ -67,6 +69,22 @@ describe("esphome-web-esp-connect-card connect cancel", () => {
 
     expect(openNoPortPickedDialog).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledOnce();
+  });
+
+  it("says to click again for a picker refused after the click ran out", async () => {
+    restoreActivation = withUserActivation(false);
+    const el = new ESPHomeWebEspConnectCard();
+    (el as any)._localize = (k: string) => k;
+    (navigator as any).serial = {
+      requestPort: vi.fn(async () => {
+        throw pickerRefused();
+      }),
+    };
+
+    await (el as any)._connect();
+
+    expect(openNoPortPickedDialog).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith("serial.picker_needs_click");
   });
 });
 

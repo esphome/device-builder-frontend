@@ -10,6 +10,7 @@ vi.mock("../../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
   loadPicoboot: mocks.loadPicoboot,
 }));
 
+import { lapsedPick } from "../../_web-serial.js";
 import {
   flashPico,
   PicoFlashError,
@@ -171,5 +172,15 @@ describe("picoFlashFailureCopy", () => {
     expect(
       picoFlashFailureCopy(new PicoFlashError("access-denied", cause), localize).title
     ).toBe("firmware.rp2_usb_access_denied");
+  });
+
+  it("says to click again for a chooser refused after the click ran out", () => {
+    const refused = lapsedPick();
+    expect(
+      picoFlashFailureCopy(new PicoFlashError("connect", refused), localize)
+    ).toEqual({
+      title: "firmware.browser_flash_connect_failed",
+      detail: "serial.picker_needs_click",
+    });
   });
 });
