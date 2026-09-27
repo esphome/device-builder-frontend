@@ -5,6 +5,7 @@
  * EditorView into `.cm-wrap`, `_destroyView` tears it down, a detach that
  * lasts tears it down too, and a move keeps it.
  */
+import { history, undo } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
@@ -22,7 +23,7 @@ class TestCmEditor extends CodeMirrorEditorElement {
   doc = "hello\nworld\n";
 
   protected _mountEditor() {
-    this._mountView(this.doc, []);
+    this._mountView(this.doc, [history()]);
   }
 
   get view(): EditorView | null {
@@ -78,7 +79,10 @@ describe("CodeMirrorEditorElement", () => {
   it("keeps the view, and what it holds, when the element is moved synchronously", async () => {
     const el = await mount(new TestCmEditor());
     const first = el.view!;
-    first.dispatch({ changes: { from: 0, insert: "typed " } });
+    first.dispatch({
+      changes: { from: 0, insert: "typed " },
+      selection: { anchor: 2, head: 5 },
+    });
     const elsewhere = document.createElement("div");
     document.body.appendChild(elsewhere);
 
@@ -87,7 +91,11 @@ describe("CodeMirrorEditorElement", () => {
 
     expect(el.view).toBe(first);
     expect(el.view!.state.doc.toString()).toBe("typed hello\nworld\n");
+    expect(el.view!.state.selection.main.toJSON()).toEqual({ anchor: 2, head: 5 });
     expect(el.container.querySelectorAll(".cm-editor").length).toBe(1);
+    // The edit made before the move is still on the undo stack.
+    expect(undo(el.view!)).toBe(true);
+    expect(el.view!.state.doc.toString()).toBe("hello\nworld\n");
   });
 
   it("mounts from the current properties on a reconnect", async () => {
