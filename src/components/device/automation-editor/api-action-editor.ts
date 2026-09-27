@@ -12,7 +12,7 @@
  * Public surface mirrors the automation/script editors:
  *
  * - ``configuration``, ``board``, ``platform``, ``value``,
- *   ``location``, ``yaml``, ``addMode`` props.
+ *   ``location``, ``yaml`` props.
  * - Events: ``automation-change``, ``yaml-draft`` / ``yaml-updated``
  *   (auto-apply + delete), ``section-select`` after delete,
  *   ``dirty-change``, ``section-mount`` / ``section-unmount``.
@@ -28,11 +28,10 @@ import { keyed } from "lit/directives/keyed.js";
 
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
-import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { actionsFocus, paramFocus } from "./automation-focus.js";
-import { CallableAutomationEditor, type CallableNameField } from "./callable-editor.js";
+import { CallableAutomationEditor } from "./callable-editor.js";
 import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
 import { emptyAutomationTree } from "./serialise.js";
@@ -61,17 +60,10 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     return location.kind === "api_action" && !!location.action_name;
   }
 
-  /** ``action``, or the legacy ``service``, holds the name in the YAML. */
-  protected override _nameField(): CallableNameField {
-    return {
-      inputId: "api-action-name",
-      yamlKeys: ["action", "service"],
-      label: this._localize("device.api_action_id_label"),
-      description: this._localize("device.api_action_id_description"),
-      value: this.location?.action_name ?? "",
-      onInput: this._onActionNameChange,
-    };
-  }
+  protected override readonly _nameInputId = "api-action-name";
+
+  /** ``service`` is the legacy spelling of ``action``. */
+  protected override readonly _nameYamlKeys = ["action", "service"];
 
   protected render() {
     const gate = this.renderStateGate();
@@ -86,7 +78,15 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     return keyed(
       this._target,
       html`
-        ${this._renderHeader()} ${this._renderNameField(disabled)}
+        ${this._renderHeader()}
+        ${this._renderNameField(
+          {
+            label: this._localize("device.api_action_id_label"),
+            description: this._localize("device.api_action_id_description"),
+            value: this.location?.action_name ?? "",
+          },
+          disabled
+        )}
         <esphome-callable-params-editor
           .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
           .focusParam=${paramFocus(focus, "variables")}
@@ -141,16 +141,6 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
       </div>
     </div>`;
   }
-
-  private _onActionNameChange = (name: string) => {
-    // Normalize so the field reshapes invalid characters
-    // (``"my action"`` → ``"my_action"``) as the user types and the
-    // YAML key the upsert produces is always valid.
-    const normalized = normalizeEspHomeId(name);
-    if (!normalized) return;
-    this.location = { kind: "api_action", action_name: normalized };
-    this._engine.scheduleAutoApply();
-  };
 
   private _onVariablesChange = (e: CustomEvent<{ value: Record<string, string> }>) => {
     e.stopPropagation();

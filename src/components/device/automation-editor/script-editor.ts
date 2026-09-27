@@ -12,9 +12,8 @@
  *
  * Same public-surface conventions as the automation editor:
  *
- * - ``addMode`` distinguishes the wizard mount (id input + save into
- *   a new section) from the navigator-routed edit mount (id locked,
- *   value hydrated from the backend).
+ * - The id is locked and the value is hydrated from the backend; a
+ *   script is renamed in the YAML.
  * - Save / delete are optimistic + revert-on-failure (toast.error on
  *   failure); the editor's ``inFlightWrite`` guard signals to the
  *   parent's reconnect handler to skip clobbering an in-flight
@@ -45,7 +44,7 @@ import {
   focusKey,
   paramFocus,
 } from "./automation-focus.js";
-import { CallableAutomationEditor, type CallableNameField } from "./callable-editor.js";
+import { CallableAutomationEditor } from "./callable-editor.js";
 import { renderActionsSection } from "./render-actions-section.js";
 import "./callable-params-editor.js";
 import { applyParamChange, emptyAutomationTree } from "./serialise.js";
@@ -83,8 +82,8 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
 
   /** Component catalog entry for the ``script`` component, lazily
    *  fetched on mount. Drives the header (name / description /
-   *  docs / image) and the inline config-entry form (``id``,
-   *  ``mode``, ``max_runs`` — ``parameters`` and ``then`` stay
+   *  docs / image) and the inline config-entry form (``mode``,
+   *  ``max_runs`` — ``parameters`` and ``then`` stay
    *  under bespoke surfaces because the form's generic ``map``
    *  type wouldn't validate the typed-parameter shape). */
   @state() private _scriptComponent: ComponentCatalogEntry | null = null;
@@ -94,15 +93,8 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
    *  isn't drowned out by the rarely-used options. */
   @state() private _showAdvanced = false;
 
-  protected override _nameField(): CallableNameField {
-    return {
-      inputId: "script-id",
-      yamlKeys: ["id"],
-      label: this._localize("device.script_id_label"),
-      description: this._localize("device.script_id_description"),
-      value: this.location?.id ?? "",
-    };
-  }
+  protected override readonly _nameInputId = "script-id";
+  protected override readonly _nameYamlKeys = ["id"];
 
   // Can't upsert a script with no id.
   protected override _canApply(location: AutomationLocation): boolean {
@@ -149,7 +141,15 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     return keyed(
       this._target,
       html`
-        ${this._renderHeader()} ${this._renderNameField(disabled)}
+        ${this._renderHeader()}
+        ${this._renderNameField(
+          {
+            label: this._localize("device.script_id_label"),
+            description: this._localize("device.script_id_description"),
+            value: this.location?.id ?? "",
+          },
+          disabled
+        )}
         ${this._renderConfigForm(automation, disabled, focus)}
         ${
           this._showAdvanced
@@ -215,11 +215,11 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   /**
    * Inline ``<esphome-config-entry-form>`` driven by the script
    * component's catalog config_entries — gives us the same form
-   * surface a regular component gets (catalog descriptions, id /
-   * mode / max_runs renderers, advanced-toggle, validation) for
-   * free.
+   * surface a regular component gets (catalog descriptions, mode /
+   * max_runs renderers, advanced-toggle, validation) for free.
    *
-   * ``parameters`` and ``then`` are filtered out: ``parameters``
+   * ``id`` is the locked name field above the form. ``parameters``
+   * and ``then`` are filtered out too: ``parameters``
    * has a typed-declaration UI that's still bespoke (the generic
    * map renderer can't validate the ``{name: type}`` constraint),
    * and ``then`` is the actions block, rendered by the action-list
@@ -232,7 +232,6 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
   ) {
     const comp = this._scriptComponent;
     if (!comp) return nothing;
-    // ``id`` is the locked name field above the form.
     const entries = comp.config_entries.filter(
       (e) => e.key !== "id" && e.key !== "parameters" && e.key !== "then"
     );

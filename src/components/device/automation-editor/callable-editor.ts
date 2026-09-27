@@ -3,7 +3,7 @@
  * script and api-action. Owns the mount-time catalog load the
  * automation editor diverges from.
  */
-import { type CSSResultGroup, html, nothing } from "lit";
+import { type CSSResultGroup, html } from "lit";
 
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { getErrorMessage } from "../../../util/error-message.js";
@@ -13,20 +13,6 @@ import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { entryFieldFocus, focusKey } from "./automation-focus.js";
 import { BaseAutomationEditor } from "./base-editor.js";
 
-/** The field that names a callable: a script's id, an API action's name. */
-export interface CallableNameField {
-  /** ``id`` of the input, which the label points at. */
-  inputId: string;
-  /** YAML keys that hold the name; the caret on one flashes the field. */
-  yamlKeys: readonly string[];
-  label: string;
-  description: string;
-  value: string;
-  /** Called with what the user typed while adding; the field cannot be
-   *  typed into without it. */
-  onInput?: (value: string) => void;
-}
-
 export abstract class CallableAutomationEditor<
   L extends AutomationLocation,
 > extends BaseAutomationEditor<L> {
@@ -35,7 +21,11 @@ export abstract class CallableAutomationEditor<
   /** ``focusKey`` already name-flashed — one-shot per target. */
   private _nameFlashKey?: string;
 
-  protected abstract _nameField(): CallableNameField;
+  /** ``id`` of the name input, which its label points at. */
+  protected abstract readonly _nameInputId: string;
+
+  /** YAML keys that hold the name; the caret on one flashes the field. */
+  protected abstract readonly _nameYamlKeys: readonly string[];
 
   protected override updated(changed: Map<string, unknown>) {
     this._maybeFlashName();
@@ -43,28 +33,27 @@ export abstract class CallableAutomationEditor<
   }
 
   /**
-   * The name input. Locked in edit mode so the YAML splice destination
-   * stays pinned: a rename would move the entry to a different slot, and
-   * the backend has no rename. ``readonly`` rather than ``disabled`` for
-   * the lock so the value stays focusable and selectable for copy and
-   * screen readers; ``disabled`` is reserved for the during-delete state
-   * where the whole editor is inert.
+   * The field that names the callable: a script's id, an API action's
+   * name. Locked, since the YAML splice destination is keyed by it: a
+   * rename would move the entry to a different slot, and the backend has
+   * no rename. ``readonly`` rather than ``disabled`` so the value stays
+   * focusable and selectable for copy and screen readers; ``disabled``
+   * is reserved for the during-delete state where the whole editor is
+   * inert.
    */
-  protected _renderNameField(disabled: boolean) {
-    const field = this._nameField();
-    const { onInput } = field;
+  protected _renderNameField(
+    field: { label: string; description: string; value: string },
+    disabled: boolean
+  ) {
     return html`<div class="field">
-      <label class="field-label" for=${field.inputId}>${field.label}</label>
+      <label class="field-label" for=${this._nameInputId}>${field.label}</label>
       <p class="field-description">${renderMarkdown(field.description)}</p>
       <input
-        id=${field.inputId}
+        id=${this._nameInputId}
         type="text"
         .value=${field.value}
         ?disabled=${disabled}
-        ?readonly=${!this.addMode || !onInput}
-        @input=${
-          onInput ? (e: Event) => onInput((e.target as HTMLInputElement).value) : nothing
-        }
+        readonly
       />
     </div>`;
   }
@@ -72,14 +61,13 @@ export abstract class CallableAutomationEditor<
   /** The name lives in a bespoke input, outside any form — flash its
    *  field when the cursor targets one of its YAML keys. */
   private _maybeFlashName(): void {
-    const { inputId, yamlKeys } = this._nameField();
     const focus = this._currentFocus();
     const head = entryFieldFocus(focus)?.[0];
-    if (head === undefined || !yamlKeys.includes(head)) return;
+    if (head === undefined || !this._nameYamlKeys.includes(head)) return;
     const key = focusKey(focus);
     if (key === this._nameFlashKey) return;
     const field = this.shadowRoot
-      ?.querySelector(`#${inputId}`)
+      ?.querySelector(`#${this._nameInputId}`)
       ?.closest<HTMLElement>(".field");
     // Hold the shot while the loading spinner still owns the render.
     if (!field) return;
