@@ -90,6 +90,16 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   @state() protected _hydrating = false;
   private _hydrateId = 0;
 
+  /** The YAML was edited outside the editor and the tree is still from
+   *  before. Written from it, the section would undo that edit (#1920),
+   *  so the editor is held until the reload that follows has settled. */
+  @state() private _stale = false;
+
+  /** Inert and read-only: the tree on screen is about to be replaced. */
+  private get _held(): boolean {
+    return this._hydrating || this._stale;
+  }
+
   /** One ``automations/parse`` per buffer while it is in flight, so a burst
    *  of relocations and reloads shares the round trip. */
   private readonly _parses = new KeyedPromiseCache<ParsedAutomation[]>({
@@ -138,7 +148,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected readonly _engine = new AutoApplyController(this, {
     getApi: () => this._api,
     getLocalize: () => this._localize,
-    isReadOnly: () => this._parseError.active || this._hydrating,
+    isReadOnly: () => this._parseError.active || this._held,
     canApply: (location) => this._canApply(location),
     setError: (message) => {
       this._error = message;
@@ -219,6 +229,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) {
       this._dropStaleTree();
+      this._stale = false;
       return;
     }
     const id = ++this._hydrateId;
@@ -259,6 +270,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       if (id !== this._hydrateId) return;
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
+    } finally {
+      if (id === this._hydrateId) this._stale = false;
     }
   }
 
@@ -269,6 +282,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     // previous section's tree under the new location.
     this._hydrateId++;
     this._dropStaleTree();
+    this._stale = false;
     setHeld(this, false);
   }
 
@@ -296,7 +310,19 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._retargeted = true;
       }
     }
-    setHeld(this, this._hydrating);
+    // As ``reload()``: an edit of the form on its way out keeps its tree.
+    if (
+      changed.has("yaml") &&
+      this.hasUpdated &&
+      !this.addMode &&
+      this.location &&
+      this.value !== null &&
+      !this._engine.dirty &&
+      !this._engine.shouldSkipReload()
+    ) {
+      this._stale = true;
+    }
+    setHeld(this, this._held);
   }
 
   protected updated(changed: Map<string, unknown>) {

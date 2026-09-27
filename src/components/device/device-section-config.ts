@@ -60,6 +60,7 @@ import {
 } from "./device-section-config/draft-and-delete.js";
 import {
   loadConfig,
+  noteYamlChange,
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
 import {
@@ -219,6 +220,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   /** For the form: goes up when the YAML was edited outside it, which is
    *  up to a second before the reload, and when ``_values`` was read. */
   _valuesRead = 0;
+  _valuesStale = false;
   /** A retargeting load is in flight while the outgoing section is still
    *  on screen. The pane is inert meanwhile; the write fences cover
    *  programmatic dispatch, so nothing writes its values under the
@@ -318,9 +320,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
     ) {
       revalidateFields(this);
     }
-    if (changedProperties.has("yaml") && this.yaml !== this._lastSelfWrittenYaml) {
-      this._valuesRead++;
-    }
+    if (changedProperties.has("yaml")) noteYamlChange(this);
     // loadConfig synchronously flips _loading/_error; running it in
     // willUpdate folds those into the in-progress render rather than
     // scheduling a second one.

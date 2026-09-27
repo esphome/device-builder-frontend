@@ -3,6 +3,7 @@ import {
   getIn,
   isPlainObject,
   isPrimitiveOrNullish,
+  isUnderScalar,
   setIn,
 } from "../../src/util/nested-values.js";
 
@@ -201,5 +202,22 @@ describe("isPlainObject", () => {
       // accepts ``value.a`` without a cast.
       expect(value.a).toBe(1);
     }
+  });
+});
+
+describe("isUnderScalar", () => {
+  it.each([
+    [{ pin: "GPIO5" }, ["pin", "inverted"], true],
+    [{ pin: 5 }, ["pin", "mode", "input"], true],
+    [{ pin: { number: "GPIO5" } }, ["pin", "inverted"], false],
+    [{ pin: { mode: "INPUT" } }, ["pin", "mode", "input"], true],
+    [{ filters: [{ multiply: 2 }] }, ["filters", "0", "multiply"], false],
+    [{ filters: ["x"] }, ["filters", "0", "multiply"], true],
+    [{}, ["pin", "inverted"], false],
+    [{ pin: null }, ["pin", "inverted"], false],
+    [{ pin: "GPIO5" }, ["pin"], false],
+    [{ pin: "GPIO5" }, [], false],
+  ])("%j at %j is %s", (obj, path, expected) => {
+    expect(isUnderScalar(obj, path)).toBe(expected);
   });
 });

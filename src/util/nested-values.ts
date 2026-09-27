@@ -188,3 +188,15 @@ export function asRecord(value: unknown): Record<string, unknown> {
 export function asMappingList(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.map(asRecord) : [];
 }
+
+/** Whether a write at *path* would land under a value that is neither a
+ *  mapping nor a list, and so replace it. */
+export function isUnderScalar(obj: Record<string, unknown>, path: string[]): boolean {
+  let node: unknown = obj;
+  for (const segment of path.slice(0, -1)) {
+    node = (node as Record<string, unknown>)[segment];
+    if (node === undefined || node === null) return false;
+    if (typeof node !== "object") return true;
+  }
+  return false;
+}

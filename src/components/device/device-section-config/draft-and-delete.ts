@@ -2,7 +2,7 @@ import { clearPathErrors, validateEntries } from "../../../util/config-validatio
 import { isPlatformComponentId } from "../../../util/featured-id.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
-import { setIn } from "../../../util/nested-values.js";
+import { isUnderScalar, setIn } from "../../../util/nested-values.js";
 import { notifyError, notifySuccess } from "../../../util/notify.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
@@ -18,6 +18,7 @@ import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import { fireSectionEvent, prepareSectionEvent } from "../section-editor.js";
+import { readStaleValues } from "./loading.js";
 
 // Validates against the *render* schema (resolveSectionEntries), not the raw
 // catalog. MAP_SECTIONS (substitutions / packages) carry an irrelevant flat
@@ -90,6 +91,13 @@ export function onValueChange(
 ): void {
   if (host._reloading) return;
   const { path, value } = e.detail;
+  if (readStaleValues(host) && isUnderScalar(host._values, path)) {
+    // The control that wrote is from before the edit, which left a plain
+    // value where it writes (a pin in its short form): the write would
+    // replace that value. Drop it, the form shows the values just read.
+    host._valuesRead++;
+    return;
+  }
   host._values = setIn(host._values, path, value);
   host._setDirty(true);
   const errKey = path.join(".");
@@ -120,6 +128,7 @@ export function applySectionValues(
   changes: { path: string[]; value: unknown }[]
 ): void {
   if (host._reloading) return;
+  readStaleValues(host);
   for (const { path, value } of changes) {
     host._values = setIn(host._values, path, value);
   }

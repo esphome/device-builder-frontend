@@ -21,6 +21,51 @@ export interface SectionConfigResponse {
   required_groups: RequiredGroup[];
 }
 
+/** Read the loaded section's values from *yaml*. */
+function readValues(host: ESPHomeDeviceSectionConfig, yaml: string): void {
+  if (!host._config) return;
+  // Asymmetric with save/delete paths: undefined here means "section
+  // not in live yaml" — surface an empty form (silent), since this load
+  // is reactive to external mutations, not explicit user intent.
+  const resolvedFromLine = resolveCurrentFromLine(yaml, host.sectionKey, host.fromLine);
+  const parsedValues = parseYamlSectionValues(yaml, host.sectionKey, resolvedFromLine);
+  // Pre-format hex values to canonical "0x…" string form (#410) so a
+  // save preserves the user's hex notation even when they only edited
+  // an unrelated field. Without this, i2c addresses round-trip from
+  // 0x76 to 118 on the next save.
+  // Expand maybe_simple_value shorthands (a bare `microphone: mic_id`)
+  // into the canonical mapping/list shape the renderers and dotted-path
+  // edits address; left as a scalar it renders as an empty list and the
+  // first edit clobbers it (#2397).
+  host._values = normalizeMaybeValues(
+    normalizeHexValues(parsedValues, host._config.entries),
+    host._config.entries
+  );
+  host._resolvedFromLine = resolvedFromLine;
+  host._presentComponents = parseTopLevelComponents(yaml);
+  host._valuesStale = false;
+}
+
+/** The YAML changed. When that was not the section's own draft, the form
+ *  is told at once and ``_values``, still from before, is stale until read
+ *  again. As ``reload()``, a draft on its way out keeps the values it has. */
+export function noteYamlChange(host: ESPHomeDeviceSectionConfig): void {
+  if (host.yaml === host._lastSelfWrittenYaml) return;
+  host._valuesRead++;
+  host._valuesStale = host._draftTimer === null;
+}
+
+/** Before the form writes: the YAML was edited outside it and the reload
+ *  that follows up to a second later has not read the values yet, so read
+ *  them now. Written from the old ones, the section would undo that edit
+ *  (#1920). The form was told of the edit when it happened. Returns
+ *  whether the values were read. */
+export function readStaleValues(host: ESPHomeDeviceSectionConfig): boolean {
+  if (!host._valuesStale) return false;
+  readValues(host, host.yaml);
+  return true;
+}
+
 export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void> {
   const id = ++host._loadId;
   host._loading = true;
@@ -85,27 +130,9 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
       host._isPlatformDomain = false;
       host._isUnknown = false;
     }
-    // Asymmetric with save/delete paths: undefined here means "section
-    // not in live yaml" — surface an empty form (silent), since this load
-    // is reactive to external mutations, not explicit user intent.
-    const resolvedFromLine = resolveCurrentFromLine(yaml, host.sectionKey, host.fromLine);
-    const parsedValues = parseYamlSectionValues(yaml, host.sectionKey, resolvedFromLine);
-    // Pre-format hex values to canonical "0x…" string form (#410) so a
-    // save preserves the user's hex notation even when they only edited
-    // an unrelated field. Without this, i2c addresses round-trip from
-    // 0x76 to 118 on the next save.
-    // Expand maybe_simple_value shorthands (a bare `microphone: mic_id`)
-    // into the canonical mapping/list shape the renderers and dotted-path
-    // edits address; left as a scalar it renders as an empty list and the
-    // first edit clobbers it (#2397).
     // Not for the section's own draft, written while this load was waiting.
     if (yaml !== host._lastSelfWrittenYaml) host._valuesRead++;
-    host._values = normalizeMaybeValues(
-      normalizeHexValues(parsedValues, host._config.entries),
-      host._config.entries
-    );
-    host._resolvedFromLine = resolvedFromLine;
-    host._presentComponents = parseTopLevelComponents(yaml);
+    readValues(host, yaml);
   } catch (e) {
     if (id !== host._loadId) return;
     host._config = null;
