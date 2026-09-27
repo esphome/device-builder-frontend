@@ -175,6 +175,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
 
   // A preparation ended: name why it failed, or show the firmware as ready.
   private _onPrepared(error: string | null): void {
+    // A file that was dropped is unpicked too: the input fires no change for
+    // the same file again, so it could not be picked a second time.
+    if (this._fileInput && this._preparation.state.kind === "idle") {
+      this._fileInput.value = "";
+    }
     if (error !== null) this._setState("error", error);
     else if (this._firmware) this._setState("connecting", this._readyMessage());
     else this._resetForRetry();

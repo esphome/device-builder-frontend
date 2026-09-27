@@ -121,7 +121,9 @@ async function settled(el: ESPHomeWebFlashReceiver) {
 // A receiver opened by hand, with ``file`` as the picked one.
 async function pickFile(file: { arrayBuffer: () => Promise<ArrayBuffer> }) {
   const el = await mountReceiver(null);
-  Object.defineProperty(el, "_fileInput", { value: { files: [file] } });
+  Object.defineProperty(el, "_fileInput", {
+    value: { files: [file], value: "C:\\fakepath\\firmware.bin" },
+  });
   await (el as any)._onFileChange();
   await settled(el);
   return el;
@@ -369,6 +371,7 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toBe("web.flash.invalid_image");
     expect(requestPort).not.toHaveBeenCalled();
+    expect((el as any)._fileInput.value).toBe("");
   });
 
   it("says so when the picked file cannot be read, and offers no install", async () => {
@@ -380,6 +383,19 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._statusMessage).toBe("web.flash.choose_file");
     expect(engines.esp.prepare).not.toHaveBeenCalled();
     expect(primaryButton(el).disabled).toBe(true);
+    // Unpicked, so picking the same file again fires a change.
+    expect((el as any)._fileInput.value).toBe("");
+  });
+
+  it("keeps a file picked while it is ready or can be checked again", async () => {
+    const ready = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect((ready as any)._fileInput.value).not.toBe("");
+    document.body.innerHTML = "";
+    const offline = new TypeError("Failed to fetch");
+    engines.load.esp.mockRejectedValueOnce(offline).mockRejectedValueOnce(offline);
+    const retryable = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect(preparation(retryable)).toBe("retryable");
+    expect((retryable as any)._fileInput.value).not.toBe("");
   });
 
   it("sends the manual reset as the done note and parks the port for Logs", async () => {
