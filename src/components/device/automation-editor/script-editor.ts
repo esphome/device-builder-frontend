@@ -88,11 +88,6 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
    *  type wouldn't validate the typed-parameter shape). */
   @state() private _scriptComponent: ComponentCatalogEntry | null = null;
 
-  /** Mirrors the automation editor: gates non-required entries
-   *  in the form behind a toggle so the casual "id only" case
-   *  isn't drowned out by the rarely-used options. */
-  @state() private _showAdvanced = false;
-
   protected override readonly _nameInputId = "script-id";
   protected override readonly _nameYamlKeys = ["id"];
 
@@ -259,10 +254,6 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
       ></esphome-config-entry-form>
     `;
   }
-
-  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
-    this._showAdvanced = e.detail.show;
-  };
 
   /** Does the script catalog define a ``parameters`` entry? Used to
    *  decide whether to show the advanced toggle even when the form

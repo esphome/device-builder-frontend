@@ -63,12 +63,6 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
    *  live in a dead "Target #N" readonly box). */
   @state() private _intervalComponent: ComponentCatalogEntry | null = null;
 
-  /** "Show advanced settings" toggle state for the params form.
-   *  Mirrors ``device-section-config``'s same-named state but
-   *  scoped to this editor instance — switching away and back
-   *  resets to collapsed, matching the component-editor UX. */
-  @state() private _showAdvanced = false;
-
   /** Parse ``substitutions:`` from the current YAML once per edit so the
    *  read-only Target field can preview ${...} like the text fields do. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
@@ -243,10 +237,6 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
       `
     );
   }
-
-  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
-    this._showAdvanced = e.detail.show;
-  };
 
   private _onTriggerParamsValueChange = (
     e: CustomEvent<{ path: string[]; value: unknown }>
