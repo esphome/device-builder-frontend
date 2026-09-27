@@ -351,6 +351,23 @@ describe("esphome-web-update-nrf-dialog", () => {
 });
 
 describe("esphome-web-update-nrf-dialog over serial", () => {
+  it("drops a chooser failure that lands after the dialog closed", async () => {
+    const el = await mountDialog();
+    let refuse!: (err: Error) => void;
+    mocks.requestSerialPort.mockReturnValue(
+      new Promise((_resolve, reject) => (refuse = reject))
+    );
+
+    const update = el._updateOverSerial();
+    el.open = false;
+    await el.updateComplete;
+    refuse(new Error("no port"));
+    await update;
+
+    expect(el._state).toBe("idle");
+    expect(el._errorMessage).toBe("");
+  });
+
   const lost = new SerialDeviceLostError();
 
   it.each([

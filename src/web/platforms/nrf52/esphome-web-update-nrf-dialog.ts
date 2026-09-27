@@ -160,7 +160,10 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
         try {
           return await requestSerialPort();
         } catch (err) {
-          this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
+          // Not on a dialog closed under the chooser: it would reopen failed.
+          if (this.open) {
+            this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
+          }
           return null;
         }
       },
