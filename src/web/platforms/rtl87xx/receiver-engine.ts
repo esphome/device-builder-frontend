@@ -14,7 +14,7 @@ import {
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import {
   type ReceiverEngine,
-  singleUf2Part,
+  singleWholePart,
 } from "../../flash-receiver/receiver-engine.js";
 import { serialRun } from "../../flash-receiver/serial-run.js";
 import { parseFailureCopy } from "../../install/preparation.js";
@@ -22,7 +22,7 @@ import { parseFailureCopy } from "../../install/preparation.js";
 export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
   logs: RTL87XX_SERIAL_LOGS,
   async prepare(parts, _erase, localize) {
-    const uf2 = singleUf2Part(parts);
+    const uf2 = singleWholePart(parts);
     const parsed = uf2
       ? await loadAmbz2Image(uf2)
       : { key: "firmware.rtl_bad_uf2", detail: "not a single UF2 part" };

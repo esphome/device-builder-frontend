@@ -29,7 +29,7 @@ import {
   type ReceiverEngine,
   type ReceiverRun,
   type ReceiverStep,
-  singleUf2Part,
+  singleWholePart,
 } from "../../flash-receiver/receiver-engine.js";
 
 const UF2_FILENAME = "firmware.uf2";
@@ -122,7 +122,7 @@ function downloadRun(uf2: Uint8Array, localize: LocalizeFunc): ReceiverRun {
 export const rp2PicobootReceiverEngine: ReceiverEngine = {
   logs: RP2_SERIAL_LOGS,
   async prepare(parts, _erase, localize) {
-    const uf2 = singleUf2Part(parts);
+    const uf2 = singleWholePart(parts);
     if (!uf2) {
       return { error: `${localize("firmware.rp2_bad_uf2")} (not a single UF2 part)` };
     }

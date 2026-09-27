@@ -70,10 +70,10 @@ export interface ReceiverPlan {
 }
 
 /**
- * The bytes of a hand-off that is one UF2 whole, as one part at address 0;
- * undefined for anything else.
+ * The bytes of a hand-off that is one file whole (a UF2, a DFU package), as
+ * one part at address 0; undefined for anything else.
  */
-export function singleUf2Part(parts: FlashPart[]): Uint8Array | undefined {
+export function singleWholePart(parts: FlashPart[]): Uint8Array | undefined {
   return parts.length === 1 && parts[0].address === 0 ? parts[0].data : undefined;
 }
 
@@ -110,4 +110,6 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/rtl87xx/receiver-engine.js")).rtlAmbz2ReceiverEngine,
   "rp2-picoboot": async () =>
     (await import("../platforms/rp2/receiver-engine.js")).rp2PicobootReceiverEngine,
+  "nrf-dfu": async () =>
+    (await import("../platforms/nrf52/receiver-engine.js")).nrfDfuReceiverEngine,
 };

@@ -8,6 +8,11 @@ vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadAmbz2Image: rtl.loadAmbz2Image,
 }));
+const nrf = vi.hoisted(() => ({ loadDfuPackage: vi.fn() }));
+vi.mock("../../../src/platforms/nrf52/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadDfuPackage: nrf.loadDfuPackage,
+}));
 const steps = vi.hoisted(() => ({
   downloadBuildArtifact: vi.fn(),
   pickUf2: (binaries: Array<{ type?: string }>) => binaries.find((b) => b.type === "uf2"),
@@ -61,6 +66,7 @@ const asHost = (h: ReturnType<typeof makeHost>) =>
 
 beforeEach(() => {
   rtl.loadAmbz2Image.mockResolvedValue({ image: { runs: [], totalBytes: 0 } });
+  nrf.loadDfuPackage.mockResolvedValue({ pkg: { parts: [] } });
 });
 afterEach(() => vi.clearAllMocks());
 
@@ -68,9 +74,10 @@ afterEach(() => vi.clearAllMocks());
 const callbacks = () => openFlasher.mock.calls[0][4] as FlasherCallbacks;
 
 describe("handOffToFlasher", () => {
-  it("opens nothing for a device whose platform cannot hand off", () => {
+  it("opens nothing for a device whose chip cannot be handed off", () => {
     const host = makeHost();
-    host._device.target_platform = "nrf52";
+    host._device.target_platform = "rtl87xx";
+    host._device.mcu = "rtl8710b";
     handOffToFlasher(asHost(host));
     expect(openFlasher).not.toHaveBeenCalled();
     expect(host._step).toBe("download-ready");
@@ -119,6 +126,16 @@ describe("handOffToFlasher", () => {
     handOffToFlasher(asHost(host));
     expect(openFlasher.mock.calls[0][3]).toMatchObject({
       flasher: "rp2-picoboot",
+      erase: false,
+    });
+  });
+
+  it("hands an nRF52's DFU package to the DFU flasher, without erase", () => {
+    const host = makeHost();
+    host._device.target_platform = "nrf52";
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3]).toMatchObject({
+      flasher: "nrf-dfu",
       erase: false,
     });
   });
@@ -274,11 +291,32 @@ describe("startUsbFlash artifact", () => {
     expect(host._statusMessage).toBe("firmware.no_flashable_binary");
   });
 
-  it("refuses a platform that has no hand-off instead of sending an ESP image", async () => {
-    const host = flowHost("nrf52", "nrf52840");
+  it("sends the DFU package for an nRF52 through the shared download", async () => {
+    const host = flowHost("nrf52", null);
+    const artifact = downloaded("firmware.zip");
+    steps.downloadBuildArtifact.mockResolvedValue(artifact);
     await startUsbFlash(asHost(host));
-    expect(steps.downloadBuildArtifact).not.toHaveBeenCalled();
-    expect(host._statusMessage).toBe("firmware.no_flashable_binary");
+    const [, , pick, noArtifactKey] = steps.downloadBuildArtifact.mock.calls[0];
+    expect(pick([...binaries, { file: "firmware.zip", title: "DFU" }])?.file).toBe(
+      "firmware.zip"
+    );
+    expect(noArtifactKey).toBe("firmware.nrf_no_dfu_package");
+    expect(host._usbFirmware).toBe(artifact.bytes.buffer);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("refuses a bad DFU package in the dashboard, before any flasher tab is offered", async () => {
+    const host = flowHost("nrf52", null);
+    steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.zip"));
+    nrf.loadDfuPackage.mockResolvedValueOnce({
+      key: "firmware.nrf_bad_package",
+      detail: "no manifest",
+    });
+    await startUsbFlash(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.nrf_bad_package");
+    expect(host._errorMessage).toBe("no manifest");
+    expect(host._usbFirmware).toBeNull();
   });
 
   it("stays where the shared download left the dialog when it failed", async () => {

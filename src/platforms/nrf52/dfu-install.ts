@@ -2,6 +2,7 @@
  * The Device Builder's nRF52 install: Nordic legacy DFU over the bootloader's
  * CDC. The engine loads on demand so it stays out of the main chunk.
  */
+import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import {
   downloadBuildArtifact,
@@ -11,6 +12,7 @@ import {
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
+import type { HandoffSpec } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
@@ -25,6 +27,24 @@ declare module "../platform-support.js" {
     "nrf-dfu": "nrf-reset" | "nrf-wait";
   }
 }
+
+const NO_DFU_PACKAGE_KEY = "firmware.nrf_no_dfu_package";
+
+const pickDfuPackage = (binaries: FirmwareBinary[]): FirmwareBinary | undefined =>
+  binaries.find((b) => b.file.endsWith(".zip"));
+
+// Handed whole to web.esphome.io's nrf-dfu engine; parsed first so a bad
+// package is refused before a tab opens. DFU erases what it writes.
+const NRF_DFU_HANDOFF: HandoffSpec = {
+  flasher: "nrf-dfu",
+  erase: false,
+  pick: pickDfuPackage,
+  noArtifactKey: NO_DFU_PACKAGE_KEY,
+  check: async (bytes) => {
+    const parsed = await loadDfuPackage(bytes);
+    return "key" in parsed ? parsed : null;
+  },
+};
 
 /** The parsed DFU package, kept for Retry. */
 export const nrfPackage = new FlashImageSlot<DfuPackage>();
@@ -43,8 +63,8 @@ export async function startNrfDfuInstall(
   const artifact = await downloadBuildArtifact(
     host,
     device,
-    (binaries) => binaries.find((b) => b.file.endsWith(".zip")),
-    "firmware.nrf_no_dfu_package"
+    pickDfuPackage,
+    NO_DFU_PACKAGE_KEY
   );
   if (!artifact) return;
   const bytes = artifact.bytes;
@@ -145,6 +165,7 @@ export const nrfDfuInstall: BrowserInstall<"nrf-dfu"> = {
   image: nrfPackage,
   start: startNrfDfuInstall,
   showFirstStep: showResetStep,
+  handoff: NRF_DFU_HANDOFF,
   steps: {
     "nrf-reset": {
       detailKey: "firmware.nrf_step1_desc",

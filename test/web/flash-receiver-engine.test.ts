@@ -189,7 +189,7 @@ describe("esphome-web-flash-receiver engines", () => {
     const ready = opener.postMessage.mock.calls
       .map((c) => c[0] as { type: string; flashers?: string[] })
       .find((m) => m.type === MSG_READY);
-    expect(ready?.flashers).toEqual(["esp", "rtl-ambz2", "rp2-picoboot"]);
+    expect(ready?.flashers).toEqual(["esp", "rtl-ambz2", "rp2-picoboot", "nrf-dfu"]);
   });
 
   it("runs esptool for a frame without a flasher, as an older dashboard sends", async () => {
