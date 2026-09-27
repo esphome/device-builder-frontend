@@ -136,6 +136,25 @@ describe("automation-condition-tree advanced section", () => {
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(true);
   });
 
+  it("puts focus back on the move button once its row has moved", async () => {
+    const el = await mountTree([
+      node("sensor.in_range"),
+      node("number.in_range"),
+      node("sensor.in_range"),
+    ]);
+    const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!;
+    button.focus();
+    const focus = vi.spyOn(button, "focus");
+
+    button.click();
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.activeElement).toBe(button);
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
   it("moves the flag with its row on a reorder", async () => {
     const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
     const opened = forms(el)[0];

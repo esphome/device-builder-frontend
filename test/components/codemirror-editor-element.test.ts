@@ -25,10 +25,6 @@ class TestCmEditor extends CodeMirrorEditorElement {
     this._mountView(this.doc, []);
   }
 
-  protected firstUpdated() {
-    this._mountEditor();
-  }
-
   get view(): EditorView | null {
     return this._view;
   }

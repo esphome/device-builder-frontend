@@ -28,6 +28,7 @@
  */
 import { html } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 import memoizeOne from "memoize-one";
 
 import type {
@@ -174,71 +175,73 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
     const focus = this._currentFocus();
-    return html`
-      ${renderAutomationHeader(
-        this.location,
-        this._intervalComponent,
-        activeTrigger,
-        this._localize
-      )}
-      ${
-        this.addMode
-          ? renderAddModePickers({
-              target,
-              triggers,
-              devices,
-              scripts,
-              effectiveTriggerId,
-              automation,
-              board: this.board,
-              yaml: this.yaml,
-              disabled,
-              onTargetChange: this._onTargetChange,
-              onTriggerChange: this._onTriggerChange,
-              onTriggerParamsChange: this._onTriggerParamsChange,
-            })
-          : html`${renderIdentityFields(
-              this.location,
-              devices,
-              this._parseSubstitutions(this.yaml),
-              this._localize
-            )}${renderTriggerParamsForm({
-              location: this.location,
-              intervalComponent: this._intervalComponent,
-              activeTrigger,
-              automation,
-              board: this.board,
-              yaml: this.yaml,
-              disabled,
-              showAdvanced: this._showAdvanced,
-              focusFieldPath: entryFieldFocus(focus),
-              onValueChange: this._onTriggerParamsValueChange,
-              onAdvancedToggle: this._onAdvancedToggle,
-            })}`
-      }
-      ${renderActionsSection({
-        automation,
-        catalog: actions,
-        conditionCatalog: conditions,
-        scripts,
-        devices,
-        board: this.board,
-        yaml: this.yaml,
-        disabled,
-        localize: this._localize,
-        focusTarget: actionsFocus(focus),
-        target: this._target,
-        descriptionKey: "device.automation_actions_description",
-        onActionsChange: this._onActionsChange,
-      })}
-      ${this.renderFooter({
-        label: this._localize("device.delete_automation"),
-        message: () =>
-          this._localize("device.confirm_delete_automation", {
-            name: this._deleteTargetName(activeTrigger),
-          }),
-      })}
-    `;
+    return keyed(
+      this._target,
+      html`
+        ${renderAutomationHeader(
+          this.location,
+          this._intervalComponent,
+          activeTrigger,
+          this._localize
+        )}
+        ${
+          this.addMode
+            ? renderAddModePickers({
+                target,
+                triggers,
+                devices,
+                scripts,
+                effectiveTriggerId,
+                automation,
+                board: this.board,
+                yaml: this.yaml,
+                disabled,
+                onTargetChange: this._onTargetChange,
+                onTriggerChange: this._onTriggerChange,
+                onTriggerParamsChange: this._onTriggerParamsChange,
+              })
+            : html`${renderIdentityFields(
+                this.location,
+                devices,
+                this._parseSubstitutions(this.yaml),
+                this._localize
+              )}${renderTriggerParamsForm({
+                location: this.location,
+                intervalComponent: this._intervalComponent,
+                activeTrigger,
+                automation,
+                board: this.board,
+                yaml: this.yaml,
+                disabled,
+                showAdvanced: this._showAdvanced,
+                focusFieldPath: entryFieldFocus(focus),
+                onValueChange: this._onTriggerParamsValueChange,
+                onAdvancedToggle: this._onAdvancedToggle,
+              })}`
+        }
+        ${renderActionsSection({
+          automation,
+          catalog: actions,
+          conditionCatalog: conditions,
+          scripts,
+          devices,
+          board: this.board,
+          yaml: this.yaml,
+          disabled,
+          localize: this._localize,
+          focusTarget: actionsFocus(focus),
+          descriptionKey: "device.automation_actions_description",
+          onActionsChange: this._onActionsChange,
+        })}
+        ${this.renderFooter({
+          label: this._localize("device.delete_automation"),
+          message: () =>
+            this._localize("device.confirm_delete_automation", {
+              name: this._deleteTargetName(activeTrigger),
+            }),
+        })}
+      `
+    );
   }
 
   private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
@@ -261,7 +264,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
 
   private _onTargetChange = (e: CustomEvent<{ target: AutomationLocation | null }>) => {
     e.stopPropagation();
-    this._relocate(e.detail.target);
+    this.location = e.detail.target;
     // Reset trigger when switching target kinds — the previous
     // trigger id wouldn't apply to the new target's domain.
     this._engine.withValue({ trigger_id: null, trigger_params: {} });
@@ -283,10 +286,10 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
     // ``trigger`` field. The catalog-qualified vs bare-YAML-key id
     // forms are documented in ``trigger-identity.ts``.
     if (this.location?.kind === "device_on") {
-      this._relocate({ ...this.location, trigger: e.detail.triggerId });
+      this.location = { ...this.location, trigger: e.detail.triggerId };
     } else if (this.location?.kind === "component_on") {
       const bare = bareTriggerKey(e.detail.triggerId);
-      this._relocate({ ...this.location, trigger: bare });
+      this.location = { ...this.location, trigger: bare };
     }
   };
 

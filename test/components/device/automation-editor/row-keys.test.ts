@@ -11,10 +11,7 @@ interface Row {
 }
 const row = (name: string): Row => ({ name });
 
-function keysOf(keys: RowKeys<Row>, rows: readonly Row[]): readonly number[] {
-  keys.reconcile(rows);
-  return keys.keys;
-}
+const keysOf = (keys: RowKeys<Row>, rows: readonly Row[]) => keys.keysFor(rows);
 
 function seeded(...names: string[]) {
   const keys = new RowKeys<Row>();
@@ -59,7 +56,7 @@ describe("RowKeys", () => {
   it("never hands a deleted row's key to a row added later", () => {
     const { keys, rows, a, b, c } = seeded("a", "b", "c");
     const shorter = removeAt(rows, 2);
-    keys.reconcile(shorter);
+    keys.keysFor(shorter);
     const [, , added] = keysOf(keys, [...shorter, row("d")]);
     expect([a, b, c]).not.toContain(added);
   });
@@ -81,6 +78,11 @@ describe("RowKeys", () => {
     expect([a, b, c]).not.toContain(next[0]);
   });
 
+  it("hands back the same keys when asked again for the same list", () => {
+    const { keys, rows, a, b, c } = seeded("a", "b", "c");
+    expect(keysOf(keys, rows)).toEqual([a, b, c]);
+  });
+
   it("keys the same object listed twice as two rows", () => {
     const keys = new RowKeys<Row>();
     const twin = row("twin");
@@ -91,7 +93,7 @@ describe("RowKeys", () => {
   it("keeps an edited row's key when the row above it is deleted next", () => {
     const { keys, rows, b, c } = seeded("a", "b", "c");
     const edited = replaceAt(rows, 1, { ...rows[1] });
-    keys.reconcile(edited);
+    keys.keysFor(edited);
     expect(keysOf(keys, removeAt(edited, 0))).toEqual([b, c]);
   });
 });

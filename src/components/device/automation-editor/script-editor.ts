@@ -23,6 +23,7 @@
 import { mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 
 import type {
   AutomationLocation,
@@ -136,34 +137,36 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const focus = this._currentFocus();
-    return html`
-      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
-      ${
-        this._showAdvanced
-          ? this._renderParametersField(automation, disabled, focus)
-          : nothing
-      }
-      ${renderActionsSection({
-        automation,
-        catalog: actions,
-        conditionCatalog: conditions,
-        scripts,
-        devices,
-        board: this.board,
-        yaml: this.yaml,
-        disabled,
-        localize: this._localize,
-        focusTarget: actionsFocus(focus),
-        target: this._target,
-        descriptionKey: "device.script_actions_description",
-        onActionsChange: this._onActionsChange,
-      })}
-      ${this.renderFooter({
-        label: this._localize("device.delete_script"),
-        message: (location) =>
-          this._localize("device.confirm_delete_script", { name: location.id }),
-      })}
-    `;
+    return keyed(
+      this._target,
+      html`
+        ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
+        ${
+          this._showAdvanced
+            ? this._renderParametersField(automation, disabled, focus)
+            : nothing
+        }
+        ${renderActionsSection({
+          automation,
+          catalog: actions,
+          conditionCatalog: conditions,
+          scripts,
+          devices,
+          board: this.board,
+          yaml: this.yaml,
+          disabled,
+          localize: this._localize,
+          focusTarget: actionsFocus(focus),
+          descriptionKey: "device.script_actions_description",
+          onActionsChange: this._onActionsChange,
+        })}
+        ${this.renderFooter({
+          label: this._localize("device.delete_script"),
+          message: (location) =>
+            this._localize("device.confirm_delete_script", { name: location.id }),
+        })}
+      `
+    );
   }
 
   /**

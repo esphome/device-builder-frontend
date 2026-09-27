@@ -24,6 +24,7 @@
 import { mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
+import { keyed } from "lit/directives/keyed.js";
 
 import type { AutomationLocation } from "../../../api/types/automations.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
@@ -87,41 +88,43 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const focus = this._currentFocus();
-    return html`
-      ${this._renderHeader()} ${this._renderActionNameField(disabled)}
-      <esphome-callable-params-editor
-        .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
-        .focusParam=${paramFocus(focus, "variables")}
-        ?disabled=${disabled}
-        .fieldLabel=${this._localize("device.api_action_variables")}
-        .description=${this._localize("device.api_action_variables_description")}
-        .addLabel=${this._localize("device.api_action_add_variable")}
-        .namePlaceholder=${this._localize("device.api_action_variable_name_placeholder")}
-        @value-change=${this._onVariablesChange}
-      ></esphome-callable-params-editor>
-      ${renderActionsSection({
-        automation,
-        catalog: actions,
-        conditionCatalog: conditions,
-        scripts,
-        devices,
-        board: this.board,
-        yaml: this.yaml,
-        disabled,
-        localize: this._localize,
-        focusTarget: actionsFocus(focus),
-        target: this._target,
-        descriptionKey: "device.api_action_actions_description",
-        onActionsChange: this._onActionsChange,
-      })}
-      ${this.renderFooter({
-        label: this._localize("device.delete_api_action"),
-        message: (location) =>
-          this._localize("device.confirm_delete_api_action", {
-            name: location.action_name,
-          }),
-      })}
-    `;
+    return keyed(
+      this._target,
+      html`
+        ${this._renderHeader()} ${this._renderActionNameField(disabled)}
+        <esphome-callable-params-editor
+          .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
+          .focusParam=${paramFocus(focus, "variables")}
+          ?disabled=${disabled}
+          .fieldLabel=${this._localize("device.api_action_variables")}
+          .description=${this._localize("device.api_action_variables_description")}
+          .addLabel=${this._localize("device.api_action_add_variable")}
+          .namePlaceholder=${this._localize("device.api_action_variable_name_placeholder")}
+          @value-change=${this._onVariablesChange}
+        ></esphome-callable-params-editor>
+        ${renderActionsSection({
+          automation,
+          catalog: actions,
+          conditionCatalog: conditions,
+          scripts,
+          devices,
+          board: this.board,
+          yaml: this.yaml,
+          disabled,
+          localize: this._localize,
+          focusTarget: actionsFocus(focus),
+          descriptionKey: "device.api_action_actions_description",
+          onActionsChange: this._onActionsChange,
+        })}
+        ${this.renderFooter({
+          label: this._localize("device.delete_api_action"),
+          message: (location) =>
+            this._localize("device.confirm_delete_api_action", {
+              name: location.action_name,
+            }),
+        })}
+      `
+    );
   }
 
   private _renderHeader() {
@@ -196,7 +199,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
     // YAML key the upsert produces is always valid.
     const normalized = normalizeEspHomeId(name);
     if (!normalized) return;
-    this._relocate({ kind: "api_action", action_name: normalized });
+    this.location = { kind: "api_action", action_name: normalized };
     this._engine.scheduleAutoApply();
   }
 

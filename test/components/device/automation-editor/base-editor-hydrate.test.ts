@@ -141,45 +141,54 @@ describe("base editor relocation hydrate", () => {
     expect((editor as any).value.actions).toHaveLength(0);
   });
 
-  it("counts a new target once the parent's other automation has landed", async () => {
+  const actionList = (editor: ESPHomeScriptEditor) =>
+    editor.shadowRoot!.querySelector("esphome-automation-action-list");
+
+  it("remounts its body once the parent's other automation has landed", async () => {
     const d = deferred<ParsedAutomation[]>();
     const { editor } = await mountAt("a", vi.fn().mockReturnValue(d.promise));
-    const before = (editor as any)._target;
+    const before = actionList(editor);
+    expect(before).not.toBeNull();
 
     (editor as any).location = { kind: "script", id: "b" };
     await editor.updateComplete;
     await flushMicrotasks(3);
     // The previous tree is still on screen, so its rows stay mounted.
-    expect((editor as any)._target).toBe(before);
+    expect(actionList(editor)).toBe(before);
 
     d.resolve([parsedScript("b")]);
     await flushMicrotasks(5);
-    expect((editor as any)._target).toBe(before + 1);
+    await editor.updateComplete;
+    expect(actionList(editor)).not.toBe(before);
   });
 
-  it("does not count a rename the editor made itself", async () => {
+  it("keeps its body through a rename the editor made itself", async () => {
     const parse = vi.fn().mockResolvedValue([parsedScript("renamed")]);
     const { editor } = await mountAt("a", parse);
-    const before = (editor as any)._target;
+    const before = actionList(editor);
 
-    (editor as any)._relocate({ kind: "script", id: "renamed" });
+    (editor as any)._onConfigFormValueChange(
+      new CustomEvent("value-change", { detail: { path: ["id"], value: "renamed" } })
+    );
     await editor.updateComplete;
     await flushMicrotasks(5);
+    await editor.updateComplete;
 
-    expect((editor as any).value.actions).toHaveLength(1);
-    expect((editor as any)._target).toBe(before);
+    expect(editor.location).toEqual({ kind: "script", id: "renamed" });
+    expect(actionList(editor)).toBe(before);
   });
 
-  it("does not count a re-parse of the same automation", async () => {
+  it("keeps its body through a re-parse of the same automation", async () => {
     const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
     const { editor } = await mountAt("a", parse);
-    const before = (editor as any)._target;
+    const before = actionList(editor);
 
     (editor as any).yaml = "script:\n  - id: a\n";
     editor.reload();
     await flushMicrotasks(5);
+    await editor.updateComplete;
 
     expect(parse).toHaveBeenCalled();
-    expect((editor as any)._target).toBe(before);
+    expect(actionList(editor)).toBe(before);
   });
 });

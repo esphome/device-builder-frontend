@@ -137,6 +137,19 @@ describe("automation-action-list row identity", () => {
     expect(first.value).toEqual(delay("1s"));
   });
 
+  it("puts focus back on the move button once its row has moved", async () => {
+    const list = await mountList([delay("1s"), delay("2s"), delay("3s")]);
+    const button = nodeButton(nodes(list)[0], MOVE_DOWN);
+    button.focus();
+    const focus = vi.spyOn(button, "focus");
+
+    button.click();
+    await settle(list);
+
+    expect(nodes(list)[1].shadowRoot!.activeElement).toBe(button);
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a collapsed card collapsed when it is moved", async () => {
     const list = await mountList([delay("1s"), delay("2s")]);
 

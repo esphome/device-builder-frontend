@@ -20,9 +20,13 @@ export abstract class CodeMirrorEditorElement extends LitElement {
 
   protected _view: EditorView | null = null;
 
-  /** Mount the view from the element's current properties; subclasses
-   *  call it from ``firstUpdated``. */
+  /** Mount the view from the element's current properties, resetting
+   *  anything the subclass tracked about the previous view. */
   protected abstract _mountEditor(): void;
+
+  protected firstUpdated(): void {
+    this._mountEditor();
+  }
 
   /** Build the view into ``.cm-wrap`` with the subclass's extensions;
    *  tears down any existing view first so the single-handle contract

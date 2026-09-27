@@ -99,10 +99,6 @@ export class ESPHomeLambdaEditor extends CodeMirrorEditorElement {
     return html`<div class="cm-wrap ${this.invalid ? "invalid" : ""}"></div>`;
   }
 
-  protected firstUpdated() {
-    this._mountEditor();
-  }
-
   protected updated(changed: Map<string, unknown>) {
     if (!this._view) return;
     if (changed.has("_darkMode")) {

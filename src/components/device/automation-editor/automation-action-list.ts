@@ -13,7 +13,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiPlus } from "@mdi/js";
-import { html, LitElement, nothing, type PropertyValues } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
@@ -93,11 +93,17 @@ export class ESPHomeAutomationActionList extends LitElement {
 
   private readonly _rows = new RowKeys<ActionNode>();
 
-  protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("actions")) this._rows.reconcile(this.actions);
+  /** The control that asked for a reorder. Its row is moved in the DOM,
+   *  which drops focus, so it is focused again once the rows have moved. */
+  private _refocus: HTMLElement | null = null;
+
+  protected updated(): void {
+    this._refocus?.focus();
+    this._refocus = null;
   }
 
   protected render() {
+    const keys = this._rows.keysFor(this.actions);
     return html`
       <div class=${this.noHeader ? "" : "ae-section"}>
         ${
@@ -114,7 +120,7 @@ export class ESPHomeAutomationActionList extends LitElement {
               </p>`
             : repeat(
                 this.actions,
-                (_node, idx) => this._rows.keys[idx],
+                (_node, idx) => keys[idx],
                 (node, idx) => this._renderRow(node, idx, idx === this.actions.length - 1)
               )
         }
@@ -178,6 +184,8 @@ export class ESPHomeAutomationActionList extends LitElement {
 
   private _onReorder(idx: number, e: CustomEvent<{ delta: number }>) {
     e.stopPropagation();
+    const row = e.currentTarget as HTMLElement;
+    this._refocus = row.shadowRoot?.activeElement as HTMLElement | null;
     this._emit(swap(this.actions, idx, idx + e.detail.delta));
   }
 

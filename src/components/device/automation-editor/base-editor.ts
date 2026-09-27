@@ -98,15 +98,16 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected _resolveFocus = createFocusResolver();
 
-  /** Counts the automations the parent has pointed this editor at; see
-   *  ``renderActionsSection``. It advances when the new tree lands, and
-   *  not for a location the editor wrote itself (a rename). */
+  /** Counts the automations the parent has pointed this editor at. The
+   *  editor is reused, so each one keys its body on this to start the
+   *  next automation with fresh rows and forms. It advances when the new
+   *  tree lands, and not for a rename the editor wrote itself. */
   protected _target = 0;
   private _retargeted = false;
   private _ownLocation: L | null = null;
 
-  /** Move the editor's own location, as a rename of what it edits does. */
-  protected _relocate(location: L | null): void {
+  /** Rename what the editor edits, without counting as a new target. */
+  protected _relocate(location: L): void {
     this._ownLocation = location;
     this.location = location;
   }
@@ -242,7 +243,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       // controller withholds a read-only section's empty tree.
       const m = this._parseError.resolve(parsed, this.location);
       if (m) {
-        this._relocate(m.location as L);
+        this.location = m.location;
         if (this._retargeted) this._target++;
         this._retargeted = false;
         this.value = m.tree;
