@@ -65,7 +65,15 @@ export abstract class SerialStreamSession {
   }
 
   protected async writeBytes(bytes: Uint8Array): Promise<void> {
-    await this.race(Promise.race([this.writer.write(bytes), this.gone]));
+    try {
+      await this.race(Promise.race([this.writer.write(bytes), this.gone]));
+    } catch (err) {
+      // The browser can fail the write before the read, or the port, says so.
+      const lost = deviceLostFrom(err);
+      if (!lost) throw err;
+      this.end(lost);
+      throw this.readEnded ?? lost;
+    }
   }
 
   private async readLoop(): Promise<void> {

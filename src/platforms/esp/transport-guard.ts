@@ -33,15 +33,16 @@ const guards = new WeakMap<Transport, () => void>();
  *
  * What ended the session ends every later call the same way: esptool-js
  * tries a block again and reports the last failure, which would otherwise be
- * the stream still locked by the write that hung.
+ * the stream still locked by the write that hung, or a minute of waiting on
+ * a port the browser already failed.
  */
 export function guardTransport(transport: Transport): void {
   const watch = watchPortLost(transport.device);
-  let stalled: SerialWriteStalledError | null = null;
+  let ended: Error | null = null;
   const { write, read } = transport;
 
   const guarded = async <T>(io: () => Promise<T>, deadlineMs?: number): Promise<T> => {
-    const ended = stalled ?? watch.lost;
+    ended ??= watch.lost;
     if (ended) throw ended;
     const live = Promise.race([io(), watch.gone]);
     try {
@@ -50,11 +51,13 @@ export function guardTransport(transport: Transport): void {
         : await withDeadline(
             live,
             deadlineMs,
-            () => (stalled = new SerialWriteStalledError(deadlineMs))
+            () => (ended = new SerialWriteStalledError(deadlineMs))
           );
     } catch (err) {
       // The browser can fail the stream before it reports the device gone.
-      throw deviceLostFrom(err) ?? err;
+      const lost = deviceLostFrom(err);
+      if (!lost) throw err;
+      throw (ended ??= lost);
     }
   };
   transport.write = (data) =>

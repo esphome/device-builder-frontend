@@ -76,6 +76,17 @@ describe("guardTransport", () => {
     await expect(transport.read(3000)).rejects.toBeInstanceOf(SerialDeviceLostError);
   });
 
+  it("ends every later call once the browser failed the stream, without sending", async () => {
+    const lost = new DOMException("The device has been lost.", "NetworkError");
+    const { transport, write } = fakeTransport({ write: () => Promise.reject(lost) });
+    const first = await transport.write(DATA).catch((err: unknown) => err);
+    expect(first).toMatchObject({ cause: lost });
+    // esptool-js sends the block again; the port is not asked a second time.
+    await expect(transport.write(DATA)).rejects.toBe(first);
+    await expect(transport.read(3000)).rejects.toBe(first);
+    expect(write).toHaveBeenCalledOnce();
+  });
+
   it("leaves a failed open, which the browser words the same, as it is", async () => {
     const busy = new DOMException("Failed to open serial port.", "NetworkError");
     markOpenFailure(busy);

@@ -298,4 +298,16 @@ describe("flashAmbz2", () => {
     await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
+
+  it("reports the failure when the reboot and the close never return", async () => {
+    const rom = fakeRom({ linkAfterPings: 1000 });
+    const p = flashAmbz2(rom.port, image, { onProgress: () => {} });
+    p.catch(() => {});
+    await vi.advanceTimersByTimeAsync(1000);
+    // The board is unplugged: from here a line change stays pending.
+    rom.raw.setSignals.mockReturnValue(new Promise(() => {}));
+    rom.raw.close.mockReturnValue(new Promise(() => {}));
+    rom.dropLink();
+    await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
+  });
 });

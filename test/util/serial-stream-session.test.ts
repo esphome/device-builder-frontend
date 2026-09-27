@@ -71,6 +71,21 @@ describe("SerialStreamSession", () => {
     expect(session.ended).toBe(first);
   });
 
+  it("ends the session when the browser fails the write first", async () => {
+    const gone = lost();
+    const port = Object.assign(makeDisconnectPort(), {
+      readable: new ReadableStream<Uint8Array>(),
+      writable: new WritableStream<Uint8Array>({ write: () => Promise.reject(gone) }),
+    });
+    const session = new Session(port);
+    await expect(session.write(new Uint8Array([1]))).rejects.toMatchObject({
+      name: "SerialDeviceLostError",
+      cause: gone,
+    });
+    // Whatever waits on an answer is told too.
+    expect(session.ended).toBeInstanceOf(SerialDeviceLostError);
+  });
+
   it("keeps a read that ended for another reason as it is", async () => {
     const { port, failRead } = stuckPort();
     const session = new Session(port);
