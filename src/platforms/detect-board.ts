@@ -7,6 +7,7 @@
 import { requestSerialPort } from "../util/web-serial.js";
 import {
   BannerOpenTimeoutError,
+  BannerTeardownError,
   type BootBannerMatch,
   readBootBanner,
 } from "./boot-banner.js";
@@ -61,11 +62,13 @@ export async function detectBoard(
     // read of the boot log names most boards outright, and only an ESP (or
     // a silent board, such as an ESP8266 whose ROM speaks at 74880) goes on
     // to esptool, whose chunk fetches meanwhile. A port that refused to open
-    // is esptool's to report; one whose open never came back is not handed
-    // on at all, since it is still ours until that open settles.
+    // is esptool's to report; one whose open never came back, or that could
+    // not be released, is not handed on at all: it is still ours, and the
+    // next open would fail with copy that blames another program.
     preloadEsptool();
     const hit = await readBootBanner(port).catch((err: unknown) => {
-      if (err instanceof BannerOpenTimeoutError) throw err;
+      if (err instanceof BannerOpenTimeoutError || err instanceof BannerTeardownError)
+        throw err;
       console.warn("[detect] Could not read the boot banner:", err);
       return null;
     });

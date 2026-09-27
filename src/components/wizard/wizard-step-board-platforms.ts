@@ -84,8 +84,11 @@ export function platformToPreset(
   mcu?: string
 ): WizardBoardPreset | null {
   const chips = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === platform);
+  // Only a named chip is looked up: with none, ``p.mcu === undefined`` would
+  // pick a variant-only entry (plain ESP32) over the whole platform.
   const chip =
-    chips.find((p) => p.mcu === mcu) ?? (chips.length === 1 ? chips[0] : undefined);
+    (mcu === undefined ? undefined : chips.find((p) => p.mcu === mcu)) ??
+    (chips.length === 1 ? chips[0] : undefined);
   if (chip) return { label: chip.label };
   if (chips.length === 0) return null;
   return { label: chips.map((p) => p.label).join(" / "), platform };

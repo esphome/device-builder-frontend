@@ -194,6 +194,10 @@ describe("wizard step-board platform chips", () => {
       expect(platformToPreset("rtl87xx", "rtl8720c")).toEqual({ label: "RTL8720C" });
     });
 
+    it("narrows a platform without a chip to the platform, not to a variant-only entry", () => {
+      expect(platformToPreset("esp32")).toMatchObject({ platform: "esp32" });
+    });
+
     it("takes the board id from the app descriptor or the banner", () => {
       expect(
         detectedBoardId({

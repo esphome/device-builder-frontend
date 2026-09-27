@@ -76,15 +76,20 @@ const isSettled = (hit: BootBannerMatch | null): boolean =>
  * bridge's auto-reset circuit gives) and read what it prints at 115200 for
  * up to ``BOOT_BANNER_MS``, stopping early once the text is conclusive. The
  * port is opened here and closed after, all under one deadline. Resolves
- * what the text named, or null; rejects only when the port cannot be opened
- * (marked, so the copy can say it is held elsewhere) or the whole thing
- * outlives its deadline, after which the abandoned read touches the port no
- * further than closing what it opened late: esptool may have it by then.
+ * what the text named, or null. Rejects when the port cannot be opened
+ * (marked, so the copy can say it is held elsewhere), when the whole thing
+ * outlives its deadline, or when the port could not be released afterwards
+ * and nothing was found: the caller must not hand it on then, since the next
+ * open fails and its copy would blame another program. After the deadline
+ * the abandoned read touches the port no further than closing what it
+ * opened late: esptool may have it by then.
  */
 export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch | null> {
   const session: BannerSession = { abandoned: false, opened: false };
+  let hit: BootBannerMatch | null = null;
+  let failure: unknown;
   try {
-    return await withDeadline(
+    hit = await withDeadline(
       readAfterReset(port, session),
       BOOT_BANNER_DEADLINE_MS,
       () => {
@@ -94,9 +99,17 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
           : new BannerOpenTimeoutError(BOOT_BANNER_DEADLINE_MS);
       }
     );
-  } finally {
-    if (session.opened) await teardown(port, session);
+  } catch (err) {
+    failure = err;
   }
+  const released = session.opened ? await teardown(port, session) : true;
+  if (failure !== undefined) throw failure;
+  // A board the banner named is a result whatever the port did afterwards;
+  // with nothing found the port would go to esptool, which must not happen
+  // while it is still held.
+  if (!released && (hit === null || hit.platform === "esp"))
+    throw new BannerTeardownError();
+  return hit;
 }
 
 /**
@@ -111,6 +124,14 @@ export class BannerOpenTimeoutError extends Error {
   }
 }
 
+/** The port could not be released after the read; it stays held until replugged. */
+export class BannerTeardownError extends Error {
+  constructor() {
+    super("The serial port could not be released after reading the boot banner");
+    this.name = "BannerTeardownError";
+  }
+}
+
 interface BannerSession {
   /** The deadline passed; the port is no longer ours to touch. */
   abandoned: boolean;
@@ -121,23 +142,42 @@ interface BannerSession {
 
 /**
  * Cancel any reader the read still holds and close the port, in a bounded
- * time: a teardown that hangs must not hold the detect, and one that fails
- * is worth knowing about, since esptool's open fails next and its copy would
- * blame another program.
+ * time: a teardown that hangs must not hold the detect. True when the port
+ * closed; a close that failed or hung is logged and reported, since the next
+ * open fails and its copy would blame another program.
  */
-async function teardown(port: SerialPort, session: BannerSession): Promise<void> {
+async function teardown(port: SerialPort, session: BannerSession): Promise<boolean> {
+  let closed = false;
   const release = (async () => {
     await session.reader?.cancel().catch(() => {});
-    await port.close().catch((err: unknown) => {
-      console.warn("[detect] Could not close the port after the boot banner read:", err);
-    });
+    await port.close().then(
+      () => {
+        closed = true;
+      },
+      (err: unknown) => {
+        console.warn(
+          "[detect] Could not close the port after the boot banner read:",
+          err
+        );
+      }
+    );
   })();
   if (!(await settledWithin(release, TEARDOWN_MS))) {
     console.warn(
       `[detect] The port did not close in ${TEARDOWN_MS} ms after the boot banner read`
     );
   }
+  return closed;
 }
+
+// Web Serial raises these on the read and then offers a fresh ``readable``;
+// the port itself is fine. A reset pulse can produce one at 115200.
+const RECOVERABLE_READ_ERRORS = new Set([
+  "BufferOverrunError",
+  "FramingError",
+  "BreakError",
+  "ParityError",
+]);
 
 async function readAfterReset(
   port: SerialPort,
@@ -152,28 +192,47 @@ async function readAfterReset(
   }
   await pulseReset(port, session);
   if (session.abandoned) return null;
-  const reader = port.readable!.getReader();
-  session.reader = reader;
   const decoder = new TextDecoder("utf-8", { fatal: false });
-  // The window closes by cancelling the reader, which ends a pending read.
-  const window = setTimeout(() => void reader.cancel().catch(() => {}), BOOT_BANNER_MS);
+  // The window closes by cancelling whichever reader is current, which ends
+  // its pending read.
+  let open = true;
+  const window = setTimeout(() => {
+    open = false;
+    void session.reader?.cancel().catch(() => {});
+  }, BOOT_BANNER_MS);
   let text = "";
   let hit: BootBannerMatch | null = null;
   try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value, { stream: true });
-      hit = matchBootBanner(text);
-      if (isSettled(hit)) break;
+    while (open && port.readable) {
+      const reader = port.readable.getReader();
+      session.reader = reader;
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) return hit;
+          text += decoder.decode(value, { stream: true });
+          hit = matchBootBanner(text);
+          if (isSettled(hit)) return hit;
+        }
+      } catch (err) {
+        // A recoverable error ends this stream, not the port: keep what was
+        // read and go on with the fresh one while the window is open.
+        if (!(err instanceof DOMException && RECOVERABLE_READ_ERRORS.has(err.name)))
+          throw err;
+        console.debug(
+          "[detect] Recoverable read error during the boot banner:",
+          err.name
+        );
+      } finally {
+        await reader.cancel().catch(() => {});
+        reader.releaseLock();
+        session.reader = undefined;
+      }
     }
+    return hit;
   } finally {
     clearTimeout(window);
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
-    session.reader = undefined;
   }
-  return hit;
 }
 
 /**

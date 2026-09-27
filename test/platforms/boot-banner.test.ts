@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   BannerOpenTimeoutError,
+  BannerTeardownError,
   BOOT_BANNER_MS,
   matchBootBanner,
   readBootBanner,
@@ -83,18 +84,27 @@ describe("matchBootBanner", () => {
 });
 
 /** A port whose readable stream plays ``chunks`` once the reset is released. */
-function fakePort(chunks: string[], opts: { noSignals?: boolean } = {}) {
+function fakePort(
+  chunks: string[],
+  opts: { noSignals?: boolean; errorAfter?: number } = {}
+) {
   const enc = new TextEncoder();
   const signals: SerialOutputSignals[] = [];
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let queue: string[] = [];
+  const newStream = () =>
+    new ReadableStream<Uint8Array>({
+      start: (c) => {
+        controller = c;
+        // A stream after an error carries on with what is left.
+        for (const chunk of queue) c.enqueue(enc.encode(chunk));
+        queue = [];
+      },
+    });
   const raw = {
     readable: null as ReadableStream<Uint8Array> | null,
     open: vi.fn(async () => {
-      raw.readable = new ReadableStream<Uint8Array>({
-        start: (c) => {
-          controller = c;
-        },
-      });
+      raw.readable = newStream();
     }),
     close: vi.fn(async () => {
       raw.readable = null;
@@ -102,8 +112,23 @@ function fakePort(chunks: string[], opts: { noSignals?: boolean } = {}) {
     setSignals: vi.fn(async (s: SerialOutputSignals) => {
       if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
       signals.push(s);
-      if (s.requestToSend === false)
-        for (const c of chunks) controller?.enqueue(enc.encode(c));
+      if (s.requestToSend !== false) return;
+      // The board prints once the reset is released; ``errorAfter`` chunks in,
+      // the stream fails the way Web Serial does on a framing error and the
+      // port offers a fresh one with the rest.
+      chunks.forEach((c, i) => {
+        if (opts.errorAfter !== undefined && i === opts.errorAfter) {
+          queue = chunks.slice(i);
+          // What was read before the error is delivered first, as a real
+          // port does; the error lands a tick later.
+          setTimeout(() => {
+            controller?.error(new DOMException("framing", "FramingError"));
+            raw.readable = newStream();
+          }, 5);
+        } else if (opts.errorAfter === undefined || i < opts.errorAfter) {
+          controller?.enqueue(enc.encode(c));
+        }
+      });
     }),
   };
   // Not the shared makeWebSerialPort: ``readable`` must be the live field the
@@ -201,14 +226,45 @@ describe("readBootBanner", () => {
     expect(signals).toEqual([{ dataTerminalReady: false, requestToSend: true }]);
   });
 
-  it("moves on, with a warning, when the teardown itself hangs", async () => {
+  it("moves on, with a warning, when the teardown itself hangs, and keeps the port back", async () => {
     const { port, raw } = fakePort([ESP32]);
     raw.close.mockImplementation(() => new Promise<void>(() => {}));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
     await vi.advanceTimersByTimeAsync(5000);
-    expect(await pending).toEqual({ platform: "esp" });
+    await assertion;
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("did not close"));
+    warn.mockRestore();
+  });
+
+  it("keeps what it read across a recoverable read error and carries on", async () => {
+    const head = RTL_PLAIN.slice(0, RTL_PLAIN.indexOf("== RAM Start =="));
+    const tail = RTL_PLAIN.slice(RTL_PLAIN.indexOf("== RAM Start =="));
+    const { port } = fakePort([head, tail], { errorAfter: 1 });
+    const pending = readBootBanner(port);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS);
+    expect(await pending).toEqual({
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
+      board: "bw15",
+    });
+  });
+
+  it("refuses to hand on a port it could not release when nothing was found", async () => {
+    const { port, raw } = fakePort([]);
+    raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
+    await assertion;
+    // A board that named itself is still a result.
+    const found = fakePort([RTL_PLAIN]);
+    found.raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
+    const p2 = readBootBanner(found.port);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
+    expect((await p2)?.board).toBe("bw15");
     warn.mockRestore();
   });
 
