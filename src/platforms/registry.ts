@@ -41,6 +41,19 @@ export function serialLogsFor(
   return serialLogsOf(platformFor(targetPlatform));
 }
 
+/**
+ * The install flow for a device, by its platform and its chip: nothing when
+ * the platform's flasher names its chips and the device's is not one of them.
+ */
+export function installFor(
+  targetPlatform: string | null | undefined,
+  mcu: string | null | undefined
+): AnyBrowserInstall | undefined {
+  const install = platformFor(targetPlatform)?.install;
+  if (install?.chips && !(mcu && install.chips.includes(mcu))) return undefined;
+  return install;
+}
+
 /** The install flow an install method string selects, if any. */
 export function installForMethod(method: string): AnyBrowserInstall | undefined {
   return PLATFORMS.find((p) => p.install?.id === method)?.install;

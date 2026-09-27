@@ -169,6 +169,8 @@ const withoutWebUsb = (key: string) => () =>
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",
   methodKey: "rp2_uf2",
+  // The RP2350 is the same platform; its image and BOOTSEL device are refused.
+  chips: ["rp2040"],
   // Only the WebUSB write can end in logs; the UF2 download path never does.
   get holdsPort() {
     return isWebUsbSupported();

@@ -16,6 +16,7 @@ import type {
   PlatformSupport,
 } from "../../src/platforms/platform-support.js";
 import {
+  installFor,
   installForMethod,
   platformFor,
   PLATFORMS,
@@ -40,6 +41,12 @@ const SAMPLE_PLATFORM: Record<string, string> = {
   rtl87xx: "rtl87xx",
 };
 
+// The chip of each split platform its flasher writes, and one it does not.
+const CHIPS: Record<string, { takes: string; refuses: string }> = {
+  rp2: { takes: "rp2040", refuses: "rp2350" },
+  rtl87xx: { takes: "rtl8720c", refuses: "rtl8710b" },
+};
+
 const byId = PLATFORMS.map((p) => [p.id, p] as const);
 
 describe("PLATFORMS", () => {
@@ -57,6 +64,29 @@ describe("PLATFORMS", () => {
     if (platform.install) {
       expect(installForMethod(platform.install.id)).toBe(platform.install);
     }
+  });
+
+  it.each(byId)("%s offers its install by chip", (id, platform) => {
+    const sample = SAMPLE_PLATFORM[id];
+    const chips = CHIPS[id];
+    // Every platform that is more than one chip names the chips it writes.
+    expect(platform.install?.chips !== undefined).toBe(chips !== undefined);
+    if (!chips) {
+      expect(installFor(sample, null)).toBe(platform.install);
+      expect(installFor(sample, "anything")).toBe(platform.install);
+      return;
+    }
+    expect(installFor(sample, chips.takes)).toBe(platform.install);
+    expect(installFor(sample, chips.refuses)).toBeUndefined();
+    // Unknown is not offered: the chip has to be one the flasher writes.
+    expect(installFor(sample, null)).toBeUndefined();
+    expect(installFor(sample, undefined)).toBeUndefined();
+    expect(installFor(sample, "")).toBeUndefined();
+  });
+
+  it("has no install for a platform without a descriptor", () => {
+    expect(installFor("esp32", null)).toBeUndefined();
+    expect(installFor(null, "rp2040")).toBeUndefined();
   });
 
   it.each(byId)(

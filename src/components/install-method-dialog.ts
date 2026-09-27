@@ -49,6 +49,7 @@ import {
   renderInstallNotice,
   renderManualDownloadOption,
   renderMethodRow,
+  renderOtaAddressCard,
   renderOtaOption,
   renderPlatformFlashOption,
   renderServerSerialOption,
@@ -98,6 +99,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   @property()
   deviceTargetPlatform = "";
+
+  /** The device's chip where its platform is more than one (``Device.mcu``). */
+  @property({ attribute: false })
+  deviceMcu: string | null = null;
 
   @property()
   mode: "install" | "logs" = "install";
@@ -267,6 +272,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const platformRow = renderPlatformFlashOption(
       ctx,
       this.deviceTargetPlatform,
+      this.deviceMcu,
       hasWebSerial,
       availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined
     );
@@ -480,81 +486,18 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     });
   }
 
-  /**
-   * OTA address-override card. Header row mirrors the other
-   * .option cards (icon + title + description) and the chevron
-   * toggles an inline form INSIDE the same card so the address
-   * input lives within the card's outline rather than dangling
-   * below as a separate panel.
-   */
   private _renderOtaAddressCard() {
-    const expanded = this._otaAddressCardExpanded;
-    const trimmed = this._otaAddressValue.trim();
-    const canSubmit = trimmed.length > 0 && trimmed !== OTA_PORT;
-    return html`
-      <div class="option-collapsible">
-        <button
-          type="button"
-          class="option-collapsible__header"
-          aria-expanded=${expanded ? "true" : "false"}
-          aria-controls=${expanded ? "ota-address-form" : nothing}
-          @click=${this._onToggleOtaAddressCard}
-        >
-          <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
-          <div class="info">
-            <span class="title" id="ota-address-title"
-              >${this._localize("dashboard.install_method_network_address_label")}</span
-            >
-            <span class="desc"
-              >${this._localize("dashboard.install_method_network_address_desc")}</span
-            >
-          </div>
-          <wa-icon
-            class="option-chevron"
-            library="mdi"
-            name=${expanded ? "chevron-up" : "chevron-down"}
-          ></wa-icon>
-        </button>
-        ${
-          expanded
-            ? html`
-                <div id="ota-address-form" class="option-collapsible__body">
-                  <input
-                    class="ota-form-input"
-                    type="text"
-                    autocomplete="off"
-                    spellcheck="false"
-                    placeholder="192.168.1.42"
-                    aria-labelledby="ota-address-title"
-                    .value=${this._otaAddressValue}
-                    @input=${(e: Event) => {
-                      this._otaAddressValue = (e.target as HTMLInputElement).value;
-                    }}
-                    @keydown=${(e: KeyboardEvent) => {
-                      if (e.key === "Enter" && canSubmit) {
-                        this._submitOtaAddress();
-                      }
-                    }}
-                  />
-                  <div class="ota-form-actions">
-                    <button
-                      class="btn btn--primary"
-                      ?disabled=${!canSubmit}
-                      @click=${this._submitOtaAddress}
-                    >
-                      ${this._localize(
-                        this.mode === "logs"
-                          ? "dashboard.logs_method_network_address_submit"
-                          : "dashboard.install_method_network_address_submit"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              `
-            : nothing
-        }
-      </div>
-    `;
+    return renderOtaAddressCard({
+      localize: this._localize,
+      mode: this.mode,
+      expanded: this._otaAddressCardExpanded,
+      value: this._otaAddressValue,
+      onToggle: this._onToggleOtaAddressCard,
+      onInput: (value) => {
+        this._otaAddressValue = value;
+      },
+      onSubmit: this._submitOtaAddress,
+    });
   }
 
   private _onToggleAdvanced = () => {

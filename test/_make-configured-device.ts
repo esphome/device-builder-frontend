@@ -25,6 +25,7 @@ const _BASE = {
   area: "",
   board_id: "esp32-c3-devkitm-1",
   target_platform: "esp32",
+  mcu: null,
   address: "kitchen.local",
   ip: "",
   mac_address: "",

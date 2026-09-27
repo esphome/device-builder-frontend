@@ -33,7 +33,12 @@ function makeHost() {
     _failureKind: null as string | null,
     _usbFirmware: new ArrayBuffer(16) as ArrayBuffer | null,
     _usbFirmwareName: "firmware.factory.bin",
-    _device: { name: "dev", friendly_name: "Dev", target_platform: "esp32" },
+    _device: {
+      name: "dev",
+      friendly_name: "Dev",
+      target_platform: "esp32",
+      mcu: null as string | null,
+    },
     _step: "download-ready",
     _statusMessage: "",
     _errorMessage: "",
@@ -108,6 +113,7 @@ describe("handOffToFlasher", () => {
   it("reads the flasher from the device's platform, and names an outdated receiver", () => {
     const host = makeHost();
     host._device.target_platform = "rtl87xx";
+    host._device.mcu = "rtl8720c";
     handOffToFlasher(asHost(host));
     expect(openFlasher.mock.calls[0][3]).toMatchObject({
       flasher: "rtl-ambz2",
@@ -155,7 +161,7 @@ describe("download-ready detail (web-flash)", () => {
 });
 
 describe("startUsbFlash artifact", () => {
-  function flowHost(targetPlatform: string) {
+  function flowHost(targetPlatform: string, mcu: string | null = null) {
     return {
       ...makeHost(),
       _step: "compiling",
@@ -164,6 +170,7 @@ describe("startUsbFlash artifact", () => {
         name: "dev",
         friendly_name: "Dev",
         target_platform: targetPlatform,
+        mcu,
       },
       _usbFirmware: null as ArrayBuffer | null,
       _usbFirmwareName: "",
@@ -179,7 +186,7 @@ describe("startUsbFlash artifact", () => {
   });
 
   it("sends the UF2 for an RTL8720C through the shared download", async () => {
-    const host = flowHost("rtl87xx");
+    const host = flowHost("rtl87xx", "rtl8720c");
     const artifact = downloaded("firmware.uf2");
     steps.downloadBuildArtifact.mockResolvedValue(artifact);
     await startUsbFlash(asHost(host));
@@ -192,7 +199,7 @@ describe("startUsbFlash artifact", () => {
   });
 
   it("refuses an RTL8710B image in the dashboard, before any flasher tab is offered", async () => {
-    const host = flowHost("rtl87xx");
+    const host = flowHost("rtl87xx", "rtl8720c");
     steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.uf2"));
     rtl.loadAmbz2Image.mockResolvedValueOnce({
       key: "firmware.rtl_wrong_family",
@@ -215,15 +222,25 @@ describe("startUsbFlash artifact", () => {
     expect(host._step).toBe("download-ready");
   });
 
+  it.each([
+    ["rtl87xx", "rtl8710b"],
+    ["rtl87xx", null],
+  ])("refuses %s with chip %s before the build", async (platform, mcu) => {
+    const host = flowHost(platform, mcu);
+    await startUsbFlash(asHost(host));
+    expect(steps.downloadBuildArtifact).not.toHaveBeenCalled();
+    expect(host._statusMessage).toBe("firmware.no_flashable_binary");
+  });
+
   it("refuses a platform that has no hand-off instead of sending an ESP image", async () => {
-    const host = flowHost("rp2040");
+    const host = flowHost("rp2040", "rp2040");
     await startUsbFlash(asHost(host));
     expect(steps.downloadBuildArtifact).not.toHaveBeenCalled();
     expect(host._statusMessage).toBe("firmware.no_flashable_binary");
   });
 
   it("stays where the shared download left the dialog when it failed", async () => {
-    const host = flowHost("rtl87xx");
+    const host = flowHost("rtl87xx", "rtl8720c");
     steps.downloadBuildArtifact.mockResolvedValue(null);
     await startUsbFlash(asHost(host));
     expect(host._usbFirmware).toBeNull();
