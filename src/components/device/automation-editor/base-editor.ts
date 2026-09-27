@@ -305,8 +305,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       // broken mid edit fails here, and the next edit reads again.
       return;
     }
-    // Not for a YAML edited again since: its own reload is still to come.
-    if (yaml === this.yaml) this._stale = false;
+    // Held on for a YAML edited since: its own reload is still to come.
+    this._stale = yaml !== this.yaml;
   }
 
   connectedCallback() {

@@ -370,4 +370,35 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
     expect(inner.value.actions).toHaveLength(1);
   });
+
+  it("stays held when the YAML was edited while it read its first tree", async () => {
+    const d = deferred<ParsedAutomation[]>();
+    const api = makeEditorApi({
+      parseDeviceAutomations: vi
+        .fn()
+        .mockReturnValueOnce(d.promise)
+        .mockResolvedValue([parsedEdited()]),
+    });
+    const editor = new ESPHomeScriptEditor();
+    editor.yaml = YAML;
+    await mountEditor(editor, api, {
+      configuration: "device.yaml",
+      location: { kind: "script", id: "a" },
+    });
+    const inner = editor as any;
+    await editByHand(editor);
+
+    d.resolve([parsedAutomation({ location: { kind: "script", id: "a" } })]);
+    await settled(editor);
+    expect(inner.value.actions).toHaveLength(0);
+    expect(editor.inert).toBe(true);
+    inner._engine.withValue({ actions: [] });
+    await flushMicrotasks(3);
+    expect(api.upsertAutomation).not.toHaveBeenCalled();
+
+    editor.reload();
+    await settled(editor);
+    expect(editor.inert).toBe(false);
+    expect(inner.value.actions).toHaveLength(1);
+  });
 });
