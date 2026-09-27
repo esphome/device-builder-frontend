@@ -101,6 +101,37 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
   });
 
+  it("drops the tree of a section the edit took out of the YAML", async () => {
+    const { editor, inner, api } = await mount({
+      parseDeviceAutomations: vi.fn().mockResolvedValue([]),
+    });
+    await editByHand(editor);
+
+    editor.reload();
+    await settled(editor);
+
+    expect(inner.value).toBeNull();
+    inner._engine.scheduleAutoApply();
+    await inner._engine.flushPending();
+    expect(api.upsertAutomation).not.toHaveBeenCalled();
+  });
+
+  it("keeps the tree of a section the edit left with a parse error", async () => {
+    const { editor, inner } = await mount({
+      parseDeviceAutomations: vi
+        .fn()
+        .mockResolvedValue([{ ...parsedEdited(), error: "bad" }]),
+    });
+    const tree = inner.value;
+    await editByHand(editor);
+
+    editor.reload();
+    await settled(editor);
+
+    expect(inner.value).toBe(tree);
+    expect(inner._parseError.active).toBe(true);
+  });
+
   it("is released when the reload has nothing to ask", async () => {
     const { editor, inner } = await mount();
     await editByHand(editor);

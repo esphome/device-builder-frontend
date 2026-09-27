@@ -264,6 +264,9 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         // leave over an edit that no longer exists.
         this._engine.notifyHydrated();
       } else {
+        // The edit took the section out of the YAML: written, the tree
+        // from before would put it back.
+        if (this._stale && !this._parseError.active) this.value = null;
         this._dropStaleTree();
       }
     } catch (err) {
