@@ -4,6 +4,7 @@
  * button opens the picker).
  */
 import { html } from "lit";
+import { keyed } from "lit/directives/keyed.js";
 
 import type {
   AutomationAction,
@@ -30,6 +31,11 @@ export function renderActionsSection(opts: {
   disabled: boolean;
   localize: LocalizeFunc;
   focusTarget?: AutomationFocus | null;
+  /** Names the automation being edited. The editor element is reused from
+   *  one automation to the next, and every node of the new tree is a new
+   *  object, so the list is remounted rather than left to carry each row's
+   *  state over by position. */
+  targetKey: string;
   /** Required so each editor names its own copy — a fallback would
    *  silently render the automation flavour under a script. */
   descriptionKey: string;
@@ -42,19 +48,22 @@ export function renderActionsSection(opts: {
         ${renderMarkdown(opts.localize(opts.descriptionKey))}
       </p>
       <esphome-catalog-picker-host>
-        <esphome-automation-action-list
-          no-header
-          .focusTarget=${opts.focusTarget ?? null}
-          .actions=${opts.automation.actions}
-          .catalog=${opts.catalog}
-          .conditionCatalog=${opts.conditionCatalog}
-          .scripts=${opts.scripts}
-          .devices=${opts.devices}
-          .board=${opts.board}
-          .yaml=${opts.yaml}
-          ?disabled=${opts.disabled}
-          @actions-change=${opts.onActionsChange}
-        ></esphome-automation-action-list>
+        ${keyed(
+          opts.targetKey,
+          html`<esphome-automation-action-list
+            no-header
+            .focusTarget=${opts.focusTarget ?? null}
+            .actions=${opts.automation.actions}
+            .catalog=${opts.catalog}
+            .conditionCatalog=${opts.conditionCatalog}
+            .scripts=${opts.scripts}
+            .devices=${opts.devices}
+            .board=${opts.board}
+            .yaml=${opts.yaml}
+            ?disabled=${opts.disabled}
+            @actions-change=${opts.onActionsChange}
+          ></esphome-automation-action-list>`
+        )}
       </esphome-catalog-picker-host>
     </div>
   `;

@@ -154,6 +154,7 @@ export class ESPHomeScriptEditor extends CallableAutomationEditor<ScriptLocation
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
+        targetKey: this._targetKey(),
         descriptionKey: "device.script_actions_description",
         onActionsChange: this._onActionsChange,
       })}

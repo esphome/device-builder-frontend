@@ -227,6 +227,7 @@ export class ESPHomeAutomationEditor extends BaseAutomationEditor<AutomationLoca
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
+        targetKey: this._targetKey(),
         descriptionKey: "device.automation_actions_description",
         onActionsChange: this._onActionsChange,
       })}

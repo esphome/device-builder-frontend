@@ -5,15 +5,17 @@
  * ``wait_until``) embed nested action lists for each of their
  * ``accepts_action_list`` keys. Each action row is an
  * ``<esphome-automation-action-node>``; this component owns the
- * outer list ergonomics (add / reorder / remove).
+ * outer list ergonomics (add / reorder / remove). Rows are keyed, so a
+ * row's element and what it remembers follow its action through them.
  *
  * Pure-presentational: parent owns ``actions`` and listens for
  * ``actions-change`` to update its own state.
  */
 import { consume } from "@lit/context";
 import { mdiPlus } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { repeat } from "lit/directives/repeat.js";
 
 import type {
   ActionNode,
@@ -38,6 +40,7 @@ import {
 } from "./automation-focus.js";
 import type { CatalogPickedDetail } from "./catalog-picker-dialog.js";
 import { requestCatalogPick } from "./catalog-picker-host.js";
+import { RowKeys } from "./row-keys.js";
 import { emptyActionNode, removeAt, replaceAt, swap } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -88,6 +91,13 @@ export class ESPHomeAutomationActionList extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
+  private readonly _rowKeys = new RowKeys<ActionNode>();
+  private _keys: readonly number[] = [];
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("actions")) this._keys = this._rowKeys.reconcile(this.actions);
+  }
+
   protected render() {
     return html`
       <div class=${this.noHeader ? "" : "ae-section"}>
@@ -103,8 +113,10 @@ export class ESPHomeAutomationActionList extends LitElement {
             ? html`<p class="empty-message--dashed" role="status">
                 ${this._localize("device.automation_actions_empty")}
               </p>`
-            : this.actions.map((node, idx) =>
-                this._renderRow(node, idx, idx === this.actions.length - 1)
+            : repeat(
+                this.actions,
+                (_node, idx) => this._keys[idx],
+                (node, idx) => this._renderRow(node, idx, idx === this.actions.length - 1)
               )
         }
         <button

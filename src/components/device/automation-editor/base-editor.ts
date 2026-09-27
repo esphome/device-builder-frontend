@@ -98,6 +98,11 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
 
   protected _resolveFocus = createFocusResolver();
 
+  /** Names the automation being edited, for ``renderActionsSection``. */
+  protected _targetKey(): string {
+    return this.location ? sectionKeyFromLocation(this.location) : "";
+  }
+
   /** Focus target for the current caret; none while a stale tree is shown. */
   protected _currentFocus() {
     return this._resolveFocus(

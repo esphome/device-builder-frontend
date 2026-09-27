@@ -110,6 +110,7 @@ export class ESPHomeApiActionEditor extends CallableAutomationEditor<ApiActionLo
         disabled,
         localize: this._localize,
         focusTarget: actionsFocus(focus),
+        targetKey: this._targetKey(),
         descriptionKey: "device.api_action_actions_description",
         onActionsChange: this._onActionsChange,
       })}

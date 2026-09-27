@@ -4,9 +4,8 @@
  * Advanced-section wiring tests for ``automation-condition-tree.ts``
  * (issue #1905: sensor.in_range's above/below were unreachable).
  *
- * The tree renders rows with a plain ``conditions.map(...)`` (no keyed
- * ``repeat()``), so the per-row "Show advanced settings" flag is keyed
- * by index and must follow its row across kind changes and removals.
+ * The tree keys its rows, so the per-row "Show advanced settings" flag
+ * follows its row across moves and removals, and is reset by a kind change.
  * ``config-entry-form`` drags CodeMirror in transitively, so ``vi.mock``
  * no-ops it; picks are delivered by answering the tree's pick request.
  */
@@ -129,6 +128,45 @@ describe("automation-condition-tree advanced section", () => {
 
     expect(forms(el)).toHaveLength(1);
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(true);
+  });
+
+  it("moves the flag with its row on a reorder", async () => {
+    const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
+    const opened = forms(el)[0];
+
+    toggleAdvanced(opened, true);
+    await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '.ae-row button[aria-label="device.automation_move_down"]'
+    )!.click();
+    await el.updateComplete;
+
+    expect(el.conditions.map((c) => c.condition_id)).toEqual([
+      "number.in_range",
+      "sensor.in_range",
+    ]);
+    expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);
+    expect(forms(el)[1].hasAttribute("show-advanced")).toBe(true);
+    // The row's own form moved with it, carrying whatever it remembers.
+    expect(forms(el)[1]).toBe(opened);
+  });
+
+  it("leaves the flags alone when the parent drops a delete", async () => {
+    const el = new ESPHomeAutomationConditionTree();
+    el.conditions = [node("sensor.in_range"), node("number.in_range")];
+    el.catalog = CATALOG;
+    // A read only owner ignores conditions-change.
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    toggleAdvanced(forms(el)[1], true);
+    await el.updateComplete;
+    el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".ae-row-delete")[0].click();
+    await el.updateComplete;
+
+    expect(forms(el)).toHaveLength(2);
+    expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);
+    expect(forms(el)[1].hasAttribute("show-advanced")).toBe(true);
   });
 
   it("resets the flag when the row's condition kind changes", async () => {
