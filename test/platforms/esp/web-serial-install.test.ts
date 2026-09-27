@@ -463,18 +463,93 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     host._open = true;
   };
 
-  it("does not connect when the dialog was dismissed during the port pick", async () => {
-    const { host, api } = ready();
-    seams.requestSerialPort.mockImplementationOnce(async () => {
-      dismiss(host);
-      return { getInfo: () => ({}) } as SerialPort;
-    });
+  type Made = ReturnType<typeof ready>;
+  it.each([
+    {
+      name: "the port pick",
+      arm: ({ host }: Made) =>
+        seams.requestSerialPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          return { getInfo: () => ({}) } as SerialPort;
+        }),
+      released: false,
+    },
+    {
+      name: "a port pick that then fails",
+      arm: ({ host }: Made) =>
+        seams.requestSerialPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw lapsedPick();
+        }),
+      released: false,
+    },
+    {
+      name: "the connect",
+      arm: ({ host }: Made) =>
+        esptool.connectToPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          return CHIP;
+        }),
+      released: true,
+    },
+    {
+      name: "a connect that then fails",
+      arm: ({ host }: Made) =>
+        esptool.connectToPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw new Error("Failed to connect with the device");
+        }),
+      released: false,
+    },
+    {
+      name: "the chip check",
+      arm: ({ host, api }: Made) => {
+        host._device.board_id = "esp32dev";
+        api.getBoard.mockImplementationOnce(async () => {
+          dismiss(host);
+          return { esphome: { platform: "esp32" } };
+        });
+      },
+      released: true,
+    },
+    {
+      name: "the image listing, which then finds none",
+      arm: ({ host, api }: Made) =>
+        api.firmwareGetBinaries.mockImplementationOnce(async () => {
+          dismiss(host);
+          return [];
+        }),
+      released: true,
+    },
+    {
+      name: "the download",
+      arm: ({ host, api }: Made) =>
+        api.firmwareDownloadBytes.mockImplementationOnce(async () => {
+          dismiss(host);
+          return new Uint8Array([1]).buffer;
+        }),
+      released: true,
+    },
+    {
+      name: "a download that then fails",
+      arm: ({ host, api }: Made) =>
+        api.firmwareDownloadBytes.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw new Error("boom");
+        }),
+      released: true,
+    },
+  ])("stands down quietly when dismissed during $name", async ({ arm, released }) => {
+    const made = ready();
+    arm(made);
 
-    await run(host);
+    await run(made.host);
 
-    expect(esptool.connectToPort).not.toHaveBeenCalled();
-    expect(api.firmwareCompile).not.toHaveBeenCalled();
-    expect(host._fail).not.toHaveBeenCalled();
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
+    expect(made.host._fail).not.toHaveBeenCalled();
+    expect(made.host._close).not.toHaveBeenCalled();
+    if (released) expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    else expect(esptool.disconnect).not.toHaveBeenCalled();
   });
 
   it("stands down when the same device was reopened during the connect", async () => {
@@ -505,101 +580,6 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     await run(host);
 
     expect(host._close).not.toHaveBeenCalled();
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("stays quiet when the picker fails after a dismissal", async () => {
-    const { host } = ready();
-    seams.requestSerialPort.mockImplementationOnce(async () => {
-      dismiss(host);
-      throw lapsedPick();
-    });
-
-    await run(host);
-
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("stays quiet when there is no image to flash after a dismissal", async () => {
-    const { host, api } = ready();
-    api.firmwareGetBinaries.mockImplementationOnce(async () => {
-      dismiss(host);
-      return [];
-    });
-
-    await run(host);
-
-    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("releases the port and does not compile when dismissed during the connect", async () => {
-    const { host, api } = ready();
-    esptool.connectToPort.mockImplementationOnce(async () => {
-      dismiss(host);
-      return CHIP;
-    });
-
-    await run(host);
-
-    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
-    expect(api.firmwareCompile).not.toHaveBeenCalled();
-    expect(esptool.flashFirmware).not.toHaveBeenCalled();
-    expect(host._fail).not.toHaveBeenCalled();
-    expect(host._detected).toBeNull();
-  });
-
-  it("stays quiet when the connect fails after a dismissal", async () => {
-    const { host } = ready();
-    esptool.connectToPort.mockImplementationOnce(async () => {
-      dismiss(host);
-      throw new Error("Failed to connect with the device");
-    });
-
-    await run(host);
-
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("releases the port and does not compile when dismissed during the chip check", async () => {
-    const { host, api } = ready();
-    host._device.board_id = "esp32dev";
-    api.getBoard.mockImplementationOnce(async () => {
-      dismiss(host);
-      return { esphome: { platform: "esp32" } };
-    });
-
-    await run(host);
-
-    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
-    expect(api.firmwareCompile).not.toHaveBeenCalled();
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("releases the port and does not flash when dismissed during the download", async () => {
-    const { host, api } = ready();
-    api.firmwareDownloadBytes.mockImplementationOnce(async () => {
-      dismiss(host);
-      return new Uint8Array([1]).buffer;
-    });
-
-    await run(host);
-
-    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
-    expect(esptool.flashFirmware).not.toHaveBeenCalled();
-    expect(host._fail).not.toHaveBeenCalled();
-  });
-
-  it("stays quiet when the download fails after a dismissal", async () => {
-    const { host, api } = ready();
-    api.firmwareDownloadBytes.mockImplementationOnce(async () => {
-      dismiss(host);
-      throw new Error("boom");
-    });
-
-    await run(host);
-
-    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
     expect(host._fail).not.toHaveBeenCalled();
   });
 });

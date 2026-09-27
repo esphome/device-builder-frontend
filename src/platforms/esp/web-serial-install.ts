@@ -6,6 +6,10 @@
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import {
+  installLog,
+  runGuard,
+} from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import {
   compileOrFail,
   finishWithLogsPort,
 } from "../../components/firmware-install-dialog/install-flow.js";
@@ -63,20 +67,15 @@ export async function startWebSerialInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // A dismissal (X, Escape) only closes the dialog, and a reopen for the same
-  // device restores it. The compile is the one await a dismissal settles, so
-  // after every other one the flow checks that the dialog is still open on
-  // this very install.
-  const run = host._installRun;
-  const stillCurrent = () => host._installRun === run && host._open;
+  // The compile is the one await a dismissal settles; after every other one
+  // the flow checks that the dialog is still on this run.
+  const stillCurrent = runGuard(host);
 
   // Surface esptool-js chip-detect / flash-session output in the shared log,
   // the same buffer the compile phase streams to. Without this the WebSerial
   // install showed no esptool logs at all, unlike the OTA / server-serial
   // paths which stream the backend job output (#346).
-  const onLog = (line: string) => {
-    host._log.enqueue(line);
-  };
+  const onLog = installLog(host, stillCurrent);
 
   // 1. Pick the port in the click (the engine chunk fetches meanwhile), then
   // connect and detect the chip. A dismissed picker closes the dialog.
@@ -117,10 +116,13 @@ export async function startWebSerialInstall(
     );
     return;
   }
-  if (!stillCurrent()) {
+  // Past the connect a stand-down must also give the held session back.
+  const standDown = async () => {
+    if (stillCurrent()) return false;
     await releaseSerial(esptool, detected);
-    return;
-  }
+    return true;
+  };
+  if (await standDown()) return;
   host._detected = detected;
 
   // 2. Verify chip matches platform. device.target_platform only carries the
@@ -144,10 +146,7 @@ export async function startWebSerialInstall(
     } catch {
       // Network hiccup — fall back to target_platform.
     }
-    if (!stillCurrent()) {
-      await releaseSerial(esptool, detected);
-      return;
-    }
+    if (await standDown()) return;
   }
   // Fold the expected side through the same helper so a board catalog stamping
   // the esp8285 variant still matches a detected ESP8266/ESP8285. Idempotent on
@@ -209,10 +208,7 @@ export async function startWebSerialInstall(
     if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return;
   }
-  if (!stillCurrent()) {
-    await releaseSerial(esptool, detected);
-    return;
-  }
+  if (await standDown()) return;
 
   // 5. Flash on the still-open session.
   host._step = "flashing";
