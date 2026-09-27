@@ -178,6 +178,7 @@ describe("renderRegistryListField — emitChange contract", () => {
     )[0] as HTMLButtonElement;
     firstRemove.click();
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
+    expect(el.ctx.rowRemoved).toHaveBeenCalledWith(["effects"], 0);
   });
 
   it("Each row's wa-select has a per-row aria-label", async () => {
@@ -236,6 +237,9 @@ describe("renderRegistryListField — emitChange contract", () => {
     picker.value = "pulse";
     picker.dispatchEvent(new Event("change"));
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
+    // The row's values are gone, and what the form remembered for them too.
+    expect(el.ctx.rowKindChanged).toHaveBeenCalledWith(["effects"], 0);
+    expect(el.ctx.rowRemoved).not.toHaveBeenCalled();
   });
 
   it("Picker change with empty nextId never produces an empty-key item", async () => {

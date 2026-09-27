@@ -227,6 +227,7 @@ describe("renderNestedListField", () => {
     expect(handlers).toHaveLength(4);
     handlers[1]();
     expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "a" }, { id: "c" }]);
+    expect(ctx.rowRemoved).toHaveBeenCalledWith(["devices"], 1);
     // Untouched siblings preserve identity.
     const next = emitChange.mock.calls[0][1] as Array<Record<string, unknown>>;
     expect(next[0]).toBe(before.devices[0]);

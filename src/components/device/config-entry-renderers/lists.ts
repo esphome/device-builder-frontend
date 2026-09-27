@@ -36,10 +36,7 @@ function arrayItemHandlers(
   makeNewItem: () => unknown
 ): { addItem: () => void; removeAt: (idx: number) => void } {
   const removeAt = (idx: number) => {
-    // Row edit buffers are keyed by index; a removal shifts the indices,
-    // so an un-blurred buffer would paint (and commit) over the row that
-    // slides into its slot.
-    ctx.clearEditingMagnitudesUnder(path);
+    ctx.rowRemoved(path, idx);
     ctx.emitChange(
       path,
       readArrayAt(ctx, path).filter((_, i) => i !== idx)

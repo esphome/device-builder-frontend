@@ -487,6 +487,7 @@ export class ESPHomeRegistryList extends LitElement {
   }
 
   private _removeAt(index: number) {
+    this.ctx.rowRemoved(this.path, index);
     this._mutateEditable((items) => items.filter((_, i) => i !== index));
   }
 
@@ -504,6 +505,7 @@ export class ESPHomeRegistryList extends LitElement {
       // would silently produce a scalar where the new type expects a
       // time string. V1 has no sub-form to surface the mismatch, so
       // emit ``{nextId: null}`` and let the user reconfigure.
+      this.ctx.rowKindChanged(this.path, index);
       return items.map((it, i) => (i === index ? { [nextId]: null } : it));
     });
   }
