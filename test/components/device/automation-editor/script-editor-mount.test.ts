@@ -17,10 +17,12 @@ import type { AvailableAutomations } from "../../../../src/api/types/automations
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 
+import { flushMicrotasks } from "../../../_dom.js";
 import {
   loggerBodies,
   makeEditorApi,
   mountEditor as mountHarness,
+  parsedAutomation,
   slimWithLoggerAction,
 } from "./_editor-harness.js";
 
@@ -138,6 +140,41 @@ describe("script-editor action-catalog hydration (#1286)", () => {
       const form = editor.shadowRoot!.querySelector("esphome-config-entry-form");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((form as any).entries.map((e: { key: string }) => e.key)).toEqual(["mode"]);
+    });
+
+    it("flashes the id field again for the next script the editor shows", async () => {
+      const scrolled = vi
+        .spyOn(HTMLElement.prototype, "scrollIntoView")
+        .mockImplementation(() => {});
+      const api = makeEditorApi(
+        {
+          parseDeviceAutomations: vi.fn().mockResolvedValue([
+            parsedAutomation({
+              location: { kind: "script", id: "other_script" },
+              label: "other_script",
+              automation: { ...SCRIPT.value, trigger_params: { id: "other_script" } },
+            }),
+          ]),
+        },
+        slimWithLoggerAction()
+      );
+      const editor = await mountEditor(api, "device.yaml", {
+        ...SCRIPT,
+        focusYamlPath: ["script", 0, "id"],
+      });
+      expect(scrolled).toHaveBeenCalledTimes(1);
+
+      editor.location = { kind: "script", id: "other_script" };
+      editor.focusYamlPath = ["script", 1, "id"];
+      await editor.updateComplete;
+      await flushMicrotasks(10);
+      await editor.updateComplete;
+
+      expect(
+        editor.shadowRoot!.querySelector<HTMLInputElement>("#script-id")!.value
+      ).toBe("other_script");
+      expect(scrolled).toHaveBeenCalledTimes(2);
+      vi.restoreAllMocks();
     });
 
     it("flashes the id field when the cursor is on the id line", async () => {

@@ -18,7 +18,9 @@ export abstract class CallableAutomationEditor<
 > extends BaseAutomationEditor<L> {
   static styles: CSSResultGroup = [BaseAutomationEditor.styles, fieldHighlightStyles];
 
-  /** ``focusKey`` already name-flashed — one-shot per target. */
+  /** Target already name-flashed, one shot each. It names the callable
+   *  on screen as well as the caret's place: that place reads the same
+   *  in every script. */
   private _nameFlashKey?: string;
 
   /** ``id`` of the name input, which its label points at. */
@@ -64,7 +66,7 @@ export abstract class CallableAutomationEditor<
     const focus = this._currentFocus();
     const head = entryFieldFocus(focus)?.[0];
     if (head === undefined || !this._nameYamlKeys.includes(head)) return;
-    const key = focusKey(focus);
+    const key = `${this._target}:${focusKey(focus)}`;
     if (key === this._nameFlashKey) return;
     const field = this.shadowRoot
       ?.querySelector(`#${this._nameInputId}`)
