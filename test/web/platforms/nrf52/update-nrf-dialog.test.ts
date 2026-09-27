@@ -75,6 +75,7 @@ const TRANSPORTS = [
 ] as const;
 
 beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.loadSmpEngine.mockImplementation(() => mocks.loadRealSmpEngine());
   mocks.isWebBluetoothSupported.mockReturnValue(true);
   mocks.requestSerialPort.mockResolvedValue({ port: true });
@@ -170,6 +171,20 @@ describe.each(TRANSPORTS)(
       expect(flash).not.toHaveBeenCalled();
       expect(el._state).toBe("error");
       expect(el._errorMessage).toBe("web.install.tools_load_failed");
+    });
+
+    it("reports a device that stops answering part way with the engine's reason", async () => {
+      const el = await mountDialog();
+      const err = new SmpNoReplyError("SMP: no response from the device");
+      flash.mockImplementation(async (_target, _image, hooks) => {
+        hooks.onProgress(40);
+        throw err;
+      });
+
+      await el[run]();
+
+      expect(el._errorMessage).toBe("web.nrf.install_error_flash");
+      expect(console.error).toHaveBeenCalledWith(expect.any(String), err);
     });
 
     it("reports any other failure with the engine's reason, and retries afresh", async () => {

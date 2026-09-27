@@ -212,7 +212,9 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
       });
       if (!abort.signal.aborted) this._state = "success";
     } catch (err) {
-      if (!abort.signal.aborted) this._fail(this._failureOf(engine, err));
+      if (abort.signal.aborted) return;
+      console.error("[nrf52] The MCUboot update failed:", err);
+      this._fail(this._failureOf(engine, err));
     } finally {
       if (this._abort === abort) this._abort = null;
     }
@@ -226,7 +228,9 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
       return this._localize("firmware.nrf_smp_ble_service_not_found");
     }
     if (engine.isSerialDeviceLost(err)) return this._localize("serial.device_lost");
-    if (err instanceof engine.SmpNoReplyError) {
+    // Only a device that never answered: one that stopped part way has the
+    // transport.
+    if (err instanceof engine.SmpNoReplyError && this._progress === 0) {
       return this._localize("web.nrf.update_no_reply");
     }
     return this._localize("web.nrf.install_error_flash", {
