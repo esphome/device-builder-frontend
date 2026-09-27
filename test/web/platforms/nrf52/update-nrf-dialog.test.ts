@@ -134,6 +134,23 @@ describe.each(TRANSPORTS)(
       expect(el._pending).toBe(false);
     });
 
+    it("does not start once the dialog closed under the chooser", async () => {
+      const el = await mountDialog();
+      let choose!: (picked: unknown) => void;
+      const chooser = new Promise((resolve) => (choose = resolve));
+      mocks.pickBleDevice.mockReturnValue(chooser);
+      mocks.requestSerialPort.mockReturnValue(chooser);
+
+      const update = el[run]();
+      el.open = false;
+      await el.updateComplete;
+      choose(target);
+      await update;
+
+      expect(flash).not.toHaveBeenCalled();
+      expect(el._state).toBe("idle");
+    });
+
     it("names a device that never answers as one without that transport", async () => {
       const el = await mountDialog();
       flash.mockRejectedValue(new SmpNoReplyError("SMP: no response from the device"));

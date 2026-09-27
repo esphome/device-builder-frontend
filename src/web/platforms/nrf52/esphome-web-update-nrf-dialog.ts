@@ -189,7 +189,10 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     } finally {
       this._pending = false;
     }
-    if (target === null || this._state !== "idle") return;
+    // A dialog closed under the chooser dropped the image it was opened for.
+    if (target === null || this._state !== "idle" || this._image.state !== prepared) {
+      return;
+    }
 
     this._logLines = [];
     this._progress = 0;
