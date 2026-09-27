@@ -1,4 +1,3 @@
-import { DeviceState } from "../../api/types/devices.js";
 import type {
   DeviceEventData,
   DeviceStateChangedEventData,
@@ -33,6 +32,7 @@ import type {
 } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { type RemoteBuildJobState } from "../../context/index.js";
+import { anchorOffline } from "../../util/device-status.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
@@ -80,7 +80,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       if (preferences && host._prefsWritesInFlight === 0) {
         applyPreferences(host, preferences);
       }
-      host._devices = devices;
+      host._devices = devices.map((d) => anchorOffline(d));
       host._importableDevices = importable;
       host._devicesLoaded = true;
       host._buildServerPeers = peers ?? null;
@@ -136,14 +136,14 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.DEVICE_ADDED: {
       const { device } = data as DeviceEventData;
       if (!host._devices.some((d) => d.configuration === device.configuration)) {
-        host._devices = [...host._devices, device];
+        host._devices = [...host._devices, anchorOffline(device)];
       }
       break;
     }
     case DeviceEventType.DEVICE_UPDATED: {
       const { device } = data as DeviceEventData;
       host._devices = host._devices.map((d) =>
-        d.configuration === device.configuration ? device : d
+        d.configuration === device.configuration ? anchorOffline(device) : d
       );
       break;
     }
@@ -157,10 +157,14 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.DEVICE_STATE_CHANGED: {
       // Narrow event stays flat on the wire; fold it into runtime_state.
       // New runtime_state object so Lit change detection sees the update.
-      const { configuration, state } = data as DeviceStateChangedEventData;
+      const { configuration, state, offline_seconds } =
+        data as DeviceStateChangedEventData;
       host._devices = host._devices.map((d) =>
         d.configuration === configuration
-          ? { ...d, runtime_state: { ...d.runtime_state, state: state as DeviceState } }
+          ? anchorOffline({
+              ...d,
+              runtime_state: { ...d.runtime_state, state, offline_seconds },
+            })
           : d
       );
       break;

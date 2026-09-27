@@ -46,12 +46,16 @@ function reachability(
 // the expiry summary/explainer args are observable. Anchor == NOW (frozen
 // clock) makes the rendered mDNS age exactly mdns_last_seen_seconds_ago.
 function renderCalls(
-  r: ReachabilityStateEvent,
-  deviceState: DeviceState = DeviceState.ONLINE
+  r: ReachabilityStateEvent | null,
+  deviceState: DeviceState = DeviceState.ONLINE,
+  device: { offline_since?: number | null; name_add_mac_suffix?: boolean } = {}
 ): Array<[string, Record<string, unknown> | undefined]> {
   const calls: Array<[string, Record<string, unknown> | undefined]> = [];
   const host = {
-    device: { runtime_state: { state: deviceState } },
+    device: {
+      name_add_mac_suffix: device.name_add_mac_suffix ?? false,
+      runtime_state: { state: deviceState, offline_since: device.offline_since ?? null },
+    },
     _reachability: r,
     _reachabilityAnchorMs: NOW,
     _localize: (key: string, args?: Record<string, unknown>) => {
@@ -112,5 +116,49 @@ describe("renderReachabilitySection — mDNS expiry wiring", () => {
   it("hides the countdown when no PTR lifetime is known", () => {
     const calls = renderCalls(reachability({ mdns_ptr_ttl_seconds: null }));
     expect(calls.some(([k]) => k === "dashboard.drawer_mdns_expires_in")).toBe(false);
+  });
+});
+
+describe("renderReachabilitySection - offline duration row", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const OFFLINE_SINCE = NOW / 1000 - 7200;
+  const hasRow = (calls: ReturnType<typeof renderCalls>) =>
+    calls.some(([k]) => k === "dashboard.drawer_offline_for");
+
+  it("shows for an offline device with a stamp", () => {
+    const calls = renderCalls(reachability(), DeviceState.OFFLINE, {
+      offline_since: OFFLINE_SINCE,
+    });
+    expect(hasRow(calls)).toBe(true);
+    expect(calls.some(([k]) => k === "dashboard.drawer_offline_for_tooltip")).toBe(true);
+  });
+
+  it("shows before any reachability snapshot has arrived", () => {
+    const calls = renderCalls(null, DeviceState.OFFLINE, {
+      offline_since: OFFLINE_SINCE,
+    });
+    expect(hasRow(calls)).toBe(true);
+    expect(calls.some(([k]) => k === "dashboard.drawer_waiting_for_signal")).toBe(false);
+  });
+
+  it("is absent without a stamp", () => {
+    expect(hasRow(renderCalls(reachability(), DeviceState.OFFLINE))).toBe(false);
+  });
+
+  it("is absent while the offline verdict is untracked", () => {
+    const calls = renderCalls(reachability(), DeviceState.OFFLINE, {
+      offline_since: OFFLINE_SINCE,
+      name_add_mac_suffix: true,
+    });
+    expect(hasRow(calls)).toBe(false);
+  });
+
+  it("renders nothing with no snapshot and no duration", () => {
+    expect(renderCalls(null, DeviceState.OFFLINE)).toEqual([]);
   });
 });

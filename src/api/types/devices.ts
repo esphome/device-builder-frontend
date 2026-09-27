@@ -33,6 +33,13 @@ export interface DeviceRuntimeState {
    *  the device is seen online. ``ip_addresses[0]`` matches the flat
    *  ``ip`` when populated. */
   ip_addresses: string[];
+  /** Seconds the device had been unreachable when this was sent; ``null``
+   *  while online or unknown. An age, so the server's clock is never
+   *  measured against the browser's. */
+  offline_seconds: number | null;
+  /** Not on the wire: ``offline_seconds`` anchored to the browser clock on
+   *  receipt, as epoch seconds (``anchorOffline``). */
+  offline_since?: number | null;
   deployed_version: string;
   /**
    * 8-char hex hash the running firmware reports via the

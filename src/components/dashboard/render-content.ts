@@ -144,6 +144,7 @@ export function renderCardGrid(
             ?name-add-mac-suffix=${device.name_add_mac_suffix === true}
             ?api-encrypted=${device.api_encrypted === true}
             .apiEncryptionActive=${rt.api_encryption_active}
+            .offlineSince=${rt.offline_since ?? null}
             ?queued-update=${rt.queued_update}
             ?busy=${host._activeJobs.has(device.configuration)}
             .activeJob=${host._activeJobs.get(device.configuration) ?? null}

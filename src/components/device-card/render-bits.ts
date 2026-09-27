@@ -1,10 +1,12 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
-import { isStatusUntracked } from "../../util/device-status.js";
+import { activeLocale } from "../../common/localize.js";
+import { isStatusUntracked, offlineSeconds } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
+import { formatDuration } from "../../util/relative-time.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
 // Busy-badge copy per active job type; anything else (upload, install,
@@ -125,6 +127,26 @@ export function renderEncryptionIcon(
     <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
+/** The pill's "Offline 2h" label, ``null`` when it shows no duration. */
+export function offlineDurationLabel(card: ESPHomeDeviceCard): string | null {
+  const seconds = offlineSeconds(card.state, card.nameAddMacSuffix, card.offlineSince);
+  if (seconds === null || jobBadgeShown(card)) return null;
+  return card._localize("dashboard.offline_for", {
+    duration: formatDuration(seconds, { language: activeLocale(), units: 1 }),
+  });
+}
+
+/** The finished job's status while its badge shows, else ``null``. */
+function finishedBadgeStatus(card: ESPHomeDeviceCard): JobStatus | null {
+  const status = card.recentJob?.status;
+  return status !== undefined && RECENT_JOB_ICON[status] ? status : null;
+}
+
+/** True while a busy or finished-job badge stands in for the status pill. */
+export function jobBadgeShown(card: ESPHomeDeviceCard): boolean {
+  return card.busy || finishedBadgeStatus(card) !== null;
+}
+
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   if (card.busy) {
     const labelKey =
@@ -141,15 +163,12 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       ${card._localize(labelKey)}
     </div>`;
   }
-  if (card.recentJob) {
-    const status = card.recentJob.status;
-    const icon = RECENT_JOB_ICON[status];
-    if (icon) {
-      return html`<div class="device-status ${RECENT_JOB_VARIANT[status]}">
-        <wa-icon library="mdi" name=${icon}></wa-icon>
-        ${card._localize(RECENT_JOB_LABEL[status])}
-      </div>`;
-    }
+  const finished = finishedBadgeStatus(card);
+  if (finished !== null) {
+    return html`<div class="device-status ${RECENT_JOB_VARIANT[finished]}">
+      <wa-icon library="mdi" name=${RECENT_JOB_ICON[finished]}></wa-icon>
+      ${card._localize(RECENT_JOB_LABEL[finished])}
+    </div>`;
   }
   // "No status" is the least self-explanatory state; clicking it opens
   // the dialog in explainer-only mode (the probe stays suppressed
@@ -198,7 +217,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     card.state === DeviceState.ONLINE
       ? card._localize("dashboard.online")
       : card.state === DeviceState.OFFLINE
-        ? card._localize("dashboard.offline")
+        ? (offlineDurationLabel(card) ?? card._localize("dashboard.offline"))
         : card._localize("dashboard.unknown");
   if (card.state !== DeviceState.ONLINE && !card.selectMode) {
     // Non-online badges open the troubleshooting dialog. Passive while

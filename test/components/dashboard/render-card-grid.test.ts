@@ -71,6 +71,20 @@ describe("renderCardGrid", () => {
     expect(card.hasAttribute("show-update")).toBe(true);
   });
 
+  it("binds the browser-anchored offline stamp onto the card", () => {
+    const stamped = renderCard(
+      makeConfiguredDevice({
+        runtime_state: { state: DeviceState.OFFLINE, offline_since: 1_800_000_000 },
+      })
+    ) as HTMLElement & { offlineSince: number | null };
+    expect(stamped.offlineSince).toBe(1_800_000_000);
+
+    const bare = renderCard(makeConfiguredDevice()) as HTMLElement & {
+      offlineSince: number | null;
+    };
+    expect(bare.offlineSince).toBeNull();
+  });
+
   it("binds the raw migration flag onto the card, ungated", () => {
     const shown = renderCard(makeConfiguredDevice({ migration_available: true }));
     expect(shown.hasAttribute("migration-available")).toBe(true);

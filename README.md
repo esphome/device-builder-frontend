@@ -93,14 +93,15 @@ python3 -m build --wheel
 
 ### Other scripts
 
-| Script               | Description                            |
-| -------------------- | -------------------------------------- |
-| `pnpm run lint`       | TypeScript type-check (`tsc --noEmit`) |
-| `pnpm test`           | Run the Vitest suite once              |
-| `pnpm run test:watch` | Run tests in watch mode                |
-| `pnpm run format`     | Format `src/` with Prettier            |
-| `pnpm run dev:web`    | ESPHome Web dev server (port 5174)     |
-| `pnpm run build:web`  | Build the standalone ESPHome Web site  |
+| Script                 | Description                             |
+| ---------------------- | --------------------------------------- |
+| `pnpm run lint`        | TypeScript type-check (`tsc --noEmit`)  |
+| `pnpm run lint:cycles` | Fail on runtime import cycles in `src/` |
+| `pnpm test`            | Run the Vitest suite once               |
+| `pnpm run test:watch`  | Run tests in watch mode                 |
+| `pnpm run format`      | Format `src/` with Prettier             |
+| `pnpm run dev:web`     | ESPHome Web dev server (port 5174)      |
+| `pnpm run build:web`   | Build the standalone ESPHome Web site   |
 
 ## ESPHome Web
 

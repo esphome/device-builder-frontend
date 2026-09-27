@@ -17,6 +17,7 @@
     "gen:languages": "node build-scripts/gen-language-manifest.cjs",
     "lint": "node build-scripts/gen-language-manifest.cjs && tsc --noEmit",
     "lint:eslint": "node build-scripts/gen-language-manifest.cjs && eslint src test --max-warnings=0",
+    "lint:cycles": "node build-scripts/check-import-cycles.cjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "vitest run",

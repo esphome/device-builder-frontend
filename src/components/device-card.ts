@@ -30,11 +30,13 @@ import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
+import { OfflineClockController } from "../util/offline-clock.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { busyActionLabel, updateActionTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
+  offlineDurationLabel,
   renderEncryptionIcon,
   renderLabels,
   renderMigrationDot,
@@ -75,6 +77,11 @@ export class ESPHomeDeviceCard extends LitElement {
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] =
     [];
+  @property({ attribute: false }) offlineSince: number | null = null;
+
+  protected readonly _offlineClock = new OfflineClockController(this, () =>
+    offlineDurationLabel(this)
+  );
 
   // Resolved against the catalog at render time so a recolor / rename in
   // another client repaints every card without per-card state.

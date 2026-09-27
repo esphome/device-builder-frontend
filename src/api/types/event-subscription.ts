@@ -276,6 +276,8 @@ export interface DeviceEventData {
 export interface DeviceStateChangedEventData {
   configuration: string;
   state: DeviceState;
+  /** Mirrors ``runtime_state.offline_seconds``. */
+  offline_seconds: number | null;
 }
 
 /** Data payload for importable_device_added events. */

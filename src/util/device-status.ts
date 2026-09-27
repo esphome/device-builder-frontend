@@ -13,6 +13,35 @@ export const isStatusUntracked = (
   nameAddMacSuffix: boolean
 ): boolean => nameAddMacSuffix && state !== DeviceState.ONLINE;
 
+/** Anchors the wire's `offline_seconds` to the browser clock on receipt, so
+ *  the duration ticks locally and clock skew with the server can't show. */
+export const anchorOffline = (
+  device: ConfiguredDevice,
+  nowMs = Date.now()
+): ConfiguredDevice => {
+  const age = device.runtime_state.offline_seconds;
+  return {
+    ...device,
+    runtime_state: {
+      ...device.runtime_state,
+      offline_since: age === null ? null : nowMs / 1000 - age,
+    },
+  };
+};
+
+/** Seconds offline, or `null` when no duration applies. */
+export const offlineSeconds = (
+  state: DeviceState,
+  nameAddMacSuffix: boolean,
+  offlineSince: number | null,
+  nowMs = Date.now()
+): number | null =>
+  state === DeviceState.OFFLINE &&
+  !isStatusUntracked(state, nameAddMacSuffix) &&
+  offlineSince !== null
+    ? nowMs / 1000 - offlineSince
+    : null;
+
 /** Facet bucket id for untracked devices (beside the `DeviceState` values). */
 export const UNTRACKED_STATE = "untracked";
 

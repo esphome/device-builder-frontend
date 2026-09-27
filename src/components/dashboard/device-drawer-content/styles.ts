@@ -60,6 +60,18 @@ export const deviceDrawerContentStyles = css`
     margin-bottom: 2px;
   }
 
+  .offline-for {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: help;
+  }
+
+  .offline-for wa-icon {
+    font-size: 14px;
+    color: var(--wa-color-text-quiet);
+  }
+
   .value {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);

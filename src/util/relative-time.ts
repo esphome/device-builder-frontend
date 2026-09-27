@@ -174,11 +174,30 @@ export function getNumberFormatter(
 }
 
 /**
+ * Whole calendar years in the *seconds* ending at *nowMs*, and the days
+ * left over. Counted from the start date, so leap years are exact; in UTC,
+ * so a DST shift can't shorten a day.
+ */
+function calendarYears(seconds: number, nowMs: number): { years: number; days: number } {
+  const startMs = nowMs - seconds * 1000;
+  const anniversaryMs = (years: number): number => {
+    const date = new Date(startMs);
+    return date.setUTCFullYear(date.getUTCFullYear() + years);
+  };
+  let years = new Date(nowMs).getUTCFullYear() - new Date(startMs).getUTCFullYear();
+  if (anniversaryMs(years) > nowMs) years--;
+  return { years, days: Math.floor((nowMs - anniversaryMs(years)) / 86_400_000) };
+}
+
+/**
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
- * (zero minutes dropped: ``1h``). The ``counter`` variant is for a live
- * ticking readout: seconds kept in the minute range (``4m 32s``) and
- * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
+ * / ``2d 3h`` / ``1y 35d`` (zero minor unit dropped: ``1h``, ``2d``,
+ * ``1y``; years are calendar years back from *nowMs*), or the leading
+ * unit alone with ``units: 1`` (``1h`` / ``2d`` / ``1y``). The ``counter``
+ * variant is for a live ticking readout: seconds kept in the minute range
+ * (``4m 32s``) and hour-range minutes zero-padded (``1h 05m``, stable width
+ * per minute tick).
  * Locale-aware digits via the shared number formatter; the unit letters
  * aren't localized. Negative input clamps to ``0s``.
  */
@@ -187,26 +206,36 @@ export function formatDuration(
   {
     variant = "compact",
     language,
-  }: { variant?: "counter" | "compact"; language?: string } = {}
+    nowMs = Date.now(),
+    units = 2,
+  }: {
+    variant?: "counter" | "compact";
+    language?: string;
+    nowMs?: number;
+    units?: 1 | 2;
+  } = {}
 ): string {
-  const counter = variant === "counter";
   const total = Math.max(0, Math.floor(seconds));
   const fmt = getNumberFormatter(language, 0);
   if (total < 60) return `${fmt.format(total)}s`;
-  if (total < 3600) {
-    const minutes = Math.floor(total / 60);
-    return counter
-      ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
-      : `${fmt.format(minutes)}m`;
-  }
-  const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  if (counter) {
-    return `${fmt.format(hours)}h ${getNumberFormatter(language, 0, 2).format(minutes)}m`;
+  if (variant === "counter") {
+    if (total < 3600) return `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`;
+    const padded = getNumberFormatter(language, 0, 2).format(minutes);
+    return `${fmt.format(Math.floor(total / 3600))}h ${padded}m`;
   }
-  return minutes > 0
-    ? `${fmt.format(hours)}h ${fmt.format(minutes)}m`
-    : `${fmt.format(hours)}h`;
+  const pair = (major: number, unit: string, minor: number, minorUnit: string) =>
+    units === 2 && minor > 0
+      ? `${fmt.format(major)}${unit} ${fmt.format(minor)}${minorUnit}`
+      : `${fmt.format(major)}${unit}`;
+  if (total < 3600) return `${fmt.format(minutes)}m`;
+  if (total < 86400) return pair(Math.floor(total / 3600), "h", minutes, "m");
+  // No calendar year is shorter than 365 days, so skip the date math below it.
+  if (total >= 365 * 86400) {
+    const { years, days } = calendarYears(total, nowMs);
+    if (years > 0) return pair(years, "y", days, "d");
+  }
+  return pair(Math.floor(total / 86400), "d", Math.floor((total % 86400) / 3600), "h");
 }
 
 /**
