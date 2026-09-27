@@ -35,6 +35,7 @@ export async function loadDfuPackage(
   try {
     engine = await loadDfuEngine();
   } catch (err) {
+    console.error("[nrf52] Could not load the parser chunk:", err);
     return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
   }
   try {

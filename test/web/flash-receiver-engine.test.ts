@@ -232,7 +232,7 @@ describe("esphome-web-flash-receiver engines", () => {
     engines.load.esp.mockRejectedValueOnce(offline).mockRejectedValueOnce(offline);
     const { el } = await handOff({ name: "fw.bin" }, false);
     expect((el as any)._state).toBe("error");
-    expect((el as any)._statusMessage).toBe("firmware.engine_load_failed");
+    expect((el as any)._statusMessage).toBe("web.install.tools_load_failed");
     expect(preparation(el)).toBe("retryable");
     expect(primaryButton(el).disabled).toBe(false);
     // The button says what the click does: it loads again, it does not install.

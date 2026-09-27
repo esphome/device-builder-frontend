@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { fakeHost } from "../../_fake-host.js";
-import { Preparation, type Prepared } from "../../../src/web/install/preparation.js";
+import {
+  parseFailureCopy,
+  Preparation,
+  type Prepared,
+} from "../../../src/web/install/preparation.js";
 
 function make(prepare: (input: string) => Promise<Prepared<string, string>>) {
   const host = fakeHost();
@@ -83,5 +87,21 @@ describe("Preparation", () => {
     await Promise.resolve();
     expect(preparation.state).toEqual({ kind: "idle" });
     expect(settled).toHaveBeenCalledOnce();
+  });
+});
+
+describe("parseFailureCopy", () => {
+  it("offers a retry for tools that did not load, without sending to a reload", () => {
+    expect(parseFailureCopy("firmware.engine_load_failed")).toEqual({
+      key: "web.install.tools_load_failed",
+      retryable: true,
+    });
+  });
+
+  it("keeps the line of a file that is not firmware, which no retry helps", () => {
+    expect(parseFailureCopy("firmware.rtl_bad_uf2")).toEqual({
+      key: "firmware.rtl_bad_uf2",
+      retryable: false,
+    });
   });
 });

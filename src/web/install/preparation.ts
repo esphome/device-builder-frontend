@@ -10,6 +10,21 @@ export type PreparationState<I, T> =
   /** A chunk the check needs did not load; the input is kept to try again. */
   | { kind: "retryable"; input: I };
 
+/** The line for tools that did not load, where Retry loads them again. */
+export const TOOLS_LOAD_FAILED = "web.install.tools_load_failed";
+
+/**
+ * The line and the retry of a parse that failed with ``key``. Tools that did
+ * not load can be loaded again with the same input, and their line must not
+ * send the user to reload the page, which would lose what was picked or
+ * handed over.
+ */
+export function parseFailureCopy(key: string): { key: string; retryable: boolean } {
+  return key === "firmware.engine_load_failed"
+    ? { key: TOOLS_LOAD_FAILED, retryable: true }
+    : { key, retryable: false };
+}
+
 /**
  * Gets something ready to install before the user clicks, where reading,
  * fetching a chunk or parsing is needed first. A device picker needs the
@@ -39,10 +54,11 @@ export class Preparation<I, T, F> {
   start(input: I): void {
     const generation = ++this._generation;
     this._set({ kind: "pending" });
-    const prepared = this._prepare(input).catch((err: unknown): Prepared<T, F> => ({
-      failure: this._failureOf(err),
-      retryable: false,
-    }));
+    const prepared = this._prepare(input).catch((err: unknown): Prepared<T, F> => {
+      // Shown as the input's failure, so a bug in the preparing is told apart here.
+      console.error("[preparation] The preparing was rejected:", err);
+      return { failure: this._failureOf(err), retryable: false };
+    });
     void prepared.then((result) => {
       if (generation !== this._generation) return;
       if ("value" in result) {

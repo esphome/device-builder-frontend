@@ -2032,6 +2032,7 @@
     },
     "install": {
       "preparing": "Preparing firmware…",
+      "tools_load_failed": "Could not load the flashing tools. Check your connection and retry.",
       "erasing": "Erasing device…",
       "done": "Installation complete",
       "unsupported_chip": "There's no ready-made ESPHome Web firmware for the {chip} (for example, chips without built-in Wi-Fi). Create a device in your ESPHome Device Builder and install it from there instead.",

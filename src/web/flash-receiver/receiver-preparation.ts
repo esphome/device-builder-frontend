@@ -1,7 +1,7 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import type { Prepared } from "../install/preparation.js";
+import { type Prepared, TOOLS_LOAD_FAILED } from "../install/preparation.js";
 import type { FlashPart } from "../platforms/esp/firmware-build.js";
 import type { HandoffFlasher } from "./protocol.js";
 import {
@@ -39,7 +39,7 @@ export async function prepareForReceiver(
     engine = await RECEIVER_ENGINES[input.flasher]();
   } catch (err) {
     console.error("[flash receiver] Could not load the engine chunk:", err);
-    return { failure: localize("firmware.engine_load_failed"), retryable: true };
+    return { failure: localize(TOOLS_LOAD_FAILED), retryable: true };
   }
   try {
     const plan = await engine.prepare(input.parts, input.erase, localize);

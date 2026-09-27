@@ -28,7 +28,11 @@ import {
   renderRetryButton,
 } from "../../install/install-progress.js";
 
-import { Preparation, type Prepared } from "../../install/preparation.js";
+import {
+  parseFailureCopy,
+  Preparation,
+  type Prepared,
+} from "../../install/preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -83,10 +87,8 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await loadAmbz2Image(bytes);
     if ("image" in parsed) return { value: parsed.image };
-    return {
-      failure: { title: this._localize(parsed.key), detail: parsed.detail },
-      retryable: parsed.key === "firmware.engine_load_failed",
-    };
+    const { key, retryable } = parseFailureCopy(parsed.key);
+    return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
   }
 
   private _onPrepared(failure: FilePickerError | null): void {

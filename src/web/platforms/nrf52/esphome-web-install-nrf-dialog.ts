@@ -32,7 +32,11 @@ import {
   renderRetryButton,
 } from "../../install/install-progress.js";
 
-import { Preparation, type Prepared } from "../../install/preparation.js";
+import {
+  parseFailureCopy,
+  Preparation,
+  type Prepared,
+} from "../../install/preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -82,10 +86,8 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     const bytes = await file.arrayBuffer();
     const parsed = await loadDfuPackage(new Uint8Array(bytes));
     if ("pkg" in parsed) return { value: parsed.pkg };
-    return {
-      failure: { title: this._localize(parsed.key), detail: parsed.detail },
-      retryable: parsed.key === "firmware.engine_load_failed",
-    };
+    const { key, retryable } = parseFailureCopy(parsed.key);
+    return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
   }
 
   private _onPrepared(failure: FilePickerError | null): void {

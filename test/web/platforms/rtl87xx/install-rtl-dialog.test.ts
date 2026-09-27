@@ -219,7 +219,7 @@ describe("esphome-web-install-rtl-dialog", () => {
     expect(pickerText(el)).toEqual({
       name: "firmware.uf2",
       status: "",
-      error: "firmware.engine_load_failed: Failed to fetch",
+      error: "web.install.tools_load_failed: Failed to fetch",
     });
     button(el, "command.retry").click();
     await vi.waitFor(() => expect(button(el, INSTALL)).toBeDefined());
