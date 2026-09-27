@@ -31,6 +31,9 @@ export interface LightDismissOptions {
  * binds only while active, so the click that opened the popover (whose
  * capture phase has already run by the time the host flips the flag)
  * can't self-dismiss it.
+ *
+ * A disconnect drops the listeners but keeps what the host asked for, so
+ * a host reconnected while still open is bound again.
  */
 export class LightDismissController extends ActiveListenerController {
   private readonly _escape: EscapeController;
