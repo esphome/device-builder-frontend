@@ -173,6 +173,34 @@ describe("readBootBanner", () => {
     ).not.toHaveBeenCalled();
   });
 
+  it("never finishes a reset pulse it started once the deadline has passed", async () => {
+    const { port, raw, signals } = fakePort([]);
+    let releaseFirst: () => void = () => {};
+    raw.setSignals.mockImplementationOnce((s: SerialOutputSignals) => {
+      signals.push(s);
+      return new Promise<void>((r) => (releaseFirst = r));
+    });
+    const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toThrow("Boot banner not read");
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+    releaseFirst();
+    await vi.advanceTimersByTimeAsync(10);
+    // Only the first line change happened; the release is esptool's to do.
+    expect(signals).toEqual([{ dataTerminalReady: false, requestToSend: true }]);
+  });
+
+  it("moves on, with a warning, when the teardown itself hangs", async () => {
+    const { port, raw } = fakePort([ESP32]);
+    raw.close.mockImplementation(() => new Promise<void>(() => {}));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const pending = readBootBanner(port);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await pending).toEqual({ platform: "esp" });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("did not close"));
+    warn.mockRestore();
+  });
+
   it("rejects when the port will not open", async () => {
     const { port, raw } = fakePort([]);
     raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));

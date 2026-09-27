@@ -316,10 +316,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return;
     }
     this._applyDetection(landing.preset);
-    // Nothing to narrow to (an unknown device, or a board the banner named
-    // that the catalog lacks): say so rather than look like nothing happened.
+    // Nothing to narrow to: say which kind of nothing, rather than look like
+    // nothing happened. A board that named itself but is not in the catalog
+    // is a different story from a device we could not tell at all.
     if (!landing.preset) {
-      this._detectError = this._localize("wizard.connect_your_board_unrecognized");
+      const named = detection.kind === "named" ? detection.board : undefined;
+      this._detectError = named
+        ? this._localize("wizard.connect_your_board_unknown_catalog_board", {
+            board: named,
+          })
+        : this._localize("wizard.connect_your_board_unrecognized");
     }
     void this._fetchBoards();
   }

@@ -147,7 +147,7 @@ describe("wizard-step-board WebSerial detect errors", () => {
     await el.updateComplete;
     warn.mockRestore();
 
-    expect(detectError(el)?.textContent).toContain("Could not tell which board this is");
+    expect(detectError(el)?.textContent).toContain('calls itself "some-new-kit"');
     expect(esptool.connectToPort).not.toHaveBeenCalled();
   });
 });
